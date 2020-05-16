@@ -1,0 +1,2 @@
+# microNomicon
+A minimal Nomicon
