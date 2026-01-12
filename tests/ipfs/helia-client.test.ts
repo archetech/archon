@@ -1,6 +1,7 @@
 import mockFs from 'mock-fs';
 import HeliaClient from '@didcid/ipfs/helia';
 import { ExpectedExceptionError } from '@didcid/common/errors';
+import { generateCID } from '@didcid/ipfs/utils';
 
 describe('start', () => {
     it('should ignore a second call to start', async () => {
@@ -20,9 +21,9 @@ describe('stop', () => {
 
 describe('addJSON', () => {
     const data = { key: 'mock' };
-    const hash = 'z3v8AuaXiw9ZVBhPuQdTJySePBjwpBtvsSCRLXuPLzwqokHV8cS';
 
     it('should create CID from data', async () => {
+        const hash = await generateCID(data);
         const ipfs = await HeliaClient.create();
         const cid = await ipfs.addJSON(data);
         await ipfs.stop();
@@ -31,6 +32,7 @@ describe('addJSON', () => {
     });
 
     it('should create CID from data without using helia', async () => {
+        const hash = await generateCID(data);
         const ipfs = await HeliaClient.create({ minimal: true });
         const cid = await ipfs.addJSON(data);
 
@@ -38,6 +40,7 @@ describe('addJSON', () => {
     });
 
     it('should create CID from data with fs blockstore', async () => {
+        const hash = await generateCID(data);
         mockFs({});
         const ipfs = await HeliaClient.create({ datadir: 'ipfs' });
         const cid = await ipfs.addJSON(data);
@@ -90,9 +93,9 @@ describe('getJSON', () => {
 
 describe('addText', () => {
     const mockData = 'mock text data';
-    const hash = 'zb2rhgNGdyFtViUWRk4oYLGrwdkgbt4GnF2s15k3ZujX6w3QW';
 
     it('should create CID from text data', async () => {
+        const hash = await generateCID(mockData);
         const ipfs = await HeliaClient.create();
         const cid = await ipfs.addText(mockData);
         await ipfs.stop();
@@ -101,6 +104,7 @@ describe('addText', () => {
     });
 
     it('should create CID from text data without using helia', async () => {
+        const hash = await generateCID(mockData);
         const ipfs = await HeliaClient.create({ minimal: true });
         const cid = await ipfs.addText(mockData);
 
@@ -108,6 +112,7 @@ describe('addText', () => {
     });
 
     it('should create CID from text data with fs blockstore', async () => {
+        const hash = await generateCID(mockData);
         mockFs({});
         const ipfs = await HeliaClient.create({ datadir: 'ipfs' });
         const cid = await ipfs.addText(mockData);
@@ -158,9 +163,9 @@ describe('getText', () => {
 
 describe('addData', () => {
     const mockData = Buffer.from('mock data');
-    const hash = 'zb2rhYuMKCR7pY51Tzv52NmTW9zYU2P53XFUJitvDwtSpCDhd';
 
     it('should create CID from text data', async () => {
+        const hash = await generateCID(mockData);
         const ipfs = await HeliaClient.create();
         const cid = await ipfs.addData(mockData);
         await ipfs.stop();
@@ -169,6 +174,7 @@ describe('addData', () => {
     });
 
     it('should create CID from text data without using helia', async () => {
+        const hash = await generateCID(mockData);
         const ipfs = await HeliaClient.create({ minimal: true });
         const cid = await ipfs.addData(mockData);
 
@@ -176,6 +182,7 @@ describe('addData', () => {
     });
 
     it('should create CID from text data with fs blockstore', async () => {
+        const hash = await generateCID(mockData);
         mockFs({});
         const ipfs = await HeliaClient.create({ datadir: 'ipfs' });
         const cid = await ipfs.addData(mockData);

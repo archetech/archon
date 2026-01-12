@@ -1593,7 +1593,7 @@ v1router.post('/events/process', async (req, res) => {
  *     responses:
  *       200:
  *         description: >
- *           A CID (Content Identifier) for the added JSON object in base58btc format
+ *           A CID (Content Identifier) for the added JSON object in standard CID v1 base32 format
  *         content:
  *           text/plain:
  *             schema:
@@ -1674,7 +1674,7 @@ v1router.get('/cas/json/:cid', async (req, res) => {
  *     responses:
  *       200:
  *         description: >
- *           A CID (Content Identifier) for the added text in base58btc format
+ *           A CID (Content Identifier) for the added text in standard CID v1 base32 format
  *         content:
  *           text/plain:
  *             schema:
@@ -1756,7 +1756,7 @@ v1router.get('/cas/text/:cid', async (req, res) => {
  *     responses:
  *       200:
  *         description: >
- *           A CID (Content Identifier) for the added data in base58btc format
+ *           A CID (Content Identifier) for the added data in standard CID v1 base32 format
  *         content:
  *           text/plain:
  *             schema:

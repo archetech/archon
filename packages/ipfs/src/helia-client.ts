@@ -3,7 +3,6 @@ import { json, JSON } from '@helia/json';
 import { unixfs, UnixFS } from '@helia/unixfs';
 import { FsBlockstore } from 'blockstore-fs';
 import { CID } from 'multiformats';
-import { base58btc } from 'multiformats/bases/base58';
 import * as jsonCodec from 'multiformats/codecs/json';
 import * as rawCodec from 'multiformats/codecs/raw';
 import * as sha256 from 'multiformats/hashes/sha2';
@@ -45,7 +44,7 @@ async function generateCID(data: any): Promise<string> {
     const hash = await sha256.sha256.digest(buf);
     const cid = CID.createV1(code, hash);
 
-    return cid.toString(base58btc);
+    return cid.toString(); // CID v1 default: base32 encoding
 }
 
 class HeliaClient implements IPFSClient {
@@ -92,7 +91,7 @@ class HeliaClient implements IPFSClient {
     public async addJSON(data: any): Promise<string> {
         if (this.ipfs) {
             const cid = await this.ipfs.add(data);
-            return cid.toString(base58btc);
+            return cid.toString(); // CID v1 default: base32 encoding
         }
 
         return generateCID(data);
@@ -111,7 +110,7 @@ class HeliaClient implements IPFSClient {
         if (this.unixfs) {
             const buf = new TextEncoder().encode(data);
             const cid = await this.unixfs.addBytes(buf);
-            return cid.toString(base58btc);
+            return cid.toString(); // CID v1 default: base32 encoding
         }
 
         return generateCID(data);
@@ -134,7 +133,7 @@ class HeliaClient implements IPFSClient {
     public async addData(data: Buffer): Promise<string> {
         if (this.unixfs) {
             const cid = await this.unixfs.addBytes(data);
-            return cid.toString(base58btc);
+            return cid.toString(); // CID v1 default: base32 encoding
         }
 
         return generateCID(data);

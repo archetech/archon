@@ -3,6 +3,7 @@ import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
+import { generateCID } from '@didcid/ipfs/utils';
 
 const mockConsole = {
     log: (): void => { },
@@ -29,9 +30,9 @@ beforeEach(async () => {
 
 describe('addJSON', () => {
     const data = { key: 'mock' };
-    const hash = 'z3v8AuaXiw9ZVBhPuQdTJySePBjwpBtvsSCRLXuPLzwqokHV8cS';
 
     it('should create CID from data', async () => {
+        const hash = await generateCID(data);
         const cid = await gatekeeper.addJSON(data);
 
         expect(cid).toBe(hash);
@@ -51,9 +52,9 @@ describe('getJSON', () => {
 
 describe('addText', () => {
     const mockData = 'mock text data';
-    const hash = 'zb2rhgNGdyFtViUWRk4oYLGrwdkgbt4GnF2s15k3ZujX6w3QW';
 
     it('should create CID from text data', async () => {
+        const hash = await generateCID(mockData);
         const cid = await gatekeeper.addText(mockData);
 
         expect(cid).toBe(hash);
@@ -73,9 +74,9 @@ describe('getText', () => {
 
 describe('addData', () => {
     const mockData = Buffer.from('mock data');
-    const hash = 'zb2rhYuMKCR7pY51Tzv52NmTW9zYU2P53XFUJitvDwtSpCDhd';
 
     it('should create CID from text data', async () => {
+        const hash = await generateCID(mockData);
         const cid = await gatekeeper.addData(mockData);
 
         expect(cid).toBe(hash);

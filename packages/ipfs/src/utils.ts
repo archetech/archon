@@ -1,5 +1,4 @@
 import { CID } from 'multiformats';
-import { base58btc } from 'multiformats/bases/base58';
 import * as jsonCodec from 'multiformats/codecs/json';
 import * as rawCodec from 'multiformats/codecs/raw';
 import * as sha256 from 'multiformats/hashes/sha2';
@@ -51,6 +50,6 @@ export async function generateCID(data: any): Promise<string> {
 
     const hash = await sha256.sha256.digest(buf);
     const cid = CID.createV1(code, hash);
-    
-    return cid.toString(base58btc);
+
+    return cid.toString(); // CID v1 default: base32 encoding
 }

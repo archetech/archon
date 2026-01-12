@@ -1,0 +1,1 @@
+./start-node redis ipfs gatekeeper keymaster hypr-mediator cli

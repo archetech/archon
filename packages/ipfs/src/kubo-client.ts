@@ -1,7 +1,6 @@
 
 import { create, KuboRPCClient } from 'kubo-rpc-client'
 import { CID } from 'multiformats/cid';
-import { base58btc } from 'multiformats/bases/base58';
 import * as jsonCodec from 'multiformats/codecs/json';
 import * as sha256 from 'multiformats/hashes/sha2';
 import ip from 'ip';
@@ -88,7 +87,7 @@ class KuboClient implements IPFSClient {
 
     async addText(text: string): Promise<string> {
         const { cid } = await this.ipfs.add(text, { cidVersion: 1 });
-        return cid.toString(base58btc);
+        return cid.toString(); // CID v1 default: base32 encoding
     }
 
     async getText(cid: string): Promise<string> {
@@ -102,7 +101,7 @@ class KuboClient implements IPFSClient {
 
     async addData(data: Buffer): Promise<string> {
         const { cid } = await this.ipfs.add(data, { cidVersion: 1 });
-        return cid.toString(base58btc);
+        return cid.toString(); // CID v1 default: base32 encoding
     }
 
     async getData(cid: string): Promise<Buffer> {
@@ -122,7 +121,7 @@ class KuboClient implements IPFSClient {
         // !!! No need to await since we pre-generated the cid?
         await this.ipfs.block.put(buf, { cid });
 
-        return cid.toString(base58btc);
+        return cid.toString(); // CID v1 default: base32 encoding
     }
 
     async getJSON(cid: string): Promise<any> {

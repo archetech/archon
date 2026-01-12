@@ -1,4 +1,4 @@
-# Archon DID Scheme
+# Archon (did:cid) DID Scheme
 
 
 ## Abstract
@@ -17,12 +17,12 @@ Archon DIDs have the following format:
 archon-did        = "did:cid:" archon-identifier
                    [ ";" did-service ] [ "/" did-path ]
                    [ "?" did-query ] [ "#" did-fragment ]
-archon-identifier = CID encoded with base58btc
+archon-identifier = CID v1 in standard base32 encoding
 ```
 
 ### Example: Archon DID
 
-`did:cid:z3v8AuaYnnFwgRFgkQWnYca2wbvcWN8sa94BfnoJtqbphdTREc6`
+`did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m`
 
 ## DID Lifecycle
 
@@ -87,7 +87,7 @@ Upon receiving the operation the Archon node must:
 1. Apply JSON canonicalization scheme to the operation.
 1. Pin the seed object to the CAS (e.g. IPFS).
 
-The resulting content address (CID for IPFS) in base58btc encoding is used as the Archon DID suffix. For example the operation above corresponds to CID "z3v8AuaWjjt2tN9HHtQf8Au9ARZ25zzjkmWmkfVvYDaoM3xcnUP" (in base58btc encoding) yielding the Archon DID `did:cid:z3v8AuaWjjt2tN9HHtQf8Au9ARZ25zzjkmWmkfVvYDaoM3xcnUP`.
+The resulting content address (CID for IPFS) in standard CID v1 base32 encoding is used as the Archon DID suffix. For example the operation above corresponds to CID "bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe" yielding the Archon DID `did:cid:bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe`.
 
 ### Assets
 

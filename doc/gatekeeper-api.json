@@ -371,7 +371,7 @@
                     {
                       "type": "string",
                       "description": "A DID string (when a create operation succeeds).",
-                      "example": "did:cid:z3v8AuahvBGDMXvCTWedYbxnH6C9ZrsEtEJAvip2XPzcZb8yo6A"
+                      "example": "did:cid:bafkreicdwgtc6qf5zdoqyxsyqx6bvxi5rjzk2xjjznb3lxjvxqkdsmbpre"
                     },
                     {
                       "type": "boolean",
@@ -1812,12 +1812,12 @@
         },
         "responses": {
           "200": {
-            "description": "A CID (Content Identifier) for the added JSON object in base58btc format\n",
+            "description": "A CID (Content Identifier) for the added JSON object in standard CID v1 base32 format\n",
             "content": {
               "text/plain": {
                 "schema": {
                   "type": "string",
-                  "example": "z3v8AuahvBGDMXvCTWedYbxnH6C9ZrsEtEJAvip2XPzcZb8yo6A"
+                  "example": "bafkreicdwgtc6qf5zdoqyxsyqx6bvxi5rjzk2xjjznb3lxjvxqkdsmbpre"
                 }
               }
             }
@@ -1900,7 +1900,7 @@
         },
         "responses": {
           "200": {
-            "description": "A CID (Content Identifier) for the added text in base58btc format\n",
+            "description": "A CID (Content Identifier) for the added text in standard CID v1 base32 format\n",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1989,7 +1989,7 @@
         },
         "responses": {
           "200": {
-            "description": "A CID (Content Identifier) for the added data in base58btc format\n",
+            "description": "A CID (Content Identifier) for the added data in standard CID v1 base32 format\n",
             "content": {
               "text/plain": {
                 "schema": {
