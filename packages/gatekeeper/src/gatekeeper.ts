@@ -78,7 +78,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         this.isProcessingEvents = false;
         this.ipfs = options.ipfs;
         this.cipher = new CipherNode();
-        this.didPrefix = options.didPrefix || 'did:test';
+        this.didPrefix = options.didPrefix || 'did:cid';
         this.maxOpBytes = options.maxOpBytes || 64 * 1024; // 64KB
         this.maxQueueSize = options.maxQueueSize || 100;
 
@@ -732,7 +732,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     throw new InvalidOperationError('signature');
                 }
 
-                // TEMP during did:test, operation.previd is optional
+                // TEMP during did:cid, operation.previd is optional
                 if (operation.previd && operation.previd !== doc.didDocumentMetadata?.versionId) {
                     throw new InvalidOperationError('previd');
                 }
@@ -965,7 +965,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                         return ImportStatus.ADDED;
                     }
 
-                    // TEMP during did:test, operation.previd is optional
+                    // TEMP during did:cid, operation.previd is optional
                     if (!event.operation.previd) {
                         await this.db.addEvent(did, event);
                         return ImportStatus.ADDED;

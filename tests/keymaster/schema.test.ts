@@ -121,7 +121,7 @@ describe('getSchema', () => {
         expect(schema).toBeNull();
     });
 
-    it('should return the old style schema (TEMP during did:test)', async () => {
+    it('should return the old style schema (TEMP during did:cid)', async () => {
         await keymaster.createId('Bob');
         const did = await keymaster.createAsset(mockSchema);
         const schema = await keymaster.getSchema(did);

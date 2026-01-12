@@ -231,7 +231,7 @@ describe('testPoll', () => {
         isPoll = await keymaster.testPoll(100);
         expect(isPoll).toBe(false);
 
-        isPoll = await keymaster.testPoll('did:test:mock');
+        isPoll = await keymaster.testPoll('did:cid:mock');
         expect(isPoll).toBe(false);
     });
 });
@@ -249,7 +249,7 @@ describe('listPolls', () => {
         const poll3 = await keymaster.createPoll(template);
         const schema1 = await keymaster.createSchema();
         // add a bogus DID to trigger the exception case
-        await keymaster.addToOwned('did:test:mock');
+        await keymaster.addToOwned('did:cid:mock');
 
         const polls = await keymaster.listPolls();
 
@@ -281,7 +281,7 @@ describe('getPoll', () => {
         expect(poll).toBeNull();
     });
 
-    it('should return old style poll (TEMP during did:test)', async () => {
+    it('should return old style poll (TEMP during did:cid)', async () => {
         await keymaster.createId('Bob');
         const rosterDid = await keymaster.createGroup('mockRoster');
         const template = await keymaster.pollTemplate();

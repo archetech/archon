@@ -650,7 +650,7 @@ describe('getGroup', () => {
         expect(group).toBeNull();
     });
 
-    it('should return old style group (TEMP during did:test)', async () => {
+    it('should return old style group (TEMP during did:cid)', async () => {
         await keymaster.createId('Bob');
         const oldGroup = {
             name: 'mock',
@@ -691,7 +691,7 @@ describe('listGroups', () => {
         const group3 = await keymaster.createGroup('mock-3');
         const schema1 = await keymaster.createSchema();
         // add a bogus DID to trigger the exception case
-        await keymaster.addToOwned('did:test:mock53');
+        await keymaster.addToOwned('did:cid:mock53');
 
         const groups = await keymaster.listGroups();
 

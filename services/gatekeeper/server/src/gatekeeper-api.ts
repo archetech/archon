@@ -425,7 +425,7 @@ v1router.post('/did', async (req, res) => {
  *                   prefix:
  *                     type: string
  *                     description: Optional DID prefix override. If omitted, server default is used.
- *                     example: did:test
+ *                     example: did:cid
  *                   validUntil:
  *                     type: string
  *                     format: date-time

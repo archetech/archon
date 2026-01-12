@@ -12,6 +12,6 @@ Operations come from Keymaster clients such as end-user wallets and network medi
 | ------------------------------- | ---------| ---------------------------------------------------------------------- |
 | `ARCHON_GATEKEEPER_PORT`            | 4224     | Service port                                                           |
 | `ARCHON_GATEKEEPER_DB`              | redis    | DID database adapter, must be `redis`, `json`, `mongodb`, or `sqlite`  |
-| `ARCHON_GATEKEEPER_DID_PREFIX`      | did:test | Default prefix assigned to DIDs created                                |
+| `ARCHON_GATEKEEPER_DID_PREFIX`      | did:cid | Default prefix assigned to DIDs created                                |
 | `ARCHON_GATEKEEPER_GC_INTERVAL`     | 15       | The number of minutes between garbage collection cycles (0 to disable) |
 | `ARCHON_GATEKEEPER_STATUS_INTERVAL` |  5       | The number of minutes between logging status updates (0 to disable)    |

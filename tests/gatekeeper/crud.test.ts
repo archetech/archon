@@ -37,7 +37,7 @@ describe('createDID', () => {
 
         const did = await gatekeeper.createDID(agentOp);
 
-        expect(did.startsWith('did:test:')).toBe(true);
+        expect(did.startsWith('did:cid:')).toBe(true);
     });
 
     it('should create DID for local registry', async () => {
@@ -46,7 +46,7 @@ describe('createDID', () => {
 
         const did = await gatekeeper.createDID(agentOp);
 
-        expect(did.startsWith('did:test:')).toBe(true);
+        expect(did.startsWith('did:cid:')).toBe(true);
     });
 
     it('should throw exception on invalid version', async () => {
@@ -192,7 +192,7 @@ describe('createDID', () => {
 
         const did = await gatekeeper.createDID(assetOp);
 
-        expect(did.startsWith('did:test:')).toBe(true);
+        expect(did.startsWith('did:cid:')).toBe(true);
     });
 
     it('should throw exception on invalid create asset operation', async () => {
@@ -603,11 +603,11 @@ describe('resolveDID', () => {
         await checkForInvalidDidError([1, 2, 3]);
         await checkForInvalidDidError({});
         await checkForInvalidDidError({ mock: 1 });
-        await checkForInvalidDidError('did:test:xxx');
+        await checkForInvalidDidError('did:cid:xxx');
     });
 
     it('should return notFound error for missing DID', async () => {
-        const { didResolutionMetadata } = await gatekeeper.resolveDID('did:test:z3v8Auah2NPDigFc3qKx183QKL6vY8fJYQk6NeLz7KF2RFtC9c8');
+        const { didResolutionMetadata } = await gatekeeper.resolveDID('did:cid:z3v8Auah2NPDigFc3qKx183QKL6vY8fJYQk6NeLz7KF2RFtC9c8');
         expect(didResolutionMetadata).toBeDefined();
         expect(didResolutionMetadata!.error).toBe('notFound');
     });

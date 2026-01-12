@@ -219,7 +219,7 @@ describe('unpublishCredential', () => {
         await keymaster.createId('Bob');
 
         try {
-            await keymaster.unpublishCredential('did:test:mock49');
+            await keymaster.unpublishCredential('did:cid:mock49');
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

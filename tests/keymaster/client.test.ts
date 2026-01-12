@@ -61,13 +61,13 @@ const mockCredential = {
     "type": [
         "VerifiableCredential",
         // eslint-disable-next-line sonarjs/no-duplicate-string
-        "did:test:z3v8AuacbUAvrNRex7q3dm2HJU5hQSpSp7YEcaCUcX1vhCfk5EY"
+        "did:cid:z3v8AuacbUAvrNRex7q3dm2HJU5hQSpSp7YEcaCUcX1vhCfk5EY"
     ],
     // eslint-disable-next-line sonarjs/no-duplicate-string
-    "issuer": "did:test:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe",
+    "issuer": "did:cid:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe",
     "validFrom": "2025-03-28T10:57:47.055Z",
     "credentialSubject": {
-        "id": "did:test:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe"
+        "id": "did:cid:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe"
     },
     "credential": {
         "email": "TBD"
@@ -1756,8 +1756,8 @@ describe('testAgent', () => {
 });
 
 describe('bindCredential', () => {
-    const credentialDID = 'did:test:z3v8AuacbUAvrNRex7q3dm2HJU5hQSpSp7YEcaCUcX1vhCfk5EY';
-    const userDID = 'did:test:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe';
+    const credentialDID = 'did:cid:z3v8AuacbUAvrNRex7q3dm2HJU5hQSpSp7YEcaCUcX1vhCfk5EY';
+    const userDID = 'did:cid:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe';
 
     it('should bind credential', async () => {
         nock(KeymasterURL)
@@ -1796,12 +1796,12 @@ describe('issueCredential', () => {
         ],
         "type": [
             "VerifiableCredential",
-            "did:test:z3v8AuacbUAvrNRex7q3dm2HJU5hQSpSp7YEcaCUcX1vhCfk5EY"
+            "did:cid:z3v8AuacbUAvrNRex7q3dm2HJU5hQSpSp7YEcaCUcX1vhCfk5EY"
         ],
-        "issuer": "did:test:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe",
+        "issuer": "did:cid:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe",
         "validFrom": "2025-03-28T10:57:47.055Z",
         "credentialSubject": {
-            "id": "did:test:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe"
+            "id": "did:cid:z3v8AuaUaK93ip2KsM5KGsWXWqgXFSNQxRkcMReXe4LheX5CkHe"
         },
         "credential": {
             "email": "TBD"
@@ -2321,7 +2321,7 @@ describe('votePoll', () => {
 });
 
 describe('updatePoll', () => {
-    const mockBallot = "did:test:z3v8AuaZUTzAPHj4oUwYqjHuhBr9HczoLsfT4hZtx4iBkpsFKbL";
+    const mockBallot = "did:cid:z3v8AuaZUTzAPHj4oUwYqjHuhBr9HczoLsfT4hZtx4iBkpsFKbL";
 
     it('should update poll', async () => {
         nock(KeymasterURL)

@@ -48,12 +48,12 @@ const MOCK_WALLET_V0_WITH_IDS: WalletFile = {
     "counter": 2,
     "ids": {
         "id_1": {
-            "did": "did:test:z3v8AuakAd5R7WeGZUin2TtsqyxJPxouLfMEbpn5CmaNXChWq7r",
+            "did": "did:cid:z3v8AuakAd5R7WeGZUin2TtsqyxJPxouLfMEbpn5CmaNXChWq7r",
             "account": 0,
             "index": 0
         },
         "id_2": {
-            "did": "did:test:z3v8AuaiAYJ263LLYdApaUmGjy8Dnhx46LU1YDUvGHAcj9Ykgxg",
+            "did": "did:cid:z3v8AuaiAYJ263LLYdApaUmGjy8Dnhx46LU1YDUvGHAcj9Ykgxg",
             "account": 1,
             "index": 0
         }
@@ -733,8 +733,8 @@ describe('checkWallet', () => {
 
     it('should detect invalid DIDs', async () => {
         await keymaster.createId('Alice');
-        await keymaster.addToOwned('did:test:mock1');
-        await keymaster.addToHeld('did:test:mock2');
+        await keymaster.addToOwned('did:cid:mock1');
+        await keymaster.addToHeld('did:cid:mock2');
 
         const { checked, invalid, deleted } = await keymaster.checkWallet();
 
@@ -806,8 +806,8 @@ describe('fixWallet', () => {
 
     it('should remove invalid DIDs', async () => {
         await keymaster.createId('Alice');
-        await keymaster.addToOwned('did:test:mock1');
-        await keymaster.addToHeld('did:test:mock2');
+        await keymaster.addToOwned('did:cid:mock1');
+        await keymaster.addToHeld('did:cid:mock2');
 
         const { idsRemoved, ownedRemoved, heldRemoved, namesRemoved } = await keymaster.fixWallet();
 
@@ -836,7 +836,7 @@ describe('fixWallet', () => {
 describe('WalletEncrypted', () => {
     it('returns the plain wallet when base wallet is not encrypted', async () => {
         const base = new WalletJsonMemory();
-        const plain: WalletFile = { seed: {} as Seed, counter: 42, ids: {}, names: { foo: 'did:test:abc' } };
+        const plain: WalletFile = { seed: {} as Seed, counter: 42, ids: {}, names: { foo: 'did:cid:abc' } };
         await base.saveWallet(plain, true);
         const wrapped = new WalletEncrypted(base, PASSPHRASE);
         const loaded = await wrapped.loadWallet();

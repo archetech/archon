@@ -2154,7 +2154,7 @@ export default class Keymaster implements KeymasterInterface {
             return null;
         }
 
-        // TEMP during did:test, return old version groups
+        // TEMP during did:cid, return old version groups
         const castOldAsset = asset as Group;
         if (castOldAsset.members) {
             return castOldAsset;
@@ -2347,7 +2347,7 @@ export default class Keymaster implements KeymasterInterface {
             return null;
         }
 
-        // TEMP during did:test, return old version schemas
+        // TEMP during did:cid, return old version schemas
         const castOldAsset = asset as { properties?: unknown };
         if (castOldAsset.properties) {
             return asset;
@@ -2492,7 +2492,7 @@ export default class Keymaster implements KeymasterInterface {
     async getPoll(id: string): Promise<Poll | null> {
         const asset = await this.resolveAsset(id);
 
-        // TEMP during did:test, return old version poll
+        // TEMP during did:cid, return old version poll
         const castOldAsset = asset as Poll;
         if (castOldAsset.options) {
             return castOldAsset;

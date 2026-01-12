@@ -6,7 +6,7 @@ const config = {
     port: process.env.ARCHON_GATEKEEPER_PORT ? parseInt(process.env.ARCHON_GATEKEEPER_PORT) : 4224,
     db: process.env.ARCHON_GATEKEEPER_DB || 'redis',
     ipfsURL: process.env.ARCHON_IPFS_URL || 'http://localhost:5001/api/v0',
-    didPrefix: process.env.ARCHON_GATEKEEPER_DID_PREFIX || 'did:test',
+    didPrefix: process.env.ARCHON_GATEKEEPER_DID_PREFIX || 'did:cid',
     registries: process.env.ARCHON_GATEKEEPER_REGISTRIES ? process.env.ARCHON_GATEKEEPER_REGISTRIES.split(',') : undefined,
     jsonLimit: process.env.ARCHON_GATEKEEPER_JSON_LIMIT || '4mb',
     gcInterval: process.env.ARCHON_GATEKEEPER_GC_INTERVAL ? parseInt(process.env.ARCHON_GATEKEEPER_GC_INTERVAL) : 15,

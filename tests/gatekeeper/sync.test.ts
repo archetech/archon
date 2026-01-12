@@ -179,7 +179,7 @@ describe('removeDIDs', () => {
     });
 
     it('should return true if unknown DIDs specified', async () => {
-        const ok = await gatekeeper.removeDIDs(['did:test:mock']);
+        const ok = await gatekeeper.removeDIDs(['did:cid:mock']);
         expect(ok).toBe(true);
     });
 });

@@ -67,7 +67,7 @@ describe('generateDID', () => {
         };
         const did = await gatekeeper.generateDID(mockTxn);
 
-        expect(did.startsWith('did:test:')).toBe(true);
+        expect(did.startsWith('did:cid:')).toBe(true);
     });
 
     it('should create DID from operation with configured prefix', async () => {
@@ -514,7 +514,7 @@ describe('gatekeeper.db', () => {
 
     it('getEvents should return empty list on malformed DID with no suffix', async () => {
         // @ts-expect-error Testing invalid DID
-        const events = await gatekeeper.db.getEvents("did:test:");
+        const events = await gatekeeper.db.getEvents("did:cid:");
 
         expect(events).toStrictEqual([]);
     });

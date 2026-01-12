@@ -22,7 +22,7 @@ spawn bash kc create-id -r local "$random_value"
 
 # Look for the specific DID pattern
 expect {
-    -re "(did:test:\[a-zA-Z0-9]+)" {
+    -re "(did:cid:\[a-zA-Z0-9]+)" {
         set captured_did $expect_out(1,string)
         puts "\n✅ Captured DID: $captured_did"
     }
@@ -45,7 +45,7 @@ if {$captured_did eq ""} {
 # Use the captured value in another function call
 spawn bash kc backup-id
 
-# Expect the output to match a string like did:test followed by some characters (e.g., did:test12345)
+# Expect the output to match a string like did:cid followed by some characters (e.g., did:cid12345)
 expect {
     "OK" { 
         puts "\n✅  OK Matched! ID backed up"

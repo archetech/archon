@@ -32,7 +32,7 @@ const db_redis = new DbRedis('archon-test');
 await db_redis.start();
 
 const gatekeeper = new Gatekeeper({ db: db_redis });
-const did = 'did:test:z3v8AuaTV5VKcT9MJoSHkSTRLpXDoqcgqiKkwGBNSV4nVzb6kLk';
+const did = 'did:cid:z3v8AuaTV5VKcT9MJoSHkSTRLpXDoqcgqiKkwGBNSV4nVzb6kLk';
 const docs = await gatekeeper.resolveDID(did);
 console.log(JSON.stringify(docs, null, 4));
 ```
@@ -59,7 +59,7 @@ await gatekeeper.connect({
     becomeChattyAfter: 5
 });
 
-const did = 'did:test:z3v8AuaTV5VKcT9MJoSHkSTRLpXDoqcgqiKkwGBNSV4nVzb6kLk';
+const did = 'did:cid:z3v8AuaTV5VKcT9MJoSHkSTRLpXDoqcgqiKkwGBNSV4nVzb6kLk';
 const docs = await gatekeeper.resolveDID(did);
 console.log(JSON.stringify(docs, null, 4));
 ```

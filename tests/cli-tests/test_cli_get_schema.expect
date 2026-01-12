@@ -20,10 +20,10 @@ set random_value [expr {int(rand() * 1000)}]
 # Start the CLI program
 spawn bash kc create-id -r local "$random_value"
 
-# Expect the output to match a string like did:test followed by some characters (e.g., did:test12345)
+# Expect the output to match a string like did:cid followed by some characters (e.g., did:cid12345)
 expect {
-    "did:test*" { 
-        puts "\n✅ Matched did:test output"
+    "did:cid*" { 
+        puts "\n✅ Matched did:cid output"
     }
     timeout {
         puts "\n❌ Timeout waiting for expected output"
@@ -36,7 +36,7 @@ spawn bash kc create-schema share/schema/social-media.json testing-get-schema
 
 # Look for the specific DID pattern
 expect {
-    -re "(did:test:\[a-zA-Z0-9]+)" {
+    -re "(did:cid:\[a-zA-Z0-9]+)" {
         set captured_did $expect_out(1,string)
         puts "\n✅ Captured DID: $captured_did"
     }

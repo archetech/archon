@@ -275,7 +275,7 @@ describe('createIdOperation', () => {
         const did = await gatekeeper.createDID(operation);
 
         expect(did).toBeDefined();
-        expect(did.startsWith('did:test:')).toBe(true);
+        expect(did.startsWith('did:cid:')).toBe(true);
 
         // Verify the created DID resolves correctly
         const doc = await keymaster.resolveDID(did);
