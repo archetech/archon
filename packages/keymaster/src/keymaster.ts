@@ -5,14 +5,14 @@ import {
     InvalidParameterError,
     KeymasterError,
     UnknownIDError
-} from '@mdip/common/errors';
+} from '@didcid/common/errors';
 import {
     GatekeeperInterface,
-    MdipDocument,
+    DidCidDocument,
     DocumentMetadata,
     ResolveDIDOptions,
     Operation,
-} from '@mdip/gatekeeper/types';
+} from '@didcid/gatekeeper/types';
 import {
     Challenge,
     ChallengeResponse,
@@ -47,7 +47,7 @@ import {
     WalletEncFile,
     SearchEngine,
     Seed,
-} from '@mdip/keymaster/types';
+} from '@didcid/keymaster/types';
 import {
     isV1WithEnc,
     isV1Decrypted,
@@ -59,8 +59,8 @@ import {
     EcdsaJwkPair,
     EcdsaJwkPrivate,
     EcdsaJwkPublic,
-} from '@mdip/cipher/types';
-import { isValidDID } from '@mdip/ipfs/utils';
+} from '@didcid/cipher/types';
+import { isValidDID } from '@didcid/ipfs/utils';
 import { decMnemonic, encMnemonic } from "./encryption.js";
 
 const DefaultSchema = {
@@ -409,13 +409,13 @@ export default class Keymaster implements KeymasterInterface {
         return { idsRemoved, ownedRemoved, heldRemoved, namesRemoved };
     }
 
-    async resolveSeedBank(): Promise<MdipDocument> {
+    async resolveSeedBank(): Promise<DidCidDocument> {
         const keypair = await this.hdKeyPair();
 
         const operation: Operation = {
             type: "create",
             created: new Date(0).toISOString(),
-            mdip: {
+            register: {
                 version: 1,
                 type: "agent",
                 registry: this.defaultRegistry,
@@ -437,7 +437,7 @@ export default class Keymaster implements KeymasterInterface {
         return this.gatekeeper.resolveDID(did);
     }
 
-    async updateSeedBank(doc: MdipDocument): Promise<boolean> {
+    async updateSeedBank(doc: DidCidDocument): Promise<boolean> {
         const keypair = await this.hdKeyPair();
         const did = doc.didDocument?.id;
         if (!did) {
@@ -482,7 +482,7 @@ export default class Keymaster implements KeymasterInterface {
         const operation: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            mdip: {
+            register: {
                 version: 1,
                 type: "asset",
                 registry: registry,
@@ -649,7 +649,7 @@ export default class Keymaster implements KeymasterInterface {
         return this.cipher.generateJwk(hdkey.privateKey!);
     }
 
-    getPublicKeyJwk(doc: MdipDocument): EcdsaJwkPublic {
+    getPublicKeyJwk(doc: DidCidDocument): EcdsaJwkPublic {
         // TBD Return the right public key, not just the first one
         if (!doc.didDocument) {
             throw new KeymasterError('Missing didDocument.');
@@ -718,7 +718,7 @@ export default class Keymaster implements KeymasterInterface {
             type: "create",
             created: new Date().toISOString(),
             blockid,
-            mdip: {
+            register: {
                 version: 1,
                 type: "asset",
                 registry,
@@ -749,7 +749,7 @@ export default class Keymaster implements KeymasterInterface {
     ): Promise<string> {
         const assetDoc = await this.resolveDID(id);
 
-        if (assetDoc.mdip?.type !== 'asset') {
+        if (assetDoc.didDocumentRegister?.type !== 'asset') {
             throw new InvalidParameterError('id');
         }
 
@@ -1063,7 +1063,7 @@ export default class Keymaster implements KeymasterInterface {
         }
     }
 
-    async updateDID(doc: MdipDocument): Promise<boolean> {
+    async updateDID(doc: DidCidDocument): Promise<boolean> {
         const did = doc.didDocument?.id;
 
         if (!did) {
@@ -1089,7 +1089,7 @@ export default class Keymaster implements KeymasterInterface {
             return true;
         }
 
-        const block = await this.gatekeeper.getBlock(current.mdip!.registry);
+        const block = await this.gatekeeper.getBlock(current.didDocumentRegister!.registry);
         const blockid = block?.hash;
 
         const operation: Operation = {
@@ -1102,10 +1102,10 @@ export default class Keymaster implements KeymasterInterface {
 
         let controller;
 
-        if (current.mdip?.type === 'agent') {
+        if (current.didDocumentRegister?.type === 'agent') {
             controller = current.didDocument?.id;
         }
-        else if (current.mdip?.type === 'asset') {
+        else if (current.didDocumentRegister?.type === 'asset') {
             controller = current.didDocument?.controller;
         }
 
@@ -1117,7 +1117,7 @@ export default class Keymaster implements KeymasterInterface {
         const did = await this.lookupDID(id);
         const current = await this.resolveDID(did);
         const previd = current.didDocumentMetadata?.versionId;
-        const block = await this.gatekeeper.getBlock(current.mdip!.registry);
+        const block = await this.gatekeeper.getBlock(current.didDocumentRegister!.registry);
         const blockid = block?.hash;
 
         const operation: Operation = {
@@ -1129,10 +1129,10 @@ export default class Keymaster implements KeymasterInterface {
 
         let controller;
 
-        if (current.mdip?.type === 'agent') {
+        if (current.didDocumentRegister?.type === 'agent') {
             controller = current.didDocument?.id;
         }
-        else if (current.mdip?.type === 'asset') {
+        else if (current.didDocumentRegister?.type === 'asset') {
             controller = current.didDocument?.controller;
         }
 
@@ -1225,7 +1225,7 @@ export default class Keymaster implements KeymasterInterface {
     async resolveDID(
         did: string,
         options?: ResolveDIDOptions
-    ): Promise<MdipDocument> {
+    ): Promise<DidCidDocument> {
         const actualDid = await this.lookupDID(did);
         const docs = await this.gatekeeper.resolveDID(actualDid, options);
 
@@ -1292,7 +1292,7 @@ export default class Keymaster implements KeymasterInterface {
     ): Promise<boolean> {
         const assetDoc = await this.resolveDID(id);
 
-        if (assetDoc.mdip?.type !== 'asset') {
+        if (assetDoc.didDocumentRegister?.type !== 'asset') {
             throw new InvalidParameterError('id');
         }
 
@@ -1302,7 +1302,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const agentDoc = await this.resolveDID(controller);
 
-        if (agentDoc.mdip?.type !== 'agent') {
+        if (agentDoc.didDocumentRegister?.type !== 'agent') {
             throw new InvalidParameterError('controller');
         }
 
@@ -1405,7 +1405,7 @@ export default class Keymaster implements KeymasterInterface {
             type: 'create',
             created: new Date().toISOString(),
             blockid,
-            mdip: {
+            register: {
                 version: 1,
                 type: 'agent',
                 registry
@@ -1476,7 +1476,7 @@ export default class Keymaster implements KeymasterInterface {
         const msg = JSON.stringify(data);
         const backup = this.cipher.encryptMessage(keypair.publicJwk, keypair.privateJwk, msg);
         const doc = await this.resolveDID(idInfo.did);
-        const registry = doc.mdip?.registry;
+        const registry = doc.didDocumentRegister?.registry;
         if (!registry) {
             throw new InvalidParameterError('no registry found for agent DID');
         }
@@ -1619,7 +1619,7 @@ export default class Keymaster implements KeymasterInterface {
 
     async testAgent(id: string): Promise<boolean> {
         const doc = await this.resolveDID(id);
-        return doc.mdip?.type === 'agent';
+        return doc.didDocumentRegister?.type === 'agent';
     }
 
     async bindCredential(
@@ -2946,8 +2946,8 @@ export default class Keymaster implements KeymasterInterface {
         throw new KeymasterError('Unsupported group vault version');
     }
 
-    getAgentDID(doc: MdipDocument): string {
-        if (doc.mdip?.type !== 'agent') {
+    getAgentDID(doc: DidCidDocument): string {
+        if (doc.didDocumentRegister?.type !== 'agent') {
             throw new KeymasterError('Document is not an agent');
         }
 

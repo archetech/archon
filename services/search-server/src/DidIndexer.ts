@@ -1,4 +1,4 @@
-import GatekeeperClient from "@mdip/gatekeeper/client";
+import GatekeeperClient from "@didcid/gatekeeper/client";
 import type { DIDsDb } from "./types.js";
 
 export interface DidIndexerOptions {

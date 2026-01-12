@@ -19,7 +19,7 @@ import {
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
-import { MdipDocument } from "@mdip/gatekeeper/types";
+import { DidCidDocument } from "@didcid/gatekeeper/types";
 import VersionNavigator from "./VersionNavigator";
 
 function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { browserTab: string, browserSubTab?: string, showResolveField?: boolean }) {
@@ -283,7 +283,7 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
                                 }
 
                                 if (type === 'value' &&
-                                    (aliasDocs as MdipDocument)?.didDocumentMetadata?.timestamp?.chain === "TBTC"
+                                    (aliasDocs as DidCidDocument)?.didDocumentMetadata?.timestamp?.chain === "TBTC"
                                 ) {
                                     const currentKeyString = String(keyName);
                                     let url = '';

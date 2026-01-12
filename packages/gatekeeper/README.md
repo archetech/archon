@@ -1,34 +1,34 @@
-# MDIP Gatekeeper
+# Archon Gatekeeper
 
-Gatekeeper is a node library for the MDIP.
-It manages a local database of DIDs on the MDIP network.
+Gatekeeper is a node library for Archon.
+It manages a local database of DIDs on the Archon network.
 Gatekeeper functions are used to Create, Read, Update, and Delete DIDs (CRUD).
 
 ## Installation
 
 ```bash
-npm install @mdip/gatekeeper
+npm install @didcid/gatekeeper
 ```
 ## Usage
 
 ### Library
 
 The library must be configured by calling the start function with one of the supported databases:
-- JSON - @mdip/gatekeeper/db/json
-- JSON with memory cache - @mdip/gatekeeper/db/json-cache
-- sqlite - @mdip/gatekeeper/db/sqlite
-- mongodb - @mdip/gatekeeper/db/mongodb
-- redis - @mdip/gatekeeper/db/redis
+- JSON - @didcid/gatekeeper/db/json
+- JSON with memory cache - @didcid/gatekeeper/db/json-cache
+- sqlite - @didcid/gatekeeper/db/sqlite
+- mongodb - @didcid/gatekeeper/db/mongodb
+- redis - @didcid/gatekeeper/db/redis
 
 ```js
 // Import using subpaths
-import Gatekeeper from '@mdip/gatekeeper';
-import DbRedis from '@mdip/gatekeeper/db/redis';
+import Gatekeeper from '@didcid/gatekeeper';
+import DbRedis from '@didcid/gatekeeper/db/redis';
 
 // Non-subpath imports
-import Gatekeeper, { DbRedis } from '@mdip/gatekeeper';
+import Gatekeeper, { DbRedis } from '@didcid/gatekeeper';
 
-const db_redis = new DbRedis('mdip-test');
+const db_redis = new DbRedis('archon-test');
 await db_redis.start();
 
 const gatekeeper = new Gatekeeper({ db: db_redis });
@@ -43,10 +43,10 @@ The GatekeeperClient is used to communicate with a Gatekeeper REST API service.
 
 ```js
 // Import using subpaths
-import GatekeeperClient from '@mdip/gatekeeper/client';
+import GatekeeperClient from '@didcid/gatekeeper/client';
 
 // Non-subpath imports
-import { GatekeeperClient } from '@mdip/gatekeeper';
+import { GatekeeperClient } from '@didcid/gatekeeper';
 
 // Try connecting to the gatekeeper service every second,
 // and start reporting (chatty) if not connected after 5 attempts

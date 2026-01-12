@@ -1,6 +1,6 @@
-# MDIP Hyperswarm mediator
+# Archon Hyperswarm mediator
 
-The Hyperswarm mediator is responsible for distributing unconfirmed MDIP operations to the network and for organizing an IPFS peer network for file-sharing.
+The Hyperswarm mediator is responsible for distributing unconfirmed Archon operations to the network and for organizing an IPFS peer network for file-sharing.
 
 When a node gets a new connection, it sends the connection a `sync` message and the connection replies with a series of `batch` messages containing all the operations in the connection's DID database. The nodes imports these operations into its Gatekeeper. The Gatekeeper will add any new operations it hasn't seen before, merge any operations it has already seen, and reject invalid operations.
 
@@ -11,10 +11,10 @@ When a node receives a `queue` message it will import the operations like during
 
 | variable                  | default                | description                   |
 | ------------------------- | ---------------------- | ----------------------------- |
-| `KC_GATEKEEPER_URL`       | http://localhost:4224  | MDIP gatekeeper service URL   |
-| `KC_KEYMASTER_URL`        | http://localhost:4226  | MDIP keymaster service URL    |
-| `KC_IPFS_URL`             | http://localhost:5001/api/v0  | IPFS RPC URL           |
-| `KC_NODE_ID       `       | (no default)           | Keymaster node agent name     |
-| `KC_NODE_NAME`            | anon                   | Human-readable name for the node |
-| `KC_MDIP_PROTOCOL`        | /MDIP/v1.0-public      | MDIP network topic to join    |
-| `KC_HYPR_EXPORT_INTERVAL` |  2                     | Seconds between export cycles |
+| `ARCHON_GATEKEEPER_URL`       | http://localhost:4224  | Archon gatekeeper service URL   |
+| `ARCHON_KEYMASTER_URL`        | http://localhost:4226  | Archon keymaster service URL    |
+| `ARCHON_IPFS_URL`             | http://localhost:5001/api/v0  | IPFS RPC URL           |
+| `ARCHON_NODE_ID       `       | (no default)           | Keymaster node agent name     |
+| `ARCHON_NODE_NAME`            | anon                   | Human-readable name for the node |
+| `ARCHON_PROTOCOL`        | /ARCHON/v0.1      | Archon network topic to join    |
+| `ARCHON_HYPR_EXPORT_INTERVAL` |  2                     | Seconds between export cycles |

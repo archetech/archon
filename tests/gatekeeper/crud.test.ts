@@ -1,8 +1,8 @@
-import CipherNode from '@mdip/cipher/node';
-import Gatekeeper from '@mdip/gatekeeper';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory.ts';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
+import CipherNode from '@didcid/cipher/node';
+import Gatekeeper from '@didcid/gatekeeper';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
 import TestHelper from './helper.ts';
 
 const mockConsole = {
@@ -57,7 +57,7 @@ describe('createDID', () => {
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: mdip.version=2');
+            expect(error.message).toBe('Invalid operation: register.version=2');
         }
     });
 
@@ -70,7 +70,7 @@ describe('createDID', () => {
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: mdip.registry=mockRegistry');
+            expect(error.message).toBe('Invalid operation: register.registry=mockRegistry');
         }
     });
 
@@ -93,13 +93,13 @@ describe('createDID', () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'mockRegistry' });
         // @ts-expect-error Testing invalid usage
-        agentOp.mdip!.type = 'mock';
+        agentOp.register!.type = 'mock';
 
         try {
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: mdip.type=mock');
+            expect(error.message).toBe('Invalid operation: register.type=mock');
         }
     });
 
@@ -135,11 +135,11 @@ describe('createDID', () => {
 
         try {
             const agentOp = await helper.createAgentOp(keypair);
-            agentOp.mdip = undefined;
+            agentOp.register = undefined;
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: mdip');
+            expect(error.message).toBe('Invalid operation: register');
         }
 
         try {
@@ -236,7 +236,7 @@ describe('createDID', () => {
             await gatekeeper.createDID(assetOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: mdip.validUntil=mock');
+            expect(error.message).toBe('Invalid operation: register.validUntil=mock');
         }
     });
 
@@ -292,7 +292,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            mdip: agentOp.mdip
+            didDocumentRegister: agentOp.register
         };
 
         expect(doc).toStrictEqual(expected);
@@ -338,7 +338,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            mdip: agentOp.mdip
+            didDocumentRegister: agentOp.register
         };
 
         expect(ok).toBe(true);
@@ -406,7 +406,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            mdip: agentOp.mdip
+            didDocumentRegister: agentOp.register
         };
 
         expect(ok).toBe(true);
@@ -453,7 +453,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            mdip: agentOp.mdip
+            didDocumentRegister: agentOp.register
         };
 
         expect(ok).toBe(true);
@@ -550,7 +550,7 @@ describe('resolveDID', () => {
         const agentOp = await helper.createAgentOp(keypair);
         const agent = await gatekeeper.createDID(agentOp);
         const assetOp = await helper.createAssetOp(agent, keypair);
-        delete assetOp.mdip!.validUntil;
+        delete assetOp.register!.validUntil;
         const opid = await gatekeeper.generateCID(assetOp);
         const did = await gatekeeper.createDID(assetOp);
         const doc = await gatekeeper.resolveDID(did);
@@ -572,7 +572,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            mdip: assetOp.mdip
+            didDocumentRegister: assetOp.register
         };
 
         expect(doc).toStrictEqual(expected);

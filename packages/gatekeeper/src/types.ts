@@ -1,5 +1,5 @@
-import { EcdsaJwkPublic } from '@mdip/cipher/types';
-import { IPFSClient } from "@mdip/ipfs/types";
+import { EcdsaJwkPublic } from '@didcid/cipher/types';
+import { IPFSClient } from "@didcid/ipfs/types";
 
 export interface JsonDbFile {
     dids: Record<string, GatekeeperEvent[]>
@@ -70,7 +70,7 @@ export interface GatekeeperEvent {
     operation: Operation;
     did?: string;
     opid?: string;
-    blockchain?: MdipRegistration;
+    blockchain?: DidRegister;
 }
 
 export interface GatekeeperDb {
@@ -131,10 +131,10 @@ export interface GatekeeperInterface {
     resetDb(): Promise<boolean>;
     verifyDb(options?: { chatty?: boolean }): Promise<VerifyDbResult>;
     createDID(operation: Operation): Promise<string>;
-    resolveDID(did: string, options?: ResolveDIDOptions): Promise<MdipDocument>;
+    resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;
     updateDID(operation: Operation): Promise<boolean>;
     deleteDID(operation: Operation): Promise<boolean>;
-    getDIDs(options?: GetDIDOptions): Promise<string[] | MdipDocument[]>;
+    getDIDs(options?: GetDIDOptions): Promise<string[] | DidCidDocument[]>;
     exportDIDs(dids?: string[]): Promise<GatekeeperEvent[][]>;
     importDIDs(dids: GatekeeperEvent[][]): Promise<ImportBatchResult>;
     removeDIDs(dids: string[]): Promise<boolean>;
@@ -154,7 +154,7 @@ export interface GatekeeperInterface {
     generateDID(operation: Operation): Promise<string>;
 }
 
-export interface MdipRegistration {
+export interface DidRegister {
     height?: number;
     index?: number;
     txid?: string;
@@ -162,14 +162,14 @@ export interface MdipRegistration {
     opidx?: number;
 }
 
-export interface Mdip {
+export interface DocumentRegister {
     version: number;
     type: 'agent' | 'asset';
     registry: string;
     validUntil?: string;
     prefix?: string;
     opid?: string;
-    registration?: MdipRegistration;
+    registration?: DidRegister;
     created?: string;
 }
 
@@ -185,7 +185,7 @@ export interface DocumentMetadata {
     timestamp?: any;
 }
 
-export interface MdipDocument {
+export interface DidCidDocument {
     didDocument?: {
         '@context'?: string[];
         id?: string;
@@ -205,7 +205,7 @@ export interface MdipDocument {
         error?: string;
     },
     didDocumentData?: unknown,
-    mdip?: Mdip,
+    didDocumentRegister?: DocumentRegister,
 }
 
 export interface Signature {
@@ -219,10 +219,10 @@ export interface Operation {
     type: 'create' | 'update' | 'delete';
     created?: string;
     signature?: Signature;
-    mdip?: Mdip;
+    register?: DocumentRegister;
     publicJwk?: EcdsaJwkPublic;
     controller?: string;
-    doc?: MdipDocument;
+    doc?: DidCidDocument;
     previd?: string;
     did?: string,
     data?: unknown;

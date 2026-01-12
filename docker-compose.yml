@@ -29,23 +29,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.gatekeeper
-    image: keychainmdip/gatekeeper
+    image: ghcr.io/archetech/gatekeeper
     environment:
-      - KC_GATEKEEPER_PORT=4224
-      - KC_GATEKEEPER_DB=${KC_GATEKEEPER_DB}
-      - KC_GATEKEEPER_DID_PREFIX=${KC_GATEKEEPER_DID_PREFIX}
-      - KC_GATEKEEPER_REGISTRIES=${KC_GATEKEEPER_REGISTRIES}
-      - KC_GATEKEEPER_GC_INTERVAL=${KC_GATEKEEPER_GC_INTERVAL}
-      - KC_GATEKEEPER_STATUS_INTERVAL=${KC_GATEKEEPER_STATUS_INTERVAL}
-      - KC_GATEKEEPER_SERVE_CLIENT=${KC_GATEKEEPER_SERVE_CLIENT}
-      - KC_MONGODB_URL=mongodb://mongodb:27017
-      - KC_REDIS_URL=redis://redis:6379
-      - KC_IPFS_URL=http://ipfs:5001/api/v0
+      - ARCHON_GATEKEEPER_PORT=4224
+      - ARCHON_GATEKEEPER_DB=${ARCHON_GATEKEEPER_DB}
+      - ARCHON_GATEKEEPER_DID_PREFIX=${ARCHON_GATEKEEPER_DID_PREFIX}
+      - ARCHON_GATEKEEPER_REGISTRIES=${ARCHON_GATEKEEPER_REGISTRIES}
+      - ARCHON_GATEKEEPER_GC_INTERVAL=${ARCHON_GATEKEEPER_GC_INTERVAL}
+      - ARCHON_GATEKEEPER_STATUS_INTERVAL=${ARCHON_GATEKEEPER_STATUS_INTERVAL}
+      - ARCHON_GATEKEEPER_SERVE_CLIENT=${ARCHON_GATEKEEPER_SERVE_CLIENT}
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
     volumes:
       - ./data:/app/gatekeeper/data
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
-      - ${KC_GATEKEEPER_PORT}:4224
+      - ${ARCHON_GATEKEEPER_PORT}:4224
     depends_on:
       - mongodb
       - redis
@@ -55,25 +55,25 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.keymaster
-    image: keychainmdip/keymaster
+    image: ghcr.io/archetech/keymaster
     environment:
-      - KC_KEYMASTER_PORT=4226
-      - KC_GATEKEEPER_URL=http://gatekeeper:4224
-      - KC_DISABLE_SEARCH=${KC_DISABLE_SEARCH:-false}
-      - KC_SEARCH_URL=http://search-server:4002
-      - KC_NODE_ID=${KC_NODE_ID}
-      - KC_KEYMASTER_DB=${KC_KEYMASTER_DB}
-      - KC_ENCRYPTED_PASSPHRASE=${KC_ENCRYPTED_PASSPHRASE}
-      - KC_WALLET_CACHE=${KC_WALLET_CACHE}
-      - KC_DEFAULT_REGISTRY=${KC_DEFAULT_REGISTRY}
-      - KC_KEYMASTER_SERVE_CLIENT=${KC_KEYMASTER_SERVE_CLIENT}
-      - KC_MONGODB_URL=mongodb://mongodb:27017
-      - KC_REDIS_URL=redis://redis:6379
+      - ARCHON_KEYMASTER_PORT=4226
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_DISABLE_SEARCH=${ARCHON_DISABLE_SEARCH:-false}
+      - ARCHON_SEARCH_URL=http://search-server:4002
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_KEYMASTER_DB=${ARCHON_KEYMASTER_DB}
+      - ARCHON_ENCRYPTED_PASSPHRASE=${ARCHON_ENCRYPTED_PASSPHRASE}
+      - ARCHON_WALLET_CACHE=${ARCHON_WALLET_CACHE}
+      - ARCHON_DEFAULT_REGISTRY=${ARCHON_DEFAULT_REGISTRY}
+      - ARCHON_KEYMASTER_SERVE_CLIENT=${ARCHON_KEYMASTER_SERVE_CLIENT}
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
     volumes:
       - ./data:/app/keymaster/data
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
-      - ${KC_KEYMASTER_PORT}:4226
+      - ${ARCHON_KEYMASTER_PORT}:4226
     depends_on:
       - gatekeeper
       - redis
@@ -84,23 +84,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.hyperswarm
-    image: keychainmdip/hyperswarm-mediator
+    image: ghcr.io/archetech/hyperswarm-mediator
     environment:
-      - KC_GATEKEEPER_URL=http://gatekeeper:4224
-      - KC_KEYMASTER_URL=http://keymaster:4226
-      - KC_IPFS_URL=http://ipfs:5001/api/v0
-      - KC_NODE_ID=${KC_NODE_ID}
-      - KC_NODE_NAME=${KC_NODE_NAME}
-      - KC_MDIP_PROTOCOL=${KC_MDIP_PROTOCOL}
-      - KC_HYPR_EXPORT_INTERVAL=${KC_HYPR_EXPORT_INTERVAL}
-    user: "${KC_UID}:${KC_GID}"
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_NODE_NAME=${ARCHON_NODE_NAME}
+      - ARCHON_PROTOCOL=${ARCHON_PROTOCOL}
+      - ARCHON_HYPR_EXPORT_INTERVAL=${ARCHON_HYPR_EXPORT_INTERVAL}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - gatekeeper
       - keymaster
       - ipfs
 
   tftc-node:
-    image: keychainmdip/feathercoin:v0.19.2
+    image: ghcr.io/archetech/feathercoin:v0.19.2
     volumes:
       - ./data/tftc:/root/.feathercoin
 
@@ -108,39 +108,39 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.satoshi
-    image: keychainmdip/satoshi-mediator
+    image: ghcr.io/archetech/satoshi-mediator
     environment:
-      - KC_GATEKEEPER_URL=http://gatekeeper:4224
-      - KC_KEYMASTER_URL=http://keymaster:4226
-      - KC_MONGODB_URL=mongodb://mongodb:27017
-      - KC_REDIS_URL=redis://redis:6379
-      - KC_NODE_ID=${KC_NODE_ID}
-      - KC_SAT_CHAIN=TFTC
-      - KC_SAT_NETWORK=testnet
-      - KC_SAT_START_BLOCK=0
-      - KC_SAT_HOST=tftc-node
-      - KC_SAT_PORT=19337
-      - KC_SAT_USER=${KC_TFTC_USER}
-      - KC_SAT_PASS=${KC_TFTC_PASS}
-      - KC_SAT_WALLET=${KC_TFTC_WALLET}
-      - KC_SAT_IMPORT_INTERVAL=${KC_TFTC_IMPORT_INTERVAL}
-      - KC_SAT_EXPORT_INTERVAL=${KC_TFTC_EXPORT_INTERVAL}
-      - KC_SAT_FEE_BLOCK_TARGET=${KC_TFTC_FEE_BLOCK_TARGET}
-      - KC_SAT_FEE_FALLBACK_SAT_BYTE=${KC_TFTC_FEE_FALLBACK_SAT_BYTE}
-      - KC_SAT_FEE_MAX=${KC_TFTC_FEE_MAX}
-      - KC_SAT_RBF_ENABLED=${KC_TFTC_RBF_ENABLED}
-      - KC_SAT_REIMPORT=${KC_TFTC_REIMPORT}
-      - KC_SAT_DB=${KC_TFTC_DB}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_SAT_CHAIN=TFTC
+      - ARCHON_SAT_NETWORK=testnet
+      - ARCHON_SAT_START_BLOCK=0
+      - ARCHON_SAT_HOST=tftc-node
+      - ARCHON_SAT_PORT=19337
+      - ARCHON_SAT_USER=${ARCHON_TFTC_USER}
+      - ARCHON_SAT_PASS=${ARCHON_TFTC_PASS}
+      - ARCHON_SAT_WALLET=${ARCHON_TFTC_WALLET}
+      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_TFTC_IMPORT_INTERVAL}
+      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_TFTC_EXPORT_INTERVAL}
+      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_TFTC_FEE_BLOCK_TARGET}
+      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_TFTC_FEE_FALLBACK_SAT_BYTE}
+      - ARCHON_SAT_FEE_MAX=${ARCHON_TFTC_FEE_MAX}
+      - ARCHON_SAT_RBF_ENABLED=${ARCHON_TFTC_RBF_ENABLED}
+      - ARCHON_SAT_REIMPORT=${ARCHON_TFTC_REIMPORT}
+      - ARCHON_SAT_DB=${ARCHON_TFTC_DB}
     volumes:
       - ./data:/app/satoshi/data
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - tftc-node
       - gatekeeper
       - keymaster
 
   btc-node:
-    image: keychainmdip/bitcoin-core:v28.0-multiarch
+    image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
     volumes:
       - ./data/btc:/root/.bitcoin
     ports:
@@ -150,39 +150,39 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.satoshi-inscription
-    image: keychainmdip/inscription-mediator
+    image: ghcr.io/archetech/inscription-mediator
     environment:
-      - KC_GATEKEEPER_URL=http://gatekeeper:4224
-      - KC_KEYMASTER_URL=http://keymaster:4226
-      - KC_MONGODB_URL=mongodb://mongodb:27017
-      - KC_REDIS_URL=redis://redis:6379
-      - KC_NODE_ID=${KC_NODE_ID}
-      - KC_SAT_CHAIN=BTC
-      - KC_SAT_NETWORK=bitcoin
-      - KC_SAT_HOST=btc-node
-      - KC_SAT_PORT=8332
-      - KC_SAT_START_BLOCK=${KC_BTC_START_BLOCK}
-      - KC_SAT_USER=${KC_BTC_USER}
-      - KC_SAT_PASS=${KC_BTC_PASS}
-      - KC_SAT_WALLET=${KC_BTC_WALLET}
-      - KC_SAT_IMPORT_INTERVAL=${KC_BTC_IMPORT_INTERVAL}
-      - KC_SAT_EXPORT_INTERVAL=${KC_BTC_EXPORT_INTERVAL}
-      - KC_SAT_FEE_BLOCK_TARGET=${KC_BTC_FEE_BLOCK_TARGET}
-      - KC_SAT_FEE_FALLBACK_SAT_BYTE=${KC_BTC_FEE_FALLBACK_SAT_BYTE}
-      - KC_SAT_FEE_MAX=${KC_BTC_FEE_MAX}
-      - KC_SAT_RBF_ENABLED=${KC_BTC_RBF_ENABLED}
-      - KC_SAT_REIMPORT=${KC_BTC_REIMPORT}
-      - KC_SAT_DB=${KC_BTC_DB}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_SAT_CHAIN=BTC
+      - ARCHON_SAT_NETWORK=bitcoin
+      - ARCHON_SAT_HOST=btc-node
+      - ARCHON_SAT_PORT=8332
+      - ARCHON_SAT_START_BLOCK=${ARCHON_BTC_START_BLOCK}
+      - ARCHON_SAT_USER=${ARCHON_BTC_USER}
+      - ARCHON_SAT_PASS=${ARCHON_BTC_PASS}
+      - ARCHON_SAT_WALLET=${ARCHON_BTC_WALLET}
+      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_BTC_IMPORT_INTERVAL}
+      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_BTC_EXPORT_INTERVAL}
+      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_BTC_FEE_BLOCK_TARGET}
+      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_BTC_FEE_FALLBACK_SAT_BYTE}
+      - ARCHON_SAT_FEE_MAX=${ARCHON_BTC_FEE_MAX}
+      - ARCHON_SAT_RBF_ENABLED=${ARCHON_BTC_RBF_ENABLED}
+      - ARCHON_SAT_REIMPORT=${ARCHON_BTC_REIMPORT}
+      - ARCHON_SAT_DB=${ARCHON_BTC_DB}
     volumes:
       - ./data:/app/satoshi/data
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - btc-node
       - gatekeeper
       - keymaster
 
   tbtc-node:
-    image: keychainmdip/bitcoin-core:v28.0-multiarch
+    image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
     volumes:
       - ./data/tbtc:/root/.bitcoin
 
@@ -190,39 +190,39 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.satoshi
-    image: keychainmdip/satoshi-mediator
+    image: ghcr.io/archetech/satoshi-mediator
     environment:
-      - KC_GATEKEEPER_URL=http://gatekeeper:4224
-      - KC_KEYMASTER_URL=http://keymaster:4226
-      - KC_MONGODB_URL=mongodb://mongodb:27017
-      - KC_REDIS_URL=redis://redis:6379
-      - KC_NODE_ID=${KC_NODE_ID}
-      - KC_SAT_CHAIN=TBTC
-      - KC_SAT_NETWORK=testnet
-      - KC_SAT_HOST=tbtc-node
-      - KC_SAT_PORT=48332
-      - KC_SAT_START_BLOCK=${KC_TBTC_START_BLOCK}
-      - KC_SAT_USER=${KC_TBTC_USER}
-      - KC_SAT_PASS=${KC_TBTC_PASS}
-      - KC_SAT_WALLET=${KC_TBTC_WALLET}
-      - KC_SAT_IMPORT_INTERVAL=${KC_TBTC_IMPORT_INTERVAL}
-      - KC_SAT_EXPORT_INTERVAL=${KC_TBTC_EXPORT_INTERVAL}
-      - KC_SAT_FEE_BLOCK_TARGET=${KC_TBTC_FEE_BLOCK_TARGET}
-      - KC_SAT_FEE_FALLBACK_SAT_BYTE=${KC_TBTC_FEE_FALLBACK_SAT_BYTE}
-      - KC_SAT_FEE_MAX=${KC_TBTC_FEE_MAX}
-      - KC_SAT_RBF_ENABLED=${KC_TBTC_RBF_ENABLED}
-      - KC_SAT_REIMPORT=${KC_TBTC_REIMPORT}
-      - KC_SAT_DB=${KC_TBTC_DB}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_SAT_CHAIN=TBTC
+      - ARCHON_SAT_NETWORK=testnet
+      - ARCHON_SAT_HOST=tbtc-node
+      - ARCHON_SAT_PORT=48332
+      - ARCHON_SAT_START_BLOCK=${ARCHON_TBTC_START_BLOCK}
+      - ARCHON_SAT_USER=${ARCHON_TBTC_USER}
+      - ARCHON_SAT_PASS=${ARCHON_TBTC_PASS}
+      - ARCHON_SAT_WALLET=${ARCHON_TBTC_WALLET}
+      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_TBTC_IMPORT_INTERVAL}
+      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_TBTC_EXPORT_INTERVAL}
+      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_TBTC_FEE_BLOCK_TARGET}
+      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_TBTC_FEE_FALLBACK_SAT_BYTE}
+      - ARCHON_SAT_FEE_MAX=${ARCHON_TBTC_FEE_MAX}
+      - ARCHON_SAT_RBF_ENABLED=${ARCHON_TBTC_RBF_ENABLED}
+      - ARCHON_SAT_REIMPORT=${ARCHON_TBTC_REIMPORT}
+      - ARCHON_SAT_DB=${ARCHON_TBTC_DB}
     volumes:
       - ./data:/app/satoshi/data
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - tbtc-node
       - gatekeeper
       - keymaster
 
   signet-node:
-    image: keychainmdip/bitcoin-core:v28.0-multiarch
+    image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
     volumes:
       - ./data/signet:/root/.bitcoin
     ports:
@@ -232,32 +232,32 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.satoshi
-    image: keychainmdip/satoshi-mediator
+    image: ghcr.io/archetech/satoshi-mediator
     environment:
-      - KC_GATEKEEPER_URL=http://gatekeeper:4224
-      - KC_KEYMASTER_URL=http://keymaster:4226
-      - KC_MONGODB_URL=mongodb://mongodb:27017
-      - KC_REDIS_URL=redis://redis:6379
-      - KC_NODE_ID=${KC_NODE_ID}
-      - KC_SAT_CHAIN=Signet
-      - KC_SAT_NETWORK=testnet
-      - KC_SAT_HOST=signet-node
-      - KC_SAT_PORT=38332
-      - KC_SAT_START_BLOCK=${KC_SIGNET_START_BLOCK}
-      - KC_SAT_USER=${KC_SIGNET_USER}
-      - KC_SAT_PASS=${KC_SIGNET_PASS}
-      - KC_SAT_WALLET=${KC_SIGNET_WALLET}
-      - KC_SAT_IMPORT_INTERVAL=${KC_SIGNET_IMPORT_INTERVAL}
-      - KC_SAT_EXPORT_INTERVAL=${KC_SIGNET_EXPORT_INTERVAL}
-      - KC_SAT_FEE_BLOCK_TARGET=${KC_SIGNET_FEE_BLOCK_TARGET}
-      - KC_SAT_FEE_FALLBACK_SAT_BYTE=${KC_SIGNET_FEE_FALLBACK_SAT_BYTE}
-      - KC_SAT_FEE_MAX=${KC_SIGNET_FEE_MAX}
-      - KC_SAT_RBF_ENABLED=${KC_SIGNET_RBF_ENABLED}
-      - KC_SAT_REIMPORT=${KC_SIGNET_REIMPORT}
-      - KC_SAT_DB=${KC_SIGNET_DB}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_SAT_CHAIN=Signet
+      - ARCHON_SAT_NETWORK=testnet
+      - ARCHON_SAT_HOST=signet-node
+      - ARCHON_SAT_PORT=38332
+      - ARCHON_SAT_START_BLOCK=${ARCHON_SIGNET_START_BLOCK}
+      - ARCHON_SAT_USER=${ARCHON_SIGNET_USER}
+      - ARCHON_SAT_PASS=${ARCHON_SIGNET_PASS}
+      - ARCHON_SAT_WALLET=${ARCHON_SIGNET_WALLET}
+      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_SIGNET_IMPORT_INTERVAL}
+      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_SIGNET_EXPORT_INTERVAL}
+      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_SIGNET_FEE_BLOCK_TARGET}
+      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_SIGNET_FEE_FALLBACK_SAT_BYTE}
+      - ARCHON_SAT_FEE_MAX=${ARCHON_SIGNET_FEE_MAX}
+      - ARCHON_SAT_RBF_ENABLED=${ARCHON_SIGNET_RBF_ENABLED}
+      - ARCHON_SAT_REIMPORT=${ARCHON_SIGNET_REIMPORT}
+      - ARCHON_SAT_DB=${ARCHON_SIGNET_DB}
     volumes:
       - ./data:/app/satoshi/data
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - signet-node
       - gatekeeper
@@ -267,32 +267,32 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.satoshi-inscription
-    image: keychainmdip/inscription-mediator
+    image: ghcr.io/archetech/inscription-mediator
     environment:
-      - KC_GATEKEEPER_URL=http://gatekeeper:4224
-      - KC_KEYMASTER_URL=http://keymaster:4226
-      - KC_MONGODB_URL=mongodb://mongodb:27017
-      - KC_REDIS_URL=redis://redis:6379
-      - KC_NODE_ID=${KC_NODE_ID}
-      - KC_SAT_CHAIN=Signet
-      - KC_SAT_NETWORK=testnet
-      - KC_SAT_HOST=signet-node
-      - KC_SAT_PORT=38332
-      - KC_SAT_START_BLOCK=${KC_SIGNET_INS_START_BLOCK}
-      - KC_SAT_USER=${KC_SIGNET_INS_USER}
-      - KC_SAT_PASS=${KC_SIGNET_INS_PASS}
-      - KC_SAT_WALLET=${KC_SIGNET_INS_WALLET}
-      - KC_SAT_IMPORT_INTERVAL=${KC_SIGNET_INS_IMPORT_INTERVAL}
-      - KC_SAT_EXPORT_INTERVAL=${KC_SIGNET_INS_EXPORT_INTERVAL}
-      - KC_SAT_FEE_BLOCK_TARGET=${KC_SIGNET_INS_FEE_BLOCK_TARGET}
-      - KC_SAT_FEE_FALLBACK_SAT_BYTE=${KC_SIGNET_INS_FEE_FALLBACK_SAT_BYTE}
-      - KC_SAT_FEE_MAX=${KC_SIGNET_INS_FEE_MAX}
-      - KC_SAT_RBF_ENABLED=${KC_SIGNET_INS_RBF_ENABLED}
-      - KC_SAT_REIMPORT=${KC_SIGNET_INS_REIMPORT}
-      - KC_SAT_DB=${KC_SIGNET_INS_DB}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_SAT_CHAIN=Signet
+      - ARCHON_SAT_NETWORK=testnet
+      - ARCHON_SAT_HOST=signet-node
+      - ARCHON_SAT_PORT=38332
+      - ARCHON_SAT_START_BLOCK=${ARCHON_SIGNET_INS_START_BLOCK}
+      - ARCHON_SAT_USER=${ARCHON_SIGNET_INS_USER}
+      - ARCHON_SAT_PASS=${ARCHON_SIGNET_INS_PASS}
+      - ARCHON_SAT_WALLET=${ARCHON_SIGNET_INS_WALLET}
+      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_SIGNET_INS_IMPORT_INTERVAL}
+      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_SIGNET_INS_EXPORT_INTERVAL}
+      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_SIGNET_INS_FEE_BLOCK_TARGET}
+      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_SIGNET_INS_FEE_FALLBACK_SAT_BYTE}
+      - ARCHON_SAT_FEE_MAX=${ARCHON_SIGNET_INS_FEE_MAX}
+      - ARCHON_SAT_RBF_ENABLED=${ARCHON_SIGNET_INS_RBF_ENABLED}
+      - ARCHON_SAT_REIMPORT=${ARCHON_SIGNET_INS_REIMPORT}
+      - ARCHON_SAT_DB=${ARCHON_SIGNET_INS_DB}
     volumes:
       - ./data:/app/satoshi/data
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - signet-node
       - gatekeeper
@@ -302,14 +302,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cli
-    image: keychainmdip/cli
+    image: ghcr.io/archetech/cli
     environment:
-      - KC_GATEKEEPER_URL=http://gatekeeper:4224
-      - KC_KEYMASTER_URL=http://keymaster:4226
-      - KC_IPFS_URL=http://ipfs:5001/api/v0
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
     volumes:
       - ./share:/app/share
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - gatekeeper
       - keymaster
@@ -319,7 +319,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.explorer
-    image: keychainmdip/explorer
+    image: ghcr.io/archetech/explorer
     environment:
       - VITE_EXPLORER_PORT=4000
       - VITE_GATEKEEPER_URL=http://localhost:4224
@@ -334,7 +334,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.search-server
-    image: keychainmdip/search-server
+    image: ghcr.io/archetech/search-server
     environment:
       - SEARCH_SERVER_PORT=4002
       - SEARCH_SERVER_GATEKEEPER_URL=http://gatekeeper:4224
@@ -342,7 +342,7 @@ services:
       - SEARCH_SERVER_DB=sqlite
     volumes:
       - ./data:/app/search-server/data
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "4002:4002"
     depends_on:
@@ -352,15 +352,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.react-wallet
-    image: keychainmdip/react-wallet
+    image: ghcr.io/archetech/react-wallet
     environment:
-      - VITE_PORT=${KC_REACT_WALLET_PORT:-4228}
+      - VITE_PORT=${ARCHON_REACT_WALLET_PORT:-4228}
       - VITE_GATEKEEPER_URL=http://gatekeeper:4224
       - VITE_KEYMASTER_URL=http://keymaster:4226
       - VITE_SEARCH_SERVER=http://search-server:4002
-    user: "${KC_UID}:${KC_GID}"
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
-      - "${KC_REACT_WALLET_PORT:-4228}:${KC_REACT_WALLET_PORT:-4228}"
+      - "${ARCHON_REACT_WALLET_PORT:-4228}:${ARCHON_REACT_WALLET_PORT:-4228}"
     depends_on:
       - gatekeeper
       - search-server

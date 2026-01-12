@@ -7,19 +7,19 @@
     "txnsScanned": 10937920,
     "registered": [
         {
-            "did": "did:mdip:z3v8AuaeipfrDvTXbvZtsnHjCTLda5fx4LxgMyi41BRhTPuGJAP",
+            "did": "did:cid:z3v8AuaeipfrDvTXbvZtsnHjCTLda5fx4LxgMyi41BRhTPuGJAP",
             "txid": "56945f6c627f255e4ff1ddb254431deb009fbdfab37a6a82ff5b5036fa9fff55"
         },
         {
-            "did": "did:mdip:z3v8AuaURPMVvF4BjzgDLmwXWTGoMsQLvpnFZsx2dVVruFnAdW2",
+            "did": "did:cid:z3v8AuaURPMVvF4BjzgDLmwXWTGoMsQLvpnFZsx2dVVruFnAdW2",
             "txid": "2e8aafcfb134a7cc7992a1cfdd393fccebe5017bbd0f9634756d9cbb3fbc1bed"
         },
         {
-            "did": "did:mdip:z3v8AuaYpnYUQzXjkua8oP654DejhodJuSEKrSQEmaQeexJpPex",
+            "did": "did:cid:z3v8AuaYpnYUQzXjkua8oP654DejhodJuSEKrSQEmaQeexJpPex",
             "txid": "b8f70a9421911ca36deabc0e2bf26d1de1234dbbf5da26f6109923666645c76c"
         },
         {
-            "did": "did:mdip:z3v8AuagZBazdsGwvTnLaV6RjNV3JUu6woGevvYF5imjJfpY4aC",
+            "did": "did:cid:z3v8AuagZBazdsGwvTnLaV6RjNV3JUu6woGevvYF5imjJfpY4aC",
             "txid": "f0e4aee3bb3cb4048a4e62fed6e9f09260d955411937820bd300dd4bfd2fafd9"
         }
     ],
@@ -2363,7 +2363,7 @@
             "index": 103,
             "time": "2025-05-05T18:05:29.000Z",
             "txid": "56945f6c627f255e4ff1ddb254431deb009fbdfab37a6a82ff5b5036fa9fff55",
-            "did": "did:mdip:z3v8AuaeipfrDvTXbvZtsnHjCTLda5fx4LxgMyi41BRhTPuGJAP",
+            "did": "did:cid:z3v8AuaeipfrDvTXbvZtsnHjCTLda5fx4LxgMyi41BRhTPuGJAP",
             "imported": {
                 "queued": 1,
                 "processed": 0,
@@ -2379,7 +2379,7 @@
             "index": 21,
             "time": "2025-05-05T22:45:46.000Z",
             "txid": "2e8aafcfb134a7cc7992a1cfdd393fccebe5017bbd0f9634756d9cbb3fbc1bed",
-            "did": "did:mdip:z3v8AuaURPMVvF4BjzgDLmwXWTGoMsQLvpnFZsx2dVVruFnAdW2",
+            "did": "did:cid:z3v8AuaURPMVvF4BjzgDLmwXWTGoMsQLvpnFZsx2dVVruFnAdW2",
             "imported": {
                 "queued": 1,
                 "processed": 0,
@@ -2395,7 +2395,7 @@
             "index": 173,
             "time": "2025-05-05T22:05:45.000Z",
             "txid": "2e8aafcfb134a7cc7992a1cfdd393fccebe5017bbd0f9634756d9cbb3fbc1bed",
-            "did": "did:mdip:z3v8AuaURPMVvF4BjzgDLmwXWTGoMsQLvpnFZsx2dVVruFnAdW2",
+            "did": "did:cid:z3v8AuaURPMVvF4BjzgDLmwXWTGoMsQLvpnFZsx2dVVruFnAdW2",
             "imported": {
                 "queued": 0,
                 "processed": 1,
@@ -2891,7 +2891,7 @@
             "index": 136,
             "time": "2025-08-11T20:21:54.000Z",
             "txid": "f0e4aee3bb3cb4048a4e62fed6e9f09260d955411937820bd300dd4bfd2fafd9",
-            "did": "did:mdip:z3v8AuagZBazdsGwvTnLaV6RjNV3JUu6woGevvYF5imjJfpY4aC",
+            "did": "did:cid:z3v8AuagZBazdsGwvTnLaV6RjNV3JUu6woGevvYF5imjJfpY4aC",
             "imported": {
                 "queued": 1,
                 "processed": 0,

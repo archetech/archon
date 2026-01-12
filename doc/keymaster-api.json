@@ -895,9 +895,9 @@
                           "type": "object",
                           "description": "Arbitrary data attached to the DID (only present for assets)."
                         },
-                        "mdip": {
+                        "didDocumentRegister": {
                           "type": "object",
-                          "description": "MDIP-specific metadata fields.",
+                          "description": "Registration metadata fields.",
                           "properties": {
                             "type": {
                               "type": "string",
@@ -6386,11 +6386,11 @@
                     "description": "The Dmail message object to create.",
                     "example": {
                       "to": [
-                        "did:mdip:abc123",
-                        "did:mdip:def456"
+                        "did:cid:abc123",
+                        "did:cid:def456"
                       ],
                       "cc": [
-                        "did:mdip:ghi789"
+                        "did:cid:ghi789"
                       ],
                       "subject": "Hello World",
                       "body": "This is a test Dmail message."
@@ -6999,12 +6999,12 @@
                     "description": "The NoticeMessage object to create.",
                     "example": {
                       "to": [
-                        "did:mdip:abc123",
-                        "did:mdip:def456"
+                        "did:cid:abc123",
+                        "did:cid:def456"
                       ],
                       "dids": [
-                        "did:mdip:dmail1",
-                        "did:mdip:dmail2"
+                        "did:cid:dmail1",
+                        "did:cid:dmail2"
                       ]
                     }
                   },
@@ -7079,12 +7079,12 @@
                     "description": "The updated NoticeMessage object.",
                     "example": {
                       "to": [
-                        "did:mdip:abc123",
-                        "did:mdip:def456"
+                        "did:cid:abc123",
+                        "did:cid:def456"
                       ],
                       "dids": [
-                        "did:mdip:dmail1",
-                        "did:mdip:dmail2"
+                        "did:cid:dmail1",
+                        "did:cid:dmail2"
                       ]
                     }
                   }

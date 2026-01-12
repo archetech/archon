@@ -1,5 +1,5 @@
 import { MongoClient, Db } from 'mongodb';
-import { InvalidDIDError } from '@mdip/common/errors';
+import { InvalidDIDError } from '@didcid/common/errors';
 import { GatekeeperDb, GatekeeperEvent, Operation, BlockId, BlockInfo } from '../types.js'
 
 interface DidsDoc {
@@ -37,7 +37,7 @@ export default class DbMongo implements GatekeeperDb {
     }
 
     async start(): Promise<void> {
-        this.client = new MongoClient(process.env.KC_MONGODB_URL || 'mongodb://localhost:27017');
+        this.client = new MongoClient(process.env.ARCHON_MONGODB_URL || 'mongodb://localhost:27017');
         await this.client.connect();
         this.db = this.client.db(this.dbName);
         await this.db.collection('dids').createIndex({ id: 1 });

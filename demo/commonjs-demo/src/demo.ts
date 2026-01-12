@@ -1,14 +1,14 @@
 // Subpath import example
-// import Keymaster from '@mdip/keymaster';
-// import KeymasterClient from '@mdip/keymaster/client';
-// import GatekeeperClient from '@mdip/gatekeeper/client';
-// import WalletJsonMemory from '@mdip/keymaster/wallet/json-memory';
-// import CipherNode from '@mdip/cipher/node';
+// import Keymaster from '@didcid/keymaster';
+// import KeymasterClient from '@didcid/keymaster/client';
+// import GatekeeperClient from '@didcid/gatekeeper/client';
+// import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
+// import CipherNode from '@didcid/cipher/node';
 
 // If your build does not support subpaths import use the following example
-import Keymaster, { KeymasterClient, WalletJsonMemory } from '@mdip/keymaster';
-import { GatekeeperClient } from '@mdip/gatekeeper';
-import CipherNode from '@mdip/cipher';
+import Keymaster, { KeymasterClient, WalletJsonMemory } from '@didcid/keymaster';
+import { GatekeeperClient } from '@didcid/gatekeeper';
+import CipherNode from '@didcid/cipher';
 
 import dotenv from 'dotenv';
 
@@ -42,7 +42,7 @@ async function main() {
             gatekeeper: gatekeeperClient,
             wallet,
             cipher,
-            passphrase: process.env.KC_ENCRYPTED_PASSPHRASE || "passphrase",
+            passphrase: process.env.ARCHON_ENCRYPTED_PASSPHRASE || "passphrase",
         });
     }
 

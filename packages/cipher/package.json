@@ -1,7 +1,7 @@
 {
-  "name": "@mdip/cipher",
-  "version": "1.4.0-beta.5",
-  "description": "MDIP cipher lib",
+  "name": "@didcid/cipher",
+  "version": "0.1.0",
+  "description": "Archon cipher lib",
   "type": "module",
   "main": "./dist/cjs/cipher-web.cjs",
   "module": "./dist/esm/cipher-web.js",
@@ -78,6 +78,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KeychainMDIP/kc.git"
+    "url": "git+https://github.com/archetech/archon.git"
   }
 }

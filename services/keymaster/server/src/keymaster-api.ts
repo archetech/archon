@@ -3,18 +3,18 @@ import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import GatekeeperClient from '@mdip/gatekeeper/client';
-import Keymaster from '@mdip/keymaster';
-import SearchClient from '@mdip/keymaster/search';
-import { WalletBase } from '@mdip/keymaster/types';
-import WalletJson from '@mdip/keymaster/wallet/json';
-import WalletRedis from '@mdip/keymaster/wallet/redis';
-import WalletMongo from '@mdip/keymaster/wallet/mongo';
-import WalletSQLite from '@mdip/keymaster/wallet/sqlite';
-import WalletEncrypted from '@mdip/keymaster/wallet/json-enc';
-import WalletCache from '@mdip/keymaster/wallet/cache';
-import CipherNode from '@mdip/cipher/node';
-import { InvalidParameterError } from '@mdip/common/errors';
+import GatekeeperClient from '@didcid/gatekeeper/client';
+import Keymaster from '@didcid/keymaster';
+import SearchClient from '@didcid/keymaster/search';
+import { WalletBase } from '@didcid/keymaster/types';
+import WalletJson from '@didcid/keymaster/wallet/json';
+import WalletRedis from '@didcid/keymaster/wallet/redis';
+import WalletMongo from '@didcid/keymaster/wallet/mongo';
+import WalletSQLite from '@didcid/keymaster/wallet/sqlite';
+import WalletEncrypted from '@didcid/keymaster/wallet/json-enc';
+import WalletCache from '@didcid/keymaster/wallet/cache';
+import CipherNode from '@didcid/cipher/node';
+import { InvalidParameterError } from '@didcid/common/errors';
 import config from './config.js';
 
 const app = express();
@@ -28,7 +28,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DIDNotFound = { error: 'DID not found' };
 
-const serveClient = (process.env.KC_KEYMASTER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
+const serveClient = (process.env.ARCHON_KEYMASTER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
 
 if (serveClient) {
     const clientBuildDir = path.join(__dirname, '../../client/build');
@@ -761,9 +761,9 @@ v1router.get('/export/wallet/encrypted', async (req, res) => {
  *                     didDocumentData:
  *                       type: object
  *                       description: Arbitrary data attached to the DID (only present for assets).
- *                     mdip:
+ *                     didDocumentRegister:
  *                       type: object
- *                       description: MDIP-specific metadata fields.
+ *                       description: Registration metadata fields.
  *                       properties:
  *                         type:
  *                           type: string
@@ -5400,8 +5400,8 @@ v1router.get('/dmail', async (req, res) => {
  *                 type: object
  *                 description: The Dmail message object to create.
  *                 example:
- *                   to: ["did:mdip:abc123", "did:mdip:def456"]
- *                   cc: ["did:mdip:ghi789"]
+ *                   to: ["did:cid:abc123", "did:cid:def456"]
+ *                   cc: ["did:cid:ghi789"]
  *                   subject: "Hello World"
  *                   body: "This is a test Dmail message."
  *               options:
@@ -5935,8 +5935,8 @@ v1router.get('/dmail/:id/attachments/:name', async (req, res) => {
  *                 type: object
  *                 description: The NoticeMessage object to create.
  *                 example:
- *                   to: ["did:mdip:abc123", "did:mdip:def456"]
- *                   dids: ["did:mdip:dmail1", "did:mdip:dmail2"]
+ *                   to: ["did:cid:abc123", "did:cid:def456"]
+ *                   dids: ["did:cid:dmail1", "did:cid:dmail2"]
  *               options:
  *                 type: object
  *                 description: Additional creation options (e.g., registry, validUntil).
@@ -5995,8 +5995,8 @@ v1router.post('/notices', async (req, res) => {
  *                 type: object
  *                 description: The updated NoticeMessage object.
  *                 example:
- *                   to: ["did:mdip:abc123", "did:mdip:def456"]
- *                   dids: ["did:mdip:dmail1", "did:mdip:dmail2"]
+ *                   to: ["did:cid:abc123", "did:cid:def456"]
+ *                   dids: ["did:cid:dmail1", "did:cid:dmail2"]
  *     responses:
  *       200:
  *         description: Indicates whether the update was successful.
@@ -6084,7 +6084,7 @@ async function waitForNodeId() {
     let isReady = false;
 
     if (!config.nodeID) {
-        throw new Error('KC_NODE_ID is not set in the configuration.');
+        throw new Error('ARCHON_NODE_ID is not set in the configuration.');
     }
 
     const ids = await keymaster.listIds();

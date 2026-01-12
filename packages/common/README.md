@@ -1,9 +1,9 @@
-# MDIP common
+# Archon common
 
-Common MDIP utilities and errors
+Common Archon utilities and errors
 
 ## Installation
 
 ```bash
-npm install @mdip/common
+npm install @didcid/common
 ```

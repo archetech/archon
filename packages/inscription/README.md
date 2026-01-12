@@ -1,4 +1,4 @@
-# @mdip/inscription
+# @didcid/inscription
 
 High‑level TypeScript/JavaScript library for creating and fee‑bumping Taproot inscription transactions using `bitcoinjs-lib`. It builds the standard two‑transaction flow (commit + reveal) and supports both P2TR and P2WPKH funding inputs. The library signs entirely in‑process using account‑level BIP32 extended private keys (xprv/tprv), no external signers or PSBT hand‑offs required.
 
@@ -7,11 +7,11 @@ High‑level TypeScript/JavaScript library for creating and fee‑bumping Taproo
 ## Installation
 
 ```bash
-npm install @mdip/inscription
+npm install @didcid/inscription
 ```
 
 ```ts
-import Inscription from '@mdip/inscription';
+import Inscription from '@didcid/inscription';
 
 const inscription = new Inscription({
   feeMax: 0.002,        // maximum total BTC fee you are willing to pay
@@ -103,7 +103,7 @@ Send both `commitHex` and `revealHex` immediately, in order (commit first). The 
 **Example**
 
 ```ts
-import Inscription from '@mdip/inscription';
+import Inscription from '@didcid/inscription';
 
 const inscription = new Inscription({ feeMax: 0.002, network: 'bitcoin' });
 const queue = await gatekeeper.getQueue(REGISTRY);
@@ -182,7 +182,7 @@ Derives a Taproot (BIP86) bech32m address from an account‑level BIP86 xprv and
 **Example**
 
 ```ts
-import Inscription from '@mdip/inscription';
+import Inscription from '@didcid/inscription';
 
 const ins = new Inscription({ feeMax: 0.002, network: 'testnet' });
 const addr = ins.deriveP2TRAddress(process.env.BIP86_XPRV, "m/86/1/0/0/0");
@@ -205,7 +205,7 @@ Derives a Native SegWit (BIP84) bech32 P2WPKH address from an account‑level BI
 **Example**
 
 ```ts
-import Inscription from '@mdip/inscription';
+import Inscription from '@didcid/inscription';
 
 const ins = new Inscription({ feeMax: 0.002, network: 'testnet' });
 const addr = ins.deriveP2WPKHAddress(process.env.BIP84_XPRV, "m/84/1/0/0/0");

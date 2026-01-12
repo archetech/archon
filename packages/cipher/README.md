@@ -1,11 +1,11 @@
-# MDIP cipher
+# Archon cipher
 
-MDIP cryptography utilities for encryption/decryption and creating/verifying signatures.
+Archon cryptography utilities for encryption/decryption and creating/verifying signatures.
 
 ## Installation
 
 ```bash
-npm install @mdip/cipher
+npm install @didcid/cipher
 ```
 
 ## Usage
@@ -17,10 +17,10 @@ The classes are identical but have different package dependencies.
 
 ```js
 // Import using subpaths
-import CipherNode from '@mdip/cipher/node';
+import CipherNode from '@didcid/cipher/node';
 
 //Non-subpath import
-import CipherNode from '@mdip/cipher';
+import CipherNode from '@didcid/cipher';
 
 const cipher = new CipherNode();
 ```
@@ -29,10 +29,10 @@ const cipher = new CipherNode();
 
 ```js
 // Import using subpaths
-import CipherWeb from '@mdip/cipher/web';
+import CipherWeb from '@didcid/cipher/web';
 
 //Non-subpath import
-import CipherWeb from '@mdip/cipher';
+import CipherWeb from '@didcid/cipher';
 
 const cipher = new CipherWeb();
 ```

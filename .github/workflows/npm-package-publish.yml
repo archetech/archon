@@ -9,12 +9,12 @@ on:
         type: choice
         options:
           - 'all'
-          - '@mdip/cipher'
-          - '@mdip/common'
-          - '@mdip/gatekeeper'
-          - '@mdip/inscription'
-          - '@mdip/ipfs'
-          - '@mdip/keymaster'
+          - '@didcid/cipher'
+          - '@didcid/common'
+          - '@didcid/gatekeeper'
+          - '@didcid/inscription'
+          - '@didcid/ipfs'
+          - '@didcid/keymaster'
       version:
         description: 'Version bump type'
         required: true

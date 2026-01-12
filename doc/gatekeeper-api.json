@@ -167,7 +167,7 @@
                     "required": [
                       "type",
                       "created",
-                      "mdip",
+                      "register",
                       "signature"
                     ],
                     "properties": {
@@ -183,7 +183,7 @@
                         "format": "date-time",
                         "description": "Timestamp of when the operation was created."
                       },
-                      "mdip": {
+                      "register": {
                         "type": "object",
                         "required": [
                           "version",
@@ -193,7 +193,7 @@
                         "properties": {
                           "version": {
                             "type": "integer",
-                            "description": "MDIP version (e.g., 1)."
+                            "description": "Protocol version (e.g., 1)."
                           },
                           "type": {
                             "type": "string",
@@ -201,7 +201,7 @@
                               "agent",
                               "asset"
                             ],
-                            "description": "MDIP type."
+                            "description": "DID type."
                           },
                           "registry": {
                             "type": "string",
@@ -213,7 +213,7 @@
                             "description": "Optional expiration time for ephemeral DIDs."
                           }
                         },
-                        "description": "MDIP metadata fields for creation."
+                        "description": "Registration metadata fields for creation."
                       },
                       "signature": {
                         "type": "object",
@@ -244,11 +244,11 @@
                       },
                       "publicJwk": {
                         "type": "object",
-                        "description": "Required if mdip.type = \"agent\". Contains the public key in JWK format."
+                        "description": "Required if register.type = \"agent\". Contains the public key in JWK format."
                       },
                       "controller": {
                         "type": "string",
-                        "description": "Required if mdip.type = \"asset\". Must match the `signer` in `signature`."
+                        "description": "Required if register.type = \"asset\". Must match the `signer` in `signature`."
                       }
                     }
                   },
@@ -371,7 +371,7 @@
                     {
                       "type": "string",
                       "description": "A DID string (when a create operation succeeds).",
-                      "example": "did:mdip:z3v8AuahvBGDMXvCTWedYbxnH6C9ZrsEtEJAvip2XPzcZb8yo6A"
+                      "example": "did:cid:z3v8AuahvBGDMXvCTWedYbxnH6C9ZrsEtEJAvip2XPzcZb8yo6A"
                     },
                     {
                       "type": "boolean",
@@ -405,10 +405,10 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "description": "An MDIP Operation object.",
+                "description": "An Operation object.",
                 "required": [
                   "type",
-                  "mdip"
+                  "register"
                 ],
                 "properties": {
                   "type": {
@@ -424,9 +424,9 @@
                     "type": "string",
                     "description": "Optional DID (usually absent for create when generating)."
                   },
-                  "mdip": {
+                  "register": {
                     "type": "object",
-                    "description": "MDIP metadata for the operation.",
+                    "description": "Registration metadata for the operation.",
                     "required": [
                       "version",
                       "type",
@@ -674,9 +674,9 @@
                       "type": "object",
                       "description": "Arbitrary data attached to the DID (for assets)."
                     },
-                    "mdip": {
+                    "didDocumentRegister": {
                       "type": "object",
-                      "description": "MDIP-specific metadata fields.",
+                      "description": "Registration metadata fields.",
                       "properties": {
                         "type": {
                           "type": "string",
@@ -684,7 +684,7 @@
                             "agent",
                             "asset"
                           ],
-                          "description": "The MDIP type."
+                          "description": "The DID type."
                         },
                         "registry": {
                           "type": "string",
@@ -698,7 +698,7 @@
                         },
                         "version": {
                           "type": "integer",
-                          "description": "Supported MDIP version."
+                          "description": "Supported protocol version."
                         },
                         "validUntil": {
                           "type": "string",
@@ -954,7 +954,7 @@
                           "didDocumentMetadata": {
                             "type": "object"
                           },
-                          "mdip": {
+                          "didDocumentRegister": {
                             "type": "object"
                           }
                         }
@@ -1147,9 +1147,9 @@
                             "format": "date-time",
                             "description": "Creation timestamp (if `type = \"create\"`)."
                           },
-                          "mdip": {
+                          "register": {
                             "type": "object",
-                            "description": "MDIP metadata."
+                            "description": "Registration metadata."
                           },
                           "publicJwk": {
                             "type": "object",
@@ -1374,9 +1374,9 @@
                           "format": "date-time",
                           "description": "Timestamp when the DID was created (if `type = \"create\"`)."
                         },
-                        "mdip": {
+                        "register": {
                           "type": "object",
-                          "description": "MDIP metadata (type, version, registry)."
+                          "description": "Registration metadata (type, version, registry)."
                         },
                         "publicJwk": {
                           "type": "object",

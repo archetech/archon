@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "keymaster-sdk"
 version = "1.4.0-beta"
-description = "Keymaster is a client library for the MDIP"
+description = "Keymaster is a client library for Archon"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
@@ -17,4 +17,4 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/KeychainMDIP/kc/"
+Homepage = "https://github.com/archetech/archon/"

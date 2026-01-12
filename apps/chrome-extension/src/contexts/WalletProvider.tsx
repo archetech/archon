@@ -9,19 +9,19 @@ import React, {
     useState,
 } from "react";
 
-import GatekeeperClient from "@mdip/gatekeeper/client";
-import Keymaster from "@mdip/keymaster";
-import SearchClient from "@mdip/keymaster/search";
-import CipherWeb from "@mdip/cipher/web";
-import WalletChrome from "@mdip/keymaster/wallet/chrome";
-import { isEncryptedWallet, isLegacyV0, isV1WithEnc } from '@mdip/keymaster/wallet/typeGuards';
-import { StoredWallet, WalletBase } from "@mdip/keymaster/types";
-import WalletWebEncrypted from "@mdip/keymaster/wallet/web-enc";
+import GatekeeperClient from "@didcid/gatekeeper/client";
+import Keymaster from "@didcid/keymaster";
+import SearchClient from "@didcid/keymaster/search";
+import CipherWeb from "@didcid/cipher/web";
+import WalletChrome from "@didcid/keymaster/wallet/chrome";
+import { isEncryptedWallet, isLegacyV0, isV1WithEnc } from '@didcid/keymaster/wallet/typeGuards';
+import { StoredWallet, WalletBase } from "@didcid/keymaster/types";
+import WalletWebEncrypted from "@didcid/keymaster/wallet/web-enc";
 import PassphraseModal from "../modals/PassphraseModal";
 import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
-import { encMnemonic } from '@mdip/keymaster/encryption';
-import WalletJsonMemory from "@mdip/keymaster/wallet/json-memory";
+import { encMnemonic } from '@didcid/keymaster/encryption';
+import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 
 const gatekeeper = new GatekeeperClient();
 const cipher = new CipherWeb();

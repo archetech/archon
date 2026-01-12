@@ -1,6 +1,6 @@
 import React, { createContext, Dispatch, ReactNode, SetStateAction, useContext, useState } from "react";
 import { useWalletContext } from "./WalletProvider";
-import {DmailItem} from "@mdip/keymaster/types";
+import {DmailItem} from "@didcid/keymaster/types";
 
 interface VariablesContextValue {
     currentId: string;

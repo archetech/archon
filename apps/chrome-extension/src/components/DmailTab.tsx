@@ -42,7 +42,7 @@ import {
     ChevronRight,
     ArrowDropDown,
 } from "@mui/icons-material";
-import { DmailItem, DmailMessage } from '@mdip/keymaster/types';
+import { DmailItem, DmailMessage } from '@didcid/keymaster/types';
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
@@ -53,7 +53,7 @@ import CopyResolveDID from "./CopyResolveDID";
 import CopyDID from "./CopyDID";
 import DmailSearchModal, { AdvancedSearchParams } from "../modals/DmailSearchModal";
 import DisplayDID from "./DisplayDID";
-import { MdipDocument } from "@mdip/gatekeeper/types";
+import { DidCidDocument } from "@didcid/gatekeeper/types";
 import VersionNavigator from "./VersionNavigator";
 
 const DmailTab: React.FC = () => {
@@ -83,7 +83,7 @@ const DmailTab: React.FC = () => {
     const [bulkMenuAnchor, setBulkMenuAnchor] = useState<null | HTMLElement>(null);
     const [docVersion, setDocVersion] = useState<number>(1);
     const [docVersionMax, setDocVersionMax] = useState<number>(1);
-    const [docAtVersion, setDocAtVersion] = useState<MdipDocument | null>(null);
+    const [docAtVersion, setDocAtVersion] = useState<DidCidDocument | null>(null);
     const [createdAt, setCreatedAt] = useState<string | null>(null);
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();

@@ -1,15 +1,15 @@
 import sharp from 'sharp';
-import Gatekeeper from '@mdip/gatekeeper';
-import Keymaster from '@mdip/keymaster';
+import Gatekeeper from '@didcid/gatekeeper';
+import Keymaster from '@didcid/keymaster';
 import {
     GroupVault,
     GroupVaultLogin,
-} from '@mdip/keymaster/types';
-import CipherNode from '@mdip/cipher/node';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory';
-import WalletJsonMemory from '@mdip/keymaster/wallet/json-memory';
-import { ExpectedExceptionError, UnknownIDError, InvalidParameterError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
+} from '@didcid/keymaster/types';
+import CipherNode from '@didcid/cipher/node';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
+import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
+import { ExpectedExceptionError, UnknownIDError, InvalidParameterError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;

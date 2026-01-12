@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
-import Inscription from "@mdip/inscription";
-import GatekeeperClient from '@mdip/gatekeeper/client';
+import Inscription from "@didcid/inscription";
+import GatekeeperClient from '@didcid/gatekeeper/client';
 import JsonFile from "./db/jsonfile.js";
 import {
     AccountKeys,

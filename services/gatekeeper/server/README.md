@@ -1,4 +1,4 @@
-# MDIP Gatekeeper REST API server
+# Archon Gatekeeper REST API server
 
 The Gatekeeper service is responsible for guarding the integrity of the local DID database.
 Every DID has an associated sequence of operations, starting with a create operation.
@@ -10,8 +10,8 @@ Operations come from Keymaster clients such as end-user wallets and network medi
 
 | variable                        | default  | description                                                            |
 | ------------------------------- | ---------| ---------------------------------------------------------------------- |
-| `KC_GATEKEEPER_PORT`            | 4224     | Service port                                                           |
-| `KC_GATEKEEPER_DB`              | redis    | DID database adapter, must be `redis`, `json`, `mongodb`, or `sqlite`  |
-| `KC_GATEKEEPER_DID_PREFIX`      | did:test | Default prefix assigned to DIDs created                                |
-| `KC_GATEKEEPER_GC_INTERVAL`     | 15       | The number of minutes between garbage collection cycles (0 to disable) |
-| `KC_GATEKEEPER_STATUS_INTERVAL` |  5       | The number of minutes between logging status updates (0 to disable)    |
+| `ARCHON_GATEKEEPER_PORT`            | 4224     | Service port                                                           |
+| `ARCHON_GATEKEEPER_DB`              | redis    | DID database adapter, must be `redis`, `json`, `mongodb`, or `sqlite`  |
+| `ARCHON_GATEKEEPER_DID_PREFIX`      | did:test | Default prefix assigned to DIDs created                                |
+| `ARCHON_GATEKEEPER_GC_INTERVAL`     | 15       | The number of minutes between garbage collection cycles (0 to disable) |
+| `ARCHON_GATEKEEPER_STATUS_INTERVAL` |  5       | The number of minutes between logging status updates (0 to disable)    |

@@ -1,7 +1,7 @@
-import GatekeeperClient from '@mdip/gatekeeper/client';
-import Keymaster from '@mdip/keymaster';
-import WalletJson from '@mdip/keymaster/wallet/json';
-import CipherNode from '@mdip/cipher/node';
+import GatekeeperClient from '@didcid/gatekeeper/client';
+import Keymaster from '@didcid/keymaster';
+import WalletJson from '@didcid/keymaster/wallet/json';
+import CipherNode from '@didcid/cipher/node';
 
 let keymaster
 

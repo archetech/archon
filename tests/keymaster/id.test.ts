@@ -1,10 +1,10 @@
-import Gatekeeper from '@mdip/gatekeeper';
-import Keymaster from '@mdip/keymaster';
-import CipherNode from '@mdip/cipher/node';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory';
-import WalletJsonMemory from '@mdip/keymaster/wallet/json-memory';
-import { InvalidDIDError, ExpectedExceptionError, UnknownIDError, InvalidParameterError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
+import Gatekeeper from '@didcid/gatekeeper';
+import Keymaster from '@didcid/keymaster';
+import CipherNode from '@didcid/cipher/node';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
+import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
+import { InvalidDIDError, ExpectedExceptionError, UnknownIDError, InvalidParameterError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -55,7 +55,7 @@ describe('createId', () => {
         const did = await keymaster.createId(name);
         const doc = await keymaster.resolveDID(did);
 
-        expect(doc.mdip!.registry).toBe('hyperswarm');
+        expect(doc.didDocumentRegister!.registry).toBe('hyperswarm');
     });
 
     it('should create a new ID on customized default registry', async () => {
@@ -66,7 +66,7 @@ describe('createId', () => {
         const did = await keymaster.createId(name);
         const doc = await keymaster.resolveDID(did);
 
-        expect(doc.mdip!.registry).toBe(defaultRegistry);
+        expect(doc.didDocumentRegister!.registry).toBe(defaultRegistry);
     });
 
     it('should throw to create a second ID with the same name', async () => {
@@ -171,10 +171,10 @@ describe('createIdOperation', () => {
 
         expect(operation.type).toBe('create');
         expect(operation.created).toBeDefined();
-        expect(operation.mdip).toBeDefined();
-        expect(operation.mdip!.version).toBe(1);
-        expect(operation.mdip!.type).toBe('agent');
-        expect(operation.mdip!.registry).toBe('hyperswarm'); // Default registry
+        expect(operation.register).toBeDefined();
+        expect(operation.register!.version).toBe(1);
+        expect(operation.register!.type).toBe('agent');
+        expect(operation.register!.registry).toBe('hyperswarm'); // Default registry
         expect(operation.publicJwk).toBeDefined();
         expect(operation.signature).toBeDefined();
         expect(operation.signature!.signed).toBeDefined();
@@ -187,7 +187,7 @@ describe('createIdOperation', () => {
         const registry = 'TFTC';
         const operation = await keymaster.createIdOperation(name, 0, { registry });
 
-        expect(operation.mdip!.registry).toBe(registry);
+        expect(operation.register!.registry).toBe(registry);
         expect(operation.type).toBe('create');
         expect(operation.publicJwk).toBeDefined();
         expect(operation.signature).toBeDefined();
@@ -198,7 +198,7 @@ describe('createIdOperation', () => {
         const registry = 'local';
         const operation = await keymaster.createIdOperation(name, 0, { registry });
 
-        expect(operation.mdip!.registry).toBe(registry);
+        expect(operation.register!.registry).toBe(registry);
         expect(operation.type).toBe('create');
         expect(operation.publicJwk).toBeDefined();
         expect(operation.signature).toBeDefined();
@@ -255,7 +255,7 @@ describe('createIdOperation', () => {
         const msgHash = cipher.hashJSON({
             type: operation.type,
             created: operation.created,
-            mdip: operation.mdip,
+            register: operation.register,
             publicJwk: operation.publicJwk
         });
 
@@ -280,8 +280,8 @@ describe('createIdOperation', () => {
         // Verify the created DID resolves correctly
         const doc = await keymaster.resolveDID(did);
         expect(doc.didDocument!.id).toBe(did);
-        expect(doc.mdip!.type).toBe('agent');
-        expect(doc.mdip!.registry).toBe('hyperswarm');
+        expect(doc.didDocumentRegister!.type).toBe('agent');
+        expect(doc.didDocumentRegister!.registry).toBe('hyperswarm');
     });
 
     it('should use customized default registry when none specified', async () => {
@@ -297,7 +297,7 @@ describe('createIdOperation', () => {
         const name = 'Henry';
         const operation = await customKeymaster.createIdOperation(name);
 
-        expect(operation.mdip!.registry).toBe(defaultRegistry);
+        expect(operation.register!.registry).toBe(defaultRegistry);
     });
 });
 

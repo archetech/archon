@@ -15,15 +15,15 @@ Resolving a DID means fetching the documents associated with a DID. The document
 This example returns a Credential object that includes a schema in its `didDocumentData`:
 
 ```json {14-30}
-$ ./kc resolve-did did:mdip:test:z3v8AuaYLYSWZJUa4bSadeoiNA3ps8dWDYtsmJNMDJhbFDjaKaX
+$ ./archon resolve-did did:cid:test:z3v8AuaYLYSWZJUa4bSadeoiNA3ps8dWDYtsmJNMDJhbFDjaKaX
 {
     "@context": "https://w3id.org/did-resolution/v1",
     "didDocument": {
         "@context": [
             "https://www.w3.org/ns/did/v1"
         ],
-        "id": "did:mdip:test:z3v8AuaYLYSWZJUa4bSadeoiNA3ps8dWDYtsmJNMDJhbFDjaKaX",
-        "controller": "did:mdip:test:z3v8AuaaBKfwrt2Y7AAbDaGqLNgyn1BDhP7wUFpEMEngmwYwi17"
+        "id": "did:cid:test:z3v8AuaYLYSWZJUa4bSadeoiNA3ps8dWDYtsmJNMDJhbFDjaKaX",
+        "controller": "did:cid:test:z3v8AuaaBKfwrt2Y7AAbDaGqLNgyn1BDhP7wUFpEMEngmwYwi17"
     },
     "didDocumentMetadata": {
         "created": "2024-03-21T20:26:01.826Z"
@@ -45,7 +45,7 @@ $ ./kc resolve-did did:mdip:test:z3v8AuaYLYSWZJUa4bSadeoiNA3ps8dWDYtsmJNMDJhbFDj
         ],
         "type": "object"
     },
-    "mdip": {
+    "didDocumentRegister": {
         "registry": "hyperswarm",
         "type": "asset",
         "version": 1

@@ -1,4 +1,4 @@
-import { Operation } from '@mdip/gatekeeper/types';
+import { Operation } from '@didcid/gatekeeper/types';
 import { gzipSync } from "zlib";
 import * as bitcoin from 'bitcoinjs-lib';
 import { ECPairFactory } from 'ecpair';
@@ -18,7 +18,7 @@ bitcoin.initEccLib(ecc);
 const bip32 = BIP32Factory(ecc);
 const ECPair = ECPairFactory(ecc);
 
-const PROTOCOL_TAG = Buffer.from('MDIP', 'ascii');
+const ARCHON_TAG = Buffer.from('ARCHON', 'ascii');
 const MAX_LEAF_BYTES = 10 * 1024;
 const MAX_LEAVES = 38;
 const HARD_LIMIT = MAX_LEAF_BYTES * MAX_LEAVES;
@@ -53,12 +53,12 @@ export default class Inscription {
 
         const ops = this.tryParseOperationArray(payload);
 
-        let includeMdipTag = false;
+        let includeArchonTag = false;
         let batch: Operation[] = [];
         let payloadBuf: Buffer;
 
         if (ops) {
-            includeMdipTag = true;
+            includeArchonTag = true;
             for (const op of ops) {
                 const candidate = this.encodePayload([...batch, op], payloadEncoding);
                 if (candidate.length > HARD_LIMIT) {
@@ -82,7 +82,7 @@ export default class Inscription {
         const tapScripts: Buffer[] = [];
 
         for (const slice of slices) {
-            const tScript = this.buildInscriptionScript(xonly, slice, includeMdipTag);
+            const tScript = this.buildInscriptionScript(xonly, slice, includeArchonTag);
             tapScripts.push(tScript);
 
             const p2tr = bitcoin.payments.p2tr({
@@ -399,7 +399,7 @@ export default class Inscription {
             });
         }
 
-        const marker = Buffer.concat([PROTOCOL_TAG, Buffer.from([0x01])]);
+        const marker = Buffer.concat([ARCHON_TAG, Buffer.from([0x01])]);
         psbt.addOutput({
             script: bitcoin.script.compile([bitcoin.opcodes.OP_RETURN, marker]),
             value: 0,
@@ -520,7 +520,7 @@ export default class Inscription {
 
         const revealTx = bitcoin.Transaction.fromHex(revealHex);
 
-        const mdipScripts: Buffer[] = [];
+        const archonScripts: Buffer[] = [];
         const anyScripts: Buffer[] = [];
 
         for (const inp of revealTx.ins) {
@@ -531,12 +531,12 @@ export default class Inscription {
 
             const tScript = Buffer.from(w[w.length - 2]);
             anyScripts.push(tScript);
-            if (tScript.includes(PROTOCOL_TAG)) {
-                mdipScripts.push(tScript);
+            if (tScript.includes(ARCHON_TAG)) {
+                archonScripts.push(tScript);
             }
         }
 
-        const tapScripts = mdipScripts.length ? mdipScripts : anyScripts;
+        const tapScripts = archonScripts.length ? archonScripts : anyScripts;
         if (tapScripts.length === 0) {
             throw new Error('no Taproot-inscription inputs found in reveal tx');
         }
@@ -567,7 +567,7 @@ export default class Inscription {
         return out;
     }
 
-    private buildInscriptionScript(xonly: Buffer, payload: Buffer, includeMdipTag: boolean): Buffer {
+    private buildInscriptionScript(xonly: Buffer, payload: Buffer, includeArchonTag: boolean): Buffer {
         const { script, opcodes } = bitcoin;
 
         const chunks: Buffer[] = [];
@@ -580,7 +580,7 @@ export default class Inscription {
             opcodes.OP_CHECKSIG,
             opcodes.OP_FALSE,
             opcodes.OP_IF,
-            ...(includeMdipTag ? [PROTOCOL_TAG] : []),
+            ...(includeArchonTag ? [ARCHON_TAG] : []),
             ...chunks,
             opcodes.OP_ENDIF,
         ]);

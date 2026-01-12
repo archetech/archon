@@ -15,7 +15,7 @@ export function extractDid(input: string): string | null {
     try {
         const url = new URL(input);
 
-        if (url.protocol === 'mdip:') {
+        if (url.protocol === 'archon:') {
             const host = (url.host || '').toLowerCase();
 
             if (host === 'auth') {

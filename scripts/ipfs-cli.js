@@ -1,11 +1,11 @@
 import { program } from 'commander';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import KuboClient from '@mdip/ipfs/kubo';
+import KuboClient from '@didcid/ipfs/kubo';
 
 dotenv.config();
 const ipfs = new KuboClient();
-await ipfs.connect({ url: process.env.KC_IPFS_URL });
+await ipfs.connect({ url: process.env.ARCHON_IPFS_URL });
 
 program
     .version('1.0.0')

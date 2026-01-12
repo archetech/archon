@@ -4,7 +4,7 @@ import { AbstractBase } from './abstract-base.js';
 export default class WalletChrome extends AbstractBase {
     walletName: string;
 
-    constructor(walletName: string = 'mdip-keymaster') {
+    constructor(walletName: string = 'archon-keymaster') {
         super();
         this.walletName = walletName;
     }

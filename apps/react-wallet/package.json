@@ -1,7 +1,7 @@
 {
-  "name": "@mdip/react-wallet",
+  "name": "@didcid/react-wallet",
   "version": "1.4.0-beta.5",
-  "description": "MDIP Android Demo",
+  "description": "Archon Android Demo",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

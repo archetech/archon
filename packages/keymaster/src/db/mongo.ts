@@ -17,7 +17,7 @@ export default class WalletMongo extends AbstractBase {
 
     constructor(walletKey: string = 'wallet') {
         super();
-        const url = process.env.KC_MONGODB_URL || 'mongodb://localhost:27017';
+        const url = process.env.ARCHON_MONGODB_URL || 'mongodb://localhost:27017';
         this.client = new MongoClient(url);
         this.collectionName = walletKey;
     }

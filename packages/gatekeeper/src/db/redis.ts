@@ -1,5 +1,5 @@
 import { Redis } from 'ioredis';
-import { InvalidDIDError } from '@mdip/common/errors';
+import { InvalidDIDError } from '@didcid/common/errors';
 import { GatekeeperDb, GatekeeperEvent, Operation, BlockId, BlockInfo } from '../types.js'
 
 const REDIS_NOT_STARTED_ERROR = 'Redis not started. Call start() first.';
@@ -22,7 +22,7 @@ export default class DbRedis implements GatekeeperDb {
     }
 
     async start(): Promise<void> {
-        const url = process.env.KC_REDIS_URL || 'redis://localhost:6379';
+        const url = process.env.ARCHON_REDIS_URL || 'redis://localhost:6379';
         this.redis = new Redis(url);
     }
 

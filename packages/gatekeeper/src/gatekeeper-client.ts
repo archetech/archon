@@ -7,7 +7,7 @@ import {
     GatekeeperEvent,
     GetStatusResult,
     Operation,
-    MdipDocument,
+    DidCidDocument,
     ResolveDIDOptions,
     GetDIDOptions,
     ImportBatchResult,
@@ -176,7 +176,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
-    async resolveDID(did: string, options?: ResolveDIDOptions): Promise<MdipDocument> {
+    async resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument> {
         try {
             if (options) {
                 const queryParams = new URLSearchParams(options as Record<string, string>);
@@ -215,7 +215,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
-    async getDIDs(options?: GetDIDOptions): Promise<string[] | MdipDocument[]> {
+    async getDIDs(options?: GetDIDOptions): Promise<string[] | DidCidDocument[]> {
         try {
             const response = await this.axios.post(`${this.API}/dids`, options);
             return response.data;

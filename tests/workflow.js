@@ -1,8 +1,8 @@
-import Keymaster from '@mdip/keymaster';
-import WalletJson from '@mdip/keymaster/wallet/json';
-import CipherNode from '@mdip/cipher/node';
-import Gatekeeper from '@mdip/gatekeeper';
-import DbJson from '@mdip/gatekeeper/db/json';
+import Keymaster from '@didcid/keymaster';
+import WalletJson from '@didcid/keymaster/wallet/json';
+import CipherNode from '@didcid/cipher/node';
+import Gatekeeper from '@didcid/gatekeeper';
+import DbJson from '@didcid/gatekeeper/db/json';
 
 const mockSchema = {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -142,7 +142,7 @@ async function runWorkflow(keymaster) {
 }
 
 async function main() {
-    const db = new DbJson('mdip-workflow');
+    const db = new DbJson('archon-workflow');
     const gatekeeper = new Gatekeeper({ db });
 
     const wallet = new WalletJson();

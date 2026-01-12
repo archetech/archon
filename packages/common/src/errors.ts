@@ -1,4 +1,4 @@
-export class MDIPError extends Error {
+export class ArchonError extends Error {
     public type: string;
     public detail?: string;
 
@@ -10,7 +10,7 @@ export class MDIPError extends Error {
     }
 }
 
-export class InvalidDIDError extends MDIPError {
+export class InvalidDIDError extends ArchonError {
     static type = 'Invalid DID';
 
     constructor(detail?: string) {
@@ -18,7 +18,7 @@ export class InvalidDIDError extends MDIPError {
     }
 }
 
-export class InvalidParameterError extends MDIPError {
+export class InvalidParameterError extends ArchonError {
     static type = 'Invalid parameter';
 
     constructor(detail?: string) {
@@ -26,7 +26,7 @@ export class InvalidParameterError extends MDIPError {
     }
 }
 
-export class InvalidOperationError extends MDIPError {
+export class InvalidOperationError extends ArchonError {
     static type = 'Invalid operation';
 
     constructor(detail?: string) {
@@ -34,7 +34,7 @@ export class InvalidOperationError extends MDIPError {
     }
 }
 
-export class KeymasterError extends MDIPError {
+export class KeymasterError extends ArchonError {
     static type = 'Keymaster';
 
     constructor(detail?: string) {
@@ -42,7 +42,7 @@ export class KeymasterError extends MDIPError {
     }
 }
 
-export class UnknownIDError extends MDIPError {
+export class UnknownIDError extends ArchonError {
     static type = 'Unknown ID';
 
     constructor(detail?: string) {
@@ -51,7 +51,7 @@ export class UnknownIDError extends MDIPError {
 }
 
 // For unit tests
-export class ExpectedExceptionError extends MDIPError {
+export class ExpectedExceptionError extends ArchonError {
     static type = 'Expected to throw an exception';
 
     constructor() {

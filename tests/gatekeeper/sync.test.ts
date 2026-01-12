@@ -1,9 +1,9 @@
-import CipherNode from '@mdip/cipher/node';
-import Gatekeeper from '@mdip/gatekeeper';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory.ts';
-import { copyJSON } from '@mdip/common/utils';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
+import CipherNode from '@didcid/cipher/node';
+import Gatekeeper from '@didcid/gatekeeper';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
+import { copyJSON } from '@didcid/common/utils';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
 import TestHelper from './helper.ts';
 
 const mockConsole = {
@@ -96,11 +96,11 @@ describe('exportDIDs', () => {
     it('should export a DIDs in order requested', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
-        delete agentOp.mdip!.validUntil;
+        delete agentOp.register!.validUntil;
         const agentDID = await gatekeeper.createDID(agentOp);
 
         const assetOp = await helper.createAssetOp(agentDID, keypair);
-        delete assetOp.mdip!.validUntil;
+        delete assetOp.register!.validUntil;
         const assetDID = await gatekeeper.createDID(assetOp);
 
         const exports = await gatekeeper.exportDIDs([assetDID, agentDID]);
@@ -350,53 +350,53 @@ describe('importBatch', () => {
         expect(response.rejected).toBe(1);
     });
 
-    it('should report an error on missing mdip metadata', async () => {
+    it('should report an error on missing register metadata', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        delete ops[0].operation.mdip;
+        delete ops[0].operation.register;
 
         const response = await gatekeeper.importBatch(ops);
 
         expect(response.rejected).toBe(1);
     });
 
-    it('should report an error on invalid mdip version', async () => {
+    it('should report an error on invalid register version', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].operation.mdip!.version = -1;
+        ops[0].operation.register!.version = -1;
 
         const response = await gatekeeper.importBatch(ops);
 
         expect(response.rejected).toBe(1);
     });
 
-    it('should report an error on invalid mdip type', async () => {
+    it('should report an error on invalid register type', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
         // @ts-expect-error Testing invalid usage
-        ops[0].operation.mdip!.type = 'mock';
+        ops[0].operation.register!.type = 'mock';
 
         const response = await gatekeeper.importBatch(ops);
 
         expect(response.rejected).toBe(1);
     });
 
-    it('should report an error on invalid mdip registry', async () => {
+    it('should report an error on invalid register registry', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].operation.mdip!.registry = 'mock';
+        ops[0].operation.register!.registry = 'mock';
 
         const response = await gatekeeper.importBatch(ops);
 

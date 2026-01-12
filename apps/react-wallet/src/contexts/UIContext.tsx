@@ -19,7 +19,7 @@ import {
 import { useWalletContext } from "./WalletProvider";
 import { useVariablesContext } from "./VariablesProvider";
 import { useSnackbar } from "./SnackbarProvider";
-import WalletWeb from "@mdip/keymaster/wallet/web";
+import WalletWeb from "@didcid/keymaster/wallet/web";
 
 interface UIContextValue {
     selectedTab: string;
@@ -259,8 +259,8 @@ export function UIProvider(
                 setPendingChallenge(did);
             }
         };
-        window.addEventListener('mdip:openAuth', onOpenAuth as EventListener);
-        return () => window.removeEventListener('mdip:openAuth', onOpenAuth as EventListener);
+        window.addEventListener('archon:openAuth', onOpenAuth as EventListener);
+        return () => window.removeEventListener('archon:openAuth', onOpenAuth as EventListener);
     }, []);
 
     useEffect(() => {
@@ -273,8 +273,8 @@ export function UIProvider(
                 setPendingHeldDID(did);
             }
         };
-        window.addEventListener('mdip:openAccept', onOpenAccept as EventListener);
-        return () => window.removeEventListener('mdip:openAccept', onOpenAccept as EventListener);
+        window.addEventListener('archon:openAccept', onOpenAccept as EventListener);
+        return () => window.removeEventListener('archon:openAccept', onOpenAccept as EventListener);
     }, []);
 
     useEffect(() => {
@@ -347,14 +347,14 @@ export function UIProvider(
                 const doc = await keymaster.resolveDID(name);
                 nameList[name] = did;
 
-                const reg = doc.mdip?.registry;
+                const reg = doc.didDocumentRegister?.registry;
                 if (reg) {
                     registryMap[name] = reg;
                 }
 
                 const data = doc.didDocumentData as Record<string, unknown>;
 
-                if (doc.mdip?.type === 'agent') {
+                if (doc.didDocumentRegister?.type === 'agent') {
                     agentList.push(name);
                     continue;
                 }

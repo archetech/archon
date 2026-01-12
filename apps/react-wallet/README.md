@@ -1,4 +1,4 @@
-# Android MDIP Demo
+# Android Archon Demo
 
 Install dependencies and run the app.
 
@@ -15,7 +15,7 @@ Install JDK 21, Android Studio (API 35) and then configure Capacitor path to And
 ### Mac
 export CAPACITOR_ANDROID_STUDIO_PATH="/Applications/Android Studio.app/Contents/MacOS/studio"
 
-### Linux 
+### Linux
 #### tarball install:
 export CAPACITOR_ANDROID_STUDIO_PATH="$HOME/android-studio/bin/studio.sh"
 

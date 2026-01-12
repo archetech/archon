@@ -6,7 +6,7 @@ The Assets screen allows a user to create and manage multiple types of digital a
 
 ## SCHEMAS Screen
 
-In the Schemas screen, users can create their own Verifiable Credential schemas or access schemas created and registered on MDIP by other users. Here, Alice creates a "ClubMembership" schema containing a "memberName".
+In the Schemas screen, users can create their own Verifiable Credential schemas or access schemas created and registered on Archon by other users. Here, Alice creates a "ClubMembership" schema containing a "memberName".
 
 ![SCHEMAS screen](schema-screen.png)
 

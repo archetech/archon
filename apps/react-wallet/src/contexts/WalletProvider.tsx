@@ -8,19 +8,19 @@ import {
     useRef,
     useState,
 } from "react";
-import GatekeeperClient from "@mdip/gatekeeper/client";
-import Keymaster from "@mdip/keymaster";
-import { WalletBase, StoredWallet } from '@mdip/keymaster/types';
-import { isEncryptedWallet, isV1WithEnc, isLegacyV0 } from '@mdip/keymaster/wallet/typeGuards';
-import SearchClient from "@mdip/keymaster/search";
-import CipherWeb from "@mdip/cipher";
-import WalletWeb from "@mdip/keymaster/wallet/web";
-import WalletWebEncrypted from "@mdip/keymaster/wallet/web-enc";
-import WalletJsonMemory from "@mdip/keymaster/wallet/json-memory";
+import GatekeeperClient from "@didcid/gatekeeper/client";
+import Keymaster from "@didcid/keymaster";
+import { WalletBase, StoredWallet } from '@didcid/keymaster/types';
+import { isEncryptedWallet, isV1WithEnc, isLegacyV0 } from '@didcid/keymaster/wallet/typeGuards';
+import SearchClient from "@didcid/keymaster/search";
+import CipherWeb from "@didcid/cipher";
+import WalletWeb from "@didcid/keymaster/wallet/web";
+import WalletWebEncrypted from "@didcid/keymaster/wallet/web-enc";
+import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 import PassphraseModal from "../modals/PassphraseModal";
 import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
-import { encMnemonic } from '@mdip/keymaster/encryption';
+import { encMnemonic } from '@didcid/keymaster/encryption';
 import { takeDeepLink } from '../utils/deepLinkQueue';
 import { extractDid } from '../utils/utils';
 import {
@@ -210,9 +210,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         window.dispatchEvent(evt);
     }
 
-    function parseMdip(url: string): { action?: string, did?: string | null } {
+    function parsePrefix(url: string): { action?: string, did?: string | null } {
         try {
-            const u = new URL(url.replace(/^mdip:\/\//, 'https://'));
+            const u = new URL(url.replace(/^archon:\/\//, 'https://'));
             const action = (u.hostname || u.pathname.replace(/^\//, '') || '').toLowerCase();
             const did = extractDid(url);
             return { action, did };
@@ -232,21 +232,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 return;
             }
 
-            const { action, did } = parseMdip(url);
+            const { action, did } = parsePrefix(url);
 
             if (action === 'accept' && did) {
-                openEvent(did, "mdip:openAccept");
+                openEvent(did, "archon:openAccept");
                 return;
             }
 
             if (did) {
-                openEvent(did, "mdip:openAuth");
+                openEvent(did, "archon:openAuth");
             }
         };
 
         handleQueued();
-        window.addEventListener('mdip:deepLinkQueued', handleQueued);
-        return () => window.removeEventListener('mdip:deepLinkQueued', handleQueued);
+        window.addEventListener('archon:deepLinkQueued', handleQueued);
+        return () => window.removeEventListener('archon:deepLinkQueued', handleQueued);
     }, [isReady]);
 
     async function handleWalletUploadFile(uploaded: unknown) {

@@ -1,15 +1,15 @@
 ---
-title: Keychain-MDIP CLI User Manual
+title: Archon CLI User Manual
 sidebar_label: CLI
 ---
 
-The CLI is a Command Line Interface to the Keychain implementation of the MultiDimensional Identity Protocol (MDIP). `kc` (short for KeyChain) is a script invoked in a unix-like terminal environment (bash, zsh, etc).
+The CLI is a Command Line Interface to Archon. `archon` is a script invoked in a unix-like terminal environment (bash, zsh, etc).
 
 ## Quickstart
 
-The Keychain-MDIP CLI is a user-facing tool used to interact with the MDIP sub-systems and networks.
+The Archon CLI is a user-facing tool used to interact with the Archon sub-systems and networks.
 
-The Keychain CLI brings together functionality from three important sub-components:
+The Archon CLI brings together functionality from three important sub-components:
 
 1. Decentralized Identity (DID) registration and management as defined by W3C DID Core.
 1. Verifiable Credential (VC) credential and management as defined by W3C VC Data Model.
@@ -17,17 +17,17 @@ The Keychain CLI brings together functionality from three important sub-componen
 
 ### Installation
 
-Keychain is provided as a set of docker containers and scripts:
+Archon is provided as a set of docker containers and scripts:
 
 1. From your terminal, download the repository and move to it:
 
    ```sh
    # SSH
-   git@github.com:KeychainMDIP/kc.git
+   git@github.com:archetech/archon.git
    #HTTPS
-   https://github.com/KeychainMDIP/kc.git
+   https://github.com/archetech/archon.git
 
-   cd kc
+   cd archon
    ```
 
 1. Copy `sample.env` to `.env`:
@@ -36,20 +36,20 @@ Keychain is provided as a set of docker containers and scripts:
    cp sample.env .env
    ```
 
-1. Edit the `KC_NODE_ID` and `KC_NODE_NAME` with unique values. The remaining values will be covered in futher documentation:
+1. Edit the `ARCHON_NODE_ID` and `ARCHON_NODE_NAME` with unique values. The remaining values will be covered in futher documentation:
 
    ```sh title=".env" {2-3}
    # Gatekeeper
-   KC_DEBUG=false
-   KC_NODE_NAME=mynode
-   KC_NODE_ID=mynodeID
-   KC_GATEKEEPER_DB=json
-   KC_GATEKEEPER_REGISTRIES=hyperswarm,TBTC,TFTC
+   ARCHON_DEBUG=false
+   ARCHON_NODE_NAME=mynode
+   ARCHON_NODE_ID=mynodeID
+   ARCHON_GATEKEEPER_DB=json
+   ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,TBTC,TFTC
 
    ...
    ```
 
-1. Run the keychain start script:
+1. Run the Archon start script:
 
    ```sh
    # Tied to the shell session:
@@ -59,7 +59,7 @@ Keychain is provided as a set of docker containers and scripts:
    ./start-node -d
    ```
 
-1. There's also a script to stop Keychain:
+1. There's also a script to stop Archon:
 
    ```sh
    ./stop-node
@@ -67,16 +67,16 @@ Keychain is provided as a set of docker containers and scripts:
 
 ### CLI
 
-All the CLI commands are self-documented using the `--help` flag, or by running `kc` with no flags:
+All the CLI commands are self-documented using the `--help` flag, or by running `archon` with no flags:
 
 <details>
 
-<summary><code>kc --help</code></summary>
+<summary><code>archon --help</code></summary>
 
 ```sh
-Usage: keychain-cli [options] [command]
+Usage: archon-cli [options] [command]
 
-Keychain CLI tool
+Archon CLI tool
 
 Options:
   -V, --version                              output the version number
@@ -177,21 +177,21 @@ Commands:
 The following examples use a `$` to denote the shell prompt:
 
 ```bash{promptUser: user}
-$ kc
+$ archon
 ```
 
 > [!NOTE]
-> Unless you edit your shell's `$PATH` variable, you need to invoke kc with a `./` prefix to run the script in the current directory:
+> Unless you edit your shell's `$PATH` variable, you need to invoke archon with a `./` prefix to run the script in the current directory:
 
 ```sh
-$ ./kc
+$ ./archon
 ```
 
 Begin by creating a new identity. This will be described in more detail later, but try it now with your own first name:
 
 ```sh
-$ kc create-id yourName
-did:mdip:test:z3v8AuaYd1CGfC6PCQDXKyKkbt5kJ4o3h2ABBNPGyGNQfEQ99Ce
+$ archon create-id yourName
+did:cid:test:z3v8AuaYd1CGfC6PCQDXKyKkbt5kJ4o3h2ABBNPGyGNQfEQ99Ce
 ```
 
 The long string returned starting with `did` will be unique to you. This is your new Decentralized IDentity (DID for short).

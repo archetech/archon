@@ -1,8 +1,8 @@
-[![unit-test](https://github.com/KeychainMDIP/kc/actions/workflows/unit-test.yml/badge.svg)](https://github.com/KeychainMDIP/kc/actions/workflows/unit-test.yml) [![Coverage Status](https://coveralls.io/repos/github/KeychainMDIP/kc/badge.svg?branch=main)](https://coveralls.io/github/KeychainMDIP/kc?branch=main)
+[![unit-test](https://github.com/archetech/archon/actions/workflows/unit-test.yml/badge.svg)](https://github.com/archetech/archon/actions/workflows/unit-test.yml) [![Coverage Status](https://coveralls.io/repos/github/archetech/archon/badge.svg?branch=main)](https://coveralls.io/github/archetech/archon?branch=main)
 
-# kc
+# Archon
 
-Keychain (kc) is the reference implementation of the Multi Dimensional Identity Protocol. Visit our website [keychain.org](https://keychain.org) for additional documentation and details.
+Archon is a decentralized identity (DID) protocol implementation. Visit our website [archetech.github.io/archon](https://archetech.github.io/archon) for additional documentation and details.
 
 ## Quick start
 
@@ -13,15 +13,15 @@ Recommended system requirements:
 - minimum of 8Gb RAM if operating a full trustless node
 
 ```
-$ git clone https://github.com/KeychainMDIP/kc
-$ cd kc
+$ git clone https://github.com/archetech/archon
+$ cd archon
 $ cp sample.env .env
 $ ./start-node
 ```
 
 ### Local Development (for developers)
 
-If you're developing or working on Keychain follow these additional steps after cloning.
+If you're developing or working on Archon follow these additional steps after cloning.
 
 ```bash
 npm install
@@ -30,21 +30,21 @@ npm run build
 
 ## Overview
 
-A Keychain MDIP node includes several interoperating microservices. If you follow the dependency arrows on the diagram below, you will end up at the central core service, the [Gatekeeper service](https://github.com/KeychainMDIP/kc/blob/main/services/gatekeeper/server/README.md) responsible for maintaining the integrity of the local DID database. The mediators are responsible for connecting the Gatekeeper to various networks such as [Hyperswarm](https://github.com/KeychainMDIP/kc/blob/main/services/mediators/hyperswarm/README.md). The TBTC (testnet Bitcoin) and TFTC (testnet Feathercoin) mediators are both instances of the [Satoshi mediator](https://github.com/KeychainMDIP/kc/blob/main/services/mediators/satoshi/README.md) since they are derived from Bitcoin core (they differ only in how they are configured). [Keymaster](https://github.com/KeychainMDIP/kc/blob/main/packages/keymaster/README.md) is the MDIP client responsible for holding the private keys and signing DID operations (create, update, delete) sent to Gatekeeper. The [browser web wallet](https://github.com/KeychainMDIP/kc/blob/main/services/gatekeeper/client/README.md), [browser extension](https://github.com/KeychainMDIP/kc/blob/main/apps/chrome-extension/README.md), and [Keymaster service](https://github.com/KeychainMDIP/kc/blob/main/services/keymaster/server/README.md) all use the [Keymaster library](https://github.com/KeychainMDIP/kc/blob/main/packages/keymaster/README.md). The [server web wallet](https://github.com/KeychainMDIP/kc/blob/main/services/keymaster/client/README.md) is the same as the browser web wallet, except it is configured to talk to the Keymaster service instead of hosting its own wallet. It uses the same [KeymasterClient](https://github.com/KeychainMDIP/kc/blob/main/packages/keymaster/src/keymaster-sdk.ts) as the kc CLI. There are two CLI (command line interface) components: [kc](scripts/keychain-cli.js) for talking to the Keymaster service, and [admin](scripts/admin-cli.js) for talking to the Gatekeeper service. The admin script uses the same [GatekeeperClient](https://github.com/KeychainMDIP/kc/blob/main/packages/gatekeeper/README.md) as the Keymaster service and the mediators.
+An Archon node includes several interoperating microservices. If you follow the dependency arrows on the diagram below, you will end up at the central core service, the [Gatekeeper service](https://github.com/archetech/archon/blob/main/services/gatekeeper/server/README.md) responsible for maintaining the integrity of the local DID database. The mediators are responsible for connecting the Gatekeeper to various networks such as [Hyperswarm](https://github.com/archetech/archon/blob/main/services/mediators/hyperswarm/README.md). The TBTC (testnet Bitcoin) and TFTC (testnet Feathercoin) mediators are both instances of the [Satoshi mediator](https://github.com/archetech/archon/blob/main/services/mediators/satoshi/README.md) since they are derived from Bitcoin core (they differ only in how they are configured). [Keymaster](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md) is the Archon client responsible for holding the private keys and signing DID operations (create, update, delete) sent to Gatekeeper. The [browser web wallet](https://github.com/archetech/archon/blob/main/services/gatekeeper/client/README.md), [browser extension](https://github.com/archetech/archon/blob/main/apps/chrome-extension/README.md), and [Keymaster service](https://github.com/archetech/archon/blob/main/services/keymaster/server/README.md) all use the [Keymaster library](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md). The [server web wallet](https://github.com/archetech/archon/blob/main/services/keymaster/client/README.md) is the same as the browser web wallet, except it is configured to talk to the Keymaster service instead of hosting its own wallet. It uses the same [KeymasterClient](https://github.com/archetech/archon/blob/main/packages/keymaster/src/keymaster-sdk.ts) as the archon CLI. There are two CLI (command line interface) components: [archon](scripts/archon-cli.js) for talking to the Keymaster service, and [admin](scripts/admin-cli.js) for talking to the Gatekeeper service. The admin script uses the same [GatekeeperClient](https://github.com/archetech/archon/blob/main/packages/gatekeeper/README.md) as the Keymaster service and the mediators.
 
 
-![alt text](keychain-node.png)
+![alt text](archon-node.png)
 
 ## Node configuration
 
-Customize your node in the kc/.env file. Environment variables are documented for each service in the READMEs linked in the Overview above.
+Customize your node in the archon/.env file. Environment variables are documented for each service in the READMEs linked in the Overview above.
 
 ```
-KC_UID=1000                                        # Docker host UID
-KC_GID=1002                                        # Docker host GID
-KC_NODE_NAME=anon                                  # Hyperswarm node name
-KC_NODE_ID=anon                                    # Node Keymaster DID name
-KC_GATEKEEPER_REGISTRIES=hyperswarm,TBTC,TFTC      # Supported DID Registries
+ARCHON_UID=1000                                        # Docker host UID
+ARCHON_GID=1002                                        # Docker host GID
+ARCHON_NODE_NAME=anon                                  # Hyperswarm node name
+ARCHON_NODE_ID=anon                                    # Node Keymaster DID name
+ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,TBTC,TFTC      # Supported DID Registries
 ...
 {adjust registry details for advanced users only}
 ```
@@ -53,23 +53,23 @@ Once your node is operational (start-node), you can setup local dependencies and
 
 ```
 $ npm ci                                     # Installs all node package dependencies
-$ ./kc -h                                    # Displays kc CLI help
-$ ./kc create-id anon TBTC                   # Creates Node Keymaster DID name (set as KC_NODE_ID in .env)
-$ ./scripts/tbtc-cli createwallet mdip       # Creates MDIP wallet for Bitcoin Testnet registry
+$ ./archon -h                                # Displays archon CLI help
+$ ./archon create-id anon TBTC               # Creates Node Keymaster DID name (set as ARCHON_NODE_ID in .env)
+$ ./scripts/tbtc-cli createwallet archon     # Creates Archon wallet for Bitcoin Testnet registry
 $ ./scripts/tbtc-cli getnewaddress           # Get a new address to fund Bitcoin Testnet wallet
 $ ./scripts/tbtc-cli getwalletinfo           # Get a general status of confirmed and incoming funds
 ```
 
 ## Command line interface wallet
 
-Use the CLI `./kc` or the web app at http://localhost:4226 to access the server-side wallet.
+Use the CLI `./archon` or the web app at http://localhost:4226 to access the server-side wallet.
 Use the web app at http://localhost:4224 to access a client-side (browser) wallet.
 
 ```
-$ ./kc
-Usage: keychain-cli [options] [command]
+$ ./archon
+Usage: archon-cli [options] [command]
 
-Keychain CLI tool
+Archon CLI tool
 
 Options:
   -V, --version                              output the version number

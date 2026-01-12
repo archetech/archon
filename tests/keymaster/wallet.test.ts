@@ -1,21 +1,21 @@
-import Gatekeeper from '@mdip/gatekeeper';
-import Keymaster from '@mdip/keymaster';
-import { WalletEncFile } from '@mdip/keymaster/types';
+import Gatekeeper from '@didcid/gatekeeper';
+import Keymaster from '@didcid/keymaster';
+import { WalletEncFile } from '@didcid/keymaster/types';
 import {
     EncryptedWallet,
     Seed,
     WalletFile,
-} from '@mdip/keymaster/types';
-import CipherNode from '@mdip/cipher/node';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory';
-import WalletJsonMemory from '@mdip/keymaster/wallet/json-memory';
-import WalletEncrypted from '@mdip/keymaster/wallet/json-enc';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
-import { MdipDocument } from "@mdip/gatekeeper/types";
+} from '@didcid/keymaster/types';
+import CipherNode from '@didcid/cipher/node';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
+import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
+import WalletEncrypted from '@didcid/keymaster/wallet/json-enc';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
+import { DidCidDocument } from "@didcid/gatekeeper/types";
 import { TestHelper } from './helper.ts';
 import { disableSubtle } from './testUtils.ts';
-import { encMnemonic, decMnemonic } from '@mdip/keymaster/encryption';
+import { encMnemonic, decMnemonic } from '@didcid/keymaster/encryption';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -153,7 +153,7 @@ describe('loadWallet', () => {
             await wallet_enc.loadWallet();
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('KC_ENCRYPTED_PASSPHRASE not set');
+            expect(error.message).toBe('ARCHON_ENCRYPTED_PASSPHRASE not set');
         }
     });
 
@@ -467,7 +467,7 @@ describe('exportEncryptedWallet', () => {
 
 describe('updateSeedBank', () => {
     it('should throw error on missing DID', async () => {
-        const doc: MdipDocument = {};
+        const doc: DidCidDocument = {};
 
         try {
             await keymaster.updateSeedBank(doc);

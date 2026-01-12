@@ -37,7 +37,7 @@ import {
     Link,
     ArrowBack,
 } from "@mui/icons-material";
-import { DmailItem, DmailMessage } from '@mdip/keymaster/types';
+import { DmailItem, DmailMessage } from '@didcid/keymaster/types';
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
@@ -49,7 +49,7 @@ import CopyDID from "./CopyDID";
 import DmailSearchModal, { AdvancedSearchParams } from "../modals/DmailSearchModal";
 import DisplayDID from "./DisplayDID";
 import VersionNavigator from "./VersionNavigator";
-import { MdipDocument } from "@mdip/gatekeeper/types";
+import { DidCidDocument } from "@didcid/gatekeeper/types";
 
 const DmailTab: React.FC = () => {
     const [registry, setRegistry] = useState<string>("hyperswarm");
@@ -57,7 +57,7 @@ const DmailTab: React.FC = () => {
     const [selectedView, setSelectedView] = useState<(DmailItem & { did: string }) | null>(null);
     const [docVersion, setDocVersion] = useState<number>(1);
     const [docVersionMax, setDocVersionMax] = useState<number>(1);
-    const [docAtVersion, setDocAtVersion] = useState<MdipDocument | null>(null);
+    const [docAtVersion, setDocAtVersion] = useState<DidCidDocument | null>(null);
     const [createdAt, setCreatedAt] = useState<string | null>(null);
     const [sendTo, setSendTo] = useState<string>("");
     const [sendSubject, setSendSubject] = useState<string>("");

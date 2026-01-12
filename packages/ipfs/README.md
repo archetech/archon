@@ -1,11 +1,11 @@
-# MDIP IPFS
+# Archon IPFS
 
-MDIP utilities for integrating with IPFS.
+Archon utilities for integrating with IPFS.
 
 ## Installation
 
 ```bash
-npm install @mdip/ipfs
+npm install @didcid/ipfs
 ```
 
 ## Usage
@@ -14,10 +14,10 @@ npm install @mdip/ipfs
 
 ```js
 // Import using subpaths
-import HeliaClient from '@mdip/ipfs/helia';
+import HeliaClient from '@didcid/ipfs/helia';
 
 // Non-subpath import
-import { HeliaClient } from '@mdip/ipfs';
+import { HeliaClient } from '@didcid/ipfs';
 
 const ipfs = new HeliaClient();
 

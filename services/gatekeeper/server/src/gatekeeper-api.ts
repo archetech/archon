@@ -5,18 +5,18 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { EventEmitter } from 'events';
 
-import Gatekeeper from '@mdip/gatekeeper';
-import DbJsonCache from '@mdip/gatekeeper/db/json-cache';
-import DbRedis from '@mdip/gatekeeper/db/redis';
-import DbSqlite from '@mdip/gatekeeper/db/sqlite';
-import DbMongo from '@mdip/gatekeeper/db/mongo';
-import { CheckDIDsResult, ResolveDIDOptions, Operation } from '@mdip/gatekeeper/types';
-import KuboClient from '@mdip/ipfs/kubo';
+import Gatekeeper from '@didcid/gatekeeper';
+import DbJsonCache from '@didcid/gatekeeper/db/json-cache';
+import DbRedis from '@didcid/gatekeeper/db/redis';
+import DbSqlite from '@didcid/gatekeeper/db/sqlite';
+import DbMongo from '@didcid/gatekeeper/db/mongo';
+import { CheckDIDsResult, ResolveDIDOptions, Operation } from '@didcid/gatekeeper/types';
+import KuboClient from '@didcid/ipfs/kubo';
 import config from './config.js';
 
 EventEmitter.defaultMaxListeners = 100;
 
-const dbName = 'mdip';
+const dbName = 'archon';
 const db = (() => {
     switch (config.db) {
     case 'sqlite': return new DbSqlite(dbName);
@@ -60,7 +60,7 @@ app.use(express.json({ limit: config.jsonLimit }));
 // Define __dirname in ES module scope
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const serveClient = (process.env.KC_GATEKEEPER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
+const serveClient = (process.env.ARCHON_GATEKEEPER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
 
 if (serveClient) {
     const clientBuildDir = path.join(__dirname, '../../client/build');
@@ -225,7 +225,7 @@ v1router.get('/status', async (req, res) => {
  *           schema:
  *             oneOf:
  *               - type: object
- *                 required: [ type, created, mdip, signature ]
+ *                 required: [ type, created, register, signature ]
  *                 properties:
  *                   type:
  *                     type: string
@@ -235,17 +235,17 @@ v1router.get('/status', async (req, res) => {
  *                     type: string
  *                     format: date-time
  *                     description: Timestamp of when the operation was created.
- *                   mdip:
+ *                   register:
  *                     type: object
  *                     required: [ version, type, registry ]
  *                     properties:
  *                       version:
  *                         type: integer
- *                         description: MDIP version (e.g., 1).
+ *                         description: Protocol version (e.g., 1).
  *                       type:
  *                         type: string
  *                         enum: [ "agent", "asset" ]
- *                         description: MDIP type.
+ *                         description: DID type.
  *                       registry:
  *                         type: string
  *                         description: Registry where the DID is created.
@@ -253,7 +253,7 @@ v1router.get('/status', async (req, res) => {
  *                         type: string
  *                         format: date-time
  *                         description: Optional expiration time for ephemeral DIDs.
- *                     description: MDIP metadata fields for creation.
+ *                     description: Registration metadata fields for creation.
  *                   signature:
  *                     type: object
  *                     description: Cryptographic signature verifying the create operation.
@@ -274,10 +274,10 @@ v1router.get('/status', async (req, res) => {
  *                         description: Hash of the operation payload, if applicable.
  *                   publicJwk:
  *                     type: object
- *                     description: Required if mdip.type = "agent". Contains the public key in JWK format.
+ *                     description: Required if register.type = "agent". Contains the public key in JWK format.
  *                   controller:
  *                     type: string
- *                     description: Required if mdip.type = "asset". Must match the `signer` in `signature`.
+ *                     description: Required if register.type = "asset". Must match the `signer` in `signature`.
  *
  *               - type: object
  *                 required: [ type, did, signature ]
@@ -354,7 +354,7 @@ v1router.get('/status', async (req, res) => {
  *               oneOf:
  *                 - type: string
  *                   description: A DID string (when a create operation succeeds).
- *                   example: did:mdip:z3v8AuahvBGDMXvCTWedYbxnH6C9ZrsEtEJAvip2XPzcZb8yo6A
+ *                   example: did:cid:z3v8AuahvBGDMXvCTWedYbxnH6C9ZrsEtEJAvip2XPzcZb8yo6A
  *                 - type: boolean
  *                   description: A success indicator for update/delete operations.
  *                   example: true
@@ -393,8 +393,8 @@ v1router.post('/did', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             description: An MDIP Operation object.
- *             required: [ type, mdip ]
+ *             description: An Operation object.
+ *             required: [ type, register ]
  *             properties:
  *               type:
  *                 type: string
@@ -406,9 +406,9 @@ v1router.post('/did', async (req, res) => {
  *               did:
  *                 type: string
  *                 description: Optional DID (usually absent for create when generating).
- *               mdip:
+ *               register:
  *                 type: object
- *                 description: MDIP metadata for the operation.
+ *                 description: Registration metadata for the operation.
  *                 required: [ version, type, registry ]
  *                 properties:
  *                   version:
@@ -603,21 +603,21 @@ v1router.post("/did/generate", async (req, res) => {
  *                 didDocumentData:
  *                   type: object
  *                   description: Arbitrary data attached to the DID (for assets).
- *                 mdip:
+ *                 didDocumentRegister:
  *                   type: object
- *                   description: MDIP-specific metadata fields.
+ *                   description: Registration metadata fields.
  *                   properties:
  *                     type:
  *                       type: string
  *                       enum: [ "agent", "asset" ]
- *                       description: The MDIP type.
+ *                       description: The DID type.
  *                     registry:
  *                       type: string
  *                       enum: [ "local", "hyperswarm", "TBTC", "TFTC" ]
  *                       description: Registry in which this DID is maintained.
  *                     version:
  *                       type: integer
- *                       description: Supported MDIP version.
+ *                       description: Supported protocol version.
  *                     validUntil:
  *                       type: string
  *                       format: date-time
@@ -855,7 +855,7 @@ v1router.delete('/did/:did', async (req, res) => {
  *                         description: DID Document contents
  *                       didDocumentMetadata:
  *                         type: object
- *                       mdip:
+ *                       register:
  *                         type: object
  *
  *       500:
@@ -1026,9 +1026,9 @@ v1router.post('/dids/export', async (req, res) => {
  *                         type: string
  *                         format: date-time
  *                         description: Creation timestamp (if `type = "create"`).
- *                       mdip:
+ *                       register:
  *                         type: object
- *                         description: MDIP metadata.
+ *                         description: Registration metadata.
  *                       publicJwk:
  *                         type: object
  *                         description: Public key in JWK format (required for agent creates).
@@ -1205,9 +1205,9 @@ v1router.post('/batch/export', async (req, res) => {
  *                       type: string
  *                       format: date-time
  *                       description: Timestamp when the DID was created (if `type = "create"`).
- *                     mdip:
+ *                     register:
  *                       type: object
- *                       description: MDIP metadata (type, version, registry).
+ *                       description: Registration metadata (type, version, registry).
  *                     publicJwk:
  *                       type: object
  *                       description: Public key in JWK format, required for "agent" creation.
@@ -2130,7 +2130,7 @@ function formatBytes(bytes: number) {
 }
 
 async function main() {
-    console.log(`Starting KeychainMDIP Gatekeeper with a db (${config.db}) check...`);
+    console.log(`Starting Archon Gatekeeper with a db (${config.db}) check...`);
     await reportStatus();
 
     if (config.statusInterval > 0) {

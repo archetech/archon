@@ -2,7 +2,7 @@ import { program } from 'commander';
 import fs from 'fs';
 import dotenv from 'dotenv';
 
-import KeymasterClient from '@mdip/keymaster/client';
+import KeymasterClient from '@didcid/keymaster/client';
 
 dotenv.config();
 
@@ -12,8 +12,8 @@ const UPDATE_OK = "OK";
 const UPDATE_FAILED = "Update failed";
 
 program
-    .version('1.0.0')
-    .description('Keychain CLI tool')
+    .version('0.1.0')
+    .description('Archon CLI tool')
     .configureHelp({ sortSubcommands: true });
 
 program
@@ -1269,7 +1269,7 @@ program
     });
 
 async function run() {
-    const keymasterURL = process.env.KC_KEYMASTER_URL || 'http://localhost:4226';
+    const keymasterURL = process.env.ARCHON_KEYMASTER_URL || 'http://localhost:4226';
 
     keymaster = new KeymasterClient();
     await keymaster.connect({

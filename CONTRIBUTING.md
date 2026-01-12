@@ -1,6 +1,6 @@
-# Contributing to the MDIP Keychain open source project
+# Contributing to the Archon open source project
 
-1. [Create an issue](https://github.com/KeychainMDIP/kc/issues) first
+1. [Create an issue](https://github.com/archetech/archon/issues) first
     - Requirements and acceptance criteria should be discussed in the issue
 2. Create a development branch from the issue
     - Branch name should start with issue number

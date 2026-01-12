@@ -1,5 +1,5 @@
 import { createContext, Dispatch, ReactNode, SetStateAction, useContext, useState } from "react";
-import { DmailItem } from "@mdip/keymaster/types";
+import { DmailItem } from "@didcid/keymaster/types";
 
 interface VariablesContextValue {
     currentId: string;

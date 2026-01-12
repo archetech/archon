@@ -21,7 +21,7 @@ import { useSnackbar } from "./SnackbarProvider";
 import { useAuthContext } from "./AuthContext";
 import { useVariablesContext } from "./VariablesProvider";
 import { useThemeContext } from "./ContextProviders";
-import WalletChrome from "@mdip/keymaster/wallet/chrome";
+import WalletChrome from "@didcid/keymaster/wallet/chrome";
 
 export enum RefreshMode {
     NONE = 'NONE',
@@ -410,14 +410,14 @@ export function UIProvider(
                 const doc = await keymaster.resolveDID(name);
                 nameList[name] = did;
 
-                const reg = doc.mdip?.registry;
+                const reg = doc.didDocumentRegister?.registry;
                 if (reg) {
                     registryMap[name] = reg;
                 }
 
                 const data = doc.didDocumentData as Record<string, unknown>;
 
-                if (doc.mdip?.type === 'agent') {
+                if (doc.didDocumentRegister?.type === 'agent') {
                     agentList.push(name);
                     continue;
                 }

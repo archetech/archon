@@ -8,7 +8,7 @@ import {
     DialogTitle,
     Typography,
 } from "@mui/material";
-import { PollResults } from "@mdip/keymaster";
+import { PollResults } from "@didcid/keymaster";
 import { useThemeContext } from "../contexts/ContextProviders";
 
 interface PollResultsModalProps {

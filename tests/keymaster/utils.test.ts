@@ -1,11 +1,11 @@
-import Gatekeeper from '@mdip/gatekeeper';
-import Keymaster from '@mdip/keymaster';
-import CipherNode from '@mdip/cipher/node';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory';
-import WalletJsonMemory from '@mdip/keymaster/wallet/json-memory';
-import { ExpectedExceptionError, UnknownIDError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
-import { MdipDocument } from "@mdip/gatekeeper/types";
+import Gatekeeper from '@didcid/gatekeeper';
+import Keymaster from '@didcid/keymaster';
+import CipherNode from '@didcid/cipher/node';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
+import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
+import { ExpectedExceptionError, UnknownIDError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
+import { DidCidDocument } from "@didcid/gatekeeper/types";
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -176,7 +176,7 @@ describe('resolveDID', () => {
 
 describe('updateDID', () => {
     it('should throw if doc missing id', async () => {
-        const doc: MdipDocument = {};
+        const doc: DidCidDocument = {};
 
         try {
             await keymaster.updateDID(doc);
@@ -378,7 +378,7 @@ describe('rotateKeys', () => {
 });
 
 describe('getPublicKeyJwk', () => {
-    it('should return the public key from an MDIP document', async () => {
+    it('should return the public key from a DID document', async () => {
         const bob = await keymaster.createId('Bob');
         const doc = await keymaster.resolveDID(bob);
         const publicKeyJwk = keymaster.getPublicKeyJwk(doc);
@@ -427,7 +427,7 @@ describe('getPublicKeyJwk', () => {
 });
 
 describe('getAgentDID', () => {
-    it('should return the DID from an MDIP document', async () => {
+    it('should return the DID from a DID document', async () => {
         const bob = await keymaster.createId('Bob');
         const doc = await keymaster.resolveDID(bob);
         const did = keymaster.getAgentDID(doc);

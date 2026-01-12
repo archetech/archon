@@ -13,10 +13,10 @@ The wallet contains a user's private data, including secret keys and associated 
 Creating a wallet generates a unique seed that is used to derive a hierarchical-deterministic key-pair. This key-pair will be used to generate new unique key-pairs for each future DID generated using this wallet:
 
 > [!NOTE]
-> `kc create-wallet` does nothing when you already have a wallet, like the one created by `create-id`.
+> `archon create-wallet` does nothing when you already have a wallet, like the one created by `create-id`.
 
 ```json
-$ kc create-wallet
+$ archon create-wallet
 {
     "seed": {
         "mnemonic": "P6f40acil4qA1oIHhoK_qNfBPjvdiTn8djxLtcIGMmu5ojQ0g-fAGLLn33Ix5TavvQTzvc6kXax509bQBZZiXjb7ibTToGyUn0oPeBvSV0RcvHOSXWRmATqIqd7dpQrdXqWAwVuxeQ3vy95e2NU",
@@ -30,10 +30,10 @@ $ kc create-wallet
 }
 ```
 
-Use the command `show-wallet` to view the contents of your wallet; initially, the wallet is empty, but we will see private content added to the wallet as we create MDIP identities and operations:
+Use the command `show-wallet` to view the contents of your wallet; initially, the wallet is empty, but we will see private content added to the wallet as we create Archon identities and operations:
 
 ```json
-$ kc show-wallet
+$ archon show-wallet
 {
     "seed": {
         "mnemonic": "BeSI1tnY5TtWweCdEHESV98MXc8CUCu0pFNZ1tLR-0XaP9PvtCcbcUrGfwwIy4qakOkL0hT88xl4Ko3SXbL3U6pEBY4rcROqEwnUuKUN2z9Dx4nKGNz29SDy1GaLV14NbYc1AEa01TEULJr1xzD5",
@@ -56,21 +56,21 @@ To recover a wallet from a backup, you need two pieces of information:
 The mnemonic consists of 12 short words (BIP-39) that are used to generate the wallet's private keys:
 
 ```sh
-$ kc show-mnemonic
+$ archon show-mnemonic
 know soon mind pen polar pulse patient salmon wage friend equip rotate
 ```
 
 Creating a wallet backup encrypts the current state of a user wallet content in a DID Document:
 
 ```sh 
-$ kc backup-wallet
-did:mdip:test:z3v8Auairrc7XjSdoA1QvuytZXmGdmjcaFsPb2xKjM6TzowPKRn
+$ archon backup-wallet
+did:cid:test:z3v8Auairrc7XjSdoA1QvuytZXmGdmjcaFsPb2xKjM6TzowPKRn
 ```
 
 If you lose the wallet file, you can regenerate the private keys from the mnemonic:
 
 ```json
-$ kc import-wallet "know soon mind pen polar pulse patient salmon wage friend equip rotate"
+$ archon import-wallet "know soon mind pen polar pulse patient salmon wage friend equip rotate"
 {
     "seed": {
         "mnemonic": "8PnD0nzyjd9TphttasCFXg_HNDntYdQlx_JHG6Y8K-U7nZUmkxeB4BLYv8xA9af-r6OChSul1Lp6gRPve7qnU_pOVTOE9c7qew-X7Nv_Vd6by-3IxI03ryHkgNjNTOxHlA6iae0D9wA6sFak",
@@ -87,7 +87,7 @@ $ kc import-wallet "know soon mind pen polar pulse patient salmon wage friend eq
 Once a wallet's keys are recreated from the mnemonic, you can recover its contents from a backup DID generated using the backup process above:
 
 ```json
-$ kc recover-wallet did:mdip:z3v8AuaXcTg74E4nWXDkX3wtZXjGjvp55z7QYixWSUHyG89qFTy
+$ archon recover-wallet did:cid:z3v8AuaXcTg74E4nWXDkX3wtZXjGjvp55z7QYixWSUHyG89qFTy
 {
     "seed": {
         "mnemonic": "P6f40acil4qA1oIHhoK_qNfBPjvdiTn8djxLtcIGMmu5ojQ0g-fAGLLn33Ix5TavvQTzvc6kXax509bQBZZiXjb7ibTToGyUn0oPeBvSV0RcvHOSXWRmATqIqd7dpQrdXqWAwVuxeQ3vy95e2NU",
@@ -99,7 +99,7 @@ $ kc recover-wallet did:mdip:z3v8AuaXcTg74E4nWXDkX3wtZXjGjvp55z7QYixWSUHyG89qFTy
     "counter": 1,
     "ids": {
         "extropy": {
-            "did": "did:mdip:test:z3v8AuaiyHqG3KMpcoBoqvUpMrtCsGsu8iPU1oTEfcsUNxtGyt4",
+            "did": "did:cid:test:z3v8AuaiyHqG3KMpcoBoqvUpMrtCsGsu8iPU1oTEfcsUNxtGyt4",
             "account": 0,
             "index": 0
         }
@@ -109,7 +109,7 @@ $ kc recover-wallet did:mdip:z3v8AuaXcTg74E4nWXDkX3wtZXjGjvp55z7QYixWSUHyG89qFTy
 ```
 
 > [!NOTE]
-> You can also run `kc recover-wallet` Without specifying a backup DID, and `kc` will choose the most recent backup.
+> You can also run `archon recover-wallet` Without specifying a backup DID, and `archon` will choose the most recent backup.
 
 `recover-wallet` does not overwrite the existing wallet, it only prints the contents of the backup. The output should be redirected to a temporary `wallet.json` file, which can then be copied over the existing wallet in the `./data` folder.
 

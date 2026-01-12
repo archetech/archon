@@ -1,7 +1,7 @@
 import {
-    MdipDocument,
+    DidCidDocument,
     ResolveDIDOptions,
-} from '@mdip/gatekeeper/types';
+} from '@didcid/gatekeeper/types';
 import {
     Challenge,
     ChallengeResponse,
@@ -407,7 +407,7 @@ export default class KeymasterClient implements KeymasterInterface {
     async resolveDID(
         id: string,
         options?: ResolveDIDOptions
-    ): Promise<MdipDocument> {
+    ): Promise<DidCidDocument> {
         try {
             if (options) {
                 const queryParams = new URLSearchParams(options as Record<string, string>);

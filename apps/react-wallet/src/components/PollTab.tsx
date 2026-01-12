@@ -30,7 +30,7 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import PollResultsModal from "../modals/PollResultsModal";
-import {NoticeMessage, Poll, PollResults} from "@mdip/keymaster/types";
+import {NoticeMessage, Poll, PollResults} from "@didcid/keymaster/types";
 import TextInputModal from "../modals/TextInputModal";
 import WarningModal from "../modals/WarningModal";
 import CopyResolveDID from "./CopyResolveDID";

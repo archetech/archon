@@ -2,9 +2,9 @@ import * as bitcoin from 'bitcoinjs-lib';
 import * as ecc from 'tiny-secp256k1';
 import { BIP32Factory, BIP32Interface } from 'bip32';
 import { randomBytes } from 'crypto';
-import Inscription from '@mdip/inscription';
-import {Operation} from "@mdip/gatekeeper/types";
-import {ExpectedExceptionError} from "@mdip/common/errors";
+import Inscription from '@didcid/inscription';
+import {Operation} from "@didcid/gatekeeper/types";
+import {ExpectedExceptionError} from "@didcid/common/errors";
 
 bitcoin.initEccLib(ecc);
 
@@ -26,7 +26,7 @@ interface AccountKeys {
 
 const NETWORK: 'testnet' = 'testnet';
 const net = bitcoin.networks[NETWORK];
-const PROTOCOL_TAG = Buffer.from('MDIP', 'ascii');
+const ARCHON_TAG = Buffer.from('ARCHON', 'ascii');
 
 function seedNode(): BIP32Interface {
     const seed = Buffer.from(
@@ -97,7 +97,7 @@ function smallOps(n = 3) {
         return {
             type,
             created: new Date().toISOString(),
-            mdip: { version: 1, type: "asset", registry: "mockRegistry" },
+            register: { version: 1, type: "asset", registry: "mockRegistry" },
         }
     });
     return Buffer.from(JSON.stringify(ops), 'utf8');
@@ -110,7 +110,7 @@ export function largeOps(leaves: number): Operation[] {
     return [{
         type: "create",
         created: new Date().toISOString(),
-        mdip: { version: 1, type: "asset", registry: "mockRegistry" },
+        register: { version: 1, type: "asset", registry: "mockRegistry" },
         data,
     }];
 }
@@ -149,7 +149,7 @@ describe('Inscription createTransactions', () => {
         const hasOpReturn = reveal.outs.some((o) => {
             try {
                 const decomp = bitcoin.script.decompile(o.script) || [];
-                return decomp[0] === bitcoin.opcodes.OP_RETURN && Buffer.isBuffer(decomp[1]) && (decomp[1] as Buffer).toString('ascii').startsWith('MDIP');
+                return decomp[0] === bitcoin.opcodes.OP_RETURN && Buffer.isBuffer(decomp[1]) && (decomp[1] as Buffer).toString('ascii').startsWith('ARCHON');
             } catch {
                 return false;
             }
@@ -557,21 +557,21 @@ describe('Inscription createTransactions', () => {
             .flatMap((i) => (i.witness ?? []).map((w) => w.toString("hex")))
             .join("");
 
-        expect(witnessHex).toContain(PROTOCOL_TAG.toString("hex"));
+        expect(witnessHex).toContain(ARCHON_TAG.toString("hex"));
 
-        const mdipInput = reveal.ins.find((i) => {
+        const archonInput = reveal.ins.find((i) => {
             const w = i.witness;
             if (!w || w.length < 3) return false;
-            return w[w.length - 2].includes(PROTOCOL_TAG);
+            return w[w.length - 2].includes(ARCHON_TAG);
         });
 
-        expect(mdipInput).toBeTruthy();
+        expect(archonInput).toBeTruthy();
 
-        const tapScript = mdipInput!.witness![mdipInput!.witness!.length - 2];
+        const tapScript = archonInput!.witness![archonInput!.witness!.length - 2];
         const decomp = bitcoin.script.decompile(tapScript) ?? [];
 
         const tagIdx = decomp.findIndex(
-            (el) => Buffer.isBuffer(el) && (el as Buffer).equals(PROTOCOL_TAG),
+            (el) => Buffer.isBuffer(el) && (el as Buffer).equals(ARCHON_TAG),
         );
         expect(tagIdx).toBeGreaterThanOrEqual(0);
 
@@ -601,7 +601,7 @@ describe('Inscription bumpTransactionFee', () => {
                 type: 'p2tr',
                 txid: makeTxid(21),
                 vout: 0,
-                amount: 60_000,
+                amount: 100_000,
                 hdkeypath: hdp(86, 0, 5)
             }
         ];
@@ -610,27 +610,35 @@ describe('Inscription bumpTransactionFee', () => {
             smallOps(2),
             hdp(86, 0, 0),
             utxos,
-            2,
+            1, // Low initial fee rate to ensure room for bumping
             keys
         );
 
         const base = parseFeeFromReveal(revealHex, commitHex);
         const curSatPerVb = Math.floor(base.fee / base.vsize);
 
+        // Request a bump to a higher fee rate
+        const targetSatPerVb = curSatPerVb + 2;
+
         const bumpedHex = await lib.bumpTransactionFee(
             hdp(86, 0, 0),
             [],
             curSatPerVb,
-            curSatPerVb + 1,
+            targetSatPerVb,
             keys,
             commitHex,
             revealHex
         );
 
         const bumped = parseFeeFromReveal(bumpedHex, commitHex);
+
         expect(bumped.vsize).toBe(base.vsize);
+        // Fee should increase when bumping
         expect(bumped.fee).toBeGreaterThan(base.fee);
-        expect(bumped.fee).toBeGreaterThanOrEqual(base.fee + base.vsize);
+        // The bumped fee should be approximately at the target rate
+        // (allowing for small estimation differences between planned and actual vsize)
+        const bumpedSatPerVb = bumped.fee / bumped.vsize;
+        expect(bumpedSatPerVb).toBeGreaterThanOrEqual(targetSatPerVb - 0.5);
     });
 
     it('bump uses extra P2TR input path (covers extra p2tr signer branch)', async () => {
@@ -834,12 +842,12 @@ describe('Inscription bumpTransactionFee', () => {
 
         const scriptIdx = w0.length - 2;
         const original = Buffer.from(w0[scriptIdx]);
-        const tag = Buffer.from('MDIP', 'ascii');
+        const tag = Buffer.from('ARCHON', 'ascii');
 
         const mutated = Buffer.from(original);
         const pos = mutated.indexOf(tag);
         expect(pos).toBeGreaterThanOrEqual(0);
-        mutated.set(Buffer.from('NOPE', 'ascii'), pos);
+        mutated.set(Buffer.from('NOPENO', 'ascii'), pos);
 
         tx.ins[0].witness[scriptIdx] = mutated;
         const revealHexMut = tx.toHex();

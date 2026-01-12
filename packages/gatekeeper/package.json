@@ -1,7 +1,7 @@
 {
-  "name": "@mdip/gatekeeper",
-  "version": "1.4.0-beta.5",
-  "description": "MDIP Gatekeeper",
+  "name": "@didcid/gatekeeper",
+  "version": "0.1.0",
+  "description": "Archon Gatekeeper",
   "type": "module",
   "module": "./dist/esm/index.js",
   "main": "./dist/cjs/index.cjs",
@@ -105,9 +105,9 @@
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@mdip/cipher": "*",
-    "@mdip/common": "*",
-    "@mdip/ipfs": "*",
+    "@didcid/cipher": "*",
+    "@didcid/common": "*",
+    "@didcid/ipfs": "*",
     "axios": "^1.7.7",
     "canonicalize": "^2.0.0",
     "dotenv": "^16.4.5",
@@ -118,7 +118,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KeychainMDIP/kc.git"
+    "url": "git+https://github.com/archetech/archon.git"
   },
   "devDependencies": {
     "@rollup/plugin-json": "^6.1.0"

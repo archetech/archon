@@ -1,7 +1,7 @@
 {
-  "name": "mdip-cjs-demo",
+  "name": "archon-cjs-demo",
   "version": "1.0.0",
-  "description": "Minimal CommonJS demo for @mdip packages",
+  "description": "Minimal CommonJS demo for @didcid packages",
   "main": "dist/demo.js",
   "scripts": {
     "clean": "rm -rf dist",

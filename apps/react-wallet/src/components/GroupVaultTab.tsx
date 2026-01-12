@@ -22,7 +22,7 @@ import AuthDetailsModal from "../modals/AuthDetailsModal";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
 import DmailDialog from "./DmailDialog";
-import { DmailMessage } from '@mdip/keymaster/types';
+import { DmailMessage } from '@didcid/keymaster/types';
 import CopyResolveDID from "./CopyResolveDID";
 import { useThemeContext } from "../contexts/ContextProviders";
 

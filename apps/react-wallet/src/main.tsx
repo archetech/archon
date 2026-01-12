@@ -9,14 +9,14 @@ import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
 App.addListener('appUrlOpen', ({ url }) => {
     queueDeepLink(url);
-    window.dispatchEvent(new Event('mdip:deepLinkQueued'));
+    window.dispatchEvent(new Event('archon:deepLinkQueued'));
 });
 
 (async () => {
     const launch = await App.getLaunchUrl();
     if (launch?.url) {
         queueDeepLink(launch.url);
-        window.dispatchEvent(new Event('mdip:deepLinkQueued'));
+        window.dispatchEvent(new Event('archon:deepLinkQueued'));
     }
 })();
 

@@ -1,5 +1,5 @@
-import { GatekeeperClient } from '@mdip/gatekeeper';
-import CipherNode from '@mdip/cipher';
+import { GatekeeperClient } from '@didcid/gatekeeper';
+import CipherNode from '@didcid/cipher';
 import dotenv from 'dotenv';
 import fs from 'fs';
 

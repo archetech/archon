@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import JsonViewer from "./components/JsonViewer.js";
 import Events from "./components/Events.js";
-import GatekeeperClient from '@mdip/gatekeeper/client';
+import GatekeeperClient from '@didcid/gatekeeper/client';
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import {
     Alert,
@@ -12,7 +12,7 @@ import {
     Typography,
 } from "@mui/material";
 import Header from "./components/Header.js";
-import { GatekeeperEvent } from "@mdip/gatekeeper/types";
+import { GatekeeperEvent } from "@didcid/gatekeeper/types";
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 
 const gatekeeper = new GatekeeperClient();
@@ -72,11 +72,11 @@ function App() {
     function handleThemeToggle(event: React.ChangeEvent<HTMLInputElement>) {
         const isDark = event.target.checked;
         setDarkMode(isDark);
-        localStorage.setItem('mdip-explorer-theme-mode', isDark ? 'dark' : 'light');
+        localStorage.setItem('archon-explorer-theme-mode', isDark ? 'dark' : 'light');
     }
 
     useEffect(() => {
-        const themeMode = localStorage.getItem('mdip-explorer-theme-mode');
+        const themeMode = localStorage.getItem('archon-explorer-theme-mode');
         if (themeMode) {
             setDarkMode(themeMode === 'dark');
         }

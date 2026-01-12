@@ -34,7 +34,7 @@ export default class WalletEncrypted extends AbstractBase {
         }
 
         if (!this.passphrase) {
-            throw new Error('KC_ENCRYPTED_PASSPHRASE not set');
+            throw new Error('ARCHON_ENCRYPTED_PASSPHRASE not set');
         }
 
         const salt = Buffer.from(encryptedData.salt, 'base64');

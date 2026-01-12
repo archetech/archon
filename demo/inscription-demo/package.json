@@ -1,7 +1,7 @@
 {
-  "name": "mdip-inscription-demo",
+  "name": "archon-inscription-demo",
   "version": "1.0.0",
-  "description": "Demo for @mdip/inscription package",
+  "description": "Demo for @didcid/inscription package",
   "main": "dist/demo.js",
   "scripts": {
     "clean": "rm -rf dist",

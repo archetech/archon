@@ -15,7 +15,7 @@ export default class WalletRedis extends AbstractBase {
 
     constructor(walletKey: string = 'wallet') {
         super();
-        this.url = process.env.KC_REDIS_URL || 'redis://localhost:6379';
+        this.url = process.env.ARCHON_REDIS_URL || 'redis://localhost:6379';
         this.walletKey = walletKey;
         this.redis = null
     }

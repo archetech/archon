@@ -7,7 +7,7 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
-import WalletChrome from "@mdip/keymaster/wallet/chrome";
+import WalletChrome from "@didcid/keymaster/wallet/chrome";
 
 const WalletTab = () => {
     const [open, setOpen] = useState<boolean>(false);
@@ -174,7 +174,7 @@ const WalletTab = () => {
 
             const link = document.createElement('a');
             link.href = url;
-            link.download = 'mdip-wallet.json';
+            link.download = 'archon-wallet.json';
             link.click();
 
             URL.revokeObjectURL(url);

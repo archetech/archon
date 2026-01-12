@@ -8,7 +8,7 @@ import {
     DialogTitle,
     Typography,
 } from "@mui/material";
-import { PollResults } from "@mdip/keymaster/types";
+import { PollResults } from "@didcid/keymaster/types";
 
 interface PollResultsModalProps {
     open: boolean;

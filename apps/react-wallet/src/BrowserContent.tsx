@@ -510,13 +510,13 @@ function BrowserContent() {
                                         component="h6"
                                         sx={{ ml: 2 }}
                                     >
-                                        MDIP
+                                        Archon
                                     </Typography>
 
                                     <Box
                                         component="img"
                                         src="/icon_transparent.png"
-                                        alt="MDIP"
+                                        alt="Archon"
                                         sx={{ width: 32, height: 32 }}
                                     />
                                 </Toolbar>

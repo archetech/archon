@@ -1,11 +1,11 @@
-import Gatekeeper from '@mdip/gatekeeper';
-import Keymaster, { DmailTags } from '@mdip/keymaster';
-import CipherNode from '@mdip/cipher/node';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory';
-import WalletJsonMemory from '@mdip/keymaster/wallet/json-memory';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
-import { DmailMessage, NoticeMessage } from '@mdip/keymaster/types';
+import Gatekeeper from '@didcid/gatekeeper';
+import Keymaster, { DmailTags } from '@didcid/keymaster';
+import CipherNode from '@didcid/cipher/node';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
+import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
+import { DmailMessage, NoticeMessage } from '@didcid/keymaster/types';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -460,8 +460,8 @@ describe('sendDmail', () => {
         expect(notice).toBeDefined();
 
         const doc = await keymaster.resolveDID(notice!);
-        expect(doc.mdip!.registry).toBe('hyperswarm');
-        expect(doc.mdip!.validUntil).toBeDefined();
+        expect(doc.didDocumentRegister!.registry).toBe('hyperswarm');
+        expect(doc.didDocumentRegister!.validUntil).toBeDefined();
 
         const asset = doc.didDocumentData as { notice?: NoticeMessage };
 

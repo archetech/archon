@@ -20,7 +20,7 @@ From W3C:
 >
 > \- [Source](https://www.w3.org/TR/vc-data-model/#what-is-a-verifiable-credential)
 
-## MDIP Verifiable Credential Basic Workflow
+## Archon Verifiable Credential Basic Workflow
 
 ![](workflow.png)
 
@@ -63,30 +63,30 @@ $ cat data/schema/social-media.json
 
 ## Creating a Credential DID
 
-MDIP-compatible credentials are created using a JSON schema file as a template. The schema file will be registered with a Gatekeeper to create the Credential and receive its associated DID.
+Archon-compatible credentials are created using a JSON schema file as a template. The schema file will be registered with a Gatekeeper to create the Credential and receive its associated DID.
 
 ```sh
-$ kc create-credential data/schema/social-media.json social-media
-did:mdip:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7
+$ archon create-credential data/schema/social-media.json social-media
+did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7
 ```
 
 ```json
-$ kc list-names
+$ archon list-names
 {
-    "social-media": "did:mdip:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
+    "social-media": "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
 }
 ```
 
 ```json
-$ kc resolve-did social-media
+$ archon resolve-did social-media
 {
     "@context": "https://w3id.org/did-resolution/v1",
     "didDocument": {
         "@context": [
             "https://www.w3.org/ns/did/v1"
         ],
-        "id": "did:mdip:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7",
-        "controller": "did:mdip:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY"
+        "id": "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7",
+        "controller": "did:cid:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY"
     },
     "didDocumentMetadata": {
         "created": "2024-03-22T15:00:31.047Z"
@@ -108,7 +108,7 @@ $ kc resolve-did social-media
         ],
         "type": "object"
     },
-    "mdip": {
+    "didDocumentRegister": {
         "registry": "hyperswarm",
         "type": "asset",
         "version": 1
@@ -125,7 +125,7 @@ The Credential DID must now be bound to the Agent DID who is to become the Subje
 In the command below, both `social-media` and `Bob`  are resolved to their respective DIDs using the named alias and identity names from the user's private wallet:
 
 ```json
-$ kc bind-credential social-media Bob
+$ archon bind-credential social-media Bob
 {
     "@context": [
         "https://www.w3.org/ns/credentials/v2",
@@ -133,13 +133,13 @@ $ kc bind-credential social-media Bob
     ],
     "type": [
         "VerifiableCredential",
-        "did:mdip:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
+        "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
     ],
-    "issuer": "did:mdip:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
+    "issuer": "did:cid:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
     "validFrom": "2024-03-22T15:04:33.684Z",
     "validUntil": null,
     "credentialSubject": {
-        "id": "did:mdip:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk"
+        "id": "did:cid:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk"
     },
     "credential": {
         "account": "http://yNtjneCOyzLGUNtiAK.wnarGe6zodO-cGG47CGWl66-kvLbKVHCrFQPFy-ihIYfNlEuc",
@@ -155,7 +155,7 @@ This JSON Bound Credential does not yet contain user-specific information other 
 The bound credential must be populated with holder-specific information. This step will typically be automated in most deployments. In the case of our social media schema, we must populate a service field with the name of an online social media provider, and we must populate the account field with a URL to the holder's specific social media account.
 
 ```sh
-$ kc bind-credential social-media Bob > bob-twitter.json
+$ archon bind-credential social-media Bob > bob-twitter.json
 (output sent to the bob-twitter.json file)
 ```
 
@@ -170,13 +170,13 @@ $ cat bob-twitter.json
     ],
     "type": [
         "VerifiableCredential",
-        "did:mdip:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
+        "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
     ],
-    "issuer": "did:mdip:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
+    "issuer": "did:cid:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
     "validFrom": "2024-03-22T15:06:24.773Z",
     "validUntil": null,
     "credentialSubject": {
-        "id": "did:mdip:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk"
+        "id": "did:cid:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk"
     },
     "credential": {
         "account": "https://twitter.com/bob",
@@ -190,8 +190,8 @@ $ cat bob-twitter.json
 The credential, bound and populated with the subject's information, must now be signed by the issuer and encrypted to the subject's keys:
 
 ```sh
-$ kc issue-credential bob-twitter.json
-did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
+$ archon issue-credential bob-twitter.json
+did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
 ```
 
 The issuer (Alice) should now send the VC's DID to the subject (Bob).
@@ -201,7 +201,7 @@ The issuer (Alice) should now send the VC's DID to the subject (Bob).
 Only the issuer and holder of a VC can verify it since it is encrypted. When Bob receives the credential from Alice, he can view its contents before accepting it:
 
 ```json
-$ kc decrypt-json did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
+$ archon decrypt-json did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
 {
     "@context": [
         "https://www.w3.org/ns/credentials/v2",
@@ -209,20 +209,20 @@ $ kc decrypt-json did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5A
     ],
     "type": [
         "VerifiableCredential",
-        "did:mdip:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
+        "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
     ],
-    "issuer": "did:mdip:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
+    "issuer": "did:cid:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
     "validFrom": "2024-03-22T15:06:24.773Z",
     "validUntil": null,
     "credentialSubject": {
-        "id": "did:mdip:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk"
+        "id": "did:cid:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk"
     },
     "credential": {
         "account": "https://twitter.com/bob",
         "service": "twitter.com"
     },
     "signature": {
-        "signer": "did:mdip:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
+        "signer": "did:cid:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
         "signed": "2024-03-22T15:09:02.994Z",
         "hash": "62f7cb1a31d338d29287f9ce91b4da103391dca88b853ea1b05920c6049ae8ff",
         "value": "37941a42492a431ceaff91c86de55eb0cd3ed98107a3ce19a76d88511b7fe2bc6fcf298c69e431b048ab0786e9624b647e4d03a4c26031c4c6e2b6882223defe"
@@ -235,12 +235,12 @@ $ kc decrypt-json did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5A
 Accepting a credential adds the DID to the user's local wallet:
 
 ```sh
-$ kc accept-credential did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
+$ archon accept-credential did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
 OK saved
 ```
 
 ```json
-$ kc show-wallet
+$ archon show-wallet
 {
     "seed": {
         "mnemonic": "MLPxAgU1ym_v_YR2Q6-nY47L8xxMqbJqG_NzRNBh3_MHcZ4QQA2x3DI4fSAG2g-XHC3M_EGtmqY6NhVpsC9yKysFYQmcqjm7cAknpJajZYCVlVs7hJPRLdOqkpy4eotTVblgZdYsYtcgbU9kmYc",
@@ -252,26 +252,26 @@ $ kc show-wallet
     "counter": 3,
     "ids": {
         "Alice": {
-            "did": "did:mdip:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
+            "did": "did:cid:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
             "account": 0,
             "index": 1,
             "owned": [
-                "did:mdip:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7",
-                "did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2"
+                "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7",
+                "did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2"
             ]
         },
         "Bob": {
-            "did": "did:mdip:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk",
+            "did": "did:cid:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk",
             "account": 2,
             "index": 0,
             "held": [
-                "did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2"
+                "did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2"
             ]
         }
     },
     "current": "Bob",
     "names": {
-        "social-media": "did:mdip:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
+        "social-media": "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
     }
 }
 ```
@@ -281,12 +281,12 @@ $ kc show-wallet
 The issuer of a credential can revoke their credential at any time. This will blank out the VC's credential content data and set the `didDocumentMetadata.deactivated` property to true.
 
 ```sh
-$ kc revoke-credential did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
+$ archon revoke-credential did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
 OK revoked
 ```
 
 ```json
-$ kc resolve-did did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
+$ archon resolve-did did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5ASk2
 {
     "@context": "https://w3id.org/did-resolution/v1",
     "didDocument": {},
@@ -296,7 +296,7 @@ $ kc resolve-did did:mdip:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK5AS
         "updated": "2024-03-22T15:17:53.368Z"
     },
     "didDocumentData": {},
-    "mdip": {
+    "didDocumentRegister": {
         "registry": "hyperswarm",
         "type": "asset",
         "version": 1

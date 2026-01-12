@@ -6,9 +6,9 @@ document.addEventListener("click", (event) => {
 
     const href = target.getAttribute("href") || "";
 
-    if (href.startsWith("mdip://")) {
+    if (href.startsWith("archon://")) {
         event.preventDefault();
-        const parsedURL = new URL(href.replace("mdip://", "https://mdip/"));
+        const parsedURL = new URL(href.replace("archon://", "https://archon/"));
         const tab = parsedURL.pathname.slice(1);
         if (tab === "auth") {
             const challenge = parsedURL.searchParams.get("challenge");

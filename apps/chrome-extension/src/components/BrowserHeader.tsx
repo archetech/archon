@@ -37,13 +37,13 @@ const BrowserHeader = (
             </IconButton>
 
             <Typography variant="h6" component="h6" sx={{ ml: 4 }}>
-                MDIP
+                Archon
             </Typography>
 
             <Box
                 component="img"
                 src="icon_inverted.png"
-                alt="MDIP"
+                alt="Archon"
                 sx={{ width: 32, height: 32, mr: 4 }}
             />
 

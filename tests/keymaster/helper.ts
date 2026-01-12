@@ -1,4 +1,4 @@
-import Keymaster from "@mdip/keymaster";
+import Keymaster from "@didcid/keymaster";
 
 export const mockJson = {
     key: "value",

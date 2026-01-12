@@ -1,4 +1,4 @@
-import KeymasterClient from '@mdip/keymaster/client';
+import KeymasterClient from '@didcid/keymaster/client';
 import KeymasterUI from './KeymasterUI.js';
 import './App.css';
 

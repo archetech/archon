@@ -1,7 +1,7 @@
 import nock from 'nock';
-import GatekeeperClient from '@mdip/gatekeeper/client';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import {Operation} from "@mdip/gatekeeper/types";
+import GatekeeperClient from '@didcid/gatekeeper/client';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import {Operation} from "@didcid/gatekeeper/types";
 
 const GatekeeperURL = 'http://gatekeeper.org';
 const ServerError = { message: 'Server error' };
@@ -971,7 +971,7 @@ describe('generateDID', () => {
     const op: any = {
         type: 'create',
         created: new Date().toISOString(),
-        mdip: { version: 1, type: 'agent', registry: 'local' },
+        register: { version: 1, type: 'agent', registry: 'local' },
     };
 
     it('should return a generated DID', async () => {

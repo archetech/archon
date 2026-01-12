@@ -1,11 +1,11 @@
-import Gatekeeper from '@mdip/gatekeeper';
-import Keymaster, { DmailTags, NoticeTags } from '@mdip/keymaster';
-import CipherNode from '@mdip/cipher/node';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory';
-import WalletJsonMemory from '@mdip/keymaster/wallet/json-memory';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
-import { NoticeMessage, SearchEngine } from '@mdip/keymaster/types';
+import Gatekeeper from '@didcid/gatekeeper';
+import Keymaster, { DmailTags, NoticeTags } from '@didcid/keymaster';
+import CipherNode from '@didcid/cipher/node';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
+import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
+import { NoticeMessage, SearchEngine } from '@didcid/keymaster/types';
 
 class MockSearch implements SearchEngine {
     private results: string[] = [];
@@ -178,11 +178,11 @@ describe('verifyDIDList', () => {
         }
 
         try {
-            await keymaster.verifyDIDList(['did:mdip:123']);
+            await keymaster.verifyDIDList(['did:cid:123']);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
-            expect(error.message).toBe('Invalid parameter: Invalid DID: did:mdip:123');
+            expect(error.message).toBe('Invalid parameter: Invalid DID: did:cid:123');
         }
     });
 });

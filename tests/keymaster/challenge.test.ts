@@ -1,10 +1,10 @@
-import Gatekeeper from '@mdip/gatekeeper';
-import Keymaster from '@mdip/keymaster';
-import CipherNode from '@mdip/cipher/node';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory';
-import WalletJsonMemory from '@mdip/keymaster/wallet/json-memory';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
+import Gatekeeper from '@didcid/gatekeeper';
+import Keymaster from '@didcid/keymaster';
+import CipherNode from '@didcid/cipher/node';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
+import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
 import { mockSchema } from './helper.ts';
 
 let ipfs: HeliaClient;
@@ -43,7 +43,7 @@ describe('createChallenge', () => {
         expect(doc.didDocumentData).toStrictEqual({ challenge: {} });
 
         const now = Date.now();
-        const validUntil = new Date(doc.mdip!.validUntil!).getTime();
+        const validUntil = new Date(doc.didDocumentRegister!.validUntil!).getTime();
         const ttl = validUntil - now;
 
         expect(ttl < 60 * 60 * 1000).toBe(true);
@@ -58,7 +58,7 @@ describe('createChallenge', () => {
         expect(doc.didDocument!.id).toBe(did);
         expect(doc.didDocument!.controller).toBe(alice);
         expect(doc.didDocumentData).toStrictEqual({ challenge: {} });
-        expect(doc.mdip!.validUntil).toBe(validUntil);
+        expect(doc.didDocumentRegister!.validUntil).toBe(validUntil);
     });
 
     it('should create a valid challenge', async () => {

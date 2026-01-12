@@ -1,4 +1,4 @@
-import { ImportBatchResult, ProcessEventsResult } from '@mdip/gatekeeper/types';
+import { ImportBatchResult, ProcessEventsResult } from '@didcid/gatekeeper/types';
 
 export interface DiscoveredItem {
     height: number;

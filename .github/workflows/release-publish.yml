@@ -41,25 +41,25 @@ jobs:
       matrix:
         include:
           - dockerfile: Dockerfile.gatekeeper
-            image: ${{ needs.generate.outputs.REGISTRY }}/keychainmdip/gatekeeper
+            image: ${{ needs.generate.outputs.REGISTRY }}/ghcr.io/archetech/gatekeeper
             tag: ${{ needs.generate.outputs.GIT_TAG }}
           - dockerfile: Dockerfile.keymaster
-            image: ${{ needs.generate.outputs.REGISTRY }}/keychainmdip/keymaster
+            image: ${{ needs.generate.outputs.REGISTRY }}/ghcr.io/archetech/keymaster
             tag: ${{ needs.generate.outputs.GIT_TAG }}
           - dockerfile: Dockerfile.hyperswarm
-            image: ${{ needs.generate.outputs.REGISTRY }}/keychainmdip/hyperswarm-mediator
+            image: ${{ needs.generate.outputs.REGISTRY }}/ghcr.io/archetech/hyperswarm-mediator
             tag: ${{ needs.generate.outputs.GIT_TAG }}
           - dockerfile: Dockerfile.satoshi
-            image: ${{ needs.generate.outputs.REGISTRY }}/keychainmdip/sat-mediator
+            image: ${{ needs.generate.outputs.REGISTRY }}/ghcr.io/archetech/sat-mediator
             tag: ${{ needs.generate.outputs.GIT_TAG }}
           - dockerfile: Dockerfile.cli
-            image: ${{ needs.generate.outputs.REGISTRY }}/keychainmdip/cli
+            image: ${{ needs.generate.outputs.REGISTRY }}/ghcr.io/archetech/cli
             tag: ${{ needs.generate.outputs.GIT_TAG }}
           - dockerfile: Dockerfile.explorer
-            image: ${{ needs.generate.outputs.REGISTRY }}/keychainmdip/explorer
+            image: ${{ needs.generate.outputs.REGISTRY }}/ghcr.io/archetech/explorer
             tag: ${{ needs.generate.outputs.GIT_TAG }}
           - dockerfile: Dockerfile.search-server
-            image: ${{ needs.generate.outputs.REGISTRY }}/keychainmdip/search-server
+            image: ${{ needs.generate.outputs.REGISTRY }}/ghcr.io/archetech/search-server
             tag: ${{ needs.generate.outputs.GIT_TAG }}
 
     permissions:

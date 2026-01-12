@@ -9,7 +9,7 @@ import {
     FormControl,
     TextField
 } from "@mui/material";
-import { GatekeeperEvent } from "@mdip/gatekeeper/types";
+import { GatekeeperEvent } from "@didcid/gatekeeper/types";
 import { getTypeStyle, handleCopyDID } from "../shared/utilities.js";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 

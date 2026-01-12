@@ -1,6 +1,6 @@
 import * as sqlite from 'sqlite';
 import sqlite3 from 'sqlite3';
-import { InvalidDIDError } from '@mdip/common/errors';
+import { InvalidDIDError } from '@didcid/common/errors';
 import { GatekeeperDb, GatekeeperEvent, Operation, BlockId, BlockInfo } from '../types.js'
 
 interface DidsRow {

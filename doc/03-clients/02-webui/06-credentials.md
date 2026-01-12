@@ -2,7 +2,7 @@
 title: Credentials
 ---
 
-The Credentials screen allows a user to accept and issue fully P2P Verifiable Credentials. Users must first register a schema on the MDIP network, or select an existing schema DID, before a credential can be issued.
+The Credentials screen allows a user to accept and issue fully P2P Verifiable Credentials. Users must first register a schema on the Archon network, or select an existing schema DID, before a credential can be issued.
 
 The credential subjects are listed from known Agent DIDs contained in the wallet (from the [IDENTITIES](./identities) and [DIDS](./dids) screens).
 
@@ -24,7 +24,7 @@ In the "HELD" Credentials screen, a user can chose from a variety of options:
 
 ![Held Credentials](held-credentials.png)
 
-- **Resolve**: This will display the *public* (encrypted) view of the credential. Resolving a credential confirms it exists in the MDIP Gatekeeper node.
+- **Resolve**: This will display the *public* (encrypted) view of the credential. Resolving a credential confirms it exists in the Archon Gatekeeper node.
 
 - **Decrypt**: If the credential is encrypted to the current DID, this will decrypt the cypher_receiver field using the DID keys.
 

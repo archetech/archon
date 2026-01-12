@@ -1,14 +1,14 @@
 import BtcClient, {Block, BlockVerbose, BlockHeader, FundRawTransactionOptions, MempoolEntry} from 'bitcoin-core';
-import GatekeeperClient from '@mdip/gatekeeper/client';
-import KeymasterClient from '@mdip/keymaster/client';
+import GatekeeperClient from '@didcid/gatekeeper/client';
+import KeymasterClient from '@didcid/keymaster/client';
 import JsonFile from './db/jsonfile.js';
 import JsonRedis from './db/redis.js';
 import JsonMongo from './db/mongo.js';
 import JsonSQLite from './db/sqlite.js';
 import config from './config.js';
-import { isValidDID } from '@mdip/ipfs/utils';
+import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
-import { GatekeeperEvent, Operation } from '@mdip/gatekeeper/types';
+import { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
 
 const REGISTRY = config.chain;
 const SMART_FEE_MODE = "CONSERVATIVE";
@@ -612,7 +612,7 @@ async function syncBlocks(): Promise<void> {
 
 async function main() {
     if (!READ_ONLY && !config.nodeID) {
-        console.log('satoshi-mediator must have a KC_NODE_ID configured');
+        console.log('satoshi-mediator must have a ARCHON_NODE_ID configured');
         return;
     }
 

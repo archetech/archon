@@ -1,9 +1,9 @@
-import { Cipher, EcdsaJwkPublic } from '@mdip/cipher/types';
+import { Cipher, EcdsaJwkPublic } from '@didcid/cipher/types';
 import {
     GatekeeperInterface,
-    MdipDocument,
+    DidCidDocument,
     ResolveDIDOptions,
-} from '@mdip/gatekeeper/types';
+} from '@didcid/gatekeeper/types';
 
 export interface EncryptedWallet {
     salt: string;
@@ -336,7 +336,7 @@ export interface KeymasterInterface {
     removeName(name: string): Promise<boolean>;
 
     // DID resolution
-    resolveDID(did: string, options?: ResolveDIDOptions): Promise<MdipDocument>;
+    resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;
 
     // Assets
     createAsset(data: unknown, options?: CreateAssetOptions): Promise<string>;

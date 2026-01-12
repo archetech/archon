@@ -40,8 +40,8 @@ jobs:
       - name: Run cli-tests
         working-directory: ./tests
         env:
-          KC_GATEKEEPER_URL: http://localhost:4224
-          KC_KEYMASTER_URL: http://localhost:4226
+          ARCHON_GATEKEEPER_URL: http://localhost:4224
+          ARCHON_KEYMASTER_URL: http://localhost:4226
         run: |
           ./run_cli_tests.sh --ci-redis
         

@@ -2,7 +2,7 @@
   "name": "gatekeeper-server",
   "version": "1.4.0-beta.5",
   "type": "module",
-  "description": "MDIP Gatekeeper REST API server",
+  "description": "Archon Gatekeeper REST API server",
   "main": "src/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",

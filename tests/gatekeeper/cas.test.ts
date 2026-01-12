@@ -1,8 +1,8 @@
-import { BlockInfo } from '@mdip/gatekeeper/types';
-import Gatekeeper from '@mdip/gatekeeper';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory.ts';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
+import { BlockInfo } from '@didcid/gatekeeper/types';
+import Gatekeeper from '@didcid/gatekeeper';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
 
 const mockConsole = {
     log: (): void => { },

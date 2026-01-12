@@ -1,6 +1,6 @@
-# mdip-inscription-demo
+# archon-inscription-demo
 
-A minimal export-only mediator that demonstrates how to embed `Operation[]` batches on-chain using the `@mdip/inscription` library and the public mempool.space API. It creates Taproot "commit" and "reveal" transactions, broadcasts them, and optionally bumps fees (RBF/CPFP) if they linger unconfirmed.
+A minimal export-only mediator that demonstrates how to embed `Operation[]` batches on-chain using the `@didcid/inscription` library and the public mempool.space API. It creates Taproot "commit" and "reveal" transactions, broadcasts them, and optionally bumps fees (RBF/CPFP) if they linger unconfirmed.
 
 ---
 
@@ -12,7 +12,7 @@ A minimal export-only mediator that demonstrates how to embed `Operation[]` batc
     * fund commit outputs for each reveal leaf,
     * receive change,
     * and fund fee bumps.
-* Builds and signs transactions fully in-process with `@mdip/inscription`.
+* Builds and signs transactions fully in-process with `@didcid/inscription`.
 * Broadcasts commit+reveal via mempool.space REST.
 * Tracks the latest reveal txid and, once `BUMP_BLOCK_TARGET` blocks have passed with no confirmation, bumps its fee using `inscription.bumpTransactionFee`.
 * Persists minimal state in `data/mediator.json` via a simple JSON file DB.

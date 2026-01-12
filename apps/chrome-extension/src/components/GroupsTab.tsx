@@ -6,7 +6,7 @@ import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import {Delete, Edit} from "@mui/icons-material";
 import WarningModal from "../modals/WarningModal";
-import { Group } from '@mdip/keymaster/types'
+import { Group } from '@didcid/keymaster/types'
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";
 

@@ -1,7 +1,7 @@
 {
-  "name": "mdip-chrome-extension",
+  "name": "archon-chrome-extension",
   "version": "1.4.0-beta.5",
-  "description": "MDIP Chrome Extension",
+  "description": "Archon Chrome Extension",
   "main": "index.js",
   "scripts": {
     "start": "webpack --progress --config webpack.dev.js",

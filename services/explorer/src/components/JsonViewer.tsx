@@ -17,8 +17,8 @@ import {
 } from "@mui/material";
 import {
     GatekeeperInterface,
-    MdipDocument
-} from "@mdip/gatekeeper/types";
+    DidCidDocument
+} from "@didcid/gatekeeper/types";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import { handleCopyDID } from '../shared/utilities.js';
 import axios from "axios";
@@ -35,7 +35,7 @@ function JsonViewer(
         gatekeeper: GatekeeperInterface;
         setError: (error: any) => void;
     }) {
-    const [aliasDocs, setAliasDocs] = useState<MdipDocument | undefined>(undefined);
+    const [aliasDocs, setAliasDocs] = useState<DidCidDocument | undefined>(undefined);
     const [aliasDocsVersion, setAliasDocsVersion] = useState<number>(1);
     const [aliasDocsVersionMax, setAliasDocsVersionMax] = useState<number>(1);
     const [aliasDocsVersions, setAliasDocsVersions] = useState<number[] | undefined>(undefined);

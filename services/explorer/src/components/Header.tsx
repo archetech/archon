@@ -36,12 +36,12 @@ const Header = (
         >
             <Box sx={{ display: "flex", alignItems: "center", mr: 4 }}>
                 <Typography variant="h6" sx={{ mr: 2 }}>
-                    MDIP
+                    Archon
                 </Typography>
                 <Box
                     component="img"
                     src={iconInverted}
-                    alt="MDIP"
+                    alt="Archon"
                     sx={{ width: 32, height: 32 }}
                 />
             </Box>

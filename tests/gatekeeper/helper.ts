@@ -1,7 +1,7 @@
-import CipherNode from '@mdip/cipher/node';
-import { Operation, MdipDocument } from '@mdip/gatekeeper/types';
-import Gatekeeper from '@mdip/gatekeeper';
-import type { EcdsaJwkPair } from '@mdip/cipher/types';
+import CipherNode from '@didcid/cipher/node';
+import { Operation, DidCidDocument } from '@didcid/gatekeeper/types';
+import Gatekeeper from '@didcid/gatekeeper';
+import type { EcdsaJwkPair } from '@didcid/cipher/types';
 
 export default class TestHelper {
     private gatekeeper: Gatekeeper;
@@ -24,7 +24,7 @@ export default class TestHelper {
         const operation: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            mdip: {
+            register: {
                 version: version,
                 type: "agent",
                 registry: registry,
@@ -33,7 +33,7 @@ export default class TestHelper {
         };
 
         if (prefix) {
-            operation.mdip!.prefix = prefix;
+            operation.register!.prefix = prefix;
         }
 
         const msgHash = this.cipher.hashJSON(operation);
@@ -52,7 +52,7 @@ export default class TestHelper {
     async createUpdateOp(
         keypair: EcdsaJwkPair,
         did: string,
-        doc: MdipDocument,
+        doc: DidCidDocument,
         options: {
             excludePrevid?: boolean;
             mockPrevid?: string;
@@ -125,7 +125,7 @@ export default class TestHelper {
         const dataAnchor: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            mdip: {
+            register: {
                 version: 1,
                 type: "asset",
                 registry,

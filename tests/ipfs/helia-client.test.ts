@@ -1,6 +1,6 @@
 import mockFs from 'mock-fs';
-import HeliaClient from '@mdip/ipfs/helia';
-import { ExpectedExceptionError } from '@mdip/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
+import { ExpectedExceptionError } from '@didcid/common/errors';
 
 describe('start', () => {
     it('should ignore a second call to start', async () => {

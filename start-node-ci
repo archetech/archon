@@ -2,7 +2,7 @@
 set -e
 source .env
 
-echo $KC_GATEKEEPER_URL
+echo $ARCHON_GATEKEEPER_URL
 
 docker compose down
 docker compose build cli gatekeeper keymaster ipfs redis mongodb

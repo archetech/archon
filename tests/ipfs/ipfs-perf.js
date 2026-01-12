@@ -1,5 +1,5 @@
 
-import HeliaClient from '@mdip/ipfs/helia';
+import HeliaClient from '@didcid/ipfs/helia';
 import * as uuid from 'uuid';
 
 const ipfs = new HeliaClient();

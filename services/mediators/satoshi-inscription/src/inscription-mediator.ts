@@ -3,14 +3,14 @@ import * as bitcoin from 'bitcoinjs-lib';
 import * as ecc from 'tiny-secp256k1';
 import { gunzipSync } from 'zlib';
 import { BIP32Factory } from 'bip32';
-import GatekeeperClient from '@mdip/gatekeeper/client';
+import GatekeeperClient from '@didcid/gatekeeper/client';
 import JsonFile from './db/jsonfile.js';
 import JsonRedis from './db/redis.js';
 import JsonMongo from './db/mongo.js';
 import JsonSQLite from './db/sqlite.js';
 import config from './config.js';
-import { GatekeeperEvent, Operation } from '@mdip/gatekeeper/types';
-import Inscription from '@mdip/inscription';
+import { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
+import Inscription from '@didcid/inscription';
 import {
     AccountKeys,
     MediatorDb,
@@ -23,7 +23,7 @@ import {
 } from './types.js';
 
 const REGISTRY = config.chain + "-Inscription";
-const PROTOCOL_TAG = Buffer.from('MDIP', 'ascii');
+const ARCHON_TAG = Buffer.from('ARCHON', 'ascii');
 const SMART_FEE_MODE = "CONSERVATIVE";
 
 const READ_ONLY = config.exportInterval === 0;
@@ -171,13 +171,13 @@ async function extractOperations(txn: BlockTxVerbose, height: number, index: num
 
             const tapScriptHex = vin.txinwitness[vin.txinwitness.length - 2];
             const buf = Buffer.from(tapScriptHex, 'hex');
-            if (!buf.includes(PROTOCOL_TAG)) {
+            if (!buf.includes(ARCHON_TAG)) {
                 return;
             }
 
             const decomp = bitcoin.script.decompile(buf) || [];
             const tagIdx = decomp.findIndex(
-                el => Buffer.isBuffer(el) && (el as Buffer).equals(PROTOCOL_TAG)
+                el => Buffer.isBuffer(el) && (el as Buffer).equals(ARCHON_TAG)
             );
             if (tagIdx === -1) {
                 return;
@@ -272,7 +272,7 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
             console.log(height, String(i).padStart(4), tx.txid);
 
             const asm: string | undefined = tx.vout?.[0]?.scriptPubKey?.asm;
-            if (!asm || !asm.startsWith('OP_RETURN 4d44495001')) {
+            if (!asm || !asm.startsWith('OP_RETURN 4152434f4e01')) {
                 continue;
             }
 
@@ -387,7 +387,7 @@ async function extractCommitHex(revealHex: string) {
         }
 
         const tScript = Buffer.from(w[w.length - 2]);
-        if (!tScript.includes(PROTOCOL_TAG)) {
+        if (!tScript.includes(ARCHON_TAG)) {
             continue;
         }
 
@@ -825,7 +825,7 @@ async function syncBlocks(): Promise<void> {
 
 async function main() {
     if (!READ_ONLY && !config.nodeID) {
-        console.log('inscription-mediator must have a KC_NODE_ID configured');
+        console.log('inscription-mediator must have a ARCHON_NODE_ID configured');
         return;
     }
 

@@ -7,7 +7,7 @@ import { base58btc } from 'multiformats/bases/base58';
 import * as jsonCodec from 'multiformats/codecs/json';
 import * as rawCodec from 'multiformats/codecs/raw';
 import * as sha256 from 'multiformats/hashes/sha2';
-import { MDIPError } from '@mdip/common/errors';
+import { ArchonError } from '@didcid/common/errors';
 import { IPFSClient } from './types.js';
 import { createLibp2p } from 'libp2p';
 
@@ -16,7 +16,7 @@ interface HeliaConfig {
     datadir?: string;
 }
 
-export class NotConnectedError extends MDIPError {
+export class NotConnectedError extends ArchonError {
     static type = 'Not connected';
 
     constructor() {

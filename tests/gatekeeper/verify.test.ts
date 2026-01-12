@@ -1,7 +1,7 @@
-import CipherNode from '@mdip/cipher/node';
-import Gatekeeper from '@mdip/gatekeeper';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory.ts';
-import HeliaClient from '@mdip/ipfs/helia';
+import CipherNode from '@didcid/cipher/node';
+import Gatekeeper from '@didcid/gatekeeper';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
+import HeliaClient from '@didcid/ipfs/helia';
 import TestHelper from './helper.ts';
 
 const mockConsole = {

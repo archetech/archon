@@ -1,11 +1,11 @@
-import CipherNode from '@mdip/cipher/node';
-import { copyJSON, compareOrdinals } from '@mdip/common/utils';
-import { isValidDID, generateCID } from '@mdip/ipfs/utils';
+import CipherNode from '@didcid/cipher/node';
+import { copyJSON, compareOrdinals } from '@didcid/common/utils';
+import { isValidDID, generateCID } from '@didcid/ipfs/utils';
 import {
     InvalidParameterError,
     InvalidOperationError
-} from '@mdip/common/errors';
-import { IPFSClient } from '@mdip/ipfs/types';
+} from '@didcid/common/errors';
+import { IPFSClient } from '@didcid/ipfs/types';
 import {
     BlockId,
     BlockInfo,
@@ -16,7 +16,7 @@ import {
     GatekeeperOptions,
     ImportEventsResult,
     Operation,
-    MdipDocument,
+    DidCidDocument,
     ResolveDIDOptions,
     GetDIDOptions,
     CheckDIDsResult,
@@ -136,7 +136,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             try {
                 const doc = await this.resolveDID(did, { verify: true });
-                validUntil = doc.mdip?.validUntil;
+                validUntil = doc.didDocumentRegister?.validUntil;
             }
             catch (error) {
                 if (chatty) {
@@ -222,11 +222,11 @@ export default class Gatekeeper implements GatekeeperInterface {
                     console.log(`resolved ${n}/${total} ${did} OK`);
                 }
 
-                if (doc.mdip?.type === 'agent') {
+                if (doc.didDocumentRegister?.type === 'agent') {
                     agents += 1;
                 }
 
-                if (doc.mdip?.type === 'asset') {
+                if (doc.didDocumentRegister?.type === 'asset') {
                     assets += 1;
                 }
 
@@ -237,11 +237,11 @@ export default class Gatekeeper implements GatekeeperInterface {
                     unconfirmed += 1;
                 }
 
-                if (doc.mdip?.validUntil) {
+                if (doc.didDocumentRegister?.validUntil) {
                     ephemeral += 1;
                 }
 
-                const registry = doc.mdip?.registry;
+                const registry = doc.didDocumentRegister?.registry;
                 if (registry) {
                     byRegistry[registry] = (byRegistry[registry] || 0) + 1;
                 }
@@ -286,7 +286,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     async generateDID(operation: Operation): Promise<string> {
         const cid = await this.generateCID(operation);
-        const prefix = operation.mdip?.prefix || this.didPrefix;
+        const prefix = operation.register?.prefix || this.didPrefix;
         return `${prefix}:${cid}`;
     }
 
@@ -360,31 +360,31 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError(`created=${operation.created}`);
         }
 
-        if (!operation.mdip) {
-            throw new InvalidOperationError('mdip');
+        if (!operation.register) {
+            throw new InvalidOperationError('register');
         }
 
-        if (!ValidVersions.includes(operation.mdip.version)) {
-            throw new InvalidOperationError(`mdip.version=${operation.mdip.version}`);
+        if (!ValidVersions.includes(operation.register.version)) {
+            throw new InvalidOperationError(`register.version=${operation.register.version}`);
         }
 
-        if (!ValidTypes.includes(operation.mdip.type)) {
-            throw new InvalidOperationError(`mdip.type=${operation.mdip.type}`);
+        if (!ValidTypes.includes(operation.register.type)) {
+            throw new InvalidOperationError(`register.type=${operation.register.type}`);
         }
 
-        if (!ValidRegistries.includes(operation.mdip.registry)) {
-            throw new InvalidOperationError(`mdip.registry=${operation.mdip.registry}`);
+        if (!ValidRegistries.includes(operation.register.registry)) {
+            throw new InvalidOperationError(`register.registry=${operation.register.registry}`);
         }
 
         if (!this.verifySignatureFormat(operation.signature)) {
             throw new InvalidOperationError('signature');
         }
 
-        if (operation.mdip.validUntil && !this.verifyDateFormat(operation.mdip.validUntil)) {
-            throw new InvalidOperationError(`mdip.validUntil=${operation.mdip.validUntil}`);
+        if (operation.register.validUntil && !this.verifyDateFormat(operation.register.validUntil)) {
+            throw new InvalidOperationError(`register.validUntil=${operation.register.validUntil}`);
         }
 
-        if (operation.mdip.type === 'agent') {
+        if (operation.register.type === 'agent') {
             if (!operation.publicJwk) {
                 throw new InvalidOperationError('publicJwk');
             }
@@ -396,15 +396,15 @@ export default class Gatekeeper implements GatekeeperInterface {
             return this.cipher.verifySig(msgHash, operation.signature!.value, operation.publicJwk);
         }
 
-        if (operation.mdip.type === 'asset') {
+        if (operation.register.type === 'asset') {
             if (operation.controller !== operation.signature?.signer) {
                 throw new InvalidOperationError('signer is not controller');
             }
 
             const doc = await this.resolveDID(operation.signature!.signer, { confirm: true, versionTime: operation.signature!.signed });
 
-            if (doc.mdip && doc.mdip.registry === 'local' && operation.mdip.registry !== 'local') {
-                throw new InvalidOperationError(`non-local registry=${operation.mdip.registry}`);
+            if (doc.didDocumentRegister && doc.didDocumentRegister.registry === 'local' && operation.register.registry !== 'local') {
+                throw new InvalidOperationError(`non-local registry=${operation.register.registry}`);
             }
 
             const operationCopy = copyJSON(operation);
@@ -421,10 +421,10 @@ export default class Gatekeeper implements GatekeeperInterface {
             return this.cipher.verifySig(msgHash, operation.signature!.value, publicJwk);
         }
 
-        throw new InvalidOperationError(`mdip.type=${operation.mdip.type}`);
+        throw new InvalidOperationError(`register.type=${operation.register.type}`);
     }
 
-    async verifyUpdateOperation(operation: Operation, doc: MdipDocument): Promise<boolean> {
+    async verifyUpdateOperation(operation: Operation, doc: DidCidDocument): Promise<boolean> {
         if (JSON.stringify(operation).length > this.maxOpBytes) {
             throw new InvalidOperationError('size');
         }
@@ -495,7 +495,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError('signature')
         }
 
-        const registry = operation.mdip!.registry;
+        const registry = operation.register!.registry;
 
         // Reject operations with unsupported registries
         if (!registry || !this.supportedRegistries.includes(registry)) {
@@ -525,28 +525,28 @@ export default class Gatekeeper implements GatekeeperInterface {
         });
     }
 
-    async generateDoc(anchor: Operation, defaultDID?: string): Promise<MdipDocument> {
-        let doc: MdipDocument = {};
+    async generateDoc(anchor: Operation, defaultDID?: string): Promise<DidCidDocument> {
+        let doc: DidCidDocument = {};
         try {
-            if (!anchor?.mdip) {
+            if (!anchor?.register) {
                 return {};
             }
 
-            if (!ValidVersions.includes(anchor.mdip.version)) {
+            if (!ValidVersions.includes(anchor.register.version)) {
                 return {};
             }
 
-            if (!ValidTypes.includes(anchor.mdip.type)) {
+            if (!ValidTypes.includes(anchor.register.type)) {
                 return {};
             }
 
-            if (!ValidRegistries.includes(anchor.mdip.registry)) {
+            if (!ValidRegistries.includes(anchor.register.registry)) {
                 return {};
             }
 
             const did = defaultDID ?? await this.generateDID(anchor);
 
-            if (anchor.mdip.type === 'agent') {
+            if (anchor.register.type === 'agent') {
                 // TBD support different key types?
                 doc = {
                     "didDocument": {
@@ -568,11 +568,11 @@ export default class Gatekeeper implements GatekeeperInterface {
                         "created": anchor.created,
                     },
                     "didDocumentData": {},
-                    "mdip": anchor.mdip,
+                    "didDocumentRegister": anchor.register,
                 };
             }
 
-            if (anchor.mdip.type === 'asset') {
+            if (anchor.register.type === 'asset') {
                 doc = {
                     "didDocument": {
                         "@context": ["https://www.w3.org/ns/did/v1"],
@@ -583,11 +583,11 @@ export default class Gatekeeper implements GatekeeperInterface {
                         "created": anchor.created,
                     },
                     "didDocumentData": anchor.data,
-                    "mdip": anchor.mdip,
+                    "didDocumentRegister": anchor.register,
                 };
             }
 
-            if (doc.didDocumentMetadata && anchor.mdip.prefix) {
+            if (doc.didDocumentMetadata && anchor.register.prefix) {
                 doc.didDocumentMetadata.canonicalId = did;
             }
         }
@@ -601,7 +601,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     async resolveDID(
         did?: string,
         options?: ResolveDIDOptions
-    ): Promise<MdipDocument> {
+    ): Promise<DidCidDocument> {
         const { versionTime, versionSequence, confirm = false, verify = false } = options || {};
 
         if (!did || !isValidDID(did)) {
@@ -629,7 +629,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         const anchor = events[0];
         let doc = await this.generateDoc(anchor.operation, did);
 
-        if (versionTime && doc.mdip?.created && new Date(doc.mdip.created) > new Date(versionTime)) {
+        if (versionTime && doc.didDocumentRegister?.created && new Date(doc.didDocumentRegister.created) > new Date(versionTime)) {
             // TBD What to return if DID was created after specified time?
         }
 
@@ -649,12 +649,12 @@ export default class Gatekeeper implements GatekeeperInterface {
             const updated = generateStandardDatetime(time);
             let timestamp;
 
-            if (doc.mdip?.registry) {
+            if (doc.didDocumentRegister?.registry) {
                 let lowerBound;
                 let upperBound;
 
                 if (operation.blockid) {
-                    const lowerBlock = await this.db.getBlock(doc.mdip.registry, operation.blockid);
+                    const lowerBlock = await this.db.getBlock(doc.didDocumentRegister.registry, operation.blockid);
 
                     if (lowerBlock) {
                         lowerBound = {
@@ -667,7 +667,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 }
 
                 if (blockchain) {
-                    const upperBlock = await this.db.getBlock(doc.mdip.registry, blockchain.height);
+                    const upperBlock = await this.db.getBlock(doc.didDocumentRegister.registry, blockchain.height);
 
                     if (upperBlock) {
                         upperBound = {
@@ -685,7 +685,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
                 if (lowerBound || upperBound) {
                     timestamp = {
-                        chain: doc.mdip.registry,
+                        chain: doc.didDocumentRegister.registry,
                         opid: versionId,
                         lowerBound,
                         upperBound,
@@ -721,7 +721,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 break;
             }
 
-            confirmed = confirmed && doc.mdip?.registry === registry;
+            confirmed = confirmed && doc.didDocumentRegister?.registry === registry;
 
             if (confirm && !confirmed) {
                 break;
@@ -782,9 +782,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         // Remove deprecated fields
         delete (doc as any)['@context'];
 
-        if (doc.mdip) {
-            delete doc.mdip.opid // Replaced by didDocumentMetadata.versionId
-            delete doc.mdip.registration // Replaced by didDocumentMetadata.timestamp
+        if (doc.didDocumentRegister) {
+            delete doc.didDocumentRegister.opid // Replaced by didDocumentMetadata.versionId
+            delete doc.didDocumentRegister.registration // Replaced by didDocumentMetadata.timestamp
         }
 
         return copyJSON(doc);
@@ -802,7 +802,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             return false;
         }
 
-        const registry = doc.mdip?.registry;
+        const registry = doc.didDocumentRegister?.registry;
 
         // Reject operations with unsupported registries
         if (!registry || !this.supportedRegistries.includes(registry)) {
@@ -828,7 +828,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.updateDID(operation)
     }
 
-    async getDIDs(options?: GetDIDOptions): Promise<string[] | MdipDocument[]> {
+    async getDIDs(options?: GetDIDOptions): Promise<string[] | DidCidDocument[]> {
         let { dids, updatedAfter, updatedBefore, confirm, verify, resolve } = options || {};
         if (!dids) {
             const keys = await this.db.getAllKeys();
@@ -838,7 +838,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (updatedAfter || updatedBefore || resolve) {
             const start = updatedAfter ? new Date(updatedAfter) : null;
             const end = updatedBefore ? new Date(updatedBefore) : null;
-            const docList: MdipDocument[] = [];
+            const docList: DidCidDocument[] = [];
             const didList: string[] = [];
 
             for (const did of dids) {
@@ -939,7 +939,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
                 if (opMatch) {
                     const first = currentEvents[0];
-                    const nativeRegistry = first.operation.mdip?.registry;
+                    const nativeRegistry = first.operation.register?.registry;
 
                     if (opMatch.registry === nativeRegistry) {
                         // If this event is already confirmed on the native registry, no need to update
@@ -987,7 +987,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     }
 
                     const first = currentEvents[0];
-                    const nativeRegistry = first.operation.mdip?.registry;
+                    const nativeRegistry = first.operation.register?.registry;
 
                     if (event.registry === nativeRegistry) {
                         const nextEvent = currentEvents[index + 1];
@@ -1119,31 +1119,31 @@ export default class Gatekeeper implements GatekeeperInterface {
                 return false;
             }
 
-            if (!operation.mdip) {
+            if (!operation.register) {
                 return false;
             }
 
-            if (!ValidVersions.includes(operation.mdip.version)) {
+            if (!ValidVersions.includes(operation.register.version)) {
                 return false;
             }
 
-            if (!ValidTypes.includes(operation.mdip.type)) {
+            if (!ValidTypes.includes(operation.register.type)) {
                 return false;
             }
 
-            if (!ValidRegistries.includes(operation.mdip.registry)) {
+            if (!ValidRegistries.includes(operation.register.registry)) {
                 return false;
             }
 
             // eslint-disable-next-line
-            if (operation.mdip.type === 'agent') {
+            if (operation.register.type === 'agent') {
                 if (!operation.publicJwk) {
                     return false;
                 }
             }
 
             // eslint-disable-next-line
-            if (operation.mdip.type === 'asset') {
+            if (operation.register.type === 'asset') {
                 if (operation.controller !== operation.signature?.signer) {
                     return false;
                 }
@@ -1152,7 +1152,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         else if (operation.type === 'update') {
             const doc = operation.doc;
 
-            if (!doc || !doc.didDocument || !doc.didDocumentMetadata || !doc.didDocumentData || !doc.mdip) {
+            if (!doc || !doc.didDocument || !doc.didDocumentMetadata || !doc.didDocumentData || !doc.didDocumentRegister) {
                 return false;
             }
 
@@ -1214,7 +1214,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         const nonlocalDIDs = allDIDs.filter(events => {
             if (events.length > 0) {
                 const create = events[0];
-                const registry = create.operation?.mdip?.registry;
+                const registry = create.operation?.register?.registry;
                 return registry && registry !== 'local'
             }
             return false;

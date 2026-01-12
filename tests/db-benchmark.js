@@ -1,9 +1,9 @@
 import * as uuid from 'uuid';
 
-import DbJson from '@mdip/gatekeeper/db/json';
-import DbSqlite from '@mdip/gatekeeper/db/sqlite';
-import DbMongo from '@mdip/gatekeeper/db/mongo';
-import DbRedis from '@mdip/gatekeeper/db/redis';
+import DbJson from '@didcid/gatekeeper/db/json';
+import DbSqlite from '@didcid/gatekeeper/db/sqlite';
+import DbMongo from '@didcid/gatekeeper/db/mongo';
+import DbRedis from '@didcid/gatekeeper/db/redis';
 
 async function importDIDs(db) {
 
@@ -24,7 +24,7 @@ async function importDIDs(db) {
                 "operation": {
                     "type": "create",
                     "created": new Date().toISOString(),
-                    "mdip": {
+                    "register": {
                         "version": 1,
                         "type": "asset",
                         "registry": "hyperswarm"
@@ -85,7 +85,7 @@ async function runBenchmark(db) {
 }
 
 async function main() {
-    const dbName = 'mdip-benchmark';
+    const dbName = 'archon-benchmark';
 
     const db_json = new DbJson(dbName);
     console.log('>> db_json');

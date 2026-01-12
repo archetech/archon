@@ -1,7 +1,7 @@
 import nock from 'nock';
-import KeymasterClient from '@mdip/keymaster/client';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import {Seed, WalletEncFile, WalletFile} from "@mdip/keymaster/types";
+import KeymasterClient from '@didcid/keymaster/client';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import {Seed, WalletEncFile, WalletFile} from "@didcid/keymaster/types";
 
 const KeymasterURL = 'http://keymaster.org';
 const ServerError = { message: 'Server error' };
@@ -3010,7 +3010,7 @@ describe('getGroupVaultItem', () => {
     });
 });
 
-const mockDmailId = 'did:mdip:dmail';
+const mockDmailId = 'did:cid:dmail';
 const mockDmail = { to: ['mockTo'], cc: ['mockCC'], subject: 'Test subject', body: 'Test body' };
 
 describe('createDmail', () => {
@@ -3401,7 +3401,7 @@ describe('listDmail', () => {
     });
 });
 
-const mockNoticeId = 'did:mdip:notice';
+const mockNoticeId = 'did:cid:notice';
 const mockNotice = { to: ['mockTo'], dids: ['mockDID'] };
 
 describe('createNotice', () => {

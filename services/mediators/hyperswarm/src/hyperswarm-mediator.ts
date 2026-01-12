@@ -5,11 +5,11 @@ import { sha256 } from '@noble/hashes/sha256';
 import asyncLib from 'async';
 import { EventEmitter } from 'events';
 
-import GatekeeperClient from '@mdip/gatekeeper/client';
-import KeymasterClient from '@mdip/keymaster/client';
-import KuboClient from '@mdip/ipfs/kubo';
-import { Operation } from '@mdip/gatekeeper/types';
-import CipherNode from '@mdip/cipher/node';
+import GatekeeperClient from '@didcid/gatekeeper/client';
+import KeymasterClient from '@didcid/keymaster/client';
+import KuboClient from '@didcid/ipfs/kubo';
+import { Operation } from '@didcid/gatekeeper/types';
+import CipherNode from '@didcid/cipher/node';
 import config from './config.js';
 import { exit } from 'process';
 
@@ -198,7 +198,7 @@ async function shareDb(conn: HyperswarmConnection): Promise<void> {
         const batchSize = 1000; // export DIDs in batches of 1000 for scalability
         const dids = await gatekeeper.getDIDs();
 
-        // Either empty or we got an MdipDocument[] which should not happen.
+        // Either empty or we got an DidCidDocument[] which should not happen.
         if (!isStringArray(dids)) {
             return;
         }

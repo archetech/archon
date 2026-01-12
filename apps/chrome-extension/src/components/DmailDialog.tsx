@@ -7,7 +7,7 @@ import {
     DialogTitle,
     TextField,
 } from "@mui/material";
-import { DmailMessage } from '@mdip/keymaster/types';
+import { DmailMessage } from '@didcid/keymaster/types';
 
 interface DmailDialogProps {
     open: boolean;

@@ -582,7 +582,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
                 docList[name] = doc;
 
-                if (doc.mdip.type === 'agent') {
+                if (doc.didDocumentRegister.type === 'agent') {
                     agentList.push(name);
                     continue;
                 }
@@ -787,7 +787,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         try {
             const docs = await keymaster.resolveDID(name);
 
-            if (docs.mdip.type === 'agent') {
+            if (docs.didDocumentRegister.type === 'agent') {
                 showAlert("Only asset DIDs may be transferred");
                 return;
             }
@@ -1766,7 +1766,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
             const link = document.createElement('a');
             link.href = url;
-            link.download = 'mdip-wallet.json';
+            link.download = 'archon-wallet.json';
             link.click();
 
             // The URL.revokeObjectURL() method releases an existing object URL which was previously created by calling URL.createObjectURL().

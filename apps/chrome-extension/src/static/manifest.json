@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "MDIP Chrome Extension",
-    "description": "MDIP Chrome Extension",
+    "name": "Archon Chrome Extension",
+    "description": "Archon Chrome Extension",
     "version": "1.1.1",
     "icons": {
         "16": "icon.png",
@@ -10,7 +10,7 @@
     },
     "action": {
         "default_popup": "popup.html",
-        "default_title": "MDIP Chrome Extension",
+        "default_title": "Archon Chrome Extension",
         "default_icon": "icon.png"
     },
     "background": {

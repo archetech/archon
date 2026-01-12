@@ -1,6 +1,6 @@
-import CipherNode from '@mdip/cipher/node';
-import { ProofOfWork } from '@mdip/cipher/types';
-import { ExpectedExceptionError } from '@mdip/common/errors';
+import CipherNode from '@didcid/cipher/node';
+import { ProofOfWork } from '@didcid/cipher/types';
+import { ExpectedExceptionError } from '@didcid/common/errors';
 
 const cipher = new CipherNode();
 

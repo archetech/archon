@@ -2,7 +2,7 @@ import os
 import requests
 import json
 
-_base_url = os.environ.get("KC_KEYMASTER_URL", "http://localhost:4226")
+_base_url = os.environ.get("ARCHON_KEYMASTER_URL", "http://localhost:4226")
 _keymaster_api = _base_url + "/api/v1"
 
 

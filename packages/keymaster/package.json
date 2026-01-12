@@ -1,7 +1,7 @@
 {
-  "name": "@mdip/keymaster",
-  "version": "1.4.0-beta.5",
-  "description": "MDIP Keymaster",
+  "name": "@didcid/keymaster",
+  "version": "0.1.0",
+  "description": "Archon Keymaster",
   "type": "module",
   "module": "./dist/esm/index.js",
   "main": "./dist/cjs/index.cjs",
@@ -169,7 +169,7 @@
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@mdip/common": "*",
+    "@didcid/common": "*",
     "axios": "^1.7.7",
     "file-type": "^21.0.0",
     "image-size": "^2.0.1",
@@ -180,6 +180,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KeychainMDIP/kc.git"
+    "url": "git+https://github.com/archetech/archon.git"
   }
 }

@@ -2,12 +2,12 @@ import { program } from 'commander';
 import fs from 'fs';
 import dotenv from 'dotenv';
 
-import GatekeeperClient from '@mdip/gatekeeper/client';
-import CipherNode from '@mdip/cipher/node';
+import GatekeeperClient from '@didcid/gatekeeper/client';
+import CipherNode from '@didcid/cipher/node';
 
 dotenv.config();
 
-const gatekeeperURL = process.env.KC_GATEKEEPER_URL || 'http://localhost:4224';
+const gatekeeperURL = process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224';
 const gatekeeper = new GatekeeperClient();
 const cipher = new CipherNode();
 

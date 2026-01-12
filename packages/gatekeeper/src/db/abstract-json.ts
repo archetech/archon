@@ -1,4 +1,4 @@
-import { InvalidDIDError } from '@mdip/common/errors';
+import { InvalidDIDError } from '@didcid/common/errors';
 import {
     BlockId,
     BlockInfo,

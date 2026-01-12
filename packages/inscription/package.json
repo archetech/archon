@@ -1,7 +1,7 @@
 {
-  "name": "@mdip/inscription",
-  "version": "1.4.0-beta.5",
-  "description": "MDIP Inscription",
+  "name": "@didcid/inscription",
+  "version": "0.1.0",
+  "description": "Archon Inscription",
   "type": "module",
   "main": "./dist/cjs/index.cjs",
   "module": "./dist/esm/index.js",
@@ -43,7 +43,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KeychainMDIP/kc.git"
+    "url": "git+https://github.com/archetech/archon.git"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.3",

@@ -1,11 +1,11 @@
-import CipherNode from '@mdip/cipher/node';
-import { Operation } from '@mdip/gatekeeper/types';
-import Gatekeeper from '@mdip/gatekeeper';
-import DbJsonMemory from '@mdip/gatekeeper/db/json-memory.ts';
-import { compareOrdinals } from '@mdip/common/utils';
-import { ExpectedExceptionError } from '@mdip/common/errors';
-import HeliaClient from '@mdip/ipfs/helia';
-import { isValidDID } from '@mdip/ipfs/utils';
+import CipherNode from '@didcid/cipher/node';
+import { Operation } from '@didcid/gatekeeper/types';
+import Gatekeeper from '@didcid/gatekeeper';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
+import { compareOrdinals } from '@didcid/common/utils';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import HeliaClient from '@didcid/ipfs/helia';
+import { isValidDID } from '@didcid/ipfs/utils';
 import TestHelper from './helper.ts';
 
 const mockConsole = {
@@ -59,7 +59,7 @@ describe('generateDID', () => {
         const mockTxn: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            mdip: {
+            register: {
                 registry: "mockRegistry",
                 type: 'agent',
                 version: 1,
@@ -74,7 +74,7 @@ describe('generateDID', () => {
         const mockTxn: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            mdip: {
+            register: {
                 version: 1,
                 type: "asset",
                 registry: "mockRegistry"
@@ -91,7 +91,7 @@ describe('generateDID', () => {
         const mockTxn: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            mdip: {
+            register: {
                 version: 1,
                 type: "asset",
                 registry: "mockRegistry",
@@ -108,7 +108,7 @@ describe('generateDID', () => {
         const mockTxn: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            mdip: {
+            register: {
                 version: 1,
                 type: "asset",
                 registry: "mockRegistry"
@@ -151,7 +151,7 @@ describe('generateDoc', () => {
             didDocumentMetadata: {
                 created: expect.any(String),
             },
-            mdip: agentOp.mdip,
+            didDocumentRegister: agentOp.register,
         };
 
         expect(doc).toStrictEqual(expected);
@@ -186,7 +186,7 @@ describe('generateDoc', () => {
                 created: expect.any(String),
                 canonicalId: did,
             },
-            mdip: agentOp.mdip,
+            didDocumentRegister: agentOp.register,
         };
 
         expect(doc).toStrictEqual(expected);
@@ -212,22 +212,22 @@ describe('generateDoc', () => {
             didDocumentMetadata: {
                 created: expect.any(String),
             },
-            mdip: assetOp.mdip,
+            didDocumentRegister: assetOp.register,
         };
 
         expect(doc).toStrictEqual(expected);
     });
 
-    it('should return an empty doc if mdip missing from anchor', async () => {
+    it('should return an empty doc if register missing from anchor', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
-        delete agentOp.mdip;
+        delete agentOp.register;
         const doc = await gatekeeper.generateDoc(agentOp);
 
         expect(doc).toStrictEqual({});
     });
 
-    it('should return an empty doc if mdip version invalid', async () => {
+    it('should return an empty doc if register version invalid', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair, { version: 0 });
         const doc = await gatekeeper.generateDoc(agentOp);
@@ -235,17 +235,17 @@ describe('generateDoc', () => {
         expect(doc).toStrictEqual({});
     });
 
-    it('should return an empty doc if mdip type invalid', async () => {
+    it('should return an empty doc if register type invalid', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         // @ts-expect-error Testing invalid usage
-        agentOp.mdip!.type = 'mock';
+        agentOp.register!.type = 'mock';
         const doc = await gatekeeper.generateDoc(agentOp);
 
         expect(doc).toStrictEqual({});
     });
 
-    it('should return an empty doc if mdip registry invalid', async () => {
+    it('should return an empty doc if register registry invalid', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'mock' });
         const doc = await gatekeeper.generateDoc(agentOp);
@@ -478,21 +478,21 @@ describe('Test operation validation errors', () => {
         let assetOp = await helper.createAssetOp(agent, keypair);
 
         // @ts-expect-error Testing invalid value
-        assetOp.mdip!.type = "dummy";
+        assetOp.register!.type = "dummy";
 
         try {
             await gatekeeper.verifyCreateOperation(assetOp);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
-            expect(error.message).toBe('Invalid operation: mdip.type=dummy');
+            expect(error.message).toBe('Invalid operation: register.type=dummy');
         }
     });
 
     it('create error with invalid signature', async () => {
         const keypair = cipher.generateRandomJwk();
         let agentOp = await helper.createAgentOp(keypair);
-        agentOp.mdip!.prefix = "dummy";
+        agentOp.register!.prefix = "dummy";
 
         try {
             await gatekeeper.createDID(agentOp);
