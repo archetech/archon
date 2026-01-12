@@ -15,7 +15,7 @@ export async function encMnemonic(mnemonic: string, pass: string) {
     const iv = await randBytes(IV_LEN);
 
     const key = await deriveKey(pass, salt);
-    const ct = await crypto.subtle.encrypt({ name: ENC_ALG, iv }, key, new TextEncoder().encode(mnemonic));
+    const ct = await crypto.subtle.encrypt({ name: ENC_ALG, iv: iv as Uint8Array<ArrayBuffer> }, key, new TextEncoder().encode(mnemonic));
     return { salt: b64(salt), iv: b64(iv), data: b64(new Uint8Array(ct)) };
 }
 
@@ -55,7 +55,7 @@ async function deriveKey(pass: string, salt: Uint8Array): Promise<CryptoKey> {
     const enc = new TextEncoder();
     const passKey = await crypto.subtle.importKey('raw', enc.encode(pass), { name: ENC_KDF }, false, ['deriveKey']);
     return crypto.subtle.deriveKey(
-        { name: ENC_KDF, salt, iterations: ENC_ITER, hash: ENC_HASH },
+        { name: ENC_KDF, salt: salt as Uint8Array<ArrayBuffer>, iterations: ENC_ITER, hash: ENC_HASH },
         passKey,
         { name: ENC_ALG, length: 256 },
         false,

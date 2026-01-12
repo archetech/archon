@@ -37,7 +37,7 @@ async function deriveKey(pass: string, salt: Uint8Array): Promise<CryptoKey> {
     return crypto.subtle.deriveKey(
         {
             name: kdf,
-            salt,
+            salt: salt as Uint8Array<ArrayBuffer>,
             iterations,
             hash
         },

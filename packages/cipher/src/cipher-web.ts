@@ -2,7 +2,7 @@ import * as bip39 from 'bip39';
 import { base64url } from 'multiformats/bases/base64';
 import CipherBase from './cipher-base.js';
 import { Cipher, HDKeyJSON } from './types.js';
-import HDKeyBrowser from '@didcid/browser-hdkey';
+import HDKeyBrowser from '@mdip/browser-hdkey';
 
 export default class CipherWeb extends CipherBase implements Cipher {
     generateHDKey(mnemonic: string): HDKeyBrowser {
