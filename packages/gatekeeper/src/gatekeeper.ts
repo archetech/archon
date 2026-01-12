@@ -32,12 +32,10 @@ const ValidTypes = ['agent', 'asset'];
 const ValidRegistries = [
     'local',
     'hyperswarm',
-    'TESS',
-    'TBTC',
-    'TFTC',
-    'Signet',
-    'Signet-Inscription',
-    'BTC-Inscription'
+    'BTC/mainnet',
+    'BTC/testnet4',
+    'BTC/signet',
+    'FTC/testnet5',
 ];
 
 enum ImportStatus {

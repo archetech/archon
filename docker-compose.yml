@@ -99,12 +99,12 @@ services:
       - keymaster
       - ipfs
 
-  tftc-node:
+  ftc-testnet5-node:
     image: keychainmdip/feathercoin:v0.19.2
     volumes:
-      - ./data/tftc:/root/.feathercoin
+      - ./data/ftc-testnet5:/root/.feathercoin
 
-  tftc-mediator:
+  ftc-testnet5-mediator:
     build:
       context: .
       dockerfile: Dockerfile.satoshi
@@ -115,10 +115,10 @@ services:
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
-      - ARCHON_SAT_CHAIN=TFTC
+      - ARCHON_SAT_CHAIN=ftc-testnet5
       - ARCHON_SAT_NETWORK=testnet
       - ARCHON_SAT_START_BLOCK=0
-      - ARCHON_SAT_HOST=tftc-node
+      - ARCHON_SAT_HOST=ftc-testnet5-node
       - ARCHON_SAT_PORT=19337
       - ARCHON_SAT_USER=${ARCHON_TFTC_USER}
       - ARCHON_SAT_PASS=${ARCHON_TFTC_PASS}
@@ -135,7 +135,7 @@ services:
       - ./data:/app/satoshi/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
-      - tftc-node
+      - ftc-testnet5-node
       - gatekeeper
       - keymaster
 
@@ -157,7 +157,7 @@ services:
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
-      - ARCHON_SAT_CHAIN=BTC
+      - ARCHON_SAT_CHAIN=BTC/mainnet
       - ARCHON_SAT_NETWORK=bitcoin
       - ARCHON_SAT_HOST=btc-node
       - ARCHON_SAT_PORT=8332
@@ -181,12 +181,12 @@ services:
       - gatekeeper
       - keymaster
 
-  tbtc-node:
+  btc-testnet4-node:
     image: keychainmdip/bitcoin-core:v28.0-multiarch
     volumes:
-      - ./data/tbtc:/root/.bitcoin
+      - ./data/btc-testnet4:/root/.bitcoin
 
-  tbtc-mediator:
+  btc-testnet4-mediator:
     build:
       context: .
       dockerfile: Dockerfile.satoshi
@@ -197,9 +197,9 @@ services:
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
-      - ARCHON_SAT_CHAIN=TBTC
+      - ARCHON_SAT_CHAIN=BTC/testnet4
       - ARCHON_SAT_NETWORK=testnet
-      - ARCHON_SAT_HOST=tbtc-node
+      - ARCHON_SAT_HOST=btc-testnet4-node
       - ARCHON_SAT_PORT=48332
       - ARCHON_SAT_START_BLOCK=${ARCHON_TBTC_START_BLOCK}
       - ARCHON_SAT_USER=${ARCHON_TBTC_USER}
@@ -217,18 +217,18 @@ services:
       - ./data:/app/satoshi/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
-      - tbtc-node
+      - btc-testnet4-node
       - gatekeeper
       - keymaster
 
-  signet-node:
+  btc-signet-node:
     image: keychainmdip/bitcoin-core:v28.0-multiarch
     volumes:
-      - ./data/signet:/root/.bitcoin
+      - ./data/btc-signet:/root/.bitcoin
     ports:
       - 38332:38332
 
-  signet-mediator:
+  btc-signet-mediator:
     build:
       context: .
       dockerfile: Dockerfile.satoshi
@@ -239,9 +239,9 @@ services:
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
-      - ARCHON_SAT_CHAIN=Signet
+      - ARCHON_SAT_CHAIN=BTC/btc-signet
       - ARCHON_SAT_NETWORK=testnet
-      - ARCHON_SAT_HOST=signet-node
+      - ARCHON_SAT_HOST=btc-signet-node
       - ARCHON_SAT_PORT=38332
       - ARCHON_SAT_START_BLOCK=${ARCHON_SIGNET_START_BLOCK}
       - ARCHON_SAT_USER=${ARCHON_SIGNET_USER}
@@ -259,7 +259,7 @@ services:
       - ./data:/app/satoshi/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
-      - signet-node
+      - btc-signet-node
       - gatekeeper
       - keymaster
 
@@ -289,7 +289,7 @@ services:
       - VITE_EXPLORER_PORT=4000
       - VITE_GATEKEEPER_URL=http://localhost:4224
       - VITE_SEARCH_SERVER=http://localhost:4002
-      - VITE_OPERATION_NETWORKS=hyperswarm,local,TFTC,TBTC
+      - VITE_OPERATION_NETWORKS=hyperswarm,local,ftc-testnet5,btc-testnet4
     ports:
       - "4000:4000"
     depends_on:

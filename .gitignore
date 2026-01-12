@@ -7,6 +7,7 @@ coverage/
 .clinic/
 .idea/
 .vscode/
+.claude/
 dist/
 dids.db-journal
 .venv
