@@ -58,10 +58,10 @@ All the Archon components illustrated above are composed together using Docker C
 - archon-gatekeeper-1 is the Archon Gatekeeper, a reference implementation of Archon exposing a REST [Gatekeeper API](../../gatekeeper-api.json) interface.
 - archon-keymaster-1 is the Archon Keymaster, which provides an interface to the server's keymaster wallet and expose a REST [Keymaster API](../../keymaster-api.json) to manage the server's Archon identity.
 - kc-hyperswarm-1 is the document distribution protocol service built on [Hyperswarm](https://github.com/holepunchto/hyperswarm).
-- kc-tftc-mediator-1 is the Archon Mediator for [Feathercoin Testnet](https://feathercoin.com/)
-- kc-tbtc-mediator-1 is the Archon Mediator for [Bitcoin Testnet](https://github.com/bitcoin/)
-- kc-tftc-node is a generic Feathercoin Testnet node
-- kc-tbtc-node is a generic [Bitcoin Testnet4](https://github.com/bitcoin/bitcoin/pull/29775) node
+- kc-FTC/testnet5-mediator-1 is the Archon Mediator for [Feathercoin Testnet](https://feathercoin.com/)
+- kc-BTC/testnet4-mediator-1 is the Archon Mediator for [Bitcoin Testnet](https://github.com/bitcoin/)
+- kc-FTC/testnet5-node is a generic Feathercoin Testnet node
+- kc-BTC/testnet4-node is a generic [Bitcoin Testnet4](https://github.com/bitcoin/bitcoin/pull/29775) node
 - kc-signet-node is a generic [Bitcoin Signet] node
 
 ## Systems Requirements
@@ -145,8 +145,8 @@ Once a local copy of the repository is available, we can look at important parts
 | /scripts                    | Archon command line interface scripts                                                                                                  |
 | /scripts/admin-cli.js       | Archon admin-cli tool to manage registry status, batching, queuing, import/export functions                                            |
 | /scripts/keychain-cli.js    | Archon cli tool to manage the local `data/wallet.json` file                                                                            |
-| /scripts/tbtc-cli           | Bitcoin Testnet cli tool to connect to the TBTC Docker container                                                                     |
-| /scripts/tbtc-logs          | Bitcoin Testnet log viewer tool, connecting automatically to the TBTC Docker container                                               |
+| /scripts/BTC/testnet4-cli           | Bitcoin Testnet cli tool to connect to the BTC/testnet4 Docker container                                                                     |
+| /scripts/BTC/testnet4-logs          | Bitcoin Testnet log viewer tool, connecting automatically to the BTC/testnet4 Docker container                                               |
 | /services                   | Source code for each Archon REST API service                                                                                           |
 | /services/gatekeeper/client | Keymaster WebUI client; exposed as `http://localhost:4224`                                                                           |
 | /services/gatekeeper/server | Gatekeeper API server; exposed as `http://localhost:4224/api/v1/`                                                                    |
@@ -183,7 +183,7 @@ The `.env` file includes the following customizable environment variables. At a 
 | # Gatekeeper               |                        |                                                                                                      |
 | `ARCHON_DEBUG`                 | `false`                |                                                                                                      |
 | `ARCHON_GATEKEEPER_DB`         | `json`                 | Type of local data storage; leave as json for now with more options coming soon                      |
-| `ARCHON_GATEKEEPER_REGISTRIES` | `hyperswarm,TBTC,TFTC` | List of DID registries supported by this node. `TESS` is deprecated and can be removed if present    |
+| `ARCHON_GATEKEEPER_REGISTRIES` | `hyperswarm,BTC/testnet4,FTC/testnet5` | List of DID registries supported by this node. `TESS` is deprecated and can be removed if present    |
 | `ARCHON_GATEKEEPER_PORT`       | `4224`                 | Default Archon port for the Gatekeeper API                                                             |
 | `ARCHON_GATEKEEPER_VERIFY_DB`  | `true`                 |                                                                                                      |
 |                            |                        |                                                                                                      |
@@ -198,20 +198,20 @@ WARNING: Changes to these variables are likely to **break** the Docker Compose f
 | Variable                        | Default Value | Description                                                                |
 |---------------------------------|---------------|----------------------------------------------------------------------------|
 | # Bitcoin testnet4 mediator     |               |                                                                            |
-| `ARCHON_TBTC_HOST`                  | `localhost`   | Host name for the Bitcoin Testnet node                                     |
-| `ARCHON_TBTC_CHAIN`                 | `TBTC`        | Archon registry name for the Bitcoin Testnet network                         |
-| `ARCHON_TBTC_NETWORK`               | `testnet`     |                                                                            |
-| `ARCHON_TBTC_START_BLOCK`           | `38000`       |                                                                            |
-| `ARCHON_TBTC_PORT`                  | `48332`       | Bitcoin Testnet node RPC port                                              |
-| `ARCHON_TBTC_USER`                  | `testnet4`    | Bitcoin Testnet node RPC user                                              |
-| `ARCHON_TBTC_PASS`                  | `testnet4`    | Bitcoin Testnet node RPC password                                          |
-| `ARCHON_TBTC_WALLET`                | `archon`        | Name of the Bitcoin Testnet wallet to draw funds from for transaction fees |
-| `ARCHON_TBTC_IMPORT_INTERVAL`       | `1`           | Archon Satoshi Mediator import loop wait interval (in minutes)               |
-| `ARCHON_TBTC_EXPORT_INTERVAL`       | `1`           | Archon Satoshi Mediator export loop wait interval (in minutes)               |
-| `ARCHON_TBTC_FEE_BLOCK_TARGET`      | `1`           | Number of blocks to pass before Replace-By-Fee is used if enabled          |
-| `ARCHON_TBTC_FEE_FALLBACK_SAT_BYTE` | `10`          | Fallback Sat/Byte if estimatesmartfee does not have enough data            |
-| `ARCHON_TBTC_FEE_MAX`               | `0.00000600`  | Bitcoin Testnet transaction maximum fee                                    |
-| `ARCHON_TBTC_RBF_ENABLED`           | false         | Whether Replace-By-Fee is enabled                                          |
+| `ARCHON_BTC_T4_HOST`                  | `localhost`   | Host name for the Bitcoin Testnet node                                     |
+| `ARCHON_BTC_T4_CHAIN`                 | `BTC/testnet4`        | Archon registry name for the Bitcoin Testnet network                         |
+| `ARCHON_BTC_T4_NETWORK`               | `testnet`     |                                                                            |
+| `ARCHON_BTC_T4_START_BLOCK`           | `38000`       |                                                                            |
+| `ARCHON_BTC_T4_PORT`                  | `48332`       | Bitcoin Testnet node RPC port                                              |
+| `ARCHON_BTC_T4_USER`                  | `testnet4`    | Bitcoin Testnet node RPC user                                              |
+| `ARCHON_BTC_T4_PASS`                  | `testnet4`    | Bitcoin Testnet node RPC password                                          |
+| `ARCHON_BTC_T4_WALLET`                | `archon`        | Name of the Bitcoin Testnet wallet to draw funds from for transaction fees |
+| `ARCHON_BTC_T4_IMPORT_INTERVAL`       | `1`           | Archon Satoshi Mediator import loop wait interval (in minutes)               |
+| `ARCHON_BTC_T4_EXPORT_INTERVAL`       | `1`           | Archon Satoshi Mediator export loop wait interval (in minutes)               |
+| `ARCHON_BTC_T4_FEE_BLOCK_TARGET`      | `1`           | Number of blocks to pass before Replace-By-Fee is used if enabled          |
+| `ARCHON_BTC_T4_FEE_FALLBACK_SAT_BYTE` | `10`          | Fallback Sat/Byte if estimatesmartfee does not have enough data            |
+| `ARCHON_BTC_T4_FEE_MAX`               | `0.00000600`  | Bitcoin Testnet transaction maximum fee                                    |
+| `ARCHON_BTC_T4_RBF_ENABLED`           | false         | Whether Replace-By-Fee is enabled                                          |
 
 ### Customizing the docker-compose.yml services
 
@@ -285,19 +285,19 @@ The Archon Gatekeeper uses [Hyperswarm](https://github.com/holepunchto/hyperswar
       - gatekeeper
 ```
 
-#### Registry Services (TBTC)
+#### Registry Services (BTC/testnet4)
 
 Archon uses immutable ledgers to record evidence of a decentralized consensus on the order of operations that form the history of a DID. The Archon protocol is blockchain agnostic and provides 2 Testnet examples to demonstrate the protocol's portability: Bitcoin Testnet4 and Feathercoin Testnet. Each DID is registered on a blockchain selected by the end-user at the time of creation. DID operations are batched and exported by the Archon Mediator to its associated blockchain node.
 
 In the example below, we use a generic bitcoin-code node configured to operate on testnet4. A similar service configuration block for Feathercoin Testnet is provided in the `kc` repository:
 
 ```yaml
-  tbtc-node:
+  BTC/testnet4-node:
     image: macterra/bitcoin-core:v27.99.0-2f7d9aec4d04
     volumes:
-      - ./data/tbtc:/root/.bitcoin
+      - ./data/BTC/testnet4:/root/.bitcoin
 
-  tbtc-mediator:
+  BTC/testnet4-mediator:
     build:
       context: .
       dockerfile: Dockerfile.sat
@@ -305,25 +305,25 @@ In the example below, we use a generic bitcoin-code node configured to operate o
     environment:
       - ARCHON_GATEKEEPER_URL=${ARCHON_GATEKEEPER_URL}
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
-      - ARCHON_SAT_CHAIN=TBTC
+      - ARCHON_SAT_CHAIN=BTC/testnet4
       - ARCHON_SAT_NETWORK=testnet
-      - ARCHON_SAT_HOST=tbtc-node
+      - ARCHON_SAT_HOST=BTC/testnet4-node
       - ARCHON_SAT_PORT=48332
-      - ARCHON_SAT_START_BLOCK=${ARCHON_TBTC_START_BLOCK}
-      - ARCHON_SAT_USER=${ARCHON_TBTC_USER}
-      - ARCHON_SAT_PASS=${ARCHON_TBTC_PASS}
-      - ARCHON_SAT_WALLET=${ARCHON_TBTC_WALLET}
-      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_TBTC_IMPORT_INTERVAL}
-      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_TBTC_EXPORT_INTERVAL}
-      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_TBTC_FEE_BLOCK_TARGET}
-      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_TBTC_FEE_FALLBACK_SAT_BYTE}
-      - ARCHON_SAT_FEE_MAX=${ARCHON_TBTC_FEE_MAX}
-      - ARCHON_SAT_RBF_ENABLED=${ARCHON_TBTC_RBF_ENABLED}
+      - ARCHON_SAT_START_BLOCK=${ARCHON_BTC_T4_START_BLOCK}
+      - ARCHON_SAT_USER=${ARCHON_BTC_T4_USER}
+      - ARCHON_SAT_PASS=${ARCHON_BTC_T4_PASS}
+      - ARCHON_SAT_WALLET=${ARCHON_BTC_T4_WALLET}
+      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_BTC_T4_IMPORT_INTERVAL}
+      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_BTC_T4_EXPORT_INTERVAL}
+      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_BTC_T4_FEE_BLOCK_TARGET}
+      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_BTC_T4_FEE_FALLBACK_SAT_BYTE}
+      - ARCHON_SAT_FEE_MAX=${ARCHON_BTC_T4_FEE_MAX}
+      - ARCHON_SAT_RBF_ENABLED=${ARCHON_BTC_T4_RBF_ENABLED}
     volumes:
       - ./data:/app/satoshi/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
-      - tbtc-node
+      - BTC/testnet4-node
 ```
 
 ## Launching and Running an Archon Node
@@ -349,7 +349,7 @@ The `build` process will download numerous containers and dependencies as define
 
 ```log
 Oct 16 18:11:49 archon-gatekeeper start-node[3151048]: gatekeeper-1     | Server is running on port 4224, persisting with json
-Oct 16 18:11:49 archon-gatekeeper start-node[3151048]: gatekeeper-1     | Supported registries: hyperswarm,TBTC,TFTC,Signet
+Oct 16 18:11:49 archon-gatekeeper start-node[3151048]: gatekeeper-1     | Supported registries: hyperswarm,BTC/testnet4,FTC/testnet5,Signet
 Oct 16 18:11:50 archon-gatekeeper start-node[3151048]: gatekeeper-1     | GET /api/v1/ready 200 9.088 ms - 4
 Oct 16 18:11:50 archon-gatekeeper start-node[3151048]: hyperswarm-1     | Gatekeeper service is ready!
 ```
@@ -382,18 +382,18 @@ The `./kc show-wallet` command will show an updated JSON wallet containing the n
 
 Archon supports multiple decentralized registries: Bitcoin, Signet, Testnet4 and Feathercoin Testnet. More registries will become available over time. Decentralized registries are an important part of decentralizing identitity; the registry contains the concensus on order of Archon operations.
 
-By default, the Archon Satoshi Mediator will be looking for a wallet named `archon`. The Bitcoin Testnet4 node is configured to store its data in the `data/tbtc` directory.
+By default, the Archon Satoshi Mediator will be looking for a wallet named `archon`. The Bitcoin Testnet4 node is configured to store its data in the `data/BTC/testnet4` directory.
 
 The following command will show your wallet information
 
 ```bash
-./scripts/tbtc-cli createwallet archon
+./scripts/BTC/testnet4-cli createwallet archon
 ```
 
 We can then create a new Bitcoin Testnet4 address:
 
 ```bash
-./scripts/tbtc-cli getnewaddress
+./scripts/BTC/testnet4-cli getnewaddress
 ```
 
 The new Bitcoin Testnet4 address should be used to *fund* the server's Bitcoin Testnet4 wallet. Below are 2 currently operational Testnet4 faucets:
@@ -404,10 +404,10 @@ The new Bitcoin Testnet4 address should be used to *fund* the server's Bitcoin T
 You can view the `unconfirmed_balance` and `balance` of your wallet with the following command:
 
 ```bash
-./scripts/tbtc-cli/getwalletinfo
+./scripts/BTC/testnet4-cli/getwalletinfo
 ```
 
-The `tbtc-cli` script passes the command line arguments to the standard bitcoin node wallet operating inside the `tbtc-node` docker container. The commands above should also be replicated for other supported blockchains (ex: `./scripts/tftc-cli`).
+The `BTC/testnet4-cli` script passes the command line arguments to the standard bitcoin node wallet operating inside the `BTC/testnet4-node` docker container. The commands above should also be replicated for other supported blockchains (ex: `./scripts/FTC/testnet5-cli`).
 
 ### Automated Restart using Systemd
 
@@ -475,10 +475,10 @@ Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #0 building with "default"
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #1 [gatekeeper internal] load build definition from Dockerfile.gatekeeper
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #1 transferring dockerfile: 505B done
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #1 DONE 0.0s
-Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #3 [tbtc-mediator internal] load build definition from Dockerfile.sat
+Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #3 [BTC/testnet4-mediator internal] load build definition from Dockerfile.sat
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #3 transferring dockerfile: 415B done
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #3 DONE 0.0s
-Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #4 [tftc-node internal] load build definition from Dockerfile.ftc
+Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #4 [FTC/testnet5-node internal] load build definition from Dockerfile.ftc
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #4 transferring dockerfile: 556B done
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #4 DONE 0.0s
 ...
@@ -486,11 +486,11 @@ Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container archon-gatekeep
 Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container archon-keymaster-1  Created
 Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-hyperswarm-1  Created
 Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-mongodb-1  Created
-Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-tftc-node-1  Created
-Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-tbtc-node-1  Created
-Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-tftc-mediator-1  Created
-Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-tbtc-mediator-1  Created
-Oct 28 16:34:14 archon-gatekeeper start-node[703710]: Attaching to gatekeeper-1, hyperswarm-1, keymaster-1, mongodb-1, tbtc-mediator-1, tbtc-node-1, tftc-mediator-1, tftc-node-1
+Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-FTC/testnet5-node-1  Created
+Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-BTC/testnet4-node-1  Created
+Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-FTC/testnet5-mediator-1  Created
+Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-BTC/testnet4-mediator-1  Created
+Oct 28 16:34:14 archon-gatekeeper start-node[703710]: Attaching to gatekeeper-1, hyperswarm-1, keymaster-1, mongodb-1, BTC/testnet4-mediator-1, BTC/testnet4-node-1, FTC/testnet5-mediator-1, FTC/testnet5-node-1
 ```
 
 #### Log samples: Archon Gatekeeper Service
@@ -522,9 +522,9 @@ Oct 28 16:34:20 archon-gatekeeper start-node[703710]: gatekeeper-1     | 75 did:
 Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | 6987 did:test:z3v8AuaiDEX5skrxB1bHH4aE5Jp6QcubQ7gqnpPWwFpedVSxtsF OK
 Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | verifyDb: 56.681s
 Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | Server is running on port 4224, persisting with json
-Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | Supported registries: hyperswarm,TBTC,TFTC
+Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | Supported registries: hyperswarm,BTC/testnet4,FTC/testnet5
 Oct 28 16:35:32 archon-gatekeeper node[95272]: Gatekeeper service is ready!
-Oct 28 16:35:32 archon-gatekeeper start-node[705212]: gatekeeper-1     | GET /api/v1/ready 200 - 7.745 ms 
+Oct 28 16:35:32 archon-gatekeeper start-node[705212]: gatekeeper-1     | GET /api/v1/ready 200 - 7.745 ms
 ```
 
 Once available, the Gatekeeper will report being `ready` when queried on its local API:
@@ -544,7 +544,7 @@ Oct 28 16:35:34 archon-gatekeeper start-node[705212]: hyperswarm-1     | Gatekee
 Oct 28 16:35:34 archon-gatekeeper start-node[705212]: keymaster-1      | Gatekeeper service is ready!
 Oct 28 16:35:34 archon-gatekeeper start-node[705212]: keymaster-1      | keymaster server running on port 4226
 Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      | current ID: mynodeID
-Oct 28 16:35:35 archon-gatekeeper start-node[705212]: gatekeeper-1     | GET /api/v1/did/did:test:z3v8AuaebRuWwQNHLvSXPD59KoTqTky7cvDSJ88Tnjf9gp2ULTe 200 - 28.696 ms 
+Oct 28 16:35:35 archon-gatekeeper start-node[705212]: gatekeeper-1     | GET /api/v1/did/did:test:z3v8AuaebRuWwQNHLvSXPD59KoTqTky7cvDSJ88Tnjf9gp2ULTe 200 - 28.696 ms
 Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      | {
 Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      |     "@context": "https://w3id.org/did-resolution/v1",
 Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      |     "didDocument": {
@@ -578,97 +578,97 @@ Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      |     "di
 Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      |     "didDocumentRegister": {
 Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      |         "version": 1,
 Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      |         "type": "agent",
-Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      |         "registry": "TBTC"
+Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      |         "registry": "BTC/testnet4"
 Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      |     }
 Oct 28 16:35:35 archon-gatekeeper start-node[705212]: keymaster-1      | }
 ```
 
 Once ready, the Keymaster will report being `ready` when queried on its local API: `curl http://localhost:4226/api/v1/ready`.
 
-#### Log samples: Blockchain Node (TBTC)
+#### Log samples: Blockchain Node (BTC/testnet4)
 
 The `kc/docker-compose.yml` script will launch Bitcoin Testnet4 and Feathercoin Testnet nodes to be used as DID registries.
 
 The following logs are generated when the Bitcoin node is launched:
 
 ```log
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.770935Z Bitcoin Core version v27.99.0-2f7d9aec4d04 (release build)
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.771013Z Script verification uses 5 additional threads
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.771092Z Using the 'sse4(1way),sse41(4way),avx2(8way)' SHA256 implementation
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.879674Z Using RdSeed as an additional entropy source
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.879677Z Using RdRand as an additional entropy source
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881323Z Default data directory /root/.bitcoin
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881331Z Using data directory /root/.bitcoin/testnet4
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881342Z Config file: /root/.bitcoin/bitcoin.conf
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881359Z Config file arg: debug="0"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881368Z Config file arg: debugexclude="libevent"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881375Z Config file arg: debugexclude="leveldb"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881381Z Config file arg: debugexclude="tor"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881387Z Config file arg: discover="0"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881394Z Config file arg: keypool="1"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881404Z Config file arg: logtimemicros="1"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881413Z Config file arg: mocktime="0"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881442Z Config file arg: rest="1"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881452Z Config file arg: rpcpassword=****
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881463Z Config file arg: rpcuser=****
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881472Z Config file arg: server="1"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881484Z Config file arg: testnet4="1"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881494Z Config file arg: txindex="1"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881502Z Config file arg: uacomment="archon-1"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881510Z Config file arg: [testnet4] rpcallowip="0.0.0.0/0"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881517Z Config file arg: [testnet4] rpcbind="0.0.0.0"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881524Z Config file arg: [testnet4] wallet="archon"
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881532Z Command-line arg: printtoconsole=""
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881540Z Using at most 125 automatic connections (1048576 file descriptors available)
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.881712Z scheduler thread start
-Oct 28 16:37:04 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:04.885815Z Binding RPC on address 0.0.0.0 port 48332
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.770935Z Bitcoin Core version v27.99.0-2f7d9aec4d04 (release build)
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.771013Z Script verification uses 5 additional threads
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.771092Z Using the 'sse4(1way),sse41(4way),avx2(8way)' SHA256 implementation
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.879674Z Using RdSeed as an additional entropy source
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.879677Z Using RdRand as an additional entropy source
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881323Z Default data directory /root/.bitcoin
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881331Z Using data directory /root/.bitcoin/testnet4
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881342Z Config file: /root/.bitcoin/bitcoin.conf
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881359Z Config file arg: debug="0"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881368Z Config file arg: debugexclude="libevent"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881375Z Config file arg: debugexclude="leveldb"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881381Z Config file arg: debugexclude="tor"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881387Z Config file arg: discover="0"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881394Z Config file arg: keypool="1"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881404Z Config file arg: logtimemicros="1"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881413Z Config file arg: mocktime="0"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881442Z Config file arg: rest="1"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881452Z Config file arg: rpcpassword=****
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881463Z Config file arg: rpcuser=****
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881472Z Config file arg: server="1"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881484Z Config file arg: testnet4="1"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881494Z Config file arg: txindex="1"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881502Z Config file arg: uacomment="archon-1"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881510Z Config file arg: [testnet4] rpcallowip="0.0.0.0/0"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881517Z Config file arg: [testnet4] rpcbind="0.0.0.0"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881524Z Config file arg: [testnet4] wallet="archon"
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881532Z Command-line arg: printtoconsole=""
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881540Z Using at most 125 automatic connections (1048576 file descriptors available)
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.881712Z scheduler thread start
+Oct 28 16:37:04 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:04.885815Z Binding RPC on address 0.0.0.0 port 48332
 ...
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.583276Z Initializing chainstate Chainstate [ibd] @ height -1 (null)
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.583358Z Opening LevelDB in /root/.bitcoin/testnet4/chainstate
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.598581Z Opened LevelDB successfully
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.598679Z Using obfuscation key for /root/.bitcoin/testnet4/chainstate: bba716c40aa18d67
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.631910Z Loaded best chain: hashBestChain=000000000000000f3b85cc00b4126131accec6e0e95a649eeb7c8b4fa38b5e81 height=52414 date=2024-10-27T20:11:36Z progress=1.000000
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.638516Z Opening LevelDB in /root/.bitcoin/testnet4/chainstate
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.651019Z Opened LevelDB successfully
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.651113Z Using obfuscation key for /root/.bitcoin/testnet4/chainstate: bba716c40aa18d67
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.651142Z [Chainstate [ibd] @ height 52414 (000000000000000f3b85cc00b4126131accec6e0e95a649eeb7c8b4fa38b5e81)] resized coinsdb cache to 8.0 MiB
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.651153Z [Chainstate [ibd] @ height 52414 (000000000000000f3b85cc00b4126131accec6e0e95a649eeb7c8b4fa38b5e81)] resized coinstip cache to 384.0 MiB
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.651173Z init message: Verifying blocks…
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.651189Z Verifying last 6 blocks at level 3
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.651212Z Verification progress: 0%
-Oct 28 16:37:05 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T16:37:05.679435Z Verification progress: 16%
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.583276Z Initializing chainstate Chainstate [ibd] @ height -1 (null)
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.583358Z Opening LevelDB in /root/.bitcoin/testnet4/chainstate
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.598581Z Opened LevelDB successfully
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.598679Z Using obfuscation key for /root/.bitcoin/testnet4/chainstate: bba716c40aa18d67
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.631910Z Loaded best chain: hashBestChain=000000000000000f3b85cc00b4126131accec6e0e95a649eeb7c8b4fa38b5e81 height=52414 date=2024-10-27T20:11:36Z progress=1.000000
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.638516Z Opening LevelDB in /root/.bitcoin/testnet4/chainstate
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.651019Z Opened LevelDB successfully
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.651113Z Using obfuscation key for /root/.bitcoin/testnet4/chainstate: bba716c40aa18d67
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.651142Z [Chainstate [ibd] @ height 52414 (000000000000000f3b85cc00b4126131accec6e0e95a649eeb7c8b4fa38b5e81)] resized coinsdb cache to 8.0 MiB
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.651153Z [Chainstate [ibd] @ height 52414 (000000000000000f3b85cc00b4126131accec6e0e95a649eeb7c8b4fa38b5e81)] resized coinstip cache to 384.0 MiB
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.651173Z init message: Verifying blocks…
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.651189Z Verifying last 6 blocks at level 3
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.651212Z Verification progress: 0%
+Oct 28 16:37:05 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T16:37:05.679435Z Verification progress: 16%
 ...
 ```
 
-Note the default use of `testnet4="1"` in the Bitcoin configuration file, now located in `kc/data/tbtc/bitcoin.conf`. Customizations to the connectivity between Archon and its repositories must be reflected in both configurations files (registry and Archon).
+Note the default use of `testnet4="1"` in the Bitcoin configuration file, now located in `kc/data/BTC/testnet4/bitcoin.conf`. Customizations to the connectivity between Archon and its repositories must be reflected in both configurations files (registry and Archon).
 
-#### Log samples: Archon Mediator (TBTC)
+#### Log samples: Archon Mediator (BTC/testnet4)
 
 The `kc/docker-compose.yml` default configuration will launch an Archon Satoshi Mediator process configured to import/export with the Bitcoin Testnet4 blockchain.
 
-The logs below show the Archon Mediator successfully exporting the a DID update operation to the TBTC registry:
+The logs below show the Archon Mediator successfully exporting the a DID update operation to the BTC/testnet4 registry:
 
 ```log
-Oct 28 16:37:09 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | Waiting for TBTC node...
-Oct 28 16:37:11 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | current block height: 52581
-Oct 28 16:37:11 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | import loop waiting 1 minute(s)...
-Oct 28 16:37:15 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | [
-Oct 28 16:37:15 archon-gatekeeper start-node[706734]: tbtc-mediator-1  |     {
-Oct 28 16:37:15 archon-gatekeeper start-node[706734]: tbtc-mediator-1  |         "type": "update",
-Oct 28 16:37:15 archon-gatekeeper start-node[706734]: tbtc-mediator-1  |         "did": "did:test:z3v8AuabA1TdC1GDvGoYkEXsESoJThCyuRekbn3fELkeGSGJa1e",
-Oct 28 16:37:15 archon-gatekeeper start-node[706734]: tbtc-mediator-1  |         "doc": {
-Oct 28 16:37:15 archon-gatekeeper start-node[706734]: tbtc-mediator-1  |     }
-Oct 28 16:37:15 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | ]
+Oct 28 16:37:09 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | Waiting for BTC/testnet4 node...
+Oct 28 16:37:11 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | current block height: 52581
+Oct 28 16:37:11 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | import loop waiting 1 minute(s)...
+Oct 28 16:37:15 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | [
+Oct 28 16:37:15 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  |     {
+Oct 28 16:37:15 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  |         "type": "update",
+Oct 28 16:37:15 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  |         "did": "did:test:z3v8AuabA1TdC1GDvGoYkEXsESoJThCyuRekbn3fELkeGSGJa1e",
+Oct 28 16:37:15 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  |         "doc": {
+Oct 28 16:37:15 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  |     }
+Oct 28 16:37:15 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | ]
 ...
-Oct 28 16:37:17 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | {
-Oct 28 16:37:17 archon-gatekeeper start-node[706734]: tbtc-mediator-1  |     "hex": "0200000000010172471d5072fe4b3cca7b1280d12e3ae419bf021358f7fbde00c07bd9faf886a50100000000fdffffff0200000000000000003e6a3c6469643a746573743a7a3376384175616258426d4e4d50784c4454596e4655724c5173667835526a414479343348506a355758666f384e7546764a57c2450000000000001600141b3544273e9a63b04cba431d086563a780f84c15024730440220068107db0675ed3fe6c32b6a4f5e2523c26ddcdaed812fc9be5858eb3cbcb9ea022005a9a9d7927424112e87719835aa8f7f17df6b1373c32d1764f5528d085a17730121027e15ea510377a03013154c70e66a9851db5591e428c370f51e12f6bbd3a7016400000000",
-Oct 28 16:37:17 archon-gatekeeper start-node[706734]: tbtc-mediator-1  |     "complete": true
-Oct 28 16:37:17 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | }
-Oct 28 16:37:17 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | 0.00017858000000000001
-Oct 28 16:37:17 archon-gatekeeper start-node[706734]: tbtc-node-1      | 2024-10-28T19:43:17.461639Z [archon] AddToWallet 4b52dfa95d7b9472147b2821a33c59cdd52bf1444b6c0feed4e7c8c0d9a6f798  new InMempool
-Oct 28 16:37:17 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | Transaction broadcast with txid: 4b52dfa95d7b9472147b2821a33c59cdd52bf1444b6c0feed4e7c8c0d9a6f798
-Oct 28 16:37:18 archon-gatekeeper start-node[706734]: gatekeeper-1     | POST /api/v1/queue/TBTC/clear 200 650.769 ms - 4
-Oct 28 16:37:18 archon-gatekeeper start-node[706734]: tbtc-mediator-1  | export loop waiting 1 minute(s)...
+Oct 28 16:37:17 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | {
+Oct 28 16:37:17 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  |     "hex": "0200000000010172471d5072fe4b3cca7b1280d12e3ae419bf021358f7fbde00c07bd9faf886a50100000000fdffffff0200000000000000003e6a3c6469643a746573743a7a3376384175616258426d4e4d50784c4454596e4655724c5173667835526a414479343348506a355758666f384e7546764a57c2450000000000001600141b3544273e9a63b04cba431d086563a780f84c15024730440220068107db0675ed3fe6c32b6a4f5e2523c26ddcdaed812fc9be5858eb3cbcb9ea022005a9a9d7927424112e87719835aa8f7f17df6b1373c32d1764f5528d085a17730121027e15ea510377a03013154c70e66a9851db5591e428c370f51e12f6bbd3a7016400000000",
+Oct 28 16:37:17 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  |     "complete": true
+Oct 28 16:37:17 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | }
+Oct 28 16:37:17 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | 0.00017858000000000001
+Oct 28 16:37:17 archon-gatekeeper start-node[706734]: BTC/testnet4-node-1      | 2024-10-28T19:43:17.461639Z [archon] AddToWallet 4b52dfa95d7b9472147b2821a33c59cdd52bf1444b6c0feed4e7c8c0d9a6f798  new InMempool
+Oct 28 16:37:17 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | Transaction broadcast with txid: 4b52dfa95d7b9472147b2821a33c59cdd52bf1444b6c0feed4e7c8c0d9a6f798
+Oct 28 16:37:18 archon-gatekeeper start-node[706734]: gatekeeper-1     | POST /api/v1/queue/BTC/testnet4/clear 200 650.769 ms - 4
+Oct 28 16:37:18 archon-gatekeeper start-node[706734]: BTC/testnet4-mediator-1  | export loop waiting 1 minute(s)...
 ```
 
 ## Secure Hosting an Archon Node with nginx
@@ -690,8 +690,8 @@ When using Docker as an operating environment, other ports are used within the D
 
 ```docker
 mongo:latest             27017/tcp kc-mongodb-1
-bitcoin-core:v27.99.0    48332/tcp kc-tbtc-node-1
-feathercoind             19337/tcp kc-tftc-node-1
+bitcoin-core:v27.99.0    48332/tcp kc-BTC/testnet4-node-1
+feathercoind             19337/tcp kc-FTC/testnet5-node-1
 ```
 
 None of the ports listed above should *ever* be directly addressable from the Internet. It is recommended that a firewall be set up to prevent access to these services.
@@ -706,9 +706,9 @@ The nginx configuration file below can be used to launch a live Archon node that
 #
 server {
     server_name archon.mydomain.net; # Replace with your domain name
-    access_log /var/log/archon-node; 
+    access_log /var/log/archon-node;
 
-    # Block POST and DELETE requests 
+    # Block POST and DELETE requests
     if ($request_method !~ ^(GET|HEAD)$ ) {
       return 405;
     }

@@ -1,2 +1,2 @@
 #!/usr/bin/env sh
-docker compose logs -f tftc-node tftc-mediator
+docker compose logs -f ftc-testnet5-node ftc-testnet5-mediator

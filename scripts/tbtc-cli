@@ -1,2 +1,2 @@
 #!/usr/bin/env sh
-docker compose exec -it tbtc-node bitcoin-cli "$@"
+docker compose exec -it btc-testnet4-node bitcoin-cli "$@"

@@ -613,7 +613,7 @@ v1router.post("/did/generate", async (req, res) => {
  *                       description: The DID type.
  *                     registry:
  *                       type: string
- *                       enum: [ "local", "hyperswarm", "TBTC", "TFTC" ]
+ *                       enum: [ "local", "hyperswarm", "BTC/testnet4", "FTC/testnet5" ]
  *                       description: Registry in which this DID is maintained.
  *                     version:
  *                       type: integer
@@ -1284,7 +1284,7 @@ v1router.post('/batch/import', async (req, res) => {
  *           type: string
  *         description: >
  *           The name of the registry whose queue is being retrieved.
- *           Valid values may include "local", "hyperswarm", "TBTC", "TFTC", etc.
+ *           Valid values may include "local", "hyperswarm", "BTC/testnet4", "FTC/testnet5", etc.
  *
  *     responses:
  *       200:

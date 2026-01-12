@@ -283,7 +283,7 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
                                 }
 
                                 if (type === 'value' &&
-                                    (aliasDocs as DidCidDocument)?.didDocumentMetadata?.timestamp?.chain === "TBTC"
+                                    (aliasDocs as DidCidDocument)?.didDocumentMetadata?.timestamp?.chain === "BTC/testnet4"
                                 ) {
                                     const currentKeyString = String(keyName);
                                     let url = '';

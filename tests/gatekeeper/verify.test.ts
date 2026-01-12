@@ -14,7 +14,7 @@ const mockConsole = {
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
 const ipfs = new HeliaClient();
-const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'TFTC'] });
+const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'FTC/testnet5'] });
 const helper = new TestHelper(gatekeeper, cipher);
 
 beforeAll(async () => {

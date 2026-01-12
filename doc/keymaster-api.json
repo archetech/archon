@@ -911,8 +911,8 @@
                               "enum": [
                                 "local",
                                 "hyperswarm",
-                                "TBTC",
-                                "TFTC"
+                                "BTC/testnet4",
+                                "FTC/testnet5"
                               ]
                             },
                             "version": {
@@ -1167,8 +1167,8 @@
                         "enum": [
                           "local",
                           "hyperswarm",
-                          "TBTC",
-                          "TFTC"
+                          "BTC/testnet4",
+                          "FTC/testnet5"
                         ]
                       }
                     }
@@ -1755,8 +1755,8 @@
                         "enum": [
                           "local",
                           "hyperswarm",
-                          "TBTC",
-                          "TFTC"
+                          "BTC/testnet4",
+                          "FTC/testnet5"
                         ]
                       },
                       "validUntil": {

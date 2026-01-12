@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export type NetworkName = 'bitcoin' | 'testnet' | 'regtest';
-export type ChainName = 'BTC' | 'TBTC' | 'Signet' | 'TFTC';
+export type ChainName = 'BTC' | 'BTC/testnet4' | 'Signet' | 'FTC/testnet5';
 export type SatoshiDB = 'json' | 'sqlite' | 'mongodb' | 'redis';
 
 export interface AppConfig {
@@ -33,12 +33,12 @@ function toChain(name: string | undefined): ChainName {
     case 'BTC':
     case undefined:
         return 'BTC';
-    case 'TBTC':
-        return 'TBTC';
+    case 'BTC/testnet4':
+        return 'BTC/testnet4';
     case 'Signet':
         return 'Signet';
-    case 'TFTC':
-        return 'TFTC';
+    case 'FTC/testnet5':
+        return 'FTC/testnet5';
     default:
         throw new Error(`Unsupported chain "${name}"`);
     }

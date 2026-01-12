@@ -25,7 +25,7 @@ afterAll(async () => {
 
 beforeEach(() => {
     const db = new DbJsonMemory('test');
-    gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'TFTC'] });
+    gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'FTC/testnet5'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
@@ -59,7 +59,7 @@ describe('createId', () => {
     });
 
     it('should create a new ID on customized default registry', async () => {
-        const defaultRegistry = 'TFTC';
+        const defaultRegistry = 'FTC/testnet5';
         const keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase: 'passphrase' });
 
         const name = 'Bob';
@@ -184,7 +184,7 @@ describe('createIdOperation', () => {
 
     it('should create operation with custom registry', async () => {
         const name = 'Alice';
-        const registry = 'TFTC';
+        const registry = 'FTC/testnet5';
         const operation = await keymaster.createIdOperation(name, 0, { registry });
 
         expect(operation.register!.registry).toBe(registry);

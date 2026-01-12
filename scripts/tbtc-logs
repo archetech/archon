@@ -1,2 +1,2 @@
 #!/usr/bin/env sh
-docker compose logs -f tbtc-node tbtc-mediator
+docker compose logs -f btc-testnet4-node btc-testnet4-mediator

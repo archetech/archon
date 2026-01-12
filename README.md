@@ -30,7 +30,7 @@ npm run build
 
 ## Overview
 
-An Archon node includes several interoperating microservices. If you follow the dependency arrows on the diagram below, you will end up at the central core service, the [Gatekeeper service](https://github.com/archetech/archon/blob/main/services/gatekeeper/server/README.md) responsible for maintaining the integrity of the local DID database. The mediators are responsible for connecting the Gatekeeper to various networks such as [Hyperswarm](https://github.com/archetech/archon/blob/main/services/mediators/hyperswarm/README.md). The TBTC (testnet Bitcoin) and TFTC (testnet Feathercoin) mediators are both instances of the [Satoshi mediator](https://github.com/archetech/archon/blob/main/services/mediators/satoshi/README.md) since they are derived from Bitcoin core (they differ only in how they are configured). [Keymaster](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md) is the Archon client responsible for holding the private keys and signing DID operations (create, update, delete) sent to Gatekeeper. The [browser web wallet](https://github.com/archetech/archon/blob/main/services/gatekeeper/client/README.md), [browser extension](https://github.com/archetech/archon/blob/main/apps/chrome-extension/README.md), and [Keymaster service](https://github.com/archetech/archon/blob/main/services/keymaster/server/README.md) all use the [Keymaster library](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md). The [server web wallet](https://github.com/archetech/archon/blob/main/services/keymaster/client/README.md) is the same as the browser web wallet, except it is configured to talk to the Keymaster service instead of hosting its own wallet. It uses the same [KeymasterClient](https://github.com/archetech/archon/blob/main/packages/keymaster/src/keymaster-sdk.ts) as the archon CLI. There are two CLI (command line interface) components: [archon](scripts/archon-cli.js) for talking to the Keymaster service, and [admin](scripts/admin-cli.js) for talking to the Gatekeeper service. The admin script uses the same [GatekeeperClient](https://github.com/archetech/archon/blob/main/packages/gatekeeper/README.md) as the Keymaster service and the mediators.
+An Archon node includes several interoperating microservices. If you follow the dependency arrows on the diagram below, you will end up at the central core service, the [Gatekeeper service](https://github.com/archetech/archon/blob/main/services/gatekeeper/server/README.md) responsible for maintaining the integrity of the local DID database. The mediators are responsible for connecting the Gatekeeper to various networks such as [Hyperswarm](https://github.com/archetech/archon/blob/main/services/mediators/hyperswarm/README.md). The BTC/testnet4 (testnet Bitcoin) and FTC/testnet5 (testnet Feathercoin) mediators are both instances of the [Satoshi mediator](https://github.com/archetech/archon/blob/main/services/mediators/satoshi/README.md) since they are derived from Bitcoin core (they differ only in how they are configured). [Keymaster](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md) is the Archon client responsible for holding the private keys and signing DID operations (create, update, delete) sent to Gatekeeper. The [browser web wallet](https://github.com/archetech/archon/blob/main/services/gatekeeper/client/README.md), [browser extension](https://github.com/archetech/archon/blob/main/apps/chrome-extension/README.md), and [Keymaster service](https://github.com/archetech/archon/blob/main/services/keymaster/server/README.md) all use the [Keymaster library](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md). The [server web wallet](https://github.com/archetech/archon/blob/main/services/keymaster/client/README.md) is the same as the browser web wallet, except it is configured to talk to the Keymaster service instead of hosting its own wallet. It uses the same [KeymasterClient](https://github.com/archetech/archon/blob/main/packages/keymaster/src/keymaster-sdk.ts) as the archon CLI. There are two CLI (command line interface) components: [archon](scripts/archon-cli.js) for talking to the Keymaster service, and [admin](scripts/admin-cli.js) for talking to the Gatekeeper service. The admin script uses the same [GatekeeperClient](https://github.com/archetech/archon/blob/main/packages/gatekeeper/README.md) as the Keymaster service and the mediators.
 
 
 ![alt text](archon-node.png)
@@ -44,7 +44,7 @@ ARCHON_UID=1000                                        # Docker host UID
 ARCHON_GID=1002                                        # Docker host GID
 ARCHON_NODE_NAME=anon                                  # Hyperswarm node name
 ARCHON_NODE_ID=anon                                    # Node Keymaster DID name
-ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,TBTC,TFTC      # Supported DID Registries
+ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,BTC/testnet4,FTC/testnet5      # Supported DID Registries
 ...
 {adjust registry details for advanced users only}
 ```
@@ -54,10 +54,10 @@ Once your node is operational (start-node), you can setup local dependencies and
 ```
 $ npm ci                                     # Installs all node package dependencies
 $ ./archon -h                                # Displays archon CLI help
-$ ./archon create-id anon TBTC               # Creates Node Keymaster DID name (set as ARCHON_NODE_ID in .env)
-$ ./scripts/tbtc-cli createwallet archon     # Creates Archon wallet for Bitcoin Testnet registry
-$ ./scripts/tbtc-cli getnewaddress           # Get a new address to fund Bitcoin Testnet wallet
-$ ./scripts/tbtc-cli getwalletinfo           # Get a general status of confirmed and incoming funds
+$ ./archon create-id anon BTC/testnet4               # Creates Node Keymaster DID name (set as ARCHON_NODE_ID in .env)
+$ ./scripts/BTC/testnet4-cli createwallet archon     # Creates Archon wallet for Bitcoin Testnet registry
+$ ./scripts/BTC/testnet4-cli getnewaddress           # Get a new address to fund Bitcoin Testnet wallet
+$ ./scripts/BTC/testnet4-cli getwalletinfo           # Get a general status of confirmed and incoming funds
 ```
 
 ## Command line interface wallet
