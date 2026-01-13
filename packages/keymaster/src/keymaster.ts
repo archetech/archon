@@ -1073,6 +1073,13 @@ export default class Keymaster implements KeymasterInterface {
         const current = await this.resolveDID(did);
         const previd = current.didDocumentMetadata?.versionId;
 
+        // Ensure update operations always carry didDocumentRegistration for clarity and
+        // to support future registry migration semantics. If the caller intentionally set
+        // didDocumentRegistration (e.g., to change registry), preserve it.
+        if (!doc.didDocumentRegistration && current.didDocumentRegistration) {
+            doc.didDocumentRegistration = current.didDocumentRegistration;
+        }
+
         // Compare the hashes of the current and updated documents without the metadata
         delete current.didDocumentMetadata;
         delete current.didResolutionMetadata;

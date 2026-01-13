@@ -674,6 +674,79 @@ describe('processEvents', () => {
         expect(doc2.didDocumentMetadata!.confirmed).toBe(true);
     });
 
+    it('should confirm hyperswarm-backed updates after backup import', async () => {
+        const keypair = cipher.generateRandomJwk();
+
+        // Create on hyperswarm, but locally stored events are initially unconfirmed (registry=local)
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'hyperswarm' });
+        const did = await gatekeeper.createDID(agentOp);
+
+        // Simulate a Keymaster-style backup/update: signed doc omits didDocumentMetadata
+        const v1doc = await gatekeeper.resolveDID(did);
+        const v2doc = copyJSON(v1doc);
+        v2doc.didDocumentData = { version: 2 };
+        delete (v2doc as any).didDocumentMetadata;
+
+        const updateOp = await helper.createUpdateOp(keypair, did, v2doc);
+        await gatekeeper.updateDID(updateOp);
+
+        const localDoc = await gatekeeper.resolveDID(did);
+        expect(localDoc.didDocumentMetadata!.version).toBe('2');
+        expect(localDoc.didDocumentMetadata!.confirmed).toBe(false);
+
+        // Import hyperswarm confirmations (mediator creates events with registry=hyperswarm)
+        const events = await gatekeeper.exportDID(did);
+        events[0].registry = 'hyperswarm';
+        events[1].registry = 'hyperswarm';
+
+        await gatekeeper.importBatch(events);
+        const response = await gatekeeper.processEvents();
+
+        expect(response.added + response.merged).toBe(2);
+
+        const confirmedDoc = await gatekeeper.resolveDID(did);
+        expect(confirmedDoc.didDocumentMetadata!.version).toBe('2');
+        expect(confirmedDoc.didDocumentMetadata!.confirmed).toBe(true);
+    });
+
+    it('should confirm updates on the registry specified by the current version', async () => {
+        const keypair = cipher.generateRandomJwk();
+
+        // v1 is created on hyperswarm
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'hyperswarm' });
+        const did = await gatekeeper.createDID(agentOp);
+
+        // v2 update changes registry to FTC/testnet5 (so v3 confirmations should be on FTC/testnet5)
+        const v1doc = await gatekeeper.resolveDID(did);
+        v1doc.didDocumentData = { version: 2 };
+        v1doc.didDocumentRegistration = { ...v1doc.didDocumentRegistration!, registry: 'FTC/testnet5' };
+        const updateOp1 = await helper.createUpdateOp(keypair, did, v1doc);
+        await gatekeeper.updateDID(updateOp1);
+
+        // v3 update (created locally) should eventually be confirmed on FTC/testnet5
+        const v2doc = await gatekeeper.resolveDID(did);
+        v2doc.didDocumentData = { version: 3 };
+        const updateOp2 = await helper.createUpdateOp(keypair, did, v2doc);
+        await gatekeeper.updateDID(updateOp2);
+
+        // Locally, the latest version is unconfirmed (updates were stored as registry=local)
+        const localDoc = await gatekeeper.resolveDID(did);
+        expect(localDoc.didDocumentMetadata!.version).toBe('3');
+        expect(localDoc.didDocumentMetadata!.confirmed).toBe(false);
+
+        // Import confirmations: v2 confirmed on hyperswarm; v3 confirmed on FTC/testnet5
+        const events = await gatekeeper.exportDID(did);
+        events[1].registry = 'hyperswarm';
+        events[2].registry = 'FTC/testnet5';
+
+        await gatekeeper.importBatch(events);
+        await gatekeeper.processEvents();
+
+        const confirmedDoc = await gatekeeper.resolveDID(did);
+        expect(confirmedDoc.didDocumentMetadata!.version).toBe('3');
+        expect(confirmedDoc.didDocumentMetadata!.confirmed).toBe(true);
+    });
+
     it('should resolve with timestamp when available', async () => {
         const mockBlock1 = { hash: 'mockBlockid1', height: 100, time: 100 };
         const mockBlock2 = { hash: 'mockBlockid2', height: 101, time: 101 };

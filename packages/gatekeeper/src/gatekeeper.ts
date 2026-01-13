@@ -926,6 +926,25 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             const did = event.did;
 
+            const expectedRegistryForIndex = (events: GatekeeperEvent[], index: number): string | undefined => {
+                if (index <= 0) {
+                    return events[0]?.operation?.registration?.registry;
+                }
+
+                let registry = events[0]?.operation?.registration?.registry;
+                for (let i = 1; i < index; i++) {
+                    const op = events[i]?.operation;
+                    if (op?.type === 'update') {
+                        const nextRegistry = op.doc?.didDocumentRegistration?.registry;
+                        if (nextRegistry) {
+                            registry = nextRegistry;
+                        }
+                    }
+                }
+
+                return registry;
+            };
+
             return await this.withDidLock(did, async () => {
                 const currentEvents = await this.db.getEvents(did);
 
@@ -942,17 +961,16 @@ export default class Gatekeeper implements GatekeeperInterface {
                 const opMatch = currentEvents.find(item => item.operation.signature?.value === event.operation.signature?.value);
 
                 if (opMatch) {
-                    const first = currentEvents[0];
-                    const nativeRegistry = first.operation.registration?.registry;
+                    const index = currentEvents.indexOf(opMatch);
+                    const expectedRegistry = expectedRegistryForIndex(currentEvents, index);
 
-                    if (opMatch.registry === nativeRegistry) {
-                        // If this event is already confirmed on the native registry, no need to update
+                    if (expectedRegistry && opMatch.registry === expectedRegistry) {
+                        // Already confirmed on the expected registry for this version
                         return ImportStatus.MERGED;
                     }
 
-                    if (event.registry === nativeRegistry) {
-                        // If this import is on the native registry, replace the current one
-                        const index = currentEvents.indexOf(opMatch);
+                    if (expectedRegistry && event.registry === expectedRegistry) {
+                        // Import is confirmed on the expected registry for this version, replace existing event
                         currentEvents[index] = event;
                         await this.db.setEvents(did, currentEvents);
                         return ImportStatus.ADDED;
@@ -990,10 +1008,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                         return ImportStatus.ADDED;
                     }
 
-                    const first = currentEvents[0];
-                    const nativeRegistry = first.operation.registration?.registry;
+                    const expectedRegistry = expectedRegistryForIndex(currentEvents, index + 1);
 
-                    if (event.registry === nativeRegistry) {
+                    if (expectedRegistry && event.registry === expectedRegistry) {
                         const nextEvent = currentEvents[index + 1];
 
                         if (nextEvent.registry !== event.registry ||
