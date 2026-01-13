@@ -645,6 +645,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         for (const { time, operation, registry, registration: blockchain } of events) {
             const versionId = await this.generateCID(operation);
             const updated = generateStandardDatetime(time);
+            const previousRegistration = doc.didDocumentRegistration;
             let timestamp;
 
             if (doc.didDocumentRegistration?.registry) {
@@ -741,7 +742,12 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (operation.type === 'update') {
                 versionNum += 1;
 
-                doc = operation.doc || {};
+                const nextDoc = operation.doc || {};
+                if (!nextDoc.didDocumentRegistration && previousRegistration) {
+                    nextDoc.didDocumentRegistration = previousRegistration;
+                }
+
+                doc = nextDoc;
                 doc.didDocumentMetadata = {
                     created,
                     updated,
@@ -1150,7 +1156,14 @@ export default class Gatekeeper implements GatekeeperInterface {
         else if (operation.type === 'update') {
             const doc = operation.doc;
 
-            if (!doc || !doc.didDocument || !doc.didDocumentMetadata || !doc.didDocumentData || !doc.didDocumentRegistration) {
+            // Keymaster intentionally omits didDocumentMetadata/didResolutionMetadata from update operations.
+            // Gatekeeper re-materializes didDocumentMetadata during resolution, and didDocumentRegistration
+            // can be carried forward from the previous version.
+            if (!doc || !doc.didDocument || !doc.didDocumentData) {
+                return false;
+            }
+
+            if (doc.didDocument.id && operation.did && doc.didDocument.id !== operation.did) {
                 return false;
             }
 
