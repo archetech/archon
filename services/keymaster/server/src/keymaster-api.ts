@@ -761,7 +761,7 @@ v1router.get('/export/wallet/encrypted', async (req, res) => {
  *                     didDocumentData:
  *                       type: object
  *                       description: Arbitrary data attached to the DID (only present for assets).
- *                     didDocumentRegister:
+ *                     didDocumentRegistration:
  *                       type: object
  *                       description: Registration metadata fields.
  *                       properties:

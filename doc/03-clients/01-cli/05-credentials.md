@@ -108,7 +108,7 @@ $ archon resolve-did social-media
         ],
         "type": "object"
     },
-    "didDocumentRegister": {
+    "didDocumentRegistration": {
         "registry": "hyperswarm",
         "type": "asset",
         "version": 1
@@ -296,7 +296,7 @@ $ archon resolve-did did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6FK
         "updated": "2024-03-22T15:17:53.368Z"
     },
     "didDocumentData": {},
-    "didDocumentRegister": {
+    "didDocumentRegistration": {
         "registry": "hyperswarm",
         "type": "asset",
         "version": 1

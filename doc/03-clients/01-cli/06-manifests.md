@@ -133,7 +133,7 @@ $ archon resolve-id
             }
         }
     },
-    "didDocumentRegister": {
+    "didDocumentRegistration": {
         "registry": "hyperswarm",
         "type": "agent",
         "version": 1

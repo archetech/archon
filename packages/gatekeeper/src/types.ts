@@ -70,7 +70,7 @@ export interface GatekeeperEvent {
     operation: Operation;
     did?: string;
     opid?: string;
-    blockchain?: DidRegister;
+    registration?: DidRegistration;
 }
 
 export interface GatekeeperDb {
@@ -154,7 +154,7 @@ export interface GatekeeperInterface {
     generateDID(operation: Operation): Promise<string>;
 }
 
-export interface DidRegister {
+export interface DidRegistration {
     height?: number;
     index?: number;
     txid?: string;
@@ -162,14 +162,14 @@ export interface DidRegister {
     opidx?: number;
 }
 
-export interface DocumentRegister {
+export interface DocumentRegistration {
     version: number;
     type: 'agent' | 'asset';
     registry: string;
     validUntil?: string;
     prefix?: string;
     opid?: string;
-    registration?: DidRegister;
+    registration?: DidRegistration;
     created?: string;
 }
 
@@ -205,7 +205,7 @@ export interface DidCidDocument {
         error?: string;
     },
     didDocumentData?: unknown,
-    didDocumentRegister?: DocumentRegister,
+    didDocumentRegistration?: DocumentRegistration,
 }
 
 export interface Signature {
@@ -219,7 +219,7 @@ export interface Operation {
     type: 'create' | 'update' | 'delete';
     created?: string;
     signature?: Signature;
-    register?: DocumentRegister;
+    registration?: DocumentRegistration;
     publicJwk?: EcdsaJwkPublic;
     controller?: string;
     doc?: DidCidDocument;

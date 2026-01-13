@@ -48,7 +48,7 @@ To create an agent DID, the Archon client must sign and submit a "create" operat
 1. Convert to JWK (JSON Web Key) format
 1. Create a operation object with these fields in any order:
     1. `type`  must be "create"
-    1. `register` metadata includes:
+    1. `registration` metadata includes:
         1. `version`  number, e.g. 1
         1. `type`  must be "agent"
         1. `registry`  (from a list of valid registries, e.g. "BTC", "hyperswarm", etc.)
@@ -63,7 +63,7 @@ Example
 {
     "type": "create",
     "created": "2024-03-21T14:17:00.693Z",
-    "register": {
+    "registration": {
         "registry": "hyperswarm",
         "type": "agent",
         "version": 1
@@ -95,7 +95,7 @@ To create an asset DID, the Archon client must sign and submit a `create` operat
 
 1. Create a operation object with these fields in any order:
     1. `type`  must be "create"
-    1. `register` metadata includes:
+    1. `registration` metadata includes:
         1. `version`  number, e.g. 1
         1. `type`  must be "agent"
         1. `registry`  (from a list of valid registries, e.g. "BTC", "hyperswarm", etc.)
@@ -111,7 +111,7 @@ Example
 {
     "type": "create",
     "created": "2024-03-21T18:47:00.655Z",
-    "register": {
+    "registration": {
         "version": 1,
         "type": "asset",
         "registry": "hyperswarm"
@@ -147,7 +147,7 @@ A DID Update is a change to any of the documents associated with the DID. To ini
         1. `didDocument` the main document
         1. `didDocumentMetadata` the document's metadata
         1. `didDocumentData` the document's data
-        1. `didDocumentRegister` the Archon protocol spec
+        1. `didDocumentRegistration` the Archon protocol spec
     1. `previd` the CID of the previous operation
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key of the controller of the DID
@@ -188,7 +188,7 @@ Example update to rotate keys for an agent DID:
             "created": "2024-03-25T14:57:20.868Z"
         },
         "didDocumentData": {},
-        "didDocumentRegister": {
+        "didDocumentRegistration": {
             "registry": "hyperswarm",
             "type": "agent",
             "version": 1
@@ -257,7 +257,7 @@ After revocation is confirmed on the DID's registry, resolving the DID will resu
         "updated": "2024-03-21T18:55:11.530Z"
     },
     "didDocumentData": {},
-    "didDocumentRegister": {
+    "didDocumentRegistration": {
         "registry": "hyperswarm",
         "type": "asset",
         "version": 1

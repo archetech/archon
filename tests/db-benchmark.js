@@ -24,7 +24,7 @@ async function importDIDs(db) {
                 "operation": {
                     "type": "create",
                     "created": new Date().toISOString(),
-                    "register": {
+                    "registration": {
                         "version": 1,
                         "type": "asset",
                         "registry": "hyperswarm"

@@ -225,7 +225,7 @@ v1router.get('/status', async (req, res) => {
  *           schema:
  *             oneOf:
  *               - type: object
- *                 required: [ type, created, register, signature ]
+ *                 required: [ type, created, registration, signature ]
  *                 properties:
  *                   type:
  *                     type: string
@@ -235,7 +235,7 @@ v1router.get('/status', async (req, res) => {
  *                     type: string
  *                     format: date-time
  *                     description: Timestamp of when the operation was created.
- *                   register:
+ *                   registration:
  *                     type: object
  *                     required: [ version, type, registry ]
  *                     properties:
@@ -394,7 +394,7 @@ v1router.post('/did', async (req, res) => {
  *           schema:
  *             type: object
  *             description: An Operation object.
- *             required: [ type, register ]
+ *             required: [ type, registration ]
  *             properties:
  *               type:
  *                 type: string
@@ -406,7 +406,7 @@ v1router.post('/did', async (req, res) => {
  *               did:
  *                 type: string
  *                 description: Optional DID (usually absent for create when generating).
- *               register:
+ *               registration:
  *                 type: object
  *                 description: Registration metadata for the operation.
  *                 required: [ version, type, registry ]
@@ -603,7 +603,7 @@ v1router.post("/did/generate", async (req, res) => {
  *                 didDocumentData:
  *                   type: object
  *                   description: Arbitrary data attached to the DID (for assets).
- *                 didDocumentRegister:
+ *                 didDocumentRegistration:
  *                   type: object
  *                   description: Registration metadata fields.
  *                   properties:
@@ -855,7 +855,7 @@ v1router.delete('/did/:did', async (req, res) => {
  *                         description: DID Document contents
  *                       didDocumentMetadata:
  *                         type: object
- *                       register:
+ *                       didDocumentRegistration:
  *                         type: object
  *
  *       500:
@@ -1026,7 +1026,7 @@ v1router.post('/dids/export', async (req, res) => {
  *                         type: string
  *                         format: date-time
  *                         description: Creation timestamp (if `type = "create"`).
- *                       register:
+ *                       registration:
  *                         type: object
  *                         description: Registration metadata.
  *                       publicJwk:
@@ -1205,7 +1205,7 @@ v1router.post('/batch/export', async (req, res) => {
  *                       type: string
  *                       format: date-time
  *                       description: Timestamp when the DID was created (if `type = "create"`).
- *                     register:
+ *                     registration:
  *                       type: object
  *                       description: Registration metadata (type, version, registry).
  *                     publicJwk:

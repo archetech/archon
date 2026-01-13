@@ -582,7 +582,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
                 docList[name] = doc;
 
-                if (doc.didDocumentRegister.type === 'agent') {
+                if (doc.didDocumentRegistration.type === 'agent') {
                     agentList.push(name);
                     continue;
                 }
@@ -787,7 +787,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         try {
             const docs = await keymaster.resolveDID(name);
 
-            if (docs.didDocumentRegister.type === 'agent') {
+            if (docs.didDocumentRegistration.type === 'agent') {
                 showAlert("Only asset DIDs may be transferred");
                 return;
             }

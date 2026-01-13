@@ -33,11 +33,6 @@ $ archon resolve-did did:cid:z3v8AuadZVYKXq9oyoWmCgqGREsvMxCKDWxwLHNw3tHpfDyrNr3
     },
     "didDocumentMetadata": {
         "created": "2024-03-14T19:39:55.374Z",
-        "didDocumentRegister": {
-            "registry": "hyperswarm",
-            "type": "asset",
-            "version": 1
-        },
         "data": {
             "cipher_hash": "b618bf73a5a421ff1ab89cb0a6dd76d296915f8b17f8f899bdbc42ee68906cd6",
             "cipher_receiver": "UsCHFkoWeKbmnPC6rL5K55O2zewCehy9WHGFOuxE_nYZrIpxwn4biSbkqhMO_7iFRWFM7Kv_R78SQOO_GROpF_0ttlQYOg",
@@ -45,6 +40,11 @@ $ archon resolve-did did:cid:z3v8AuadZVYKXq9oyoWmCgqGREsvMxCKDWxwLHNw3tHpfDyrNr3
             "created": "2024-03-14T19:39:55.374Z",
             "sender": "did:cid:z3v8AuagsGQwffFd2oVhkdcTWRBi2ps5FdRAJD4jzEVMszkYBCj"
         }
+    },
+    "didDocumentRegistration": {
+        "registry": "hyperswarm",
+        "type": "asset",
+        "version": 1
     }
 }
 ```
@@ -116,11 +116,6 @@ $ archon resolve-did did:cid:z3v8AuaamvoV6JnvnhJk3E1npohd3jxThPSXFAzZZ4WwzMrirbq
     },
     "didDocumentMetadata": {
         "created": "2024-03-13T21:01:16.102Z",
-        "didDocumentRegister": {
-            "registry": "hyperswarm",
-            "type": "asset",
-            "version": 1
-        },
         "data": {
             "cipher_hash": "cb98be9a0f06160ccdff4d35bf00971944b5a27db3e6974b0301cd26018588c1",
             "cipher_receiver": "AG_uM(...)UyV8",
@@ -128,6 +123,11 @@ $ archon resolve-did did:cid:z3v8AuaamvoV6JnvnhJk3E1npohd3jxThPSXFAzZZ4WwzMrirbq
             "created": "2024-03-13T21:01:16.100Z",
             "sender": "did:cid:z3v8AuagsGQwffFd2oVhkdcTWRBi2ps5FdRAJD4jzEVMszkYBCj"
         }
+    },
+    "didDocumentRegistration": {
+        "registry": "hyperswarm",
+        "type": "asset",
+        "version": 1
     }
 }
 ```

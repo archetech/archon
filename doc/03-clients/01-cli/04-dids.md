@@ -45,7 +45,7 @@ $ ./archon resolve-did did:cid:test:z3v8AuaYLYSWZJUa4bSadeoiNA3ps8dWDYtsmJNMDJhb
         ],
         "type": "object"
     },
-    "didDocumentRegister": {
+    "didDocumentRegistration": {
         "registry": "hyperswarm",
         "type": "asset",
         "version": 1

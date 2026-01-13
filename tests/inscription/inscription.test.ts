@@ -3,8 +3,8 @@ import * as ecc from 'tiny-secp256k1';
 import { BIP32Factory, BIP32Interface } from 'bip32';
 import { randomBytes } from 'crypto';
 import Inscription from '@didcid/inscription';
-import {Operation} from "@didcid/gatekeeper/types";
-import {ExpectedExceptionError} from "@didcid/common/errors";
+import { Operation } from "@didcid/gatekeeper/types";
+import { ExpectedExceptionError } from "@didcid/common/errors";
 
 bitcoin.initEccLib(ecc);
 
@@ -97,7 +97,7 @@ function smallOps(n = 3) {
         return {
             type,
             created: new Date().toISOString(),
-            register: { version: 1, type: "asset", registry: "mockRegistry" },
+            registration: { version: 1, type: "asset", registry: "mockRegistry" },
         }
     });
     return Buffer.from(JSON.stringify(ops), 'utf8');
@@ -110,7 +110,7 @@ export function largeOps(leaves: number): Operation[] {
     return [{
         type: "create",
         created: new Date().toISOString(),
-        register: { version: 1, type: "asset", registry: "mockRegistry" },
+        registration: { version: 1, type: "asset", registry: "mockRegistry" },
         data,
     }];
 }
@@ -492,7 +492,7 @@ describe('Inscription createTransactions', () => {
             hdkeypath: hdp(86, 0, idx),
         }));
 
-        const json =  { "test" : "test" };
+        const json = { "test": "test" };
 
         const { revealHex } = await lib.createTransactions(
             Buffer.from(JSON.stringify(json), 'utf8'),
@@ -520,7 +520,7 @@ describe('Inscription createTransactions', () => {
             hdkeypath: hdp(86, 0, idx),
         }));
 
-        const json =  [{ "test" : "test" }];
+        const json = [{ "test": "test" }];
 
         const { revealHex } = await lib.createTransactions(
             Buffer.from(JSON.stringify(json), 'utf8'),

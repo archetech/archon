@@ -43,7 +43,7 @@ describe('createChallenge', () => {
         expect(doc.didDocumentData).toStrictEqual({ challenge: {} });
 
         const now = Date.now();
-        const validUntil = new Date(doc.didDocumentRegister!.validUntil!).getTime();
+        const validUntil = new Date(doc.didDocumentRegistration!.validUntil!).getTime();
         const ttl = validUntil - now;
 
         expect(ttl < 60 * 60 * 1000).toBe(true);
@@ -58,7 +58,7 @@ describe('createChallenge', () => {
         expect(doc.didDocument!.id).toBe(did);
         expect(doc.didDocument!.controller).toBe(alice);
         expect(doc.didDocumentData).toStrictEqual({ challenge: {} });
-        expect(doc.didDocumentRegister!.validUntil).toBe(validUntil);
+        expect(doc.didDocumentRegistration!.validUntil).toBe(validUntil);
     });
 
     it('should create a valid challenge', async () => {

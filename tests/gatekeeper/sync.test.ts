@@ -96,11 +96,11 @@ describe('exportDIDs', () => {
     it('should export a DIDs in order requested', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
-        delete agentOp.register!.validUntil;
+        delete agentOp.registration!.validUntil;
         const agentDID = await gatekeeper.createDID(agentOp);
 
         const assetOp = await helper.createAssetOp(agentDID, keypair);
-        delete assetOp.register!.validUntil;
+        delete assetOp.registration!.validUntil;
         const assetDID = await gatekeeper.createDID(assetOp);
 
         const exports = await gatekeeper.exportDIDs([assetDID, agentDID]);
@@ -356,7 +356,7 @@ describe('importBatch', () => {
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        delete ops[0].operation.register;
+        delete ops[0].operation.registration;
 
         const response = await gatekeeper.importBatch(ops);
 
@@ -369,7 +369,7 @@ describe('importBatch', () => {
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].operation.register!.version = -1;
+        ops[0].operation.registration!.version = -1;
 
         const response = await gatekeeper.importBatch(ops);
 
@@ -383,7 +383,7 @@ describe('importBatch', () => {
         const ops = await gatekeeper.exportDID(did);
 
         // @ts-expect-error Testing invalid usage
-        ops[0].operation.register!.type = 'mock';
+        ops[0].operation.registration!.type = 'mock';
 
         const response = await gatekeeper.importBatch(ops);
 
@@ -396,7 +396,7 @@ describe('importBatch', () => {
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].operation.register!.registry = 'mock';
+        ops[0].operation.registration!.registry = 'mock';
 
         const response = await gatekeeper.importBatch(ops);
 
@@ -633,14 +633,14 @@ describe('processEvents', () => {
 
         ops[0].registry = 'FTC/testnet5';
         ops[1].registry = 'FTC/testnet5';
-        ops[1].blockchain = {
+        ops[1].registration = {
             "height": 100,
             "index": 1,
             "txid": "mock1",
             "batch": "mock1"
         };
         ops[2].registry = 'FTC/testnet5';
-        ops[2].blockchain = {
+        ops[2].registration = {
             "height": 200,
             "index": 2,
             "txid": "mock2",
@@ -690,7 +690,7 @@ describe('processEvents', () => {
 
         ops[0].registry = 'FTC/testnet5';
         ops[1].registry = 'FTC/testnet5';
-        ops[1].blockchain = {
+        ops[1].registration = {
             "height": 101,
             "index": 1,
             "txid": "mockTxid",
@@ -716,9 +716,9 @@ describe('processEvents', () => {
                 height: mockBlock2.height,
                 time: mockBlock2.time,
                 timeISO: new Date(mockBlock2.time * 1000).toISOString(),
-                txid: ops[1].blockchain.txid,
-                txidx: ops[1].blockchain.index,
-                batchid: ops[1].blockchain.batch,
+                txid: ops[1].registration.txid,
+                txidx: ops[1].registration.index,
+                batchid: ops[1].registration.batch,
             }
         };
 

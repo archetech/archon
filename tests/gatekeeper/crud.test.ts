@@ -57,7 +57,7 @@ describe('createDID', () => {
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: register.version=2');
+            expect(error.message).toBe('Invalid operation: registration.version=2');
         }
     });
 
@@ -70,7 +70,7 @@ describe('createDID', () => {
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: register.registry=mockRegistry');
+            expect(error.message).toBe('Invalid operation: registration.registry=mockRegistry');
         }
     });
 
@@ -93,13 +93,13 @@ describe('createDID', () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'mockRegistry' });
         // @ts-expect-error Testing invalid usage
-        agentOp.register!.type = 'mock';
+        agentOp.registration!.type = 'mock';
 
         try {
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: register.type=mock');
+            expect(error.message).toBe('Invalid operation: registration.type=mock');
         }
     });
 
@@ -135,11 +135,11 @@ describe('createDID', () => {
 
         try {
             const agentOp = await helper.createAgentOp(keypair);
-            agentOp.register = undefined;
+            agentOp.registration = undefined;
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: register');
+            expect(error.message).toBe('Invalid operation: registration');
         }
 
         try {
@@ -236,7 +236,7 @@ describe('createDID', () => {
             await gatekeeper.createDID(assetOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: register.validUntil=mock');
+            expect(error.message).toBe('Invalid operation: registration.validUntil=mock');
         }
     });
 
@@ -292,7 +292,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            didDocumentRegister: agentOp.register
+            didDocumentRegistration: agentOp.registration
         };
 
         expect(doc).toStrictEqual(expected);
@@ -338,7 +338,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            didDocumentRegister: agentOp.register
+            didDocumentRegistration: agentOp.registration
         };
 
         expect(ok).toBe(true);
@@ -406,7 +406,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            didDocumentRegister: agentOp.register
+            didDocumentRegistration: agentOp.registration
         };
 
         expect(ok).toBe(true);
@@ -453,7 +453,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            didDocumentRegister: agentOp.register
+            didDocumentRegistration: agentOp.registration
         };
 
         expect(ok).toBe(true);
@@ -550,7 +550,7 @@ describe('resolveDID', () => {
         const agentOp = await helper.createAgentOp(keypair);
         const agent = await gatekeeper.createDID(agentOp);
         const assetOp = await helper.createAssetOp(agent, keypair);
-        delete assetOp.register!.validUntil;
+        delete assetOp.registration!.validUntil;
         const opid = await gatekeeper.generateCID(assetOp);
         const did = await gatekeeper.createDID(assetOp);
         const doc = await gatekeeper.resolveDID(did);
@@ -572,7 +572,7 @@ describe('resolveDID', () => {
             didResolutionMetadata: {
                 retrieved: expect.any(String),
             },
-            didDocumentRegister: assetOp.register
+            didDocumentRegistration: assetOp.registration
         };
 
         expect(doc).toStrictEqual(expected);

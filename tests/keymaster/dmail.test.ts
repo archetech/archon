@@ -460,8 +460,8 @@ describe('sendDmail', () => {
         expect(notice).toBeDefined();
 
         const doc = await keymaster.resolveDID(notice!);
-        expect(doc.didDocumentRegister!.registry).toBe('hyperswarm');
-        expect(doc.didDocumentRegister!.validUntil).toBeDefined();
+        expect(doc.didDocumentRegistration!.registry).toBe('hyperswarm');
+        expect(doc.didDocumentRegistration!.validUntil).toBeDefined();
 
         const asset = doc.didDocumentData as { notice?: NoticeMessage };
 

@@ -167,7 +167,7 @@
                     "required": [
                       "type",
                       "created",
-                      "register",
+                      "registration",
                       "signature"
                     ],
                     "properties": {
@@ -183,7 +183,7 @@
                         "format": "date-time",
                         "description": "Timestamp of when the operation was created."
                       },
-                      "register": {
+                      "registration": {
                         "type": "object",
                         "required": [
                           "version",
@@ -371,7 +371,7 @@
                     {
                       "type": "string",
                       "description": "A DID string (when a create operation succeeds).",
-                      "example": "did:cid:bafkreicdwgtc6qf5zdoqyxsyqx6bvxi5rjzk2xjjznb3lxjvxqkdsmbpre"
+                      "example": "did:cid:z3v8AuahvBGDMXvCTWedYbxnH6C9ZrsEtEJAvip2XPzcZb8yo6A"
                     },
                     {
                       "type": "boolean",
@@ -408,7 +408,7 @@
                 "description": "An Operation object.",
                 "required": [
                   "type",
-                  "register"
+                  "registration"
                 ],
                 "properties": {
                   "type": {
@@ -424,7 +424,7 @@
                     "type": "string",
                     "description": "Optional DID (usually absent for create when generating)."
                   },
-                  "register": {
+                  "registration": {
                     "type": "object",
                     "description": "Registration metadata for the operation.",
                     "required": [
@@ -674,7 +674,7 @@
                       "type": "object",
                       "description": "Arbitrary data attached to the DID (for assets)."
                     },
-                    "didDocumentRegister": {
+                    "didDocumentRegistration": {
                       "type": "object",
                       "description": "Registration metadata fields.",
                       "properties": {
@@ -954,7 +954,7 @@
                           "didDocumentMetadata": {
                             "type": "object"
                           },
-                          "didDocumentRegister": {
+                          "didDocumentRegistration": {
                             "type": "object"
                           }
                         }
@@ -1147,7 +1147,7 @@
                             "format": "date-time",
                             "description": "Creation timestamp (if `type = \"create\"`)."
                           },
-                          "register": {
+                          "registration": {
                             "type": "object",
                             "description": "Registration metadata."
                           },
@@ -1374,7 +1374,7 @@
                           "format": "date-time",
                           "description": "Timestamp when the DID was created (if `type = \"create\"`)."
                         },
-                        "register": {
+                        "registration": {
                           "type": "object",
                           "description": "Registration metadata (type, version, registry)."
                         },
@@ -1817,7 +1817,7 @@
               "text/plain": {
                 "schema": {
                   "type": "string",
-                  "example": "bafkreicdwgtc6qf5zdoqyxsyqx6bvxi5rjzk2xjjznb3lxjvxqkdsmbpre"
+                  "example": "z3v8AuahvBGDMXvCTWedYbxnH6C9ZrsEtEJAvip2XPzcZb8yo6A"
                 }
               }
             }

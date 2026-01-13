@@ -83,7 +83,7 @@ $ archon resolve-id
         "created": "2024-03-22T14:48:41.213Z"
     },
     "didDocumentData": {},
-    "didDocumentRegister": {
+    "didDocumentRegistration": {
         "registry": "hyperswarm",
         "type": "agent",
         "version": 1
@@ -221,7 +221,7 @@ $ archon rotate-keys
     "didDocumentData": {
         "vault": "did:cid:test:z3v8AuafhKoRuEkDTjyoabgPXKx4Yi4cPmPdzUgMNyKxkzYNA6u"
     },
-    "didDocumentRegister": {
+    "didDocumentRegistration": {
         "registry": "hyperswarm",
         "type": "agent",
         "version": 1

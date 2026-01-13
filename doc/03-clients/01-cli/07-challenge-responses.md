@@ -40,7 +40,7 @@ $ archon resolve-did sm-challenge
             }
         ]
     },
-    "didDocumentRegister": {
+    "didDocumentRegistration": {
         "registry": "hyperswarm",
         "type": "asset",
         "version": 1

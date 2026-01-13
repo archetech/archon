@@ -415,7 +415,7 @@ export default class Keymaster implements KeymasterInterface {
         const operation: Operation = {
             type: "create",
             created: new Date(0).toISOString(),
-            register: {
+            registration: {
                 version: 1,
                 type: "agent",
                 registry: this.defaultRegistry,
@@ -482,7 +482,7 @@ export default class Keymaster implements KeymasterInterface {
         const operation: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            register: {
+            registration: {
                 version: 1,
                 type: "asset",
                 registry: registry,
@@ -718,7 +718,7 @@ export default class Keymaster implements KeymasterInterface {
             type: "create",
             created: new Date().toISOString(),
             blockid,
-            register: {
+            registration: {
                 version: 1,
                 type: "asset",
                 registry,
@@ -749,7 +749,7 @@ export default class Keymaster implements KeymasterInterface {
     ): Promise<string> {
         const assetDoc = await this.resolveDID(id);
 
-        if (assetDoc.didDocumentRegister?.type !== 'asset') {
+        if (assetDoc.didDocumentRegistration?.type !== 'asset') {
             throw new InvalidParameterError('id');
         }
 
@@ -1089,7 +1089,7 @@ export default class Keymaster implements KeymasterInterface {
             return true;
         }
 
-        const block = await this.gatekeeper.getBlock(current.didDocumentRegister!.registry);
+        const block = await this.gatekeeper.getBlock(current.didDocumentRegistration!.registry);
         const blockid = block?.hash;
 
         const operation: Operation = {
@@ -1102,10 +1102,10 @@ export default class Keymaster implements KeymasterInterface {
 
         let controller;
 
-        if (current.didDocumentRegister?.type === 'agent') {
+        if (current.didDocumentRegistration?.type === 'agent') {
             controller = current.didDocument?.id;
         }
-        else if (current.didDocumentRegister?.type === 'asset') {
+        else if (current.didDocumentRegistration?.type === 'asset') {
             controller = current.didDocument?.controller;
         }
 
@@ -1117,7 +1117,7 @@ export default class Keymaster implements KeymasterInterface {
         const did = await this.lookupDID(id);
         const current = await this.resolveDID(did);
         const previd = current.didDocumentMetadata?.versionId;
-        const block = await this.gatekeeper.getBlock(current.didDocumentRegister!.registry);
+        const block = await this.gatekeeper.getBlock(current.didDocumentRegistration!.registry);
         const blockid = block?.hash;
 
         const operation: Operation = {
@@ -1129,10 +1129,10 @@ export default class Keymaster implements KeymasterInterface {
 
         let controller;
 
-        if (current.didDocumentRegister?.type === 'agent') {
+        if (current.didDocumentRegistration?.type === 'agent') {
             controller = current.didDocument?.id;
         }
-        else if (current.didDocumentRegister?.type === 'asset') {
+        else if (current.didDocumentRegistration?.type === 'asset') {
             controller = current.didDocument?.controller;
         }
 
@@ -1292,7 +1292,7 @@ export default class Keymaster implements KeymasterInterface {
     ): Promise<boolean> {
         const assetDoc = await this.resolveDID(id);
 
-        if (assetDoc.didDocumentRegister?.type !== 'asset') {
+        if (assetDoc.didDocumentRegistration?.type !== 'asset') {
             throw new InvalidParameterError('id');
         }
 
@@ -1302,7 +1302,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const agentDoc = await this.resolveDID(controller);
 
-        if (agentDoc.didDocumentRegister?.type !== 'agent') {
+        if (agentDoc.didDocumentRegistration?.type !== 'agent') {
             throw new InvalidParameterError('controller');
         }
 
@@ -1405,7 +1405,7 @@ export default class Keymaster implements KeymasterInterface {
             type: 'create',
             created: new Date().toISOString(),
             blockid,
-            register: {
+            registration: {
                 version: 1,
                 type: 'agent',
                 registry
@@ -1476,7 +1476,7 @@ export default class Keymaster implements KeymasterInterface {
         const msg = JSON.stringify(data);
         const backup = this.cipher.encryptMessage(keypair.publicJwk, keypair.privateJwk, msg);
         const doc = await this.resolveDID(idInfo.did);
-        const registry = doc.didDocumentRegister?.registry;
+        const registry = doc.didDocumentRegistration?.registry;
         if (!registry) {
             throw new InvalidParameterError('no registry found for agent DID');
         }
@@ -1619,7 +1619,7 @@ export default class Keymaster implements KeymasterInterface {
 
     async testAgent(id: string): Promise<boolean> {
         const doc = await this.resolveDID(id);
-        return doc.didDocumentRegister?.type === 'agent';
+        return doc.didDocumentRegistration?.type === 'agent';
     }
 
     async bindCredential(
@@ -2947,7 +2947,7 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     getAgentDID(doc: DidCidDocument): string {
-        if (doc.didDocumentRegister?.type !== 'agent') {
+        if (doc.didDocumentRegistration?.type !== 'agent') {
             throw new KeymasterError('Document is not an agent');
         }
 

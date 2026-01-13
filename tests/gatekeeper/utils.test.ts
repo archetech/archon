@@ -59,7 +59,7 @@ describe('generateDID', () => {
         const mockTxn: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            register: {
+            registration: {
                 registry: "mockRegistry",
                 type: 'agent',
                 version: 1,
@@ -74,7 +74,7 @@ describe('generateDID', () => {
         const mockTxn: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            register: {
+            registration: {
                 version: 1,
                 type: "asset",
                 registry: "mockRegistry"
@@ -91,7 +91,7 @@ describe('generateDID', () => {
         const mockTxn: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            register: {
+            registration: {
                 version: 1,
                 type: "asset",
                 registry: "mockRegistry",
@@ -108,7 +108,7 @@ describe('generateDID', () => {
         const mockTxn: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            register: {
+            registration: {
                 version: 1,
                 type: "asset",
                 registry: "mockRegistry"
@@ -151,7 +151,7 @@ describe('generateDoc', () => {
             didDocumentMetadata: {
                 created: expect.any(String),
             },
-            didDocumentRegister: agentOp.register,
+            didDocumentRegistration: agentOp.registration,
         };
 
         expect(doc).toStrictEqual(expected);
@@ -186,7 +186,7 @@ describe('generateDoc', () => {
                 created: expect.any(String),
                 canonicalId: did,
             },
-            didDocumentRegister: agentOp.register,
+            didDocumentRegistration: agentOp.registration,
         };
 
         expect(doc).toStrictEqual(expected);
@@ -212,7 +212,7 @@ describe('generateDoc', () => {
             didDocumentMetadata: {
                 created: expect.any(String),
             },
-            didDocumentRegister: assetOp.register,
+            didDocumentRegistration: assetOp.registration,
         };
 
         expect(doc).toStrictEqual(expected);
@@ -221,7 +221,7 @@ describe('generateDoc', () => {
     it('should return an empty doc if register missing from anchor', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
-        delete agentOp.register;
+        delete agentOp.registration;
         const doc = await gatekeeper.generateDoc(agentOp);
 
         expect(doc).toStrictEqual({});
@@ -239,7 +239,7 @@ describe('generateDoc', () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         // @ts-expect-error Testing invalid usage
-        agentOp.register!.type = 'mock';
+        agentOp.registration!.type = 'mock';
         const doc = await gatekeeper.generateDoc(agentOp);
 
         expect(doc).toStrictEqual({});
@@ -478,21 +478,21 @@ describe('Test operation validation errors', () => {
         let assetOp = await helper.createAssetOp(agent, keypair);
 
         // @ts-expect-error Testing invalid value
-        assetOp.register!.type = "dummy";
+        assetOp.registration!.type = "dummy";
 
         try {
             await gatekeeper.verifyCreateOperation(assetOp);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
-            expect(error.message).toBe('Invalid operation: register.type=dummy');
+            expect(error.message).toBe('Invalid operation: registration.type=dummy');
         }
     });
 
     it('create error with invalid signature', async () => {
         const keypair = cipher.generateRandomJwk();
         let agentOp = await helper.createAgentOp(keypair);
-        agentOp.register!.prefix = "dummy";
+        agentOp.registration!.prefix = "dummy";
 
         try {
             await gatekeeper.createDID(agentOp);

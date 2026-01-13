@@ -24,7 +24,7 @@ export default class TestHelper {
         const operation: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            register: {
+            registration: {
                 version: version,
                 type: "agent",
                 registry: registry,
@@ -33,7 +33,7 @@ export default class TestHelper {
         };
 
         if (prefix) {
-            operation.register!.prefix = prefix;
+            operation.registration!.prefix = prefix;
         }
 
         const msgHash = this.cipher.hashJSON(operation);
@@ -125,7 +125,7 @@ export default class TestHelper {
         const dataAnchor: Operation = {
             type: "create",
             created: new Date().toISOString(),
-            register: {
+            registration: {
                 version: 1,
                 type: "asset",
                 registry,
