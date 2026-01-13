@@ -2,3 +2,6 @@ android/.gradle/
 android/build/
 android/app/build/
 
+.env.production
+.env.production.local
+

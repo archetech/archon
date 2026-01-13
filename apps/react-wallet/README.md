@@ -8,6 +8,18 @@ Run the app in the browser.
 
 `npm run dev`
 
+## Configuration
+
+This app uses Vite environment variables for the default service URLs.
+
+- Local development falls back to `http://localhost:*` (or `10.0.2.2` on Android emulator).
+- Production builds (`vite build` / `npm run android:build`) automatically load `.env.production`.
+
+To set production endpoints locally:
+
+1. Copy `.env.production.example` to `.env.production`
+2. Edit the URLs as needed.
+
 ## Set up Android Studio
 
 Install JDK 21, Android Studio (API 35) and then configure Capacitor path to Android Studio.
