@@ -1,5 +1,5 @@
 import type HDKeyNode from 'hdkey';
-import type HDKeyBrowser from '@mdip/browser-hdkey';
+import type HDKeyBrowser from '@didcid/browser-hdkey';
 
 export interface HDKeyJSON {
     xpriv: string,
