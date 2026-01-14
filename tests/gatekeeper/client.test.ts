@@ -1,7 +1,6 @@
 import nock from 'nock';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import { ExpectedExceptionError } from '@didcid/common/errors';
-import { Operation } from "@didcid/gatekeeper/types";
 
 const GatekeeperURL = 'http://gatekeeper.org';
 const ServerError = { message: 'Server error' };

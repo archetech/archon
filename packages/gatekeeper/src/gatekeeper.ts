@@ -645,7 +645,6 @@ export default class Gatekeeper implements GatekeeperInterface {
         for (const { time, operation, registry, registration: blockchain } of events) {
             const versionId = await this.generateCID(operation);
             const updated = generateStandardDatetime(time);
-            const previousRegistration = doc.didDocumentRegistration;
             let timestamp;
 
             if (doc.didDocumentRegistration?.registry) {
@@ -743,11 +742,18 @@ export default class Gatekeeper implements GatekeeperInterface {
                 versionNum += 1;
 
                 const nextDoc = operation.doc || {};
-                if (!nextDoc.didDocumentRegistration && previousRegistration) {
-                    nextDoc.didDocumentRegistration = previousRegistration;
+
+                // Merge update: carry forward fields not provided in the update
+                if (nextDoc.didDocument !== undefined) {
+                    doc.didDocument = nextDoc.didDocument;
+                }
+                if (nextDoc.didDocumentData !== undefined) {
+                    doc.didDocumentData = nextDoc.didDocumentData;
+                }
+                if (nextDoc.didDocumentRegistration !== undefined) {
+                    doc.didDocumentRegistration = nextDoc.didDocumentRegistration;
                 }
 
-                doc = nextDoc;
                 doc.didDocumentMetadata = {
                     created,
                     updated,
@@ -1176,11 +1182,12 @@ export default class Gatekeeper implements GatekeeperInterface {
             // Keymaster intentionally omits didDocumentMetadata/didResolutionMetadata from update operations.
             // Gatekeeper re-materializes didDocumentMetadata during resolution, and didDocumentRegistration
             // can be carried forward from the previous version.
-            if (!doc || !doc.didDocument || !doc.didDocumentData) {
+            // Update must include any or all of: didDocument, didDocumentData, didDocumentRegistration
+            if (!doc || (!doc.didDocument && !doc.didDocumentData && !doc.didDocumentRegistration)) {
                 return false;
             }
 
-            if (doc.didDocument.id && operation.did && doc.didDocument.id !== operation.did) {
+            if (doc.didDocument?.id && operation.did && doc.didDocument.id !== operation.did) {
                 return false;
             }
 

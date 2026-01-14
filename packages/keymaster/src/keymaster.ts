@@ -1063,38 +1063,14 @@ export default class Keymaster implements KeymasterInterface {
         }
     }
 
-    async updateDID(doc: DidCidDocument): Promise<boolean> {
-        const did = doc.didDocument?.id;
-
-        if (!did) {
-            throw new InvalidParameterError('doc.didDocument.id');
-        }
-
+    async updateDID(id: string, doc: DidCidDocument): Promise<boolean> {
+        const did = await this.lookupDID(id);
         const current = await this.resolveDID(did);
         const previd = current.didDocumentMetadata?.versionId;
 
-        // Ensure update operations always carry didDocumentRegistration for clarity and
-        // to support future registry migration semantics. If the caller intentionally set
-        // didDocumentRegistration (e.g., to change registry), preserve it.
-        if (!doc.didDocumentRegistration && current.didDocumentRegistration) {
-            doc.didDocumentRegistration = current.didDocumentRegistration;
-        }
-
-        // Compare the hashes of the current and updated documents without the metadata
-        delete current.didDocumentMetadata;
-        delete current.didResolutionMetadata;
-
+        // Strip metadata fields from the update doc
         delete doc.didDocumentMetadata;
         delete doc.didResolutionMetadata;
-
-        const currentHash = this.cipher.hashJSON(current);
-        const updateHash = this.cipher.hashJSON(doc);
-
-        // If no change, return immediately without updating
-        // Maybe add a force update option later if needed?
-        if (currentHash === updateHash) {
-            return true;
-        }
 
         const block = await this.gatekeeper.getBlock(current.didDocumentRegistration!.registry);
         const blockid = block?.hash;
@@ -1285,12 +1261,12 @@ export default class Keymaster implements KeymasterInterface {
         const doc = await this.resolveDID(did);
         const currentData = doc.didDocumentData || {};
 
-        doc.didDocumentData = {
+        const updatedData = {
             ...currentData,
             ...data
         };
 
-        return this.updateDID(doc);
+        return this.updateDID(did, { didDocumentData: updatedData });
     }
 
     async transferAsset(
@@ -1316,9 +1292,12 @@ export default class Keymaster implements KeymasterInterface {
         const assetDID = assetDoc.didDocument!.id;
         const prevOwner = assetDoc.didDocument!.controller;
 
-        assetDoc.didDocument!.controller = agentDoc.didDocument!.id;
+        const updatedDidDocument = {
+            ...assetDoc.didDocument!,
+            controller: agentDoc.didDocument!.id,
+        };
 
-        const ok = await this.updateDID(assetDoc);
+        const ok = await this.updateDID(id, { didDocument: updatedDidDocument });
 
         if (ok && assetDID && prevOwner) {
             await this.removeFromOwned(assetDID, prevOwner);
@@ -1474,6 +1453,9 @@ export default class Keymaster implements KeymasterInterface {
         // Backs up current ID if id is not provided
         const wallet = await this.loadWallet();
         const name = id || wallet.current;
+        if (!name) {
+            throw new InvalidParameterError('no current ID');
+        }
         const idInfo = await this.fetchIdInfo(name, wallet);
         const keypair = await this.hdKeyPair();
         const data = {
@@ -1491,9 +1473,9 @@ export default class Keymaster implements KeymasterInterface {
         const vaultDid = await this.createAsset({ backup: backup }, { registry, controller: name });
 
         if (doc.didDocumentData) {
-            const docData = doc.didDocumentData as { vault: string };
-            docData.vault = vaultDid;
-            return this.updateDID(doc);
+            const currentData = doc.didDocumentData as { vault?: string };
+            const updatedData = { ...currentData, vault: vaultDid };
+            return this.updateDID(name, { didDocumentData: updatedData });
         }
         return false;
     }
@@ -1556,12 +1538,17 @@ export default class Keymaster implements KeymasterInterface {
                 throw new KeymasterError('DID Document missing verificationMethod');
             }
 
-            const vmethod = doc.didDocument.verificationMethod[0];
+            const vmethod = { ...doc.didDocument.verificationMethod[0] };
             vmethod.id = `#key-${nextIndex + 1}`;
             vmethod.publicKeyJwk = keypair.publicJwk;
-            doc.didDocument.authentication = [vmethod.id];
 
-            ok = await this.updateDID(doc);
+            const updatedDidDocument = {
+                ...doc.didDocument,
+                verificationMethod: [vmethod],
+                authentication: [vmethod.id],
+            };
+
+            ok = await this.updateDID(id.did, { didDocument: updatedDidDocument });
             if (!ok) {
                 throw new KeymasterError('Cannot rotate keys');
             }
@@ -1753,7 +1740,6 @@ export default class Keymaster implements KeymasterInterface {
         const cipher_receiver = this.cipher.encryptMessage(receivePublicJwk, senderKeypair.privateJwk, msg);
         const msgHash = this.cipher.hashMessage(msg);
 
-        const doc = await this.resolveDID(did);
         const encrypted: EncryptedMessage = {
             sender: id.did,
             created: new Date().toISOString(),
@@ -1761,8 +1747,7 @@ export default class Keymaster implements KeymasterInterface {
             cipher_sender: cipher_sender,
             cipher_receiver: cipher_receiver,
         };
-        doc.didDocumentData = { encrypted };
-        return this.updateDID(doc);
+        return this.updateDID(did, { didDocumentData: { encrypted } });
     }
 
     async revokeCredential(credential: string): Promise<boolean> {
@@ -1867,7 +1852,7 @@ export default class Keymaster implements KeymasterInterface {
 
         data.manifest[credential] = vc;
 
-        const ok = await this.updateDID(doc);
+        const ok = await this.updateDID(id.did, { didDocumentData: doc.didDocumentData });
         if (ok) {
             return vc;
         }
@@ -1883,7 +1868,7 @@ export default class Keymaster implements KeymasterInterface {
 
         if (credential && data.manifest && credential in data.manifest) {
             delete data.manifest[credential];
-            await this.updateDID(doc);
+            await this.updateDID(id.did, { didDocumentData: doc.didDocumentData });
 
             return `OK credential ${did} removed from manifest`;
         }

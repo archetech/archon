@@ -62,22 +62,22 @@ Example
 ```json
 {
     "type": "create",
-    "created": "2024-03-21T14:17:00.693Z",
+    "created": "2026-01-14T19:29:06.924Z",
     "registration": {
-        "registry": "hyperswarm",
+        "version": 1,
         "type": "agent",
-        "version": 1
+        "registry": "hyperswarm"
     },
     "publicJwk": {
-        "crv": "secp256k1",
         "kty": "EC",
-        "x": "Mhw_QuIwAqtSC7iGs4a5hTn6o9l3n4e41SVxtwSZHsg",
-        "y": "PHqyl-KJ74BGYL19Ou-iQ7M-Adn9zKy9xX4wzVPWkcs"
+        "crv": "secp256k1",
+        "x": "LRrQabMIkvGVTA2IRk0JdWCpu57MNGm89nugrBZHo24",
+        "y": "KHsWAaidAIGCosDjRYDIk-94793e4xVEL4UwFxjWgB8"
     },
     "signature": {
-        "hash": "5a2b4280bed5adac087afb0a143b3bcf21c9f140937ed1964eb1106b2f5c4bdf",
-        "signed": "2024-03-21T14:17:00.703Z",
-        "value": "0b087eb5f05cfd3563d56fd1edc2b893b2d27ef096514272f989aabd081d37781a14453e8f36536d391c6539d10f6744b4a06ffbf9c559d9383435e278b71554"
+        "signed": "2026-01-14T19:29:06.927Z",
+        "hash": "59173cb6beec2a1d9c4ca02ba78269999244cf402ae1d4a63c6687f7ddf397ec",
+        "value": "a8d4f4121b688c3c4e24187bd6975d9969cc85aad0649c4e7a55bbd5e8457ee66aaea3e5b37db348fe1b0f60b260d12f017489440fb75f90f0475bc75724cf1f"
     }
 }
 ```
@@ -110,21 +110,24 @@ Example
 ```json
 {
     "type": "create",
-    "created": "2024-03-21T18:47:00.655Z",
+    "created": "2026-01-14T19:32:24.354Z",
     "registration": {
         "version": 1,
         "type": "asset",
         "registry": "hyperswarm"
     },
-    "controller": "did:cid:test:z3v8AuaaBKfwrt2Y7AAbDaGqLNgyn1BDhP7wUFpEMEngmwYwi17",
+    "controller": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
     "data": {
-        "credentials": []
+        "group": {
+            "name": "testgroup",
+            "members": []
+        }
     },
     "signature": {
-        "signer": "did:cid:test:z3v8AuaaBKfwrt2Y7AAbDaGqLNgyn1BDhP7wUFpEMEngmwYwi17",
-        "signed": "2024-03-21T18:47:00.729Z",
-        "hash": "3810490d72e7c912d3213d5d96b4f9c184b347038b385aadc568a6624810b0ef",
-        "value": "e80a12d81b9be8a63440203dccb90e954d21b91e862b3fe72d0f306877292b9a5f8e00881256132225ab39f2cbe9d47012fb4ac32882ac4bfe3bbb49f80efec4"
+        "signer": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
+        "signed": "2026-01-14T19:32:24.375Z",
+        "hash": "3c9a93528dc7564903a88bd271ac30afa565f297b7dc3fa90db2dfb3821d7734",
+        "value": "34640c06ae6f7a72768b8177f94a34a7fac4025634cebf9825e4d3bbbbd4959d0d7f2aa2ac83c84861b2bc294f90ac1bec0ba7dcd1fb109bcb21fb605f033a91"
     }
 }
 ```
@@ -143,9 +146,8 @@ A DID Update is a change to any of the documents associated with the DID. To ini
 1. Create a operation object with these fields in any order:
     1. `type` must be set to "update"
     1. `did` specifies the DID
-    1. `doc` is set to the new version of the document set, which must include:
+    1. `doc` is set to the new version of the document set, which must include any or all of:
         1. `didDocument` the main document
-        1. `didDocumentMetadata` the document's metadata
         1. `didDocumentData` the document's data
         1. `didDocumentRegistration` the Archon protocol spec
     1. `previd` the CID of the previous operation
@@ -159,47 +161,37 @@ Example update to rotate keys for an agent DID:
 ```json
 {
     "type": "update",
-    "did": "did:cid:test:z3v8AuadvRQErtPapNx3ncdUJpPc5dBDGTXXiRxsaH2N8Lj2KzL",
+    "did": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
+    "previd": "bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
     "doc": {
-        "@context": "https://w3id.org/did-resolution/v1",
         "didDocument": {
             "@context": [
                 "https://www.w3.org/ns/did/v1"
             ],
-            "id": "did:cid:test:z3v8AuadvRQErtPapNx3ncdUJpPc5dBDGTXXiRxsaH2N8Lj2KzL",
+            "id": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
             "verificationMethod": [
                 {
                     "id": "#key-2",
-                    "controller": "did:cid:test:z3v8AuadvRQErtPapNx3ncdUJpPc5dBDGTXXiRxsaH2N8Lj2KzL",
+                    "controller": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
                     "type": "EcdsaSecp256k1VerificationKey2019",
                     "publicKeyJwk": {
                         "kty": "EC",
                         "crv": "secp256k1",
-                        "x": "CkHUpYCLpO-ITepMH8NyR1BinjtC8GEjPZmLbhhvdYQ",
-                        "y": "7tbEsQCgPhMx4vgP7anOZEscV0ruXyaEkyKTXaIMniQ"
+                        "x": "hrpjLquejw7lOE2RVGr1LQ315k0JI1lwlI4WI3t983k",
+                        "y": "G2_-Agy95QnIFzW5sa9Ik72vDPeqJ0rqqrxWs3CM49o"
                     }
                 }
             ],
             "authentication": [
                 "#key-2"
             ]
-        },
-        "didDocumentMetadata": {
-            "created": "2024-03-25T14:57:20.868Z"
-        },
-        "didDocumentData": {},
-        "didDocumentRegistration": {
-            "registry": "hyperswarm",
-            "type": "agent",
-            "version": 1
         }
     },
-    "previd": "z3v8Auaa5U9xP6TRzobvzZE7j6N8nkatxW1UuWiay5xrbAR5D9e",
     "signature": {
-        "signer": "did:cid:test:z3v8AuadvRQErtPapNx3ncdUJpPc5dBDGTXXiRxsaH2N8Lj2KzL",
-        "signed": "2024-03-25T14:57:26.343Z",
-        "hash": "575612ed3195eef4e1b7d43b3e40f893d834176321fee8ff6ffe51a79647d912",
-        "value": "87571672a51e3558ed9a9d4ef5fcad4dafbf22ee881735e579305b3ebb404a1d0891e3b45c8ad5c11c95e3ae76ca6f2328c87313d58fe80713c0887294d9078a"
+        "signer": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
+        "signed": "2026-01-14T19:29:16.117Z",
+        "hash": "5aa9c86ca0b269f6e7a7257357214147af06ce971d4d7642c8da3a6e468cd085",
+        "value": "2c490cf4d1b694e016b3494655cb418eab3675e8a6c6c9d0567c2c11353c99577e651ce79bd83fd3dc48b3120cd81df2d80dc36e1d1a469e44fed15e81980181"
     }
 }
 ```
@@ -230,13 +222,13 @@ Example deletion operation:
 ```json
 {
     "type": "delete",
-    "did": "did:cid:z3v8AuagQPwk6WhAjauVgkFCBJfHJBVBmNAYEhDNMBEXEmWQrHr",
-    "previd": "z3v8AuaWLbUPpU31mCazznLYy6JtTWmgx9QFsDVveDPDU8Na1sJ",
+    "did": "did:cid:bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha",
+    "previd": "bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha",
     "signature": {
-        "signer": "did:cid:z3v8Auad6fdVkSZE4khWmMwgTjpoMtv82fiT7c56ivNBdjzeMS2",
-        "created": "2024-02-05T20:00:54.171Z",
-        "hash": "ff71d0966ee87d827bf3674cb1511c845e18f010186326b3898f336b30e94662",
-        "value": "92f95f431729858c79ec4c10824e5aa996b7ae5277ec5143af43baf55c7c8d2f73931be5be46da0a7795b5c3b773041a91ccc2755857ddfa34758993428e7ad1"
+        "signer": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
+        "signed": "2026-01-14T19:34:32.170Z",
+        "hash": "4c286b598e3ebf3a7952c52c130261882871a467cad0e8edf7e27217827c6451",
+        "value": "6144e8b8f9a11c34ae7f489f62538e077730580e6edcaa60e6a6a780cb6b80373013622696d62f60dbe016f2ec84383632424435a2c5864e4f6a23cf30472377"
     }
 }
 ```
@@ -249,18 +241,26 @@ Upon receiving the operation the Archon node must:
 After revocation is confirmed on the DID's registry, resolving the DID will result in response like this:
 ```json
 {
-    "@context": "https://w3id.org/did-resolution/v1",
-    "didDocument": {},
+    "didDocument": {
+        "id": "did:cid:bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha"
+    },
     "didDocumentMetadata": {
-        "created": "2024-03-21T18:47:00.655Z",
         "deactivated": true,
-        "updated": "2024-03-21T18:55:11.530Z"
+        "created": "2026-01-14T19:32:24Z",
+        "deleted": "2026-01-14T19:34:33Z",
+        "versionId": "bagaaierats6ttxvpx2l3tat25ota7z7335akfd2iup5loajsdlqcwismkgpq",
+        "version": "2",
+        "confirmed": true,
+        "isOwned": false
     },
     "didDocumentData": {},
     "didDocumentRegistration": {
-        "registry": "hyperswarm",
+        "version": 1,
         "type": "asset",
-        "version": 1
+        "registry": "hyperswarm"
+    },
+    "didResolutionMetadata": {
+        "retrieved": "2026-01-14T19:36:09.115Z"
     }
 }
 ```
