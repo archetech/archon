@@ -100,7 +100,7 @@ services:
       - ipfs
 
   ftc-testnet5-node:
-    image: keychainmdip/feathercoin:v0.19.2
+    image: ghcr.io/archetech/feathercoin:v0.19.2
     volumes:
       - ./data/ftc-testnet5:/root/.feathercoin
 
@@ -139,50 +139,8 @@ services:
       - gatekeeper
       - keymaster
 
-  btc-node:
-    image: keychainmdip/bitcoin-core:v28.0-multiarch
-    volumes:
-      - ./data/btc:/root/.bitcoin
-    ports:
-      - 8332:8332
-
-  btc-mediator:
-    build:
-      context: .
-      dockerfile: Dockerfile.satoshi-inscription
-    image: ghcr.io/archetech/inscription-mediator
-    environment:
-      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
-      - ARCHON_KEYMASTER_URL=http://keymaster:4226
-      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
-      - ARCHON_REDIS_URL=redis://redis:6379
-      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
-      - ARCHON_SAT_CHAIN=BTC/mainnet
-      - ARCHON_SAT_NETWORK=bitcoin
-      - ARCHON_SAT_HOST=btc-node
-      - ARCHON_SAT_PORT=8332
-      - ARCHON_SAT_START_BLOCK=${ARCHON_BTC_START_BLOCK}
-      - ARCHON_SAT_USER=${ARCHON_BTC_USER}
-      - ARCHON_SAT_PASS=${ARCHON_BTC_PASS}
-      - ARCHON_SAT_WALLET=${ARCHON_BTC_WALLET}
-      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_BTC_IMPORT_INTERVAL}
-      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_BTC_EXPORT_INTERVAL}
-      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_BTC_FEE_BLOCK_TARGET}
-      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_BTC_FEE_FALLBACK_SAT_BYTE}
-      - ARCHON_SAT_FEE_MAX=${ARCHON_BTC_FEE_MAX}
-      - ARCHON_SAT_RBF_ENABLED=${ARCHON_BTC_RBF_ENABLED}
-      - ARCHON_SAT_REIMPORT=${ARCHON_BTC_REIMPORT}
-      - ARCHON_SAT_DB=${ARCHON_BTC_DB}
-    volumes:
-      - ./data:/app/satoshi/data
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    depends_on:
-      - btc-node
-      - gatekeeper
-      - keymaster
-
   btc-testnet4-node:
-    image: keychainmdip/bitcoin-core:v28.0-multiarch
+    image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
     volumes:
       - ./data/btc-testnet4:/root/.bitcoin
 
@@ -222,7 +180,7 @@ services:
       - keymaster
 
   btc-signet-node:
-    image: keychainmdip/bitcoin-core:v28.0-multiarch
+    image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
     volumes:
       - ./data/btc-signet:/root/.bitcoin
     ports:

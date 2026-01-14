@@ -321,9 +321,9 @@ async function importBatch(item: DiscoveredInscribedItem) {
 
     let logObj: DiscoveredItem = {
         height: item.events[0].ordinal![0],
-        index: item.events[0].blockchain!.index!,
+        index: item.events[0].registration!.index!,
         time: item.events[0].time,
-        txid: item.events[0].blockchain!.txid!,
+        txid: item.events[0].registration!.txid!,
     };
 
     let update: DiscoveredInscribedItem = { ...item };
@@ -347,9 +347,9 @@ function sameItem(a: InscribedKey, b: InscribedKey) {
 
 function keyFromItem(item: DiscoveredInscribedItem): InscribedKey {
     return {
-        height: item.events[0]!.blockchain!.height!,
-        index: item.events[0]!.blockchain!.index!,
-        txid: item.events[0]!.blockchain!.txid!,
+        height: item.events[0]!.registration!.height!,
+        index: item.events[0]!.registration!.index!,
+        txid: item.events[0]!.registration!.txid!,
     };
 }
 

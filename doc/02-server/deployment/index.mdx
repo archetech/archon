@@ -3,9 +3,9 @@ title: Archon Full Trustless Node Deployment Guide
 sidebar_label: Deployment Guide
 ---
 
-Archon is a suite of software tools, libraries, and services that implement the Archon Identity Protocol as defined and documented by the [CID DID Scheme](https://archetech.github.io/archon/docs/protocol/scheme). This document refers to the [Archon v.1.3.0 Fall 2025 release](https://github.com/KeychainMDIP/kc/releases/tag/v.1.3.0).
+Archon is a suite of software tools, libraries, and services that implement the Archon Identity Protocol as defined and documented by the [CID DID Scheme](https://archetech.github.io/archon/docs/protocol/scheme). This document refers to the [Archon v0.1.0 release](https://github.com/archetech/archon/releases/tag/TBD).
 
-There are countless ways to deploy Archon technology. These guidelines reflect current lessons learned and best practices. Feedback, recommendations, and additional best practices are welcome. Recommendations can be sent by opening an [issue](https://github.com/KeychainMDIP/kc/issues) against this document to share your experience with Archon; these may be incorporated in future versions of this document. You can also comment diretly at the bottom of any docs page, provided you have a GitHub account.
+There are countless ways to deploy Archon technology. These guidelines reflect current lessons learned and best practices. Feedback, recommendations, and additional best practices are welcome. Recommendations can be sent by opening an [issue](https://github.com/archetech/archon/issues) against this document to share your experience with Archon; these may be incorporated in future versions of this document. You can also comment diretly at the bottom of any docs page, provided you have a GitHub account.
 
 ## What is an Archon Node?
 
@@ -51,7 +51,7 @@ Archon operators can interact with their server's Keymaster in multiple ways:
 
 ![Archon-components](./archon_components.png)
 
-All the Archon components illustrated above are composed together using Docker Compose in the official ['kc'](https://github.com/KeychainMDIP/kc/releases/tag/) release. The release provides a simple `start-node` script that will compile, dockerize, and launch all required Archon components. The convenience of this script will be preserved as we explore configuration and deployment options below.
+All the Archon components illustrated above are composed together using Docker Compose in the official ['kc'](https://github.com/archetech/archon/releases/tag/) release. The release provides a simple `start-node` script that will compile, dockerize, and launch all required Archon components. The convenience of this script will be preserved as we explore configuration and deployment options below.
 
 ![Archon-resources](./archon-resource-usage.png)
 
@@ -122,7 +122,7 @@ Once the server environment is prepared, we can begin the installation of Archon
 Clone Archon from its source repository:
 
 ```bash
-git clone https://github.com/KeychainMDIP/kc
+git clone https://github.com/archetech/archon
 cd kc
 git checkout v.1.3.0
 ```
