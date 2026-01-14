@@ -645,6 +645,139 @@ For applications requiring on-chain data storage, Archon supports Taproot inscri
 3. Lower on-chain footprint than OP_RETURN for larger data
 4. Compatible with ordinals ecosystem
 
+### 7.5 Blockchain Timestamping
+
+One of Archon's most powerful features is automatic cryptographic timestamping for all DID operations registered on blockchain-based registries. When a DID operation is anchored to Bitcoin, Feathercoin, or any other blockchain registry, it inherits an immutable, independently verifiable timestamp from the block in which it was confirmed.
+
+#### How Timestamping Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    TIMESTAMP BOUNDS                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   LOWER BOUND (optional)          UPPER BOUND (confirmed)       │
+│   ───────────────────────         ─────────────────────────     │
+│   Block referenced in the         Block containing the          │
+│   operation's blockid field       anchored operation            │
+│                                                                 │
+│   "This operation was created     "This operation was           │
+│    after this block existed"       confirmed at this time"      │
+│                                                                 │
+│   ┌─────────────┐                 ┌─────────────┐               │
+│   │ Block #800  │ ──────────────> │ Block #805  │               │
+│   │ 2024-01-10  │    Operation    │ 2024-01-10  │               │
+│   │ 12:00:00    │    Created      │ 12:50:00    │               │
+│   └─────────────┘                 └─────────────┘               │
+│         ↑                               ↑                       │
+│   Lower Bound                     Upper Bound                   │
+│   (reference point)               (confirmation)                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+When resolving a DID, the `didDocumentMetadata` includes timestamp information:
+
+```json
+{
+  "didDocumentMetadata": {
+    "created": "2024-01-15T10:30:00Z",
+    "updated": "2024-01-16T14:00:00Z",
+    "versionId": "bafkrei...",
+    "version": "2",
+    "confirmed": true,
+    "timestamp": {
+      "chain": "BTC",
+      "opid": "bafkrei...",
+      "lowerBound": {
+        "time": 1705312800,
+        "timeISO": "2024-01-15T10:00:00Z",
+        "blockid": "00000000000000000002a7c4...",
+        "height": 826000
+      },
+      "upperBound": {
+        "time": 1705316400,
+        "timeISO": "2024-01-15T11:00:00Z",
+        "blockid": "00000000000000000001b8f2...",
+        "height": 826005,
+        "txid": "a1b2c3d4e5f6...",
+        "txidx": 42,
+        "batchid": "bafkrei...",
+        "opidx": 3
+      }
+    }
+  }
+}
+```
+
+#### Timestamp Components
+
+**Lower Bound** (optional): Created when the operation includes a `blockid` field referencing a recent block at the time of creation. This proves the operation was created *after* that block existed, establishing a "not before" time.
+
+**Upper Bound** (always present for confirmed operations): The block in which the operation batch was anchored. This provides:
+- `time`: Unix timestamp of the block
+- `timeISO`: Human-readable ISO 8601 format
+- `blockid`: The block hash (independently verifiable)
+- `height`: Block height in the chain
+- `txid`: Transaction ID containing the batch
+- `txidx`: Transaction index within the block
+- `batchid`: CID of the operation batch
+- `opidx`: Index of this operation within the batch
+
+#### Why Blockchain Timestamps Matter
+
+**1. Legal Admissibility**
+
+Blockchain timestamps provide cryptographic proof of existence at a specific time. Unlike self-asserted timestamps, blockchain timestamps are:
+- Independently verifiable by any node
+- Immutable once confirmed
+- Backed by computational proof-of-work
+- Anchored to a globally-recognized timechain
+
+This makes them suitable for legal contexts where proving "when" something happened matters:
+- Contract signing dates
+- Intellectual property registration
+- Regulatory compliance timestamps
+- Audit trails
+
+**2. Temporal Ordering**
+
+The ordinal key `{block height, transaction index, batch index, operation index}` provides a strict total ordering of all operations, resolving any ambiguity about which operation came first. This is critical for:
+- Key rotation (ensuring old keys can't sign "backdated" operations)
+- Credential revocation (proving when a credential was revoked)
+- Dispute resolution (establishing timeline of events)
+
+**3. Trust Minimization**
+
+Traditional timestamping services require trusting a third party. Blockchain timestamps derive their trustworthiness from:
+- Decentralized consensus (no single authority)
+- Economic security (cost of attack exceeds benefit)
+- Transparent verification (anyone can audit)
+
+**4. Proof of Non-Existence**
+
+The timestamp system also enables proving that something *didn't* exist before a certain time. If an operation's lower bound is block N, it cannot have existed before block N was mined.
+
+#### Timestamp Precision by Registry
+
+| Registry | Typical Precision | Verification |
+|----------|-------------------|--------------|
+| Bitcoin | ~10 minutes (block time) | Full node or SPV proof |
+| Feathercoin | ~2.5 minutes | Full node or SPV proof |
+| Hyperswarm | Sub-second (self-asserted) | Peer attestation only |
+
+#### Use Cases for Timestamps
+
+**Intellectual Property**: Prove when a creative work was first registered, establishing priority for copyright or patent claims.
+
+**Credential Validity Windows**: Verify that a credential was issued before its expiration date and hadn't been revoked at the time of use.
+
+**Audit Compliance**: Demonstrate that required attestations or certifications were in place at specific regulatory checkpoints.
+
+**Legal Evidence**: Provide court-admissible proof of when digital agreements, signatures, or declarations were made.
+
+**Version Control**: Establish authoritative ordering of document revisions or identity updates, preventing "time-warp" attacks.
+
 ---
 
 ## 8. Verifiable Credentials
@@ -900,6 +1033,7 @@ Track ownership and authenticity of digital assets:
 | Credential Support | Full | Limited | Full | Limited |
 | Key Recovery | BIP-39 | Varies | N/A | N/A |
 | Arbitrary Data Storage | Yes (didDocumentData) | No | External only | No |
+| Blockchain Timestamps | Automatic (with bounds) | Implicit | No | No |
 
 ### 12.2 Architectural Comparison
 
@@ -974,9 +1108,10 @@ Key innovations include:
 1. **Zero-cost, instant identity creation** through IPFS content addressing
 2. **Flexible finality options** via multi-registry architecture
 3. **The didDocumentData extension** enabling arbitrary application data bound to identities
-4. **Full W3C compliance** ensuring ecosystem interoperability
-5. **Comprehensive credential support** for real-world applications
-6. **Enterprise-ready features** including groups, vaults, and organizational management
+4. **Automatic blockchain timestamping** providing cryptographic proof of when operations occurred
+5. **Full W3C compliance** ensuring ecosystem interoperability
+6. **Comprehensive credential support** for real-world applications
+7. **Enterprise-ready features** including groups, vaults, and organizational management
 
 The protocol is production-ready, with multiple client implementations (CLI, web, mobile, browser extension), robust cryptographic foundations, and extensive testing. Organizations seeking to implement decentralized identity infrastructure will find Archon provides the flexibility, security, and performance required for diverse use cases.
 
