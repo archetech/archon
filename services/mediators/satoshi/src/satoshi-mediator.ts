@@ -228,7 +228,7 @@ async function importBatch(item: DiscoveredItem) {
             time: item.time,
             ordinal: [item.height, item.index, i],
             operation: queue[i],
-            blockchain: {
+            registration: {
                 height: item.height,
                 index: item.index,
                 txid: item.txid,
