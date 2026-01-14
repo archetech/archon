@@ -17,13 +17,14 @@ Archon is a decentralized identity (DID) protocol implementing the W3C-compliant
 5. [The did:cid Method](#5-the-didcid-method)
 6. [The didDocumentData Extension](#6-the-diddocumentdata-extension)
 7. [Registry System](#7-registry-system)
-8. [Verifiable Credentials](#8-verifiable-credentials)
-9. [Cryptographic Foundation](#9-cryptographic-foundation)
-10. [Network Topology](#10-network-topology)
-11. [Use Cases](#11-use-cases)
-12. [Comparison with Existing Solutions](#12-comparison-with-existing-solutions)
-13. [Future Directions](#13-future-directions)
-14. [Conclusion](#14-conclusion)
+8. [Advanced Features](#8-advanced-features)
+9. [Verifiable Credentials](#9-verifiable-credentials)
+10. [Cryptographic Foundation](#10-cryptographic-foundation)
+11. [Network Topology](#11-network-topology)
+12. [Use Cases](#12-use-cases)
+13. [Comparison with Existing Solutions](#13-comparison-with-existing-solutions)
+14. [Future Directions](#14-future-directions)
+15. [Conclusion](#15-conclusion)
 
 ---
 
@@ -780,9 +781,274 @@ The timestamp system also enables proving that something *didn't* exist before a
 
 ---
 
-## 8. Verifiable Credentials
+## 8. Advanced Features
 
-### 8.1 W3C Verifiable Credentials Support
+Beyond the core DID functionality, Archon includes several advanced features that extend the protocol into a comprehensive identity and communication platform.
+
+### 8.1 Time-Travel Resolution
+
+Archon supports resolving DIDs at any point in their history, enabling powerful audit and compliance capabilities.
+
+**Resolution Options:**
+
+```javascript
+// Resolve at a specific point in time
+resolveDID(did, { versionTime: "2024-01-15T10:00:00Z" })
+
+// Resolve a specific version number
+resolveDID(did, { versionSequence: 3 })
+
+// Resolve a specific version by its CID
+resolveDID(did, { versionId: "bafkrei..." })
+```
+
+**How It Works:**
+
+Every DID operation includes a `previd` field linking to the previous operation, creating an immutable chain:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Version 1  │────>│  Version 2  │────>│  Version 3  │
+│  (Create)   │     │  (Update)   │     │  (Update)   │
+│             │     │             │     │             │
+│ previd: ∅   │     │ previd: v1  │     │ previd: v2  │
+│ time: T1    │     │ time: T2    │     │ time: T3    │
+└─────────────┘     └─────────────┘     └─────────────┘
+```
+
+The resolver walks this chain, applying operations up to the requested time/version, then returns the reconstructed document state.
+
+**Use Cases:**
+- **Audit trails**: Prove what credentials existed at a specific regulatory checkpoint
+- **Dispute resolution**: Establish the state of an identity at a contested point in time
+- **Recovery**: Examine historical states to understand how a DID evolved
+- **Compliance**: Demonstrate historical compliance at any point
+
+### 8.2 Decentralized Messaging (D-Mail)
+
+Archon includes a complete decentralized email system built on top of the DID infrastructure:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        D-MAIL SYSTEM                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   SENDER                          RECIPIENT                     │
+│   ──────                          ─────────                     │
+│   1. Compose message              4. Refresh notices            │
+│   2. Encrypt for recipient        5. Import dmail               │
+│   3. Create notice asset          6. Decrypt message            │
+│                                   7. File in folder             │
+│                                                                 │
+│   Message stored as encrypted asset DID                         │
+│   Notice points recipient to the message                        │
+│   Both sender and recipient retain encrypted copies             │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- **Folder organization**: INBOX, SENT, DRAFT, ARCHIVED, DELETED
+- **CC support**: Multiple recipients with individual encryption
+- **Attachments**: Files stored as asset DIDs
+- **Read tracking**: UNREAD tag for new messages
+- **Dual encryption**: Both sender and recipient can decrypt
+
+**Message Structure:**
+```json
+{
+  "didDocumentData": {
+    "dmail": {
+      "from": "did:cid:bafkrei...alice",
+      "to": ["did:cid:bafkrei...bob"],
+      "cc": ["did:cid:bafkrei...carol"],
+      "subject": "Meeting Tomorrow",
+      "body": "encrypted-content...",
+      "attachments": ["did:cid:bafkrei...file1"],
+      "created": "2024-01-15T10:30:00Z"
+    }
+  }
+}
+```
+
+### 8.3 Privacy-Preserving Voting
+
+Archon's polling system goes beyond simple vote counting to provide cryptographic privacy guarantees:
+
+**Two-Phase Voting Protocol:**
+
+```
+Phase 1: Ballot Collection (Private)
+──────────────────────────────────────
+• Voters cast encrypted ballots
+• Ballots stored as asset DIDs
+• Vote choices hidden from everyone
+• Eligibility verified via credentials
+
+Phase 2: Result Revelation (Optional)
+──────────────────────────────────────
+• Poll creator can reveal results
+• Individual ballots can remain hidden
+• Or full transparency with ballot publication
+```
+
+**Privacy Features:**
+
+1. **Spoil Ballots**: Voters can cast intentionally invalid ballots that are indistinguishable from valid ones, providing plausible deniability about whether they voted.
+
+2. **Hidden Results**: Poll creators can choose to keep results hidden until a deadline or indefinitely.
+
+3. **Anonymous Tallying**: Results can be published without revealing individual votes.
+
+**Poll Structure:**
+```json
+{
+  "didDocumentData": {
+    "poll": {
+      "question": "Approve the Q4 budget?",
+      "options": ["Yes", "No", "Abstain"],
+      "deadline": "2024-02-01T00:00:00Z",
+      "roster": "did:cid:bafkrei...eligible-voters",
+      "resultsHidden": true,
+      "ballots": {
+        "did:cid:bafkrei...ballot1": "encrypted...",
+        "did:cid:bafkrei...ballot2": "encrypted..."
+      }
+    }
+  }
+}
+```
+
+### 8.4 Group Vaults with Secret Membership
+
+Archon supports multi-party encrypted storage where members can share data without necessarily knowing each other's identities:
+
+**Standard Group:**
+```json
+{
+  "didDocumentData": {
+    "group": {
+      "name": "Project Alpha Team",
+      "members": [
+        "did:cid:bafkrei...alice",
+        "did:cid:bafkrei...bob"
+      ],
+      "vault": "did:cid:bafkrei...shared-vault"
+    }
+  }
+}
+```
+
+**Secret Member Group:**
+```json
+{
+  "didDocumentData": {
+    "group": {
+      "name": "Anonymous Review Board",
+      "secretMembers": true,
+      "encryptedMembers": "encrypted-member-list...",
+      "vault": "did:cid:bafkrei...shared-vault"
+    }
+  }
+}
+```
+
+**How Secret Membership Works:**
+
+1. **Encrypted Member List**: The member list is encrypted so only the group controller knows all members
+2. **Individual Access Keys**: Each member receives their own derived key to access the vault
+3. **Plausible Membership**: Members cannot prove or disprove others' membership
+4. **Anonymous Contributions**: Items added to the vault don't reveal the contributor
+
+**Use Cases:**
+- **Whistleblower systems**: Submit documents without revealing identity to other submitters
+- **Blind review**: Academic or professional review where reviewers don't know each other
+- **Anonymous committees**: Voting bodies where member composition is confidential
+
+### 8.5 Challenge-Response Authentication
+
+Archon provides a flexible challenge-response system for authentication and authorization:
+
+```
+┌──────────────┐                    ┌──────────────┐
+│   VERIFIER   │                    │    PROVER    │
+│              │                    │              │
+│ 1. Create    │    Challenge       │              │
+│    challenge │ ─────────────────> │ 2. Receive   │
+│              │                    │    challenge │
+│              │                    │              │
+│              │    Response (VP)   │ 3. Create    │
+│ 4. Verify    │ <───────────────── │    response  │
+│    response  │                    │              │
+└──────────────┘                    └──────────────┘
+```
+
+**Challenge Types:**
+
+1. **Simple Identity Challenge**: Prove you control a specific DID
+2. **Credential Challenge**: Prove you hold a credential of a specific type
+3. **Issuer-Specific Challenge**: Prove you hold a credential from a specific issuer
+
+**Challenge Structure:**
+```json
+{
+  "type": "VerifiablePresentation",
+  "challenge": "random-nonce-12345",
+  "domain": "https://example.com",
+  "credentialRequirements": [
+    {
+      "type": "EmployeeCredential",
+      "issuers": ["did:cid:bafkrei...acme-corp"]
+    }
+  ]
+}
+```
+
+**Response (Verifiable Presentation):**
+```json
+{
+  "type": "VerifiablePresentation",
+  "holder": "did:cid:bafkrei...alice",
+  "challenge": "random-nonce-12345",
+  "verifiableCredential": [
+    { /* Matching credential */ }
+  ],
+  "proof": { /* Signature over presentation */ }
+}
+```
+
+### 8.6 Key Rotation
+
+Archon supports secure key rotation without changing the DID:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      KEY ROTATION                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Before Rotation          After Rotation                       │
+│   ───────────────          ──────────────                       │
+│   DID: did:cid:abc...      DID: did:cid:abc... (unchanged)     │
+│   Key: #key-1              Key: #key-2                          │
+│                                                                 │
+│   The DID remains constant, but the controlling key changes.    │
+│   Old signatures remain valid for historical verification.      │
+│   New operations must use the new key.                          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Security Properties:**
+- Old keys cannot sign new operations (enforced by `previd` chain)
+- Historical signatures remain verifiable
+- Compromised keys can be rotated without losing identity
+- Key rotation is itself timestamped on blockchain registries
+
+---
+
+## 9. Verifiable Credentials
+
+### 9.1 W3C Verifiable Credentials Support
 
 Archon implements the full W3C Verifiable Credentials Data Model:
 
@@ -811,7 +1077,7 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 }
 ```
 
-### 8.2 Credential Lifecycle
+### 9.2 Credential Lifecycle
 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
@@ -823,7 +1089,7 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
 ```
 
-### 8.3 Privacy Features
+### 9.3 Privacy Features
 
 **Encryption**
 - Credentials can be encrypted for specific recipients
@@ -837,9 +1103,9 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 
 ---
 
-## 9. Cryptographic Foundation
+## 10. Cryptographic Foundation
 
-### 9.1 Key Management
+### 10.1 Key Management
 
 **Hierarchical Deterministic Wallets (BIP-32)**
 ```
@@ -860,7 +1126,7 @@ Master Seed (BIP-39 Mnemonic)
 - **JWK format**: Standardized key representation
 - **AES-256-GCM**: Symmetric encryption for at-rest protection
 
-### 9.2 Signature Scheme
+### 10.2 Signature Scheme
 
 All operations are signed using ECDSA over secp256k1:
 
@@ -880,7 +1146,7 @@ valid = ECDSA_verify(
 )
 ```
 
-### 9.3 Content Addressing
+### 10.3 Content Addressing
 
 DIDs are derived from content addresses:
 
@@ -895,9 +1161,9 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 
 ---
 
-## 10. Network Topology
+## 11. Network Topology
 
-### 10.1 Node Types
+### 11.1 Node Types
 
 **Full Nodes**
 - Run complete Gatekeeper with local database
@@ -916,7 +1182,7 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 - Focus on specific registry synchronization
 - May run blockchain full nodes
 
-### 10.2 Peer Discovery
+### 11.2 Peer Discovery
 
 **Hyperswarm DHT**
 - Nodes announce presence on topic-based DHT
@@ -928,7 +1194,7 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 - Global availability of DID operations
 - No single point of failure for content access
 
-### 10.3 Synchronization
+### 11.3 Synchronization
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -960,9 +1226,9 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 
 ---
 
-## 11. Use Cases
+## 12. Use Cases
 
-### 11.1 Self-Sovereign Identity
+### 12.1 Self-Sovereign Identity
 
 Individuals create and control their own digital identities without relying on any central authority:
 
@@ -972,7 +1238,7 @@ Individuals create and control their own digital identities without relying on a
 - Present credentials selectively to verifiers
 - Recover identity using mnemonic seed phrase
 
-### 11.2 Enterprise Identity Management
+### 12.2 Enterprise Identity Management
 
 Organizations deploy Archon for decentralized employee and partner identity:
 
@@ -981,7 +1247,7 @@ Organizations deploy Archon for decentralized employee and partner identity:
 - Enable passwordless authentication
 - Audit credential usage and access
 
-### 11.3 Educational Credentials
+### 12.3 Educational Credentials
 
 Universities and certification bodies issue verifiable credentials:
 
@@ -990,7 +1256,7 @@ Universities and certification bodies issue verifiable credentials:
 - Micro-credentials for specific skills
 - Instant verification by employers
 
-### 11.4 IoT Device Identity
+### 12.4 IoT Device Identity
 
 Connected devices receive unique, verifiable identities:
 
@@ -999,7 +1265,7 @@ Connected devices receive unique, verifiable identities:
 - Supply chain provenance tracking
 - Firmware update verification
 
-### 11.5 Voting and Governance
+### 12.5 Voting and Governance
 
 Organizations implement transparent voting systems:
 
@@ -1008,7 +1274,7 @@ Organizations implement transparent voting systems:
 - Proof of eligibility without identity disclosure
 - Auditable election results
 
-### 11.6 Digital Asset Provenance
+### 12.6 Digital Asset Provenance
 
 Track ownership and authenticity of digital assets:
 
@@ -1019,9 +1285,9 @@ Track ownership and authenticity of digital assets:
 
 ---
 
-## 12. Comparison with Existing Solutions
+## 13. Comparison with Existing Solutions
 
-### 12.1 Feature Comparison
+### 13.1 Feature Comparison
 
 | Feature | did:cid (Archon) | did:btc | did:web | did:key |
 |---------|------------------|---------|---------|---------|
@@ -1034,8 +1300,11 @@ Track ownership and authenticity of digital assets:
 | Key Recovery | BIP-39 | Varies | N/A | N/A |
 | Arbitrary Data Storage | Yes (didDocumentData) | No | External only | No |
 | Blockchain Timestamps | Automatic (with bounds) | Implicit | No | No |
+| Time-Travel Resolution | Yes | No | No | No |
+| Built-in Messaging | Yes (D-Mail) | No | No | No |
+| Voting/Governance | Yes | No | No | No |
 
-### 12.2 Architectural Comparison
+### 13.2 Architectural Comparison
 
 **did:btc / did:ion**
 - Requires blockchain transaction for every operation
@@ -1059,9 +1328,9 @@ Track ownership and authenticity of digital assets:
 
 ---
 
-## 13. Future Directions
+## 14. Future Directions
 
-### 13.1 Protocol Evolution
+### 14.1 Protocol Evolution
 
 **Multi-Signature Support**
 - Threshold signatures for organizational control
@@ -1078,7 +1347,7 @@ Track ownership and authenticity of digital assets:
 - Interoperability with other DID methods
 - Federated identity across networks
 
-### 13.2 Ecosystem Development
+### 14.2 Ecosystem Development
 
 **Schema Registry**
 - Standardized credential schemas
@@ -1090,7 +1359,7 @@ Track ownership and authenticity of digital assets:
 - Trust registries for verifier policies
 - Reputation systems for identity providers
 
-### 13.3 Performance Optimization
+### 14.3 Performance Optimization
 
 **Layer 2 Scaling**
 - Batching and rollup techniques
@@ -1099,7 +1368,7 @@ Track ownership and authenticity of digital assets:
 
 ---
 
-## 14. Conclusion
+## 15. Conclusion
 
 Archon represents a significant advancement in decentralized identity technology. By separating identity creation from updates and supporting multiple registry options, it solves the fundamental tension between decentralization, cost, and speed that has limited previous approaches.
 
@@ -1109,9 +1378,12 @@ Key innovations include:
 2. **Flexible finality options** via multi-registry architecture
 3. **The didDocumentData extension** enabling arbitrary application data bound to identities
 4. **Automatic blockchain timestamping** providing cryptographic proof of when operations occurred
-5. **Full W3C compliance** ensuring ecosystem interoperability
-6. **Comprehensive credential support** for real-world applications
-7. **Enterprise-ready features** including groups, vaults, and organizational management
+5. **Time-travel resolution** allowing DIDs to be resolved at any point in their history
+6. **Decentralized messaging (D-Mail)** built on the identity layer
+7. **Privacy-preserving voting** with spoil ballots and two-phase revelation
+8. **Group vaults with secret membership** for anonymous collaboration
+9. **Full W3C compliance** ensuring ecosystem interoperability
+10. **Comprehensive credential support** for real-world applications
 
 The protocol is production-ready, with multiple client implementations (CLI, web, mobile, browser extension), robust cryptographic foundations, and extensive testing. Organizations seeking to implement decentralized identity infrastructure will find Archon provides the flexibility, security, and performance required for diverse use cases.
 
