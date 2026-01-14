@@ -18,24 +18,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup env for Testing
         working-directory: ./tests/cli-tests
         run: |
           sudo apt update
           sudo apt-get install -y expect
           ./generate_test_env.sh
-          ln -s "$GITHUB_WORKSPACE/kc" /usr/local/bin/kc
+          ln -s "$GITHUB_WORKSPACE/archon" /usr/local/bin/archon
           ln -s "$GITHUB_WORKSPACE/admin" /usr/local/bin/admin
           echo "/usr/local/bin" >> $GITHUB_PATH
-      
 
       - name: Run Node
         run: |
           ./start-node-ci cli
           docker compose ps
           sleep 30
-
 
       - name: Run cli-tests
         working-directory: ./tests
@@ -44,33 +42,27 @@ jobs:
           ARCHON_KEYMASTER_URL: http://localhost:4226
         run: |
           ./run_cli_tests.sh --ci-redis
-        
 
       - name: Grab logs
         if: always()
         run: |
           docker compose logs --no-color keymaster cli gatekeeper redis > docker-compose-logs.txt
           cat docker-compose-logs.txt
-      
 
       - name: Teardown Docker
         run: |
           ./stop-node
-      
-          
+
       - name: Upload docker logs & artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: docker-compose-logs
           path: docker-compose-logs.txt
-      
 
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-            name: E2E Artifacts
-            path: tests/test-results/cli-tests.xml
-
-
+          name: E2E Artifacts
+          path: tests/test-results/cli-tests.xml
