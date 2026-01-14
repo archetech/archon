@@ -45,4 +45,5 @@ export const BlockVerbosity = {
     JSON_TX_DATA: 2,
 };
 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export type BlockVerbosity = typeof BlockVerbosity[keyof typeof BlockVerbosity];
