@@ -15,14 +15,15 @@ Archon is a decentralized identity (DID) protocol implementing the W3C-compliant
 3. [The Archon Solution](#3-the-archon-solution)
 4. [Technical Architecture](#4-technical-architecture)
 5. [The did:cid Method](#5-the-didcid-method)
-6. [Registry System](#6-registry-system)
-7. [Verifiable Credentials](#7-verifiable-credentials)
-8. [Cryptographic Foundation](#8-cryptographic-foundation)
-9. [Network Topology](#9-network-topology)
-10. [Use Cases](#10-use-cases)
-11. [Comparison with Existing Solutions](#11-comparison-with-existing-solutions)
-12. [Future Directions](#12-future-directions)
-13. [Conclusion](#13-conclusion)
+6. [The didDocumentData Extension](#6-the-diddocumentdata-extension)
+7. [Registry System](#7-registry-system)
+8. [Verifiable Credentials](#8-verifiable-credentials)
+9. [Cryptographic Foundation](#9-cryptographic-foundation)
+10. [Network Topology](#10-network-topology)
+11. [Use Cases](#11-use-cases)
+12. [Comparison with Existing Solutions](#12-comparison-with-existing-solutions)
+13. [Future Directions](#13-future-directions)
+14. [Conclusion](#14-conclusion)
 
 ---
 
@@ -340,9 +341,235 @@ All DID state changes occur through signed operations:
 
 ---
 
-## 6. Registry System
+## 6. The didDocumentData Extension
 
-### 6.1 Registry Abstraction
+### 6.1 Beyond the W3C Standard
+
+One of Archon's most powerful innovations is the `didDocumentData` field—an extension to the standard DID document structure that enables arbitrary application data to be stored alongside the identity itself. While the W3C DID Core specification defines the structure of `didDocument` and `didDocumentMetadata`, it also explicitly supports extensibility through additional properties.
+
+The W3C DID specification states that DID methods may add custom properties beyond the core specification, provided they support lossless conversion between representations. Archon leverages this extensibility to introduce `didDocumentData`: a flexible, schema-free container for application-specific data that travels with the DID throughout its lifecycle.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ARCHON DOCUMENT SET                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐  │
+│   │  didDocument (W3C Standard)                             │  │
+│   │  • Verification methods, authentication, services       │  │
+│   └─────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐  │
+│   │  didDocumentMetadata (W3C Standard)                     │  │
+│   │  • Created, updated, deactivated, versionId             │  │
+│   └─────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐  │
+│   │  didDocumentData (Archon Extension)                     │  │
+│   │  • Arbitrary JSON data bound to the DID                 │  │
+│   │  • Cryptographically signed and versioned               │  │
+│   │  • Supports any application use case                    │  │
+│   └─────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐  │
+│   │  didDocumentRegistration (Archon Extension)             │  │
+│   │  • Registry, type (agent/asset), protocol version       │  │
+│   └─────────────────────────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6.2 Design Philosophy
+
+Traditional DID systems treat identities as static containers for cryptographic keys and service endpoints. Archon recognizes that real-world identities are dynamic, accumulating attributes, relationships, and context over time. The `didDocumentData` field transforms DIDs from mere identifiers into rich, self-sovereign data containers.
+
+**Key Properties:**
+
+1. **Schema-Free**: No predefined structure—applications define their own data schemas
+2. **Cryptographically Bound**: All data is signed by the DID controller, ensuring authenticity
+3. **Version-Controlled**: Every change creates a new version with full audit trail
+4. **Decentrally Stored**: Data is distributed via IPFS and synchronized across registries
+5. **Controller-Owned**: Only the DID controller can modify the data
+
+### 6.3 Use Cases Enabled by didDocumentData
+
+The `didDocumentData` extension unlocks an expansive range of applications that would be impossible or impractical with standard DID documents:
+
+#### Credential Manifests
+
+Users can publish verified credentials to their DID, creating a public or selectively-disclosed portfolio:
+
+```json
+{
+  "didDocumentData": {
+    "manifest": {
+      "did:cid:bafkrei...degree": {
+        "type": ["VerifiableCredential", "UniversityDegree"],
+        "issuer": "did:cid:bafkrei...stanford",
+        "credentialSubject": {
+          "degree": "Bachelor of Science in Computer Science"
+        }
+      },
+      "did:cid:bafkrei...certification": {
+        "type": ["VerifiableCredential", "ProfessionalCertification"],
+        "issuer": "did:cid:bafkrei...aws",
+        "credentialSubject": {
+          "certification": "AWS Solutions Architect"
+        }
+      }
+    }
+  }
+}
+```
+
+This enables LinkedIn-style professional profiles that are fully decentralized and cryptographically verifiable.
+
+#### Identity Vaults
+
+Encrypted backup storage tied directly to an identity:
+
+```json
+{
+  "didDocumentData": {
+    "vault": "did:cid:bafkrei...encrypted-backup"
+  }
+}
+```
+
+Users can recover their entire identity—including all credentials and relationships—from just their seed phrase.
+
+#### Digital Assets as DIDs
+
+Images, documents, and structured data become first-class citizens with their own DIDs:
+
+```json
+{
+  "didDocumentData": {
+    "type": "image/png",
+    "encoding": "base64",
+    "data": "iVBORw0KGgoAAAANSUhEUgAA...",
+    "metadata": {
+      "title": "Profile Photo",
+      "created": "2024-01-15T10:30:00Z"
+    }
+  }
+}
+```
+
+#### Encrypted Communications
+
+End-to-end encrypted messages stored with DIDs:
+
+```json
+{
+  "didDocumentData": {
+    "encrypted": {
+      "sender": "did:cid:bafkrei...alice",
+      "created": "2024-01-15T10:30:00Z",
+      "cipher_hash": "a1b2c3...",
+      "cipher_sender": "encrypted-for-sender...",
+      "cipher_receiver": "encrypted-for-receiver..."
+    }
+  }
+}
+```
+
+#### Organizational Structures
+
+Groups and hierarchies with membership data:
+
+```json
+{
+  "didDocumentData": {
+    "group": {
+      "name": "Engineering Team",
+      "members": [
+        "did:cid:bafkrei...alice",
+        "did:cid:bafkrei...bob",
+        "did:cid:bafkrei...carol"
+      ],
+      "roles": {
+        "did:cid:bafkrei...alice": "admin",
+        "did:cid:bafkrei...bob": "member"
+      }
+    }
+  }
+}
+```
+
+#### Notices and Announcements
+
+Time-sensitive communications to specific recipients:
+
+```json
+{
+  "didDocumentData": {
+    "notice": {
+      "to": ["did:cid:bafkrei...recipient"],
+      "subject": "Meeting Request",
+      "body": "encrypted-content...",
+      "expires": "2024-02-01T00:00:00Z"
+    }
+  }
+}
+```
+
+#### Polls and Governance
+
+Decentralized voting with cryptographic integrity:
+
+```json
+{
+  "didDocumentData": {
+    "poll": {
+      "question": "Approve budget proposal?",
+      "options": ["Yes", "No", "Abstain"],
+      "deadline": "2024-02-01T00:00:00Z",
+      "results_hidden": true
+    }
+  }
+}
+```
+
+### 6.4 W3C Compatibility
+
+The W3C DID Core specification explicitly supports extensibility. Section 4.1 states:
+
+> "For maximum interoperability, it is RECOMMENDED that extensions use the W3C DID Specification Registries mechanism... It is always possible for two specific implementations to agree out-of-band to use a mutually understood extension."
+
+Archon's `didDocumentData` follows this guidance:
+
+1. **Additive Extension**: The field is added alongside standard properties, not replacing them
+2. **Lossless Conversion**: Standard DID resolution tools receive valid W3C-compliant documents
+3. **Namespace Separation**: Application data is isolated from core identity properties
+4. **Graceful Degradation**: Systems unaware of `didDocumentData` can still resolve and verify DIDs
+
+### 6.5 Security Considerations
+
+All data in `didDocumentData` inherits the security properties of the DID system:
+
+- **Authentication**: Only the DID controller (holder of the private key) can modify the data
+- **Integrity**: Every change is cryptographically signed and content-addressed
+- **Non-Repudiation**: The signature proves the controller authorized the data
+- **Auditability**: Full version history is preserved through the operation chain
+- **Revocation**: If the DID is revoked, `didDocumentData` is cleared, ensuring data lifecycle management
+
+### 6.6 Comparison with Alternatives
+
+| Approach | Storage | Verifiability | Cost | Flexibility |
+|----------|---------|---------------|------|-------------|
+| **didDocumentData** | Decentralized (IPFS) | Full (DID signatures) | Zero/Low | Unlimited |
+| Off-chain with hash | External systems | Hash-only | Variable | Full |
+| Service endpoints | External URLs | None | Variable | Full |
+| On-chain storage | Blockchain | Full | High | Limited |
+
+The `didDocumentData` approach provides the best combination: decentralized storage with full verifiability, minimal cost, and unlimited flexibility.
+
+---
+
+## 7. Registry System
+
+### 7.1 Registry Abstraction
 
 Archon's registry system provides a unified interface across different consensus mechanisms:
 
@@ -367,7 +594,7 @@ Archon's registry system provides a unified interface across different consensus
     └──────────────┘     └──────────────┘     └──────────────┘
 ```
 
-### 6.2 Hyperswarm Registry
+### 7.2 Hyperswarm Registry
 
 The Hyperswarm registry provides fast, peer-to-peer operation distribution:
 
@@ -385,7 +612,7 @@ The Hyperswarm registry provides fast, peer-to-peer operation distribution:
 
 **Best for:** Development, testing, internal organizational use, applications where speed matters more than finality
 
-### 6.3 Blockchain Registries (Satoshi)
+### 7.3 Blockchain Registries (Satoshi)
 
 Blockchain registries provide cryptographic finality through proof-of-work:
 
@@ -408,7 +635,7 @@ Blockchain registries provide cryptographic finality through proof-of-work:
 4. Transaction broadcast and confirmed
 5. All nodes can independently verify and import
 
-### 6.4 Inscription Registry
+### 7.4 Inscription Registry
 
 For applications requiring on-chain data storage, Archon supports Taproot inscriptions:
 
@@ -420,9 +647,9 @@ For applications requiring on-chain data storage, Archon supports Taproot inscri
 
 ---
 
-## 7. Verifiable Credentials
+## 8. Verifiable Credentials
 
-### 7.1 W3C Verifiable Credentials Support
+### 8.1 W3C Verifiable Credentials Support
 
 Archon implements the full W3C Verifiable Credentials Data Model:
 
@@ -451,7 +678,7 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 }
 ```
 
-### 7.2 Credential Lifecycle
+### 8.2 Credential Lifecycle
 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
@@ -463,7 +690,7 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
 ```
 
-### 7.3 Privacy Features
+### 8.3 Privacy Features
 
 **Encryption**
 - Credentials can be encrypted for specific recipients
@@ -477,9 +704,9 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 
 ---
 
-## 8. Cryptographic Foundation
+## 9. Cryptographic Foundation
 
-### 8.1 Key Management
+### 9.1 Key Management
 
 **Hierarchical Deterministic Wallets (BIP-32)**
 ```
@@ -500,7 +727,7 @@ Master Seed (BIP-39 Mnemonic)
 - **JWK format**: Standardized key representation
 - **AES-256-GCM**: Symmetric encryption for at-rest protection
 
-### 8.2 Signature Scheme
+### 9.2 Signature Scheme
 
 All operations are signed using ECDSA over secp256k1:
 
@@ -520,7 +747,7 @@ valid = ECDSA_verify(
 )
 ```
 
-### 8.3 Content Addressing
+### 9.3 Content Addressing
 
 DIDs are derived from content addresses:
 
@@ -535,9 +762,9 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 
 ---
 
-## 9. Network Topology
+## 10. Network Topology
 
-### 9.1 Node Types
+### 10.1 Node Types
 
 **Full Nodes**
 - Run complete Gatekeeper with local database
@@ -556,7 +783,7 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 - Focus on specific registry synchronization
 - May run blockchain full nodes
 
-### 9.2 Peer Discovery
+### 10.2 Peer Discovery
 
 **Hyperswarm DHT**
 - Nodes announce presence on topic-based DHT
@@ -568,7 +795,7 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 - Global availability of DID operations
 - No single point of failure for content access
 
-### 9.3 Synchronization
+### 10.3 Synchronization
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -600,9 +827,9 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 
 ---
 
-## 10. Use Cases
+## 11. Use Cases
 
-### 10.1 Self-Sovereign Identity
+### 11.1 Self-Sovereign Identity
 
 Individuals create and control their own digital identities without relying on any central authority:
 
@@ -612,7 +839,7 @@ Individuals create and control their own digital identities without relying on a
 - Present credentials selectively to verifiers
 - Recover identity using mnemonic seed phrase
 
-### 10.2 Enterprise Identity Management
+### 11.2 Enterprise Identity Management
 
 Organizations deploy Archon for decentralized employee and partner identity:
 
@@ -621,7 +848,7 @@ Organizations deploy Archon for decentralized employee and partner identity:
 - Enable passwordless authentication
 - Audit credential usage and access
 
-### 10.3 Educational Credentials
+### 11.3 Educational Credentials
 
 Universities and certification bodies issue verifiable credentials:
 
@@ -630,7 +857,7 @@ Universities and certification bodies issue verifiable credentials:
 - Micro-credentials for specific skills
 - Instant verification by employers
 
-### 10.4 IoT Device Identity
+### 11.4 IoT Device Identity
 
 Connected devices receive unique, verifiable identities:
 
@@ -639,7 +866,7 @@ Connected devices receive unique, verifiable identities:
 - Supply chain provenance tracking
 - Firmware update verification
 
-### 10.5 Voting and Governance
+### 11.5 Voting and Governance
 
 Organizations implement transparent voting systems:
 
@@ -648,7 +875,7 @@ Organizations implement transparent voting systems:
 - Proof of eligibility without identity disclosure
 - Auditable election results
 
-### 10.6 Digital Asset Provenance
+### 11.6 Digital Asset Provenance
 
 Track ownership and authenticity of digital assets:
 
@@ -659,9 +886,9 @@ Track ownership and authenticity of digital assets:
 
 ---
 
-## 11. Comparison with Existing Solutions
+## 12. Comparison with Existing Solutions
 
-### 11.1 Feature Comparison
+### 12.1 Feature Comparison
 
 | Feature | did:cid (Archon) | did:btc | did:web | did:key |
 |---------|------------------|---------|---------|---------|
@@ -672,8 +899,9 @@ Track ownership and authenticity of digital assets:
 | Finality Options | Multiple | Strong | None | N/A |
 | Credential Support | Full | Limited | Full | Limited |
 | Key Recovery | BIP-39 | Varies | N/A | N/A |
+| Arbitrary Data Storage | Yes (didDocumentData) | No | External only | No |
 
-### 11.2 Architectural Comparison
+### 12.2 Architectural Comparison
 
 **did:btc / did:ion**
 - Requires blockchain transaction for every operation
@@ -697,9 +925,9 @@ Track ownership and authenticity of digital assets:
 
 ---
 
-## 12. Future Directions
+## 13. Future Directions
 
-### 12.1 Protocol Evolution
+### 13.1 Protocol Evolution
 
 **Multi-Signature Support**
 - Threshold signatures for organizational control
@@ -716,7 +944,7 @@ Track ownership and authenticity of digital assets:
 - Interoperability with other DID methods
 - Federated identity across networks
 
-### 12.2 Ecosystem Development
+### 13.2 Ecosystem Development
 
 **Schema Registry**
 - Standardized credential schemas
@@ -728,7 +956,7 @@ Track ownership and authenticity of digital assets:
 - Trust registries for verifier policies
 - Reputation systems for identity providers
 
-### 12.3 Performance Optimization
+### 13.3 Performance Optimization
 
 **Layer 2 Scaling**
 - Batching and rollup techniques
@@ -737,7 +965,7 @@ Track ownership and authenticity of digital assets:
 
 ---
 
-## 13. Conclusion
+## 14. Conclusion
 
 Archon represents a significant advancement in decentralized identity technology. By separating identity creation from updates and supporting multiple registry options, it solves the fundamental tension between decentralization, cost, and speed that has limited previous approaches.
 
@@ -745,9 +973,10 @@ Key innovations include:
 
 1. **Zero-cost, instant identity creation** through IPFS content addressing
 2. **Flexible finality options** via multi-registry architecture
-3. **Full W3C compliance** ensuring ecosystem interoperability
-4. **Comprehensive credential support** for real-world applications
-5. **Enterprise-ready features** including groups, vaults, and organizational management
+3. **The didDocumentData extension** enabling arbitrary application data bound to identities
+4. **Full W3C compliance** ensuring ecosystem interoperability
+5. **Comprehensive credential support** for real-world applications
+6. **Enterprise-ready features** including groups, vaults, and organizational management
 
 The protocol is production-ready, with multiple client implementations (CLI, web, mobile, browser extension), robust cryptographic foundations, and extensive testing. Organizations seeking to implement decentralized identity infrastructure will find Archon provides the flexibility, security, and performance required for diverse use cases.
 
