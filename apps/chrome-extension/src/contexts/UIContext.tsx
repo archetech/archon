@@ -142,7 +142,7 @@ export function UIProvider(
         return a.length === b.length && a.every((v, i) => v === b[i]);
     }
 
-    const refreshInbox = useCallback( async() => {
+    const refreshInbox = useCallback(async () => {
         if (!keymaster) {
             return;
         }
@@ -177,7 +177,7 @@ export function UIProvider(
                     polls.push(name);
                 }
             }
-            catch {}
+            catch { }
         }
 
         setPollList(prevPolls => {
@@ -215,7 +215,7 @@ export function UIProvider(
                 await keymaster.refreshNotices();
                 await refreshPoll();
                 await refreshInbox();
-            } catch {}
+            } catch { }
         }
 
         refresh();
@@ -237,7 +237,7 @@ export function UIProvider(
         const invalid: string[] = [];
 
         if (!keymaster) {
-            return {valid, invalid};
+            return { valid, invalid };
         }
 
         const allIds = await keymaster.listIds();
@@ -250,7 +250,7 @@ export function UIProvider(
             }
         }
 
-        return {valid, invalid};
+        return { valid, invalid };
     }
 
     useEffect(() => {
@@ -340,7 +340,7 @@ export function UIProvider(
             return;
         }
 
-        chrome.runtime.sendMessage({type: "OPEN_BROWSER_WINDOW", options});
+        chrome.runtime.sendMessage({ type: "OPEN_BROWSER_WINDOW", options });
     }
 
     async function setSelectedTab(value: string) {
@@ -383,8 +383,8 @@ export function UIProvider(
             return;
         }
 
-        let nameList : Record<string, string> = {};
-        let unresolvedList : Record<string, string> = {};
+        let nameList: Record<string, string> = {};
+        let unresolvedList: Record<string, string> = {};
         const registryMap: Record<string, string> = {};
 
         const allNames = await keymaster.listNames();
@@ -410,14 +410,14 @@ export function UIProvider(
                 const doc = await keymaster.resolveDID(name);
                 nameList[name] = did;
 
-                const reg = doc.didDocumentRegister?.registry;
+                const reg = doc.didDocumentRegistration?.registry;
                 if (reg) {
                     registryMap[name] = reg;
                 }
 
                 const data = doc.didDocumentData as Record<string, unknown>;
 
-                if (doc.didDocumentRegister?.type === 'agent') {
+                if (doc.didDocumentRegistration?.type === 'agent') {
                     agentList.push(name);
                     continue;
                 }
@@ -509,7 +509,7 @@ export function UIProvider(
             }
             setCurrentDID(docs.didDocument.id);
 
-            const docData = docs.didDocumentData as {manifest?: Record<string, unknown>};
+            const docData = docs.didDocumentData as { manifest?: Record<string, unknown> };
             setManifest(docData.manifest);
         } catch (error: any) {
             setError(error);
@@ -623,7 +623,7 @@ export function UIProvider(
                 await refreshAuthStored(extensionState);
                 await refreshRegistryStored(extensionState);
                 await refreshCredentialsStored(extensionState);
-            } catch {}
+            } catch { }
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -695,7 +695,7 @@ export function UIProvider(
         try {
             const id = await keymaster.fetchIdInfo();
             const docs = await keymaster.resolveDID(id.did);
-            setManifest((docs.didDocumentData as {manifest?: Record<string, unknown>}).manifest);
+            setManifest((docs.didDocumentData as { manifest?: Record<string, unknown> }).manifest);
         } catch (error: any) {
             setError(error);
         }
