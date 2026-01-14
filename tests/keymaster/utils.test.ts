@@ -175,14 +175,14 @@ describe('resolveDID', () => {
 });
 
 describe('updateDID', () => {
-    it('should throw if doc missing id', async () => {
+    it('should throw if invalid id', async () => {
         const doc: DidCidDocument = {};
 
         try {
-            await keymaster.updateDID(doc);
+            await keymaster.updateDID('invalid-did', doc);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toContain('doc.didDocument.id');
+            expect(error.message).toContain('Unknown ID');
         }
     });
 
@@ -195,7 +195,7 @@ describe('updateDID', () => {
         const dataUpdated = { name: 'updated' };
         doc.didDocumentData = dataUpdated;
 
-        const ok = await keymaster.updateDID(doc);
+        const ok = await keymaster.updateDID(dataDid, doc);
         const doc2 = await keymaster.resolveDID(dataDid);
 
         expect(ok).toBe(true);
@@ -203,20 +203,20 @@ describe('updateDID', () => {
         expect(doc2.didDocumentMetadata!.version).toBe("2");
     });
 
-    it('should not update an asset DID if no changes', async () => {
+    it('should update an asset DID even if data is equivalent', async () => {
         await keymaster.createId('Bob');
         const mockAnchor = { name: 'mockAnchor', val: 1234 };
         const dataDid = await keymaster.createAsset(mockAnchor);
         const doc = await keymaster.resolveDID(dataDid);
 
-        // Changing the order should be ignored
+        // Changing the order still results in an update (deduplication is not done in keymaster)
         doc.didDocumentData = { val: 1234, name: 'mockAnchor' };
-        const ok = await keymaster.updateDID(doc);
+        const ok = await keymaster.updateDID(dataDid, doc);
         const doc2 = await keymaster.resolveDID(dataDid);
 
         expect(ok).toBe(true);
         expect(doc2.didDocumentData).toStrictEqual(mockAnchor);
-        expect(doc2.didDocumentMetadata!.version).toBe("1");
+        expect(doc2.didDocumentMetadata!.version).toBe("2");
     });
 
     it('should update an asset DID when owner ID is in the wallet', async () => {
@@ -234,7 +234,7 @@ describe('updateDID', () => {
 
         await keymaster.setCurrentId('Alice');
 
-        const ok = await keymaster.updateDID(doc);
+        const ok = await keymaster.updateDID(dataDid, doc);
         const doc2 = await keymaster.resolveDID(dataDid);
 
         expect(ok).toBe(true);
@@ -259,7 +259,7 @@ describe('updateDID', () => {
         await keymaster.removeId('Bob');
 
         try {
-            await keymaster.updateDID(doc);
+            await keymaster.updateDID(dataDid, doc);
             throw new ExpectedExceptionError();
         } catch (error: any) {
             expect(error.message).toBe('Unknown ID');
