@@ -69,7 +69,7 @@ if {$captured_did eq ""} {
 
 
 # Start the CLI program
-spawn bash -c "kc create-schema-template $captured_did"
+spawn bash -c "archon create-schema-template $captured_did"
 
 # Wait for and capture the full output
 expect {
@@ -116,7 +116,7 @@ set validated_keys {}
 
     # Print out all validation details
     puts "\nValidation Details:"
-    
+
     # Print validated keys first
     foreach detail $validated_keys {
         puts $detail
@@ -158,7 +158,7 @@ foreach {key val} $argv {
 
         # Print result
         puts "Deleted wallet.json!"
-        
+
     } elseif {$key == "--local"} {
         # Delete Wallet
         set script_dir [file dirname [file normalize [info script]]]
@@ -178,7 +178,7 @@ foreach {key val} $argv {
         } else {
             puts "File not found: $abs_filepath"
         }
-        
+
     } elseif {$key == "--ci-redis"} {
         # Run docker exec to delete the file
         set result [exec docker compose exec redis redis-cli flushall]
