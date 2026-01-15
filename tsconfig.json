@@ -34,9 +34,6 @@
       "@didcid/common/utils": [
         "packages/common/src/utils.ts"
       ],
-      "@didcid/inscription": [
-        "packages/inscription/src/inscription.ts"
-      ],
       "@didcid/gatekeeper": [
         "packages/gatekeeper/src/gatekeeper.ts"
       ],
