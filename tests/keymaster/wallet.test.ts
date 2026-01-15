@@ -111,7 +111,7 @@ describe('loadWallet', () => {
         }
     });
 
-    it('should load a v1 encrypted wallet without hdkey', async () => {
+    it('should load a v1 encrypted wallet', async () => {
         await wallet.saveWallet(MOCK_WALLET_V1_ENCRYPTED);
         const res = await keymaster.loadWallet();
         expect(res).toEqual(
@@ -123,10 +123,9 @@ describe('loadWallet', () => {
                 })
             })
         );
-        expect(res.seed?.hdkey).toBeUndefined();
     });
 
-    it('should load a v1 encrypted wallet from cache without hdkey', async () => {
+    it('should load a v1 encrypted wallet from cache', async () => {
         await wallet.saveWallet(MOCK_WALLET_V1_ENCRYPTED);
         // prime cache
         await keymaster.loadWallet();
@@ -141,7 +140,6 @@ describe('loadWallet', () => {
                 })
             })
         );
-        expect(res.seed?.hdkey).toBeUndefined();
     });
 
     it('should throw on unsupported wallet version', async () => {
@@ -256,7 +254,7 @@ describe('saveWallet', () => {
         expect(wallet).toStrictEqual(wallet2);
     });
 
-    it('should encrypt an unencrypted v1 wallet contents and remove hdkey', async () => {
+    it('should encrypt an unencrypted v1 wallet contents', async () => {
         const ok = await keymaster.saveWallet(MOCK_WALLET_V1);
         expect(ok).toBe(true);
 
@@ -292,10 +290,8 @@ describe('saveWallet', () => {
 
 describe('decryptMnemonic', () => {
     it('should return 12 words', async () => {
-        const wallet = await keymaster.loadWallet();
+        await keymaster.loadWallet();
         const mnemonic = await keymaster.decryptMnemonic();
-
-        expect(mnemonic !== wallet.seed!.mnemonic).toBe(true);
 
         // Split the mnemonic into words
         const words = mnemonic.split(' ');

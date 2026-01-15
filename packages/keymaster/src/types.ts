@@ -5,18 +5,8 @@ import {
     ResolveDIDOptions,
 } from '@didcid/gatekeeper/types';
 
-export interface HDKey {
-    xpriv: string;
-    xpub: string;
-}
-
 export interface Seed {
-    /** @deprecated V0 legacy field, no longer supported */
-    mnemonic?: string;
-    /** @deprecated V0 legacy field, no longer supported */
-    hdkey?: HDKey;
-
-    /** V1 passphrase-encrypted mnemonic */
+    /** Passphrase-encrypted mnemonic */
     mnemonicEnc?: {
         salt: string;
         iv: string;
