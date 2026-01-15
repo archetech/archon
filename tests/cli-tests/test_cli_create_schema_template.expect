@@ -69,7 +69,7 @@ if {$captured_did eq ""} {
 
 
 # Start the CLI program
-spawn bash -c "./archon create-schema-template $captured_did"
+spawn bash -c "archon create-schema-template $captured_did"
 
 # Wait for and capture the full output
 expect {
