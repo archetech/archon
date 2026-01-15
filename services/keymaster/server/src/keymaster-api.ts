@@ -11,7 +11,6 @@ import WalletJson from '@didcid/keymaster/wallet/json';
 import WalletRedis from '@didcid/keymaster/wallet/redis';
 import WalletMongo from '@didcid/keymaster/wallet/mongo';
 import WalletSQLite from '@didcid/keymaster/wallet/sqlite';
-import WalletEncrypted from '@didcid/keymaster/wallet/json-enc';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import CipherNode from '@didcid/cipher/node';
 import { InvalidParameterError } from '@didcid/common/errors';
@@ -6124,10 +6123,6 @@ async function initWallet() {
         wallet = new WalletJson();
     } else {
         throw new InvalidParameterError(`db=${config.db}`);
-    }
-
-    if (config.keymasterPassphrase) {
-        wallet = new WalletEncrypted(wallet, config.keymasterPassphrase);
     }
 
     if (config.walletCache) {

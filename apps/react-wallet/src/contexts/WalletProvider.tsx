@@ -15,7 +15,6 @@ import { isV1WithEnc } from '@didcid/keymaster/wallet/typeGuards';
 import SearchClient from "@didcid/keymaster/search";
 import CipherWeb from "@didcid/cipher";
 import WalletWeb from "@didcid/keymaster/wallet/web";
-import WalletWebEncrypted from "@didcid/keymaster/wallet/web-enc";
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 import PassphraseModal from "../modals/PassphraseModal";
 import WarningModal from "../modals/WarningModal";
@@ -144,8 +143,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
 
     async function rebuildKeymaster(passphrase: string) {
-        const walletEnc = new WalletWebEncrypted(walletWeb, passphrase);
-        return await buildKeymaster(walletEnc, passphrase);
+        return await buildKeymaster(walletWeb, passphrase);
     }
 
     async function handlePassphraseSubmit(passphrase: string) {

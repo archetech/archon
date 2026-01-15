@@ -6,7 +6,6 @@ import CipherWeb from '@didcid/cipher/web';
 import Keymaster from '@didcid/keymaster';
 import SearchClient from '@didcid/keymaster/search';
 import WalletWeb from '@didcid/keymaster/wallet/web';
-import WalletWebEncrypted from '@didcid/keymaster/wallet/web-enc';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 import { isV1WithEnc } from '@didcid/keymaster/wallet/typeGuards';

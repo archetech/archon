@@ -5,16 +5,6 @@ import {
     ResolveDIDOptions,
 } from '@didcid/gatekeeper/types';
 
-/**
- * @deprecated V0 encrypted wallet format is no longer supported.
- * This type is kept for reference only.
- */
-export interface EncryptedWallet {
-    salt: string;
-    iv: string;
-    data: string;
-}
-
 export interface HDKey {
     xpriv: string;
     xpub: string;

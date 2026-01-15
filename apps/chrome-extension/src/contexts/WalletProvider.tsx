@@ -16,7 +16,6 @@ import CipherWeb from "@didcid/cipher/web";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
 import { isV1WithEnc } from '@didcid/keymaster/wallet/typeGuards';
 import { StoredWallet, WalletBase } from "@didcid/keymaster/types";
-import WalletWebEncrypted from "@didcid/keymaster/wallet/web-enc";
 import PassphraseModal from "../modals/PassphraseModal";
 import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
@@ -142,8 +141,7 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
     };
 
     async function rebuildKeymaster(passphrase: string) {
-        const walletEnc = new WalletWebEncrypted(walletChrome, passphrase);
-        return await buildKeymaster(walletEnc, passphrase);
+        return await buildKeymaster(walletChrome, passphrase);
     }
 
     async function handlePassphraseSubmit(passphrase: string) {

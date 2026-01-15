@@ -8,7 +8,6 @@ import {
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import WalletEncrypted from '@didcid/keymaster/wallet/json-enc';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
 import { DidCidDocument } from "@didcid/gatekeeper/types";
@@ -96,9 +95,8 @@ describe('loadWallet', () => {
         expect(wallet2).toStrictEqual(wallet1);
     });
 
-    it('should return null when loading non-existing encrypted wallet', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, PASSPHRASE);
-        const check_wallet = await wallet_enc.loadWallet();
+    it('should return null when loading non-existing wallet', async () => {
+        const check_wallet = await wallet.loadWallet();
         expect(check_wallet).toBe(null);
     });
 
@@ -166,9 +164,8 @@ describe('saveWallet', () => {
         expect(ok).toBe(true);
     });
 
-    it('test saving directly on the encrypted wallet', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, PASSPHRASE);
-        const ok = await wallet_enc.saveWallet(MOCK_WALLET_V1);
+    it('test saving directly on the wallet', async () => {
+        const ok = await wallet.saveWallet(MOCK_WALLET_V1);
 
         expect(ok).toBe(true);
     });
@@ -238,9 +235,8 @@ describe('saveWallet', () => {
         expect(walletData).toStrictEqual(MOCK_WALLET_V1);
     });
 
-    it('encrypted wallet should return unencrypted wallet', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, PASSPHRASE);
-        const keymaster = new Keymaster({ gatekeeper, wallet: wallet_enc, cipher, passphrase: PASSPHRASE });
+    it('wallet should return unencrypted wallet', async () => {
+        const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
         const testWallet = await keymaster.loadWallet();
         const expectedWallet = await keymaster.loadWallet();
 
@@ -674,18 +670,6 @@ describe('fixWallet', () => {
         expect(ownedRemoved).toBe(0);
         expect(heldRemoved).toBe(2);
         expect(namesRemoved).toBe(2);
-    });
-});
-
-describe('WalletEncrypted', () => {
-    it('returns the plain wallet when base wallet is not encrypted', async () => {
-        const base = new WalletJsonMemory();
-        const plain: WalletFile = { seed: {} as Seed, counter: 42, ids: {}, names: { foo: 'did:cid:abc' } };
-        await base.saveWallet(plain, true);
-        const wrapped = new WalletEncrypted(base, PASSPHRASE);
-        const loaded = await wrapped.loadWallet();
-
-        expect(loaded).toStrictEqual(plain);
     });
 });
 
