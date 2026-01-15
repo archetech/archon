@@ -165,8 +165,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                     return;
                 }
             }
-        } else if (!pendingMnemonic) {
-        }
+        } 
 
         await rebuildKeymaster(passphrase);
     }
