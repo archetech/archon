@@ -10,9 +10,9 @@ set logfile "kc_help_output.log"
 # Enable logging to file
 log_file -noappend $logfile
 
-# Run the kc help command
+# Run the archon help command
 puts "Running 'kc help' command..."
-spawn kc help
+spawn bash archon help
 
 # Wait for completion
 expect eof
@@ -26,9 +26,9 @@ set output [read $fp]
 close $fp
 
 # Define the reference content (exactly as expected)
-set reference {Usage: keychain-cli [options] [command]
+set reference {Usage: archon-cli [options] [command]
 
-Keychain CLI tool
+Archon CLI tool
 
 Options:
   -V, --version                            output the version number
@@ -125,7 +125,7 @@ Commands:
 
 # Clean up the output (remove spawn line, ANSI codes, and normalize whitespace)
 # First remove the spawn line
-regsub {^spawn kc help\r?\n} $output "" output
+regsub {^spawn bash archon help\r?\n} $output "" output
 # Remove ANSI escape sequences
 regsub -all {\x1b\[[0-9;]*[mK]} $output "" output
 # Normalize CR/LF
