@@ -87,25 +87,7 @@ Archon's fundamental insight is that DID creation and DID updates have fundament
 
 By separating these concerns, Archon achieves optimal characteristics for each:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ARCHON IDENTITY LIFECYCLE                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   CREATION (IPFS/CAS)              UPDATES (Registry)          │
-│   ─────────────────────            ──────────────────────       │
-│   • Instant (<10 seconds)          • Ordered by registry        │
-│   • Zero cost                      • Cryptographically signed   │
-│   • Content-addressed              • Consensus-verified         │
-│   • Globally available             • Auditable history          │
-│   • No gatekeepers                 • Finality guarantees        │
-│                                                                 │
-│         DID = did:cid:<IPFS-CID>                               │
-│                    ↓                                            │
-│         Immediate use, updates via chosen registry              │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Archon Identity Lifecycle](images/archon-identity-lifecycle.png)
 
 ### 3.2 Multi-Registry Architecture
 
@@ -134,43 +116,7 @@ Archon implements the full W3C DID specification, ensuring interoperability with
 
 ### 4.1 System Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         ARCHON NODE                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   ┌─────────────────────────────────────────────────────────┐  │
-│   │                     GATEKEEPER                          │  │
-│   │            (DID Database & Validation Core)             │  │
-│   │                                                         │  │
-│   │  • Maintains local DID database                         │  │
-│   │  • Validates all incoming operations                    │  │
-│   │  • Manages registry-specific operation queues           │  │
-│   │  • Provides REST API for DID operations                 │  │
-│   └─────────────────────────────────────────────────────────┘  │
-│                              ↑                                  │
-│              ┌───────────────┼───────────────┐                 │
-│              ↓               ↓               ↓                 │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
-│   │   KEYMASTER  │  │  MEDIATORS   │  │   CLIENTS    │        │
-│   │   (Wallet)   │  │              │  │              │        │
-│   │              │  │ • Hyperswarm │  │ • CLI        │        │
-│   │ • HD Keys    │  │ • Satoshi    │  │ • Web Wallet │        │
-│   │ • Signing    │  │ • Inscript.  │  │ • Mobile     │        │
-│   │ • Encryption │  │              │  │ • Extension  │        │
-│   └──────────────┘  └──────────────┘  └──────────────┘        │
-│                              ↓                                  │
-│   ┌─────────────────────────────────────────────────────────┐  │
-│   │                    NETWORK LAYER                        │  │
-│   │                                                         │  │
-│   │  ┌─────────┐  ┌─────────────┐  ┌──────────────────┐    │  │
-│   │  │  IPFS   │  │  P2P (Hypr) │  │   Blockchains    │    │  │
-│   │  │  (CAS)  │  │  (Gossip)   │  │  (BTC/FTC/etc.)  │    │  │
-│   │  └─────────┘  └─────────────┘  └──────────────────────┘    │  │
-│   └─────────────────────────────────────────────────────────┘  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Archon Node Architecture](images/archon-node.png)
 
 ### 4.2 Core Components
 
@@ -203,21 +149,7 @@ Mediators synchronize DID operations across network boundaries:
 
 ### 4.3 Data Flow
 
-```
-┌──────────┐     ┌───────────┐     ┌────────────┐     ┌──────────┐
-│  Client  │────>│ Keymaster │────>│ Gatekeeper │────>│ Registry │
-│          │     │           │     │            │     │          │
-│ Request  │     │ Sign Op   │     │ Validate   │     │ Confirm  │
-│ Identity │     │ Create Op │     │ Queue Op   │     │ Order Op │
-└──────────┘     └───────────┘     └────────────┘     └──────────┘
-                                          ↓
-                                   ┌────────────┐
-                                   │    IPFS    │
-                                   │            │
-                                   │ Store Op   │
-                                   │ Return CID │
-                                   └────────────┘
-```
+![Data Flow](images/data-flow.png)
 
 ---
 
@@ -349,35 +281,7 @@ One of Archon's most powerful innovations is the `didDocumentData` field—an ex
 
 The W3C DID specification states that DID methods may add custom properties beyond the core specification, provided they support lossless conversion between representations. Archon leverages this extensibility to introduce `didDocumentData`: a flexible, schema-free container for application-specific data that travels with the DID throughout its lifecycle.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ARCHON DOCUMENT SET                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   ┌─────────────────────────────────────────────────────────┐  │
-│   │  didDocument (W3C Standard)                             │  │
-│   │  • Verification methods, authentication, services       │  │
-│   └─────────────────────────────────────────────────────────┘  │
-│                                                                 │
-│   ┌─────────────────────────────────────────────────────────┐  │
-│   │  didDocumentMetadata (W3C Standard)                     │  │
-│   │  • Created, updated, deactivated, versionId             │  │
-│   └─────────────────────────────────────────────────────────┘  │
-│                                                                 │
-│   ┌─────────────────────────────────────────────────────────┐  │
-│   │  didDocumentData (Archon Extension)                     │  │
-│   │  • Arbitrary JSON data bound to the DID                 │  │
-│   │  • Cryptographically signed and versioned               │  │
-│   │  • Supports any application use case                    │  │
-│   └─────────────────────────────────────────────────────────┘  │
-│                                                                 │
-│   ┌─────────────────────────────────────────────────────────┐  │
-│   │  didDocumentRegistration (Archon Extension)             │  │
-│   │  • Registry, type (agent/asset), protocol version       │  │
-│   └─────────────────────────────────────────────────────────┘  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Archon Document Set](images/archon-document-set.png)
 
 ### 6.2 Design Philosophy
 
@@ -573,26 +477,7 @@ The `didDocumentData` approach provides the best combination: decentralized stor
 
 Archon's registry system provides a unified interface across different consensus mechanisms:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      REGISTRY INTERFACE                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   queue(operation)    → Add operation to confirmation queue     │
-│   confirm(operation)  → Mark operation as confirmed             │
-│   getOperations(did)  → Retrieve all operations for a DID       │
-│   getOrdinal(op)      → Get ordering key for operation          │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-            ↓                    ↓                    ↓
-    ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-    │  Hyperswarm  │     │   Bitcoin    │     │  Feathercoin │
-    │              │     │              │     │              │
-    │  Gossip-     │     │  OP_RETURN   │     │  OP_RETURN   │
-    │  based       │     │  Anchoring   │     │  Anchoring   │
-    │  ordering    │     │              │     │              │
-    └──────────────┘     └──────────────┘     └──────────────┘
-```
+![Registry Interface](images/registry-interface.png)
 
 ### 7.2 Hyperswarm Registry
 
@@ -641,30 +526,7 @@ One of Archon's most powerful features is automatic cryptographic timestamping f
 
 #### How Timestamping Works
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    TIMESTAMP BOUNDS                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   LOWER BOUND (optional)          UPPER BOUND (confirmed)       │
-│   ───────────────────────         ─────────────────────────     │
-│   Block referenced in the         Block containing the          │
-│   operation's blockid field       anchored operation            │
-│                                                                 │
-│   "This operation was created     "This operation was           │
-│    after this block existed"       confirmed at this time"      │
-│                                                                 │
-│   ┌─────────────┐                 ┌─────────────┐               │
-│   │ Block #800  │ ──────────────> │ Block #805  │               │
-│   │ 2024-01-10  │    Operation    │ 2024-01-10  │               │
-│   │ 12:00:00    │    Created      │ 12:50:00    │               │
-│   └─────────────┘                 └─────────────┘               │
-│         ↑                               ↑                       │
-│   Lower Bound                     Upper Bound                   │
-│   (reference point)               (confirmation)                │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Timestamp Bounds](images/timestamp-bounds.png)
 
 When resolving a DID, the `didDocumentMetadata` includes timestamp information:
 
@@ -795,15 +657,7 @@ resolveDID(did, { versionId: "bafkrei..." })
 
 Every DID operation includes a `previd` field linking to the previous operation, creating an immutable chain:
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Version 1  │────>│  Version 2  │────>│  Version 3  │
-│  (Create)   │     │  (Update)   │     │  (Update)   │
-│             │     │             │     │             │
-│ previd: ∅   │     │ previd: v1  │     │ previd: v2  │
-│ time: T1    │     │ time: T2    │     │ time: T3    │
-└─────────────┘     └─────────────┘     └─────────────┘
-```
+![Time-Travel Resolution](images/time-travel-resolution.png)
 
 The resolver walks this chain, applying operations up to the requested time/version, then returns the reconstructed document state.
 
@@ -817,24 +671,7 @@ The resolver walks this chain, applying operations up to the requested time/vers
 
 Archon includes a complete decentralized email system built on top of the DID infrastructure:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        D-MAIL SYSTEM                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   SENDER                          RECIPIENT                     │
-│   ──────                          ─────────                     │
-│   1. Compose message              4. Refresh notices            │
-│   2. Encrypt for recipient        5. Import dmail               │
-│   3. Create notice asset          6. Decrypt message            │
-│                                   7. File in folder             │
-│                                                                 │
-│   Message stored as encrypted asset DID                         │
-│   Notice points recipient to the message                        │
-│   Both sender and recipient retain encrypted copies             │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+![D-Mail System](images/dmail-system.png)
 
 **Features:**
 - **Folder organization**: INBOX, SENT, DRAFT, ARCHIVED, DELETED
@@ -958,19 +795,7 @@ Archon supports multi-party encrypted storage where members can share data witho
 
 Archon provides a flexible challenge-response system for authentication and authorization:
 
-```
-┌──────────────┐                    ┌──────────────┐
-│   VERIFIER   │                    │    PROVER    │
-│              │                    │              │
-│ 1. Create    │    Challenge       │              │
-│    challenge │ ─────────────────> │ 2. Receive   │
-│              │                    │    challenge │
-│              │                    │              │
-│              │    Response (VP)   │ 3. Create    │
-│ 4. Verify    │ <───────────────── │    response  │
-│    response  │                    │              │
-└──────────────┘                    └──────────────┘
-```
+![Challenge-Response Authentication](images/challenge-response.png)
 
 **Challenge Types:**
 
@@ -1010,22 +835,7 @@ Archon provides a flexible challenge-response system for authentication and auth
 
 Archon supports secure key rotation without changing the DID:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      KEY ROTATION                                │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   Before Rotation          After Rotation                       │
-│   ───────────────          ──────────────                       │
-│   DID: did:cid:abc...      DID: did:cid:abc... (unchanged)     │
-│   Key: #key-1              Key: #key-2                          │
-│                                                                 │
-│   The DID remains constant, but the controlling key changes.    │
-│   Old signatures remain valid for historical verification.      │
-│   New operations must use the new key.                          │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Key Rotation](images/key-rotation.png)
 
 **Security Properties:**
 - Old keys cannot sign new operations (enforced by `previd` chain)
@@ -1068,15 +878,7 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 
 ### 9.2 Credential Lifecycle
 
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│  ISSUER  │────>│  HOLDER  │────>│ VERIFIER │     │ REVOKE   │
-│          │     │          │     │          │     │          │
-│ Create   │     │ Accept   │     │ Verify   │     │ Issuer   │
-│ Sign     │     │ Store    │     │ Validate │     │ Revokes  │
-│ Issue    │     │ Present  │     │ Trust    │     │          │
-└──────────┘     └──────────┘     └──────────┘     └──────────┘
-```
+![Credential Lifecycle](images/credential-lifecycle.png)
 
 ### 9.3 Privacy Features
 
@@ -1185,33 +987,7 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 
 ### 11.3 Synchronization
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    SYNCHRONIZATION FLOW                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Node A                              Node B                     │
-│    │                                   │                        │
-│    │──── Hyperswarm announce ─────────>│                        │
-│    │<─── Peer connection ──────────────│                        │
-│    │                                   │                        │
-│    │──── New operation (gossip) ──────>│                        │
-│    │                                   │                        │
-│    │                          ┌────────┴────────┐              │
-│    │                          │ Validate & Store │              │
-│    │                          └────────┬────────┘              │
-│    │                                   │                        │
-│    │<─── Acknowledgment ───────────────│                        │
-│    │                                   │                        │
-│                                                                 │
-│  Blockchain (background)                                        │
-│    │                                                            │
-│    │──── Poll for new blocks ─────────────────────────────────>│
-│    │                                                            │
-│    │<─── Import confirmed operations ──────────────────────────│
-│    │                                                            │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Synchronization Flow](images/synchronization-flow.png)
 
 ---
 
