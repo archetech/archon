@@ -49,8 +49,8 @@ import {
     Seed,
 } from '@didcid/keymaster/types';
 import {
-    isV1WithEnc,
-    isV1Decrypted
+    isWalletEncFile,
+    isWalletFile
 } from './db/typeGuards.js';
 import {
     Cipher,
@@ -541,7 +541,7 @@ export default class Keymaster implements KeymasterInterface {
             const backup = this.cipher.decryptMessage(keypair.publicJwk, keypair.privateJwk, castData.backup);
             let wallet = JSON.parse(backup);
 
-            if (isV1Decrypted(wallet)) {
+            if (isWalletFile(wallet)) {
                 const mnemonic = await this.decryptMnemonic();
                 // Backup might have a different mnemonic passphase so re-encrypt
                 wallet.seed.mnemonicEnc = await encMnemonic(mnemonic, this.passphrase);
@@ -558,7 +558,7 @@ export default class Keymaster implements KeymasterInterface {
                 wallet = await this.upgradeWallet(wallet);
 
                 // Decrypt the wallet if needed
-                wallet = isV1WithEnc(wallet) ? await this.decryptWalletFromStorage(wallet) : wallet;
+                wallet = isWalletEncFile(wallet) ? await this.decryptWalletFromStorage(wallet) : wallet;
 
                 // Copy all properties from the recovered wallet into the cleared current wallet
                 // This effectively replaces the current wallet with the recovered one
@@ -3617,11 +3617,11 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     private async decryptWallet(wallet: WalletFile): Promise<WalletFile> {
-        if (isV1WithEnc(wallet)) {
+        if (isWalletEncFile(wallet)) {
             wallet = await this.decryptWalletFromStorage(wallet);
         }
 
-        if (!isV1Decrypted(wallet)) {
+        if (!isWalletFile(wallet)) {
             throw new KeymasterError("Unsupported wallet version.");
         }
 
@@ -3629,7 +3629,7 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     private async encryptWallet(wallet: WalletFile): Promise<WalletEncFile> {
-        if (isV1Decrypted(wallet)) {
+        if (isWalletFile(wallet)) {
             return this.encryptWalletForStorage(wallet);
         }
         return wallet;

@@ -8,7 +8,7 @@ import SearchClient from '@didcid/keymaster/search';
 import WalletWeb from '@didcid/keymaster/wallet/web';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
-import { isV1WithEnc } from '@didcid/keymaster/wallet/typeGuards';
+import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
 import KeymasterUI from './KeymasterUI.js';
 import PassphraseModal from './PassphraseModal';
 import WarningModal from './WarningModal';
@@ -147,7 +147,7 @@ function App() {
     async function handleWalletUploadFile(uploaded) {
         setPendingWallet(uploaded);
 
-        if (isV1WithEnc(uploaded)) {
+        if (isWalletEncFile(uploaded)) {
             setUploadAction('upload-enc-v1');
             setModalAction('decrypt');
         } else {
@@ -165,11 +165,11 @@ function App() {
         setMnemonicErrorText("");
         try {
             const walletWeb = new WalletWeb();
-            let stored = pendingWallet && isV1WithEnc(pendingWallet)
+            let stored = pendingWallet && isWalletEncFile(pendingWallet)
                 ? pendingWallet
                 : await walletWeb.loadWallet();
 
-            if (!isV1WithEnc(stored)) {
+            if (!isWalletEncFile(stored)) {
                 setMnemonicErrorText('Recovery not available for this wallet type.');
                 return;
             }
@@ -192,11 +192,11 @@ function App() {
         }
         try {
             const walletWeb = new WalletWeb();
-            const base = pendingWallet && isV1WithEnc(pendingWallet)
+            const base = pendingWallet && isWalletEncFile(pendingWallet)
                 ? pendingWallet
                 : await walletWeb.loadWallet();
 
-            if (!isV1WithEnc(base)) {
+            if (!isWalletEncFile(base)) {
                 setPassphraseErrorText('Recovery not available for this wallet type.');
                 return;
             }

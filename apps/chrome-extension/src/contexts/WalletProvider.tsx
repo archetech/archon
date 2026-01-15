@@ -14,7 +14,7 @@ import Keymaster from "@didcid/keymaster";
 import SearchClient from "@didcid/keymaster/search";
 import CipherWeb from "@didcid/cipher/web";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
-import { isV1WithEnc } from '@didcid/keymaster/wallet/typeGuards';
+import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
 import { StoredWallet, WalletBase } from "@didcid/keymaster/types";
 import PassphraseModal from "../modals/PassphraseModal";
 import WarningModal from "../modals/WarningModal";
@@ -196,7 +196,7 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
     async function handleWalletUploadFile(uploaded: unknown) {
         setPendingWallet(uploaded);
 
-        if (isV1WithEnc(uploaded)) {
+        if (isWalletEncFile(uploaded)) {
             setUploadAction('upload-enc-v1');
             setModalAction('decrypt');
         } else {
@@ -246,11 +246,11 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
         setMnemonicErrorText("");
         try {
             const walletWeb = new WalletChrome();
-            let stored = pendingWallet && isV1WithEnc(pendingWallet)
+            let stored = pendingWallet && isWalletEncFile(pendingWallet)
                 ? pendingWallet
                 : await walletWeb.loadWallet();
 
-            if (!isV1WithEnc(stored)) {
+            if (!isWalletEncFile(stored)) {
                 setMnemonicErrorText('Recovery not available for this wallet type.');
                 return;
             }
@@ -273,11 +273,11 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
         }
         try {
             const walletWeb = new WalletChrome();
-            const base = pendingWallet && isV1WithEnc(pendingWallet)
+            const base = pendingWallet && isWalletEncFile(pendingWallet)
                 ? pendingWallet
                 : await walletWeb.loadWallet();
 
-            if (!isV1WithEnc(base)) {
+            if (!isWalletEncFile(base)) {
                 setPassphraseErrorText('Recovery not available for this wallet type.');
                 return;
             }

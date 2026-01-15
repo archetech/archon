@@ -11,7 +11,7 @@ import {
 import GatekeeperClient from "@didcid/gatekeeper/client";
 import Keymaster from "@didcid/keymaster";
 import { WalletBase, StoredWallet } from '@didcid/keymaster/types';
-import { isV1WithEnc } from '@didcid/keymaster/wallet/typeGuards';
+import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
 import SearchClient from "@didcid/keymaster/search";
 import CipherWeb from "@didcid/cipher";
 import WalletWeb from "@didcid/keymaster/wallet/web";
@@ -226,7 +226,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     async function handleWalletUploadFile(uploaded: unknown) {
         setPendingWallet(uploaded);
 
-        if (isV1WithEnc(uploaded)) {
+        if (isWalletEncFile(uploaded)) {
             setUploadAction('upload-enc-v1');
             setModalAction('decrypt');
         } else {
@@ -276,11 +276,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setMnemonicErrorText("");
         try {
             const walletWeb = new WalletWeb();
-            let stored = pendingWallet && isV1WithEnc(pendingWallet)
+            let stored = pendingWallet && isWalletEncFile(pendingWallet)
                 ? pendingWallet
                 : await walletWeb.loadWallet();
 
-            if (!isV1WithEnc(stored)) {
+            if (!isWalletEncFile(stored)) {
                 setMnemonicErrorText('Recovery not available for this wallet type.');
                 return;
             }
@@ -303,11 +303,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
         try {
             const walletWeb = new WalletWeb();
-            const base = pendingWallet && isV1WithEnc(pendingWallet)
+            const base = pendingWallet && isWalletEncFile(pendingWallet)
                 ? pendingWallet
                 : await walletWeb.loadWallet();
 
-            if (!isV1WithEnc(base)) {
+            if (!isWalletEncFile(base)) {
                 setPassphraseErrorText('Recovery not available for this wallet type.');
                 return;
             }
