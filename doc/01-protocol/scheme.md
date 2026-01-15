@@ -215,7 +215,7 @@ To revoke a DID, the Archon client must sign and submit a `delete` operation to 
     1. `previd` the CID of the previous operation
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key of the controller of the DID
-1. Submit the operation to the Archon node. For example, with a REST API, post the operation using the `DELETE` method to the Archon node's endpoint to update DIDs (e.g. `/api/v1/did/`)
+1. Submit the operation to the Archon node. For example, with a REST API, post the operation to the Archon node's DID endpoint (e.g. `POST /api/v1/did/`)
 
 
 Example deletion operation:
