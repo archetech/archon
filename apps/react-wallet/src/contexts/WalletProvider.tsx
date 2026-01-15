@@ -11,7 +11,7 @@ import {
 import GatekeeperClient from "@didcid/gatekeeper/client";
 import Keymaster from "@didcid/keymaster";
 import { WalletBase, StoredWallet } from '@didcid/keymaster/types';
-import { isEncryptedWallet, isV1WithEnc, isLegacyV0 } from '@didcid/keymaster/wallet/typeGuards';
+import { isV1WithEnc } from '@didcid/keymaster/wallet/typeGuards';
 import SearchClient from "@didcid/keymaster/search";
 import CipherWeb from "@didcid/cipher";
 import WalletWeb from "@didcid/keymaster/wallet/web";
@@ -61,7 +61,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const [pendingMnemonic, setPendingMnemonic] = useState<string>("");
     const [pendingWallet, setPendingWallet] = useState<unknown>(null);
     const [modalAction, setModalAction] = useState<null | "decrypt" | "set-passphrase">(null);
-    const [uploadAction, setUploadAction] = useState<null | "upload-plain-v0" | "upload-enc-v0" | "upload-enc-v1">(null);
+    const [uploadAction, setUploadAction] = useState<null | "upload-enc-v1">(null);
     const [isReady, setIsReady] = useState<boolean>(false);
     const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
     const [showResetSetup, setShowResetSetup] = useState<boolean>(false);
@@ -97,7 +97,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             clearSessionPassphrase();
         }
 
-        if (!walletData || pendingMnemonic || isLegacyV0(walletData)) {
+        if (!walletData || pendingMnemonic) {
             // eslint-disable-next-line sonarjs/no-duplicate-string
             setModalAction('set-passphrase');
         } else {
@@ -115,7 +115,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
-        const instance = new Keymaster({gatekeeper, wallet, cipher, search, passphrase});
+        const instance = new Keymaster({ gatekeeper, wallet, cipher, search, passphrase });
 
         if (pendingMnemonic) {
             await instance.newWallet(pendingMnemonic, true);
@@ -158,37 +158,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 await walletMemory.saveWallet(pendingWallet as StoredWallet, true);
 
                 try {
-                    if (uploadAction === 'upload-enc-v0') {
-                        const walletEnc = new WalletWebEncrypted(walletMemory, passphrase);
-                        // check pass & remove encyption wrapper
-                        const decrypted = await walletEnc.loadWallet();
-                        await walletWeb.saveWallet(decrypted, true);
-                    } else { // upload-enc-v1
-                        const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search, passphrase });
-                        // check pass
-                        await km.loadWallet();
-                        await walletWeb.saveWallet(pendingWallet as StoredWallet, true);
-                    }
+                    const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search, passphrase });
+                    // check pass
+                    await km.loadWallet();
+                    await walletWeb.saveWallet(pendingWallet as StoredWallet, true);
                 } catch {
                     setPassphraseErrorText(INCORRECT_PASSPHRASE);
                     return;
                 }
-            } else { // upload-plain-v0
-                await walletWeb.saveWallet(pendingWallet as StoredWallet, true);
             }
         } else if (!pendingMnemonic) {
-            const wallet = await walletWeb.loadWallet();
-            if (isEncryptedWallet(wallet)) {
-                try {
-                    const walletEnc = new WalletWebEncrypted(walletWeb, passphrase);
-                    // check pass & remove encyption wrapper
-                    const decrypted = await walletEnc.loadWallet();
-                    await walletWeb.saveWallet(decrypted, true);
-                } catch {
-                    setPassphraseErrorText(INCORRECT_PASSPHRASE);
-                    return;
-                }
-            }
         }
 
         await rebuildKeymaster(passphrase);
@@ -252,14 +231,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     async function handleWalletUploadFile(uploaded: unknown) {
         setPendingWallet(uploaded);
 
-        if (isLegacyV0(uploaded)) {
-            setUploadAction('upload-plain-v0');
-            setModalAction('set-passphrase');
-        } else if (isV1WithEnc(uploaded)) {
+        if (isV1WithEnc(uploaded)) {
             setUploadAction('upload-enc-v1');
-            setModalAction('decrypt');
-        } else if (isEncryptedWallet(uploaded)) {
-            setUploadAction('upload-enc-v0');
             setModalAction('decrypt');
         } else {
             window.alert('Unsupported wallet type');
@@ -387,7 +360,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 onStartReset={handleStartReset}
                 onStartRecover={
                     modalAction === 'decrypt' &&
-                    (uploadAction === null || uploadAction === 'upload-enc-v1')
+                        (uploadAction === null || uploadAction === 'upload-enc-v1')
                         ? handleStartRecover
                         : undefined
                 }

@@ -9,7 +9,7 @@ import WalletWeb from '@didcid/keymaster/wallet/web';
 import WalletWebEncrypted from '@didcid/keymaster/wallet/web-enc';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
-import { isEncryptedWallet, isV1WithEnc, isLegacyV0 } from '@didcid/keymaster/wallet/typeGuards';
+import { isV1WithEnc } from '@didcid/keymaster/wallet/typeGuards';
 import KeymasterUI from './KeymasterUI.js';
 import PassphraseModal from './PassphraseModal';
 import WarningModal from './WarningModal';
@@ -47,7 +47,7 @@ function App() {
             const walletWeb = new WalletWeb();
             const walletData = await walletWeb.loadWallet();
 
-            if (!walletData || isLegacyV0(walletData)) {
+            if (!walletData) {
                 setModalAction('set-passphrase');
             } else {
                 setModalAction('decrypt');
@@ -57,7 +57,7 @@ function App() {
     }, []);
 
     const buildKeymaster = async (wallet, passphrase) => {
-        const instance = new Keymaster({gatekeeper, wallet, cipher, search, passphrase});
+        const instance = new Keymaster({ gatekeeper, wallet, cipher, search, passphrase });
 
         try {
             // check pass & convert to v1 if needed
@@ -93,32 +93,10 @@ function App() {
                 await walletMemory.saveWallet(pendingWallet, true);
 
                 try {
-                    if (uploadAction === 'upload-enc-v0') {
-                        const walletEnc = new WalletWebEncrypted(walletMemory, passphrase);
-                        // check pass & remove encyption wrapper
-                        const decrypted = await walletEnc.loadWallet();
-                        await walletWeb.saveWallet(decrypted, true);
-                    } else { // upload-enc-v1
-                        const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search, passphrase });
-                        // check pass
-                        await km.loadWallet();
-                        await walletWeb.saveWallet(pendingWallet, true);
-                    }
-                } catch {
-                    setPassphraseErrorText('Incorrect passphrase');
-                    return;
-                }
-            } else { // upload-plain-v0
-                await walletWeb.saveWallet(pendingWallet, true);
-            }
-        } else {
-            const wallet = await walletWeb.loadWallet();
-            if (isEncryptedWallet(wallet)) {
-                try {
-                    const walletEnc = new WalletWebEncrypted(walletWeb, passphrase);
-                    // check pass & remove encyption wrapper
-                    const decrypted = await walletEnc.loadWallet();
-                    await walletWeb.saveWallet(decrypted, true);
+                    const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search, passphrase });
+                    // check pass
+                    await km.loadWallet();
+                    await walletWeb.saveWallet(pendingWallet, true);
                 } catch {
                     setPassphraseErrorText('Incorrect passphrase');
                     return;
@@ -128,7 +106,7 @@ function App() {
 
         await rebuildKeymaster(passphrase);
     }
-    
+
     function handleStartReset() {
         setPassphraseErrorText("");
         setShowResetConfirm(true);
@@ -170,14 +148,8 @@ function App() {
     async function handleWalletUploadFile(uploaded) {
         setPendingWallet(uploaded);
 
-        if (isLegacyV0(uploaded)) {
-            setUploadAction('upload-plain-v0');
-            setModalAction('set-passphrase');
-        } else if (isV1WithEnc(uploaded)) {
+        if (isV1WithEnc(uploaded)) {
             setUploadAction('upload-enc-v1');
-            setModalAction('decrypt');
-        } else if (isEncryptedWallet(uploaded)) {
-            setUploadAction('upload-enc-v0');
             setModalAction('decrypt');
         } else {
             window.alert('Unsupported wallet type');
@@ -261,7 +233,7 @@ function App() {
                 onStartReset={handleStartReset}
                 onStartRecover={
                     modalAction === 'decrypt' &&
-                    (uploadAction === null || uploadAction === 'upload-enc-v1')
+                        (uploadAction === null || uploadAction === 'upload-enc-v1')
                         ? handleStartRecover
                         : undefined
                 }

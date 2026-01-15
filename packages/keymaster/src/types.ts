@@ -5,6 +5,10 @@ import {
     ResolveDIDOptions,
 } from '@didcid/gatekeeper/types';
 
+/**
+ * @deprecated V0 encrypted wallet format is no longer supported.
+ * This type is kept for reference only.
+ */
 export interface EncryptedWallet {
     salt: string;
     iv: string;
@@ -17,11 +21,12 @@ export interface HDKey {
 }
 
 export interface Seed {
-    // v0 legacy
+    /** @deprecated V0 legacy field, no longer supported */
     mnemonic?: string;
+    /** @deprecated V0 legacy field, no longer supported */
     hdkey?: HDKey;
 
-    // v1 (passphrase-encrypted mnemonic)
+    /** V1 passphrase-encrypted mnemonic */
     mnemonicEnc?: {
         salt: string;
         iv: string;
@@ -226,7 +231,7 @@ export interface GroupVaultLogin {
     password: string;
 }
 
-export type StoredWallet = EncryptedWallet | WalletFile | WalletEncFile | null;
+export type StoredWallet = WalletFile | WalletEncFile | null;
 
 export interface WalletBase {
     saveWallet(wallet: StoredWallet, overwrite?: boolean): Promise<boolean>;

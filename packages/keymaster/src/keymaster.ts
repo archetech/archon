@@ -50,9 +50,7 @@ import {
 } from '@didcid/keymaster/types';
 import {
     isV1WithEnc,
-    isV1Decrypted,
-    isLegacyV0,
-    isEncryptedWallet
+    isV1Decrypted
 } from './db/typeGuards.js';
 import {
     Cipher,
@@ -3638,23 +3636,6 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     private async upgradeWallet(wallet: any): Promise<WalletFile> {
-        if (isEncryptedWallet(wallet)) {
-            await this.db.saveWallet(wallet, true);
-            wallet = await this.db.loadWallet();
-        }
-
-        if (isLegacyV0(wallet)) {
-            const hdkey = this.cipher.generateHDKeyJSON(wallet.seed.hdkey!);
-            const keypair = this.cipher.generateJwk(hdkey.privateKey!);
-            const plaintext = this.cipher.decryptMessage(keypair.publicJwk, keypair.privateJwk, wallet.seed.mnemonic!);
-            const mnemonicEnc = await encMnemonic(plaintext, this.passphrase);
-            const { seed: _legacySeed, version: _legacyVersion, ...rest } = wallet;
-            const newWallet = { version: 1, seed: { mnemonicEnc }, ...rest };
-            this._hdkeyCache = this.cipher.generateHDKey(plaintext);
-            wallet = await this.encryptWallet(newWallet);
-            await this.db.saveWallet(wallet, true);
-        }
-
         if (wallet.version !== 1) {
             throw new KeymasterError("Unsupported wallet version.");
         }
