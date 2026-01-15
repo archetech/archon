@@ -151,21 +151,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
         const walletMemory = new WalletJsonMemory();
 
-        if (uploadAction && pendingWallet) {
-            if (modalAction === 'decrypt') {
-                await walletMemory.saveWallet(pendingWallet as StoredWallet, true);
+        if (uploadAction && pendingWallet && modalAction === 'decrypt') {
+            await walletMemory.saveWallet(pendingWallet as StoredWallet, true);
 
-                try {
-                    const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search, passphrase });
-                    // check pass
-                    await km.loadWallet();
-                    await walletWeb.saveWallet(pendingWallet as StoredWallet, true);
-                } catch {
-                    setPassphraseErrorText(INCORRECT_PASSPHRASE);
-                    return;
-                }
+            try {
+                const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search, passphrase });
+                // check pass
+                await km.loadWallet();
+                await walletWeb.saveWallet(pendingWallet as StoredWallet, true);
+            } catch {
+                setPassphraseErrorText(INCORRECT_PASSPHRASE);
+                return;
             }
-        } 
+        }
 
         await rebuildKeymaster(passphrase);
     }

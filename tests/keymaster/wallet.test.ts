@@ -1,10 +1,6 @@
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
-import { WalletEncFile } from '@didcid/keymaster/types';
-import {
-    Seed,
-    WalletFile,
-} from '@didcid/keymaster/types';
+import { WalletEncFile, WalletFile } from '@didcid/keymaster/types';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
