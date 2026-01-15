@@ -45,6 +45,19 @@ if {$captured_did eq ""} {
 # Use the captured value in another function call
 spawn bash archon add-name qa $captured_did
 
+expect {
+    "OK" {
+        send_user "\n✅ Name added successfully!\n"
+    }
+    timeout {
+        send_user "\n❌ Timeout adding name.\n"
+        exit 1
+    }
+    eof {
+        send_user "\n❌ End of file reached without finding OK\n"
+        exit 1
+    }
+}
 
 # Check List
 spawn bash archon list-names

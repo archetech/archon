@@ -6,7 +6,7 @@ echo $ARCHON_GATEKEEPER_URL
 
 docker compose down
 docker compose build cli gatekeeper keymaster ipfs redis mongodb
-docker compose up -d "$@"
+docker compose up -d cli
 
 echo "Waiting for all services to be 'Up'..."
 

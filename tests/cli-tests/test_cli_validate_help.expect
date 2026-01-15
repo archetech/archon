@@ -12,7 +12,7 @@ log_file -noappend $logfile
 
 # Run the archon help command
 puts "Running 'kc help' command..."
-spawn archon help
+spawn bash archon help
 
 # Wait for completion
 expect eof
@@ -125,7 +125,7 @@ Commands:
 
 # Clean up the output (remove spawn line, ANSI codes, and normalize whitespace)
 # First remove the spawn line
-regsub {^spawn archon help\r?\n} $output "" output
+regsub {^spawn bash archon help\r?\n} $output "" output
 # Remove ANSI escape sequences
 regsub -all {\x1b\[[0-9;]*[mK]} $output "" output
 # Normalize CR/LF
