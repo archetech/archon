@@ -48,11 +48,6 @@
       "require": "./dist/cjs/db/json.cjs",
       "types": "./dist/types/db/json.d.ts"
     },
-    "./wallet/json-enc": {
-      "import": "./dist/esm/db/json-enc.js",
-      "require": "./dist/cjs/db/json-enc.cjs",
-      "types": "./dist/types/db/json-enc.d.ts"
-    },
     "./wallet/json-memory": {
       "import": "./dist/esm/db/json-memory.js",
       "require": "./dist/cjs/db/json-memory.cjs",
@@ -82,11 +77,6 @@
       "import": "./dist/esm/db/web.js",
       "require": "./dist/cjs/db/web.cjs",
       "types": "./dist/types/db/web.d.ts"
-    },
-    "./wallet/web-enc": {
-      "import": "./dist/esm/db/web-enc.js",
-      "require": "./dist/cjs/db/web-enc.cjs",
-      "types": "./dist/types/db/web-enc.d.ts"
     },
     "./wallet/chrome": {
       "import": "./dist/esm/db/chrome.js",
@@ -121,9 +111,6 @@
       "wallet/json": [
         "./dist/types/db/json.d.ts"
       ],
-      "wallet/json-enc": [
-        "./dist/types/db/json-enc.d.ts"
-      ],
       "wallet/json-memory": [
         "./dist/types/db/json-memory.d.ts"
       ],
@@ -141,9 +128,6 @@
       ],
       "wallet/web": [
         "./dist/types/db/web.d.ts"
-      ],
-      "wallet/web-enc": [
-        "./dist/types/db/web-enc.d.ts"
       ],
       "wallet/chrome": [
         "./dist/types/db/chrome.d.ts"

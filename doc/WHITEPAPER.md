@@ -200,7 +200,6 @@ Mediators synchronize DID operations across network boundaries:
 
 - **Hyperswarm Mediator**: Distributes operations via P2P gossip protocol
 - **Satoshi Mediator**: Anchors operation batches to Bitcoin/Feathercoin via OP_RETURN
-- **Inscription Mediator**: Uses Taproot witness data for inscription-based registration
 
 ### 4.3 Data Flow
 
@@ -636,17 +635,7 @@ Blockchain registries provide cryptographic finality through proof-of-work:
 4. Transaction broadcast and confirmed
 5. All nodes can independently verify and import
 
-### 7.4 Inscription Registry
-
-For applications requiring on-chain data storage, Archon supports Taproot inscriptions:
-
-**Mechanism:**
-1. Commit transaction creates inscription address
-2. Reveal transaction includes full operation data in witness
-3. Lower on-chain footprint than OP_RETURN for larger data
-4. Compatible with ordinals ecosystem
-
-### 7.5 Blockchain Timestamping
+### 7.4 Blockchain Timestamping
 
 One of Archon's most powerful features is automatic cryptographic timestamping for all DID operations registered on blockchain-based registries. When a DID operation is anchored to Bitcoin, Feathercoin, or any other blockchain registry, it inherits an immutable, independently verifiable timestamp from the block in which it was confirmed.
 

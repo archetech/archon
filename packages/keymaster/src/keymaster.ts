@@ -49,10 +49,8 @@ import {
     Seed,
 } from '@didcid/keymaster/types';
 import {
-    isV1WithEnc,
-    isV1Decrypted,
-    isLegacyV0,
-    isEncryptedWallet
+    isWalletEncFile,
+    isWalletFile
 } from './db/typeGuards.js';
 import {
     Cipher,
@@ -543,7 +541,7 @@ export default class Keymaster implements KeymasterInterface {
             const backup = this.cipher.decryptMessage(keypair.publicJwk, keypair.privateJwk, castData.backup);
             let wallet = JSON.parse(backup);
 
-            if (isV1Decrypted(wallet)) {
+            if (isWalletFile(wallet)) {
                 const mnemonic = await this.decryptMnemonic();
                 // Backup might have a different mnemonic passphase so re-encrypt
                 wallet.seed.mnemonicEnc = await encMnemonic(mnemonic, this.passphrase);
@@ -560,7 +558,7 @@ export default class Keymaster implements KeymasterInterface {
                 wallet = await this.upgradeWallet(wallet);
 
                 // Decrypt the wallet if needed
-                wallet = isV1WithEnc(wallet) ? await this.decryptWalletFromStorage(wallet) : wallet;
+                wallet = isWalletEncFile(wallet) ? await this.decryptWalletFromStorage(wallet) : wallet;
 
                 // Copy all properties from the recovered wallet into the cleared current wallet
                 // This effectively replaces the current wallet with the recovered one
@@ -3619,11 +3617,11 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     private async decryptWallet(wallet: WalletFile): Promise<WalletFile> {
-        if (isV1WithEnc(wallet)) {
+        if (isWalletEncFile(wallet)) {
             wallet = await this.decryptWalletFromStorage(wallet);
         }
 
-        if (!isV1Decrypted(wallet)) {
+        if (!isWalletFile(wallet)) {
             throw new KeymasterError("Unsupported wallet version.");
         }
 
@@ -3631,30 +3629,13 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     private async encryptWallet(wallet: WalletFile): Promise<WalletEncFile> {
-        if (isV1Decrypted(wallet)) {
+        if (isWalletFile(wallet)) {
             return this.encryptWalletForStorage(wallet);
         }
         return wallet;
     }
 
     private async upgradeWallet(wallet: any): Promise<WalletFile> {
-        if (isEncryptedWallet(wallet)) {
-            await this.db.saveWallet(wallet, true);
-            wallet = await this.db.loadWallet();
-        }
-
-        if (isLegacyV0(wallet)) {
-            const hdkey = this.cipher.generateHDKeyJSON(wallet.seed.hdkey!);
-            const keypair = this.cipher.generateJwk(hdkey.privateKey!);
-            const plaintext = this.cipher.decryptMessage(keypair.publicJwk, keypair.privateJwk, wallet.seed.mnemonic!);
-            const mnemonicEnc = await encMnemonic(plaintext, this.passphrase);
-            const { seed: _legacySeed, version: _legacyVersion, ...rest } = wallet;
-            const newWallet = { version: 1, seed: { mnemonicEnc }, ...rest };
-            this._hdkeyCache = this.cipher.generateHDKey(plaintext);
-            wallet = await this.encryptWallet(newWallet);
-            await this.db.saveWallet(wallet, true);
-        }
-
         if (wallet.version !== 1) {
             throw new KeymasterError("Unsupported wallet version.");
         }

@@ -1,15 +1,9 @@
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
-import { WalletEncFile } from '@didcid/keymaster/types';
-import {
-    EncryptedWallet,
-    Seed,
-    WalletFile,
-} from '@didcid/keymaster/types';
+import { WalletEncFile, WalletFile } from '@didcid/keymaster/types';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import WalletEncrypted from '@didcid/keymaster/wallet/json-enc';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
 import { DidCidDocument } from "@didcid/gatekeeper/types";
@@ -24,48 +18,6 @@ let cipher: CipherNode;
 let keymaster: Keymaster;
 let helper: TestHelper;
 const PASSPHRASE = 'passphrase';
-
-const MOCK_WALLET_V0_UNENCRYPTED: WalletFile = {
-    "seed": {
-        "mnemonic": "wp3keoeTNleruzCiTOrCgDmm6viThBq_GWdNIGzXKcS62XqtrBkm0-jDhEUoU1FvB5oWnmCqkSIhnKKeaUwPbK5ysjCHbIVrf9JAr-91FabxtX0B2dctgccg_MEVk88u6anmcFP4DAEhK5zUDXCYGgFR",
-        "hdkey": {
-            "xpriv": "xprv9s21ZrQH143K2JL3GWr8NVjn1XR9kpKpKX4G4g5cvYKyrGShVz7ro2zf75AYyArqm8b7VQGpbvcLXGw6Sp5sa5pAPfHMfbjsPkgiezjHSGN",
-            "xpub": "xpub661MyMwAqRbcEnQWNYP8jdgWZZFeAH3fgjyrs4VEUsrxj4mr3XS7LqK8xNiAKdSdnCb5zbdxPvgu49fdGgzMgDW8AfbyP6CQjWFkYgFbNdB"
-        }
-    },
-    "counter": 0,
-    "ids": {}
-}
-
-const MOCK_WALLET_V0_WITH_IDS: WalletFile = {
-    "seed": {
-        "mnemonic": "WLWbs2iHBobOaKVJXViqefiTYayURf-_6gh_ndflhTACKYG8WKn8WWsQHXNiyNYjU9sfM9kOce8fyAyKjUERgdjnZv2_y6MKO9QsnQMd4XUZceKSa22QGdzBSBFOZ13Odzj9fVd4W-bfvgSZuJJqMWwNhw",
-        "hdkey": {
-            "xpriv": "xprv9s21ZrQH143K2v1nGQ7a6WnEH9VQv6AT7FrxSPGPfSuvgz1mxGsazcTKNk58oRWVpB2MqgaRBPXevSuRbtUziXeQT2ZYmCXnUe6JRHomHrn",
-            "xpub": "xpub661MyMwAqRbcFQ6FNReaTeixqBKuKYtJUUnZEmg1DnSuZnLvVpBqYQmoE31V13nDfVQ8kMkfPKkMk1oWw77jUjXZJT22jH5dpRTvE8M84m9"
-        }
-    },
-    "counter": 2,
-    "ids": {
-        "id_1": {
-            "did": "did:cid:z3v8AuakAd5R7WeGZUin2TtsqyxJPxouLfMEbpn5CmaNXChWq7r",
-            "account": 0,
-            "index": 0
-        },
-        "id_2": {
-            "did": "did:cid:z3v8AuaiAYJ263LLYdApaUmGjy8Dnhx46LU1YDUvGHAcj9Ykgxg",
-            "account": 1,
-            "index": 0
-        }
-    },
-    "current": "id_2"
-}
-
-const MOCK_WALLET_V0_ENCRYPTED = {
-    "salt": "SHUIyrheMkaGv7uyV+6ZHw==",
-    "iv": "nW4a05eR2rxHY0T7",
-    "data": "O+UlnXsCA522UwUwpFqtybIKwrJsHrVatrUJgNVBjFUk6TAdMsdGzW49WiJt+lF4iJe6ftETd1wjSretZc97gi+VzZzX0Ggba6rmXnuD189jRFg7eudCqG4y6Rgt72SYxZu3pgaEJ146Ntj+H6cAcSIfYyhNgtPmlpWBZcm68wP8YRaP5i0/mZF89md4DjjyFOv8qTLG4m42fmoCmliIeJdmBChjPdpAm8V/ZOwkULjKQPpLAjDe4uCwvgenZduSJEDyP8m1jAcwGFxcI1mcXVYunR/YruczYXGY4dPnmW03lXinOX+5SR/bs9Z23uhqoVgUgW25Rfz/5zr4YFVXBQcVQXEvLtR38KPWeuOKltvU3FbysSgIrM6WBSkJt5chfYCGg7a554lqHyeGTxrlUa8th+hXSv/LVkvl+juhq+yd85QqyX8gLhxZxw4lx5eeaU3uJ+BJ33onI2y4sr02ZU5fYOIPFKS7IGCE0KK2hv0NwNvSv8oy402m9xU+iCIr19Xs28jm61/difLh/x1g/RXQUV/07b8tZLbB6n6hBC/h+3jLexJeFIpn1C1yBY+JQopTS+NgXEZZK+HuFp3k/JjI0ImxIy/2gPSm3jRAs1f8GfLLEMdJWoseZ/laPhD0QdWPQt7oGqKTfn7G72os8gGsme4AiFtKzg0zEv3whzLvOW6W2uUXAR83cXdlKcLpju7vrjjdfrcqYxkR3VDp"
-}
 
 const MOCK_WALLET_V1: WalletFile = {
     "version": 1,
@@ -139,101 +91,23 @@ describe('loadWallet', () => {
         expect(wallet2).toStrictEqual(wallet1);
     });
 
-    it('should return null when loading non-existing encrypted wallet', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, PASSPHRASE);
-        const check_wallet = await wallet_enc.loadWallet();
+    it('should return null when loading non-existing wallet', async () => {
+        const check_wallet = await wallet.loadWallet();
         expect(check_wallet).toBe(null);
     });
 
-    it('should throw exception when passphrase not set', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, "");
-        wallet_enc.saveWallet(MOCK_WALLET_V0_ENCRYPTED);
+    it('should throw exception saving an unsupported wallet version', async () => {
+        const mockWallet = { version: 0, seed: { mnemonic: "test" } };
 
         try {
-            await wallet_enc.loadWallet();
-            throw new ExpectedExceptionError();
-        } catch (error: any) {
-            expect(error.message).toBe('ARCHON_ENCRYPTED_PASSPHRASE not set');
-        }
-    });
-
-    it('should throw exception on load with incorrect passphrase', async () => {
-        const wallet_enc1 = new WalletJsonMemory();
-        const ok = await wallet_enc1.saveWallet(MOCK_WALLET_V0_ENCRYPTED);
-        expect(ok).toBe(true);
-
-        try {
-            const wallet_enc2 = new WalletEncrypted(wallet_enc1, 'incorrect');
-            await wallet_enc2.loadWallet();
-            throw new ExpectedExceptionError();
-        } catch (error: any) {
-            expect(error.message).toBe('Incorrect passphrase.');
-        }
-    });
-
-    it('should throw exception saving an encrypted wallet', async () => {
-        const mockWallet: EncryptedWallet = { salt: "", iv: "", data: "" };
-
-        try {
-            await keymaster.saveWallet(mockWallet);
+            await keymaster.saveWallet(mockWallet as any);
             throw new ExpectedExceptionError();
         } catch (error: any) {
             expect(error.message).toBe('Keymaster: Unsupported wallet version.');
         }
     });
 
-    it('should convert encrypted v0 wallet', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, PASSPHRASE);
-        const keymaster = new Keymaster({ gatekeeper, wallet: wallet_enc, cipher, passphrase: PASSPHRASE });
-        await keymaster.saveWallet(MOCK_WALLET_V0_UNENCRYPTED);
-
-        const res = await keymaster.loadWallet();
-        expect(res).toEqual(
-            expect.objectContaining({
-                version: 1,
-                counter: 0,
-                seed: expect.objectContaining({
-                    mnemonicEnc: expect.any(Object),
-                }),
-            })
-        );
-    });
-
-    it('should upgrade a v0 unencrypted to v1', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, PASSPHRASE);
-        await wallet_enc.saveWallet(MOCK_WALLET_V0_UNENCRYPTED);
-
-        const keymaster = new Keymaster({ gatekeeper, wallet: wallet_enc, cipher, passphrase: PASSPHRASE });
-        const res = await keymaster.loadWallet();
-        expect(res).toEqual(
-            expect.objectContaining({
-                version: 1,
-                counter: 0,
-                seed: expect.objectContaining({
-                    mnemonicEnc: expect.any(Object),
-                }),
-            })
-        );
-    });
-
-    it('should upgrade a v0 encrypted to v1 without encryption wrapper', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, PASSPHRASE);
-        await wallet_enc.saveWallet(MOCK_WALLET_V0_ENCRYPTED);
-
-        const keymaster = new Keymaster({ gatekeeper, wallet: wallet_enc, cipher, passphrase: PASSPHRASE });
-        const res = await keymaster.loadWallet();
-        expect(res).toEqual(
-            expect.objectContaining({
-                version: 1,
-                counter: 0,
-                seed: expect.objectContaining({
-                    mnemonicEnc: expect.any(Object),
-                }),
-            })
-        );
-    });
-
-    it('should load a v1 encrypted wallet without hdkey', async () => {
+    it('should load a v1 encrypted wallet', async () => {
         await wallet.saveWallet(MOCK_WALLET_V1_ENCRYPTED);
         const res = await keymaster.loadWallet();
         expect(res).toEqual(
@@ -245,10 +119,9 @@ describe('loadWallet', () => {
                 })
             })
         );
-        expect(res.seed?.hdkey).toBeUndefined();
     });
 
-    it('should load a v1 encrypted wallet from cache without hdkey', async () => {
+    it('should load a v1 encrypted wallet from cache', async () => {
         await wallet.saveWallet(MOCK_WALLET_V1_ENCRYPTED);
         // prime cache
         await keymaster.loadWallet();
@@ -263,7 +136,6 @@ describe('loadWallet', () => {
                 })
             })
         );
-        expect(res.seed?.hdkey).toBeUndefined();
     });
 
     it('should throw on unsupported wallet version', async () => {
@@ -286,9 +158,8 @@ describe('saveWallet', () => {
         expect(ok).toBe(true);
     });
 
-    it('test saving directly on the encrypted wallet', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, PASSPHRASE);
-        const ok = await wallet_enc.saveWallet(MOCK_WALLET_V1);
+    it('test saving directly on the wallet', async () => {
+        const ok = await wallet.saveWallet(MOCK_WALLET_V1);
 
         expect(ok).toBe(true);
     });
@@ -358,9 +229,8 @@ describe('saveWallet', () => {
         expect(walletData).toStrictEqual(MOCK_WALLET_V1);
     });
 
-    it('encrypted wallet should return unencrypted wallet', async () => {
-        const wallet_enc = new WalletEncrypted(wallet, PASSPHRASE);
-        const keymaster = new Keymaster({ gatekeeper, wallet: wallet_enc, cipher, passphrase: PASSPHRASE });
+    it('wallet should return unencrypted wallet', async () => {
+        const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
         const testWallet = await keymaster.loadWallet();
         const expectedWallet = await keymaster.loadWallet();
 
@@ -380,30 +250,7 @@ describe('saveWallet', () => {
         expect(wallet).toStrictEqual(wallet2);
     });
 
-    it('should upgrade a v0 wallet to v1', async () => {
-        const ok = await keymaster.saveWallet(MOCK_WALLET_V0_UNENCRYPTED);
-        expect(ok).toBe(true);
-
-        const res = await wallet.loadWallet();
-        expect(res).toEqual(
-            expect.objectContaining({
-                version: 1,
-                enc: expect.any(String),
-                seed: expect.objectContaining({
-                    mnemonicEnc: expect.any(Object),
-                }),
-            })
-        );
-    });
-
-    it('v0 upgrade must not use stale _hdkeyCache', async () => {
-        await keymaster.newWallet(undefined, true);
-        expect(
-            await keymaster.saveWallet(MOCK_WALLET_V0_UNENCRYPTED, true)
-        ).toBe(true);
-    });
-
-    it('should encrypt an unencrypted v1 wallet contents and remove hdkey', async () => {
+    it('should encrypt an unencrypted v1 wallet contents', async () => {
         const ok = await keymaster.saveWallet(MOCK_WALLET_V1);
         expect(ok).toBe(true);
 
@@ -439,10 +286,8 @@ describe('saveWallet', () => {
 
 describe('decryptMnemonic', () => {
     it('should return 12 words', async () => {
-        const wallet = await keymaster.loadWallet();
+        await keymaster.loadWallet();
         const mnemonic = await keymaster.decryptMnemonic();
-
-        expect(mnemonic !== wallet.seed!.mnemonic).toBe(true);
 
         // Split the mnemonic into words
         const words = mnemonic.split(' ');
@@ -627,19 +472,6 @@ describe('recoverWallet', () => {
                 ids: wallet.ids
             })
         );
-    });
-
-    it('should recover v0 wallet from seed bank', async () => {
-        await keymaster.saveWallet(MOCK_WALLET_V0_WITH_IDS);
-        const mnemonic = await keymaster.decryptMnemonic();
-        await keymaster.backupWallet(undefined, MOCK_WALLET_V0_WITH_IDS);
-
-        // Recover wallet from mnemonic
-        await keymaster.newWallet(mnemonic, true);
-        const recovered = await keymaster.recoverWallet();
-
-        expect(recovered).toBeDefined();
-        expect(recovered.ids).toStrictEqual(MOCK_WALLET_V0_WITH_IDS.ids);
     });
 
     it('should recover wallet from backup DID', async () => {
@@ -833,18 +665,6 @@ describe('fixWallet', () => {
     });
 });
 
-describe('WalletEncrypted', () => {
-    it('returns the plain wallet when base wallet is not encrypted', async () => {
-        const base = new WalletJsonMemory();
-        const plain: WalletFile = { seed: {} as Seed, counter: 42, ids: {}, names: { foo: 'did:cid:abc' } };
-        await base.saveWallet(plain, true);
-        const wrapped = new WalletEncrypted(base, PASSPHRASE);
-        const loaded = await wrapped.loadWallet();
-
-        expect(loaded).toStrictEqual(plain);
-    });
-});
-
 describe('updateWallet', () => {
     it('should throw when no wallet has been created', async () => {
         const test = new WalletJsonMemory();
@@ -879,7 +699,7 @@ describe('no WebCrypto subtle', () => {
 
     it('decMnemonic will throw without crypto subtle', async () => {
         try {
-            await decMnemonic(MOCK_WALLET_V0_ENCRYPTED, PASSPHRASE);
+            await decMnemonic(MOCK_WALLET_V1_ENCRYPTED, PASSPHRASE);
             throw new ExpectedExceptionError();
         } catch (error: any) {
             expect(error.message).toBe('Web Cryptography API not available');
