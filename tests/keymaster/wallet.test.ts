@@ -19,13 +19,15 @@ let keymaster: Keymaster;
 let helper: TestHelper;
 const PASSPHRASE = 'passphrase';
 
+// These mocks were generated with PBKDF2_ITERATIONS=1 for fast tests
+// Regenerate with: PBKDF2_ITERATIONS=1 npm test -- --testPathPattern="generate-mocks"
 const MOCK_WALLET_V1: WalletFile = {
     "version": 1,
     "seed": {
         "mnemonicEnc": {
-            "data": "p3gKBzVtJTflKBHSDgrMiuncBH4foJM++DyoQAZD/cVeQDCY4aFTxSC0nkylGcpi88Odq0SXkc2nAHyjA7+D6FZzbiTDdgqu3SJXznZEMCJDzHTkpLOa",
-            "iv": "2mHu57FRcEERBLMv",
-            "salt": "m74zOr/8etDRMoU8dnriXA==",
+            "salt": "hWNH3lTQAJ5zsfyZO7zKUg==",
+            "iv": "CVivp2Eh7L3UwDtY",
+            "data": "aFU0bf/yu9hftHYf4cDSt/M+52ZhePLgRyDkR6BihnYj268CvuKCHFCVuUK+SNFGPKFFwHsYpE9Rwk5PyGuJXU2LtoXwtgs8UbFA6Yvp9e0D5L/lJcc="
         },
     },
     "counter": 0,
@@ -36,12 +38,12 @@ const MOCK_WALLET_V1_ENCRYPTED: WalletEncFile = {
     "version": 1,
     "seed": {
         "mnemonicEnc": {
-            "salt": "8c+TrInC7EJZAnwjD6k8+A==",
-            "iv": "EkeweG9JHYjXr7cN",
-            "data": "4MLe/4SX9unO+7DTK1KUKLBLeHuJNS4bT9yjp8L/xnLzexpobGEmRJebUuv3e0aIs4krINlkTlP4krmqkI3p/EVlu9Ap6GRNoogZR4ZC1EtKUTwgNaQ7058o0/d1LQ8wSA=="
+            "salt": "hWNH3lTQAJ5zsfyZO7zKUg==",
+            "iv": "CVivp2Eh7L3UwDtY",
+            "data": "aFU0bf/yu9hftHYf4cDSt/M+52ZhePLgRyDkR6BihnYj268CvuKCHFCVuUK+SNFGPKFFwHsYpE9Rwk5PyGuJXU2LtoXwtgs8UbFA6Yvp9e0D5L/lJcc="
         }
     },
-    "enc": "CAKfW05djVJ2VnkLLbiBgtJpfC3x8xvc4_-M0OJBA6N7YcuXyd1F3GhifoUZ2Zdy2XGP_nGzhjS2u3NXgIM"
+    "enc": "SUW0qL1l8hF3MiK-M5Yc_LnTvzYM4WqojHnirgsmXj9HyG7sKRrjDwOYExla4UWDdb9EeSwiXSsWMqHoGEs"
 }
 
 beforeAll(async () => {

@@ -1,4 +1,5 @@
 const config = {
+    setupFiles: ['<rootDir>/tests/jest.setup.ts'],
     transform: {
         '^.+\\.ts$': [
             'ts-jest',

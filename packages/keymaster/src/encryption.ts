@@ -2,9 +2,20 @@
 const ENC_ALG = 'AES-GCM';
 const ENC_KDF = 'PBKDF2';
 const ENC_HASH = 'SHA-512';
-const ENC_ITER = 100_000;
+const ENC_ITER_DEFAULT = 100_000;
 const IV_LEN = 12;
 const SALT_LEN = 16;
+
+function getIterations(): number {
+    const envVal = process.env.PBKDF2_ITERATIONS;
+    if (envVal) {
+        const parsed = parseInt(envVal, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+            return parsed;
+        }
+    }
+    return ENC_ITER_DEFAULT;
+}
 
 export async function encMnemonic(mnemonic: string, pass: string) {
     if (!hasSubtle()) {
@@ -55,7 +66,7 @@ async function deriveKey(pass: string, salt: Uint8Array): Promise<CryptoKey> {
     const enc = new TextEncoder();
     const passKey = await crypto.subtle.importKey('raw', enc.encode(pass), { name: ENC_KDF }, false, ['deriveKey']);
     return crypto.subtle.deriveKey(
-        { name: ENC_KDF, salt: salt as Uint8Array<ArrayBuffer>, iterations: ENC_ITER, hash: ENC_HASH },
+        { name: ENC_KDF, salt: salt as Uint8Array<ArrayBuffer>, iterations: getIterations(), hash: ENC_HASH },
         passKey,
         { name: ENC_ALG, length: 256 },
         false,

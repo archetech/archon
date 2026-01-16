@@ -184,11 +184,13 @@ export default class Keymaster implements KeymasterInterface {
         overwrite = true
     ): Promise<boolean> {
         let upgraded: WalletFile = await this.upgradeWallet(wallet);
-        let toStore: WalletEncFile = await this.encryptWallet(upgraded);
+        // Decrypt if encrypted to verify passphrase and get decrypted form
+        const decrypted = await this.decryptWallet(upgraded);
+        let toStore: WalletEncFile = await this.encryptWalletForStorage(decrypted);
 
         const ok = await this.db.saveWallet(toStore, overwrite);
         if (ok) {
-            this._walletCache = await this.decryptWalletFromStorage(toStore);
+            this._walletCache = decrypted;
         }
         return ok;
     }
@@ -3581,7 +3583,8 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const mnemonic = await this.getMnemonicForDerivation(wallet);
-        return this.cipher.generateHDKey(mnemonic);
+        this._hdkeyCache = this.cipher.generateHDKey(mnemonic);
+        return this._hdkeyCache;
     }
 
     private async encryptWalletForStorage(decrypted: WalletFile): Promise<WalletEncFile> {
@@ -3625,13 +3628,6 @@ export default class Keymaster implements KeymasterInterface {
             throw new KeymasterError("Unsupported wallet version.");
         }
 
-        return wallet;
-    }
-
-    private async encryptWallet(wallet: WalletFile): Promise<WalletEncFile> {
-        if (isWalletFile(wallet)) {
-            return this.encryptWalletForStorage(wallet);
-        }
         return wallet;
     }
 
