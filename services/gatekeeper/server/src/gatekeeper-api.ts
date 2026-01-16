@@ -1451,16 +1451,16 @@ v1router.post('/events/process', async (req, res) => {
 
 /**
  * @swagger
- * /cas/json:
+ * /ipfs/json:
  *   post:
- *     summary: Adds a JSON object to the CAS (Content Addressable Storage)
+ *     summary: Adds a JSON object to the IPFS
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *       description: The JSON object to store in the CAS
+ *       description: The JSON object to store in IPFS
  *
  *     responses:
  *       200:
@@ -1479,7 +1479,7 @@ v1router.post('/events/process', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/cas/json', async (req, res) => {
+v1router.post('/ipfs/json', async (req, res) => {
     try {
         const response = await gatekeeper.addJSON(req.body);
         res.send(response);
@@ -1490,9 +1490,9 @@ v1router.post('/cas/json', async (req, res) => {
 
 /**
  * @swagger
- * /cas/json/{cid}:
+ * /ipfs/json/{cid}:
  *   get:
- *     summary: Retrieve a JSON object from the CAS (Content Addressable Storage)
+ *     summary: Retrieve a JSON object from the IPFS
  *     parameters:
  *       - in: path
  *         name: cid
@@ -1521,7 +1521,7 @@ v1router.post('/cas/json', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.get('/cas/json/:cid', async (req, res) => {
+v1router.get('/ipfs/json/:cid', async (req, res) => {
     try {
         const response = await gatekeeper.getJSON(req.params.cid);
         res.json(response);
@@ -1532,16 +1532,16 @@ v1router.get('/cas/json/:cid', async (req, res) => {
 
 /**
  * @swagger
- * /cas/text:
+ * /ipfs/text:
  *   post:
- *     summary: Adds text to the CAS (Content Addressable Storage)
+ *     summary: Adds text to the IPFS
  *     requestBody:
  *       required: true
  *       content:
  *         text/plain:
  *           schema:
  *             type: string
- *       description: The text to store in the CAS
+ *       description: The text to store in IPFS
  *
  *     responses:
  *       200:
@@ -1560,7 +1560,7 @@ v1router.get('/cas/json/:cid', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/cas/text', express.text({ type: 'text/plain', limit: '10mb' }), async (req, res) => {
+v1router.post('/ipfs/text', express.text({ type: 'text/plain', limit: '10mb' }), async (req, res) => {
     try {
         const response = await gatekeeper.addText(req.body);
         res.send(response);
@@ -1571,9 +1571,9 @@ v1router.post('/cas/text', express.text({ type: 'text/plain', limit: '10mb' }), 
 
 /**
  * @swagger
- * /cas/text/{cid}:
+ * /ipfs/text/{cid}:
  *   get:
- *     summary: Retrieve text from the CAS (Content Addressable Storage)
+ *     summary: Retrieve text from the IPFS
  *     parameters:
  *       - in: path
  *         name: cid
@@ -1602,7 +1602,7 @@ v1router.post('/cas/text', express.text({ type: 'text/plain', limit: '10mb' }), 
  *             schema:
  *               type: string
  */
-v1router.get('/cas/text/:cid', async (req, res) => {
+v1router.get('/ipfs/text/:cid', async (req, res) => {
     try {
         const response = await gatekeeper.getText(req.params.cid);
         res.send(response);
@@ -1613,9 +1613,9 @@ v1router.get('/cas/text/:cid', async (req, res) => {
 
 /**
  * @swagger
- * /cas/data:
+ * /ipfs/data:
  *   post:
- *     summary: Adds an octet-stream to the CAS (Content Addressable Storage)
+ *     summary: Adds an octet-stream to the IPFS
  *     requestBody:
  *       required: true
  *       content:
@@ -1623,7 +1623,7 @@ v1router.get('/cas/text/:cid', async (req, res) => {
  *           schema:
  *             type: string
  *             format: binary
- *       description: The data to store in the CAS
+ *       description: The data to store in IPFS
  *
  *     responses:
  *       200:
@@ -1642,7 +1642,7 @@ v1router.get('/cas/text/:cid', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/cas/data', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
+v1router.post('/ipfs/data', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
     try {
         const data = req.body;
         const response = await gatekeeper.addData(data);
@@ -1654,9 +1654,9 @@ v1router.post('/cas/data', express.raw({ type: 'application/octet-stream', limit
 
 /**
  * @swagger
- * /cas/data/{cid}:
+ * /ipfs/data/{cid}:
  *   get:
- *     summary: Retrieve data from the CAS (Content Addressable Storage)
+ *     summary: Retrieve data from the IPFS
  *     parameters:
  *       - in: path
  *         name: cid
@@ -1686,7 +1686,7 @@ v1router.post('/cas/data', express.raw({ type: 'application/octet-stream', limit
  *             schema:
  *               type: string
  */
-v1router.get('/cas/data/:cid', async (req, res) => {
+v1router.get('/ipfs/data/:cid', async (req, res) => {
     try {
         const response = await gatekeeper.getData(req.params.cid);
         res.set('Content-Type', 'application/octet-stream');

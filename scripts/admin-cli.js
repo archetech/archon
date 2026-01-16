@@ -369,8 +369,8 @@ program
 
 
 program
-    .command('cas-add-text <text>')
-    .description('Add text to the CAS')
+    .command('ipfs-add-text <text>')
+    .description('Add text to IPFS')
     .action(async (text) => {
         try {
             const cid = await gatekeeper.addText(text);
@@ -382,8 +382,8 @@ program
     });
 
 program
-    .command('cas-get-text <cid>')
-    .description('Get text from the CAS')
+    .command('ipfs-get-text <cid>')
+    .description('Get text from IPFS')
     .action(async (cid) => {
         try {
             const text = await gatekeeper.getText(cid);
@@ -395,8 +395,8 @@ program
     });
 
 program
-    .command('cas-add-file <file>')
-    .description('Add a file to the CAS')
+    .command('ipfs-add-file <file>')
+    .description('Add a file to IPFS')
     .action(async (file) => {
         try {
             const data = fs.readFileSync(file);
@@ -409,8 +409,8 @@ program
     });
 
 program
-    .command('cas-get-file <cid> <file>')
-    .description('Get a file from the CAS')
+    .command('ipfs-get-file <cid> <file>')
+    .description('Get a file from IPFS')
     .action(async (cid, file) => {
         try {
             const data = await gatekeeper.getData(cid);
@@ -423,8 +423,8 @@ program
     });
 
 program
-    .command('cas-add-json <file>')
-    .description('Add JSON file to the CAS')
+    .command('ipfs-add-json <file>')
+    .description('Add JSON file to IPFS')
     .action(async (file) => {
         try {
             const contents = fs.readFileSync(file);
@@ -438,8 +438,8 @@ program
     });
 
 program
-    .command('cas-get-json <cid>')
-    .description('Get JSON from the CAS')
+    .command('ipfs-get-json <cid>')
+    .description('Get JSON from IPFS')
     .action(async (cid) => {
         try {
             const json = await gatekeeper.getJSON(cid);

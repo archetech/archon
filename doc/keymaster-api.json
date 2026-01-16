@@ -5669,9 +5669,9 @@
         }
       }
     },
-    "/cas/data/{cid}": {
+    "/ipfs/data/{cid}": {
       "get": {
-        "summary": "Retrieve data from the CAS (Content Addressable Storage)",
+        "summary": "Retrieve data from the IPFS",
         "parameters": [
           {
             "in": "path",

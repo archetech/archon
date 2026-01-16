@@ -735,149 +735,6 @@
             "description": "Internal Server Error."
           }
         }
-      },
-      "post": {
-        "summary": "Update an existing DID (deprecated)",
-        "deprecated": true,
-        "parameters": [
-          {
-            "in": "path",
-            "name": "did",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "The DID to update."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "type",
-                  "did",
-                  "signature"
-                ],
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "update"
-                    ],
-                    "description": "Must be `\"update\"` for this operation."
-                  },
-                  "did": {
-                    "type": "string",
-                    "description": "The DID being updated. Must match the path parameter `{did}`."
-                  },
-                  "doc": {
-                    "type": "object",
-                    "description": "The updated DID Document or subset of data for this DID."
-                  },
-                  "previd": {
-                    "type": "string",
-                    "description": "Reference to the previous version."
-                  },
-                  "signature": {
-                    "type": "object",
-                    "description": "Cryptographic signature."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "A boolean indicating if the update was accepted.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "boolean"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete a DID (deprecated)",
-        "deprecated": true,
-        "parameters": [
-          {
-            "in": "path",
-            "name": "did",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "The DID to delete."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "type",
-                  "did",
-                  "signature"
-                ],
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "delete"
-                    ],
-                    "description": "Must be \"delete\" to deactivate the DID."
-                  },
-                  "did": {
-                    "type": "string",
-                    "description": "The DID being deleted."
-                  },
-                  "signature": {
-                    "type": "object",
-                    "description": "Cryptographic signature."
-                  },
-                  "previd": {
-                    "type": "string",
-                    "description": "Reference to the previous version."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "A boolean indicating whether the deletion was accepted and processed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "boolean"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error."
-          }
-        }
       }
     },
     "/dids/": {
@@ -1796,9 +1653,9 @@
         }
       }
     },
-    "/cas/json": {
+    "/ipfs/json": {
       "post": {
-        "summary": "Adds a JSON object to the CAS (Content Addressable Storage)",
+        "summary": "Adds a JSON object to the IPFS",
         "requestBody": {
           "required": true,
           "content": {
@@ -1808,7 +1665,7 @@
               }
             }
           },
-          "description": "The JSON object to store in the CAS"
+          "description": "The JSON object to store in IPFS"
         },
         "responses": {
           "200": {
@@ -1835,9 +1692,9 @@
         }
       }
     },
-    "/cas/json/{cid}": {
+    "/ipfs/json/{cid}": {
       "get": {
-        "summary": "Retrieve a JSON object from the CAS (Content Addressable Storage)",
+        "summary": "Retrieve a JSON object from the IPFS",
         "parameters": [
           {
             "in": "path",
@@ -1884,9 +1741,9 @@
         }
       }
     },
-    "/cas/text": {
+    "/ipfs/text": {
       "post": {
-        "summary": "Adds text to the CAS (Content Addressable Storage)",
+        "summary": "Adds text to the IPFS",
         "requestBody": {
           "required": true,
           "content": {
@@ -1896,7 +1753,7 @@
               }
             }
           },
-          "description": "The text to store in the CAS"
+          "description": "The text to store in IPFS"
         },
         "responses": {
           "200": {
@@ -1923,9 +1780,9 @@
         }
       }
     },
-    "/cas/text/{cid}": {
+    "/ipfs/text/{cid}": {
       "get": {
-        "summary": "Retrieve text from the CAS (Content Addressable Storage)",
+        "summary": "Retrieve text from the IPFS",
         "parameters": [
           {
             "in": "path",
@@ -1972,9 +1829,9 @@
         }
       }
     },
-    "/cas/data": {
+    "/ipfs/data": {
       "post": {
-        "summary": "Adds an octet-stream to the CAS (Content Addressable Storage)",
+        "summary": "Adds an octet-stream to the IPFS",
         "requestBody": {
           "required": true,
           "content": {
@@ -1985,7 +1842,7 @@
               }
             }
           },
-          "description": "The data to store in the CAS"
+          "description": "The data to store in IPFS"
         },
         "responses": {
           "200": {
@@ -2012,9 +1869,9 @@
         }
       }
     },
-    "/cas/data/{cid}": {
+    "/ipfs/data/{cid}": {
       "get": {
-        "summary": "Retrieve data from the CAS (Content Addressable Storage)",
+        "summary": "Retrieve data from the IPFS",
         "parameters": [
           {
             "in": "path",

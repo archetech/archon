@@ -1,26 +1,26 @@
-# Archon (did:cid) DID Scheme
+# The `did:cid` Method Specification
 
 
 ## Abstract
 
-The Archon DID method specification conforms to the requirements specified in the [DID specification](https://www.w3.org/TR/did-core/) currently published by the W3C Credentials Community Group. For more information about DIDs and DID method specifications, please see the [DID Primer](https://w3c-ccg.github.io/did-primer/).
+The `did:cid` method specification conforms to the requirements specified in the [DID specification](https://www.w3.org/TR/did-core/) currently published by the W3C Credentials Community Group. For more information about DIDs and DID method specifications, please see the [DID Primer](https://w3c-ccg.github.io/did-primer/).
 
 ## Introduction
 
-The Archon DID method (`did:cid`) is designed to support a P2P identity layer with secure decentralized [verifiable credentials](https://www.w3.org/TR/vc-data-model-2.0/). Archon DIDs are used for agents (e.g., users, issuers, verifiers, and Archon nodes) and assets (e.g., verifiable credentials, verifiable presentations, schemas, challenges, and responses).
+The `did:cid` method is designed to support a P2P identity layer with secure decentralized [verifiable credentials](https://www.w3.org/TR/vc-data-model-2.0/). DIDs created using this method are used for agents (e.g., users, issuers, verifiers, and nodes) and assets (e.g., verifiable credentials, verifiable presentations, schemas, challenges, and responses).
 
-## Archon DID Format
+## DID Format
 
-Archon DIDs have the following format:
+DIDs using this method have the following format:
 
 ```
-archon-did        = "did:cid:" archon-identifier
+did-cid           = "did:cid:" cid-identifier
                    [ ";" did-service ] [ "/" did-path ]
                    [ "?" did-query ] [ "#" did-fragment ]
-archon-identifier = CID v1 in standard base32 encoding
+cid-identifier    = CID v1 in standard base32 encoding
 ```
 
-### Example: Archon DID
+### Example
 
 `did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m`
 
@@ -28,25 +28,25 @@ archon-identifier = CID v1 in standard base32 encoding
 
 ![](./did-lifecycle.png)
 
-All Archon DIDs begin life anchored to a CAS (Content-Addressable Storage) such as IPFS. Once created they can be used immediately by any application or service connected to an Archon node. Subsequent updates to the DID (meaning that a document associated with the DID changes) are registered on a registry such as a blockchain (BTC, ETH, etc) or a decentralized database (e.g. hyperswarm). The registry is specified at DID creation so that nodes can determine which single source of truth to check for updates.
+All `did:cid` DIDs begin life anchored to IPFS. Once created they can be used immediately by any application or service connected to a node. Subsequent updates to the DID (meaning that a document associated with the DID changes) are registered on a registry such as a blockchain (BTC, ETH, etc) or a decentralized database (e.g. hyperswarm). The registry is specified at DID creation so that nodes can determine which single source of truth to check for updates.
 
-The *key concept of this design* is that Archon DID creation is decentralized through through the CAS, and DID updates are decentralized through the registry specified in the DID creation. The Archon DID is decentralized for its whole lifecycle, which is a hard requirement of DIDs.
+The *key concept of this design* is that DID creation is decentralized through IPFS, and DID updates are decentralized through the registry specified in the DID creation. The DID is decentralized for its whole lifecycle, which is a hard requirement of DIDs.
 
 ## DID Creation
 
-DIDs are anchored to a CAS (e.g. IPFS), prior to any declaration on a registry. This allows DIDs to be created very quickly (less than 10 seconds) and at (virtually) no cost.
+DIDs are anchored to IPFS prior to any declaration on a registry. This allows DIDs to be created very quickly (less than 10 seconds) and at (virtually) no cost.
 
-Archon DIDs support two main types of DID Subject: **agents** and **assets**. Agents have keys and control assets. Assets do not have keys, and are controlled by a single agent (the owner of the asset). The two types have slightly different creation methods.
+The `did:cid` method supports two main types of DID Subject: **agents** and **assets**. Agents have keys and control assets. Assets do not have keys, and are controlled by a single agent (the owner of the asset). The two types have slightly different creation methods.
 
 ### Agents
 
-To create an agent DID, the Archon client must sign and submit a "create" operation to the Archon node. This operation will be used to anchor the DID in the CAS.
+To create an agent DID, the client must sign and submit a "create" operation to a node. This operation will be used to anchor the DID in IPFS.
 
 1. Generate a new private key
     1. We recommend deriving a new private key from an Hierarchical Deterministic (HD) wallet (BIP-32).
 1. Generate a public key from the private key
 1. Convert to JWK (JSON Web Key) format
-1. Create a operation object with these fields in any order:
+1. Create an operation object with these fields in any order:
     1. `type`  must be "create"
     1. `registration` metadata includes:
         1. `version`  number, e.g. 1
@@ -55,8 +55,8 @@ To create an agent DID, the Archon client must sign and submit a "create" operat
     1. `publicJwk` is the public key in JWK format
     1. `created` time in ISO format
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
-1. Sign the JSON with the private key corresponding the the public key (this enables the Archon node to verify that the operation is coming from the owner of the public key)
-1. Submit the operation to the Archon node. For example, with a REST API, post the operation to the Archon node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
+1. Sign the JSON with the private key corresponding to the public key (this enables the node to verify that the operation is coming from the owner of the public key)
+1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
 
 Example
 ```json
@@ -82,29 +82,29 @@ Example
 }
 ```
 
-Upon receiving the operation the Archon node must:
+Upon receiving the operation the node must:
 1. Verify the signature
 1. Apply JSON canonicalization scheme to the operation.
-1. Pin the seed object to the CAS (e.g. IPFS).
+1. Pin the seed object to IPFS.
 
-The resulting content address (CID for IPFS) in standard CID v1 base32 encoding is used as the Archon DID suffix. For example the operation above corresponds to CID "bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe" yielding the Archon DID `did:cid:bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe`.
+The resulting content address (CID) in standard CID v1 base32 encoding is used as the DID suffix. For example the operation above corresponds to CID "bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe" yielding the DID `did:cid:bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe`.
 
 ### Assets
 
-To create an asset DID, the Archon client must sign and submit a `create` operation to the Archon node. This operation will be used to anchor the DID in the CAS.
+To create an asset DID, the client must sign and submit a `create` operation to a node. This operation will be used to anchor the DID in IPFS.
 
-1. Create a operation object with these fields in any order:
+1. Create an operation object with these fields in any order:
     1. `type`  must be "create"
     1. `registration` metadata includes:
         1. `version`  number, e.g. 1
-        1. `type`  must be "agent"
+        1. `type`  must be "asset"
         1. `registry`  (from a list of valid registries, e.g. "BTC", "hyperswarm", etc.)
     1. `controller` specifies the DID of the owner/controller of the new DID
     1. `data` can contain any data in JSON format, as long as it is not empty
     1. `created` time in ISO format
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key of the controller
-1. Submit the operation to the Archon node. For example, with a REST API, post the operation to the Archon node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
+1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
 
 Example
 ```json
@@ -132,28 +132,28 @@ Example
 }
 ```
 
-Upon receiving the operation the Archon node must:
+Upon receiving the operation the node must:
 1. Verify the signature is valid for the specified controller.
 1. Apply JSON canonicalization scheme to the operation object.
-1. Pin the seed object to the CAS (e.g. IPFS).
+1. Pin the seed object to IPFS.
 
 For example, the operation above that specifies an empty Credential asset corresponds to CID "z3v8AuahaEdEZrY9BGfu4vntYjQECBvDHqCG3mPAfEbn6No7AHh" yielding a DID of `did:cid:z3v8AuahaEdEZrY9BGfu4vntYjQECBvDHqCG3mPAfEbn6No7AHh`.
 
-# DID Update
+## DID Update
 
-A DID Update is a change to any of the documents associated with the DID. To initiate an update the Archon client must sign a operation that includes the following fields:
+A DID Update is a change to any of the documents associated with the DID. To initiate an update the client must sign an operation that includes the following fields:
 
-1. Create a operation object with these fields in any order:
+1. Create an operation object with these fields in any order:
     1. `type` must be set to "update"
     1. `did` specifies the DID
     1. `doc` is set to the new version of the document set, which must include any or all of:
         1. `didDocument` the main document
         1. `didDocumentData` the document's data
-        1. `didDocumentRegistration` the Archon protocol spec
+        1. `didDocumentRegistration` the protocol spec
     1. `previd` the CID of the previous operation
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key of the controller of the DID
-1. Submit the operation to the Archon node. For example, with a REST API, post the operation to the Archon node's endpoint to update DIDs (e.g. `/api/v1/did/`)
+1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to update DIDs (e.g. `/api/v1/did/`)
 
 It is recommended the client fetches the current version of the document and metadata, makes changes to it, then submit the new version in an update operation in order to preserve the fields that shouldn't change.
 
@@ -196,26 +196,26 @@ Example update to rotate keys for an agent DID:
 }
 ```
 
-Upon receiving the operation the Archon node must:
+Upon receiving the operation the node must:
 1. Verify the signature is valid for the controller of the DID.
 1. Verify the previd is identical to the latest version's operation CID.
 1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
 
-For registries such as BTC with non-trivial transaction costs, it is expected that update operations will be placed in a queue, then registered periodically in a batch in order to balance costs and latency of updates. If the registry has trivial transaction costs, the update operation may be distributed individually and immediately. Archon defers this tradeoff between cost, speed, and security to the node operators.
+For registries such as BTC with non-trivial transaction costs, it is expected that update operations will be placed in a queue, then registered periodically in a batch in order to balance costs and latency of updates. If the registry has trivial transaction costs, the update operation may be distributed individually and immediately. This method defers this tradeoff between cost, speed, and security to the node operators.
 
 ## DID Revocation
 
 Revoking a DID is a special kind of Update that results in the termination of the DID. Revoked DIDs cannot be updated because they have no current controller, therefore they cannot be recovered once revoked. Revoked DIDs can be resolved without error, but resolvers will return a document set with the `didMetada.deactivated` property set to `true`. The `didDocument` and `didDocumentData` properties will be set to empty.
 
-To revoke a DID, the Archon client must sign and submit a `delete` operation to the Archon node.
+To revoke a DID, the client must sign and submit a `delete` operation to a node.
 
-1. Create a operation object with these fields in any order:
+1. Create an operation object with these fields in any order:
     1. `type`  must be "delete"
     1. `did` specifies the DID to be deleted
     1. `previd` the CID of the previous operation
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key of the controller of the DID
-1. Submit the operation to the Archon node. For example, with a REST API, post the operation to the Archon node's DID endpoint (e.g. `POST /api/v1/did/`)
+1. Submit the operation to a node. For example, with a REST API, post the operation to the node's DID endpoint (e.g. `POST /api/v1/did/`)
 
 
 Example deletion operation:
@@ -233,7 +233,7 @@ Example deletion operation:
 }
 ```
 
-Upon receiving the operation the Archon node must:
+Upon receiving the operation the node must:
 1. Verify the signature is valid for the controller of the DID.
 1. Verify the previd is identical to the latest version's operation CID.
 1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
@@ -271,9 +271,9 @@ The metadata has a deactivated field set to true to conform to the [W3C specific
 
 Resolution is the operation of responding to a DID with a DID Document. If you think of the DID as a secure reference or pointer, then resolution is equivalent to dereferencing.
 
-Given a DID and an optional resolution time, the resolver infers the CAS from the format of the suffix, then retrieves the associated document seed, parsing it as plaintext JSON.
-If CAS cannot be inferred, or the data cannot be retrieved, then the resolver should delegate the resolution request to a fallback node.
-Otherwise, if the data can be retrieved but is not a valid Archon seed document, an error is returned immediately.
+Given a DID and an optional resolution time, the resolver retrieves the associated document seed from IPFS using the DID suffix as the CID, parsing it as plaintext JSON.
+If the data cannot be retrieved, then the resolver should delegate the resolution request to a fallback node.
+Otherwise, if the data can be retrieved but is not a valid seed document, an error is returned immediately.
 Once returned and validated, the resolver then evaluates the JSON to determine whether it is a known type (an agent or an asset). If it is not a known type an error is returned.
 
 If we get this far, the resolver then looks up the DID's specified registry in its document seed. If the node does not support the registry (meaning the node is not actively monitoring the registry for updates), then it must forward the resolution request to a trusted node that does support the registry. If the node is not configured with any trusted nodes for the specified registry, then it must forward the request to a trusted fallback node to handle unknown registries.
@@ -295,7 +295,7 @@ In pseudo-code:
 ```
 function resolveDid(did, versionTime=now):
     get suffix from did
-    use suffix as content address to retrieve document seed from CAS
+    use suffix as CID to retrieve document seed from IPFS
     if fail to retrieve the document seed
         forward request to a trusted node
         return
@@ -313,6 +313,6 @@ function resolveDid(did, versionTime=now):
 
 ## DID Recovery
 
-For security reasons, Archon provides no support for storing private keys. We recommend that Archon clients use BIP-39 to generate a master seed phrase consisting of at least 12 words, and that users safely store the recovery phrase.
+For security reasons, this method provides no support for storing private keys. We recommend that clients use BIP-39 to generate a master seed phrase consisting of at least 12 words, and that users safely store the recovery phrase.
 
 If a user loses a device that contains their wallet, they should be able to install the wallet software on a new device, initialize it with their seed phrase and recover their DID along with all their credentials. This implies that a "vault" of the credentials should be stored with the agent DID document, though it should be encrypted with the DID's current private key for privacy.

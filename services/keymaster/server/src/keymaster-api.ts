@@ -4769,9 +4769,9 @@ v1router.post('/documents/:id/test', async (req, res) => {
 
 /**
  * @swagger
- * /cas/data/{cid}:
+ * /ipfs/data/{cid}:
  *   get:
- *     summary: Retrieve data from the CAS (Content Addressable Storage)
+ *     summary: Retrieve data from the IPFS
  *     parameters:
  *       - in: path
  *         name: cid
@@ -4801,7 +4801,7 @@ v1router.post('/documents/:id/test', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.get('/cas/data/:cid', async (req, res) => {
+v1router.get('/ipfs/data/:cid', async (req, res) => {
     try {
         const response = await gatekeeper.getData(req.params.cid);
         // eslint-disable-next-line

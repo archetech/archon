@@ -30,10 +30,10 @@ const Endpoints = {
     events: {
         process: '/api/v1/events/process',
     },
-    cas: {
-        json: '/api/v1/cas/json',
-        text: '/api/v1/cas/text',
-        data: '/api/v1/cas/data',
+    ipfs: {
+        json: '/api/v1/ipfs/json',
+        text: '/api/v1/ipfs/text',
+        data: '/api/v1/ipfs/data',
     },
     block: '/api/v1/block',
 };
@@ -658,7 +658,7 @@ describe('addJSON', () => {
 
     it('should return a CID for JSON', async () => {
         nock(GatekeeperURL)
-            .post(Endpoints.cas.json)
+            .post(Endpoints.ipfs.json)
             .reply(200, mockCID);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -669,7 +669,7 @@ describe('addJSON', () => {
 
     it('should throw exception on addJSON server error', async () => {
         nock(GatekeeperURL)
-            .post(Endpoints.cas.json)
+            .post(Endpoints.ipfs.json)
             .reply(500, ServerError);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -690,7 +690,7 @@ describe('getJSON', () => {
 
     it('should return JSON', async () => {
         nock(GatekeeperURL)
-            .get(`${Endpoints.cas.json}/${mockCID}`)
+            .get(`${Endpoints.ipfs.json}/${mockCID}`)
             .reply(200, mockJSON);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -701,7 +701,7 @@ describe('getJSON', () => {
 
     it('should throw exception on getJSON server error', async () => {
         nock(GatekeeperURL)
-            .get(`${Endpoints.cas.json}/${mockCID}`)
+            .get(`${Endpoints.ipfs.json}/${mockCID}`)
             .reply(500, ServerError);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -722,7 +722,7 @@ describe('addText', () => {
 
     it('should return a CID for text', async () => {
         nock(GatekeeperURL)
-            .post(Endpoints.cas.text)
+            .post(Endpoints.ipfs.text)
             .reply(200, mockCID);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -733,7 +733,7 @@ describe('addText', () => {
 
     it('should throw exception on addText server error', async () => {
         nock(GatekeeperURL)
-            .post(Endpoints.cas.text)
+            .post(Endpoints.ipfs.text)
             .reply(500, ServerError);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -754,7 +754,7 @@ describe('getText', () => {
 
     it('should return text', async () => {
         nock(GatekeeperURL)
-            .get(`${Endpoints.cas.text}/${mockCID}`)
+            .get(`${Endpoints.ipfs.text}/${mockCID}`)
             .reply(200, mockText);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -765,7 +765,7 @@ describe('getText', () => {
 
     it('should throw exception on getText server error', async () => {
         nock(GatekeeperURL)
-            .get(`${Endpoints.cas.text}/${mockCID}`)
+            .get(`${Endpoints.ipfs.text}/${mockCID}`)
             .reply(500, ServerError);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -786,7 +786,7 @@ describe('addData', () => {
 
     it('should return a CID for data', async () => {
         nock(GatekeeperURL)
-            .post(Endpoints.cas.data)
+            .post(Endpoints.ipfs.data)
             .reply(200, mockCID);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -797,7 +797,7 @@ describe('addData', () => {
 
     it('should throw exception on addData server error', async () => {
         nock(GatekeeperURL)
-            .post(Endpoints.cas.data)
+            .post(Endpoints.ipfs.data)
             .reply(500, ServerError);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -818,7 +818,7 @@ describe('getData', () => {
 
     it('should return text', async () => {
         nock(GatekeeperURL)
-            .get(`${Endpoints.cas.data}/${mockCID}`)
+            .get(`${Endpoints.ipfs.data}/${mockCID}`)
             .reply(200, mockData);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
@@ -829,7 +829,7 @@ describe('getData', () => {
 
     it('should throw exception on getData server error', async () => {
         nock(GatekeeperURL)
-            .get(`${Endpoints.cas.data}/${mockCID}`)
+            .get(`${Endpoints.ipfs.data}/${mockCID}`)
             .reply(500, ServerError);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });

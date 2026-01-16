@@ -180,12 +180,12 @@ Options:
   -h, --help                                                   display help for command
 
 Commands:
-  cas-add-file <file>                                          Add a file to the CAS
-  cas-add-json <file>                                          Add JSON file to the CAS
-  cas-add-text <text>                                          Add text to the CAS
-  cas-get-file <cid> <file>                                    Get a file from the CAS
-  cas-get-json <cid>                                           Get JSON from the CAS
-  cas-get-text <cid>                                           Get text from the CAS
+  ipfs-add-file <file>                                         Add a file to IPFS
+  ipfs-add-json <file>                                         Add JSON file to IPFS
+  ipfs-add-text <text>                                         Add text to IPFS
+  ipfs-get-file <cid> <file>                                   Get a file from IPFS
+  ipfs-get-json <cid>                                          Get JSON from IPFS
+  ipfs-get-text <cid>                                          Get text from IPFS
   export-batch                                                 Export all events in a batch
   export-did <did>                                             Export DID to file
   export-dids                                                  Export all DIDs
