@@ -1874,7 +1874,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             setSelectedImageDocs(docs);
             setSelectedImage(image);
             setSelectedImageOwned(docs.didDocumentMetadata.isOwned);
-            setSelectedImageURL(`/api/v1/ipfs/data/${image.cid}`)
+            setSelectedImageURL(`/api/v1/ipfs/data/${image.cid}`);
             setImageVersion(versions);
             setImageVersionMax(versions);
         } catch (error) {
@@ -1891,7 +1891,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
             setSelectedImageDocs(docs);
             setSelectedImage(image);
-            setSelectedImageURL(`/api/v1/ipfs/data/${image.cid}`)
+            setSelectedImageURL(`/api/v1/ipfs/data/${image.cid}`);
             setImageVersion(version);
         } catch (error) {
             showError(error);

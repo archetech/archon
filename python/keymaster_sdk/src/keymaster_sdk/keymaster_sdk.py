@@ -813,7 +813,7 @@ def get_group_vault_item(vault_id, name):
     return resp.content
 
 
-def get_cas_data(cid):
+def get_ipfs_data(cid):
     safe_cid = requests.utils.quote(str(cid), safe="")
     url = f"{_keymaster_api}/ipfs/data/{safe_cid}"
     resp = requests.get(url)
