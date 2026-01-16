@@ -1453,14 +1453,14 @@ v1router.post('/events/process', async (req, res) => {
  * @swagger
  * /ipfs/json:
  *   post:
- *     summary: Adds a JSON object to the CAS (Content Addressable Storage)
+ *     summary: Adds a JSON object to the IPFS
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *       description: The JSON object to store in the CAS
+ *       description: The JSON object to store in IPFS
  *
  *     responses:
  *       200:
@@ -1492,7 +1492,7 @@ v1router.post('/ipfs/json', async (req, res) => {
  * @swagger
  * /ipfs/json/{cid}:
  *   get:
- *     summary: Retrieve a JSON object from the CAS (Content Addressable Storage)
+ *     summary: Retrieve a JSON object from the IPFS
  *     parameters:
  *       - in: path
  *         name: cid
@@ -1534,14 +1534,14 @@ v1router.get('/ipfs/json/:cid', async (req, res) => {
  * @swagger
  * /ipfs/text:
  *   post:
- *     summary: Adds text to the CAS (Content Addressable Storage)
+ *     summary: Adds text to the IPFS
  *     requestBody:
  *       required: true
  *       content:
  *         text/plain:
  *           schema:
  *             type: string
- *       description: The text to store in the CAS
+ *       description: The text to store in IPFS
  *
  *     responses:
  *       200:
@@ -1573,7 +1573,7 @@ v1router.post('/ipfs/text', express.text({ type: 'text/plain', limit: '10mb' }),
  * @swagger
  * /ipfs/text/{cid}:
  *   get:
- *     summary: Retrieve text from the CAS (Content Addressable Storage)
+ *     summary: Retrieve text from the IPFS
  *     parameters:
  *       - in: path
  *         name: cid
@@ -1615,7 +1615,7 @@ v1router.get('/ipfs/text/:cid', async (req, res) => {
  * @swagger
  * /ipfs/data:
  *   post:
- *     summary: Adds an octet-stream to the CAS (Content Addressable Storage)
+ *     summary: Adds an octet-stream to the IPFS
  *     requestBody:
  *       required: true
  *       content:
@@ -1623,7 +1623,7 @@ v1router.get('/ipfs/text/:cid', async (req, res) => {
  *           schema:
  *             type: string
  *             format: binary
- *       description: The data to store in the CAS
+ *       description: The data to store in IPFS
  *
  *     responses:
  *       200:
@@ -1656,7 +1656,7 @@ v1router.post('/ipfs/data', express.raw({ type: 'application/octet-stream', limi
  * @swagger
  * /ipfs/data/{cid}:
  *   get:
- *     summary: Retrieve data from the CAS (Content Addressable Storage)
+ *     summary: Retrieve data from the IPFS
  *     parameters:
  *       - in: path
  *         name: cid

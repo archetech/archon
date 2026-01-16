@@ -28,19 +28,19 @@ archon-identifier = CID v1 in standard base32 encoding
 
 ![](./did-lifecycle.png)
 
-All Archon DIDs begin life anchored to a CAS (Content-Addressable Storage) such as IPFS. Once created they can be used immediately by any application or service connected to an Archon node. Subsequent updates to the DID (meaning that a document associated with the DID changes) are registered on a registry such as a blockchain (BTC, ETH, etc) or a decentralized database (e.g. hyperswarm). The registry is specified at DID creation so that nodes can determine which single source of truth to check for updates.
+All Archon DIDs begin life anchored to IPFS. Once created they can be used immediately by any application or service connected to an Archon node. Subsequent updates to the DID (meaning that a document associated with the DID changes) are registered on a registry such as a blockchain (BTC, ETH, etc) or a decentralized database (e.g. hyperswarm). The registry is specified at DID creation so that nodes can determine which single source of truth to check for updates.
 
-The *key concept of this design* is that Archon DID creation is decentralized through through the CAS, and DID updates are decentralized through the registry specified in the DID creation. The Archon DID is decentralized for its whole lifecycle, which is a hard requirement of DIDs.
+The *key concept of this design* is that Archon DID creation is decentralized through IPFS, and DID updates are decentralized through the registry specified in the DID creation. The Archon DID is decentralized for its whole lifecycle, which is a hard requirement of DIDs.
 
 ## DID Creation
 
-DIDs are anchored to a CAS (e.g. IPFS), prior to any declaration on a registry. This allows DIDs to be created very quickly (less than 10 seconds) and at (virtually) no cost.
+DIDs are anchored to IPFS prior to any declaration on a registry. This allows DIDs to be created very quickly (less than 10 seconds) and at (virtually) no cost.
 
 Archon DIDs support two main types of DID Subject: **agents** and **assets**. Agents have keys and control assets. Assets do not have keys, and are controlled by a single agent (the owner of the asset). The two types have slightly different creation methods.
 
 ### Agents
 
-To create an agent DID, the Archon client must sign and submit a "create" operation to the Archon node. This operation will be used to anchor the DID in the CAS.
+To create an agent DID, the Archon client must sign and submit a "create" operation to the Archon node. This operation will be used to anchor the DID in IPFS.
 
 1. Generate a new private key
     1. We recommend deriving a new private key from an Hierarchical Deterministic (HD) wallet (BIP-32).
@@ -85,13 +85,13 @@ Example
 Upon receiving the operation the Archon node must:
 1. Verify the signature
 1. Apply JSON canonicalization scheme to the operation.
-1. Pin the seed object to the CAS (e.g. IPFS).
+1. Pin the seed object to IPFS.
 
-The resulting content address (CID for IPFS) in standard CID v1 base32 encoding is used as the Archon DID suffix. For example the operation above corresponds to CID "bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe" yielding the Archon DID `did:cid:bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe`.
+The resulting content address (CID) in standard CID v1 base32 encoding is used as the Archon DID suffix. For example the operation above corresponds to CID "bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe" yielding the Archon DID `did:cid:bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe`.
 
 ### Assets
 
-To create an asset DID, the Archon client must sign and submit a `create` operation to the Archon node. This operation will be used to anchor the DID in the CAS.
+To create an asset DID, the Archon client must sign and submit a `create` operation to the Archon node. This operation will be used to anchor the DID in IPFS.
 
 1. Create a operation object with these fields in any order:
     1. `type`  must be "create"
@@ -135,7 +135,7 @@ Example
 Upon receiving the operation the Archon node must:
 1. Verify the signature is valid for the specified controller.
 1. Apply JSON canonicalization scheme to the operation object.
-1. Pin the seed object to the CAS (e.g. IPFS).
+1. Pin the seed object to IPFS.
 
 For example, the operation above that specifies an empty Credential asset corresponds to CID "z3v8AuahaEdEZrY9BGfu4vntYjQECBvDHqCG3mPAfEbn6No7AHh" yielding a DID of `did:cid:z3v8AuahaEdEZrY9BGfu4vntYjQECBvDHqCG3mPAfEbn6No7AHh`.
 
@@ -271,8 +271,8 @@ The metadata has a deactivated field set to true to conform to the [W3C specific
 
 Resolution is the operation of responding to a DID with a DID Document. If you think of the DID as a secure reference or pointer, then resolution is equivalent to dereferencing.
 
-Given a DID and an optional resolution time, the resolver infers the CAS from the format of the suffix, then retrieves the associated document seed, parsing it as plaintext JSON.
-If CAS cannot be inferred, or the data cannot be retrieved, then the resolver should delegate the resolution request to a fallback node.
+Given a DID and an optional resolution time, the resolver retrieves the associated document seed from IPFS using the DID suffix as the CID, parsing it as plaintext JSON.
+If the data cannot be retrieved, then the resolver should delegate the resolution request to a fallback node.
 Otherwise, if the data can be retrieved but is not a valid Archon seed document, an error is returned immediately.
 Once returned and validated, the resolver then evaluates the JSON to determine whether it is a known type (an agent or an asset). If it is not a known type an error is returned.
 
@@ -295,7 +295,7 @@ In pseudo-code:
 ```
 function resolveDid(did, versionTime=now):
     get suffix from did
-    use suffix as content address to retrieve document seed from CAS
+    use suffix as CID to retrieve document seed from IPFS
     if fail to retrieve the document seed
         forward request to a trusted node
         return

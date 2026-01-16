@@ -4771,7 +4771,7 @@ v1router.post('/documents/:id/test', async (req, res) => {
  * @swagger
  * /ipfs/data/{cid}:
  *   get:
- *     summary: Retrieve data from the CAS (Content Addressable Storage)
+ *     summary: Retrieve data from the IPFS
  *     parameters:
  *       - in: path
  *         name: cid
