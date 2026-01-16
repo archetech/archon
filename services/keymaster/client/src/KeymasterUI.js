@@ -1874,7 +1874,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             setSelectedImageDocs(docs);
             setSelectedImage(image);
             setSelectedImageOwned(docs.didDocumentMetadata.isOwned);
-            setSelectedImageURL(`/api/v1/cas/data/${image.cid}`)
+            setSelectedImageURL(`/api/v1/ipfs/data/${image.cid}`)
             setImageVersion(versions);
             setImageVersionMax(versions);
         } catch (error) {
@@ -1891,7 +1891,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
             setSelectedImageDocs(docs);
             setSelectedImage(image);
-            setSelectedImageURL(`/api/v1/cas/data/${image.cid}`)
+            setSelectedImageURL(`/api/v1/ipfs/data/${image.cid}`)
             setImageVersion(version);
         } catch (error) {
             showError(error);
@@ -1990,7 +1990,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             setSelectedDocumentDocs(docs);
             setSelectedDocument(document);
             setSelectedDocumentOwned(docs.didDocumentMetadata.isOwned);
-            setSelectedDocumentURL(`/api/v1/cas/data/${document.cid}`)
+            setSelectedDocumentURL(`/api/v1/ipfs/data/${document.cid}`)
             setDocumentVersion(versions);
             setDocumentVersionMax(versions);
         } catch (error) {
@@ -2005,7 +2005,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
             setSelectedDocumentDocs(docs);
             setSelectedDocument(document);
-            setSelectedDocumentURL(`/api/v1/cas/data/${document.cid}`)
+            setSelectedDocumentURL(`/api/v1/ipfs/data/${document.cid}`)
             setDocumentVersion(version);
         } catch (error) {
             showError(error);

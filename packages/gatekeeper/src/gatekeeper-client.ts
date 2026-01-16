@@ -307,7 +307,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async addJSON(data: object): Promise<string> {
         try {
-            const response = await this.axios.post(`${this.API}/cas/json`, data);
+            const response = await this.axios.post(`${this.API}/ipfs/json`, data);
             return response.data;
         }
         catch (error) {
@@ -317,7 +317,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async getJSON(cid: string): Promise<object> {
         try {
-            const response = await this.axios.get(`${this.API}/cas/json/${cid}`);
+            const response = await this.axios.get(`${this.API}/ipfs/json/${cid}`);
             return response.data;
         }
         catch (error) {
@@ -327,7 +327,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async addText(data: string): Promise<string> {
         try {
-            const response = await this.axios.post(`${this.API}/cas/text`, data, {
+            const response = await this.axios.post(`${this.API}/ipfs/text`, data, {
                 headers: {
                     'Content-Type': 'text/plain'
                 }
@@ -340,7 +340,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async getText(cid: string): Promise<string> {
         try {
-            const response = await this.axios.get(`${this.API}/cas/text/${cid}`);
+            const response = await this.axios.get(`${this.API}/ipfs/text/${cid}`);
             return response.data;
         }
         catch (error) {
@@ -350,7 +350,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async addData(data: Buffer): Promise<string> {
         try {
-            const response = await this.axios.post(`${this.API}/cas/data`, data, {
+            const response = await this.axios.post(`${this.API}/ipfs/data`, data, {
                 headers: {
                     'Content-Type': 'application/octet-stream'
                 }
@@ -364,7 +364,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async getData(cid: string): Promise<Buffer> {
         try {
-            const response = await this.axios.get(`${this.API}/cas/data/${cid}`, {
+            const response = await this.axios.get(`${this.API}/ipfs/data/${cid}`, {
                 responseType: 'arraybuffer'
             });
             return Buffer.from(response.data);
