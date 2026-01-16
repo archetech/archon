@@ -7,9 +7,8 @@ const IV_LEN = 12;
 const SALT_LEN = 16;
 
 function getIterations(): number {
-    const envVal = process.env.PBKDF2_ITERATIONS;
-    if (envVal) {
-        const parsed = parseInt(envVal, 10);
+    if (typeof process !== 'undefined' && process.env?.PBKDF2_ITERATIONS) {
+        const parsed = parseInt(process.env.PBKDF2_ITERATIONS, 10);
         if (!isNaN(parsed) && parsed > 0) {
             return parsed;
         }
