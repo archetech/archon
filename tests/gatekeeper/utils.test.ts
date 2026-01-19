@@ -18,7 +18,7 @@ const mockConsole = {
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
 const ipfs = new HeliaClient();
-const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'FTC/testnet5'] });
+const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'FTC:testnet5'] });
 const helper = new TestHelper(gatekeeper, cipher);
 
 beforeAll(async () => {
@@ -571,43 +571,43 @@ describe('listRegistries', () => {
     });
 
     it('should return list of configured registries', async () => {
-        const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['hyperswarm', 'FTC/testnet5'] });
+        const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['hyperswarm', 'FTC:testnet5'] });
         const registries = await gatekeeper.listRegistries();
 
         expect(registries.length).toBe(2);
         expect(registries.includes('hyperswarm')).toBe(true);
-        expect(registries.includes('FTC/testnet5')).toBe(true);
+        expect(registries.includes('FTC:testnet5')).toBe(true);
     });
 
     it('should return list of inferred registries', async () => {
         const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole });
         await gatekeeper.getQueue('hyperswarm');
-        await gatekeeper.getQueue('FTC/testnet5');
-        await gatekeeper.getQueue('BTC/testnet4');
+        await gatekeeper.getQueue('FTC:testnet5');
+        await gatekeeper.getQueue('BTC:testnet4');
         const registries = await gatekeeper.listRegistries();
 
         expect(registries.length).toBe(4);
         expect(registries.includes('local')).toBe(true);
         expect(registries.includes('hyperswarm')).toBe(true);
-        expect(registries.includes('FTC/testnet5')).toBe(true);
-        expect(registries.includes('BTC/testnet4')).toBe(true);
+        expect(registries.includes('FTC:testnet5')).toBe(true);
+        expect(registries.includes('BTC:testnet4')).toBe(true);
     });
 
     it('should return non-redundant list of inferred registries', async () => {
         const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole });
         await gatekeeper.getQueue('hyperswarm');
         await gatekeeper.getQueue('hyperswarm');
-        await gatekeeper.getQueue('FTC/testnet5');
-        await gatekeeper.getQueue('FTC/testnet5');
-        await gatekeeper.getQueue('BTC/testnet4');
-        await gatekeeper.getQueue('BTC/testnet4');
-        await gatekeeper.getQueue('BTC/testnet4');
+        await gatekeeper.getQueue('FTC:testnet5');
+        await gatekeeper.getQueue('FTC:testnet5');
+        await gatekeeper.getQueue('BTC:testnet4');
+        await gatekeeper.getQueue('BTC:testnet4');
+        await gatekeeper.getQueue('BTC:testnet4');
         const registries = await gatekeeper.listRegistries();
 
         expect(registries.length).toBe(4);
         expect(registries.includes('local')).toBe(true);
         expect(registries.includes('hyperswarm')).toBe(true);
-        expect(registries.includes('FTC/testnet5')).toBe(true);
-        expect(registries.includes('BTC/testnet4')).toBe(true);
+        expect(registries.includes('FTC:testnet5')).toBe(true);
+        expect(registries.includes('BTC:testnet4')).toBe(true);
     });
 });

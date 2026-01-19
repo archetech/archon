@@ -195,4 +195,25 @@ export abstract class AbstractJson implements GatekeeperDb {
         // Lookup by hash (O(1))
         return registryBlocks[blockId] || null;
     }
+
+    async addOperation(opid: string, op: Operation): Promise<void> {
+        return this.runExclusive(async () => {
+            const db = this.loadDb();
+            if (!db.ops) {
+                db.ops = {};
+            }
+            db.ops[opid] = op;
+            this.writeDb(db);
+        });
+    }
+
+    async getOperation(opid: string): Promise<Operation | null> {
+        const db = this.loadDb();
+        return db.ops?.[opid] ?? null;
+    }
+
+    async hasOperation(opid: string): Promise<boolean> {
+        const db = this.loadDb();
+        return !!(db.ops && opid in db.ops);
+    }
 }

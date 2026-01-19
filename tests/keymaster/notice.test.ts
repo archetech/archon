@@ -48,7 +48,7 @@ afterAll(async () => {
 
 beforeEach(() => {
     const db = new DbJsonMemory('test');
-    gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'FTC/testnet5'] });
+    gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'FTC:testnet5'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
     search = new MockSearch();

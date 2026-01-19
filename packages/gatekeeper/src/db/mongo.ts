@@ -43,6 +43,7 @@ export default class DbMongo implements GatekeeperDb {
         await this.db.collection('dids').createIndex({ id: 1 });
         await this.db.collection('blocks').createIndex({ registry: 1, height: -1 });  // for latest and height lookups
         await this.db.collection('blocks').createIndex({ registry: 1, hash: 1 }, { unique: true });  // for hash lookup
+        await this.db.collection('operations').createIndex({ opid: 1 }, { unique: true });
     }
 
     async stop(): Promise<void> {
@@ -60,6 +61,7 @@ export default class DbMongo implements GatekeeperDb {
 
         await this.db.collection('dids').deleteMany({});
         await this.db.collection('queue').deleteMany({});
+        await this.db.collection('operations').deleteMany({});
     }
 
     async addEvent(did: string, event: GatekeeperEvent): Promise<number> {
@@ -251,5 +253,43 @@ export default class DbMongo implements GatekeeperDb {
         } catch (error) {
             return null;
         }
+    }
+
+    async addOperation(opid: string, op: Operation): Promise<void> {
+        if (!this.db) {
+            throw new Error(MONGO_NOT_STARTED_ERROR);
+        }
+
+        await this.db.collection('operations').updateOne(
+            { opid },
+            { $set: { opid, ...op } },
+            { upsert: true }
+        );
+    }
+
+    async getOperation(opid: string): Promise<Operation | null> {
+        if (!this.db) {
+            throw new Error(MONGO_NOT_STARTED_ERROR);
+        }
+
+        const doc = await this.db.collection('operations').findOne(
+            { opid },
+            { projection: { _id: 0, opid: 0 } }
+        );
+
+        return doc as Operation | null;
+    }
+
+    async hasOperation(opid: string): Promise<boolean> {
+        if (!this.db) {
+            throw new Error(MONGO_NOT_STARTED_ERROR);
+        }
+
+        const doc = await this.db.collection('operations').findOne(
+            { opid },
+            { projection: { _id: 1 } }
+        );
+
+        return !!doc;
     }
 }

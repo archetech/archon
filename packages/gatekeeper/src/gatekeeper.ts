@@ -7,6 +7,7 @@ import {
 } from '@didcid/common/errors';
 import { IPFSClient } from '@didcid/ipfs/types';
 import {
+    BatchMetadata,
     BlockId,
     BlockInfo,
     CheckDIDsOptions,
@@ -32,10 +33,10 @@ const ValidTypes = ['agent', 'asset'];
 const ValidRegistries = [
     'local',
     'hyperswarm',
-    'BTC/mainnet',
-    'BTC/testnet4',
-    'BTC/signet',
-    'FTC/testnet5',
+    'BTC:mainnet',
+    'BTC:testnet4',
+    'BTC:signet',
+    'FTC:testnet5',
 ];
 
 enum ImportStatus {
@@ -1242,6 +1243,51 @@ export default class Gatekeeper implements GatekeeperInterface {
             rejected,
             total: this.eventsQueue.length
         };
+    }
+
+    async importBatchByCids(cids: string[], metadata: BatchMetadata): Promise<ImportBatchResult> {
+        if (!cids || !Array.isArray(cids) || cids.length < 1) {
+            throw new InvalidParameterError('cids');
+        }
+
+        if (!metadata || !metadata.registry || !metadata.time || !metadata.ordinal) {
+            throw new InvalidParameterError('metadata');
+        }
+
+        const operations: Operation[] = [];
+        const opidMap: Map<Operation, string> = new Map();
+
+        for (const cid of cids) {
+            // Check if we already have the operation locally
+            if (await this.db.hasOperation(cid)) {
+                const op = await this.db.getOperation(cid);
+                if (op) {
+                    operations.push(op);
+                    opidMap.set(op, cid);
+                }
+            } else {
+                // Fetch from IPFS
+                const op = await this.ipfs.getJSON(cid) as Operation | null;
+                if (op) {
+                    // Store locally for future lookups
+                    await this.db.addOperation(cid, op);
+                    operations.push(op);
+                    opidMap.set(op, cid);
+                }
+            }
+        }
+
+        // Build events from operations
+        const events: GatekeeperEvent[] = operations.map((op, i) => ({
+            registry: metadata.registry,
+            time: metadata.time,
+            ordinal: [...metadata.ordinal, i],
+            operation: op,
+            opid: opidMap.get(op),
+            registration: metadata.registration,
+        }));
+
+        return this.importBatch(events);
     }
 
     async exportBatch(dids?: string[]): Promise<GatekeeperEvent[]> {

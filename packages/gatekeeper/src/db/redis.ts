@@ -215,6 +215,10 @@ export default class DbRedis implements GatekeeperDb {
         return `${this.dbName}/registry/${registry}/maxHeight`;
     }
 
+    private operationKey(opid: string): string {
+        return `${this.dbName}/ops/${opid}`;
+    }
+
 
     async addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean> {
         if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
@@ -274,5 +278,31 @@ export default class DbRedis implements GatekeeperDb {
         } catch (error) {
             return null;
         }
+    }
+
+    async addOperation(opid: string, op: Operation): Promise<void> {
+        if (!this.redis) {
+            throw new Error(REDIS_NOT_STARTED_ERROR);
+        }
+
+        await this.redis.set(this.operationKey(opid), JSON.stringify(op));
+    }
+
+    async getOperation(opid: string): Promise<Operation | null> {
+        if (!this.redis) {
+            throw new Error(REDIS_NOT_STARTED_ERROR);
+        }
+
+        const json = await this.redis.get(this.operationKey(opid));
+        return json ? JSON.parse(json) : null;
+    }
+
+    async hasOperation(opid: string): Promise<boolean> {
+        if (!this.redis) {
+            throw new Error(REDIS_NOT_STARTED_ERROR);
+        }
+
+        const exists = await this.redis.exists(this.operationKey(opid));
+        return exists === 1;
     }
 }

@@ -87,6 +87,11 @@ export default class DbSqlite implements GatekeeperDb {
 
             CREATE UNIQUE INDEX IF NOT EXISTS idx_registry_height ON blocks (registry, height);
         `);
+
+        await this.db.exec(`CREATE TABLE IF NOT EXISTS operations (
+            opid TEXT PRIMARY KEY,
+            operation TEXT
+        )`);
     }
 
     async stop(): Promise<void> {
@@ -106,6 +111,7 @@ export default class DbSqlite implements GatekeeperDb {
                 await this.db!.run('DELETE FROM dids');
                 await this.db!.run('DELETE FROM queue');
                 await this.db!.run('DELETE FROM blocks');
+                await this.db!.run('DELETE FROM operations');
             });
         });
     }
@@ -329,5 +335,47 @@ export default class DbSqlite implements GatekeeperDb {
         } catch (error) {
             return null;
         }
+    }
+
+    async addOperation(opid: string, op: Operation): Promise<void> {
+        if (!this.db) {
+            throw new Error(SQLITE_NOT_STARTED_ERROR);
+        }
+
+        await this.runExclusive(() =>
+            this.withTx(async () => {
+                await this.db!.run(
+                    `INSERT OR REPLACE INTO operations(opid, operation) VALUES(?, ?)`,
+                    opid,
+                    JSON.stringify(op)
+                );
+            })
+        );
+    }
+
+    async getOperation(opid: string): Promise<Operation | null> {
+        if (!this.db) {
+            throw new Error(SQLITE_NOT_STARTED_ERROR);
+        }
+
+        const row = await this.db.get<{ operation: string }>(
+            'SELECT operation FROM operations WHERE opid = ?',
+            opid
+        );
+
+        return row ? JSON.parse(row.operation) : null;
+    }
+
+    async hasOperation(opid: string): Promise<boolean> {
+        if (!this.db) {
+            throw new Error(SQLITE_NOT_STARTED_ERROR);
+        }
+
+        const row = await this.db.get<{ opid: string }>(
+            'SELECT 1 FROM operations WHERE opid = ?',
+            opid
+        );
+
+        return !!row;
     }
 }

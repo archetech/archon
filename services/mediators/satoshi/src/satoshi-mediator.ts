@@ -8,7 +8,7 @@ import JsonSQLite from './db/sqlite.js';
 import config from './config.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
-import { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
+import { DidRegistration } from '@didcid/gatekeeper/types';
 
 const REGISTRY = config.chain;
 const SMART_FEE_MODE = "CONSERVATIVE";
@@ -163,7 +163,7 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
 
             try {
                 const textString = Buffer.from(parts[1], 'hex').toString('utf8');
-                if (isValidDID(textString)) {
+                if (textString.startsWith('did:cid:') && isValidDID(textString)) {
                     await jsonPersister.updateDb((db) => {
                         db.discovered.push({ height, index: i, time: timestamp, txid, did: textString });
                     });
@@ -213,35 +213,31 @@ async function importBatch(item: DiscoveredItem) {
     }
 
     const asset = await keymaster.resolveAsset(item.did);
-    const queue = (asset as { batch?: Operation[] }).batch || asset;
+    const batch = (asset as { batch?: { version: number; ops: string[] } }).batch;
 
     // Skip badly formatted batches
-    if (!queue || !Array.isArray(queue) || queue.length === 0) {
+    if (!batch || batch.version !== 1 || !Array.isArray(batch.ops) || batch.ops.length === 0) {
         return;
     }
 
-    const batch: GatekeeperEvent[] = [];
+    const cids = batch.ops;
 
-    for (let i = 0; i < queue.length; i++) {
-        batch.push({
-            registry: REGISTRY,
-            time: item.time,
-            ordinal: [item.height, item.index, i],
-            operation: queue[i],
-            registration: {
-                height: item.height,
-                index: item.index,
-                txid: item.txid,
-                batch: item.did,
-                opidx: i,
-            }
-        });
-    }
+    const metadata = {
+        registry: REGISTRY,
+        time: item.time,
+        ordinal: [item.height, item.index],
+        registration: {
+            height: item.height,
+            index: item.index,
+            txid: item.txid,
+            batch: item.did,
+        } as DidRegistration,
+    };
 
     let update: DiscoveredItem = { ...item };
 
     try {
-        update.imported = await gatekeeper.importBatch(batch);
+        update.imported = await gatekeeper.importBatchByCids(cids, metadata);
         update.processed = await gatekeeper.processEvents();
     } catch (error) {
         update.error = JSON.stringify(error);
@@ -459,16 +455,19 @@ async function anchorBatch(): Promise<void> {
         return;
     }
 
-    const batch = await gatekeeper.getQueue(REGISTRY);
+    const operations = await gatekeeper.getQueue(REGISTRY);
 
-    if (batch.length > 0) {
-        console.log(JSON.stringify(batch, null, 4));
+    if (operations.length > 0) {
+        console.log(JSON.stringify(operations, null, 4));
 
+        // Save each operation to IPFS and collect CIDs
+        const cids = await Promise.all(operations.map(op => gatekeeper.addJSON(op)));
+        const batch = { version: 1, ops: cids };
         const did = await keymaster.createAsset({ batch }, { registry: 'hyperswarm', controller: config.nodeID });
         const txid = await createOpReturnTxn(did);
 
         if (txid) {
-            const ok = await gatekeeper.clearQueue(REGISTRY, batch);
+            const ok = await gatekeeper.clearQueue(REGISTRY, operations);
 
             if (ok) {
                 const blockCount = await btcClient.getBlockCount();
@@ -606,7 +605,7 @@ async function syncBlocks(): Promise<void> {
             await addBlock(height, blockHash, block.time);
         }
     } catch (error) {
-        console.error(`Error syncing blocks: ${error}`);
+        console.error(`Error syncing blocks:`, error);
     }
 }
 
@@ -616,16 +615,16 @@ async function main() {
         return;
     }
 
-    const jsonFile = new JsonFile(REGISTRY);
+    const jsonFile = new JsonFile(config.dbName);
 
     if (config.db === 'redis') {
-        jsonPersister = await JsonRedis.create(REGISTRY);
+        jsonPersister = await JsonRedis.create(config.dbName);
     }
     else if (config.db === 'mongodb') {
-        jsonPersister = await JsonMongo.create(REGISTRY);
+        jsonPersister = await JsonMongo.create(config.dbName);
     }
     else if (config.db === 'sqlite') {
-        jsonPersister = await JsonSQLite.create(REGISTRY);
+        jsonPersister = await JsonSQLite.create(config.dbName);
     }
     else {
         jsonPersister = jsonFile;
