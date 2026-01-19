@@ -55,9 +55,9 @@ Once your node is operational (start-node), you can setup local dependencies and
 $ npm ci                                     # Installs all node package dependencies
 $ ./archon -h                                # Displays archon CLI help
 $ ./archon create-id anon BTC:testnet4               # Creates Node Keymaster DID name (set as ARCHON_NODE_ID in .env)
-$ ./scripts/BTC:testnet4-cli createwallet archon     # Creates Archon wallet for Bitcoin Testnet registry
-$ ./scripts/BTC:testnet4-cli getnewaddress           # Get a new address to fund Bitcoin Testnet wallet
-$ ./scripts/BTC:testnet4-cli getwalletinfo           # Get a general status of confirmed and incoming funds
+$ ./scripts/tbtc-cli createwallet archon             # Creates Archon wallet for Bitcoin Testnet registry
+$ ./scripts/tbtc-cli getnewaddress                   # Get a new address to fund Bitcoin Testnet wallet
+$ ./scripts/tbtc-cli getwalletinfo                   # Get a general status of confirmed and incoming funds
 ```
 
 ## Command line interface wallet
