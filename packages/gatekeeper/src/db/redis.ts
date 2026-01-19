@@ -296,13 +296,4 @@ export default class DbRedis implements GatekeeperDb {
         const json = await this.redis.get(this.operationKey(opid));
         return json ? JSON.parse(json) : null;
     }
-
-    async hasOperation(opid: string): Promise<boolean> {
-        if (!this.redis) {
-            throw new Error(REDIS_NOT_STARTED_ERROR);
-        }
-
-        const exists = await this.redis.exists(this.operationKey(opid));
-        return exists === 1;
-    }
 }

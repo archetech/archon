@@ -1259,21 +1259,20 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         for (const cid of cids) {
             // Check if we already have the operation locally
-            if (await this.db.hasOperation(cid)) {
-                const op = await this.db.getOperation(cid);
-                if (op) {
-                    operations.push(op);
-                    opidMap.set(op, cid);
-                }
-            } else {
+            let op = await this.db.getOperation(cid);
+
+            if (!op) {
                 // Fetch from IPFS
-                const op = await this.ipfs.getJSON(cid) as Operation | null;
+                op = await this.ipfs.getJSON(cid) as Operation | null;
                 if (op) {
                     // Store locally for future lookups
                     await this.db.addOperation(cid, op);
-                    operations.push(op);
-                    opidMap.set(op, cid);
                 }
+            }
+
+            if (op) {
+                operations.push(op);
+                opidMap.set(op, cid);
             }
         }
 

@@ -211,9 +211,4 @@ export abstract class AbstractJson implements GatekeeperDb {
         const db = this.loadDb();
         return db.ops?.[opid] ?? null;
     }
-
-    async hasOperation(opid: string): Promise<boolean> {
-        const db = this.loadDb();
-        return !!(db.ops && opid in db.ops);
-    }
 }

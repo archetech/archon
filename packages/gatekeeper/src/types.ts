@@ -97,7 +97,6 @@ export interface GatekeeperDb {
     getBlock(registry: string, blockId?: BlockId): Promise<BlockInfo | null>;
     addOperation(opid: string, op: Operation): Promise<void>;
     getOperation(opid: string): Promise<Operation | null>;
-    hasOperation(opid: string): Promise<boolean>;
 }
 
 export interface GatekeeperOptions {

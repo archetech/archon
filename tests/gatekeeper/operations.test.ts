@@ -50,16 +50,16 @@ describe('DB operation storage', () => {
         expect(retrieved).toBeNull();
     });
 
-    it('should check if operation exists', async () => {
+    it('should return null before adding, and operation after adding', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const opid = await gatekeeper.generateCID(agentOp);
 
-        expect(await db.hasOperation(opid)).toBe(false);
+        expect(await db.getOperation(opid)).toBeNull();
 
         await db.addOperation(opid, agentOp);
 
-        expect(await db.hasOperation(opid)).toBe(true);
+        expect(await db.getOperation(opid)).toStrictEqual(agentOp);
     });
 
     it('should overwrite operation with same opid', async () => {
@@ -296,7 +296,7 @@ describe('importBatchByCids', () => {
         const cid = await ipfs.addJSON(agentOp);
 
         // Verify operation is not in local DB
-        expect(await db.hasOperation(cid)).toBe(false);
+        expect(await db.getOperation(cid)).toBeNull();
 
         const metadata = {
             registry: 'hyperswarm',
@@ -307,7 +307,6 @@ describe('importBatchByCids', () => {
         await gatekeeper.importBatchByCids([cid], metadata);
 
         // Verify operation is now stored locally
-        expect(await db.hasOperation(cid)).toBe(true);
         const storedOp = await db.getOperation(cid);
         expect(storedOp).toStrictEqual(agentOp);
     });

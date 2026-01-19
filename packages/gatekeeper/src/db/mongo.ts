@@ -279,17 +279,4 @@ export default class DbMongo implements GatekeeperDb {
 
         return doc as Operation | null;
     }
-
-    async hasOperation(opid: string): Promise<boolean> {
-        if (!this.db) {
-            throw new Error(MONGO_NOT_STARTED_ERROR);
-        }
-
-        const doc = await this.db.collection('operations').findOne(
-            { opid },
-            { projection: { _id: 1 } }
-        );
-
-        return !!doc;
-    }
 }

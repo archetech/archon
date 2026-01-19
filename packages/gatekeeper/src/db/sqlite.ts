@@ -365,17 +365,4 @@ export default class DbSqlite implements GatekeeperDb {
 
         return row ? JSON.parse(row.operation) : null;
     }
-
-    async hasOperation(opid: string): Promise<boolean> {
-        if (!this.db) {
-            throw new Error(SQLITE_NOT_STARTED_ERROR);
-        }
-
-        const row = await this.db.get<{ opid: string }>(
-            'SELECT 1 FROM operations WHERE opid = ?',
-            opid
-        );
-
-        return !!row;
-    }
 }
