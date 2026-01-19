@@ -147,7 +147,7 @@ describe('importBatchByCids', () => {
         const cids = [];
 
         for (let i = 0; i < 3; i++) {
-            const assetOp = await helper.createAssetOp(agentDid, keypair, { registry: 'hyperswarm' });
+            const assetOp = await helper.createAssetOp(agentDid, keypair, { registry: 'hyperswarm', data: `asset-${i}` });
             const cid = await ipfs.addJSON(assetOp);
             cids.push(cid);
         }
