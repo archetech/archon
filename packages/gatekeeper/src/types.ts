@@ -71,6 +71,7 @@ export interface GatekeeperEvent {
     did?: string;
     opid?: string;
     registration?: DidRegistration;
+    blockchain?: DidRegistration;
 }
 
 export interface GatekeeperDb {
