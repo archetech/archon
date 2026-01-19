@@ -313,15 +313,16 @@ describe('importBatchByCids', () => {
     });
 
     it('should handle mix of local and IPFS operations', async () => {
-        const keypair = cipher.generateRandomJwk();
+        const keypair1 = cipher.generateRandomJwk();
+        const keypair2 = cipher.generateRandomJwk();
 
         // Create first operation and store locally
-        const agentOp1 = await helper.createAgentOp(keypair, { registry: 'hyperswarm' });
+        const agentOp1 = await helper.createAgentOp(keypair1, { registry: 'hyperswarm' });
         const cid1 = await gatekeeper.generateCID(agentOp1);
         await db.addOperation(cid1, agentOp1);
 
         // Create second operation and store in IPFS only
-        const agentOp2 = await helper.createAgentOp(keypair, { registry: 'hyperswarm' });
+        const agentOp2 = await helper.createAgentOp(keypair2, { registry: 'hyperswarm' });
         const cid2 = await ipfs.addJSON(agentOp2);
 
         const metadata = {
