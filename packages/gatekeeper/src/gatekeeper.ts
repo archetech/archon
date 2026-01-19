@@ -1254,37 +1254,30 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidParameterError('metadata');
         }
 
-        const operations: Operation[] = [];
-        const opidMap: Map<Operation, string> = new Map();
+        const events: GatekeeperEvent[] = [];
 
-        for (const cid of cids) {
-            // Check if we already have the operation locally
+        for (let i = 0; i < cids.length; i++) {
+            const cid = cids[i];
             let op = await this.db.getOperation(cid);
 
             if (!op) {
-                // Fetch from IPFS
                 op = await this.ipfs.getJSON(cid) as Operation | null;
                 if (op) {
-                    // Store locally for future lookups
                     await this.db.addOperation(cid, op);
                 }
             }
 
             if (op) {
-                operations.push(op);
-                opidMap.set(op, cid);
+                events.push({
+                    registry: metadata.registry,
+                    time: metadata.time,
+                    ordinal: [...metadata.ordinal, i],
+                    operation: op,
+                    opid: cid,
+                    registration: metadata.registration,
+                });
             }
         }
-
-        // Build events from operations
-        const events: GatekeeperEvent[] = operations.map((op, i) => ({
-            registry: metadata.registry,
-            time: metadata.time,
-            ordinal: [...metadata.ordinal, i],
-            operation: op,
-            opid: opidMap.get(op),
-            registration: metadata.registration,
-        }));
 
         return this.importBatch(events);
     }
