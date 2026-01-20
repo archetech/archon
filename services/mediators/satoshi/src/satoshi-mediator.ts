@@ -1,4 +1,5 @@
 import BtcClient, {Block, BlockVerbose, BlockHeader, FundRawTransactionOptions, MempoolEntry} from 'bitcoin-core';
+import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import KeymasterClient from '@didcid/keymaster/client';
 import JsonFile from './db/jsonfile.js';
@@ -15,6 +16,7 @@ const SMART_FEE_MODE = "CONSERVATIVE";
 
 const READ_ONLY = config.exportInterval === 0;
 
+const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
 const keymaster = new KeymasterClient();
 const btcClient = new BtcClient({
@@ -499,8 +501,11 @@ async function anchorBatch(): Promise<void> {
     if (operations.length > 0) {
         console.log(JSON.stringify(operations, null, 4));
 
-        // Save each operation to IPFS and collect CIDs
-        const cids = await Promise.all(operations.map(op => gatekeeper.addJSON(op)));
+        // Save each operation to IPFS and collect CIDs (canonicalize for deterministic CIDs)
+        const cids = await Promise.all(operations.map(op => {
+            const canonical = JSON.parse(cipher.canonicalizeJSON(op));
+            return gatekeeper.addJSON(canonical);
+        }));
         const batch = { version: 1, ops: cids };
         const did = await keymaster.createAsset({ batch }, { registry: 'hyperswarm', controller: config.nodeID });
         const txid = await createOpReturnTxn(did);
