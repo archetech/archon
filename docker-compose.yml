@@ -85,7 +85,7 @@ services:
       - mongodb
       - search-server
 
-  hypr-mediator:
+  hyperswarm-mediator:
     build:
       context: .
       dockerfile: Dockerfile.hyperswarm

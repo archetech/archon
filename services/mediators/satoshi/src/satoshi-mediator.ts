@@ -593,7 +593,7 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
 async function syncBlocks(): Promise<void> {
     try {
         const latest = await gatekeeper.getBlock(REGISTRY);
-        const currentMax = latest ? latest.height : config.startBlock;
+        const currentMax = Math.max(latest?.height ?? 0, config.startBlock);
         const blockCount = await btcClient.getBlockCount();
 
         console.log(`current block height: ${blockCount}`);
