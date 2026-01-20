@@ -203,12 +203,14 @@ async function scanBlocks(): Promise<void> {
     }
 }
 
-async function importBatch(item: DiscoveredItem) {
-    if (item.error) {
+async function importBatch(item: DiscoveredItem, retry: boolean = false) {
+    // Skip already processed items (unless retrying)
+    if (item.imported && item.processed) {
         return;
     }
 
-    if (item.imported && item.processed) {
+    // Skip items with errors unless this is a retry
+    if (item.error && !retry) {
         return;
     }
 
@@ -278,6 +280,43 @@ async function importBatches(): Promise<boolean> {
     }
 
     return true;
+}
+
+async function retryFailedImports(): Promise<void> {
+    const db = await loadDb();
+    const failed = db.discovered.filter(item => item.error && !item.imported);
+
+    if (failed.length === 0) {
+        return;
+    }
+
+    console.log(`Retrying ${failed.length} failed import(s)...`);
+
+    for (const item of failed) {
+        try {
+            const update = await importBatch(item, true);
+            if (!update) {
+                continue;
+            }
+
+            await jsonPersister.updateDb((db) => {
+                const list = db.discovered ?? [];
+                const idx = list.findIndex(d => sameItem(d, update));
+                if (idx >= 0) {
+                    list[idx] = update;
+                }
+            });
+
+            if (update.imported) {
+                console.log(`Successfully imported ${item.did}`);
+            }
+        }
+        catch (error: any) {
+            if (error.error !== 'DID not found') {
+                console.error(`Retry failed for ${item.did}: ${error.error || JSON.stringify(error)}`);
+            }
+        }
+    }
 }
 
 export async function createOpReturnTxn(opReturnData: string): Promise<string | undefined> {
@@ -502,6 +541,7 @@ async function importLoop(): Promise<void> {
     try {
         await scanBlocks();
         await importBatches();
+        await retryFailedImports();
     } catch (error: any) {
         console.error(`Error in importLoop: ${error.error || JSON.stringify(error)}`);
     } finally {
