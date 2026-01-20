@@ -17,7 +17,7 @@ services:
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
-      - ARCHON_SAT_CHAIN=Signet
+      - ARCHON_SAT_CHAIN=BTC:signet
       - ARCHON_SAT_NETWORK=testnet
       - ARCHON_SAT_HOST=btc-signet-node
       - ARCHON_SAT_PORT=38332

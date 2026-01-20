@@ -1,5 +1,5 @@
 include:
-#  - docker-compose.signet.yml
+  - docker-compose.btc-signet.yml
 #  - docker-compose.btc-testnet4.yml
   - docker-compose.ftc-testnet5.yml
 
