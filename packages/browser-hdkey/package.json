@@ -29,6 +29,10 @@
     "url": "https://github.com/KeychainMDIP/browser-hdkey/issues"
   },
   "homepage": "https://github.com/KeychainMDIP/browser-hdkey",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
   "files": [
     "./lib/hdkey.d.ts",
     "./lib/hdkey.js"
