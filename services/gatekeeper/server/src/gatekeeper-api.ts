@@ -3,7 +3,11 @@ import morgan from 'morgan';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import { EventEmitter } from 'events';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
 
 import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonCache from '@didcid/gatekeeper/db/json-cache';
@@ -107,17 +111,17 @@ v1router.get('/ready', async (req, res) => {
  *     summary: Retrieve the API version
  *     responses:
  *       200:
- *         description: The API version number.
+ *         description: The API version string.
  *         content:
  *           application/json:
  *             schema:
- *               type: integer
+ *               type: string
  *       500:
  *         description: Internal Server Error.
  */
 v1router.get('/version', async (req, res) => {
     try {
-        res.json(1);
+        res.json(pkg.version);
     } catch (error: any) {
         res.status(500).send(error.toString());
     }
