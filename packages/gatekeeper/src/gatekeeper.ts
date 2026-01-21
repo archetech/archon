@@ -988,8 +988,12 @@ export default class Gatekeeper implements GatekeeperInterface {
 
                     return ImportStatus.MERGED;
                 } else {
-                    const ok = await this.verifyOperation(event.operation);
+                    // Reject update/delete operations without previd (check before expensive signature verification)
+                    if (currentEvents.length > 0 && !event.operation.previd) {
+                        return ImportStatus.REJECTED;
+                    }
 
+                    const ok = await this.verifyOperation(event.operation);
                     if (!ok) {
                         return ImportStatus.REJECTED;
                     }
@@ -997,11 +1001,6 @@ export default class Gatekeeper implements GatekeeperInterface {
                     if (currentEvents.length === 0) {
                         await this.db.addEvent(did, event);
                         return ImportStatus.ADDED;
-                    }
-
-                    // Reject update operations without previd
-                    if (!event.operation.previd) {
-                        return ImportStatus.REJECTED;
                     }
 
                     const idMatch = currentEvents.find(item => item.opid === event.operation.previd);
