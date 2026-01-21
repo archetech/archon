@@ -6,7 +6,6 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 
 const SettingsTab = () => {
     const [gatekeeperUrl, setGatekeeperUrl] = useState<string>("");
-    const [searchServerUrl, setSearchServerUrl] = useState<string>("");
     const {
         initialiseServices,
         initialiseWallet
@@ -16,9 +15,8 @@ const SettingsTab = () => {
     useEffect(() => {
         const init = async () => {
             try {
-                const result = await chrome.storage.sync.get(["gatekeeperUrl", "searchServerUrl"]);
+                const result = await chrome.storage.sync.get(["gatekeeperUrl"]);
                 setGatekeeperUrl(result.gatekeeperUrl as string);
-                setSearchServerUrl(result.searchServerUrl as string);
             } catch (error: any) {
                 console.error("Error retrieving gatekeeperUrl:", error);
             }
@@ -28,7 +26,7 @@ const SettingsTab = () => {
 
     const handleSave = async () => {
         try {
-            await chrome.storage.sync.set({ gatekeeperUrl, searchServerUrl });
+            await chrome.storage.sync.set({ gatekeeperUrl });
             await initialiseServices();
             await initialiseWallet();
             setSuccess("Services updated");
@@ -46,15 +44,6 @@ const SettingsTab = () => {
                 variant="outlined"
                 value={gatekeeperUrl}
                 onChange={(e) => setGatekeeperUrl(e.target.value)}
-                sx={{ mb: 2 }}
-                className="text-field"
-            />
-
-            <TextField
-                label="Search Server URL"
-                variant="outlined"
-                value={searchServerUrl}
-                onChange={(e) => setSearchServerUrl(e.target.value)}
                 sx={{ mb: 2 }}
                 className="text-field"
             />

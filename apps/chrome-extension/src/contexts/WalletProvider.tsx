@@ -11,7 +11,6 @@ import React, {
 
 import GatekeeperClient from "@didcid/gatekeeper/client";
 import Keymaster from "@didcid/keymaster";
-import SearchClient from "@didcid/keymaster/search";
 import CipherWeb from "@didcid/cipher/web";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
@@ -40,8 +39,6 @@ interface WalletContextValue {
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
-
-let search: SearchClient | undefined;
 
 const INCORRECT_PASSPHRASE = "Incorrect passphrase";
 
@@ -100,16 +97,14 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
     }
 
     async function initialiseServices() {
-        const { gatekeeperUrl, searchServerUrl } = await chrome.storage.sync.get([
+        const { gatekeeperUrl } = await chrome.storage.sync.get([
             "gatekeeperUrl",
-            "searchServerUrl"
         ]);
         await gatekeeper.connect({ url: gatekeeperUrl as string });
-        search = await SearchClient.create({ url: searchServerUrl as string });
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
-        const instance = new Keymaster({ gatekeeper, wallet, cipher, search, passphrase });
+        const instance = new Keymaster({ gatekeeper, wallet, cipher, search: gatekeeper, passphrase });
 
         if (pendingMnemonic) {
             await instance.newWallet(pendingMnemonic, true);
@@ -153,7 +148,7 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
             await walletMemory.saveWallet(pendingWallet as StoredWallet, true);
 
             try {
-                const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search, passphrase });
+                const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search: gatekeeper, passphrase });
                 // check pass
                 await km.loadWallet();
                 await walletChrome.saveWallet(pendingWallet as StoredWallet, true);
@@ -233,7 +228,7 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
     async function handleResetPassphraseSubmit(newPassphrase: string) {
         try {
             const walletWeb = new WalletChrome();
-            const km = new Keymaster({ gatekeeper, wallet: walletWeb, cipher, search, passphrase: newPassphrase });
+            const km = new Keymaster({ gatekeeper, wallet: walletWeb, cipher, search: gatekeeper, passphrase: newPassphrase });
             await km.newWallet(undefined, true);
             setShowResetSetup(false);
             await rebuildKeymaster(newPassphrase);

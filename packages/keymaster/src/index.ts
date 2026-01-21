@@ -1,5 +1,9 @@
 export { default } from './keymaster.js';
 export { default as KeymasterClient } from './keymaster-client.js';
+/**
+ * @deprecated SearchClient is deprecated. Use GatekeeperClient directly as the search engine.
+ * GatekeeperClient now implements the SearchEngine interface.
+ */
 export { default as SearchClient } from './search-client.js';
 export { default as WalletJsonMemory } from './db/json-memory.js';
 export { default as WalletWeb } from './db/web.js';

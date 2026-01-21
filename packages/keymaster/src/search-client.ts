@@ -20,6 +20,18 @@ function throwError(error: AxiosError | any): never {
     throw error;
 }
 
+/**
+ * @deprecated SearchClient is deprecated. Use GatekeeperClient directly as the search engine.
+ * GatekeeperClient now implements the SearchEngine interface.
+ *
+ * @example
+ * // Instead of:
+ * const search = await SearchClient.create({ url: gatekeeperUrl });
+ * new Keymaster({ gatekeeper, wallet, cipher, search, passphrase });
+ *
+ * // Use:
+ * new Keymaster({ gatekeeper, wallet, cipher, search: gatekeeper, passphrase });
+ */
 export default class SearchClient implements SearchEngine {
     private API: string = "/api/v1";
 

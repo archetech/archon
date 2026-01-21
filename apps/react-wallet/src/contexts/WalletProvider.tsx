@@ -12,7 +12,6 @@ import GatekeeperClient from "@didcid/gatekeeper/client";
 import Keymaster from "@didcid/keymaster";
 import { WalletBase, StoredWallet } from '@didcid/keymaster/types';
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
-import SearchClient from "@didcid/keymaster/search";
 import CipherWeb from "@didcid/cipher";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
@@ -24,9 +23,7 @@ import { takeDeepLink } from '../utils/deepLinkQueue';
 import { extractDid } from '../utils/utils';
 import {
     DEFAULT_GATEKEEPER_URL,
-    DEFAULT_SEARCH_SERVER_URL,
     GATEKEEPER_KEY,
-    SEARCH_SERVER_KEY
 } from "../constants"
 import {
     getSessionPassphrase,
@@ -50,8 +47,6 @@ interface WalletContextValue {
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
-
-let search: SearchClient | undefined;
 
 const INCORRECT_PASSPHRASE = "Incorrect passphrase";
 
@@ -106,15 +101,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
     async function initialiseServices() {
         const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
-        const searchServerUrl = localStorage.getItem(SEARCH_SERVER_KEY) || DEFAULT_SEARCH_SERVER_URL;
         localStorage.setItem(GATEKEEPER_KEY, gatekeeperUrl);
-        localStorage.setItem(SEARCH_SERVER_KEY, searchServerUrl);
         await gatekeeper.connect({ url: gatekeeperUrl });
-        search = await SearchClient.create({ url: searchServerUrl });
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
-        const instance = new Keymaster({ gatekeeper, wallet, cipher, search, passphrase });
+        const instance = new Keymaster({ gatekeeper, wallet, cipher, search: gatekeeper, passphrase });
 
         if (pendingMnemonic) {
             await instance.newWallet(pendingMnemonic, true);
@@ -155,7 +147,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             await walletMemory.saveWallet(pendingWallet as StoredWallet, true);
 
             try {
-                const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search, passphrase });
+                const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search: gatekeeper, passphrase });
                 // check pass
                 await km.loadWallet();
                 await walletWeb.saveWallet(pendingWallet as StoredWallet, true);
@@ -263,7 +255,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     async function handleResetPassphraseSubmit(newPassphrase: string) {
         try {
             const walletWeb = new WalletWeb();
-            const km = new Keymaster({ gatekeeper, wallet: walletWeb, cipher, search, passphrase: newPassphrase });
+            const km = new Keymaster({ gatekeeper, wallet: walletWeb, cipher, search: gatekeeper, passphrase: newPassphrase });
             await km.newWallet(undefined, true);
             setShowResetSetup(false);
             await rebuildKeymaster(newPassphrase);

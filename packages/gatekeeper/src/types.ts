@@ -165,6 +165,7 @@ export interface GatekeeperInterface {
     generateDID(operation: Operation): Promise<string>;
     searchDocs(q: string): Promise<string[]>;
     queryDocs(where: Record<string, unknown>): Promise<string[]>;
+    search(query: { where: Record<string, unknown> }): Promise<string[]>;
 }
 
 export interface DidRegistration {

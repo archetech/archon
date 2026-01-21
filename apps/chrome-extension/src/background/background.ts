@@ -1,22 +1,17 @@
 import {openBrowserValues} from "../contexts/UIContext";
 
 const DEFAULT_GATEKEEPER_URL = "http://localhost:4224";
-const DEFAULT_SEARCH_SERVER_URL = "http://localhost:4224";
 
 async function ensureDefaultSettings() {
     try {
-        const { gatekeeperUrl, searchServerUrl } = await chrome.storage.sync.get([
+        const { gatekeeperUrl } = await chrome.storage.sync.get([
             "gatekeeperUrl",
-            "searchServerUrl",
         ]);
 
         const updates: Record<string, string> = {};
 
         if (gatekeeperUrl === undefined) {
             updates.gatekeeperUrl = DEFAULT_GATEKEEPER_URL;
-        }
-        if (searchServerUrl === undefined) {
-            updates.searchServerUrl = DEFAULT_SEARCH_SERVER_URL;
         }
 
         if (Object.keys(updates).length) {

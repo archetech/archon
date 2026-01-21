@@ -441,3 +441,31 @@ describe('queryDocs path edge cases', () => {
         expect(results).toContain(assetDid);
     });
 });
+
+describe('search (SearchEngine interface)', () => {
+    it('should implement SearchEngine interface via search() method', async () => {
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await helper.createAgentOp(keypair);
+        const agentDid = await gatekeeper.createDID(agentOp);
+
+        const assetOp = await helper.createAssetOp(agentDid, keypair, {
+            data: { type: 'credential', issuer: agentDid }
+        });
+        const assetDid = await gatekeeper.createDID(assetOp);
+
+        // Use the SearchEngine interface method
+        const results = await gatekeeper.search({
+            where: { 'type': { $in: ['credential'] } }
+        });
+        expect(results).toContain(assetDid);
+    });
+
+    it('should allow gatekeeper to be used as search engine in Keymaster options', async () => {
+        // Verify gatekeeper implements SearchEngine interface by checking the method exists
+        expect(typeof gatekeeper.search).toBe('function');
+
+        // The search method should accept the same format as SearchClient
+        const results = await gatekeeper.search({ where: {} });
+        expect(Array.isArray(results)).toBe(true);
+    });
+});

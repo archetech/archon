@@ -258,6 +258,9 @@ export interface RestClientOptions {
 export interface KeymasterClientOptions extends RestClientOptions {
 }
 
+/**
+ * @deprecated SearchClientOptions is deprecated. Use GatekeeperClient directly as the search engine.
+ */
 export interface SearchClientOptions extends RestClientOptions {
 }
 
