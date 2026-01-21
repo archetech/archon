@@ -55,9 +55,14 @@ export default class DbRedis implements GatekeeperDb {
         return totalDeleted;
     }
 
-    addEvent(did: string, event: GatekeeperEvent): Promise<number> {
+    async addEvent(did: string, event: GatekeeperEvent): Promise<number> {
         if (!this.redis) {
             throw new Error(REDIS_NOT_STARTED_ERROR)
+        }
+
+        // Store operation separately if present
+        if (event.opid && event.operation) {
+            await this.addOperation(event.opid, event.operation);
         }
 
         const key = this.didKey(did);

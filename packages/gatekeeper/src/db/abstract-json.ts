@@ -54,6 +54,13 @@ export abstract class AbstractJson implements GatekeeperDb {
         const suffix = this.splitSuffix(did);
         return this.runExclusive(async () => {
             const db = this.loadDb();
+            if (!db.ops) {
+                db.ops = {};
+            }
+            // Store operation separately if present
+            if (event.opid && event.operation) {
+                db.ops[event.opid] = event.operation;
+            }
             // Strip operation and store only opid reference
             const { operation, ...strippedEvent } = event;
             if (db.dids[suffix]) {

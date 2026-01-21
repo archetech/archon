@@ -124,6 +124,10 @@ export default class DbSqlite implements GatekeeperDb {
         return this.runExclusive(() =>
             this.withTx(async () => {
                 const id = this.splitSuffix(did);
+                // Store operation separately if present
+                if (event.opid && event.operation) {
+                    await this.addOperationStrict(event.opid, event.operation);
+                }
                 const events = await this.getEventsStrictRaw(id);
                 // Strip operation and store only opid reference
                 const { operation, ...strippedEvent } = event;

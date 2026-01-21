@@ -71,6 +71,11 @@ export default class DbMongo implements GatekeeperDb {
 
         const id = this.splitSuffix(did);
 
+        // Store operation separately if present
+        if (event.opid && event.operation) {
+            await this.addOperation(event.opid, event.operation);
+        }
+
         // Strip operation and store only opid reference
         const { operation, ...strippedEvent } = event;
 
