@@ -1,6 +1,6 @@
 {
   "name": "@didcid/browser-hdkey",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Bitcoin BIP32 hierarchical deterministic keys",
   "main": "lib/hdkey.js",
   "types": "lib/hdkey.d.ts",
