@@ -735,8 +735,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     throw new InvalidOperationError('signature');
                 }
 
-                // TEMP during did:cid, operation.previd is optional
-                if (operation.previd && operation.previd !== doc.didDocumentMetadata?.versionId) {
+                if (!operation.previd || operation.previd !== doc.didDocumentMetadata?.versionId) {
                     throw new InvalidOperationError('previd');
                 }
             }
@@ -1000,10 +999,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                         return ImportStatus.ADDED;
                     }
 
-                    // TEMP during did:cid, operation.previd is optional
+                    // Reject update operations without previd
                     if (!event.operation.previd) {
-                        await this.db.addEvent(did, event);
-                        return ImportStatus.ADDED;
+                        return ImportStatus.REJECTED;
                     }
 
                     const idMatch = currentEvents.find(item => item.opid === event.operation.previd);

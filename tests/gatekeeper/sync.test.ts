@@ -904,30 +904,7 @@ describe('processEvents', () => {
         expect(response1.added).toBe(4);
     });
 
-    it('should handle processing pre-v0.5 event without previd property', async () => {
-        const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair);
-        const agentDID = await gatekeeper.createDID(agentOp);
-        const agentDoc = await gatekeeper.resolveDID(agentDID);
-        const updateOp1 = await helper.createUpdateOp(keypair, agentDID, agentDoc, { excludePrevid: true });
-        await gatekeeper.updateDID(updateOp1);
-
-        const assetOp = await helper.createAssetOp(agentDID, keypair);
-        const assetDID = await gatekeeper.createDID(assetOp);
-        const assetDoc = await gatekeeper.resolveDID(assetDID);
-        const updateOp2 = await helper.createUpdateOp(keypair, assetDID, assetDoc, { excludePrevid: true });
-        await gatekeeper.updateDID(updateOp2);
-
-        const dids = await gatekeeper.exportDIDs();
-        const ops = dids.flat();
-        await gatekeeper.resetDb();
-        await gatekeeper.importBatch(ops);
-
-        const response = await gatekeeper.processEvents();
-        expect(response.added).toBe(4);
-    });
-
-    it('should handle processing events with unknown previd property', async () => {
+    it('should defer events with unknown previd property', async () => {
         const mockPrevid = 'mockPrevid';
 
         const keypair = cipher.generateRandomJwk();
@@ -951,6 +928,32 @@ describe('processEvents', () => {
         const response = await gatekeeper.processEvents();
         expect(response.added).toBe(2);
         expect(response.pending).toBe(2);
+    });
+
+    it('should reject update events without previd property', async () => {
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await helper.createAgentOp(keypair);
+        const agentDID = await gatekeeper.createDID(agentOp);
+        const agentDoc = await gatekeeper.resolveDID(agentDID);
+        const updateOp = await helper.createUpdateOp(keypair, agentDID, agentDoc, { excludePrevid: true });
+
+        const dids = await gatekeeper.exportDIDs();
+        const ops = dids.flat();
+        await gatekeeper.resetDb();
+
+        // Add the update event without previd
+        ops.push({
+            registry: 'local',
+            time: new Date().toISOString(),
+            ordinal: [0],
+            operation: updateOp,
+        });
+
+        await gatekeeper.importBatch(ops);
+
+        const response = await gatekeeper.processEvents();
+        expect(response.added).toBe(1);  // Only the create op
+        expect(response.rejected).toBe(1);  // Update without previd rejected
     });
 
     it('should reject events with duplicate previd property', async () => {
