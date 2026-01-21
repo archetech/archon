@@ -19,11 +19,6 @@ export default class SearchIndex {
         }
     }
 
-    get(did: string): object | null {
-        const v = this.docs.get(did);
-        return v ? JSON.parse(JSON.stringify(v)) : null;
-    }
-
     delete(did: string): void {
         this.docs.delete(did);
     }
