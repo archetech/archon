@@ -1,6 +1,6 @@
 {
   "name": "gatekeeper-server",
-  "version": "1.4.0-beta.5",
+  "version": "0.1.0",
   "type": "module",
   "description": "Archon Gatekeeper REST API server",
   "main": "src/index.js",
