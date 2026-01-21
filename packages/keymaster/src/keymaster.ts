@@ -3498,7 +3498,7 @@ export default class Keymaster implements KeymasterInterface {
 
         // Search for all notice DIDs sent to the current ID
         const where = {
-            "didDocumentData.notice.to[*]": {
+            "notice.to[*]": {
                 "$in": [id.did]
             }
         };

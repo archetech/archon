@@ -1,12 +1,22 @@
 type JSONObject = Record<string, unknown>;
 
+interface DidCidDocumentLike {
+    didDocumentData?: unknown;
+}
+
 export default class SearchIndex {
     private docs = new Map<string, JSONObject>();
     private static readonly ARRAY_WILDCARD_END = /\[\*]$/;
     private static readonly ARRAY_WILDCARD_MID = /\[\*]\./;
 
     store(did: string, doc: object): void {
-        this.docs.set(did, JSON.parse(JSON.stringify(doc)) as JSONObject);
+        // Only index didDocumentData to focus on actual content
+        const data = (doc as DidCidDocumentLike).didDocumentData;
+        if (data && typeof data === 'object') {
+            this.docs.set(did, JSON.parse(JSON.stringify(data)) as JSONObject);
+        } else {
+            this.docs.set(did, {});
+        }
     }
 
     get(did: string): object | null {
