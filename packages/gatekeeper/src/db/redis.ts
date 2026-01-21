@@ -55,13 +55,20 @@ export default class DbRedis implements GatekeeperDb {
         return totalDeleted;
     }
 
-    addEvent(did: string, event: GatekeeperEvent): Promise<number> {
+    async addEvent(did: string, event: GatekeeperEvent): Promise<number> {
         if (!this.redis) {
             throw new Error(REDIS_NOT_STARTED_ERROR)
         }
 
+        // Store operation separately if present
+        if (event.opid && event.operation) {
+            await this.addOperation(event.opid, event.operation);
+        }
+
         const key = this.didKey(did);
-        const val = JSON.stringify(event);
+        // Strip operation and store only opid reference
+        const { operation, ...strippedEvent } = event;
+        const val = JSON.stringify(strippedEvent);
 
         return this.redis.rpush(key, val);
     }
@@ -72,7 +79,16 @@ export default class DbRedis implements GatekeeperDb {
         }
 
         const key = this.didKey(did);
-        const payloads = events.map(e => JSON.stringify(e));
+
+        // Update operations in ops store if modified, then strip from events
+        const payloads: string[] = [];
+        for (const event of events) {
+            if (event.opid && event.operation) {
+                await this.addOperation(event.opid, event.operation);
+            }
+            const { operation, ...stripped } = event;
+            payloads.push(JSON.stringify(stripped));
+        }
 
         await this.runExclusive(async () => {
             const multi = this.redis!.multi().del(key);
@@ -99,8 +115,26 @@ export default class DbRedis implements GatekeeperDb {
             throw new Error(REDIS_NOT_STARTED_ERROR)
         }
 
-        const events = await this.redis.lrange(this.didKey(did), 0, -1);
-        return events.map(event => JSON.parse(event));
+        const rawEvents = await this.redis.lrange(this.didKey(did), 0, -1);
+        const events: GatekeeperEvent[] = rawEvents.map(event => JSON.parse(event));
+
+        // Hydrate operations from ops store
+        const hydrated: GatekeeperEvent[] = [];
+        for (const event of events) {
+            if (event.operation) {
+                hydrated.push(event);
+            } else if (event.opid) {
+                const operation = await this.getOperation(event.opid);
+                if (operation) {
+                    hydrated.push({ ...event, operation });
+                } else {
+                    hydrated.push(event);
+                }
+            } else {
+                hydrated.push(event);
+            }
+        }
+        return hydrated;
     }
 
     async deleteEvents(did: string): Promise<number> {
@@ -215,6 +249,10 @@ export default class DbRedis implements GatekeeperDb {
         return `${this.dbName}/registry/${registry}/maxHeight`;
     }
 
+    private operationKey(opid: string): string {
+        return `${this.dbName}/ops/${opid}`;
+    }
+
 
     async addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean> {
         if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
@@ -274,5 +312,22 @@ export default class DbRedis implements GatekeeperDb {
         } catch (error) {
             return null;
         }
+    }
+
+    async addOperation(opid: string, op: Operation): Promise<void> {
+        if (!this.redis) {
+            throw new Error(REDIS_NOT_STARTED_ERROR);
+        }
+
+        await this.redis.set(this.operationKey(opid), JSON.stringify(op));
+    }
+
+    async getOperation(opid: string): Promise<Operation | null> {
+        if (!this.redis) {
+            throw new Error(REDIS_NOT_STARTED_ERROR);
+        }
+
+        const json = await this.redis.get(this.operationKey(opid));
+        return json ? JSON.parse(json) : null;
     }
 }

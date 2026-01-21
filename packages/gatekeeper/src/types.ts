@@ -6,6 +6,7 @@ export interface JsonDbFile {
     queue?: Record<string, Operation[]>
     blocks?: Record<string, any>
     hashes?: Record<string, any>
+    ops?: Record<string, Operation>
 }
 
 export interface ImportBatchResult {
@@ -13,6 +14,13 @@ export interface ImportBatchResult {
     processed: number;
     rejected: number;
     total: number;
+}
+
+export interface BatchMetadata {
+    registry: string;
+    time: string;
+    ordinal: number[];
+    registration?: DidRegistration;
 }
 
 export interface ProcessEventsResult {
@@ -87,6 +95,8 @@ export interface GatekeeperDb {
     clearQueue(registry: string, batch: Operation[]): Promise<boolean>;
     addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean>;
     getBlock(registry: string, blockId?: BlockId): Promise<BlockInfo | null>;
+    addOperation(opid: string, op: Operation): Promise<void>;
+    getOperation(opid: string): Promise<Operation | null>;
 }
 
 export interface GatekeeperOptions {
@@ -140,6 +150,7 @@ export interface GatekeeperInterface {
     removeDIDs(dids: string[]): Promise<boolean>;
     exportBatch(dids?: string[]): Promise<GatekeeperEvent[]>;
     importBatch(batch: GatekeeperEvent[]): Promise<ImportBatchResult>;
+    importBatchByCids(cids: string[], metadata: BatchMetadata): Promise<ImportBatchResult>;
     processEvents(): Promise<ProcessEventsResult>;
     getQueue(registry: string): Promise<Operation[]>;
     clearQueue(registry: string, events: Operation[]): Promise<boolean>;

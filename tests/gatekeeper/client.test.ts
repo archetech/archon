@@ -24,6 +24,7 @@ const Endpoints = {
     batch: {
         export: '/api/v1/batch/export',
         import: '/api/v1/batch/import',
+        importCids: '/api/v1/batch/import/cids',
     },
     registries: '/api/v1/registries',
     queue: '/api/v1/queue',
@@ -547,6 +548,42 @@ describe('importBatch', () => {
         try {
             // @ts-expect-error Testing without arguments
             await gatekeeper.importBatch();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('importBatchByCids', () => {
+    const mockCids = ['cid1', 'cid2'];
+    const mockMetadata = {
+        registry: 'hyperswarm',
+        time: '2024-01-01T00:00:00.000Z',
+        ordinal: [100, 0],
+    };
+
+    it('should return imported batch results', async () => {
+        nock(GatekeeperURL)
+            .post(Endpoints.batch.importCids)
+            .reply(200, { added: 2, merged: 0, rejected: 0 });
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        const results = await gatekeeper.importBatchByCids(mockCids, mockMetadata);
+
+        expect(results).toStrictEqual({ added: 2, merged: 0, rejected: 0 });
+    });
+
+    it('should throw exception on importBatchByCids server error', async () => {
+        nock(GatekeeperURL)
+            .post(Endpoints.batch.importCids)
+            .reply(500, ServerError);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        try {
+            await gatekeeper.importBatchByCids(mockCids, mockMetadata);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

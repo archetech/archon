@@ -1,4 +1,5 @@
 import BtcClient, {Block, BlockVerbose, BlockHeader, FundRawTransactionOptions, MempoolEntry} from 'bitcoin-core';
+import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import KeymasterClient from '@didcid/keymaster/client';
 import JsonFile from './db/jsonfile.js';
@@ -8,13 +9,14 @@ import JsonSQLite from './db/sqlite.js';
 import config from './config.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
-import { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
+import { DidRegistration } from '@didcid/gatekeeper/types';
 
 const REGISTRY = config.chain;
 const SMART_FEE_MODE = "CONSERVATIVE";
 
 const READ_ONLY = config.exportInterval === 0;
 
+const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
 const keymaster = new KeymasterClient();
 const btcClient = new BtcClient({
@@ -163,7 +165,7 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
 
             try {
                 const textString = Buffer.from(parts[1], 'hex').toString('utf8');
-                if (isValidDID(textString)) {
+                if (textString.startsWith('did:cid:') && isValidDID(textString)) {
                     await jsonPersister.updateDb((db) => {
                         db.discovered.push({ height, index: i, time: timestamp, txid, did: textString });
                     });
@@ -203,45 +205,43 @@ async function scanBlocks(): Promise<void> {
     }
 }
 
-async function importBatch(item: DiscoveredItem) {
-    if (item.error) {
-        return;
-    }
-
+async function importBatch(item: DiscoveredItem, retry: boolean = false) {
+    // Skip already processed items (unless retrying)
     if (item.imported && item.processed) {
         return;
     }
 
-    const asset = await keymaster.resolveAsset(item.did);
-    const queue = (asset as { batch?: Operation[] }).batch || asset;
-
-    // Skip badly formatted batches
-    if (!queue || !Array.isArray(queue) || queue.length === 0) {
+    // Skip items with errors unless this is a retry
+    if (item.error && !retry) {
         return;
     }
 
-    const batch: GatekeeperEvent[] = [];
+    const asset = await keymaster.resolveAsset(item.did);
+    const batch = (asset as { batch?: { version: number; ops: string[] } }).batch;
 
-    for (let i = 0; i < queue.length; i++) {
-        batch.push({
-            registry: REGISTRY,
-            time: item.time,
-            ordinal: [item.height, item.index, i],
-            operation: queue[i],
-            registration: {
-                height: item.height,
-                index: item.index,
-                txid: item.txid,
-                batch: item.did,
-                opidx: i,
-            }
-        });
+    // Skip badly formatted batches
+    if (!batch || batch.version !== 1 || !Array.isArray(batch.ops) || batch.ops.length === 0) {
+        return;
     }
+
+    const cids = batch.ops;
+
+    const metadata = {
+        registry: REGISTRY,
+        time: item.time,
+        ordinal: [item.height, item.index],
+        registration: {
+            height: item.height,
+            index: item.index,
+            txid: item.txid,
+            batch: item.did,
+        } as DidRegistration,
+    };
 
     let update: DiscoveredItem = { ...item };
 
     try {
-        update.imported = await gatekeeper.importBatch(batch);
+        update.imported = await gatekeeper.importBatchByCids(cids, metadata);
         update.processed = await gatekeeper.processEvents();
     } catch (error) {
         update.error = JSON.stringify(error);
@@ -282,6 +282,43 @@ async function importBatches(): Promise<boolean> {
     }
 
     return true;
+}
+
+async function retryFailedImports(): Promise<void> {
+    const db = await loadDb();
+    const failed = db.discovered.filter(item => item.error && !item.imported);
+
+    if (failed.length === 0) {
+        return;
+    }
+
+    console.log(`Retrying ${failed.length} failed import(s)...`);
+
+    for (const item of failed) {
+        try {
+            const update = await importBatch(item, true);
+            if (!update) {
+                continue;
+            }
+
+            await jsonPersister.updateDb((db) => {
+                const list = db.discovered ?? [];
+                const idx = list.findIndex(d => sameItem(d, update));
+                if (idx >= 0) {
+                    list[idx] = update;
+                }
+            });
+
+            if (update.imported) {
+                console.log(`Successfully imported ${item.did}`);
+            }
+        }
+        catch (error: any) {
+            if (error.error !== 'DID not found') {
+                console.error(`Retry failed for ${item.did}: ${error.error || JSON.stringify(error)}`);
+            }
+        }
+    }
 }
 
 export async function createOpReturnTxn(opReturnData: string): Promise<string | undefined> {
@@ -459,16 +496,22 @@ async function anchorBatch(): Promise<void> {
         return;
     }
 
-    const batch = await gatekeeper.getQueue(REGISTRY);
+    const operations = await gatekeeper.getQueue(REGISTRY);
 
-    if (batch.length > 0) {
-        console.log(JSON.stringify(batch, null, 4));
+    if (operations.length > 0) {
+        console.log(JSON.stringify(operations, null, 4));
 
+        // Save each operation to IPFS and collect CIDs (canonicalize for deterministic CIDs)
+        const cids = await Promise.all(operations.map(op => {
+            const canonical = JSON.parse(cipher.canonicalizeJSON(op));
+            return gatekeeper.addJSON(canonical);
+        }));
+        const batch = { version: 1, ops: cids };
         const did = await keymaster.createAsset({ batch }, { registry: 'hyperswarm', controller: config.nodeID });
         const txid = await createOpReturnTxn(did);
 
         if (txid) {
-            const ok = await gatekeeper.clearQueue(REGISTRY, batch);
+            const ok = await gatekeeper.clearQueue(REGISTRY, operations);
 
             if (ok) {
                 const blockCount = await btcClient.getBlockCount();
@@ -503,6 +546,7 @@ async function importLoop(): Promise<void> {
     try {
         await scanBlocks();
         await importBatches();
+        await retryFailedImports();
     } catch (error: any) {
         console.error(`Error in importLoop: ${error.error || JSON.stringify(error)}`);
     } finally {
@@ -594,7 +638,7 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
 async function syncBlocks(): Promise<void> {
     try {
         const latest = await gatekeeper.getBlock(REGISTRY);
-        const currentMax = latest ? latest.height : config.startBlock;
+        const currentMax = Math.max(latest?.height ?? 0, config.startBlock);
         const blockCount = await btcClient.getBlockCount();
 
         console.log(`current block height: ${blockCount}`);
@@ -606,7 +650,7 @@ async function syncBlocks(): Promise<void> {
             await addBlock(height, blockHash, block.time);
         }
     } catch (error) {
-        console.error(`Error syncing blocks: ${error}`);
+        console.error(`Error syncing blocks:`, error);
     }
 }
 
@@ -616,16 +660,16 @@ async function main() {
         return;
     }
 
-    const jsonFile = new JsonFile(REGISTRY);
+    const jsonFile = new JsonFile(config.dbName);
 
     if (config.db === 'redis') {
-        jsonPersister = await JsonRedis.create(REGISTRY);
+        jsonPersister = await JsonRedis.create(config.dbName);
     }
     else if (config.db === 'mongodb') {
-        jsonPersister = await JsonMongo.create(REGISTRY);
+        jsonPersister = await JsonMongo.create(config.dbName);
     }
     else if (config.db === 'sqlite') {
-        jsonPersister = await JsonSQLite.create(REGISTRY);
+        jsonPersister = await JsonSQLite.create(config.dbName);
     }
     else {
         jsonPersister = jsonFile;

@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export type NetworkName = 'bitcoin' | 'testnet' | 'regtest';
-export type ChainName = 'BTC' | 'BTC/testnet4' | 'Signet' | 'FTC/testnet5';
+export type ChainName = 'BTC:mainnet' | 'BTC:testnet4' | 'BTC:signet' | 'FTC:testnet5';
 export type SatoshiDB = 'json' | 'sqlite' | 'mongodb' | 'redis';
 
 export interface AppConfig {
@@ -26,19 +26,20 @@ export interface AppConfig {
     startBlock: number;
     reimport: boolean;
     db: SatoshiDB;
+    dbName: string;
 }
 
 function toChain(name: string | undefined): ChainName {
     switch (name) {
-    case 'BTC':
+    case 'BTC:mainnet':
     case undefined:
-        return 'BTC';
-    case 'BTC/testnet4':
-        return 'BTC/testnet4';
-    case 'Signet':
-        return 'Signet';
-    case 'FTC/testnet5':
-        return 'FTC/testnet5';
+        return 'BTC:mainnet';
+    case 'BTC:testnet4':
+        return 'BTC:testnet4';
+    case 'BTC:signet':
+        return 'BTC:signet';
+    case 'FTC:testnet5':
+        return 'FTC:testnet5';
     default:
         throw new Error(`Unsupported chain "${name}"`);
     }
@@ -95,6 +96,7 @@ const config: AppConfig = {
     startBlock: process.env.ARCHON_SAT_START_BLOCK ? parseInt(process.env.ARCHON_SAT_START_BLOCK) : 0,
     reimport: process.env.ARCHON_SAT_REIMPORT ? (process.env.ARCHON_SAT_REIMPORT === 'true') : true,
     db: toDB(process.env.ARCHON_SAT_DB),
+    dbName: process.env.ARCHON_SAT_DB_NAME || toChain(process.env.ARCHON_SAT_CHAIN).replace(/:/g, '-'),
 };
 
 export default config;

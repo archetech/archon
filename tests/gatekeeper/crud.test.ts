@@ -15,7 +15,7 @@ const mockConsole = {
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
 const ipfs = new HeliaClient();
-const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'FTC/testnet5'] });
+const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'FTC:testnet5'] });
 const helper = new TestHelper(gatekeeper, cipher);
 
 beforeAll(async () => {
@@ -76,7 +76,7 @@ describe('createDID', () => {
 
     it('should throw exception on unsupported registry', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC/testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC:testnet5' });
 
         const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['hyperswarm'] });
 
@@ -85,7 +85,7 @@ describe('createDID', () => {
             throw new ExpectedExceptionError();
         } catch (error: any) {
             // eslint-disable-next-line
-            expect(error.message).toBe('Invalid operation: registry FTC/testnet5 not supported');
+            expect(error.message).toBe('Invalid operation: registry FTC:testnet5 not supported');
         }
     });
 
@@ -241,17 +241,17 @@ describe('createDID', () => {
     });
 
     it('should throw exception when registry queue exceeds limit', async () => {
-        const gk = new Gatekeeper({ db, ipfs, console: mockConsole, maxQueueSize: 5, registries: ['hyperswarm', 'FTC/testnet5'] });
+        const gk = new Gatekeeper({ db, ipfs, console: mockConsole, maxQueueSize: 5, registries: ['hyperswarm', 'FTC:testnet5'] });
 
         try {
             for (let i = 0; i < 10; i++) {
                 const keypair = cipher.generateRandomJwk();
-                const agentOp = await helper.createAgentOp(keypair, { registry: 'FTC/testnet5' });
+                const agentOp = await helper.createAgentOp(keypair, { registry: 'FTC:testnet5' });
                 await gk.createDID(agentOp);
             }
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: registry FTC/testnet5 not supported');
+            expect(error.message).toBe('Invalid operation: registry FTC:testnet5 not supported');
         }
     });
 });
@@ -462,7 +462,7 @@ describe('resolveDID', () => {
 
     it('should resolve version at specified time', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC/testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC:testnet5' });
         const did = await gatekeeper.createDID(agentOp);
 
         // Add 10 versions
@@ -477,7 +477,7 @@ describe('resolveDID', () => {
         let timestamp = Date.now();
 
         for (const op of ops) {
-            op.registry = 'FTC/testnet5';
+            op.registry = 'FTC:testnet5';
             timestamp += 3600000; // add 1 hour to timestamp for each op
             op.time = new Date(timestamp).toISOString();
         }
@@ -789,10 +789,10 @@ describe('updateDID', () => {
     });
 
     it('should throw exception when registry queue exceeds limit', async () => {
-        const gk = new Gatekeeper({ db, ipfs, console: mockConsole, maxQueueSize: 5, registries: ['hyperswarm', 'FTC/testnet5'] });
+        const gk = new Gatekeeper({ db, ipfs, console: mockConsole, maxQueueSize: 5, registries: ['hyperswarm', 'FTC:testnet5'] });
 
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { registry: 'FTC/testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { registry: 'FTC:testnet5' });
 
         const did = await gk.createDID(agentOp);
         const doc = await gk.resolveDID(did);
@@ -805,7 +805,7 @@ describe('updateDID', () => {
             }
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: registry FTC/testnet5 not supported');
+            expect(error.message).toBe('Invalid operation: registry FTC:testnet5 not supported');
         }
     });
 });

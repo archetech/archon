@@ -613,7 +613,7 @@ v1router.post("/did/generate", async (req, res) => {
  *                       description: The DID type.
  *                     registry:
  *                       type: string
- *                       enum: [ "local", "hyperswarm", "BTC/testnet4", "FTC/testnet5" ]
+ *                       enum: [ "local", "hyperswarm", "BTC:testnet4", "FTC:testnet5" ]
  *                       description: Registry in which this DID is maintained.
  *                     version:
  *                       type: integer
@@ -1144,6 +1144,73 @@ v1router.post('/batch/import', async (req, res) => {
 
 /**
  * @swagger
+ * /batch/import/cids:
+ *   post:
+ *     summary: Import a batch of DID operations by their CIDs
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [cids, metadata]
+ *             properties:
+ *               cids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of operation CIDs to import
+ *               metadata:
+ *                 type: object
+ *                 required: [registry, time, ordinal]
+ *                 properties:
+ *                   registry:
+ *                     type: string
+ *                     description: The registry for the batch
+ *                   time:
+ *                     type: string
+ *                     format: date-time
+ *                     description: Timestamp for the batch
+ *                   ordinal:
+ *                     type: array
+ *                     items:
+ *                       type: number
+ *                     description: Ordinal for ordering events
+ *                   registration:
+ *                     type: object
+ *                     description: Optional blockchain registration metadata
+ *
+ *     responses:
+ *       200:
+ *         description: Result of the import operation
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 queued:
+ *                   type: number
+ *                 processed:
+ *                   type: number
+ *                 rejected:
+ *                   type: number
+ *                 total:
+ *                   type: number
+ */
+v1router.post('/batch/import/cids', async (req, res) => {
+    try {
+        const { cids, metadata } = req.body;
+        const response = await gatekeeper.importBatchByCids(cids, metadata);
+        res.json(response);
+    } catch (error: any) {
+        console.error(error);
+        res.status(500).send(error.toString());
+    }
+});
+
+/**
+ * @swagger
  * /queue/{registry}:
  *   get:
  *     summary: Retrieve the queued events for a specific registry
@@ -1156,7 +1223,7 @@ v1router.post('/batch/import', async (req, res) => {
  *           type: string
  *         description: >
  *           The name of the registry whose queue is being retrieved.
- *           Valid values may include "local", "hyperswarm", "BTC/testnet4", "FTC/testnet5", etc.
+ *           Valid values may include "local", "hyperswarm", "BTC:testnet4", "FTC:testnet5", etc.
  *
  *     responses:
  *       200:

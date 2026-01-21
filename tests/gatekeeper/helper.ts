@@ -119,9 +119,10 @@ export default class TestHelper {
         options: {
             registry?: string;
             validUntil?: string | null;
+            data?: unknown;
         } = {}
     ): Promise<Operation> {
-        const { registry = 'local', validUntil = null } = options;
+        const { registry = 'local', validUntil = null, data = 'mockData' } = options;
         const dataAnchor: Operation = {
             type: "create",
             created: new Date().toISOString(),
@@ -132,7 +133,7 @@ export default class TestHelper {
                 validUntil: validUntil || undefined
             },
             controller: agent,
-            data: "mockData",
+            data,
         };
 
         const msgHash = this.cipher.hashJSON(dataAnchor);

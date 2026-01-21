@@ -44,7 +44,7 @@ Archon is provided as a set of docker containers and scripts:
    ARCHON_NODE_NAME=mynode
    ARCHON_NODE_ID=mynodeID
    ARCHON_GATEKEEPER_DB=json
-   ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,BTC/testnet4,FTC/testnet5
+   ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,BTC:testnet4,FTC:testnet5
 
    ...
    ```

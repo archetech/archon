@@ -417,7 +417,7 @@ function JsonViewer(
                                     }
 
                                     if (type === 'value' &&
-                                        aliasDocs?.didDocumentMetadata?.timestamp?.chain === "BTC/testnet4"
+                                        aliasDocs?.didDocumentMetadata?.timestamp?.chain === "BTC:testnet4"
                                     ) {
                                         const currentKeyString = String(keyName);
                                         let url = '';

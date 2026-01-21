@@ -1,5 +1,6 @@
 import axiosModule, { AxiosError, type AxiosInstance, type AxiosStatic } from 'axios';
 import {
+    BatchMetadata,
     BlockId,
     BlockInfo,
     GatekeeperClientOptions,
@@ -258,6 +259,16 @@ export default class GatekeeperClient implements GatekeeperInterface {
     async importBatch(batch: GatekeeperEvent[]): Promise<ImportBatchResult> {
         try {
             const response = await this.axios.post(`${this.API}/batch/import`, batch);
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async importBatchByCids(cids: string[], metadata: BatchMetadata): Promise<ImportBatchResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/batch/import/cids`, { cids, metadata });
             return response.data;
         }
         catch (error) {

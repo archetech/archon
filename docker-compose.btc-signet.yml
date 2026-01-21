@@ -1,0 +1,42 @@
+services:
+  btc-signet-node:
+    image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
+    volumes:
+      - ./data/btc-signet:/root/.bitcoin
+    ports:
+      - 38332:38332
+
+  btc-signet-mediator:
+    build:
+      context: .
+      dockerfile: Dockerfile.satoshi
+    image: ghcr.io/archetech/satoshi-mediator
+    environment:
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_SAT_CHAIN=BTC:signet
+      - ARCHON_SAT_NETWORK=testnet
+      - ARCHON_SAT_HOST=btc-signet-node
+      - ARCHON_SAT_PORT=38332
+      - ARCHON_SAT_START_BLOCK=${ARCHON_SIGNET_START_BLOCK}
+      - ARCHON_SAT_USER=${ARCHON_SIGNET_USER}
+      - ARCHON_SAT_PASS=${ARCHON_SIGNET_PASS}
+      - ARCHON_SAT_WALLET=${ARCHON_SIGNET_WALLET}
+      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_SIGNET_IMPORT_INTERVAL}
+      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_SIGNET_EXPORT_INTERVAL}
+      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_SIGNET_FEE_BLOCK_TARGET}
+      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_SIGNET_FEE_FALLBACK_SAT_BYTE}
+      - ARCHON_SAT_FEE_MAX=${ARCHON_SIGNET_FEE_MAX}
+      - ARCHON_SAT_RBF_ENABLED=${ARCHON_SIGNET_RBF_ENABLED}
+      - ARCHON_SAT_REIMPORT=${ARCHON_SIGNET_REIMPORT}
+      - ARCHON_SAT_DB=${ARCHON_SIGNET_DB}
+    volumes:
+      - ./data:/app/satoshi/data
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    depends_on:
+      - btc-signet-node
+      - gatekeeper
+      - keymaster

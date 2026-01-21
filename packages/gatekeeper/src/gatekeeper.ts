@@ -7,6 +7,7 @@ import {
 } from '@didcid/common/errors';
 import { IPFSClient } from '@didcid/ipfs/types';
 import {
+    BatchMetadata,
     BlockId,
     BlockInfo,
     CheckDIDsOptions,
@@ -32,10 +33,10 @@ const ValidTypes = ['agent', 'asset'];
 const ValidRegistries = [
     'local',
     'hyperswarm',
-    'BTC/mainnet',
-    'BTC/testnet4',
-    'BTC/signet',
-    'FTC/testnet5',
+    'BTC:mainnet',
+    'BTC:testnet4',
+    'BTC:signet',
+    'FTC:testnet5',
 ];
 
 enum ImportStatus {
@@ -510,11 +511,13 @@ export default class Gatekeeper implements GatekeeperInterface {
                 return did;
             }
 
+            const opid = await this.generateCID(operation, true);
             await this.db.addEvent(did, {
                 registry: 'local',
                 time: operation.created!,
                 ordinal: [0],
                 operation,
+                opid,
                 did
             });
 
@@ -732,8 +735,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     throw new InvalidOperationError('signature');
                 }
 
-                // TEMP during did:cid, operation.previd is optional
-                if (operation.previd && operation.previd !== doc.didDocumentMetadata?.versionId) {
+                if (!operation.previd || operation.previd !== doc.didDocumentMetadata?.versionId) {
                     throw new InvalidOperationError('previd');
                 }
             }
@@ -820,11 +822,13 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         return this.withDidLock(operation.did, async () => {
+            const opid = await this.generateCID(operation, true);
             await this.db.addEvent(operation.did!, {
                 registry: 'local',
                 time: operation.signature?.signed || '',
                 ordinal: [0],
                 operation,
+                opid,
                 did: operation.did
             });
 
@@ -984,19 +988,17 @@ export default class Gatekeeper implements GatekeeperInterface {
 
                     return ImportStatus.MERGED;
                 } else {
-                    const ok = await this.verifyOperation(event.operation);
+                    // Reject update/delete operations without previd (check before expensive signature verification)
+                    if (currentEvents.length > 0 && !event.operation.previd) {
+                        return ImportStatus.REJECTED;
+                    }
 
+                    const ok = await this.verifyOperation(event.operation);
                     if (!ok) {
                         return ImportStatus.REJECTED;
                     }
 
                     if (currentEvents.length === 0) {
-                        await this.db.addEvent(did, event);
-                        return ImportStatus.ADDED;
-                    }
-
-                    // TEMP during did:cid, operation.previd is optional
-                    if (!event.operation.previd) {
                         await this.db.addEvent(did, event);
                         return ImportStatus.ADDED;
                     }
@@ -1242,6 +1244,43 @@ export default class Gatekeeper implements GatekeeperInterface {
             rejected,
             total: this.eventsQueue.length
         };
+    }
+
+    async importBatchByCids(cids: string[], metadata: BatchMetadata): Promise<ImportBatchResult> {
+        if (!cids || !Array.isArray(cids) || cids.length < 1) {
+            throw new InvalidParameterError('cids');
+        }
+
+        if (!metadata || !metadata.registry || !metadata.time || !metadata.ordinal) {
+            throw new InvalidParameterError('metadata');
+        }
+
+        const events: GatekeeperEvent[] = [];
+
+        for (let i = 0; i < cids.length; i++) {
+            const cid = cids[i];
+            let op = await this.db.getOperation(cid);
+
+            if (!op) {
+                op = await this.ipfs.getJSON(cid) as Operation | null;
+                if (op) {
+                    await this.db.addOperation(cid, op);
+                }
+            }
+
+            if (op) {
+                events.push({
+                    registry: metadata.registry,
+                    time: metadata.time,
+                    ordinal: [...metadata.ordinal, i],
+                    operation: op,
+                    opid: cid,
+                    registration: metadata.registration,
+                });
+            }
+        }
+
+        return this.importBatch(events);
     }
 
     async exportBatch(dids?: string[]): Promise<GatekeeperEvent[]> {
