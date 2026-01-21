@@ -1,2 +1,2 @@
 #!/usr/bin/env sh
-docker compose logs -f btc-signet-node signet-mediator
+docker compose logs -f btc-signet-node btc-signet-mediator
