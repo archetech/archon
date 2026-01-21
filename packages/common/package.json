@@ -1,6 +1,6 @@
 {
   "name": "@didcid/common",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Archon common utilities",
   "type": "module",
   "main": "./dist/cjs/index.cjs",
@@ -48,7 +48,6 @@
   "keywords": [],
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
-  "dependencies": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/archetech/archon.git"
