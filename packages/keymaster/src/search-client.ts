@@ -87,6 +87,10 @@ export default class SearchClient implements SearchEngine {
     async isReady(): Promise<boolean> {
         try {
             const response = await axios.get(`${this.API}/ready`);
+            // Handle both gatekeeper format (boolean) and old search-server format ({ ready: boolean })
+            if (typeof response.data === 'boolean') {
+                return response.data;
+            }
             return response.data.ready;
         }
         catch (error) {

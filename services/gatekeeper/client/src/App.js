@@ -22,7 +22,7 @@ const gatekeeper = new GatekeeperClient();
 const cipher = new CipherWeb();
 
 const { protocol, hostname } = window.location;
-const search = await SearchClient.create({ url: `${protocol}//${hostname}:4002` });
+const search = await SearchClient.create({ url: `${protocol}//${hostname}:4224` });
 
 function App() {
     const [isReady, setIsReady] = useState(false);

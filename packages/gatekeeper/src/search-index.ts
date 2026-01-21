@@ -1,34 +1,32 @@
-import { DIDsDb } from "../types.js";
-
 type JSONObject = Record<string, unknown>;
 
-export default class DIDsDbMemory implements DIDsDb {
+export default class SearchIndex {
     private docs = new Map<string, JSONObject>();
-    private config = new Map<string, string>();
     private static readonly ARRAY_WILDCARD_END = /\[\*]$/;
     private static readonly ARRAY_WILDCARD_MID = /\[\*]\./;
 
-    async connect(): Promise<void> {};
-    async disconnect(): Promise<void> {};
-
-    async loadUpdatedAfter(): Promise<string | null> {
-        return this.config.get('updated_after') ?? null;
-    }
-
-    async saveUpdatedAfter(timestamp: string): Promise<void> {
-        this.config.set('updated_after', timestamp);
-    }
-
-    async storeDID(did: string, doc: object): Promise<void> {
+    store(did: string, doc: object): void {
         this.docs.set(did, JSON.parse(JSON.stringify(doc)) as JSONObject);
     }
 
-    async getDID(did: string): Promise<object | null> {
+    get(did: string): object | null {
         const v = this.docs.get(did);
         return v ? JSON.parse(JSON.stringify(v)) : null;
     }
 
-    async searchDocs(q: string): Promise<string[]> {
+    delete(did: string): void {
+        this.docs.delete(did);
+    }
+
+    clear(): void {
+        this.docs.clear();
+    }
+
+    get size(): number {
+        return this.docs.size;
+    }
+
+    searchDocs(q: string): string[] {
         const out: string[] = [];
         for (const [did, doc] of this.docs.entries()) {
             if (JSON.stringify(doc).includes(q)) out.push(did);
@@ -36,21 +34,21 @@ export default class DIDsDbMemory implements DIDsDb {
         return out;
     }
 
-    async queryDocs(where: Record<string, unknown>): Promise<string[]> {
-        const entry = Object.entries(where)[0] as [string, any] | undefined;
+    queryDocs(where: Record<string, unknown>): string[] {
+        const entry = Object.entries(where)[0] as [string, unknown] | undefined;
         if (!entry) {
             return [];
         }
         const [rawPath, cond] = entry;
-        if (typeof cond !== 'object' || !Array.isArray(cond.$in)) {
-            throw new Error('Only {$in:[…]} supported');
+        if (typeof cond !== 'object' || cond === null || !Array.isArray((cond as { $in?: unknown }).$in)) {
+            throw new Error('Only {$in:[...]} supported');
         }
-        const list = cond.$in;
+        const list = (cond as { $in: unknown[] }).$in;
 
         const isKeyWildcard = rawPath.endsWith('.*');
         const isValueWildcard = rawPath.includes('.*.');
-        const isArrayTail = DIDsDbMemory.ARRAY_WILDCARD_END.test(rawPath);
-        const isArrayMid = DIDsDbMemory.ARRAY_WILDCARD_MID.test(rawPath);
+        const isArrayTail = SearchIndex.ARRAY_WILDCARD_END.test(rawPath);
+        const isArrayMid = SearchIndex.ARRAY_WILDCARD_MID.test(rawPath);
 
         const result: string[] = [];
 
@@ -58,7 +56,7 @@ export default class DIDsDbMemory implements DIDsDb {
             let match = false;
 
             if (isArrayTail) {
-                const basePath = rawPath.replace(DIDsDbMemory.ARRAY_WILDCARD_END, '');
+                const basePath = rawPath.replace(SearchIndex.ARRAY_WILDCARD_END, '');
                 const arr = this.getPath(doc, basePath);
                 if (Array.isArray(arr)) {
                     match = arr.some(v => list.includes(v));
@@ -96,11 +94,6 @@ export default class DIDsDbMemory implements DIDsDb {
         return result;
     }
 
-    async wipeDb(): Promise<void> {
-        this.docs.clear();
-        this.config.clear();
-    }
-
     private getPath(root: unknown, path: string): unknown {
         if (!path || root == null) {
             return undefined;
@@ -113,7 +106,7 @@ export default class DIDsDbMemory implements DIDsDb {
 
         const parts = clean.split('.');
 
-        let cur: any = root;
+        let cur: unknown = root;
         for (const rawPart of parts) {
             if (cur == null) {
                 return undefined;
