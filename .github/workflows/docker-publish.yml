@@ -44,8 +44,6 @@ jobs:
             image: cli
           - dockerfile: Dockerfile.explorer
             image: explorer
-          - dockerfile: Dockerfile.search-server
-            image: search-server
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

@@ -26,11 +26,11 @@ jobs:
 
       - name: Build images from this PR
         run: |
-          docker compose build mongodb redis ipfs gatekeeper search-server keymaster
+          docker compose build mongodb redis ipfs gatekeeper keymaster
 
       - name: Run Node
         run: |
-          docker compose up -d mongodb redis ipfs gatekeeper search-server keymaster
+          docker compose up -d mongodb redis ipfs gatekeeper keymaster
           docker compose ps
 
       - name: Wait for Keymaster readiness
