@@ -106,12 +106,13 @@ describe('getVersion', () => {
     it('should return version', async () => {
         nock(GatekeeperURL)
             .get(Endpoints.version)
-            .reply(200, '1');
+            .reply(200, { api: 1, server: '0.1.0' });
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
         const version = await gatekeeper.getVersion();
 
-        expect(version).toBe(1);
+        expect(version.api).toBe(1);
+        expect(version.server).toBe('0.1.0');
     });
 
     it('should throw exception on getVersion server error', async () => {

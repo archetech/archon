@@ -136,6 +136,11 @@ export interface GetStatusResult {
     memoryUsage: NodeJS.MemoryUsage;
 }
 
+export interface GetVersionResult {
+    api: number;
+    server: string;
+}
+
 export interface GatekeeperInterface {
     listRegistries(): Promise<string[]>;
     resetDb(): Promise<boolean>;

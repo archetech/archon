@@ -7,6 +7,7 @@ import {
     GatekeeperInterface,
     GatekeeperEvent,
     GetStatusResult,
+    GetVersionResult,
     Operation,
     DidCidDocument,
     ResolveDIDOptions,
@@ -147,7 +148,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
-    async getVersion(): Promise<number> {
+    async getVersion(): Promise<GetVersionResult> {
         try {
             const response = await this.axios.get(`${this.API}/version`);
             return response.data;

@@ -3,7 +3,6 @@ import morgan from 'morgan';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
 import { EventEmitter } from 'events';
 import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonCache from '@didcid/gatekeeper/db/json-cache';
@@ -13,9 +12,7 @@ import DbMongo from '@didcid/gatekeeper/db/mongo';
 import { CheckDIDsResult, ResolveDIDOptions, Operation } from '@didcid/gatekeeper/types';
 import KuboClient from '@didcid/ipfs/kubo';
 import config from './config.js';
-
-const require = createRequire(import.meta.url);
-const pkg = require('../package.json');
+import pkg from '../package.json' with { type: 'json' };
 
 EventEmitter.defaultMaxListeners = 100;
 
@@ -110,17 +107,24 @@ v1router.get('/ready', async (req, res) => {
  *     summary: Retrieve the API version
  *     responses:
  *       200:
- *         description: The API version string.
+ *         description: The API version info.
  *         content:
  *           application/json:
  *             schema:
- *               type: string
+ *               type: object
+ *               properties:
+ *                 api:
+ *                   type: integer
+ *                   description: API version number
+ *                 server:
+ *                   type: string
+ *                   description: Server package version
  *       500:
  *         description: Internal Server Error.
  */
 v1router.get('/version', async (req, res) => {
     try {
-        res.json(pkg.version);
+        res.json({ api: 1, server: pkg.version });
     } catch (error: any) {
         res.status(500).send(error.toString());
     }
