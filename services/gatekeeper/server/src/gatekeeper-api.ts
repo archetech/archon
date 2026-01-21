@@ -5,10 +5,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { EventEmitter } from 'events';
-
-const require = createRequire(import.meta.url);
-const pkg = require('../package.json');
-
 import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonCache from '@didcid/gatekeeper/db/json-cache';
 import DbRedis from '@didcid/gatekeeper/db/redis';
@@ -17,6 +13,9 @@ import DbMongo from '@didcid/gatekeeper/db/mongo';
 import { CheckDIDsResult, ResolveDIDOptions, Operation } from '@didcid/gatekeeper/types';
 import KuboClient from '@didcid/ipfs/kubo';
 import config from './config.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
 
 EventEmitter.defaultMaxListeners = 100;
 
