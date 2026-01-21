@@ -96,6 +96,8 @@ jobs:
           fi
 
       - name: Publish to NPM
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [[ "${{ github.event.inputs.version }}" == pre* ]]; then
             npx lerna publish from-git --dist-tag ${{ github.event.inputs.preid }} --yes -- --provenance
