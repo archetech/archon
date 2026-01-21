@@ -1,6 +1,6 @@
 {
   "name": "@didcid/common",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Archon common utilities",
   "type": "module",
   "main": "./dist/cjs/index.cjs",

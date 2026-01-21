@@ -1,6 +1,6 @@
 {
   "name": "@didcid/ipfs",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Archon IPFS lib",
   "type": "module",
   "module": "./dist/esm/index.js",
@@ -73,7 +73,7 @@
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@didcid/common": "^0.1.1",
+    "@didcid/common": "^0.1.2",
     "@helia/json": "^4.0.3",
     "@helia/unixfs": "^5.0.0",
     "axios": "^1.7.7",
