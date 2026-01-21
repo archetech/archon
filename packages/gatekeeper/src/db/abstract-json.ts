@@ -54,10 +54,12 @@ export abstract class AbstractJson implements GatekeeperDb {
         const suffix = this.splitSuffix(did);
         return this.runExclusive(async () => {
             const db = this.loadDb();
+            // Strip operation and store only opid reference
+            const { operation, ...strippedEvent } = event;
             if (db.dids[suffix]) {
-                db.dids[suffix].push(event);
+                db.dids[suffix].push(strippedEvent as GatekeeperEvent);
             } else {
-                db.dids[suffix] = [event];
+                db.dids[suffix] = [strippedEvent as GatekeeperEvent];
             }
             this.writeDb(db);
         });
@@ -67,8 +69,17 @@ export abstract class AbstractJson implements GatekeeperDb {
         try {
             const db = this.loadDb();
             const suffix = this.splitSuffix(did);
-            const updates = db.dids[suffix] || [];
-            return JSON.parse(JSON.stringify(updates));
+            const events = db.dids[suffix] || [];
+            // Hydrate operations from ops table
+            return events.map(event => {
+                if (event.operation) {
+                    return event;
+                }
+                if (event.opid && db.ops?.[event.opid]) {
+                    return { ...event, operation: db.ops[event.opid] };
+                }
+                return event;
+            });
         } catch {
             return [];
         }
@@ -78,7 +89,18 @@ export abstract class AbstractJson implements GatekeeperDb {
         const suffix = this.splitSuffix(did);
         return this.runExclusive(async () => {
             const db = this.loadDb();
-            db.dids[suffix] = events;
+            if (!db.ops) {
+                db.ops = {};
+            }
+            // Update operations in ops table if modified, then strip from events
+            const strippedEvents = events.map(event => {
+                if (event.opid && event.operation) {
+                    db.ops![event.opid] = event.operation;
+                }
+                const { operation, ...stripped } = event;
+                return stripped as GatekeeperEvent;
+            });
+            db.dids[suffix] = strippedEvents;
             this.writeDb(db);
         });
     }

@@ -124,8 +124,10 @@ export default class DbSqlite implements GatekeeperDb {
         return this.runExclusive(() =>
             this.withTx(async () => {
                 const id = this.splitSuffix(did);
-                const events = await this.getEventsStrict(id);
-                events.push(event);
+                const events = await this.getEventsStrictRaw(id);
+                // Strip operation and store only opid reference
+                const { operation, ...strippedEvent } = event;
+                events.push(strippedEvent as GatekeeperEvent);
                 return this.setEventsStrict(id, events);
             })
         );
@@ -135,12 +137,32 @@ export default class DbSqlite implements GatekeeperDb {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR);
         }
+        // Update operations in ops table if modified, then strip from events
+        const strippedEvents: GatekeeperEvent[] = [];
+        for (const event of events) {
+            if (event.opid && event.operation) {
+                await this.addOperationStrict(event.opid, event.operation);
+            }
+            const { operation, ...stripped } = event;
+            strippedEvents.push(stripped as GatekeeperEvent);
+        }
         const res = await this.db.run(
             `INSERT OR REPLACE INTO dids(id, events) VALUES(?, ?)`,
             id,
-            JSON.stringify(events)
+            JSON.stringify(strippedEvents)
         );
         return res.changes ?? 0;
+    }
+
+    private async addOperationStrict(opid: string, op: Operation): Promise<void> {
+        if (!this.db) {
+            throw new Error(SQLITE_NOT_STARTED_ERROR);
+        }
+        await this.db.run(
+            `INSERT OR REPLACE INTO operations(opid, operation) VALUES(?, ?)`,
+            opid,
+            JSON.stringify(op)
+        );
     }
 
 
@@ -151,7 +173,7 @@ export default class DbSqlite implements GatekeeperDb {
         );
     }
 
-    private async getEventsStrict(id: string): Promise<GatekeeperEvent[]> {
+    private async getEventsStrictRaw(id: string): Promise<GatekeeperEvent[]> {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR);
         }
@@ -166,6 +188,25 @@ export default class DbSqlite implements GatekeeperDb {
         return events as GatekeeperEvent[];
     }
 
+    private async hydrateEvents(events: GatekeeperEvent[]): Promise<GatekeeperEvent[]> {
+        const hydrated: GatekeeperEvent[] = [];
+        for (const event of events) {
+            if (event.operation) {
+                hydrated.push(event);
+            } else if (event.opid) {
+                const operation = await this.getOperation(event.opid);
+                if (operation) {
+                    hydrated.push({ ...event, operation });
+                } else {
+                    hydrated.push(event);
+                }
+            } else {
+                hydrated.push(event);
+            }
+        }
+        return hydrated;
+    }
+
     async getEvents(did: string): Promise<GatekeeperEvent[]> {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR)
@@ -173,7 +214,8 @@ export default class DbSqlite implements GatekeeperDb {
 
         try {
             const id = this.splitSuffix(did);
-            return await this.getEventsStrict(id);
+            const events = await this.getEventsStrictRaw(id);
+            return this.hydrateEvents(events);
         } catch {
             return [];
         }

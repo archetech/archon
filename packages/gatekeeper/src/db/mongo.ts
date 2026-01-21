@@ -71,11 +71,14 @@ export default class DbMongo implements GatekeeperDb {
 
         const id = this.splitSuffix(did);
 
+        // Strip operation and store only opid reference
+        const { operation, ...strippedEvent } = event;
+
         const result = await this.db.collection<DidsDoc>('dids').updateOne(
             { id },
             {
                 $push: {
-                    events: { $each: [event] }
+                    events: { $each: [strippedEvent as GatekeeperEvent] }
                 }
             },
             { upsert: true }
@@ -92,11 +95,21 @@ export default class DbMongo implements GatekeeperDb {
 
         const id = this.splitSuffix(did);
 
+        // Update operations in ops collection if modified, then strip from events
+        const strippedEvents: GatekeeperEvent[] = [];
+        for (const event of events) {
+            if (event.opid && event.operation) {
+                await this.addOperation(event.opid, event.operation);
+            }
+            const { operation, ...stripped } = event;
+            strippedEvents.push(stripped as GatekeeperEvent);
+        }
+
         await this.db
             .collection<DidsDoc>('dids')
             .updateOne(
                 { id },
-                { $set: { events } },
+                { $set: { events: strippedEvents } },
                 { upsert: true }
             );
     }
@@ -109,9 +122,26 @@ export default class DbMongo implements GatekeeperDb {
         const id = this.splitSuffix(did);
 
         try {
-
             const row = await this.db.collection('dids').findOne({ id });
-            return row?.events ?? [];
+            const events: GatekeeperEvent[] = row?.events ?? [];
+
+            // Hydrate operations from ops collection
+            const hydrated: GatekeeperEvent[] = [];
+            for (const event of events) {
+                if (event.operation) {
+                    hydrated.push(event);
+                } else if (event.opid) {
+                    const operation = await this.getOperation(event.opid);
+                    if (operation) {
+                        hydrated.push({ ...event, operation });
+                    } else {
+                        hydrated.push(event);
+                    }
+                } else {
+                    hydrated.push(event);
+                }
+            }
+            return hydrated;
         }
         catch {
             return [];

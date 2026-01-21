@@ -511,11 +511,14 @@ export default class Gatekeeper implements GatekeeperInterface {
                 return did;
             }
 
+            const opid = await this.generateCID(operation, true);
+            await this.db.addOperation(opid, operation);
             await this.db.addEvent(did, {
                 registry: 'local',
                 time: operation.created!,
                 ordinal: [0],
                 operation,
+                opid,
                 did
             });
 
@@ -821,11 +824,14 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         return this.withDidLock(operation.did, async () => {
+            const opid = await this.generateCID(operation, true);
+            await this.db.addOperation(opid, operation);
             await this.db.addEvent(operation.did!, {
                 registry: 'local',
                 time: operation.signature?.signed || '',
                 ordinal: [0],
                 operation,
+                opid,
                 did: operation.did
             });
 
@@ -958,12 +964,14 @@ export default class Gatekeeper implements GatekeeperInterface {
                 for (const e of currentEvents) {
                     if (!e.opid) {
                         e.opid = await this.generateCID(e.operation, true);
+                        await this.db.addOperation(e.opid, e.operation);
                     }
                 }
 
                 if (!event.opid) {
                     event.opid = await this.generateCID(event.operation, true);
                 }
+                await this.db.addOperation(event.opid, event.operation);
 
                 const opMatch = currentEvents.find(item => item.operation.signature?.value === event.operation.signature?.value);
 
