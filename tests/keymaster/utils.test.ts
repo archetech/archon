@@ -101,15 +101,6 @@ describe('constructor', () => {
         }
 
         try {
-            // @ts-expect-error Testing invalid usage, invalid search arg
-            new Keymaster({ gatekeeper, wallet, cipher, search: {}, passphrase: PASSPHRASE });
-            throw new ExpectedExceptionError();
-        }
-        catch (error: any) {
-            expect(error.message).toBe('Invalid parameter: options.search');
-        }
-
-        try {
             // @ts-expect-error Testing invalid usage, missing passphrase arg
             new Keymaster({ gatekeeper, wallet, cipher });
             throw new ExpectedExceptionError();

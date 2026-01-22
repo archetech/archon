@@ -219,16 +219,11 @@ export interface WalletBase {
     updateWallet(mutator: (wallet: StoredWallet) => void | Promise<void>): Promise<void>;
 }
 
-export interface SearchEngine {
-    search(query: object): Promise<string[]>;
-}
-
 export interface KeymasterOptions {
     passphrase: string;
     gatekeeper: GatekeeperInterface;
     wallet: WalletBase;
     cipher: Cipher;
-    search?: SearchEngine;
     defaultRegistry?: string;
     maxNameLength?: number;
 }
@@ -257,13 +252,6 @@ export interface RestClientOptions {
 
 export interface KeymasterClientOptions extends RestClientOptions {
 }
-
-/**
- * @deprecated SearchClientOptions is deprecated. Use GatekeeperClient directly as the search engine.
- */
-export interface SearchClientOptions extends RestClientOptions {
-}
-
 export interface WaitUntilReadyOptions {
     intervalSeconds?: number;
     chatty?: boolean;

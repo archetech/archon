@@ -106,7 +106,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
-        const instance = new Keymaster({ gatekeeper, wallet, cipher, search: gatekeeper, passphrase });
+        const instance = new Keymaster({ gatekeeper, wallet, cipher, passphrase });
 
         if (pendingMnemonic) {
             await instance.newWallet(pendingMnemonic, true);
@@ -147,7 +147,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             await walletMemory.saveWallet(pendingWallet as StoredWallet, true);
 
             try {
-                const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search: gatekeeper, passphrase });
+                const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, passphrase });
                 // check pass
                 await km.loadWallet();
                 await walletWeb.saveWallet(pendingWallet as StoredWallet, true);
@@ -255,7 +255,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     async function handleResetPassphraseSubmit(newPassphrase: string) {
         try {
             const walletWeb = new WalletWeb();
-            const km = new Keymaster({ gatekeeper, wallet: walletWeb, cipher, search: gatekeeper, passphrase: newPassphrase });
+            const km = new Keymaster({ gatekeeper, wallet: walletWeb, cipher, passphrase: newPassphrase });
             await km.newWallet(undefined, true);
             setShowResetSetup(false);
             await rebuildKeymaster(newPassphrase);

@@ -45,7 +45,6 @@ import {
     WalletBase,
     WalletFile,
     WalletEncFile,
-    SearchEngine,
     Seed,
 } from '@didcid/keymaster/types';
 import {
@@ -96,7 +95,6 @@ export default class Keymaster implements KeymasterInterface {
     private gatekeeper: GatekeeperInterface;
     private db: WalletBase;
     private cipher: Cipher;
-    private searchEngine: SearchEngine | undefined;
     private readonly defaultRegistry: string;
     private readonly ephemeralRegistry: string;
     private readonly maxNameLength: number;
@@ -114,9 +112,6 @@ export default class Keymaster implements KeymasterInterface {
         if (!options.cipher || !options.cipher.verifySig) {
             throw new InvalidParameterError('options.cipher');
         }
-        if (options.search && !options.search.search) {
-            throw new InvalidParameterError('options.search');
-        }
         if (!options.passphrase) {
             throw new InvalidParameterError('options.passphrase');
         }
@@ -125,7 +120,6 @@ export default class Keymaster implements KeymasterInterface {
         this.gatekeeper = options.gatekeeper;
         this.db = options.wallet;
         this.cipher = options.cipher;
-        this.searchEngine = options.search;
 
         this.defaultRegistry = options.defaultRegistry || 'hyperswarm';
         this.ephemeralRegistry = 'hyperswarm';
@@ -3486,10 +3480,6 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async searchNotices(): Promise<boolean> {
-        if (!this.searchEngine) {
-            return false; // Search engine not available
-        }
-
         const id = await this.fetchIdInfo();
 
         if (!id.notices) {
@@ -3507,7 +3497,7 @@ export default class Keymaster implements KeymasterInterface {
 
         try {
             // TBD search engine should not return expired notices
-            notices = await this.searchEngine.search({ where });
+            notices = await this.gatekeeper.search({ where });
         }
         catch (error) {
             throw new KeymasterError('Failed to search for notices');

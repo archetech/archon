@@ -1400,7 +1400,6 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.searchIndex.queryDocs(where);
     }
 
-    // Implements SearchEngine interface for compatibility with Keymaster
     async search(query: { where: Record<string, unknown> }): Promise<string[]> {
         return this.queryDocs(query.where);
     }

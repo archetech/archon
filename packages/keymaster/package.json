@@ -34,11 +34,6 @@
       "require": "./dist/cjs/keymaster-client.cjs",
       "types": "./dist/types/keymaster-client.d.ts"
     },
-    "./search": {
-      "import": "./dist/esm/search-client.js",
-      "require": "./dist/cjs/search-client.cjs",
-      "types": "./dist/types/search-client.d.ts"
-    },
     "./encryption": {
       "import": "./dist/esm/encryption.js",
       "require": "./dist/cjs/encryption.cjs",
@@ -102,9 +97,6 @@
     "*": {
       "client": [
         "./dist/types/keymaster-client.d.ts"
-      ],
-      "search": [
-        "./dist/types/search-client.d.ts"
       ],
       "encryption": [
         "./dist/types/encryption.d.ts"
