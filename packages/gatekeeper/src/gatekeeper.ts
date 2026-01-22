@@ -26,6 +26,7 @@ import {
     VerifyDbResult,
     Signature,
 } from './types.js';
+import SearchIndex from './search-index.js';
 
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
@@ -59,6 +60,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     private readonly maxQueueSize: number;
     supportedRegistries: string[];
     private didLocks = new Map<string, Promise<void>>();
+    private searchIndex: SearchIndex;
 
     constructor(options: GatekeeperOptions) {
         if (!options || !options.db) {
@@ -90,6 +92,31 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (!ValidRegistries.includes(registry)) {
                 throw new InvalidParameterError(`registry=${registry}`);
             }
+        }
+
+        this.searchIndex = new SearchIndex();
+    }
+
+    async initSearchIndex(): Promise<void> {
+        const dids = await this.getDIDs() as string[];
+        for (const did of dids) {
+            try {
+                const doc = await this.resolveDID(did);
+                this.searchIndex.store(did, doc);
+            } catch {
+                // Skip DIDs that can't be resolved
+            }
+        }
+        console.log(`Search index initialized with ${this.searchIndex.size} DIDs`);
+    }
+
+    private async updateSearchIndex(did: string): Promise<void> {
+        try {
+            const doc = await this.resolveDID(did);
+            this.searchIndex.store(did, doc);
+        } catch {
+            // If DID can't be resolved, remove from index
+            this.searchIndex.delete(did);
         }
     }
 
@@ -270,6 +297,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     async resetDb(): Promise<boolean> {
         await this.db.resetDb();
         this.verifiedDIDs = {};
+        this.searchIndex.clear();
         return true;
     }
 
@@ -522,6 +550,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             });
 
             await this.queueOperation(registry, operation);
+            await this.updateSearchIndex(did);
             return did;
         });
     }
@@ -833,13 +862,14 @@ export default class Gatekeeper implements GatekeeperInterface {
             });
 
             await this.queueOperation(registry, operation);
+            await this.updateSearchIndex(operation.did!);
 
             return true;
         });
     }
 
     async deleteDID(operation: Operation): Promise<boolean> {
-        return this.updateDID(operation)
+        return this.updateDID(operation);
     }
 
     async getDIDs(options?: GetDIDOptions): Promise<string[] | DidCidDocument[]> {
@@ -918,6 +948,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         for (const did of dids) {
             await this.db.deleteEvents(did);
+            this.searchIndex.delete(did);
         }
 
         return true;
@@ -1062,6 +1093,9 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (status === ImportStatus.ADDED) {
                 added += 1;
                 console.log(`import ${i}/${total}: added event for ${event.did}`);
+                if (event.did) {
+                    await this.updateSearchIndex(event.did);
+                }
             }
             else if (status === ImportStatus.MERGED) {
                 merged += 1;
@@ -1356,5 +1390,17 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     async getJSON(cid: string): Promise<object | null> {
         return this.ipfs.getJSON(cid);
+    }
+
+    async searchDocs(q: string): Promise<string[]> {
+        return this.searchIndex.searchDocs(q);
+    }
+
+    async queryDocs(where: Record<string, unknown>): Promise<string[]> {
+        return this.searchIndex.queryDocs(where);
+    }
+
+    async search(query: { where: Record<string, unknown> }): Promise<string[]> {
+        return this.queryDocs(query.where);
     }
 }

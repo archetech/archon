@@ -420,4 +420,26 @@ export default class GatekeeperClient implements GatekeeperInterface {
             throwError(error);
         }
     }
+
+    async searchDocs(q: string): Promise<string[]> {
+        try {
+            const response = await this.axios.get(`${this.API}/search`, { params: { q } });
+            return response.data;
+        } catch (error) {
+            throwError(error);
+        }
+    }
+
+    async queryDocs(where: Record<string, unknown>): Promise<string[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/query`, { where });
+            return response.data;
+        } catch (error) {
+            throwError(error);
+        }
+    }
+
+    async search(query: { where: Record<string, unknown> }): Promise<string[]> {
+        return this.queryDocs(query.where);
+    }
 }

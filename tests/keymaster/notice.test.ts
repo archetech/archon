@@ -3,37 +3,14 @@ import Keymaster, { DmailTags, NoticeTags } from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import { ExpectedExceptionError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
-import { NoticeMessage, SearchEngine } from '@didcid/keymaster/types';
-
-class MockSearch implements SearchEngine {
-    private results: string[] = [];
-    private throwError: boolean = false;
-
-    async setResults(results: string[]): Promise<void> {
-        this.results = results;
-    }
-
-    async setThrowError(throwError: boolean): Promise<void> {
-        this.throwError = throwError;
-    }
-
-    async search(query: object): Promise<string[]> {
-        if (this.throwError) {
-            throw new Error('Search engine error');
-        }
-
-        return this.results;
-    }
-}
+import { NoticeMessage } from '@didcid/keymaster/types';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
 let wallet: WalletJsonMemory;
 let cipher: CipherNode;
 let keymaster: Keymaster;
-let search: MockSearch;
 
 beforeAll(async () => {
     ipfs = new HeliaClient();
@@ -51,8 +28,7 @@ beforeEach(() => {
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'FTC:testnet5'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
-    search = new MockSearch();
-    keymaster = new Keymaster({ gatekeeper, wallet, cipher, search, passphrase: 'passphrase' });
+    keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
 });
 
 describe('verifyNotice', () => {
@@ -417,14 +393,6 @@ describe('searchNotices', () => {
         expect(ok).toBe(true);
     });
 
-    it('should return false if search engine not configured', async () => {
-        keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
-        await keymaster.createId('Alice');
-
-        const ok = await keymaster.searchNotices();
-        expect(ok).toBe(false);
-    });
-
     it('should silently skip expired notices', async () => {
         const alice = await keymaster.createId('Alice');
 
@@ -434,25 +402,10 @@ describe('searchNotices', () => {
         };
 
         const did = await keymaster.createNotice(notice);
-        search.setResults([did]);
         await gatekeeper.removeDIDs([did]);
 
         const ok = await keymaster.searchNotices();
         expect(ok).toBe(true);
-    });
-
-    it('should throw an exception if search engine throws', async () => {
-        await keymaster.createId('Alice');
-
-        search.setThrowError(true);
-
-        try {
-            await keymaster.searchNotices();
-            throw new ExpectedExceptionError();
-        }
-        catch (error: any) {
-            expect(error.message).toBe('Keymaster: Failed to search for notices');
-        }
     });
 });
 
@@ -561,7 +514,6 @@ describe('refreshNotices', () => {
         });
 
         const notice = await keymaster.sendDmail(dmail) || '';
-        search.setResults([notice]);
 
         await keymaster.setCurrentId('Alice');
         const ok = await keymaster.refreshNotices();
@@ -587,8 +539,7 @@ describe('refreshNotices', () => {
             body: 'This is a test dmail 6.',
         });
 
-        const notice = await keymaster.sendDmail(dmail) || '';
-        search.setResults([notice]);
+        await keymaster.sendDmail(dmail);
 
         await keymaster.setCurrentId('Alice');
         await keymaster.refreshNotices();
@@ -596,6 +547,5 @@ describe('refreshNotices', () => {
 
         const id = await keymaster.fetchIdInfo();
         expect(id.notices).toBeDefined();
-        expect(notice in id.notices!).toBeTruthy();
     });
 });

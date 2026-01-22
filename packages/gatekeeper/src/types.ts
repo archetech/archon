@@ -163,6 +163,9 @@ export interface GatekeeperInterface {
     getBlock(registry: string, block?: BlockId): Promise<BlockInfo | null>;
     addBlock(registry: string, block: BlockInfo): Promise<boolean>;
     generateDID(operation: Operation): Promise<string>;
+    searchDocs(q: string): Promise<string[]>;
+    queryDocs(where: Record<string, unknown>): Promise<string[]>;
+    search(query: { where: Record<string, unknown> }): Promise<string[]>;
 }
 
 export interface DidRegistration {

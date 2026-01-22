@@ -65,7 +65,7 @@ services:
       - ARCHON_KEYMASTER_PORT=4226
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       - ARCHON_DISABLE_SEARCH=${ARCHON_DISABLE_SEARCH:-false}
-      - ARCHON_SEARCH_URL=http://search-server:4002
+      - ARCHON_SEARCH_URL=http://gatekeeper:4224
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
       - ARCHON_KEYMASTER_DB=${ARCHON_KEYMASTER_DB}
       - ARCHON_ENCRYPTED_PASSPHRASE=${ARCHON_ENCRYPTED_PASSPHRASE}
@@ -83,7 +83,6 @@ services:
       - gatekeeper
       - redis
       - mongodb
-      - search-server
 
   hyperswarm-mediator:
     build:
@@ -129,28 +128,10 @@ services:
     environment:
       - VITE_EXPLORER_PORT=4000
       - VITE_GATEKEEPER_URL=http://localhost:4224
-      - VITE_SEARCH_SERVER=http://localhost:4002
+      - VITE_SEARCH_SERVER=http://localhost:4224
       - VITE_OPERATION_NETWORKS=hyperswarm,local,ftc-testnet5,btc-testnet4
     ports:
       - "4000:4000"
-    depends_on:
-      - gatekeeper
-
-  search-server:
-    build:
-      context: .
-      dockerfile: Dockerfile.search-server
-    image: ghcr.io/archetech/search-server
-    environment:
-      - SEARCH_SERVER_PORT=4002
-      - SEARCH_SERVER_GATEKEEPER_URL=http://gatekeeper:4224
-      - SEARCH_SERVER_REFRESH_INTERVAL_MS=5000
-      - SEARCH_SERVER_DB=sqlite
-    volumes:
-      - ./data:/app/search-server/data
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    ports:
-      - "4002:4002"
     depends_on:
       - gatekeeper
 
@@ -163,10 +144,9 @@ services:
       - VITE_PORT=${ARCHON_REACT_WALLET_PORT:-4228}
       - VITE_GATEKEEPER_URL=http://gatekeeper:4224
       - VITE_KEYMASTER_URL=http://keymaster:4226
-      - VITE_SEARCH_SERVER=http://search-server:4002
+      - VITE_SEARCH_SERVER=http://gatekeeper:4224
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_REACT_WALLET_PORT:-4228}:${ARCHON_REACT_WALLET_PORT:-4228}"
     depends_on:
       - gatekeeper
-      - search-server

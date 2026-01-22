@@ -37,6 +37,8 @@ const Endpoints = {
         data: '/api/v1/ipfs/data',
     },
     block: '/api/v1/block',
+    search: '/api/v1/search',
+    query: '/api/v1/query',
 };
 
 const mockConsole = {
@@ -1030,6 +1032,93 @@ describe('generateDID', () => {
 
         try {
             await gatekeeper.generateDID(op);
+            throw new ExpectedExceptionError();
+        } catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('searchDocs', () => {
+    it('should return matching DIDs', async () => {
+        const mockResults = ['did:cid:abc123', 'did:cid:def456'];
+
+        nock(GatekeeperURL)
+            .get(Endpoints.search)
+            .query({ q: 'test' })
+            .reply(200, mockResults);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        const results = await gatekeeper.searchDocs('test');
+
+        expect(results).toStrictEqual(mockResults);
+    });
+
+    it('should return empty array when no matches', async () => {
+        nock(GatekeeperURL)
+            .get(Endpoints.search)
+            .query({ q: 'nonexistent' })
+            .reply(200, []);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        const results = await gatekeeper.searchDocs('nonexistent');
+
+        expect(results).toStrictEqual([]);
+    });
+
+    it('should throw exception on searchDocs server error', async () => {
+        nock(GatekeeperURL)
+            .get(Endpoints.search)
+            .query({ q: 'test' })
+            .reply(500, ServerError);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        try {
+            await gatekeeper.searchDocs('test');
+            throw new ExpectedExceptionError();
+        } catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('queryDocs', () => {
+    const mockWhere = { 'notice.to[*]': { $in: ['did:cid:abc123'] } };
+
+    it('should return matching DIDs', async () => {
+        const mockResults = ['did:cid:xyz789'];
+
+        nock(GatekeeperURL)
+            .post(Endpoints.query, { where: mockWhere })
+            .reply(200, mockResults);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        const results = await gatekeeper.queryDocs(mockWhere);
+
+        expect(results).toStrictEqual(mockResults);
+    });
+
+    it('should return empty array when no matches', async () => {
+        nock(GatekeeperURL)
+            .post(Endpoints.query, { where: mockWhere })
+            .reply(200, []);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        const results = await gatekeeper.queryDocs(mockWhere);
+
+        expect(results).toStrictEqual([]);
+    });
+
+    it('should throw exception on queryDocs server error', async () => {
+        nock(GatekeeperURL)
+            .post(Endpoints.query)
+            .reply(500, ServerError);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        try {
+            await gatekeeper.queryDocs(mockWhere);
             throw new ExpectedExceptionError();
         } catch (error: any) {
             expect(error.message).toBe(ServerError.message);

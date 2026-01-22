@@ -4,7 +4,6 @@ import { useSearchParams } from 'react-router-dom';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import CipherWeb from '@didcid/cipher/web';
 import Keymaster from '@didcid/keymaster';
-import SearchClient from '@didcid/keymaster/search';
 import WalletWeb from '@didcid/keymaster/wallet/web';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
@@ -18,11 +17,10 @@ import './App.css';
 
 global.Buffer = Buffer;
 
-const gatekeeper = new GatekeeperClient();
-const cipher = new CipherWeb();
-
 const { protocol, hostname } = window.location;
-const search = await SearchClient.create({ url: `${protocol}//${hostname}:4002` });
+const gatekeeper = new GatekeeperClient();
+await gatekeeper.connect({ url: `${protocol}//${hostname}:4224` });
+const cipher = new CipherWeb();
 
 function App() {
     const [isReady, setIsReady] = useState(false);
@@ -56,7 +54,7 @@ function App() {
     }, []);
 
     const buildKeymaster = async (wallet, passphrase) => {
-        const instance = new Keymaster({ gatekeeper, wallet, cipher, search, passphrase });
+        const instance = new Keymaster({ gatekeeper, wallet, cipher, passphrase });
 
         try {
             // check pass & convert to v1 if needed
@@ -92,7 +90,7 @@ function App() {
                 await walletMemory.saveWallet(pendingWallet, true);
 
                 try {
-                    const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, search, passphrase });
+                    const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, passphrase });
                     // check pass
                     await km.loadWallet();
                     await walletWeb.saveWallet(pendingWallet, true);
@@ -135,7 +133,7 @@ function App() {
     async function handleResetPassphraseSubmit(newPassphrase) {
         try {
             const walletWeb = new WalletWeb();
-            const km = new Keymaster({ gatekeeper, wallet: walletWeb, cipher, search, passphrase: newPassphrase });
+            const km = new Keymaster({ gatekeeper, wallet: walletWeb, cipher, passphrase: newPassphrase });
             await km.newWallet(undefined, true);
             setShowResetSetup(false);
             await rebuildKeymaster(newPassphrase);
