@@ -1493,7 +1493,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setDmailForwarding(selectedDmailDID);
         setDmailSubject(`Fwd: ${selectedDmail.message.subject}`);
         setDmailBody(`On ${selectedDmail.date} ${selectedDmail.sender} wrote:\n\n${selectedDmail.message.body}`);
-        setDmailTab('send');
+        setDmailTab('compose');
     }
 
     async function replyDmail() {
@@ -1505,7 +1505,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setDmailBody(`On ${selectedDmail.date} ${selectedDmail.sender} wrote:\n\n${selectedDmail.message.body}`);
         setDmailTo(selectedDmail.sender);
         setDmailReference(selectedDmailDID);
-        setDmailTab('send');
+        setDmailTab('compose');
     }
 
     async function replyAllDmail() {
@@ -1519,7 +1519,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setDmailToList(selectedDmail.to);
         setDmailCcList(selectedDmail.cc);
         setDmailReference(selectedDmailDID);
-        setDmailTab('send');
+        setDmailTab('compose');
     }
 
     async function editDmail() {
@@ -1544,7 +1544,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setDmailSubject(selectedDmail.message.subject);
         setDmailBody(selectedDmail.message.body);
         setDmailAttachments(selectedDmail.attachments || {});
-        setDmailTab('send');
+        setDmailTab('compose');
     }
 
     function isDmailUnread(item) {
