@@ -49,16 +49,6 @@ import {
     WalletEncFile,
     Seed,
 } from '@didcid/keymaster/types';
-
-function hexToBase64url(hex: string): string {
-    const bytes = Buffer.from(hex, 'hex');
-    return base64url.baseEncode(bytes);
-}
-
-function base64urlToHex(b64: string): string {
-    const bytes = base64url.baseDecode(b64);
-    return Buffer.from(bytes).toString('hex');
-}
 import {
     isWalletEncFile,
     isWalletFile
@@ -71,6 +61,16 @@ import {
 } from '@didcid/cipher/types';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { decMnemonic, encMnemonic } from "./encryption.js";
+
+function hexToBase64url(hex: string): string {
+    const bytes = Buffer.from(hex, 'hex');
+    return base64url.baseEncode(bytes);
+}
+
+function base64urlToHex(b64: string): string {
+    const bytes = base64url.baseDecode(b64);
+    return Buffer.from(bytes).toString('hex');
+}
 
 const DefaultSchema = {
     "$schema": "http://json-schema.org/draft-07/schema#",

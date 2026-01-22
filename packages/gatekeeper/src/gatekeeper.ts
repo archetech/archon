@@ -27,12 +27,12 @@ import {
     VerifyDbResult,
     Proof,
 } from './types.js';
+import SearchIndex from './search-index.js';
 
 function base64urlToHex(b64: string): string {
     const bytes = base64url.baseDecode(b64);
     return Buffer.from(bytes).toString('hex');
 }
-import SearchIndex from './search-index.js';
 
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
@@ -382,11 +382,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             return false;
         }
 
-        if (!proof.proofValue || typeof proof.proofValue !== 'string') {
-            return false;
-        }
-
-        return true;
+        return !!(proof.proofValue && typeof proof.proofValue === 'string');
     }
 
     async verifyCreateOperation(operation: Operation): Promise<boolean> {
