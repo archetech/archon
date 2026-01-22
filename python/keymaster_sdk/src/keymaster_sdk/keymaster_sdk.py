@@ -485,7 +485,7 @@ def rotate_keys():
     return response["ok"]
 
 
-def add_signature(contents):
+def add_proof(contents):
     response = proxy_request(
         "POST",
         f"{_keymaster_api}/keys/sign",
@@ -494,7 +494,7 @@ def add_signature(contents):
     return response["signed"]
 
 
-def verify_signature(json):
+def verify_proof(json):
     response = proxy_request(
         "POST",
         f"{_keymaster_api}/keys/verify",

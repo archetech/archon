@@ -154,7 +154,7 @@ def test_publish_credentials():
     did = keymaster.issue_credential(bc, expire_options)
 
     response = keymaster.publish_credential(did)
-    assert_equal(response["signature"]["signer"], identifier)
+    assert_equal(response["proof"]["verificationMethod"].split("#")[0], identifier)
 
     response = keymaster.unpublish_credential(did)
     assert_equal(response, f"OK credential {did} removed from manifest")
@@ -334,12 +334,12 @@ def test_rotate_keys():
     assert_equal(wallet["ids"][alice]["index"], 1)
 
 
-def test_signature():
+def test_proof():
     alice = generate_id()
     keymaster.create_id(alice, local_options)
 
-    signed = keymaster.add_signature(str({}))
-    valid = keymaster.verify_signature(signed)
+    signed = keymaster.add_proof(str({}))
+    valid = keymaster.verify_proof(signed)
     assert_equal(valid, True)
 
 
