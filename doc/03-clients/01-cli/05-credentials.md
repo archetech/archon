@@ -221,11 +221,12 @@ $ archon decrypt-json did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6F
         "account": "https://twitter.com/bob",
         "service": "twitter.com"
     },
-    "signature": {
-        "signer": "did:cid:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
-        "signed": "2024-03-22T15:09:02.994Z",
-        "hash": "62f7cb1a31d338d29287f9ce91b4da103391dca88b853ea1b05920c6049ae8ff",
-        "value": "37941a42492a431ceaff91c86de55eb0cd3ed98107a3ce19a76d88511b7fe2bc6fcf298c69e431b048ab0786e9624b647e4d03a4c26031c4c6e2b6882223defe"
+    "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2024-03-22T15:09:02.994Z",
+        "verificationMethod": "did:cid:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY#key-1",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "N5QaQkkqQxzq_5HIbeVesMzenoEHo84ZmnbYURt_4rxvzyY4aaQxsEirB4bpYktkfk0DpMJgMcTGK2iCIiPe_g"
     }
 }
 ```

@@ -307,7 +307,7 @@ describe('issueCredential', () => {
         expect(vc.credentialSubject!.id).toBe(subject);
         expect(vc.credential!.email).toEqual(expect.any(String));
 
-        const isValid = await keymaster.verifySignature(vc);
+        const isValid = await keymaster.verifyProof(vc);
         expect(isValid).toBe(true);
 
         const wallet = await keymaster.loadWallet();
@@ -333,7 +333,7 @@ describe('issueCredential', () => {
         expect(vc.validFrom).toBe(validFrom);
         expect(vc.validUntil).toBe(validUntil);
 
-        const isValid = await keymaster.verifySignature(vc);
+        const isValid = await keymaster.verifyProof(vc);
         expect(isValid).toBe(true);
     });
 

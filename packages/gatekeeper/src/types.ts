@@ -222,17 +222,20 @@ export interface DidCidDocument {
     didDocumentRegistration?: DocumentRegistration,
 }
 
-export interface Signature {
-    signer?: string;
-    signed: string;
-    hash: string;
-    value: string;
+export type ProofPurpose = "assertionMethod" | "authentication";
+
+export interface Proof {
+    type: "EcdsaSecp256k1Signature2019";
+    created: string;
+    verificationMethod: string;
+    proofPurpose: ProofPurpose;
+    proofValue: string;
 }
 
 export interface Operation {
     type: 'create' | 'update' | 'delete';
     created?: string;
-    signature?: Signature;
+    proof?: Proof;
     registration?: DocumentRegistration;
     publicJwk?: EcdsaJwkPublic;
     controller?: string;

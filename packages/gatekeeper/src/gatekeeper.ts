@@ -6,6 +6,7 @@ import {
     InvalidOperationError
 } from '@didcid/common/errors';
 import { IPFSClient } from '@didcid/ipfs/types';
+import { base64url } from 'multiformats/bases/base64';
 import {
     BatchMetadata,
     BlockId,
@@ -24,8 +25,13 @@ import {
     ImportBatchResult,
     ProcessEventsResult,
     VerifyDbResult,
-    Signature,
+    Proof,
 } from './types.js';
+
+function base64urlToHex(b64: string): string {
+    const bytes = base64url.baseDecode(b64);
+    return Buffer.from(bytes).toString('hex');
+}
 import SearchIndex from './search-index.js';
 
 const ValidVersions = [1];
@@ -348,21 +354,35 @@ export default class Gatekeeper implements GatekeeperInterface {
         return hex64Regex.test(hash);
     }
 
-    verifySignatureFormat(signature?: Signature): boolean {
-        if (!signature) {
+    verifyProofFormat(proof?: Proof): boolean {
+        if (!proof) {
             return false;
         }
 
-        if (!this.verifyDateFormat(signature.signed)) {
+        if (proof.type !== "EcdsaSecp256k1Signature2019") {
             return false;
         }
 
-        if (!this.verifyHashFormat(signature.hash)) {
+        if (!this.verifyDateFormat(proof.created)) {
             return false;
         }
 
-        // eslint-disable-next-line
-        if (signature.signer && !this.verifyDIDFormat(signature.signer)) {
+        if (!proof.proofPurpose || !["assertionMethod", "authentication"].includes(proof.proofPurpose)) {
+            return false;
+        }
+
+        // Validate verificationMethod format: did:...#key-N or #key-N (relative reference for create ops)
+        if (!proof.verificationMethod || !proof.verificationMethod.includes('#')) {
+            return false;
+        }
+
+        const [did] = proof.verificationMethod.split('#');
+        // Empty string is valid (relative reference like #key-1), otherwise must be valid DID
+        if (did !== '' && !this.verifyDIDFormat(did)) {
+            return false;
+        }
+
+        if (!proof.proofValue || typeof proof.proofValue !== 'string') {
             return false;
         }
 
@@ -403,8 +423,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError(`registration.registry=${operation.registration.registry}`);
         }
 
-        if (!this.verifySignatureFormat(operation.signature)) {
-            throw new InvalidOperationError('signature');
+        if (!this.verifyProofFormat(operation.proof)) {
+            throw new InvalidOperationError('proof');
         }
 
         if (operation.registration.validUntil && !this.verifyDateFormat(operation.registration.validUntil)) {
@@ -417,25 +437,28 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
 
             const operationCopy = copyJSON(operation);
-            delete operationCopy.signature;
+            delete operationCopy.proof;
 
             const msgHash = this.cipher.hashJSON(operationCopy);
-            return this.cipher.verifySig(msgHash, operation.signature!.value, operation.publicJwk);
+            const signatureHex = base64urlToHex(operation.proof!.proofValue);
+            return this.cipher.verifySig(msgHash, signatureHex, operation.publicJwk);
         }
 
         if (operation.registration.type === 'asset') {
-            if (operation.controller !== operation.signature?.signer) {
+            // Extract controller DID from verificationMethod
+            const [controllerDid] = operation.proof!.verificationMethod.split('#');
+            if (operation.controller !== controllerDid) {
                 throw new InvalidOperationError('signer is not controller');
             }
 
-            const doc = await this.resolveDID(operation.signature!.signer, { confirm: true, versionTime: operation.signature!.signed });
+            const doc = await this.resolveDID(controllerDid, { confirm: true, versionTime: operation.proof!.created });
 
             if (doc.didDocumentRegistration && doc.didDocumentRegistration.registry === 'local' && operation.registration.registry !== 'local') {
                 throw new InvalidOperationError(`non-local registry=${operation.registration.registry}`);
             }
 
             const operationCopy = copyJSON(operation);
-            delete operationCopy.signature;
+            delete operationCopy.proof;
             const msgHash = this.cipher.hashJSON(operationCopy);
             if (!doc.didDocument ||
                 !doc.didDocument.verificationMethod ||
@@ -445,7 +468,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
             // TBD select the right key here, not just the first one
             const publicJwk = doc.didDocument.verificationMethod[0].publicKeyJwk;
-            return this.cipher.verifySig(msgHash, operation.signature!.value, publicJwk);
+            const signatureHex = base64urlToHex(operation.proof!.proofValue);
+            return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
         }
 
         throw new InvalidOperationError(`registration.type=${operation.registration.type}`);
@@ -456,8 +480,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError('size');
         }
 
-        if (!this.verifySignatureFormat(operation.signature)) {
-            throw new InvalidOperationError('signature');
+        if (!this.verifyProofFormat(operation.proof)) {
+            throw new InvalidOperationError('proof');
         }
 
         if (!doc?.didDocument) {
@@ -470,7 +494,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         if (doc.didDocument.controller) {
             // This DID is an asset, verify with controller's keys
-            const controllerDoc = await this.resolveDID(doc.didDocument.controller, { confirm: true, versionTime: operation.signature!.signed });
+            const controllerDoc = await this.resolveDID(doc.didDocument.controller, { confirm: true, versionTime: operation.proof!.created });
             return this.verifyUpdateOperation(operation, controllerDoc);
         }
 
@@ -478,23 +502,20 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError('doc.didDocument.verificationMethod');
         }
 
-        const signature = operation.signature!;
+        const proof = operation.proof!;
         const jsonCopy = copyJSON(operation);
-        delete jsonCopy.signature;
+        delete jsonCopy.proof;
         const msgHash = this.cipher.hashJSON(jsonCopy);
-
-        if (signature.hash && signature.hash !== msgHash) {
-            return false;
-        }
 
         if (doc.didDocument.verificationMethod.length === 0 ||
             !doc.didDocument.verificationMethod[0].publicKeyJwk) {
             throw new InvalidOperationError('didDocument missing verificationMethod');
         }
 
-        // TBD get the right signature, not just the first one
+        // TBD get the right key here, not just the first one
         const publicJwk = doc.didDocument.verificationMethod[0].publicKeyJwk;
-        return this.cipher.verifySig(msgHash, signature.value, publicJwk);
+        const signatureHex = base64urlToHex(proof.proofValue);
+        return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
     }
 
     async queueOperation(registry: string, operation: Operation) {
@@ -519,7 +540,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     async createDID(operation: Operation): Promise<string> {
         const valid = await this.verifyCreateOperation(operation);
         if (!valid) {
-            throw new InvalidOperationError('signature')
+            throw new InvalidOperationError('proof')
         }
 
         const registry = operation.registration!.registry;
@@ -728,7 +749,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const valid = await this.verifyCreateOperation(operation);
 
                     if (!valid) {
-                        throw new InvalidOperationError('signature');
+                        throw new InvalidOperationError('proof');
                     }
                 }
 
@@ -761,7 +782,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 const valid = await this.verifyUpdateOperation(operation, doc);
 
                 if (!valid) {
-                    throw new InvalidOperationError('signature');
+                    throw new InvalidOperationError('proof');
                 }
 
                 if (!operation.previd || operation.previd !== doc.didDocumentMetadata?.versionId) {
@@ -854,7 +875,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             const opid = await this.generateCID(operation, true);
             await this.db.addEvent(operation.did!, {
                 registry: 'local',
-                time: operation.signature?.signed || '',
+                time: operation.proof?.created || '',
                 ordinal: [0],
                 operation,
                 opid,
@@ -999,7 +1020,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     event.opid = await this.generateCID(event.operation, true);
                 }
 
-                const opMatch = currentEvents.find(item => item.operation.signature?.value === event.operation.signature?.value);
+                const opMatch = currentEvents.find(item => item.operation.proof?.proofValue === event.operation.proof?.proofValue);
 
                 if (opMatch) {
                     const index = currentEvents.indexOf(opMatch);
@@ -1173,7 +1194,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             return false;
         }
 
-        if (!this.verifySignatureFormat(operation.signature)) {
+        if (!this.verifyProofFormat(operation.proof)) {
             return false;
         }
 
@@ -1207,7 +1228,9 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             // eslint-disable-next-line
             if (operation.registration.type === 'asset') {
-                if (operation.controller !== operation.signature?.signer) {
+                // Extract controller DID from verificationMethod
+                const [controllerDid] = operation.proof!.verificationMethod.split('#');
+                if (operation.controller !== controllerDid) {
                     return false;
                 }
             }
@@ -1257,7 +1280,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             const ok = await this.verifyEvent(event);
 
             if (ok) {
-                const eventKey = `${event.registry}/${event.operation.signature?.hash}`;
+                const eventKey = `${event.registry}/${event.operation.proof?.proofValue}`;
                 if (!this.eventsSeen[eventKey]) {
                     this.eventsSeen[eventKey] = true;
                     this.eventsQueue.push(event);
@@ -1329,7 +1352,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         });
 
         const events = nonlocalDIDs.flat();
-        return events.sort((a, b) => new Date(a.operation.signature?.signed ?? 0).getTime() - new Date(b.operation.signature?.signed ?? 0).getTime());
+        return events.sort((a, b) => new Date(a.operation.proof?.created ?? 0).getTime() - new Date(b.operation.proof?.created ?? 0).getTime());
     }
 
     async getQueue(registry: string): Promise<Operation[]> {

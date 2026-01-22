@@ -1,5 +1,6 @@
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
+import { base64url } from 'multiformats/bases/base64';
 import {
     InvalidDIDError,
     InvalidParameterError,
@@ -12,6 +13,8 @@ import {
     DocumentMetadata,
     ResolveDIDOptions,
     Operation,
+    Proof,
+    ProofPurpose,
 } from '@didcid/gatekeeper/types';
 import {
     Challenge,
@@ -37,8 +40,7 @@ import {
     NoticeMessage,
     Poll,
     PollResults,
-    PossiblySigned,
-    Signature,
+    PossiblyProofed,
     StoredWallet,
     VerifiableCredential,
     ViewPollResult,
@@ -47,6 +49,16 @@ import {
     WalletEncFile,
     Seed,
 } from '@didcid/keymaster/types';
+
+function hexToBase64url(hex: string): string {
+    const bytes = Buffer.from(hex, 'hex');
+    return base64url.baseEncode(bytes);
+}
+
+function base64urlToHex(b64: string): string {
+    const bytes = base64url.baseDecode(b64);
+    return Buffer.from(bytes).toString('hex');
+}
 import {
     isWalletEncFile,
     isWalletFile
@@ -418,13 +430,15 @@ export default class Keymaster implements KeymasterInterface {
         };
 
         const msgHash = this.cipher.hashJSON(operation);
-        const signature = this.cipher.signHash(msgHash, keypair.privateJwk);
+        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
         const signed: Operation = {
             ...operation,
-            signature: {
-                signed: new Date(0).toISOString(),
-                hash: msgHash,
-                value: signature
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                created: new Date(0).toISOString(),
+                verificationMethod: "#key-1",
+                proofPurpose: "authentication",
+                proofValue: hexToBase64url(signatureHex),
             }
         }
         const did = await this.gatekeeper.createDID(signed);
@@ -448,14 +462,15 @@ export default class Keymaster implements KeymasterInterface {
         };
 
         const msgHash = this.cipher.hashJSON(operation);
-        const signature = this.cipher.signHash(msgHash, keypair.privateJwk);
-        const signed = {
+        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
+        const signed: Operation = {
             ...operation,
-            signature: {
-                signer: did,
-                signed: new Date().toISOString(),
-                hash: msgHash,
-                value: signature,
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                created: new Date().toISOString(),
+                verificationMethod: `${did}#key-1`,
+                proofPurpose: "authentication",
+                proofValue: hexToBase64url(signatureHex),
             }
         };
 
@@ -486,15 +501,16 @@ export default class Keymaster implements KeymasterInterface {
         };
 
         const msgHash = this.cipher.hashJSON(operation);
-        const signature = this.cipher.signHash(msgHash, keypair.privateJwk);
+        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
 
         const signed: Operation = {
             ...operation,
-            signature: {
-                signer: seedBank.didDocument?.id,
-                signed: new Date().toISOString(),
-                hash: msgHash,
-                value: signature,
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                created: new Date().toISOString(),
+                verificationMethod: `${seedBank.didDocument?.id}#key-1`,
+                proofPurpose: "authentication",
+                proofValue: hexToBase64url(signatureHex),
             }
         };
 
@@ -722,7 +738,7 @@ export default class Keymaster implements KeymasterInterface {
             data,
         };
 
-        const signed = await this.addSignature(operation, controller);
+        const signed = await this.addProof(operation, controller, "authentication");
         const did = await this.gatekeeper.createDID(signed);
 
         // Keep assets that will be garbage-collected out of the owned list
@@ -993,10 +1009,11 @@ export default class Keymaster implements KeymasterInterface {
         }
     }
 
-    async addSignature<T extends object>(
+    async addProof<T extends object>(
         obj: T,
-        controller?: string
-    ): Promise<T & { signature: Signature }> {
+        controller?: string,
+        proofPurpose: ProofPurpose = "assertionMethod"
+    ): Promise<T & { proof: Proof }> {
         if (obj == null) {
             throw new InvalidParameterError('obj');
         }
@@ -1006,20 +1023,26 @@ export default class Keymaster implements KeymasterInterface {
         const keypair = await this.fetchKeyPair(controller);
 
         if (!keypair) {
-            throw new KeymasterError('addSignature: no keypair');
+            throw new KeymasterError('addProof: no keypair');
         }
+
+        // Get the key fragment from the DID document
+        const doc = await this.resolveDID(id.did, { confirm: true });
+        const keyFragment = doc.didDocument?.verificationMethod?.[0]?.id || '#key-1';
 
         try {
             const msgHash = this.cipher.hashJSON(obj);
-            const signature = this.cipher.signHash(msgHash, keypair.privateJwk);
+            const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
+            const proofValue = hexToBase64url(signatureHex);
 
             return {
                 ...obj,
-                signature: {
-                    signer: id.did,
-                    signed: new Date().toISOString(),
-                    hash: msgHash,
-                    value: signature,
+                proof: {
+                    type: "EcdsaSecp256k1Signature2019",
+                    created: new Date().toISOString(),
+                    verificationMethod: `${id.did}${keyFragment}`,
+                    proofPurpose,
+                    proofValue,
                 }
             };
         }
@@ -1028,29 +1051,34 @@ export default class Keymaster implements KeymasterInterface {
         }
     }
 
-    async verifySignature<T extends PossiblySigned>(obj: T): Promise<boolean> {
-        if (!obj?.signature) {
+    async verifyProof<T extends PossiblyProofed>(obj: T): Promise<boolean> {
+        if (!obj?.proof) {
             return false;
         }
 
-        const { signature } = obj;
-        if (!signature.signer) {
+        const { proof } = obj;
+
+        if (proof.type !== "EcdsaSecp256k1Signature2019") {
             return false;
         }
+
+        if (!proof.verificationMethod) {
+            return false;
+        }
+
+        // Extract DID from verificationMethod
+        const [signerDid] = proof.verificationMethod.split('#');
 
         const jsonCopy = JSON.parse(JSON.stringify(obj));
-        delete jsonCopy.signature;
+        delete jsonCopy.proof;
         const msgHash = this.cipher.hashJSON(jsonCopy);
 
-        if (signature.hash && signature.hash !== msgHash) {
-            return false;
-        }
-
-        const doc = await this.resolveDID(signature.signer, { versionTime: signature.signed });
+        const doc = await this.resolveDID(signerDid, { versionTime: proof.created });
         const publicJwk = this.getPublicKeyJwk(doc);
 
         try {
-            return this.cipher.verifySig(msgHash, signature.value, publicJwk);
+            const signatureHex = base64urlToHex(proof.proofValue);
+            return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
         }
         catch (error) {
             return false;
@@ -1086,7 +1114,7 @@ export default class Keymaster implements KeymasterInterface {
             controller = current.didDocument?.controller;
         }
 
-        const signed = await this.addSignature(operation, controller);
+        const signed = await this.addProof(operation, controller, "authentication");
         return this.gatekeeper.updateDID(signed);
     }
 
@@ -1113,7 +1141,7 @@ export default class Keymaster implements KeymasterInterface {
             controller = current.didDocument?.controller;
         }
 
-        const signed = await this.addSignature(operation, controller);
+        const signed = await this.addProof(operation, controller, "authentication");
 
         const ok = await this.gatekeeper.deleteDID(signed);
 
@@ -1394,13 +1422,15 @@ export default class Keymaster implements KeymasterInterface {
         };
 
         const msgHash = this.cipher.hashJSON(operation);
-        const signature = this.cipher.signHash(msgHash, keypair.privateJwk);
+        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
         const signed: Operation = {
             ...operation,
-            signature: {
-                signed: new Date().toISOString(),
-                hash: msgHash,
-                value: signature
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                created: new Date().toISOString(),
+                verificationMethod: "#key-1",
+                proofPurpose: "authentication",
+                proofValue: hexToBase64url(signatureHex),
             },
         };
         return signed;
@@ -1664,7 +1694,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('credential.issuer');
         }
 
-        const signed = await this.addSignature(credential);
+        const signed = await this.addProof(credential);
         return this.encryptJSON(signed, credential.credentialSubject!.id, { ...options, includeHash: true });
     }
 
@@ -1717,8 +1747,8 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('credential');
         }
 
-        delete credential.signature;
-        const signed = await this.addSignature(credential);
+        delete credential.proof;
+        const signed = await this.addProof(credential);
         const msg = JSON.stringify(signed);
 
         const id = await this.fetchIdInfo();
@@ -2087,7 +2117,7 @@ export default class Keymaster implements KeymasterInterface {
             }
 
             const vp = await this.decryptJSON(credential.vp) as VerifiableCredential;
-            const isValid = await this.verifySignature(vp);
+            const isValid = await this.verifyProof(vp);
 
             if (!isValid) {
                 continue;

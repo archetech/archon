@@ -153,12 +153,12 @@ describe('createDID', () => {
 
         try {
             const agentOp = await helper.createAgentOp(keypair);
-            agentOp.signature = undefined;
+            agentOp.proof = undefined;
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
             // eslint-disable-next-line
-            expect(error.message).toBe('Invalid operation: signature');
+            expect(error.message).toBe('Invalid operation: proof');
         }
 
         try {
@@ -221,13 +221,13 @@ describe('createDID', () => {
         }
 
         try {
-            // invalid signature
+            // invalid proof
             const assetOp = await helper.createAssetOp(agent, keypair, { registry: 'hyperswarm' });
-            assetOp.signature = undefined;
+            assetOp.proof = undefined;
             await gatekeeper.createDID(assetOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: signature');
+            expect(error.message).toBe('Invalid operation: proof');
         }
 
         try {
@@ -612,13 +612,13 @@ describe('resolveDID', () => {
         expect(didResolutionMetadata!.error).toBe('notFound');
     });
 
-    it('should throw an exception on invalid signature in create op', async () => {
+    it('should throw an exception on invalid proof in create op', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
 
         const events = await db.getEvents(did);
-        // changing anything in the op will invalidate the signature
+        // changing anything in the op will invalidate the proof
         events[0].operation.did = 'mock';
         await db.setEvents(did, events);
 
@@ -626,11 +626,11 @@ describe('resolveDID', () => {
             await gatekeeper.resolveDID(did, { verify: true });
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: signature');
+            expect(error.message).toBe('Invalid operation: proof');
         }
     });
 
-    it('should throw an exception on invalid signature in update op', async () => {
+    it('should throw an exception on invalid proof in update op', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
@@ -640,7 +640,7 @@ describe('resolveDID', () => {
         await gatekeeper.updateDID(updateOp);
 
         const events = await db.getEvents(did);
-        // changing anything in the op will invalidate the signature
+        // changing anything in the op will invalidate the proof
         events[1].operation.did = 'mock';
         await db.setEvents(did, events);
 
@@ -648,7 +648,7 @@ describe('resolveDID', () => {
             await gatekeeper.resolveDID(did, { verify: true });
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: signature');
+            expect(error.message).toBe('Invalid operation: proof');
         }
     });
 
@@ -739,11 +739,11 @@ describe('updateDID', () => {
 
         try {
             const updateOp = await helper.createUpdateOp(keypair, did, doc);
-            delete updateOp.signature;
+            delete updateOp.proof;
             await gatekeeper.updateDID(updateOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: signature');
+            expect(error.message).toBe('Invalid operation: proof');
         }
 
         try {

@@ -489,7 +489,7 @@ describe('Test operation validation errors', () => {
         }
     });
 
-    it('create error with invalid signature', async () => {
+    it('create error with invalid proof', async () => {
         const keypair = cipher.generateRandomJwk();
         let agentOp = await helper.createAgentOp(keypair);
         agentOp.registration!.prefix = "dummy";
@@ -499,7 +499,7 @@ describe('Test operation validation errors', () => {
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
-            expect(error.message).toBe('Invalid operation: signature');
+            expect(error.message).toBe('Invalid operation: proof');
         }
     });
 });

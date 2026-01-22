@@ -3,6 +3,7 @@ import {
     GatekeeperInterface,
     DidCidDocument,
     ResolveDIDOptions,
+    Proof,
 } from '@didcid/gatekeeper/types';
 
 export interface Seed {
@@ -75,13 +76,6 @@ export interface Group {
     members: string[];
 }
 
-export interface Signature {
-    signer?: string;
-    signed: string;
-    hash: string;
-    value: string;
-}
-
 export interface VerifiableCredential {
     "@context": string[];
     type: string[];
@@ -92,7 +86,7 @@ export interface VerifiableCredential {
         id: string;
     };
     credential?: Record<string, unknown> | null;
-    signature?: Signature;
+    proof?: Proof;
 }
 
 export interface IssueCredentialsOptions extends EncryptOptions {
@@ -236,8 +230,8 @@ export interface EncryptedMessage {
     cipher_receiver?: string | null;
 }
 
-export interface PossiblySigned {
-    signature?: Signature;
+export interface PossiblyProofed {
+    proof?: Proof;
 }
 
 export interface RestClientOptions {

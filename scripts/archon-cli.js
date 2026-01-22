@@ -398,7 +398,7 @@ program
     .action(async (file) => {
         try {
             const contents = fs.readFileSync(file).toString();
-            const json = await keymaster.addSignature(JSON.parse(contents));
+            const json = await keymaster.addProof(JSON.parse(contents));
             console.log(JSON.stringify(json, null, 4));
         }
         catch (error) {
@@ -408,12 +408,12 @@ program
 
 program
     .command('verify-file <file>')
-    .description('Verify the signature in a JSON file')
+    .description('Verify the proof in a JSON file')
     .action(async (file) => {
         try {
             const json = JSON.parse(fs.readFileSync(file).toString());
-            const isValid = await keymaster.verifySignature(json);
-            console.log(`signature in ${file}`, isValid ? 'is valid' : 'is NOT valid');
+            const isValid = await keymaster.verifyProof(json);
+            console.log(`proof in ${file}`, isValid ? 'is valid' : 'is NOT valid');
         }
         catch (error) {
             console.error(error.error || error);

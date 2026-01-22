@@ -179,20 +179,22 @@ describe('decryptJSON', () => {
     });
 });
 
-describe('addSignature', () => {
-    it('should add a signature to the object', async () => {
+describe('addProof', () => {
+    it('should add a proof to the object', async () => {
         const name = 'Bob';
         const did = await keymaster.createId(name);
-        const hash = cipher.hashJSON(mockJson);
-        const signed = await keymaster.addSignature(mockJson);
+        const signed = await keymaster.addProof(mockJson);
 
-        expect(signed.signature.signer).toBe(did);
-        expect(signed.signature.hash).toBe(hash);
+        expect(signed.proof.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(signed.proof.verificationMethod).toContain(did);
+        expect(signed.proof.verificationMethod).toContain('#key-');
+        expect(signed.proof.proofPurpose).toBe('assertionMethod');
+        expect(signed.proof.proofValue).toBeDefined();
     });
 
     it('should throw an exception if no ID selected', async () => {
         try {
-            await keymaster.addSignature(mockJson);
+            await keymaster.addProof(mockJson);
             throw new ExpectedExceptionError();
         } catch (error: any) {
             expect(error.message).toBe('Keymaster: No current ID');
@@ -204,7 +206,7 @@ describe('addSignature', () => {
 
         try {
             // @ts-expect-error Testing invalid usage, missing arg
-            await keymaster.addSignature();
+            await keymaster.addProof();
             throw new ExpectedExceptionError();
         } catch (error: any) {
             expect(error.message).toBe('Invalid parameter: obj');
@@ -212,65 +214,67 @@ describe('addSignature', () => {
     });
 });
 
-describe('verifySignature', () => {
-    it('should return true for valid signature', async () => {
+describe('verifyProof', () => {
+    it('should return true for valid proof', async () => {
         await keymaster.createId('Bob');
 
-        const signed = await keymaster.addSignature(mockJson);
-        const isValid = await keymaster.verifySignature(signed);
+        const signed = await keymaster.addProof(mockJson);
+        const isValid = await keymaster.verifyProof(signed);
 
         expect(isValid).toBe(true);
     });
 
-    it('should return false for missing signature', async () => {
+    it('should return false for missing proof', async () => {
         await keymaster.createId('Bob');
 
         // @ts-expect-error Testing invalid usage, invalid arg
-        const isValid = await keymaster.verifySignature(mockJson);
+        const isValid = await keymaster.verifyProof(mockJson);
 
         expect(isValid).toBe(false);
     });
 
-    it('should return false for invalid signature', async () => {
+    it('should return false for invalid proofValue', async () => {
         await keymaster.createId('Bob');
 
-        const signed = await keymaster.addSignature(mockJson);
-        signed.signature.value = signed.signature.value.substring(1);
-        const isValid = await keymaster.verifySignature(signed);
+        const signed = await keymaster.addProof(mockJson);
+        signed.proof.proofValue = signed.proof.proofValue.substring(1);
+        const isValid = await keymaster.verifyProof(signed);
 
         expect(isValid).toBe(false);
     });
 
-    it('should return false for missing signer', async () => {
+    it('should return false for missing verificationMethod', async () => {
         await keymaster.createId('Bob');
 
-        const signed = await keymaster.addSignature(mockJson);
-        delete signed.signature.signer;
-        const isValid = await keymaster.verifySignature(signed);
+        const signed = await keymaster.addProof(mockJson);
+        // @ts-expect-error Testing invalid usage
+        delete signed.proof.verificationMethod;
+        const isValid = await keymaster.verifyProof(signed);
 
         expect(isValid).toBe(false);
     });
 
-    it('should return false for invalid hash', async () => {
+    it('should return false for invalid proof type', async () => {
         await keymaster.createId('Bob');
 
-        const signed = await keymaster.addSignature(mockJson);
-        signed.signature.hash = "1";
-        const isValid = await keymaster.verifySignature(signed);
+        const signed = await keymaster.addProof(mockJson);
+        // @ts-expect-error Testing invalid usage
+        signed.proof.type = "InvalidType";
+        const isValid = await keymaster.verifyProof(signed);
 
         expect(isValid).toBe(false);
     });
 
     it('should return false for null parameter', async () => {
         // @ts-expect-error Testing invalid usage, missing arg
-        const isValid = await keymaster.verifySignature();
+        const isValid = await keymaster.verifyProof();
 
         expect(isValid).toBe(false);
     });
 
     it('should return false for invalid JSON', async () => {
         // @ts-expect-error Testing invalid usage, invalid arg
-        const isValid = await keymaster.verifySignature("not JSON");
+        const isValid = await keymaster.verifyProof("not JSON");
 
         expect(isValid).toBe(false);
     });
