@@ -508,6 +508,22 @@ describe('Test operation validation errors', () => {
             expect(error.message).toBe('Invalid operation: proof');
         }
     });
+
+    it('create error with non-relative verificationMethod for agent', async () => {
+        const keypair = cipher.generateRandomJwk();
+        let agentOp = await helper.createAgentOp(keypair);
+
+        // Change verificationMethod from relative #key-1 to full DID reference
+        agentOp.proof!.verificationMethod = "did:cid:abc123#key-1";
+
+        try {
+            await gatekeeper.verifyCreateOperation(agentOp);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid operation: proof.verificationMethod must be #key-1 for agent create');
+        }
+    });
 });
 
 describe('gatekeeper.db', () => {

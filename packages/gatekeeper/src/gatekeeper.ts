@@ -423,6 +423,11 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError('proof');
         }
 
+        // For agent create operations, verificationMethod must be relative #key-1 (no DID exists yet)
+        if (operation.registration.type === 'agent' && operation.proof!.verificationMethod !== '#key-1') {
+            throw new InvalidOperationError('proof.verificationMethod must be #key-1 for agent create');
+        }
+
         if (operation.registration.validUntil && !this.verifyDateFormat(operation.registration.validUntil)) {
             throw new InvalidOperationError(`registration.validUntil=${operation.registration.validUntil}`);
         }

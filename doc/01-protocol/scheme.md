@@ -56,6 +56,7 @@ To create an agent DID, the client must sign and submit a "create" operation to 
     1. `created` time in ISO format
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key corresponding to the public key (this enables the node to verify that the operation is coming from the owner of the public key)
+    - The `proof.verificationMethod` must be set to `#key-1` (a relative reference) since the DID does not yet exist
 1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
 
 Example
@@ -106,6 +107,7 @@ To create an asset DID, the client must sign and submit a `create` operation to 
     1. `created` time in ISO format
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key of the controller
+    - The `proof.verificationMethod` must be the full DID reference of the controller (e.g., `did:cid:abc123#key-1`)
 1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
 
 Example
@@ -341,6 +343,14 @@ function verifyProof(object):
 This temporal resolution ensures that a credential issued in 2020 can still be verified in 2030, even if the issuer has rotated keys multiple times since issuance.
 
 Note: While the W3C Data Integrity specification makes `proof.created` optional, DID:CID requires it to support proper verification after key rotation.
+
+### Verification Method Format
+
+The `proof.verificationMethod` field identifies which key was used to create the proof:
+
+- **Agent create operations**: Must use relative reference `#key-1` since the DID doesn't exist yet (the proof is self-referential)
+- **Asset create operations**: Must use the full DID reference of the controller (e.g., `did:cid:abc123#key-1`)
+- **Update/delete operations**: Must use the full DID reference of the controller (e.g., `did:cid:abc123#key-N`)
 
 ## DID Recovery
 
