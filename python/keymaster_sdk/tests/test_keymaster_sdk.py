@@ -106,7 +106,8 @@ def test_issue_update_credentials():
     assert_equal(response, [did])
 
     response = keymaster.decrypt_json(did)
-    assert_equal(response["type"], ["VerifiableCredential", schema])
+    assert_equal(response["type"], ["VerifiableCredential"])
+    assert_equal(response["credentialSchema"]["id"], schema)
     assert_equal(response["issuer"], alice_id)
     assert_equal(response["credentialSubject"]["id"], alice_id)
 
@@ -120,7 +121,7 @@ def test_send_credentials():
 
     schema = keymaster.create_schema(None, expire_options)
 
-    bc = keymaster.bind_credential(schema, bob, expire_options)
+    bc = keymaster.bind_credential(bob, {**expire_options, "schema": schema})
     credential_id = keymaster.issue_credential(bc, expire_options)
     notice_id = keymaster.send_credential(credential_id, expire_options)
 
@@ -137,7 +138,7 @@ def test_bind_credentials():
 
     schema = keymaster.create_schema(None, expire_options)
 
-    bc = keymaster.bind_credential(schema, bob, expire_options)
+    bc = keymaster.bind_credential(bob, {**expire_options, "schema": schema})
     assert_equal(bc["credentialSubject"]["id"], bob_id)
 
     did = keymaster.issue_credential(bc, expire_options)
@@ -150,7 +151,7 @@ def test_publish_credentials():
     bob = generate_id()
     identifier = keymaster.create_id(bob, local_options)
     bob_schema = keymaster.create_schema(None, expire_options)
-    bc = keymaster.bind_credential(bob_schema, bob, expire_options)
+    bc = keymaster.bind_credential(bob, {**expire_options, "schema": bob_schema})
     did = keymaster.issue_credential(bc, expire_options)
 
     response = keymaster.publish_credential(did)
@@ -164,7 +165,7 @@ def test_accept_remove_revoke_credential():
     bob = generate_id()
     keymaster.create_id(bob, local_options)
     bob_schema = keymaster.create_schema(None, expire_options)
-    bc = keymaster.bind_credential(bob_schema, bob, expire_options)
+    bc = keymaster.bind_credential(bob, {**expire_options, "schema": bob_schema})
     did = keymaster.issue_credential(bc, expire_options)
 
     response = keymaster.accept_credential(did)

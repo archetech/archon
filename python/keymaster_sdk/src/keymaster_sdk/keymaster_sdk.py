@@ -235,13 +235,13 @@ def create_template(id):
     return response["template"]
 
 
-def bind_credential(schema, subject, options=None):
+def bind_credential(subject, options=None):
     if options is None:
         options = {}
     response = proxy_request(
         "POST",
         f"{_keymaster_api}/credentials/bind",
-        json={"schema": schema, "subject": subject, "options": options},
+        json={"subject": subject, "options": options},
     )
     return response["credential"]
 
