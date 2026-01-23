@@ -207,13 +207,14 @@ $ archon decrypt-json did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6F
         "https://www.w3.org/ns/credentials/v2",
         "https://www.w3.org/ns/credentials/examples/v2"
     ],
-    "type": [
-        "VerifiableCredential",
-        "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
-    ],
+    "type": ["VerifiableCredential"],
     "issuer": "did:cid:test:z3v8AuabRm9DaiakqbwFPgsLd6vSYBQtdj7poQFGYBgsZCfqTvY",
     "validFrom": "2024-03-22T15:06:24.773Z",
     "validUntil": null,
+    "credentialSchema": {
+        "id": "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7",
+        "type": "JsonSchema"
+    },
     "credentialSubject": {
         "id": "did:cid:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk",
         "account": "https://twitter.com/bob",

@@ -76,12 +76,18 @@ export interface Group {
     members: string[];
 }
 
+export interface CredentialSchema {
+    id: string;
+    type: "JsonSchema";
+}
+
 export interface VerifiableCredential {
     "@context": string[];
     type: string[];
     issuer: string;
     validFrom: string;
     validUntil?: string;
+    credentialSchema?: CredentialSchema;
     credentialSubject?: {
         id: string;
         [key: string]: unknown;

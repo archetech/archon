@@ -1657,11 +1657,11 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const id = await this.fetchIdInfo();
-        const type = await this.lookupDID(schemaId);
+        const schemaDID = await this.lookupDID(schemaId);
         const subjectDID = await this.lookupDID(subjectId);
 
         if (!claims) {
-            const schema = await this.getSchema(type);
+            const schema = await this.getSchema(schemaDID);
             claims = this.generateSchema(schema);
         }
 
@@ -1670,10 +1670,14 @@ export default class Keymaster implements KeymasterInterface {
                 "https://www.w3.org/ns/credentials/v2",
                 "https://www.w3.org/ns/credentials/examples/v2"
             ],
-            type: ["VerifiableCredential", type],
+            type: ["VerifiableCredential"],
             issuer: id.did,
             validFrom,
             validUntil,
+            credentialSchema: {
+                id: schemaDID,
+                type: "JsonSchema",
+            },
             credentialSubject: {
                 id: subjectDID,
                 ...claims,
@@ -1958,8 +1962,8 @@ export default class Keymaster implements KeymasterInterface {
                     continue;
                 }
 
-                if (doc.type && !doc.type.includes(credential.schema)) {
-                    // Wrong type
+                if (doc.credentialSchema?.id !== credential.schema) {
+                    // Wrong schema
                     continue;
                 }
 
@@ -2128,8 +2132,8 @@ export default class Keymaster implements KeymasterInterface {
             }
 
             // Check VP against VCs specified in challenge
-            if (vp.type.length >= 2 && vp.type[1].startsWith('did:')) {
-                const schema = vp.type[1];
+            if (vp.credentialSchema?.id) {
+                const schema = vp.credentialSchema.id;
                 const credential = challenge.credentials?.find(item => item.schema === schema);
 
                 if (!credential) {
