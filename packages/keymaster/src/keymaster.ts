@@ -1647,10 +1647,10 @@ export default class Keymaster implements KeymasterInterface {
         options: {
             validFrom?: string;
             validUntil?: string;
-            credential?: Record<string, unknown>;
+            claims?: Record<string, unknown>;
         } = {}
     ): Promise<VerifiableCredential> {
-        let { validFrom, validUntil, credential } = options;
+        let { validFrom, validUntil, claims } = options;
 
         if (!validFrom) {
             validFrom = new Date().toISOString();
@@ -1660,9 +1660,9 @@ export default class Keymaster implements KeymasterInterface {
         const type = await this.lookupDID(schemaId);
         const subjectDID = await this.lookupDID(subjectId);
 
-        if (!credential) {
+        if (!claims) {
             const schema = await this.getSchema(type);
-            credential = this.generateSchema(schema);
+            claims = this.generateSchema(schema);
         }
 
         return {
@@ -1676,8 +1676,8 @@ export default class Keymaster implements KeymasterInterface {
             validUntil,
             credentialSubject: {
                 id: subjectDID,
+                ...claims,
             },
-            credential,
         };
     }
 
@@ -1688,7 +1688,7 @@ export default class Keymaster implements KeymasterInterface {
         const id = await this.fetchIdInfo();
 
         if (options.schema && options.subject) {
-            credential = await this.bindCredential(options.schema, options.subject, { credential, ...options });
+            credential = await this.bindCredential(options.schema, options.subject, { claims: options.claims, ...options });
         }
 
         if (credential.issuer !== id.did) {
@@ -1742,7 +1742,6 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         if (!credential ||
-            !credential.credential ||
             !credential.credentialSubject ||
             !credential.credentialSubject.id) {
             throw new InvalidParameterError('credential');
@@ -1871,8 +1870,8 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         if (!reveal) {
-            // Remove the credential values
-            vc.credential = null;
+            // Remove the claim values, keep only the subject id
+            vc.credentialSubject = { id: vc.credentialSubject!.id };
         }
 
         data.manifest[credential] = vc;

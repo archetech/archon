@@ -84,8 +84,8 @@ export interface VerifiableCredential {
     validUntil?: string;
     credentialSubject?: {
         id: string;
+        [key: string]: unknown;
     };
-    credential?: Record<string, unknown> | null;
     proof?: Proof;
 }
 
@@ -93,7 +93,7 @@ export interface IssueCredentialsOptions extends EncryptOptions {
     schema?: string;
     subject?: string;
     validFrom?: string;
-    credential?: Record<string, unknown>;
+    claims?: Record<string, unknown>;
 }
 
 export interface Challenge {

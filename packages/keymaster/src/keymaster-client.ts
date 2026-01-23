@@ -710,7 +710,7 @@ export default class KeymasterClient implements KeymasterInterface {
         options?: {
             validFrom?: string;
             validUntil?: string;
-            credential?: Record<string, unknown>;
+            claims?: Record<string, unknown>;
         }
     ): Promise<VerifiableCredential> {
         try {

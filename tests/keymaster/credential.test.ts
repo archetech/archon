@@ -170,7 +170,8 @@ describe('publishCredential', () => {
         const vc = await keymaster.decryptJSON(did) as VerifiableCredential;
         const manifest = (doc.didDocumentData as { manifest: Record<string, VerifiableCredential> }).manifest;
 
-        vc.credential = null;
+        // When not revealing, only the subject id is kept (claims removed)
+        vc.credentialSubject = { id: vc.credentialSubject!.id };
 
         expect(manifest[did]).toStrictEqual(vc);
     });
@@ -265,19 +266,19 @@ describe('bindCredential', () => {
 
         expect(vc.issuer).toBe(userDid);
         expect(vc.credentialSubject!.id).toBe(userDid);
-        expect(vc.credential!.email).toEqual(expect.any(String));
+        expect(vc.credentialSubject!.email).toEqual(expect.any(String));
     });
 
     it('should create a bound credential with provided default', async () => {
         const userDid = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
 
-        const credential = { email: 'bob@mock.com' };
-        const vc = await keymaster.bindCredential(credentialDid, userDid, { credential });
+        const claims = { email: 'bob@mock.com' };
+        const vc = await keymaster.bindCredential(credentialDid, userDid, { claims });
 
         expect(vc.issuer).toBe(userDid);
         expect(vc.credentialSubject!.id).toBe(userDid);
-        expect(vc.credential!.email).toEqual(credential.email);
+        expect(vc.credentialSubject!.email).toEqual(claims.email);
     });
 
     it('should create a bound credential for a different user', async () => {
@@ -290,7 +291,7 @@ describe('bindCredential', () => {
 
         expect(vc.issuer).toBe(alice);
         expect(vc.credentialSubject!.id).toBe(bob);
-        expect(vc.credential!.email).toEqual(expect.any(String));
+        expect(vc.credentialSubject!.email).toEqual(expect.any(String));
     });
 });
 
@@ -305,7 +306,7 @@ describe('issueCredential', () => {
         const vc = await keymaster.decryptJSON(did) as VerifiableCredential;
         expect(vc.issuer).toBe(subject);
         expect(vc.credentialSubject!.id).toBe(subject);
-        expect(vc.credential!.email).toEqual(expect.any(String));
+        expect(vc.credentialSubject!.email).toEqual(expect.any(String));
 
         const isValid = await keymaster.verifyProof(vc);
         expect(isValid).toBe(true);
@@ -329,7 +330,7 @@ describe('issueCredential', () => {
         const vc = await keymaster.decryptJSON(did) as VerifiableCredential;
         expect(vc.issuer).toBe(subject);
         expect(vc.credentialSubject!.id).toBe(subject);
-        expect(vc.credential!.email).toEqual(expect.any(String));
+        expect(vc.credentialSubject!.email).toEqual(expect.any(String));
         expect(vc.validFrom).toBe(validFrom);
         expect(vc.validUntil).toBe(validUntil);
 
@@ -507,7 +508,7 @@ describe('updateCredential', () => {
 
         try {
             const vc2 = copyJSON(vc);
-            delete vc2.credential;
+            delete vc2.credentialSubject;
             await keymaster.updateCredential(did, vc2);
             throw new ExpectedExceptionError();
         }

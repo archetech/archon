@@ -215,9 +215,7 @@ $ archon decrypt-json did:cid:test:z3v8AuaZAWJuERtD5CwDu2mNpLHjJ6imdNGTwdZpfKY6F
     "validFrom": "2024-03-22T15:06:24.773Z",
     "validUntil": null,
     "credentialSubject": {
-        "id": "did:cid:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk"
-    },
-    "credential": {
+        "id": "did:cid:test:z3v8AuairhLoGZqf6UDKw7zXyBknTvanvSzFHnLpwy8nwa7WLzk",
         "account": "https://twitter.com/bob",
         "service": "twitter.com"
     },
