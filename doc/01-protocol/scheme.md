@@ -316,6 +316,29 @@ function resolveDid(did, versionTime=now):
     return DID document
 ```
 
+## Proof Verification
+
+When verifying a proof on a credential or other signed object, the verifier must resolve the signer's DID at the time the proof was created. This is essential for supporting key rotation - credentials signed with an old key must remain verifiable even after the signer rotates to a new key.
+
+The `proof.created` timestamp serves two purposes:
+1. Records when the proof was made (audit trail)
+2. Anchors verification to the correct historical key state
+
+In pseudocode:
+
+```
+function verifyProof(object):
+    extract signerDid from proof.verificationMethod
+    resolve signerDid at versionTime = proof.created
+    get publicKey from resolved DID document
+    verify signature using publicKey
+    return valid or invalid
+```
+
+This temporal resolution ensures that a credential issued in 2020 can still be verified in 2030, even if the issuer has rotated keys multiple times since issuance.
+
+Note: While the W3C Data Integrity specification makes `proof.created` optional, DID:CID requires it to support proper verification after key rotation.
+
 ## DID Recovery
 
 For security reasons, this method provides no support for storing private keys. We recommend that clients use BIP-39 to generate a master seed phrase consisting of at least 12 words, and that users safely store the recovery phrase.
