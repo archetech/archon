@@ -288,7 +288,7 @@ describe('importNotice', () => {
         };
 
         const schema = await keymaster.createSchema(mockSchema);
-        const bc = await keymaster.bindCredential(schema, alice);
+        const bc = await keymaster.bindCredential(alice, { schema });
         const vc = await keymaster.issueCredential(bc);
 
         const notice: NoticeMessage = {

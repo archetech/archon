@@ -458,7 +458,7 @@ program
     .description('Create bound credential for a user')
     .action(async (schema, subject) => {
         try {
-            const vc = await keymaster.bindCredential(schema, subject);
+            const vc = await keymaster.bindCredential(subject, { schema });
             console.log(JSON.stringify(vc, null, 4));
         }
         catch (error) {
@@ -1140,7 +1140,7 @@ program
                 console.log(`credential ${i + 1}/${N}`);
 
                 console.time('bindCredential');
-                const credential = await keymaster.bindCredential(schemaDID, currentID);
+                const credential = await keymaster.bindCredential(currentID, { schema: schemaDID });
                 console.timeEnd('bindCredential');
 
                 console.time('issueCredential');

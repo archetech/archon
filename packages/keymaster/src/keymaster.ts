@@ -1642,47 +1642,61 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async bindCredential(
-        schemaId: string,
         subjectId: string,
         options: {
+            schema?: string;
             validFrom?: string;
             validUntil?: string;
             claims?: Record<string, unknown>;
+            types?: string[];
         } = {}
     ): Promise<VerifiableCredential> {
-        let { validFrom, validUntil, claims } = options;
+        let { schema, validFrom, validUntil, claims, types } = options;
 
         if (!validFrom) {
             validFrom = new Date().toISOString();
         }
 
         const id = await this.fetchIdInfo();
-        const schemaDID = await this.lookupDID(schemaId);
         const subjectDID = await this.lookupDID(subjectId);
 
-        if (!claims) {
-            const schema = await this.getSchema(schemaDID);
-            claims = this.generateSchema(schema);
-        }
-
-        return {
+        const vc: VerifiableCredential = {
             "@context": [
                 "https://www.w3.org/ns/credentials/v2",
                 "https://www.w3.org/ns/credentials/examples/v2"
             ],
-            type: ["VerifiableCredential"],
+            type: ["VerifiableCredential", ...(types || [])],
             issuer: id.did,
             validFrom,
             validUntil,
-            credentialSchema: {
-                id: schemaDID,
-                type: "JsonSchema",
-            },
             credentialSubject: {
                 id: subjectDID,
-                ...claims,
             },
         };
+
+        // If schema provided, add credentialSchema and generate claims from schema
+        if (schema) {
+            const schemaDID = await this.lookupDID(schema);
+
+            if (!claims) {
+                const schema = await this.getSchema(schemaDID);
+                claims = this.generateSchema(schema);
+            }
+
+            vc.credentialSchema = {
+                id: schemaDID,
+                type: "JsonSchema",
+            };
+        }
+
+        if (claims) {
+            vc.credentialSubject = {
+                id: subjectDID,
+                ...claims,
+            };
+        }
+
+        return vc;
     }
 
     async issueCredential(
@@ -1692,7 +1706,7 @@ export default class Keymaster implements KeymasterInterface {
         const id = await this.fetchIdInfo();
 
         if (options.schema && options.subject) {
-            credential = await this.bindCredential(options.schema, options.subject, { claims: options.claims, ...options });
+            credential = await this.bindCredential(options.subject, { schema: options.schema, claims: options.claims, ...options });
         }
 
         if (credential.issuer !== id.did) {

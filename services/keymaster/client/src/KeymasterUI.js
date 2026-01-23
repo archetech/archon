@@ -927,7 +927,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function editCredential() {
         try {
-            const credentialBound = await keymaster.bindCredential(credentialSchema, credentialSubject);
+            const credentialBound = await keymaster.bindCredential(credentialSubject, { schema: credentialSchema });
             setCredentialString(JSON.stringify(credentialBound, null, 4));
             setCredentialDID('');
         } catch (error) {

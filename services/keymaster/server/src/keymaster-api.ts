@@ -2378,9 +2378,6 @@ v1router.post('/agents/:id/test', async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               schema:
- *                 type: string
- *                 description: The schema DID or name to which this credential conforms.
  *               subject:
  *                 type: string
  *                 description: The subject DID (or name) for whom this credential is bound.
@@ -2388,9 +2385,17 @@ v1router.post('/agents/:id/test', async (req, res) => {
  *                 type: object
  *                 description: Optional parameters for credential creation.
  *                 properties:
- *                   credential:
+ *                   schema:
+ *                     type: string
+ *                     description: The schema DID or name to which this credential conforms.
+ *                   claims:
  *                     type: object
- *                     description: A pre-built credential object to embed. If omitted, a default is generated from the schema.
+ *                     description: Claims to include in the credential. If omitted, defaults are generated from the schema.
+ *                   types:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     description: Additional semantic types to add to the credential type array.
  *                   validFrom:
  *                     type: string
  *                     format: date-time
@@ -2422,8 +2427,8 @@ v1router.post('/agents/:id/test', async (req, res) => {
  */
 v1router.post('/credentials/bind', async (req, res) => {
     try {
-        const { schema, subject, options } = req.body;
-        const credential = await keymaster.bindCredential(schema, subject, options);
+        const { subject, options } = req.body;
+        const credential = await keymaster.bindCredential(subject, options);
         res.json({ credential });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });

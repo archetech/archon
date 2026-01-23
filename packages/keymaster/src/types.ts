@@ -345,10 +345,12 @@ export interface KeymasterInterface {
     testAgent(did: string): Promise<boolean>;
 
     // Credentials
-    bindCredential(schema: string, subject: string, options?: {
+    bindCredential(subject: string, options?: {
+        schema?: string;
         validFrom?: string;
         validUntil?: string;
-        credential?: Record<string, unknown>;
+        claims?: Record<string, unknown>;
+        types?: string[];
     }): Promise<VerifiableCredential>;
 
     issueCredential(credential: Partial<VerifiableCredential>, options?: IssueCredentialsOptions): Promise<string>;
