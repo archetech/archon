@@ -293,6 +293,32 @@ describe('bindCredential', () => {
         expect(vc.credentialSubject!.id).toBe(bob);
         expect(vc.credentialSubject!.email).toEqual(expect.any(String));
     });
+
+    it('should create a credential with semantic types instead of schema', async () => {
+        const issuer = await keymaster.createId('ChessClub');
+        const member = await keymaster.createId('Bob');
+
+        await keymaster.setCurrentId('ChessClub');
+        const vc = await keymaster.bindCredential(member, {
+            types: ['DTGCredential', 'MembershipCredential'],
+            validUntil: '2027-01-06T10:00:00Z',
+        });
+
+        expect(vc.type).toContain('VerifiableCredential');
+        expect(vc.type).toContain('DTGCredential');
+        expect(vc.type).toContain('MembershipCredential');
+        expect(vc.credentialSchema).toBeUndefined();
+        expect(vc.issuer).toBe(issuer);
+        expect(vc.credentialSubject!.id).toBe(member);
+        expect(vc.validUntil).toBe('2027-01-06T10:00:00Z');
+
+        const did = await keymaster.issueCredential(vc);
+        const issued = await keymaster.decryptJSON(did) as VerifiableCredential;
+
+        expect(issued.type).toEqual(vc.type);
+        expect(issued.proof).toBeDefined();
+        expect(issued.proof!.proofPurpose).toBe('assertionMethod');
+    });
 });
 
 describe('issueCredential', () => {
