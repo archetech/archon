@@ -187,6 +187,9 @@ Example update to rotate keys for an agent DID:
             ],
             "authentication": [
                 "#key-2"
+            ],
+            "assertionMethod": [
+                "#key-2"
             ]
         }
     },

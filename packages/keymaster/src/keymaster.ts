@@ -1570,6 +1570,7 @@ export default class Keymaster implements KeymasterInterface {
                 ...doc.didDocument,
                 verificationMethod: [vmethod],
                 authentication: [vmethod.id],
+                assertionMethod: [vmethod.id],
             };
 
             ok = await this.updateDID(id.did, { didDocument: updatedDidDocument });

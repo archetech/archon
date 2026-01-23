@@ -610,6 +610,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                         "authentication": [
                             "#key-1"
                         ],
+                        "assertionMethod": [
+                            "#key-1"
+                        ],
                     },
                     "didDocumentMetadata": {
                         "created": anchor.created,

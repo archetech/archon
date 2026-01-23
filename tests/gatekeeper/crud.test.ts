@@ -272,6 +272,9 @@ describe('resolveDID', () => {
                 authentication: [
                     "#key-1",
                 ],
+                assertionMethod: [
+                    "#key-1",
+                ],
                 id: did,
                 verificationMethod: [
                     {
@@ -315,6 +318,9 @@ describe('resolveDID', () => {
                     "https://www.w3.org/ns/did/v1",
                 ],
                 authentication: [
+                    "#key-1",
+                ],
+                assertionMethod: [
                     "#key-1",
                 ],
                 id: did,
@@ -385,6 +391,9 @@ describe('resolveDID', () => {
                 authentication: [
                     "#key-1",
                 ],
+                assertionMethod: [
+                    "#key-1",
+                ],
                 id: did,
                 verificationMethod: [
                     {
@@ -430,6 +439,9 @@ describe('resolveDID', () => {
                     "https://www.w3.org/ns/did/v1",
                 ],
                 authentication: [
+                    "#key-1",
+                ],
+                assertionMethod: [
                     "#key-1",
                 ],
                 id: did,

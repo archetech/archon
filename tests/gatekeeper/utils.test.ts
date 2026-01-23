@@ -137,6 +137,9 @@ describe('generateDoc', () => {
                 authentication: [
                     "#key-1",
                 ],
+                assertionMethod: [
+                    "#key-1",
+                ],
                 id: did,
                 verificationMethod: [
                     {
@@ -169,6 +172,9 @@ describe('generateDoc', () => {
                     "https://www.w3.org/ns/did/v1",
                 ],
                 authentication: [
+                    "#key-1",
+                ],
+                assertionMethod: [
                     "#key-1",
                 ],
                 id: did,

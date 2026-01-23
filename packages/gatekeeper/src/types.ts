@@ -211,6 +211,7 @@ export interface DidCidDocument {
             publicKeyJwk?: EcdsaJwkPublic,
         }>,
         authentication?: string[],
+        assertionMethod?: string[],
     },
     didDocumentMetadata?: DocumentMetadata,
     didResolutionMetadata?: {
