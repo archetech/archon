@@ -5,7 +5,7 @@ from .keymaster_sdk import (
     add_group_vault_item,
     add_group_vault_member,
     add_name,
-    add_signature,
+    add_proof,
     backup_id,
     backup_wallet,
     bind_credential,
@@ -96,7 +96,7 @@ from .keymaster_sdk import (
     unpublish_credential,
     unpublish_poll,
     verify_response,
-    verify_signature,
+    verify_proof,
     view_poll,
     vote_poll,
 )

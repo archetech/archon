@@ -146,7 +146,7 @@ describe('publishCredential', () => {
     it('should reveal a valid credential', async () => {
         const bob = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
 
         await keymaster.publishCredential(did, { reveal: true });
@@ -161,7 +161,7 @@ describe('publishCredential', () => {
     it('should publish a valid credential without revealing', async () => {
         const bob = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
 
         await keymaster.publishCredential(did);
@@ -170,7 +170,8 @@ describe('publishCredential', () => {
         const vc = await keymaster.decryptJSON(did) as VerifiableCredential;
         const manifest = (doc.didDocumentData as { manifest: Record<string, VerifiableCredential> }).manifest;
 
-        vc.credential = null;
+        // When not revealing, only the subject id is kept (claims removed)
+        vc.credentialSubject = { id: vc.credentialSubject!.id };
 
         expect(manifest[did]).toStrictEqual(vc);
     });
@@ -193,7 +194,7 @@ describe('unpublishCredential', () => {
     it('should unpublish a published credential', async () => {
         const bob = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
         await keymaster.publishCredential(did, { reveal: true });
 
@@ -230,7 +231,7 @@ describe('unpublishCredential', () => {
     it('should throw an exception when credential not found', async () => {
         const bob = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
 
         try {
@@ -261,23 +262,23 @@ describe('bindCredential', () => {
         const userDid = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
 
-        const vc = await keymaster.bindCredential(credentialDid, userDid);
+        const vc = await keymaster.bindCredential(userDid, { schema: credentialDid });
 
         expect(vc.issuer).toBe(userDid);
         expect(vc.credentialSubject!.id).toBe(userDid);
-        expect(vc.credential!.email).toEqual(expect.any(String));
+        expect(vc.credentialSubject!.email).toEqual(expect.any(String));
     });
 
     it('should create a bound credential with provided default', async () => {
         const userDid = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
 
-        const credential = { email: 'bob@mock.com' };
-        const vc = await keymaster.bindCredential(credentialDid, userDid, { credential });
+        const claims = { email: 'bob@mock.com' };
+        const vc = await keymaster.bindCredential(userDid, { schema: credentialDid, claims });
 
         expect(vc.issuer).toBe(userDid);
         expect(vc.credentialSubject!.id).toBe(userDid);
-        expect(vc.credential!.email).toEqual(credential.email);
+        expect(vc.credentialSubject!.email).toEqual(claims.email);
     });
 
     it('should create a bound credential for a different user', async () => {
@@ -286,11 +287,61 @@ describe('bindCredential', () => {
         const credentialDid = await keymaster.createSchema(mockSchema);
 
         await keymaster.setCurrentId('Alice')
-        const vc = await keymaster.bindCredential(credentialDid, bob);
+        const vc = await keymaster.bindCredential(bob, { schema: credentialDid });
 
         expect(vc.issuer).toBe(alice);
         expect(vc.credentialSubject!.id).toBe(bob);
-        expect(vc.credential!.email).toEqual(expect.any(String));
+        expect(vc.credentialSubject!.email).toEqual(expect.any(String));
+    });
+
+    it('should create a credential with semantic types instead of schema', async () => {
+        const issuer = await keymaster.createId('ChessClub');
+        const member = await keymaster.createId('Bob');
+
+        await keymaster.setCurrentId('ChessClub');
+        const vc = await keymaster.bindCredential(member, {
+            types: ['DTGCredential', 'MembershipCredential'],
+            validUntil: '2027-01-06T10:00:00Z',
+        });
+
+        expect(vc.type).toContain('VerifiableCredential');
+        expect(vc.type).toContain('DTGCredential');
+        expect(vc.type).toContain('MembershipCredential');
+        expect(vc.credentialSchema).toBeUndefined();
+        expect(vc.issuer).toBe(issuer);
+        expect(vc.credentialSubject!.id).toBe(member);
+        expect(vc.validUntil).toBe('2027-01-06T10:00:00Z');
+
+        const did = await keymaster.issueCredential(vc);
+        const issued = await keymaster.decryptJSON(did) as VerifiableCredential;
+
+        expect(issued.type).toEqual(vc.type);
+        expect(issued.proof).toBeDefined();
+        expect(issued.proof!.proofPurpose).toBe('assertionMethod');
+    });
+
+    it('should auto-derive credential types from schema $credentialTypes', async () => {
+        const issuer = await keymaster.createId('ChessClub');
+        const member = await keymaster.createId('Member');
+
+        const membershipSchema = {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "$credentialTypes": ["DTGCredential", "MembershipCredential"],
+            "type": "object",
+            "properties": {
+                "memberSince": { "type": "string" }
+            },
+            "required": ["memberSince"]
+        };
+
+        await keymaster.setCurrentId('ChessClub');
+        const schemaDid = await keymaster.createSchema(membershipSchema);
+        const vc = await keymaster.bindCredential(member, { schema: schemaDid });
+
+        expect(vc.type).toEqual(['VerifiableCredential', 'DTGCredential', 'MembershipCredential']);
+        expect(vc.credentialSchema).toBeDefined();
+        expect(vc.credentialSchema!.id).toBe(schemaDid);
+        expect(vc.issuer).toBe(issuer);
     });
 });
 
@@ -298,16 +349,16 @@ describe('issueCredential', () => {
     it('should issue a bound credential when user is issuer', async () => {
         const subject = await keymaster.createId('Bob');
         const schema = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(schema, subject);
+        const boundCredential = await keymaster.bindCredential(subject, { schema });
 
         const did = await keymaster.issueCredential(boundCredential);
 
         const vc = await keymaster.decryptJSON(did) as VerifiableCredential;
         expect(vc.issuer).toBe(subject);
         expect(vc.credentialSubject!.id).toBe(subject);
-        expect(vc.credential!.email).toEqual(expect.any(String));
+        expect(vc.credentialSubject!.email).toEqual(expect.any(String));
 
-        const isValid = await keymaster.verifySignature(vc);
+        const isValid = await keymaster.verifyProof(vc);
         expect(isValid).toBe(true);
 
         const wallet = await keymaster.loadWallet();
@@ -329,11 +380,11 @@ describe('issueCredential', () => {
         const vc = await keymaster.decryptJSON(did) as VerifiableCredential;
         expect(vc.issuer).toBe(subject);
         expect(vc.credentialSubject!.id).toBe(subject);
-        expect(vc.credential!.email).toEqual(expect.any(String));
+        expect(vc.credentialSubject!.email).toEqual(expect.any(String));
         expect(vc.validFrom).toBe(validFrom);
         expect(vc.validUntil).toBe(validUntil);
 
-        const isValid = await keymaster.verifySignature(vc);
+        const isValid = await keymaster.verifyProof(vc);
         expect(isValid).toBe(true);
     });
 
@@ -344,7 +395,7 @@ describe('issueCredential', () => {
         await keymaster.setCurrentId('Alice');
 
         const schema = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(schema, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema });
 
         await keymaster.setCurrentId('Bob');
 
@@ -377,7 +428,7 @@ describe('sendCredential', () => {
     it('should create a notice for the credential', async () => {
         const subject = await keymaster.createId('Bob');
         const schema = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(schema, subject);
+        const boundCredential = await keymaster.bindCredential(subject, { schema });
         const credentialDID = await keymaster.issueCredential(boundCredential);
         const noticeDID = await keymaster.sendCredential(credentialDID);
 
@@ -413,7 +464,7 @@ describe('listIssued', () => {
     it('should return list containing one issued credential', async () => {
         const userDid = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, userDid);
+        const boundCredential = await keymaster.bindCredential(userDid, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
 
         const issued = await keymaster.listIssued();
@@ -426,7 +477,7 @@ describe('updateCredential', () => {
     it('should update a valid verifiable credential', async () => {
         const userDid = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, userDid);
+        const boundCredential = await keymaster.bindCredential(userDid, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
         const vc = (await keymaster.getCredential(did))!;
 
@@ -446,7 +497,7 @@ describe('updateCredential', () => {
     it('should throw exception on invalid parameters', async () => {
         const bob = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
         const vc = (await keymaster.getCredential(did))!;
 
@@ -507,7 +558,7 @@ describe('updateCredential', () => {
 
         try {
             const vc2 = copyJSON(vc);
-            delete vc2.credential;
+            delete vc2.credentialSubject;
             await keymaster.updateCredential(did, vc2);
             throw new ExpectedExceptionError();
         }
@@ -531,7 +582,7 @@ describe('revokeCredential', () => {
     it('should revoke a valid verifiable credential', async () => {
         const userDid = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, userDid);
+        const boundCredential = await keymaster.bindCredential(userDid, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
 
         const ok = await keymaster.revokeCredential(did);
@@ -545,7 +596,7 @@ describe('revokeCredential', () => {
     it('should throw exception if verifiable credential is already revoked', async () => {
         const userDid = await keymaster.createId('Bob');
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, userDid);
+        const boundCredential = await keymaster.bindCredential(userDid, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
 
         const ok1 = await keymaster.revokeCredential(did);
@@ -571,7 +622,7 @@ describe('revokeCredential', () => {
         await keymaster.setCurrentId('Alice');
 
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
 
         await keymaster.setCurrentId('Bob');
@@ -596,7 +647,7 @@ describe('acceptCredential', () => {
         await keymaster.setCurrentId('Alice');
 
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
 
         await keymaster.setCurrentId('Bob');
@@ -617,7 +668,7 @@ describe('acceptCredential', () => {
         await keymaster.setCurrentId('Alice');
 
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const did = await keymaster.issueCredential(boundCredential);
 
         await keymaster.setCurrentId('Carol');
@@ -634,7 +685,7 @@ describe('acceptCredential', () => {
         await keymaster.setCurrentId('Alice');
 
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const vc1 = await keymaster.issueCredential(boundCredential);
         const credential = await keymaster.getCredential(vc1);
         const vc2 = await keymaster.encryptJSON(credential, 'Carol');

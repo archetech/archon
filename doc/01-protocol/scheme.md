@@ -56,6 +56,7 @@ To create an agent DID, the client must sign and submit a "create" operation to 
     1. `created` time in ISO format
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key corresponding to the public key (this enables the node to verify that the operation is coming from the owner of the public key)
+    - The `proof.verificationMethod` must be set to `#key-1` (a relative reference) since the DID does not yet exist
 1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
 
 Example
@@ -74,16 +75,18 @@ Example
         "x": "LRrQabMIkvGVTA2IRk0JdWCpu57MNGm89nugrBZHo24",
         "y": "KHsWAaidAIGCosDjRYDIk-94793e4xVEL4UwFxjWgB8"
     },
-    "signature": {
-        "signed": "2026-01-14T19:29:06.927Z",
-        "hash": "59173cb6beec2a1d9c4ca02ba78269999244cf402ae1d4a63c6687f7ddf397ec",
-        "value": "a8d4f4121b688c3c4e24187bd6975d9969cc85aad0649c4e7a55bbd5e8457ee66aaea3e5b37db348fe1b0f60b260d12f017489440fb75f90f0475bc75724cf1f"
+    "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-01-14T19:29:06.927Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "authentication",
+        "proofValue": "qNT0EhtojDxOJBh71pddmWnMharQZJxOelW71ehFfuZqrqPls32zSP4bD2CyYNEvAXSJRA-3X5DwR1vHVyTPHw"
     }
 }
 ```
 
 Upon receiving the operation the node must:
-1. Verify the signature
+1. Verify the proof
 1. Apply JSON canonicalization scheme to the operation.
 1. Pin the seed object to IPFS.
 
@@ -104,6 +107,7 @@ To create an asset DID, the client must sign and submit a `create` operation to 
     1. `created` time in ISO format
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key of the controller
+    - The `proof.verificationMethod` must be the full DID reference of the controller (e.g., `did:cid:abc123#key-1`)
 1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
 
 Example
@@ -123,17 +127,18 @@ Example
             "members": []
         }
     },
-    "signature": {
-        "signer": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
-        "signed": "2026-01-14T19:32:24.375Z",
-        "hash": "3c9a93528dc7564903a88bd271ac30afa565f297b7dc3fa90db2dfb3821d7734",
-        "value": "34640c06ae6f7a72768b8177f94a34a7fac4025634cebf9825e4d3bbbbd4959d0d7f2aa2ac83c84861b2bc294f90ac1bec0ba7dcd1fb109bcb21fb605f033a91"
+    "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-01-14T19:32:24.375Z",
+        "verificationMethod": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q#key-1",
+        "proofPurpose": "authentication",
+        "proofValue": "NGQMBq5venJ2i4F3-Uo0p_rEAlY0zr-YJeTTu7vUlZ0NfyqirIPISGGyy8KU-QrBvsCrfc0fsQm8sh-2BfAzqQ"
     }
 }
 ```
 
 Upon receiving the operation the node must:
-1. Verify the signature is valid for the specified controller.
+1. Verify the proof is valid for the specified controller.
 1. Apply JSON canonicalization scheme to the operation object.
 1. Pin the seed object to IPFS.
 
@@ -184,20 +189,24 @@ Example update to rotate keys for an agent DID:
             ],
             "authentication": [
                 "#key-2"
+            ],
+            "assertionMethod": [
+                "#key-2"
             ]
         }
     },
-    "signature": {
-        "signer": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
-        "signed": "2026-01-14T19:29:16.117Z",
-        "hash": "5aa9c86ca0b269f6e7a7257357214147af06ce971d4d7642c8da3a6e468cd085",
-        "value": "2c490cf4d1b694e016b3494655cb418eab3675e8a6c6c9d0567c2c11353c99577e651ce79bd83fd3dc48b3120cd81df2d80dc36e1d1a469e44fed15e81980181"
+    "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-01-14T19:29:16.117Z",
+        "verificationMethod": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q#key-1",
+        "proofPurpose": "authentication",
+        "proofValue": "LEmM9NGL3b4WBzSUZVy0GOqzZ16KbGydBWfCwRNTmZV-ZRznm9g_09xIszITyB3y2A3DYYYaRp5E_tFegZgBgQ"
     }
 }
 ```
 
 Upon receiving the operation the node must:
-1. Verify the signature is valid for the controller of the DID.
+1. Verify the proof is valid for the controller of the DID.
 1. Verify the previd is identical to the latest version's operation CID.
 1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
 
@@ -224,17 +233,18 @@ Example deletion operation:
     "type": "delete",
     "did": "did:cid:bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha",
     "previd": "bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha",
-    "signature": {
-        "signer": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q",
-        "signed": "2026-01-14T19:34:32.170Z",
-        "hash": "4c286b598e3ebf3a7952c52c130261882871a467cad0e8edf7e27217827c6451",
-        "value": "6144e8b8f9a11c34ae7f489f62538e077730580e6edcaa60e6a6a780cb6b80373013622696d62f60dbe016f2ec84383632424435a2c5864e4f6a23cf30472377"
+    "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-01-14T19:34:32.170Z",
+        "verificationMethod": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q#key-1",
+        "proofPurpose": "authentication",
+        "proofValue": "YUTouPmhHDSudPSJ9iU44HdzBYDm7cqmDmanhgDLa4A3MBNiJpbWL2Db4BbzDYQ4NjJCRDWixYZOT2ojzzBHI3c"
     }
 }
 ```
 
 Upon receiving the operation the node must:
-1. Verify the signature is valid for the controller of the DID.
+1. Verify the proof is valid for the controller of the DID.
 1. Verify the previd is identical to the latest version's operation CID.
 1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
 
@@ -284,7 +294,7 @@ The document is then generated by creating an initial version of the document fr
 
 If there are any update operations, each one is validated by:
 
-1. verifying that it is signed by the controller of the DID at the time the update was created,
+1. verifying that the proof was created by the controller of the DID at the time the update was recorded,
 1. verifying that the previous version hash in the operation is identical to the hash of the document set that it is updating,
 1. verifying the new version is a valid DID document (schema validation).
 
@@ -306,10 +316,41 @@ function resolveDid(did, versionTime=now):
     generate initial document from anchor
     retrieve all update operations from did's registry
     for all updates until versionTime:
-        if signature is valid and update is valid:
+        if proof is valid and update is valid:
             apply update to DID document
     return DID document
 ```
+
+## Proof Verification
+
+When verifying a proof on a credential or other signed object, the verifier must resolve the signer's DID at the time the proof was created. This is essential for supporting key rotation - credentials signed with an old key must remain verifiable even after the signer rotates to a new key.
+
+The `proof.created` timestamp serves two purposes:
+1. Records when the proof was made (audit trail)
+2. Anchors verification to the correct historical key state
+
+In pseudocode:
+
+```
+function verifyProof(object):
+    extract signerDid from proof.verificationMethod
+    resolve signerDid at versionTime = proof.created
+    get publicKey from resolved DID document
+    verify signature using publicKey
+    return valid or invalid
+```
+
+This temporal resolution ensures that a credential issued in 2020 can still be verified in 2030, even if the issuer has rotated keys multiple times since issuance.
+
+Note: While the W3C Data Integrity specification makes `proof.created` optional, DID:CID requires it to support proper verification after key rotation.
+
+### Verification Method Format
+
+The `proof.verificationMethod` field identifies which key was used to create the proof:
+
+- **Agent create operations**: Must use relative reference `#key-1` since the DID doesn't exist yet (the proof is self-referential)
+- **Asset create operations**: Must use the full DID reference of the controller (e.g., `did:cid:abc123#key-1`)
+- **Update/delete operations**: Must use the full DID reference of the controller (e.g., `did:cid:abc123#key-N`)
 
 ## DID Recovery
 

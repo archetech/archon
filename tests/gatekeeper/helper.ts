@@ -2,6 +2,12 @@ import CipherNode from '@didcid/cipher/node';
 import { Operation, DidCidDocument } from '@didcid/gatekeeper/types';
 import Gatekeeper from '@didcid/gatekeeper';
 import type { EcdsaJwkPair } from '@didcid/cipher/types';
+import { base64url } from 'multiformats/bases/base64';
+
+function hexToBase64url(hex: string): string {
+    const bytes = Buffer.from(hex, 'hex');
+    return base64url.baseEncode(bytes);
+}
 
 export default class TestHelper {
     private gatekeeper: Gatekeeper;
@@ -37,14 +43,16 @@ export default class TestHelper {
         }
 
         const msgHash = this.cipher.hashJSON(operation);
-        const signature = this.cipher.signHash(msgHash, keypair.privateJwk);
+        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
 
         return {
             ...operation,
-            signature: {
-                signed: new Date().toISOString(),
-                hash: msgHash,
-                value: signature
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                created: new Date().toISOString(),
+                verificationMethod: "#key-1",
+                proofPurpose: "authentication",
+                proofValue: hexToBase64url(signatureHex),
             }
         };
     }
@@ -73,15 +81,16 @@ export default class TestHelper {
         };
 
         const msgHash = this.cipher.hashJSON(operation);
-        const signature = this.cipher.signHash(msgHash, keypair.privateJwk);
+        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
 
         return {
             ...operation,
-            signature: {
-                signer: did,
-                signed: new Date().toISOString(),
-                hash: msgHash,
-                value: signature,
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                created: new Date().toISOString(),
+                verificationMethod: `${did}#key-1`,
+                proofPurpose: "authentication",
+                proofValue: hexToBase64url(signatureHex),
             }
         };
     }
@@ -100,15 +109,16 @@ export default class TestHelper {
         };
 
         const msgHash = this.cipher.hashJSON(operation);
-        const signature = this.cipher.signHash(msgHash, keypair.privateJwk);
+        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
 
         return {
             ...operation,
-            signature: {
-                signer: did,
-                signed: new Date().toISOString(),
-                hash: msgHash,
-                value: signature,
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                created: new Date().toISOString(),
+                verificationMethod: `${did}#key-1`,
+                proofPurpose: "authentication",
+                proofValue: hexToBase64url(signatureHex),
             }
         };
     }
@@ -137,15 +147,16 @@ export default class TestHelper {
         };
 
         const msgHash = this.cipher.hashJSON(dataAnchor);
-        const signature = this.cipher.signHash(msgHash, keypair.privateJwk);
+        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
 
         return {
             ...dataAnchor,
-            signature: {
-                signer: agent,
-                signed: new Date().toISOString(),
-                hash: msgHash,
-                value: signature,
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                created: new Date().toISOString(),
+                verificationMethod: `${agent}#key-1`,
+                proofPurpose: "authentication",
+                proofValue: hexToBase64url(signatureHex),
             }
         };
     }

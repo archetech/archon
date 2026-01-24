@@ -42,8 +42,8 @@ function IssueTab() {
         }
         try {
             const credentialBound = await keymaster.bindCredential(
-                credentialSchema,
                 credentialSubject,
+                { schema: credentialSchema },
             );
             setCredentialString(JSON.stringify(credentialBound, null, 4));
             setCredentialDID("");

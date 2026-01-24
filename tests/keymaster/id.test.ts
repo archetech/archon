@@ -176,10 +176,12 @@ describe('createIdOperation', () => {
         expect(operation.registration!.type).toBe('agent');
         expect(operation.registration!.registry).toBe('hyperswarm'); // Default registry
         expect(operation.publicJwk).toBeDefined();
-        expect(operation.signature).toBeDefined();
-        expect(operation.signature!.signed).toBeDefined();
-        expect(operation.signature!.hash).toBeDefined();
-        expect(operation.signature!.value).toBeDefined();
+        expect(operation.proof).toBeDefined();
+        expect(operation.proof!.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(operation.proof!.created).toBeDefined();
+        expect(operation.proof!.verificationMethod).toBe('#key-1');
+        expect(operation.proof!.proofPurpose).toBe('authentication');
+        expect(operation.proof!.proofValue).toBeDefined();
     });
 
     it('should create operation with custom registry', async () => {
@@ -190,7 +192,7 @@ describe('createIdOperation', () => {
         expect(operation.registration!.registry).toBe(registry);
         expect(operation.type).toBe('create');
         expect(operation.publicJwk).toBeDefined();
-        expect(operation.signature).toBeDefined();
+        expect(operation.proof).toBeDefined();
     });
 
     it('should create operation with local registry', async () => {
@@ -201,7 +203,7 @@ describe('createIdOperation', () => {
         expect(operation.registration!.registry).toBe(registry);
         expect(operation.type).toBe('create');
         expect(operation.publicJwk).toBeDefined();
-        expect(operation.signature).toBeDefined();
+        expect(operation.proof).toBeDefined();
     });
 
     it('should create operation without modifying wallet', async () => {
@@ -247,23 +249,26 @@ describe('createIdOperation', () => {
         }
     });
 
-    it('should create valid signature that can be verified', async () => {
+    it('should create valid proof that can be verified', async () => {
         const name = 'Frank';
         const operation = await keymaster.createIdOperation(name);
 
-        // Verify that the signature matches the operation
-        const msgHash = cipher.hashJSON({
+        // Verify that the proof matches the operation
+        const operationWithoutProof = {
             type: operation.type,
             created: operation.created,
             registration: operation.registration,
             publicJwk: operation.publicJwk
-        });
+        };
+        const msgHash = cipher.hashJSON(operationWithoutProof);
 
-        expect(operation.signature!.hash).toBe(msgHash);
-
-        // Verify signature can be validated
+        // Verify proof can be validated
         const publicKey = operation.publicJwk!;
-        const isValid = cipher.verifySig(msgHash, operation.signature!.value, publicKey);
+        // Convert proofValue from base64url to hex
+        const { base64url } = await import('multiformats/bases/base64');
+        const proofValueBytes = base64url.baseDecode(operation.proof!.proofValue);
+        const proofValueHex = Buffer.from(proofValueBytes).toString('hex');
+        const isValid = cipher.verifySig(msgHash, proofValueHex, publicKey);
         expect(isValid).toBe(true);
     });
 

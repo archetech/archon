@@ -137,6 +137,9 @@ describe('generateDoc', () => {
                 authentication: [
                     "#key-1",
                 ],
+                assertionMethod: [
+                    "#key-1",
+                ],
                 id: did,
                 verificationMethod: [
                     {
@@ -169,6 +172,9 @@ describe('generateDoc', () => {
                     "https://www.w3.org/ns/did/v1",
                 ],
                 authentication: [
+                    "#key-1",
+                ],
+                assertionMethod: [
                     "#key-1",
                 ],
                 id: did,
@@ -489,7 +495,7 @@ describe('Test operation validation errors', () => {
         }
     });
 
-    it('create error with invalid signature', async () => {
+    it('create error with invalid proof', async () => {
         const keypair = cipher.generateRandomJwk();
         let agentOp = await helper.createAgentOp(keypair);
         agentOp.registration!.prefix = "dummy";
@@ -499,7 +505,23 @@ describe('Test operation validation errors', () => {
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
-            expect(error.message).toBe('Invalid operation: signature');
+            expect(error.message).toBe('Invalid operation: proof');
+        }
+    });
+
+    it('create error with non-relative verificationMethod for agent', async () => {
+        const keypair = cipher.generateRandomJwk();
+        let agentOp = await helper.createAgentOp(keypair);
+
+        // Change verificationMethod from relative #key-1 to full DID reference
+        agentOp.proof!.verificationMethod = "did:cid:abc123#key-1";
+
+        try {
+            await gatekeeper.verifyCreateOperation(agentOp);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid operation: proof.verificationMethod must be #key-1 for agent create');
         }
     });
 });

@@ -42,7 +42,7 @@ describe('createResponse', () => {
         await keymaster.setCurrentId('Alice');
 
         const credentialDid = await keymaster.createSchema(mockSchema);
-        const boundCredential = await keymaster.bindCredential(credentialDid, bob);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
         const vcDid = await keymaster.issueCredential(boundCredential);
 
         await keymaster.setCurrentId('Bob');
@@ -156,7 +156,7 @@ describe('verifyResponse', () => {
         await keymaster.setCurrentId('Alice');
 
         const credential1 = await keymaster.createSchema(mockSchema);
-        const bc1 = await keymaster.bindCredential(credential1, carol);
+        const bc1 = await keymaster.bindCredential(carol, { schema: credential1 });
         const vc1 = await keymaster.issueCredential(bc1);
 
         await keymaster.setCurrentId('Carol');
@@ -230,7 +230,7 @@ describe('verifyResponse', () => {
         await keymaster.setCurrentId('Alice');
 
         const credential1 = await keymaster.createSchema(mockSchema);
-        const bc1 = await keymaster.bindCredential(credential1, carol);
+        const bc1 = await keymaster.bindCredential(carol, { schema: credential1 });
         const vc1 = await keymaster.issueCredential(bc1);
 
         await keymaster.setCurrentId('Carol');
@@ -278,8 +278,8 @@ describe('verifyResponse', () => {
         const schema1 = await keymaster.createSchema(mockSchema, { registry: 'local' });
         const schema2 = await keymaster.createSchema(mockSchema, { registry: 'local' });
 
-        const bc1 = await keymaster.bindCredential(schema1, carol);
-        const bc2 = await keymaster.bindCredential(schema2, carol);
+        const bc1 = await keymaster.bindCredential(carol, { schema: schema1 });
+        const bc2 = await keymaster.bindCredential(carol, { schema: schema2 });
 
         const vc1 = await keymaster.issueCredential(bc1, { registry: 'local' });
         const vc2 = await keymaster.issueCredential(bc2, { registry: 'local' });
@@ -289,8 +289,8 @@ describe('verifyResponse', () => {
         const schema3 = await keymaster.createSchema(mockSchema, { registry: 'local' });
         const schema4 = await keymaster.createSchema(mockSchema, { registry: 'local' });
 
-        const bc3 = await keymaster.bindCredential(schema3, carol);
-        const bc4 = await keymaster.bindCredential(schema4, carol);
+        const bc3 = await keymaster.bindCredential(carol, { schema: schema3 });
+        const bc4 = await keymaster.bindCredential(carol, { schema: schema4 });
 
         const vc3 = await keymaster.issueCredential(bc3, { registry: 'local' });
         const vc4 = await keymaster.issueCredential(bc4, { registry: 'local' });

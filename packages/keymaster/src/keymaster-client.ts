@@ -705,16 +705,17 @@ export default class KeymasterClient implements KeymasterInterface {
     }
 
     async bindCredential(
-        schema: string,
         subject: string,
         options?: {
+            schema?: string;
             validFrom?: string;
             validUntil?: string;
-            credential?: Record<string, unknown>;
+            claims?: Record<string, unknown>;
+            types?: string[];
         }
     ): Promise<VerifiableCredential> {
         try {
-            const response = await axios.post(`${this.API}/credentials/bind`, { schema, subject, options });
+            const response = await axios.post(`${this.API}/credentials/bind`, { subject, options });
             return response.data.credential;
         }
         catch (error) {

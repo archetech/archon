@@ -3,6 +3,7 @@ import {
     GatekeeperInterface,
     DidCidDocument,
     ResolveDIDOptions,
+    Proof,
 } from '@didcid/gatekeeper/types';
 
 export interface Seed {
@@ -75,11 +76,9 @@ export interface Group {
     members: string[];
 }
 
-export interface Signature {
-    signer?: string;
-    signed: string;
-    hash: string;
-    value: string;
+export interface CredentialSchema {
+    id: string;
+    type: "JsonSchema";
 }
 
 export interface VerifiableCredential {
@@ -88,18 +87,19 @@ export interface VerifiableCredential {
     issuer: string;
     validFrom: string;
     validUntil?: string;
+    credentialSchema?: CredentialSchema;
     credentialSubject?: {
         id: string;
+        [key: string]: unknown;
     };
-    credential?: Record<string, unknown> | null;
-    signature?: Signature;
+    proof?: Proof;
 }
 
 export interface IssueCredentialsOptions extends EncryptOptions {
     schema?: string;
     subject?: string;
     validFrom?: string;
-    credential?: Record<string, unknown>;
+    claims?: Record<string, unknown>;
 }
 
 export interface Challenge {
@@ -236,8 +236,8 @@ export interface EncryptedMessage {
     cipher_receiver?: string | null;
 }
 
-export interface PossiblySigned {
-    signature?: Signature;
+export interface PossiblyProofed {
+    proof?: Proof;
 }
 
 export interface RestClientOptions {
@@ -345,10 +345,12 @@ export interface KeymasterInterface {
     testAgent(did: string): Promise<boolean>;
 
     // Credentials
-    bindCredential(schema: string, subject: string, options?: {
+    bindCredential(subject: string, options?: {
+        schema?: string;
         validFrom?: string;
         validUntil?: string;
-        credential?: Record<string, unknown>;
+        claims?: Record<string, unknown>;
+        types?: string[];
     }): Promise<VerifiableCredential>;
 
     issueCredential(credential: Partial<VerifiableCredential>, options?: IssueCredentialsOptions): Promise<string>;

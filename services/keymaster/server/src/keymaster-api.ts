@@ -680,8 +680,8 @@ v1router.get('/export/wallet/encrypted', async (req, res) => {
  *         schema:
  *           type: boolean
  *         description: >
- *           If true, verifies the signature(s) of the DID operation(s) before returning the DID Document.
- *           If a signature is invalid, an error is thrown.
+ *           If true, verifies the proof(s) of the DID operation(s) before returning the DID Document.
+ *           If a proof is invalid, an error is thrown.
  *     responses:
  *       200:
  *         description: Successfully resolved the DID Document.
@@ -1656,7 +1656,7 @@ v1router.post('/response', async (req, res) => {
  *                     description: If true, only returns the DID if it is fully confirmed on its registry.
  *                   verify:
  *                     type: boolean
- *                     description: If true, verifies the signature(s) of the response operation(s) before returning the DID Document.
+ *                     description: If true, verifies the proof(s) of the response operation(s) before returning the DID Document.
  *     responses:
  *       200:
  *         description: The result of the verification process.
@@ -2378,9 +2378,6 @@ v1router.post('/agents/:id/test', async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               schema:
- *                 type: string
- *                 description: The schema DID or name to which this credential conforms.
  *               subject:
  *                 type: string
  *                 description: The subject DID (or name) for whom this credential is bound.
@@ -2388,9 +2385,17 @@ v1router.post('/agents/:id/test', async (req, res) => {
  *                 type: object
  *                 description: Optional parameters for credential creation.
  *                 properties:
- *                   credential:
+ *                   schema:
+ *                     type: string
+ *                     description: The schema DID or name to which this credential conforms.
+ *                   claims:
  *                     type: object
- *                     description: A pre-built credential object to embed. If omitted, a default is generated from the schema.
+ *                     description: Claims to include in the credential. If omitted, defaults are generated from the schema.
+ *                   types:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     description: Additional semantic types to add to the credential type array.
  *                   validFrom:
  *                     type: string
  *                     format: date-time
@@ -2422,8 +2427,8 @@ v1router.post('/agents/:id/test', async (req, res) => {
  */
 v1router.post('/credentials/bind', async (req, res) => {
     try {
-        const { schema, subject, options } = req.body;
-        const credential = await keymaster.bindCredential(schema, subject, options);
+        const { subject, options } = req.body;
+        const credential = await keymaster.bindCredential(subject, options);
         res.json({ credential });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });
@@ -3297,7 +3302,7 @@ v1router.post('/keys/decrypt/json', async (req, res) => {
  * @swagger
  * /keys/sign:
  *   post:
- *     summary: Add a signature to a JSON object using the current ID's keys.
+ *     summary: Add a proof to a JSON object using the current ID's keys.
  *     requestBody:
  *       required: true
  *       content:
@@ -3320,7 +3325,7 @@ v1router.post('/keys/decrypt/json', async (req, res) => {
  *               properties:
  *                 signed:
  *                   type: object
- *                   description: The original JSON plus a `signature` block.
+ *                   description: The original JSON plus a `proof` block.
  *       500:
  *         description: Internal server error (e.g., signing failure).
  *         content:
@@ -3333,7 +3338,7 @@ v1router.post('/keys/decrypt/json', async (req, res) => {
  */
 v1router.post('/keys/sign', async (req, res) => {
     try {
-        const signed = await keymaster.addSignature(JSON.parse(req.body.contents));
+        const signed = await keymaster.addProof(JSON.parse(req.body.contents));
         res.json({ signed });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
@@ -3344,7 +3349,7 @@ v1router.post('/keys/sign', async (req, res) => {
  * @swagger
  * /keys/verify:
  *   post:
- *     summary: Verify a JSON object's signature.
+ *     summary: Verify a JSON object's proof.
  *     requestBody:
  *       required: true
  *       content:
@@ -3354,12 +3359,12 @@ v1router.post('/keys/sign', async (req, res) => {
  *             properties:
  *               json:
  *                 type: object
- *                 description: The signed JSON object to verify, which must include a `signature` property.
+ *                 description: The JSON object to verify, which must include a `proof` property.
  *             required:
  *               - json
  *     responses:
  *       200:
- *         description: Whether the signature is valid.
+ *         description: Whether the proof is valid.
  *         content:
  *           application/json:
  *             schema:
@@ -3367,7 +3372,7 @@ v1router.post('/keys/sign', async (req, res) => {
  *               properties:
  *                 ok:
  *                   type: boolean
- *                   description: true if the signature is valid; otherwise `false`.
+ *                   description: true if the proof is valid; otherwise `false`.
  *       500:
  *         description: Internal server error (verification failure or unexpected error).
  *         content:
@@ -3380,7 +3385,7 @@ v1router.post('/keys/sign', async (req, res) => {
  */
 v1router.post('/keys/verify', async (req, res) => {
     try {
-        const ok = await keymaster.verifySignature(req.body.json);
+        const ok = await keymaster.verifyProof(req.body.json);
         res.json({ ok });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });

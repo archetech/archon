@@ -38,8 +38,8 @@ async function runWorkflow(keymaster) {
     console.log(`Alice created schema1 ${schema1}`);
     console.log(`Alice created schema2 ${schema2}`);
 
-    const bc1 = await keymaster.bindCredential(schema1, carol);
-    const bc2 = await keymaster.bindCredential(schema2, carol);
+    const bc1 = await keymaster.bindCredential(carol, { schema: schema1 });
+    const bc2 = await keymaster.bindCredential(carol, { schema: schema2 });
 
     const vc1 = await keymaster.issueCredential(bc1, { registry: 'local' });
     const vc2 = await keymaster.issueCredential(bc2, { registry: 'local' });
@@ -55,8 +55,8 @@ async function runWorkflow(keymaster) {
     console.log(`Bob created schema3 ${schema3}`);
     console.log(`Bob created schema4 ${schema4}`);
 
-    const bc3 = await keymaster.bindCredential(schema3, carol);
-    const bc4 = await keymaster.bindCredential(schema4, carol);
+    const bc3 = await keymaster.bindCredential(carol, { schema: schema3 });
+    const bc4 = await keymaster.bindCredential(carol, { schema: schema4 });
 
     const vc3 = await keymaster.issueCredential(bc3, { registry: 'local' });
     const vc4 = await keymaster.issueCredential(bc4, { registry: 'local' });

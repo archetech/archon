@@ -28,11 +28,11 @@
         "summary": "Retrieve the API version",
         "responses": {
           "200": {
-            "description": "The API version number.",
+            "description": "The API version string.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -1318,6 +1318,90 @@
         }
       }
     },
+    "/batch/import/cids": {
+      "post": {
+        "summary": "Import a batch of DID operations by their CIDs",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "cids",
+                  "metadata"
+                ],
+                "properties": {
+                  "cids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Array of operation CIDs to import"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "required": [
+                      "registry",
+                      "time",
+                      "ordinal"
+                    ],
+                    "properties": {
+                      "registry": {
+                        "type": "string",
+                        "description": "The registry for the batch"
+                      },
+                      "time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Timestamp for the batch"
+                      },
+                      "ordinal": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "description": "Ordinal for ordering events"
+                      },
+                      "registration": {
+                        "type": "object",
+                        "description": "Optional blockchain registration metadata"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result of the import operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "queued": {
+                      "type": "number"
+                    },
+                    "processed": {
+                      "type": "number"
+                    },
+                    "rejected": {
+                      "type": "number"
+                    },
+                    "total": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/queue/{registry}": {
       "get": {
         "summary": "Retrieve the queued events for a specific registry",
@@ -2110,6 +2194,82 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "summary": "Search DIDs by text query",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "The search query string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of matching DID strings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error."
+          }
+        }
+      }
+    },
+    "/query": {
+      "post": {
+        "summary": "Query DIDs using structured MongoDB-style query",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "where": {
+                    "type": "object",
+                    "description": "Query filter object supporting $in operator"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Array of matching DID strings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - missing or invalid where parameter."
+          },
+          "500": {
+            "description": "Internal Server Error."
           }
         }
       }

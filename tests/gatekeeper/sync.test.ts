@@ -403,52 +403,53 @@ describe('importBatch', () => {
         expect(response.rejected).toBe(1);
     });
 
-    it('should report an error on missing operation signature', async () => {
+    it('should report an error on missing operation proof', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        delete ops[0].operation.signature;
+        delete ops[0].operation.proof;
 
         const response = await gatekeeper.importBatch(ops);
 
         expect(response.rejected).toBe(1);
     });
 
-    it('should report an error on invalid operation signature date', async () => {
+    it('should report an error on invalid operation proof created date', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].operation.signature!.signed = 'mock';
+        ops[0].operation.proof!.created = 'mock';
 
         const response = await gatekeeper.importBatch(ops);
 
         expect(response.rejected).toBe(1);
     });
 
-    it('should report an error on invalid operation signature hash', async () => {
+    it('should report an error on invalid operation proof type', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].operation.signature!.hash = 'mock';
+        // @ts-expect-error Testing invalid type
+        ops[0].operation.proof!.type = 'mock';
 
         const response = await gatekeeper.importBatch(ops);
 
         expect(response.rejected).toBe(1);
     });
 
-    it('should report an error on invalid operation signature signer', async () => {
+    it('should report an error on invalid operation proof verificationMethod', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].operation.signature!.signer = 'mock';
+        ops[0].operation.proof!.verificationMethod = 'mock';
 
         const response = await gatekeeper.importBatch(ops);
 
@@ -1112,7 +1113,7 @@ describe('processEvents', () => {
         expect(assetDoc3.didDocumentMetadata!.confirmed).toBe(true);
     });
 
-    it('should reject events with bad signatures', async () => {
+    it('should reject events with bad proofs', async () => {
         const keypair1 = cipher.generateRandomJwk();
         const agentOp1 = await helper.createAgentOp(keypair1);
         const agentDID1 = await gatekeeper.createDID(agentOp1);
@@ -1131,11 +1132,11 @@ describe('processEvents', () => {
         const ops = dids.flat();
         await gatekeeper.resetDb();
 
-        const sigVal1 = ops[1].operation.signature!.value;
-        const sigVal3 = ops[3].operation.signature!.value;
+        const proofVal1 = ops[1].operation.proof!.proofValue;
+        const proofVal3 = ops[3].operation.proof!.proofValue;
 
-        ops[1].operation.signature!.value = sigVal3;
-        ops[3].operation.signature!.value = sigVal1;
+        ops[1].operation.proof!.proofValue = proofVal3;
+        ops[3].operation.proof!.proofValue = proofVal1;
 
         await gatekeeper.importBatch(ops);
 

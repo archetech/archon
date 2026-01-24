@@ -216,11 +216,11 @@ export default class DbMongo implements GatekeeperDb {
         }
 
         try {
-            const hashes = batch
-                .map(op => op.signature?.hash)
-                .filter((h): h is string => !!h);
+            const proofValues = batch
+                .map(op => op.proof?.proofValue)
+                .filter((p): p is string => !!p);
 
-            if (hashes.length === 0) {
+            if (proofValues.length === 0) {
                 return true;
             }
 
@@ -228,7 +228,7 @@ export default class DbMongo implements GatekeeperDb {
                 .collection<QueueDoc>('queue')
                 .updateOne(
                     { id: registry },
-                    { $pull: { ops: { 'signature.hash': { $in: hashes } } } } as any
+                    { $pull: { ops: { 'proof.proofValue': { $in: proofValues } } } } as any
                 );
 
             return true;

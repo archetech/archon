@@ -1765,7 +1765,7 @@ describe('bindCredential', () => {
             .reply(200, { credential: mockCredential });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const credential = await keymaster.bindCredential(credentialDID, userDID);
+        const credential = await keymaster.bindCredential(userDID, { schema: credentialDID });
 
         expect(credential).toStrictEqual(mockCredential);
     });

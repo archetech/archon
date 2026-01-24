@@ -162,7 +162,7 @@ export abstract class AbstractJson implements GatekeeperDb {
                     return true;
                 }
                 db.queue[registry] = oldQueue.filter(
-                    item => !batch.some(op => op.signature?.value === item.signature?.value)
+                    item => !batch.some(op => op.proof?.proofValue === item.proof?.proofValue)
                 );
                 this.writeDb(db);
                 return true;

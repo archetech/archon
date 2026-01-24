@@ -297,11 +297,11 @@ export default class DbSqlite implements GatekeeperDb {
             this.withTx(async () => {
                 const oldQueue = await this.getQueueStrict(registry);
 
-                const batchHashes = new Set(
-                    batch.map(b => b.signature?.hash).filter((h): h is string => h !== undefined)
+                const batchProofValues = new Set(
+                    batch.map(b => b.proof?.proofValue).filter((p): p is string => p !== undefined)
                 );
                 const newQueue = oldQueue.filter(
-                    item => !batchHashes.has(item.signature?.hash || '')
+                    item => !batchProofValues.has(item.proof?.proofValue || '')
                 );
                 await this.db!.run(
                     `INSERT OR REPLACE INTO queue(id, ops) VALUES(?, ?)`,

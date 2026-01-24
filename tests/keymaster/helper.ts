@@ -38,8 +38,8 @@ export class TestHelper {
         const credential1 = await this.keymaster.createSchema(mockSchema);
         const credential2 = await this.keymaster.createSchema(mockSchema);
 
-        const bc1 = await this.keymaster.bindCredential(credential1, carol);
-        const bc2 = await this.keymaster.bindCredential(credential2, carol);
+        const bc1 = await this.keymaster.bindCredential(carol, { schema: credential1 });
+        const bc2 = await this.keymaster.bindCredential(carol, { schema: credential2 });
 
         const vc1 = await this.keymaster.issueCredential(bc1);
         const vc2 = await this.keymaster.issueCredential(bc2);
@@ -49,8 +49,8 @@ export class TestHelper {
         const credential3 = await this.keymaster.createSchema(mockSchema);
         const credential4 = await this.keymaster.createSchema(mockSchema);
 
-        const bc3 = await this.keymaster.bindCredential(credential3, carol);
-        const bc4 = await this.keymaster.bindCredential(credential4, carol);
+        const bc3 = await this.keymaster.bindCredential(carol, { schema: credential3 });
+        const bc4 = await this.keymaster.bindCredential(carol, { schema: credential4 });
 
         const vc3 = await this.keymaster.issueCredential(bc3);
         const vc4 = await this.keymaster.issueCredential(bc4);

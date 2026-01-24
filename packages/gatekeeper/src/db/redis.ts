@@ -191,11 +191,11 @@ export default class DbRedis implements GatekeeperDb {
             throw new Error(REDIS_NOT_STARTED_ERROR)
         }
 
-        const hashes = batch
-            .map(op => op.signature?.hash)
-            .filter((h): h is string => !!h);
+        const proofValues = batch
+            .map(op => op.proof?.proofValue)
+            .filter((p): p is string => !!p);
 
-        if (hashes.length === 0) {
+        if (proofValues.length === 0) {
             return true;
         }
 
@@ -215,7 +215,7 @@ export default class DbRedis implements GatekeeperDb {
                       local keep = {}
                       for i=1,#list do
                         local ok, obj = pcall(cjson.decode, list[i])
-                        if ok and obj and obj.signature and obj.signature.hash and want[obj.signature.hash] then
+                        if ok and obj and obj.proof and obj.proof.proofValue and want[obj.proof.proofValue] then
                           -- drop
                         else
                           table.insert(keep, list[i])
@@ -229,7 +229,7 @@ export default class DbRedis implements GatekeeperDb {
                     `;
 
         try {
-            await this.redis!.eval(script, 1, key, hashes.length.toString(), ...hashes);
+            await this.redis!.eval(script, 1, key, proofValues.length.toString(), ...proofValues);
             return true;
         } catch (e) {
             console.error(e);
