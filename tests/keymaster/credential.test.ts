@@ -319,6 +319,30 @@ describe('bindCredential', () => {
         expect(issued.proof).toBeDefined();
         expect(issued.proof!.proofPurpose).toBe('assertionMethod');
     });
+
+    it('should auto-derive credential types from schema $credentialTypes', async () => {
+        const issuer = await keymaster.createId('ChessClub');
+        const member = await keymaster.createId('Member');
+
+        const membershipSchema = {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "$credentialTypes": ["DTGCredential", "MembershipCredential"],
+            "type": "object",
+            "properties": {
+                "memberSince": { "type": "string" }
+            },
+            "required": ["memberSince"]
+        };
+
+        await keymaster.setCurrentId('ChessClub');
+        const schemaDid = await keymaster.createSchema(membershipSchema);
+        const vc = await keymaster.bindCredential(member, { schema: schemaDid });
+
+        expect(vc.type).toEqual(['VerifiableCredential', 'DTGCredential', 'MembershipCredential']);
+        expect(vc.credentialSchema).toBeDefined();
+        expect(vc.credentialSchema!.id).toBe(schemaDid);
+        expect(vc.issuer).toBe(issuer);
+    });
 });
 
 describe('issueCredential', () => {

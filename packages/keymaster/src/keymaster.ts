@@ -1677,10 +1677,15 @@ export default class Keymaster implements KeymasterInterface {
         // If schema provided, add credentialSchema and generate claims from schema
         if (schema) {
             const schemaDID = await this.lookupDID(schema);
+            const schemaDoc = await this.getSchema(schemaDID) as { $credentialTypes?: string[]; properties?: Record<string, unknown> } | null;
 
-            if (!claims) {
-                const schema = await this.getSchema(schemaDID);
-                claims = this.generateSchema(schema);
+            if (!claims && schemaDoc) {
+                claims = this.generateSchema(schemaDoc);
+            }
+
+            // If schema has $credentialTypes, add them to credential types
+            if (schemaDoc?.$credentialTypes) {
+                vc.type.push(...schemaDoc.$credentialTypes);
             }
 
             vc.credentialSchema = {
