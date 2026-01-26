@@ -288,7 +288,7 @@ describe('resolveDID', () => {
             didDocumentData: {},
             didDocumentMetadata: {
                 created: expect.any(String),
-                version: "1",
+                versionSequence: "1",
                 confirmed: true,
                 versionId: opid
             },
@@ -337,7 +337,7 @@ describe('resolveDID', () => {
             didDocumentMetadata: {
                 created: expect.any(String),
                 updated: expect.any(String),
-                version: "2",
+                versionSequence: "2",
                 confirmed: true,
                 versionId: opid
             },
@@ -408,7 +408,7 @@ describe('resolveDID', () => {
             didDocumentMetadata: {
                 created: expect.any(String),
                 updated: expect.any(String),
-                version: "2",
+                versionSequence: "2",
                 confirmed: true,
                 versionId: opid
             },
@@ -458,7 +458,7 @@ describe('resolveDID', () => {
             didDocumentMetadata: {
                 created: expect.any(String),
                 updated: expect.any(String),
-                version: "2",
+                versionSequence: "2",
                 confirmed: false,
                 versionId: opid
             },
@@ -500,7 +500,7 @@ describe('resolveDID', () => {
         // Pick a time out of the middle of the updates
         const doc = await gatekeeper.resolveDID(did, { versionTime: ops[5].time });
 
-        expect(doc.didDocumentMetadata!.version).toBe("6");
+        expect(doc.didDocumentMetadata!.versionSequence).toBe("6");
         expect(doc.didDocumentMetadata!.confirmed).toBe(true);
         expect(doc.didDocumentData).toStrictEqual({ mock: 5 });
     });
@@ -527,7 +527,7 @@ describe('resolveDID', () => {
             await gatekeeper.updateDID(updateOp);
         }
 
-        const versionSequence = parseInt(expected!.didDocumentMetadata!.version!, 10);
+        const versionSequence = parseInt(expected!.didDocumentMetadata!.versionSequence!, 10);
         const doc = await gatekeeper.resolveDID(did, { versionSequence });
 
         // Update expected to match the new retrieved timestamp
@@ -553,7 +553,7 @@ describe('resolveDID', () => {
         for (let i = 0; i < 10; i++) {
             const doc = await gatekeeper.resolveDID(did, { versionSequence: i + 1 });
             const version = (i + 1).toString();
-            expect(doc.didDocumentMetadata!.version).toBe(version);
+            expect(doc.didDocumentMetadata!.versionSequence).toBe(version);
         }
     });
 
@@ -577,7 +577,7 @@ describe('resolveDID', () => {
             didDocumentData: assetOp.data,
             didDocumentMetadata: {
                 created: expect.any(String),
-                version: "1",
+                versionSequence: "1",
                 confirmed: true,
                 versionId: opid
             },
@@ -705,7 +705,7 @@ describe('updateDID', () => {
 
         // Update doc to match expected
         doc.didDocumentMetadata!.updated = expect.any(String);
-        doc.didDocumentMetadata!.version = "2";
+        doc.didDocumentMetadata!.versionSequence = "2";
         doc.didDocumentMetadata!.versionId = opid;
         doc.didResolutionMetadata!.retrieved = expect.any(String);
 
@@ -727,7 +727,7 @@ describe('updateDID', () => {
 
             expect(ok).toBe(true);
             const version = (i + 2).toString();
-            expect(updatedDoc.didDocumentMetadata!.version).toBe(version);
+            expect(updatedDoc.didDocumentMetadata!.versionSequence).toBe(version);
         }
     });
 
@@ -797,7 +797,7 @@ describe('updateDID', () => {
         }
 
         const doc2 = await gatekeeper.resolveDID(did, { verify: true });
-        expect(doc2.didDocumentMetadata!.version).toBe("11");
+        expect(doc2.didDocumentMetadata!.versionSequence).toBe("11");
     });
 
     it('should throw exception when registry queue exceeds limit', async () => {
@@ -835,6 +835,6 @@ describe('deleteDID', () => {
         expect(doc).toBeDefined();
         expect(doc.didDocument).toStrictEqual({ id: did });
         expect(doc.didDocumentMetadata!.deactivated).toBe(true);
-        expect(doc.didDocumentMetadata!.version).toBe("2");
+        expect(doc.didDocumentMetadata!.versionSequence).toBe("2");
     });
 });

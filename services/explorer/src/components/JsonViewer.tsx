@@ -74,7 +74,7 @@ function JsonViewer(
             }
             setAliasDocs(docs);
 
-            const versions = parseInt(docs.didDocumentMetadata.version ?? "1", 10);
+            const versions = docs.didDocumentMetadata.version ?? 1;
             if (versions) {
                 setAliasDocsVersion(versions);
                 setAliasDocsVersionMax(versions);

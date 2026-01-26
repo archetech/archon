@@ -130,7 +130,7 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
                 setError("Invalid DID");
                 return;
             }
-            const versions = parseInt(docs.didDocumentMetadata.version ?? "1", 10);
+            const versions = docs.didDocumentMetadata.version ?? 1;
 
             setAliasDocs(docs as Record<string, unknown>);
             if (versions) {

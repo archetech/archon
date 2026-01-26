@@ -58,7 +58,7 @@ const ImageTab = () => {
             const docs = await keymaster.resolveDID(name, version ? { versionSequence: version } : {});
             setSelectedImageDocs(docs);
 
-            const currentVersion = parseInt(docs.didDocumentMetadata?.version ?? "1", 10);
+            const currentVersion = docs.didDocumentMetadata?.version ?? 1;
             setImageVersion(currentVersion);
             if (version === undefined) {
                 setImageVersionMax(currentVersion);

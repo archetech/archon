@@ -192,11 +192,11 @@ describe('addGroupMember', () => {
 
         await keymaster.addGroupMember(groupDid, dataDid);
         const dox1 = await keymaster.resolveDID(groupDid);
-        const version1 = dox1.didDocumentMetadata!.version;
+        const version1 = dox1.didDocumentMetadata!.versionSequence;
 
         await keymaster.addGroupMember(groupDid, dataDid);
         const dox2 = await keymaster.resolveDID(groupDid);
-        const version2 = dox2.didDocumentMetadata!.version;
+        const version2 = dox2.didDocumentMetadata!.versionSequence;
 
         expect(version2).toBe(version1);
     });
@@ -430,12 +430,12 @@ describe('removeGroupMember', () => {
         const groupDid = await keymaster.createGroup(groupName);
         const mockAnchor = { name: 'mockData' };
         const dox1 = await keymaster.resolveDID(groupDid);
-        const version1 = dox1.didDocumentMetadata!.version;
+        const version1 = dox1.didDocumentMetadata!.versionSequence;
 
         const dataDid = await keymaster.createAsset(mockAnchor);
         await keymaster.removeGroupMember(groupDid, dataDid);
         const dox2 = await keymaster.resolveDID(groupDid);
-        const version2 = dox2.didDocumentMetadata!.version;
+        const version2 = dox2.didDocumentMetadata!.versionSequence;
 
         expect(version2).toBe(version1);
     });
