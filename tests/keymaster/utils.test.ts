@@ -191,7 +191,7 @@ describe('updateDID', () => {
 
         expect(ok).toBe(true);
         expect(doc2.didDocumentData).toStrictEqual(dataUpdated);
-        expect(doc2.didDocumentMetadata!.version).toBe("2");
+        expect(doc2.didDocumentMetadata!.versionSequence).toBe("2");
     });
 
     it('should update an asset DID even if data is equivalent', async () => {
@@ -207,7 +207,7 @@ describe('updateDID', () => {
 
         expect(ok).toBe(true);
         expect(doc2.didDocumentData).toStrictEqual(mockAnchor);
-        expect(doc2.didDocumentMetadata!.version).toBe("2");
+        expect(doc2.didDocumentMetadata!.versionSequence).toBe("2");
     });
 
     it('should update an asset DID when owner ID is in the wallet', async () => {
@@ -231,7 +231,7 @@ describe('updateDID', () => {
         expect(ok).toBe(true);
         expect(doc2.didDocument!.controller).toBe(bob);
         expect(doc2.didDocumentData).toStrictEqual(dataUpdated);
-        expect(doc2.didDocumentMetadata!.version).toBe("2");
+        expect(doc2.didDocumentMetadata!.versionSequence).toBe("2");
     });
 
     it('should not update an asset DID when owner ID is not in the wallet', async () => {

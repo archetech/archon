@@ -671,7 +671,7 @@ describe('processEvents', () => {
 
         const doc2 = await gatekeeper.resolveDID(did);
 
-        expect(doc2.didDocumentMetadata!.version).toBe("2");
+        expect(doc2.didDocumentMetadata!.versionSequence).toBe("2");
         expect(doc2.didDocumentMetadata!.confirmed).toBe(true);
     });
 
@@ -692,7 +692,7 @@ describe('processEvents', () => {
         await gatekeeper.updateDID(updateOp);
 
         const localDoc = await gatekeeper.resolveDID(did);
-        expect(localDoc.didDocumentMetadata!.version).toBe('2');
+        expect(localDoc.didDocumentMetadata!.versionSequence).toBe('2');
         expect(localDoc.didDocumentMetadata!.confirmed).toBe(false);
 
         // Import hyperswarm confirmations (mediator creates events with registry=hyperswarm)
@@ -706,7 +706,7 @@ describe('processEvents', () => {
         expect(response.added + response.merged).toBe(2);
 
         const confirmedDoc = await gatekeeper.resolveDID(did);
-        expect(confirmedDoc.didDocumentMetadata!.version).toBe('2');
+        expect(confirmedDoc.didDocumentMetadata!.versionSequence).toBe('2');
         expect(confirmedDoc.didDocumentMetadata!.confirmed).toBe(true);
     });
 
@@ -732,7 +732,7 @@ describe('processEvents', () => {
 
         // Locally, the latest version is unconfirmed (updates were stored as registry=local)
         const localDoc = await gatekeeper.resolveDID(did);
-        expect(localDoc.didDocumentMetadata!.version).toBe('3');
+        expect(localDoc.didDocumentMetadata!.versionSequence).toBe('3');
         expect(localDoc.didDocumentMetadata!.confirmed).toBe(false);
 
         // Import confirmations: v2 confirmed on hyperswarm; v3 confirmed on FTC:testnet5
@@ -744,7 +744,7 @@ describe('processEvents', () => {
         await gatekeeper.processEvents();
 
         const confirmedDoc = await gatekeeper.resolveDID(did);
-        expect(confirmedDoc.didDocumentMetadata!.version).toBe('3');
+        expect(confirmedDoc.didDocumentMetadata!.versionSequence).toBe('3');
         expect(confirmedDoc.didDocumentMetadata!.confirmed).toBe(true);
     });
 
@@ -1096,7 +1096,7 @@ describe('processEvents', () => {
         expect(response1.added).toBe(events.length);
 
         const assetDoc2 = await gatekeeper.resolveDID(assetDID);
-        expect(assetDoc2.didDocumentMetadata!.version).toBe("3");
+        expect(assetDoc2.didDocumentMetadata!.versionSequence).toBe("3");
         expect(assetDoc2.didDocumentMetadata!.confirmed).toBe(false);
 
         for (const event of events) {
@@ -1109,7 +1109,7 @@ describe('processEvents', () => {
         expect(response2.added).toBe(events.length);
 
         const assetDoc3 = await gatekeeper.resolveDID(assetDID);
-        expect(assetDoc3.didDocumentMetadata!.version).toBe("3");
+        expect(assetDoc3.didDocumentMetadata!.versionSequence).toBe("3");
         expect(assetDoc3.didDocumentMetadata!.confirmed).toBe(true);
     });
 

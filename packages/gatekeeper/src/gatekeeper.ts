@@ -278,7 +278,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     byRegistry[registry] = (byRegistry[registry] || 0) + 1;
                 }
 
-                const version = doc.didDocumentMetadata?.version;
+                const version = doc.didDocumentMetadata?.versionSequence;
                 if (version != null) {
                     const versionNum = parseInt(version, 10);
                     if (!isNaN(versionNum)) {
@@ -761,7 +761,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     created,
                     canonicalId,
                     versionId,
-                    version: versionNum.toString(),
+                    versionSequence: versionNum.toString(),
                     confirmed,
                     timestamp,
                 }
@@ -815,7 +815,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     updated,
                     canonicalId,
                     versionId,
-                    version: versionNum.toString(),
+                    versionSequence: versionNum.toString(),
                     confirmed,
                     timestamp,
                 }
@@ -833,7 +833,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     deleted: updated,
                     canonicalId,
                     versionId,
-                    version: versionNum.toString(),
+                    versionSequence: versionNum.toString(),
                     confirmed,
                     timestamp,
                 }

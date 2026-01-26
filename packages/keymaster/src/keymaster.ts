@@ -1247,9 +1247,14 @@ export default class Keymaster implements KeymasterInterface {
         const controller = docs.didDocument?.controller || docs.didDocument?.id;
         const isOwned = await this.idInWallet(controller);
 
-        // Augment the DID document metadata with the DID ownership status
+        // Convert versionSequence string to numeric version
+        const versionSequence = docs.didDocumentMetadata?.versionSequence;
+        const version = versionSequence ? parseInt(versionSequence, 10) : undefined;
+
+        // Augment the DID document metadata with the DID ownership status and numeric version
         docs.didDocumentMetadata = {
             ...docs.didDocumentMetadata,
+            version,
             isOwned,
         } as DocumentMetadata & { isOwned?: boolean };
 

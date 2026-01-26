@@ -491,7 +491,7 @@ describe('updateCredential', () => {
         expect(updated.validUntil).toBe(vc.validUntil);
 
         const doc = await keymaster.resolveDID(did);
-        expect(doc.didDocumentMetadata!.version).toBe("2");
+        expect(doc.didDocumentMetadata!.versionSequence).toBe("2");
     });
 
     it('should throw exception on invalid parameters', async () => {
