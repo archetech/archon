@@ -393,7 +393,7 @@ export interface KeymasterInterface {
     testDocument(id: string): Promise<boolean>;
 
     // Vaults
-    createVault(options?: CreateAssetOptions): Promise<string>;
+    createVault(options?: VaultOptions): Promise<string>;
     getVault(vaultId: string, options?: ResolveDIDOptions): Promise<Vault>;
     testVault(vaultId: string, options?: ResolveDIDOptions): Promise<boolean>;
     addVaultMember(vaultId: string, memberId: string): Promise<boolean>;
