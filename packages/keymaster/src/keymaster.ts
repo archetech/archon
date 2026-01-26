@@ -1499,11 +1499,11 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('no registry found for agent DID');
         }
 
-        const vaultDid = await this.createAsset({ backup: backup }, { registry, controller: name });
+        const backupStoreDid = await this.createAsset({ backup: backup }, { registry, controller: name });
 
         if (doc.didDocumentData) {
-            const currentData = doc.didDocumentData as { vault?: string };
-            const updatedData = { ...currentData, vault: vaultDid };
+            const currentData = doc.didDocumentData as { backupStore?: string };
+            const updatedData = { ...currentData, backupStore: backupStoreDid };
             return this.updateDID(name, { didDocumentData: updatedData });
         }
         return false;
@@ -1514,17 +1514,17 @@ export default class Keymaster implements KeymasterInterface {
             const keypair = await this.hdKeyPair();
 
             const doc = await this.resolveDID(did);
-            const docData = doc.didDocumentData as { vault?: string };
-            if (!docData.vault) {
-                throw new InvalidDIDError('didDocumentData missing vault');
+            const docData = doc.didDocumentData as { backupStore?: string };
+            if (!docData.backupStore) {
+                throw new InvalidDIDError('didDocumentData missing backupStore');
             }
 
-            const vault = await this.resolveAsset(docData.vault) as { backup?: string };
-            if (typeof vault.backup !== 'string') {
-                throw new InvalidDIDError('backup not found in vault');
+            const backupStore = await this.resolveAsset(docData.backupStore) as { backup?: string };
+            if (typeof backupStore.backup !== 'string') {
+                throw new InvalidDIDError('backup not found in backupStore');
             }
 
-            const backup = this.cipher.decryptMessage(keypair.publicJwk, keypair.privateJwk, vault.backup);
+            const backup = this.cipher.decryptMessage(keypair.publicJwk, keypair.privateJwk, backupStore.backup);
             const data = JSON.parse(backup) as { name: string; id: IDInfo };
 
             await this.mutateWallet((wallet) => {
