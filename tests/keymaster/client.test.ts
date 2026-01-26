@@ -2670,7 +2670,7 @@ describe('testDocument', () => {
 describe('createVault', () => {
     const mockDID = 'did:example:123456789gvault';
 
-    it('should create a group vault', async () => {
+    it('should create a vault', async () => {
         nock(KeymasterURL)
             .post(Endpoints.vaults)
             .reply(200, { did: mockDID });
@@ -2733,7 +2733,7 @@ describe('getVault', () => {
 describe('testVault', () => {
     const mockVaultId = 'vault2';
 
-    it('should test group vault', async () => {
+    it('should test vault', async () => {
         nock(KeymasterURL)
             .post(`${Endpoints.vaults}/${mockVaultId}/test`)
             .reply(200, { test: true });
@@ -2960,7 +2960,7 @@ describe('getVaultItem', () => {
     const mockName = 'mockName';
     const mockData = Buffer.from('mockData');
 
-    it('should return group vault item data', async () => {
+    it('should return vault item data', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.vaults}/${mockVaultId}/items/${mockName}`)
             .reply(200, mockData);

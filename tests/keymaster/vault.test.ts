@@ -354,7 +354,7 @@ describe('listVaultMembers', () => {
             await keymaster.listVaultMembers(did);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Keymaster: Unsupported group vault version');
+            expect(error.message).toBe('Keymaster: Unsupported vault version');
         }
     });
 });

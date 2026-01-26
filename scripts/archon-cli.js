@@ -1160,7 +1160,7 @@ program
 
 program
     .command('create-vault')
-    .description('Create a group vault')
+    .description('Create a vault')
     .option('-n, --name <name>', 'DID name')
     .option('-r, --registry <registry>', 'registry to use')
     .option('-s, --secretMembers', 'keep member list secret from each other')
@@ -1176,7 +1176,7 @@ program
 
 program
     .command('list-vault-items <id>')
-    .description('List items in the group vault')
+    .description('List items in the vault')
     .action(async (id) => {
         try {
             const items = await keymaster.listVaultItems(id);
@@ -1189,7 +1189,7 @@ program
 
 program
     .command('add-vault-member <id> <member>')
-    .description('Add a member to a group vault')
+    .description('Add a member to a vault')
     .action(async (id, member) => {
         try {
             const ok = await keymaster.addVaultMember(id, member);
@@ -1202,7 +1202,7 @@ program
 
 program
     .command('remove-vault-member <id> <member>')
-    .description('Remove a member from a group vault')
+    .description('Remove a member from a vault')
     .action(async (id, member) => {
         try {
             const ok = await keymaster.removeVaultMember(id, member);
@@ -1215,7 +1215,7 @@ program
 
 program
     .command('list-vault-members <id>')
-    .description('List members of a group vault')
+    .description('List members of a vault')
     .action(async (id) => {
         try {
             const members = await keymaster.listVaultMembers(id);
@@ -1228,7 +1228,7 @@ program
 
 program
     .command('add-vault-item <id> <file>')
-    .description('Add an item (file) to a group vault')
+    .description('Add an item (file) to a vault')
     .action(async (id, file) => {
         try {
             const data = fs.readFileSync(file);
@@ -1243,7 +1243,7 @@ program
 
 program
     .command('remove-vault-item <id> <item>')
-    .description('Remove an item from a group vault')
+    .description('Remove an item from a vault')
     .action(async (id, item) => {
         try {
             const ok = await keymaster.removeVaultItem(id, item);
@@ -1256,7 +1256,7 @@ program
 
 program
     .command('get-vault-item <id> <item> <file>')
-    .description('Save an item from a group vault to a file')
+    .description('Save an item from a vault to a file')
     .action(async (id, item, file) => {
         try {
             const data = await keymaster.getVaultItem(id, item);

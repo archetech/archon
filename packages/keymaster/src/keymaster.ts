@@ -2897,7 +2897,7 @@ export default class Keymaster implements KeymasterInterface {
         const myVaultKey = vault.keys[myMemberId];
 
         if (!myVaultKey) {
-            throw new KeymasterError('No access to group vault');
+            throw new KeymasterError('No access to vault');
         }
 
         const privKeyJSON = await this.decryptWithDerivedKeys(wallet, id, vault.publicJwk, myVaultKey);
@@ -2987,7 +2987,7 @@ export default class Keymaster implements KeymasterInterface {
             return;
         }
 
-        throw new KeymasterError('Unsupported group vault version');
+        throw new KeymasterError('Unsupported vault version');
     }
 
     getAgentDID(doc: DidCidDocument): string {

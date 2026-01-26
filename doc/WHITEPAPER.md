@@ -745,7 +745,7 @@ Phase 2: Result Revelation (Optional)
 }
 ```
 
-### 8.4 Group Vaults with Secret Membership
+### 8.4 Vaults with Secret Membership
 
 Archon supports multi-party encrypted storage where members can share data without necessarily knowing each other's identities:
 
@@ -1146,7 +1146,7 @@ Key innovations include:
 5. **Time-travel resolution** allowing DIDs to be resolved at any point in their history
 6. **Decentralized messaging (D-Mail)** built on the identity layer
 7. **Privacy-preserving voting** with spoil ballots and two-phase revelation
-8. **Group vaults with secret membership** for anonymous collaboration
+8. **Vaults with secret membership** for anonymous collaboration
 9. **Full W3C compliance** ensuring ecosystem interoperability
 10. **Comprehensive credential support** for real-world applications
 

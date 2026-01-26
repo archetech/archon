@@ -4820,8 +4820,8 @@ v1router.get('/ipfs/data/:cid', async (req, res) => {
  * @swagger
  * /vaults:
  *   post:
- *     summary: Create a new group vault.
- *     description: Creates a new group vault asset and returns its DID.
+ *     summary: Create a new vault.
+ *     description: Creates a new vault asset and returns its DID.
  *     requestBody:
  *       required: true
  *       content:
@@ -4831,18 +4831,18 @@ v1router.get('/ipfs/data/:cid', async (req, res) => {
  *             properties:
  *               options:
  *                 type: object
- *                 description: Additional options for group vault creation.
+ *                 description: Additional options for vault creation.
  *                 properties:
  *                   registry:
  *                     type: string
- *                     description: The registry in which to create the group vault DID (e.g., "local", "hyperswarm").
+ *                     description: The registry in which to create the vault DID (e.g., "local", "hyperswarm").
  *                   validUntil:
  *                     type: string
  *                     format: date-time
- *                     description: Optional expiration date/time for the group vault.
+ *                     description: Optional expiration date/time for the vault.
  *     responses:
  *       200:
- *         description: The DID of the newly created group vault.
+ *         description: The DID of the newly created vault.
  *         content:
  *           application/json:
  *             schema:
@@ -4850,7 +4850,7 @@ v1router.get('/ipfs/data/:cid', async (req, res) => {
  *               properties:
  *                 did:
  *                   type: string
- *                   description: The DID representing the group vault.
+ *                   description: The DID representing the vault.
  *       500:
  *         description: Internal server error.
  *         content:
@@ -4875,18 +4875,18 @@ v1router.post('/vaults', async (req, res) => {
  * @swagger
  * /vaults/{id}:
  *   get:
- *     summary: Retrieve a group vault by DID.
- *     description: Returns the group vault object for the specified DID.
+ *     summary: Retrieve a vault by DID.
+ *     description: Returns the vault object for the specified DID.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the group vault to retrieve.
+ *         description: The DID of the vault to retrieve.
  *     responses:
  *       200:
- *         description: The group vault object.
+ *         description: The vault object.
  *         content:
  *           application/json:
  *             schema:
@@ -4897,7 +4897,7 @@ v1router.post('/vaults', async (req, res) => {
  *                   properties:
  *                     publicJwk:
  *                       type: object
- *                       description: The public JWK for the group vault.
+ *                       description: The public JWK for the vault.
  *                     salt:
  *                       type: string
  *                       description: The salt used for key derivation.
@@ -4910,7 +4910,7 @@ v1router.post('/vaults', async (req, res) => {
  *                       type: string
  *                       description: Encrypted items index.
  *       404:
- *         description: Group vault not found.
+ *         description: Vault not found.
  *         content:
  *           application/json:
  *             schema:
@@ -4918,7 +4918,7 @@ v1router.post('/vaults', async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   description: Error message indicating why the group vault could not be retrieved.
+ *                   description: Error message indicating why the vault could not be retrieved.
  */
 v1router.get('/vaults/:id', async (req, res) => {
     try {
@@ -4933,18 +4933,18 @@ v1router.get('/vaults/:id', async (req, res) => {
  * @swagger
  * /vaults/{id}/test:
  *   post:
- *     summary: Test if a DID refers to a valid group vault.
- *     description: Checks whether the specified DID or name refers to a valid group vault asset.
+ *     summary: Test if a DID refers to a valid vault.
+ *     description: Checks whether the specified DID or name refers to a valid vault asset.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID or name of the group vault to test.
+ *         description: The DID or name of the vault to test.
  *     responses:
  *       200:
- *         description: Indicates whether the asset is recognized as a valid group vault.
+ *         description: Indicates whether the asset is recognized as a valid vault.
  *         content:
  *           application/json:
  *             schema:
@@ -4952,9 +4952,9 @@ v1router.get('/vaults/:id', async (req, res) => {
  *               properties:
  *                 test:
  *                   type: boolean
- *                   description: true if valid group vault, otherwise false.
+ *                   description: true if valid vault, otherwise false.
  *       404:
- *         description: Group vault not found or invalid.
+ *         description: Vault not found or invalid.
  *         content:
  *           application/json:
  *             schema:
@@ -4962,7 +4962,7 @@ v1router.get('/vaults/:id', async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   description: Error message indicating why the group vault could not be tested.
+ *                   description: Error message indicating why the vault could not be tested.
  */
 v1router.post('/vaults/:id/test', async (req, res) => {
     try {
@@ -4977,15 +4977,15 @@ v1router.post('/vaults/:id/test', async (req, res) => {
  * @swagger
  * /vaults/{id}/members:
  *   post:
- *     summary: Add a member to a group vault.
- *     description: Adds a new member to the specified group vault if the caller has permission.
+ *     summary: Add a member to a vault.
+ *     description: Adds a new member to the specified vault if the caller has permission.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the group vault.
+ *         description: The DID of the vault.
  *     requestBody:
  *       required: true
  *       content:
@@ -4995,7 +4995,7 @@ v1router.post('/vaults/:id/test', async (req, res) => {
  *             properties:
  *               memberId:
  *                 type: string
- *                 description: The DID of the member to add to the group vault.
+ *                 description: The DID of the member to add to the vault.
  *             required:
  *               - memberId
  *     responses:
@@ -5010,7 +5010,7 @@ v1router.post('/vaults/:id/test', async (req, res) => {
  *                   type: boolean
  *                   description: true if the member was added, otherwise false.
  *       404:
- *         description: Group vault not found, member not found, or caller is not authorized.
+ *         description: Vault not found, member not found, or caller is not authorized.
  *         content:
  *           application/json:
  *             schema:
@@ -5035,21 +5035,21 @@ v1router.post('/vaults/:id/members', async (req, res) => {
  * @swagger
  * /vaults/{id}/members/{member}:
  *   delete:
- *     summary: Remove a member from a group vault.
- *     description: Removes the specified member from the group vault if the caller has permission.
+ *     summary: Remove a member from a vault.
+ *     description: Removes the specified member from the vault if the caller has permission.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the group vault.
+ *         description: The DID of the vault.
  *       - in: path
  *         name: member
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the member to remove from the group vault.
+ *         description: The DID of the member to remove from the vault.
  *     responses:
  *       200:
  *         description: Indicates whether the member was successfully removed.
@@ -5062,7 +5062,7 @@ v1router.post('/vaults/:id/members', async (req, res) => {
  *                   type: boolean
  *                   description: true if the member was removed, otherwise false.
  *       404:
- *         description: Member not found, group vault not found, or caller is not authorized.
+ *         description: Member not found, vault not found, or caller is not authorized.
  *         content:
  *           application/json:
  *             schema:
@@ -5087,15 +5087,15 @@ v1router.delete('/vaults/:id/members/:member', async (req, res) => {
  * @swagger
  * /vaults/{id}/members:
  *   get:
- *     summary: List all members of a group vault. (available only to group vault owner)
- *     description: Returns an object containing all member DIDs of the specified group vault.
+ *     summary: List all members of a vault. (available only to vault owner)
+ *     description: Returns an object containing all member DIDs of the specified vault.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the group vault.
+ *         description: The DID of the vault.
  *     responses:
  *       200:
  *         description: An object containing all member DIDs and their metadata.
@@ -5110,7 +5110,7 @@ v1router.delete('/vaults/:id/members/:member', async (req, res) => {
  *                     type: object
  *                     description: Metadata for each member (e.g., join date).
  *       404:
- *         description: Group vault not found or caller is not authorized.
+ *         description: Vault not found or caller is not authorized.
  *         content:
  *           application/json:
  *             schema:
@@ -5134,15 +5134,15 @@ v1router.get('/vaults/:id/members', async (req, res) => {
  * @swagger
  * /vaults/{id}/items:
  *   post:
- *     summary: Add an item to a group vault.
- *     description: Adds a new item (binary data) to the specified group vault. The item name must be provided in the X-Options header as JSON.
+ *     summary: Add an item to a vault.
+ *     description: Adds a new item (binary data) to the specified vault. The item name must be provided in the X-Options header as JSON.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the group vault.
+ *         description: The DID of the vault.
  *       - in: header
  *         name: X-Options
  *         required: true
@@ -5158,7 +5158,7 @@ v1router.get('/vaults/:id/members', async (req, res) => {
  *           schema:
  *             type: string
  *             format: binary
- *           description: The binary data to store as an item in the group vault.
+ *           description: The binary data to store as an item in the vault.
  *     responses:
  *       200:
  *         description: Indicates whether the item was successfully added.
@@ -5198,21 +5198,21 @@ v1router.post('/vaults/:id/items', express.raw({ type: 'application/octet-stream
  * @swagger
  * /vaults/{id}/items/{name}:
  *   delete:
- *     summary: Remove an item from a group vault.
- *     description: Deletes the specified item from the group vault if the caller has permission.
+ *     summary: Remove an item from a vault.
+ *     description: Deletes the specified item from the vault if the caller has permission.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the group vault.
+ *         description: The DID of the vault.
  *       - in: path
  *         name: name
  *         required: true
  *         schema:
  *           type: string
- *         description: The name of the item to remove from the group vault.
+ *         description: The name of the item to remove from the vault.
  *     responses:
  *       200:
  *         description: Indicates whether the item was successfully removed.
@@ -5225,7 +5225,7 @@ v1router.post('/vaults/:id/items', express.raw({ type: 'application/octet-stream
  *                   type: boolean
  *                   description: true if the item was removed, otherwise false.
  *       404:
- *         description: Item not found, group vault not found, or caller is not a member.
+ *         description: Item not found, vault not found, or caller is not a member.
  *         content:
  *           application/json:
  *             schema:
@@ -5252,15 +5252,15 @@ v1router.delete('/vaults/:id/items/:name', async (req, res) => {
  * @swagger
  * /vaults/{id}/items:
  *   get:
- *     summary: List all items in a group vault.
- *     description: Returns an index of all items stored in the specified group vault.
+ *     summary: List all items in a vault.
+ *     description: Returns an index of all items stored in the specified vault.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the group vault.
+ *         description: The DID of the vault.
  *     responses:
  *       200:
  *         description: An object mapping item names to their metadata.
@@ -5275,7 +5275,7 @@ v1router.delete('/vaults/:id/items/:name', async (req, res) => {
  *                     type: object
  *                     description: Metadata for each item (such as CID and byte size).
  *       404:
- *         description: Group vault not found or caller is not a member.
+ *         description: Vault not found or caller is not a member.
  *         content:
  *           application/json:
  *             schema:
@@ -5299,21 +5299,21 @@ v1router.get('/vaults/:id/items', async (req, res) => {
  * @swagger
  * /vaults/{id}/items/{name}:
  *   get:
- *     summary: Retrieve an item from a group vault.
- *     description: Returns the binary data for a specific item stored in the group vault.
+ *     summary: Retrieve an item from a vault.
+ *     description: Returns the binary data for a specific item stored in the vault.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the group vault.
+ *         description: The DID of the vault.
  *       - in: path
  *         name: name
  *         required: true
  *         schema:
  *           type: string
- *         description: The name of the item to retrieve from the group vault.
+ *         description: The name of the item to retrieve from the vault.
  *     responses:
  *       200:
  *         description: The binary data of the requested item.
@@ -5323,7 +5323,7 @@ v1router.get('/vaults/:id/items', async (req, res) => {
  *               type: string
  *               format: binary
  *       404:
- *         description: Item not found or caller is not a member of the group vault.
+ *         description: Item not found or caller is not a member of the vault.
  *         content:
  *           application/json:
  *             schema:
