@@ -607,7 +607,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     continue;
                 }
 
-                if (data.groupVault) {
+                if (data.vault) {
                     vaultList.push(name);
                     continue;
                 }
@@ -2031,7 +2031,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             const name = vaultName;
             setVaultName('');
 
-            await keymaster.createGroupVault({ registry, name });
+            await keymaster.createVault({ registry, name });
 
             refreshNames();
             setSelectedVaultName(name);
@@ -2049,8 +2049,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             setSelectedVaultOwned(docs.didDocument.controller === currentDID);
             setVaultMember('');
 
-            const vaultMembers = await keymaster.listGroupVaultMembers(vaultName);
-            const vaultItems = await keymaster.listGroupVaultItems(vaultName);
+            const vaultMembers = await keymaster.listVaultMembers(vaultName);
+            const vaultItems = await keymaster.listVaultItems(vaultName);
 
             const members = Object.keys(vaultMembers);
             const items = Object.keys(vaultItems);
@@ -2066,7 +2066,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function addVaultMember(did) {
         try {
-            await keymaster.addGroupVaultMember(selectedVaultName, did);
+            await keymaster.addVaultMember(selectedVaultName, did);
             refreshVault(selectedVaultName);
         } catch (error) {
             showError(error);
@@ -2076,7 +2076,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     async function removeVaultMember(did) {
         try {
             if (window.confirm(`Remove member from ${selectedVaultName}?`)) {
-                await keymaster.removeGroupVaultMember(selectedVaultName, did);
+                await keymaster.removeVaultMember(selectedVaultName, did);
                 refreshVault(selectedVaultName);
             }
         } catch (error) {
@@ -2102,7 +2102,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     const arrayBuffer = e.target.result;
                     const buffer = Buffer.from(arrayBuffer);
 
-                    const ok = await keymaster.addGroupVaultItem(selectedVaultName, file.name, buffer);
+                    const ok = await keymaster.addVaultItem(selectedVaultName, file.name, buffer);
 
                     if (ok) {
                         showSuccess(`Item uploaded successfully: ${file.name}`);
@@ -2147,7 +2147,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 password
             };
             const buffer = Buffer.from(JSON.stringify({ login }), 'utf-8');
-            const ok = await keymaster.addGroupVaultItem(selectedVaultName, name, buffer);
+            const ok = await keymaster.addVaultItem(selectedVaultName, name, buffer);
 
             setEditLoginOpen(false);
 
@@ -2172,7 +2172,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function downloadVaultItem(name) {
         try {
-            const buffer = await keymaster.getGroupVaultItem(selectedVaultName, name);
+            const buffer = await keymaster.getVaultItem(selectedVaultName, name);
 
             if (!buffer) {
                 showError(`Item ${name} not found in vault ${selectedVaultName}`);
@@ -2196,7 +2196,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function revealVaultItem(name) {
         try {
-            const buffer = await keymaster.getGroupVaultItem(selectedVaultName, name);
+            const buffer = await keymaster.getVaultItem(selectedVaultName, name);
 
             if (!buffer) {
                 showError(`Item ${name} not found in vault ${selectedVaultName}`);
@@ -2226,7 +2226,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     async function removeVaultItem(name) {
         try {
             if (window.confirm(`Remove item from ${selectedVaultName}?`)) {
-                await keymaster.removeGroupVaultItem(selectedVaultName, name);
+                await keymaster.removeVaultItem(selectedVaultName, name);
                 refreshVault(selectedVaultName);
             }
         } catch (error) {

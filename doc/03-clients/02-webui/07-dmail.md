@@ -2,6 +2,6 @@
 title: DMail
 ---
 
-DMail is a full-featured end-to-end encrypted P2P messaging system built using Archon DIDs and GroupVaults. 
+DMail is a full-featured end-to-end encrypted P2P messaging system built using Archon DIDs and Vaults. 
 
 ![DMAIL screen](dmail-screen.png)

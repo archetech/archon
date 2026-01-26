@@ -15,8 +15,8 @@ import {
     FileAsset,
     FixWalletResult,
     Group,
-    GroupVault,
-    GroupVaultOptions,
+    Vault,
+    VaultOptions,
     ImageAsset,
     IssueCredentialsOptions,
     KeymasterClientOptions,
@@ -1052,9 +1052,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async createGroupVault(options: GroupVaultOptions = {}): Promise<string> {
+    async createVault(options: VaultOptions = {}): Promise<string> {
         try {
-            const response = await axios.post(`${this.API}/groupVaults`, { options });
+            const response = await axios.post(`${this.API}/vaults`, { options });
             return response.data.did;
         }
         catch (error) {
@@ -1062,16 +1062,16 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async getGroupVault(id: string, options?: ResolveDIDOptions): Promise<GroupVault> {
+    async getVault(id: string, options?: ResolveDIDOptions): Promise<Vault> {
         try {
             if (options) {
                 const queryParams = new URLSearchParams(options as Record<string, string>);
-                const response = await axios.get(`${this.API}/groupVaults/${id}?${queryParams.toString()}`);
-                return response.data.groupVault;
+                const response = await axios.get(`${this.API}/vaults/${id}?${queryParams.toString()}`);
+                return response.data.vault;
             }
             else {
-                const response = await axios.get(`${this.API}/groupVaults/${id}`);
-                return response.data.groupVault;
+                const response = await axios.get(`${this.API}/vaults/${id}`);
+                return response.data.vault;
             }
         }
         catch (error) {
@@ -1079,9 +1079,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async testGroupVault(id: string, options?: ResolveDIDOptions): Promise<boolean> {
+    async testVault(id: string, options?: ResolveDIDOptions): Promise<boolean> {
         try {
-            const response = await axios.post(`${this.API}/groupVaults/${id}/test`, { options });
+            const response = await axios.post(`${this.API}/vaults/${id}/test`, { options });
             return response.data.test;
         }
         catch (error) {
@@ -1089,12 +1089,12 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async addGroupVaultMember(
+    async addVaultMember(
         vaultId: string,
         memberId: string
     ): Promise<boolean> {
         try {
-            const response = await axios.post(`${this.API}/groupVaults/${vaultId}/members`, { memberId });
+            const response = await axios.post(`${this.API}/vaults/${vaultId}/members`, { memberId });
             return response.data.ok;
         }
         catch (error) {
@@ -1102,12 +1102,12 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async removeGroupVaultMember(
+    async removeVaultMember(
         vaultId: string,
         memberId: string
     ): Promise<boolean> {
         try {
-            const response = await axios.delete(`${this.API}/groupVaults/${vaultId}/members/${memberId}`);
+            const response = await axios.delete(`${this.API}/vaults/${vaultId}/members/${memberId}`);
             return response.data.ok;
         }
         catch (error) {
@@ -1115,9 +1115,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async listGroupVaultMembers(vaultId: string): Promise<Record<string, any>> {
+    async listVaultMembers(vaultId: string): Promise<Record<string, any>> {
         try {
-            const response = await axios.get(`${this.API}/groupVaults/${vaultId}/members`);
+            const response = await axios.get(`${this.API}/vaults/${vaultId}/members`);
             return response.data.members;
         }
         catch (error) {
@@ -1125,13 +1125,13 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async addGroupVaultItem(
+    async addVaultItem(
         vaultId: string,
         name: string,
         buffer: Buffer
     ): Promise<boolean> {
         try {
-            const response = await axios.post(`${this.API}/groupVaults/${vaultId}/items`, buffer, {
+            const response = await axios.post(`${this.API}/vaults/${vaultId}/items`, buffer, {
                 headers: {
                     // eslint-disable-next-line
                     'Content-Type': 'application/octet-stream',
@@ -1145,12 +1145,12 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async removeGroupVaultItem(
+    async removeVaultItem(
         vaultId: string,
         name: string
     ): Promise<boolean> {
         try {
-            const response = await axios.delete(`${this.API}/groupVaults/${vaultId}/items/${name}`);
+            const response = await axios.delete(`${this.API}/vaults/${vaultId}/items/${name}`);
             return response.data.ok;
         }
         catch (error) {
@@ -1158,15 +1158,15 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async listGroupVaultItems(vaultId: string, options?: ResolveDIDOptions): Promise<Record<string, any>> {
+    async listVaultItems(vaultId: string, options?: ResolveDIDOptions): Promise<Record<string, any>> {
         try {
             if (options) {
                 const queryParams = new URLSearchParams(options as Record<string, string>);
-                const response = await axios.get(`${this.API}/groupVaults/${vaultId}/items?${queryParams.toString()}`);
+                const response = await axios.get(`${this.API}/vaults/${vaultId}/items?${queryParams.toString()}`);
                 return response.data.items;
             }
             else {
-                const response = await axios.get(`${this.API}/groupVaults/${vaultId}/items`);
+                const response = await axios.get(`${this.API}/vaults/${vaultId}/items`);
                 return response.data.items;
             }
         }
@@ -1175,9 +1175,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async getGroupVaultItem(vaultId: string, name: string, options?: ResolveDIDOptions): Promise<Buffer | null> {
+    async getVaultItem(vaultId: string, name: string, options?: ResolveDIDOptions): Promise<Buffer | null> {
         try {
-            let url = `${this.API}/groupVaults/${vaultId}/items/${name}`;
+            let url = `${this.API}/vaults/${vaultId}/items/${name}`;
             if (options) {
                 const queryParams = new URLSearchParams(options as Record<string, string>);
                 url += `?${queryParams.toString()}`;
@@ -1220,7 +1220,7 @@ export default class KeymasterClient implements KeymasterInterface {
 
     async createDmail(
         message: DmailMessage,
-        options: GroupVaultOptions = {}
+        options: VaultOptions = {}
     ): Promise<string> {
         try {
             const response = await axios.post(`${this.API}/dmail`, { message, options });

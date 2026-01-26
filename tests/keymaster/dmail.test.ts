@@ -331,7 +331,7 @@ describe('listDmail', () => {
         };
 
         const did = await keymaster.createDmail(mock);
-        await keymaster.removeGroupVaultItem(did, DmailTags.DMAIL); // invalidate the dmail
+        await keymaster.removeVaultItem(did, DmailTags.DMAIL); // invalidate the dmail
 
         const dmails = await keymaster.listDmail();
 
@@ -362,19 +362,19 @@ describe('getDmailMessage', () => {
         expect(dmail).toBeNull();
     });
 
-    it('should retrieve null if DID is a different kind of GroupVault', async () => {
+    it('should retrieve null if DID is a different kind of Vault', async () => {
         await keymaster.createId('Alice');
-        const vault = await keymaster.createGroupVault();
+        const vault = await keymaster.createVault();
         const dmail = await keymaster.getDmailMessage(vault);
 
         expect(dmail).toBeNull();
     });
 
-    it('should retrieve null if DID GroupVault item is the wrong type', async () => {
+    it('should retrieve null if DID Vault item is the wrong type', async () => {
         await keymaster.createId('Alice');
-        const vault = await keymaster.createGroupVault();
+        const vault = await keymaster.createVault();
         const buffer = Buffer.from('This is not a valid dmail');
-        await keymaster.addGroupVaultItem(vault, DmailTags.DMAIL, buffer);
+        await keymaster.addVaultItem(vault, DmailTags.DMAIL, buffer);
         const dmail = await keymaster.getDmailMessage(vault);
 
         expect(dmail).toBeNull();

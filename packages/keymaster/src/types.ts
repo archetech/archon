@@ -189,7 +189,7 @@ export interface FileAsset extends BinaryAsset {
     filename: string;
 }
 
-export interface GroupVault {
+export interface Vault {
     version?: number;
     publicJwk: EcdsaJwkPublic;
     salt: string;
@@ -200,12 +200,12 @@ export interface GroupVault {
     sha256: string,
 }
 
-export interface GroupVaultOptions extends CreateAssetOptions {
+export interface VaultOptions extends CreateAssetOptions {
     secretMembers?: boolean;
     version?: number;
 }
 
-export interface GroupVaultLogin {
+export interface VaultLogin {
     service: string;
     username: string;
     password: string;
@@ -392,16 +392,16 @@ export interface KeymasterInterface {
     getDocument(id: string): Promise<FileAsset | null>;
     testDocument(id: string): Promise<boolean>;
 
-    // GroupVaults
-    createGroupVault(options?: CreateAssetOptions): Promise<string>;
-    getGroupVault(vaultId: string, options?: ResolveDIDOptions): Promise<GroupVault>;
-    testGroupVault(vaultId: string, options?: ResolveDIDOptions): Promise<boolean>;
-    addGroupVaultMember(vaultId: string, memberId: string): Promise<boolean>;
-    removeGroupVaultMember(vaultId: string, memberId: string): Promise<boolean>;
-    addGroupVaultItem(vaultId: string, name: string, buffer: Buffer): Promise<boolean>;
-    removeGroupVaultItem(vaultId: string, name: string): Promise<boolean>;
-    listGroupVaultItems(vaultId: string, options?: ResolveDIDOptions): Promise<Record<string, any>>;
-    getGroupVaultItem(vaultId: string, name: string, options?: ResolveDIDOptions): Promise<Buffer | null>;
+    // Vaults
+    createVault(options?: CreateAssetOptions): Promise<string>;
+    getVault(vaultId: string, options?: ResolveDIDOptions): Promise<Vault>;
+    testVault(vaultId: string, options?: ResolveDIDOptions): Promise<boolean>;
+    addVaultMember(vaultId: string, memberId: string): Promise<boolean>;
+    removeVaultMember(vaultId: string, memberId: string): Promise<boolean>;
+    addVaultItem(vaultId: string, name: string, buffer: Buffer): Promise<boolean>;
+    removeVaultItem(vaultId: string, name: string): Promise<boolean>;
+    listVaultItems(vaultId: string, options?: ResolveDIDOptions): Promise<Record<string, any>>;
+    getVaultItem(vaultId: string, name: string, options?: ResolveDIDOptions): Promise<Buffer | null>;
 
     // Dmail
     createDmail(message: DmailMessage, options?: CreateAssetOptions): Promise<string>;

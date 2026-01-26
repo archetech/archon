@@ -723,51 +723,51 @@ def refresh_notices():
     return response["ok"]
 
 
-def create_group_vault(options=None):
+def create_vault(options=None):
     if options is None:
         options = {}
     response = proxy_request(
         "POST",
-        f"{_keymaster_api}/groupVaults",
+        f"{_keymaster_api}/vaults",
         json={"options": options},
     )
     return response["did"]
 
 
-def get_group_vault(identifier):
-    response = proxy_request("GET", f"{_keymaster_api}/groupVaults/{identifier}")
-    return response["groupVault"]
+def get_vault(identifier):
+    response = proxy_request("GET", f"{_keymaster_api}/vaults/{identifier}")
+    return response["vault"]
 
 
-def test_group_vault(identifier):
-    response = proxy_request("POST", f"{_keymaster_api}/groupVaults/{identifier}/test")
+def test_vault(identifier):
+    response = proxy_request("POST", f"{_keymaster_api}/vaults/{identifier}/test")
     return response["test"]
 
 
-def add_group_vault_member(vault_id, member_id):
+def add_vault_member(vault_id, member_id):
     response = proxy_request(
         "POST",
-        f"{_keymaster_api}/groupVaults/{vault_id}/members",
+        f"{_keymaster_api}/vaults/{vault_id}/members",
         json={"memberId": member_id},
     )
     return response["ok"]
 
 
-def remove_group_vault_member(vault_id, member_id):
+def remove_vault_member(vault_id, member_id):
     safe_member = requests.utils.quote(str(member_id), safe="")
     response = proxy_request(
         "DELETE",
-        f"{_keymaster_api}/groupVaults/{vault_id}/members/{safe_member}",
+        f"{_keymaster_api}/vaults/{vault_id}/members/{safe_member}",
     )
     return response["ok"]
 
 
-def list_group_vault_members(vault_id):
-    response = proxy_request("GET", f"{_keymaster_api}/groupVaults/{vault_id}/members")
+def list_vault_members(vault_id):
+    response = proxy_request("GET", f"{_keymaster_api}/vaults/{vault_id}/members")
     return response["members"]
 
 
-def add_group_vault_item(vault_id, name, data):
+def add_vault_item(vault_id, name, data):
     if isinstance(data, (bytes, bytearray)):
         raw = data
     else:
@@ -781,30 +781,30 @@ def add_group_vault_item(vault_id, name, data):
     }
     response = proxy_request(
         "POST",
-        f"{_keymaster_api}/groupVaults/{vault_id}/items",
+        f"{_keymaster_api}/vaults/{vault_id}/items",
         data=raw,
         headers=headers,
     )
     return response["ok"]
 
 
-def remove_group_vault_item(vault_id, name):
+def remove_vault_item(vault_id, name):
     safe = requests.utils.quote(str(name), safe="")
     response = proxy_request(
         "DELETE",
-        f"{_keymaster_api}/groupVaults/{vault_id}/items/{safe}",
+        f"{_keymaster_api}/vaults/{vault_id}/items/{safe}",
     )
     return response["ok"]
 
 
-def list_group_vault_items(vault_id):
-    response = proxy_request("GET", f"{_keymaster_api}/groupVaults/{vault_id}/items")
+def list_vault_items(vault_id):
+    response = proxy_request("GET", f"{_keymaster_api}/vaults/{vault_id}/items")
     return response["items"]
 
 
-def get_group_vault_item(vault_id, name):
+def get_vault_item(vault_id, name):
     safe = requests.utils.quote(str(name), safe="")
-    url = f"{_keymaster_api}/groupVaults/{vault_id}/items/{safe}"
+    url = f"{_keymaster_api}/vaults/{vault_id}/items/{safe}"
     resp = requests.get(url)
     try:
         resp.raise_for_status()

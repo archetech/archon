@@ -5719,7 +5719,7 @@
         }
       }
     },
-    "/groupVaults": {
+    "/vaults": {
       "post": {
         "summary": "Create a new group vault.",
         "description": "Creates a new group vault asset and returns its DID.",
@@ -5785,7 +5785,7 @@
         }
       }
     },
-    "/groupVaults/{id}": {
+    "/vaults/{id}": {
       "get": {
         "summary": "Retrieve a group vault by DID.",
         "description": "Returns the group vault object for the specified DID.",
@@ -5808,7 +5808,7 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "groupVault": {
+                    "vault": {
                       "type": "object",
                       "properties": {
                         "publicJwk": {
@@ -5856,7 +5856,7 @@
         }
       }
     },
-    "/groupVaults/{id}/test": {
+    "/vaults/{id}/test": {
       "post": {
         "summary": "Test if a DID refers to a valid group vault.",
         "description": "Checks whether the specified DID or name refers to a valid group vault asset.",
@@ -5907,7 +5907,7 @@
         }
       }
     },
-    "/groupVaults/{id}/members": {
+    "/vaults/{id}/members": {
       "post": {
         "summary": "Add a member to a group vault.",
         "description": "Adds a new member to the specified group vault if the caller has permission.",
@@ -6029,7 +6029,7 @@
         }
       }
     },
-    "/groupVaults/{id}/members/{member}": {
+    "/vaults/{id}/members/{member}": {
       "delete": {
         "summary": "Remove a member from a group vault.",
         "description": "Removes the specified member from the group vault if the caller has permission.",
@@ -6089,7 +6089,7 @@
         }
       }
     },
-    "/groupVaults/{id}/items": {
+    "/vaults/{id}/items": {
       "post": {
         "summary": "Add an item to a group vault.",
         "description": "Adds a new item (binary data) to the specified group vault. The item name must be provided in the X-Options header as JSON.",
@@ -6212,7 +6212,7 @@
         }
       }
     },
-    "/groupVaults/{id}/items/{name}": {
+    "/vaults/{id}/items/{name}": {
       "delete": {
         "summary": "Remove an item from a group vault.",
         "description": "Deletes the specified item from the group vault if the caller has permission.",

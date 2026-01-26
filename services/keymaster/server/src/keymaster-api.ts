@@ -4818,7 +4818,7 @@ v1router.get('/ipfs/data/:cid', async (req, res) => {
 
 /**
  * @swagger
- * /groupVaults:
+ * /vaults:
  *   post:
  *     summary: Create a new group vault.
  *     description: Creates a new group vault asset and returns its DID.
@@ -4861,10 +4861,10 @@ v1router.get('/ipfs/data/:cid', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/groupVaults', async (req, res) => {
+v1router.post('/vaults', async (req, res) => {
     try {
         const { options } = req.body;
-        const did = await keymaster.createGroupVault(options);
+        const did = await keymaster.createVault(options);
         res.json({ did });
     } catch (error: any) {
         res.status(500).send(error.toString());
@@ -4873,7 +4873,7 @@ v1router.post('/groupVaults', async (req, res) => {
 
 /**
  * @swagger
- * /groupVaults/{id}:
+ * /vaults/{id}:
  *   get:
  *     summary: Retrieve a group vault by DID.
  *     description: Returns the group vault object for the specified DID.
@@ -4892,7 +4892,7 @@ v1router.post('/groupVaults', async (req, res) => {
  *             schema:
  *               type: object
  *               properties:
- *                 groupVault:
+ *                 vault:
  *                   type: object
  *                   properties:
  *                     publicJwk:
@@ -4920,10 +4920,10 @@ v1router.post('/groupVaults', async (req, res) => {
  *                   type: string
  *                   description: Error message indicating why the group vault could not be retrieved.
  */
-v1router.get('/groupVaults/:id', async (req, res) => {
+v1router.get('/vaults/:id', async (req, res) => {
     try {
-        const groupVault = await keymaster.getGroupVault(req.params.id);
-        res.json({ groupVault });
+        const vault = await keymaster.getVault(req.params.id);
+        res.json({ vault });
     } catch (error: any) {
         res.status(404).send(error.toString());
     }
@@ -4931,7 +4931,7 @@ v1router.get('/groupVaults/:id', async (req, res) => {
 
 /**
  * @swagger
- * /groupVaults/{id}/test:
+ * /vaults/{id}/test:
  *   post:
  *     summary: Test if a DID refers to a valid group vault.
  *     description: Checks whether the specified DID or name refers to a valid group vault asset.
@@ -4964,9 +4964,9 @@ v1router.get('/groupVaults/:id', async (req, res) => {
  *                   type: string
  *                   description: Error message indicating why the group vault could not be tested.
  */
-v1router.post('/groupVaults/:id/test', async (req, res) => {
+v1router.post('/vaults/:id/test', async (req, res) => {
     try {
-        const test = await keymaster.testGroupVault(req.params.id);
+        const test = await keymaster.testVault(req.params.id);
         res.json({ test });
     } catch (error: any) {
         res.status(404).send(error.toString());
@@ -4975,7 +4975,7 @@ v1router.post('/groupVaults/:id/test', async (req, res) => {
 
 /**
  * @swagger
- * /groupVaults/{id}/members:
+ * /vaults/{id}/members:
  *   post:
  *     summary: Add a member to a group vault.
  *     description: Adds a new member to the specified group vault if the caller has permission.
@@ -5020,11 +5020,11 @@ v1router.post('/groupVaults/:id/test', async (req, res) => {
  *                   type: string
  *                   description: Error message indicating why the member could not be added.
  */
-v1router.post('/groupVaults/:id/members', async (req, res) => {
+v1router.post('/vaults/:id/members', async (req, res) => {
     try {
         const vaultId = req.params.id;
         const { memberId } = req.body;
-        const ok = await keymaster.addGroupVaultMember(vaultId, memberId);
+        const ok = await keymaster.addVaultMember(vaultId, memberId);
         res.json({ ok });
     } catch (error: any) {
         res.status(404).send(error.toString());
@@ -5033,7 +5033,7 @@ v1router.post('/groupVaults/:id/members', async (req, res) => {
 
 /**
  * @swagger
- * /groupVaults/{id}/members/{member}:
+ * /vaults/{id}/members/{member}:
  *   delete:
  *     summary: Remove a member from a group vault.
  *     description: Removes the specified member from the group vault if the caller has permission.
@@ -5072,11 +5072,11 @@ v1router.post('/groupVaults/:id/members', async (req, res) => {
  *                   type: string
  *                   description: Error message indicating why the member could not be removed.
  */
-v1router.delete('/groupVaults/:id/members/:member', async (req, res) => {
+v1router.delete('/vaults/:id/members/:member', async (req, res) => {
     try {
         const vaultId = req.params.id;
         const memberId = req.params.member;
-        const ok = await keymaster.removeGroupVaultMember(vaultId, memberId);
+        const ok = await keymaster.removeVaultMember(vaultId, memberId);
         res.json({ ok });
     } catch (error: any) {
         res.status(404).send(error.toString());
@@ -5085,7 +5085,7 @@ v1router.delete('/groupVaults/:id/members/:member', async (req, res) => {
 
 /**
  * @swagger
- * /groupVaults/{id}/members:
+ * /vaults/{id}/members:
  *   get:
  *     summary: List all members of a group vault. (available only to group vault owner)
  *     description: Returns an object containing all member DIDs of the specified group vault.
@@ -5120,10 +5120,10 @@ v1router.delete('/groupVaults/:id/members/:member', async (req, res) => {
  *                   type: string
  *                   description: Error message indicating why the members could not be listed.
  */
-v1router.get('/groupVaults/:id/members', async (req, res) => {
+v1router.get('/vaults/:id/members', async (req, res) => {
     try {
         const vaultId = req.params.id;
-        const members = await keymaster.listGroupVaultMembers(vaultId);
+        const members = await keymaster.listVaultMembers(vaultId);
         res.json({ members });
     } catch (error: any) {
         res.status(404).send(error.toString());
@@ -5132,7 +5132,7 @@ v1router.get('/groupVaults/:id/members', async (req, res) => {
 
 /**
  * @swagger
- * /groupVaults/{id}/items:
+ * /vaults/{id}/items:
  *   post:
  *     summary: Add an item to a group vault.
  *     description: Adds a new item (binary data) to the specified group vault. The item name must be provided in the X-Options header as JSON.
@@ -5180,14 +5180,14 @@ v1router.get('/groupVaults/:id/members', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/groupVaults/:id/items', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
+v1router.post('/vaults/:id/items', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
     try {
         const vaultId = req.params.id;
         const data = req.body;
         const headers = req.headers;
         const options = typeof headers['x-options'] === 'string' ? JSON.parse(headers['x-options']) : {};
         const { name } = options;
-        const ok = await keymaster.addGroupVaultItem(vaultId, name, data);
+        const ok = await keymaster.addVaultItem(vaultId, name, data);
         res.json({ ok });
     } catch (error: any) {
         res.status(500).send(error.toString());
@@ -5196,7 +5196,7 @@ v1router.post('/groupVaults/:id/items', express.raw({ type: 'application/octet-s
 
 /**
  * @swagger
- * /groupVaults/{id}/items/{name}:
+ * /vaults/{id}/items/{name}:
  *   delete:
  *     summary: Remove an item from a group vault.
  *     description: Deletes the specified item from the group vault if the caller has permission.
@@ -5236,11 +5236,11 @@ v1router.post('/groupVaults/:id/items', express.raw({ type: 'application/octet-s
  *                   description: Error message indicating why the item could not be removed.
  */
 // eslint-disable-next-line
-v1router.delete('/groupVaults/:id/items/:name', async (req, res) => {
+v1router.delete('/vaults/:id/items/:name', async (req, res) => {
     try {
         const vaultId = req.params.id;
         const name = req.params.name;
-        const ok = await keymaster.removeGroupVaultItem(vaultId, name);
+        const ok = await keymaster.removeVaultItem(vaultId, name);
         res.json({ ok });
     } catch (error: any) {
         res.status(404).send(error.toString());
@@ -5250,7 +5250,7 @@ v1router.delete('/groupVaults/:id/items/:name', async (req, res) => {
 
 /**
  * @swagger
- * /groupVaults/{id}/items:
+ * /vaults/{id}/items:
  *   get:
  *     summary: List all items in a group vault.
  *     description: Returns an index of all items stored in the specified group vault.
@@ -5285,10 +5285,10 @@ v1router.delete('/groupVaults/:id/items/:name', async (req, res) => {
  *                   type: string
  *                   description: Error message indicating why the items could not be listed.
  */
-v1router.get('/groupVaults/:id/items', async (req, res) => {
+v1router.get('/vaults/:id/items', async (req, res) => {
     try {
         const vaultId = req.params.id;
-        const items = await keymaster.listGroupVaultItems(vaultId);
+        const items = await keymaster.listVaultItems(vaultId);
         res.json({ items });
     } catch (error: any) {
         res.status(404).send(error.toString());
@@ -5297,7 +5297,7 @@ v1router.get('/groupVaults/:id/items', async (req, res) => {
 
 /**
  * @swagger
- * /groupVaults/{id}/items/{name}:
+ * /vaults/{id}/items/{name}:
  *   get:
  *     summary: Retrieve an item from a group vault.
  *     description: Returns the binary data for a specific item stored in the group vault.
@@ -5333,11 +5333,11 @@ v1router.get('/groupVaults/:id/items', async (req, res) => {
  *                   type: string
  *                   description: Error message indicating why the item could not be retrieved.
  */
-v1router.get('/groupVaults/:id/items/:name', async (req, res) => {
+v1router.get('/vaults/:id/items/:name', async (req, res) => {
     try {
         const vaultId = req.params.id;
         const name = req.params.name;
-        const response = await keymaster.getGroupVaultItem(vaultId, name);
+        const response = await keymaster.getVaultItem(vaultId, name);
         res.set('Content-Type', 'application/octet-stream');
         res.send(response);
     } catch (error: any) {

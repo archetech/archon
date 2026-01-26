@@ -30,8 +30,8 @@ import {
     FileAsset,
     FixWalletResult,
     Group,
-    GroupVault,
-    GroupVaultOptions,
+    Vault,
+    VaultOptions,
     IDInfo,
     ImageAsset,
     IssueCredentialsOptions,
@@ -2831,7 +2831,7 @@ export default class Keymaster implements KeymasterInterface {
         return this.updateAsset(pollId, { poll });
     }
 
-    async createGroupVault(options: GroupVaultOptions = {}): Promise<string> {
+    async createVault(options: VaultOptions = {}): Promise<string> {
         const id = await this.fetchIdInfo();
         const idKeypair = await this.fetchKeyPair();
         // version defaults to 1. To make version undefined (unit testing), set options.version to 0
@@ -2846,7 +2846,7 @@ export default class Keymaster implements KeymasterInterface {
         const members = this.cipher.encryptMessage(publicJwk, vaultKeypair.privateJwk, JSON.stringify({}));
         const items = this.cipher.encryptMessage(vaultKeypair.publicJwk, vaultKeypair.privateJwk, JSON.stringify({}));
         const sha256 = this.cipher.hashJSON({});
-        const groupVault = {
+        const vault = {
             version,
             publicJwk: vaultKeypair.publicJwk,
             salt,
@@ -2857,56 +2857,56 @@ export default class Keymaster implements KeymasterInterface {
             sha256,
         };
 
-        await this.addMemberKey(groupVault, id.did, vaultKeypair.privateJwk);
-        return this.createAsset({ groupVault }, options);
+        await this.addMemberKey(vault, id.did, vaultKeypair.privateJwk);
+        return this.createAsset({ vault }, options);
     }
 
-    async getGroupVault(groupVaultId: string, options?: ResolveDIDOptions): Promise<GroupVault> {
-        const asset = await this.resolveAsset(groupVaultId, options) as { groupVault?: GroupVault };
+    async getVault(vaultId: string, options?: ResolveDIDOptions): Promise<Vault> {
+        const asset = await this.resolveAsset(vaultId, options) as { vault?: Vault };
 
-        if (!asset.groupVault) {
-            throw new InvalidParameterError('groupVaultId');
+        if (!asset.vault) {
+            throw new InvalidParameterError('vaultId');
         }
 
-        return asset.groupVault;
+        return asset.vault;
     }
 
-    async testGroupVault(id: string, options?: ResolveDIDOptions): Promise<boolean> {
+    async testVault(id: string, options?: ResolveDIDOptions): Promise<boolean> {
         try {
-            const groupVault = await this.getGroupVault(id, options);
-            return groupVault !== null;
+            const vault = await this.getVault(id, options);
+            return vault !== null;
         }
         catch (error) {
             return false;
         }
     }
 
-    private generateSaltedId(groupVault: GroupVault, memberDID: string): string {
-        if (!groupVault.version) {
-            return this.cipher.hashMessage(groupVault.salt + memberDID);
+    private generateSaltedId(vault: Vault, memberDID: string): string {
+        if (!vault.version) {
+            return this.cipher.hashMessage(vault.salt + memberDID);
         }
 
         const suffix = memberDID.split(':').pop() as string;
-        return this.cipher.hashMessage(groupVault.salt + suffix);
+        return this.cipher.hashMessage(vault.salt + suffix);
     }
 
-    private async decryptGroupVault(groupVault: GroupVault) {
+    private async decryptVault(vault: Vault) {
         const wallet = await this.loadWallet();
         const id = await this.fetchIdInfo();
-        const myMemberId = this.generateSaltedId(groupVault, id.did);
-        const myVaultKey = groupVault.keys[myMemberId];
+        const myMemberId = this.generateSaltedId(vault, id.did);
+        const myVaultKey = vault.keys[myMemberId];
 
         if (!myVaultKey) {
             throw new KeymasterError('No access to group vault');
         }
 
-        const privKeyJSON = await this.decryptWithDerivedKeys(wallet, id, groupVault.publicJwk, myVaultKey);
+        const privKeyJSON = await this.decryptWithDerivedKeys(wallet, id, vault.publicJwk, myVaultKey);
         const privateJwk = JSON.parse(privKeyJSON) as EcdsaJwkPrivate;
 
-        let config: GroupVaultOptions = {};
+        let config: VaultOptions = {};
         let isOwner = false;
         try {
-            const configJSON = await this.decryptWithDerivedKeys(wallet, id, groupVault.publicJwk, groupVault.config);
+            const configJSON = await this.decryptWithDerivedKeys(wallet, id, vault.publicJwk, vault.config);
             config = JSON.parse(configJSON);
             isOwner = true;
         }
@@ -2918,7 +2918,7 @@ export default class Keymaster implements KeymasterInterface {
 
         if (config.secretMembers) {
             try {
-                const membersJSON = await this.decryptWithDerivedKeys(wallet, id, groupVault.publicJwk, groupVault.members);
+                const membersJSON = await this.decryptWithDerivedKeys(wallet, id, vault.publicJwk, vault.members);
                 members = JSON.parse(membersJSON);
             }
             catch (error) {
@@ -2926,14 +2926,14 @@ export default class Keymaster implements KeymasterInterface {
         }
         else {
             try {
-                const membersJSON = this.cipher.decryptMessage(groupVault.publicJwk, privateJwk, groupVault.members);
+                const membersJSON = this.cipher.decryptMessage(vault.publicJwk, privateJwk, vault.members);
                 members = JSON.parse(membersJSON);
             }
             catch (error) {
             }
         }
 
-        const itemsJSON = this.cipher.decryptMessage(groupVault.publicJwk, privateJwk, groupVault.items);
+        const itemsJSON = this.cipher.decryptMessage(vault.publicJwk, privateJwk, vault.items);
         const items = JSON.parse(itemsJSON);
 
         return {
@@ -2945,7 +2945,7 @@ export default class Keymaster implements KeymasterInterface {
         };
     }
 
-    private async checkGroupVaultOwner(vaultId: string): Promise<string> {
+    private async checkVaultOwner(vaultId: string): Promise<string> {
         const id = await this.fetchIdInfo();
         const vaultDoc = await this.resolveDID(vaultId);
         const controller = vaultDoc.didDocument?.controller;
@@ -2957,33 +2957,33 @@ export default class Keymaster implements KeymasterInterface {
         return controller
     }
 
-    private async addMemberKey(groupVault: GroupVault, memberDID: string, privateJwk: EcdsaJwkPrivate): Promise<void> {
+    private async addMemberKey(vault: Vault, memberDID: string, privateJwk: EcdsaJwkPrivate): Promise<void> {
         const memberDoc = await this.resolveDID(memberDID, { confirm: true });
         const memberPublicJwk = this.getPublicKeyJwk(memberDoc);
         const memberKey = this.cipher.encryptMessage(memberPublicJwk, privateJwk, JSON.stringify(privateJwk));
-        const memberKeyId = this.generateSaltedId(groupVault, memberDID);
-        groupVault.keys[memberKeyId] = memberKey;
+        const memberKeyId = this.generateSaltedId(vault, memberDID);
+        vault.keys[memberKeyId] = memberKey;
     }
 
-    private async checkVaultVersion(vaultId: string, groupVault: GroupVault): Promise<void> {
-        if (groupVault.version === 1) {
+    private async checkVaultVersion(vaultId: string, vault: Vault): Promise<void> {
+        if (vault.version === 1) {
             return;
         }
 
-        if (!groupVault.version) {
+        if (!vault.version) {
             const id = await this.fetchIdInfo();
-            const { privateJwk, members } = await this.decryptGroupVault(groupVault);
+            const { privateJwk, members } = await this.decryptVault(vault);
 
-            groupVault.version = 1;
-            groupVault.keys = {};
+            vault.version = 1;
+            vault.keys = {};
 
-            await this.addMemberKey(groupVault, id.did, privateJwk);
+            await this.addMemberKey(vault, id.did, privateJwk);
 
             for (const memberDID of Object.keys(members)) {
-                await this.addMemberKey(groupVault, memberDID, privateJwk);
+                await this.addMemberKey(vault, memberDID, privateJwk);
             }
 
-            await this.updateAsset(vaultId, { groupVault });
+            await this.updateAsset(vaultId, { vault });
             return;
         }
 
@@ -3004,12 +3004,12 @@ export default class Keymaster implements KeymasterInterface {
         return did;
     }
 
-    async addGroupVaultMember(vaultId: string, memberId: string): Promise<boolean> {
-        const owner = await this.checkGroupVaultOwner(vaultId);
+    async addVaultMember(vaultId: string, memberId: string): Promise<boolean> {
+        const owner = await this.checkVaultOwner(vaultId);
 
         const idKeypair = await this.fetchKeyPair();
-        const groupVault = await this.getGroupVault(vaultId);
-        const { privateJwk, config, members } = await this.decryptGroupVault(groupVault);
+        const vault = await this.getVault(vaultId);
+        const { privateJwk, config, members } = await this.decryptVault(vault);
         const memberDoc = await this.resolveDID(memberId, { confirm: true });
         const memberDID = this.getAgentDID(memberDoc);
 
@@ -3019,19 +3019,19 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         members[memberDID] = { added: new Date().toISOString() };
-        const publicJwk = config.secretMembers ? idKeypair!.publicJwk : groupVault.publicJwk;
-        groupVault.members = this.cipher.encryptMessage(publicJwk, privateJwk, JSON.stringify(members));
+        const publicJwk = config.secretMembers ? idKeypair!.publicJwk : vault.publicJwk;
+        vault.members = this.cipher.encryptMessage(publicJwk, privateJwk, JSON.stringify(members));
 
-        await this.addMemberKey(groupVault, memberDID, privateJwk);
-        return this.updateAsset(vaultId, { groupVault });
+        await this.addMemberKey(vault, memberDID, privateJwk);
+        return this.updateAsset(vaultId, { vault });
     }
 
-    async removeGroupVaultMember(vaultId: string, memberId: string): Promise<boolean> {
-        const owner = await this.checkGroupVaultOwner(vaultId);
+    async removeVaultMember(vaultId: string, memberId: string): Promise<boolean> {
+        const owner = await this.checkVaultOwner(vaultId);
 
         const idKeypair = await this.fetchKeyPair();
-        const groupVault = await this.getGroupVault(vaultId);
-        const { privateJwk, config, members } = await this.decryptGroupVault(groupVault);
+        const vault = await this.getVault(vaultId);
+        const { privateJwk, config, members } = await this.decryptVault(vault);
         const memberDoc = await this.resolveDID(memberId, { confirm: true });
         const memberDID = this.getAgentDID(memberDoc);
 
@@ -3041,33 +3041,33 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         delete members[memberDID];
-        const publicJwk = config.secretMembers ? idKeypair!.publicJwk : groupVault.publicJwk;
-        groupVault.members = this.cipher.encryptMessage(publicJwk, privateJwk, JSON.stringify(members));
+        const publicJwk = config.secretMembers ? idKeypair!.publicJwk : vault.publicJwk;
+        vault.members = this.cipher.encryptMessage(publicJwk, privateJwk, JSON.stringify(members));
 
-        const memberKeyId = this.generateSaltedId(groupVault, memberDID);
-        delete groupVault.keys[memberKeyId];
+        const memberKeyId = this.generateSaltedId(vault, memberDID);
+        delete vault.keys[memberKeyId];
 
-        return this.updateAsset(vaultId, { groupVault });
+        return this.updateAsset(vaultId, { vault });
     }
 
-    async listGroupVaultMembers(vaultId: string): Promise<Record<string, any>> {
-        const groupVault = await this.getGroupVault(vaultId);
-        const { members, isOwner } = await this.decryptGroupVault(groupVault);
+    async listVaultMembers(vaultId: string): Promise<Record<string, any>> {
+        const vault = await this.getVault(vaultId);
+        const { members, isOwner } = await this.decryptVault(vault);
 
         if (isOwner) {
-            await this.checkVaultVersion(vaultId, groupVault);
+            await this.checkVaultVersion(vaultId, vault);
         }
 
         return members;
     }
 
-    async addGroupVaultItem(vaultId: string, name: string, buffer: Buffer): Promise<boolean> {
-        await this.checkGroupVaultOwner(vaultId);
+    async addVaultItem(vaultId: string, name: string, buffer: Buffer): Promise<boolean> {
+        await this.checkVaultOwner(vaultId);
 
-        const groupVault = await this.getGroupVault(vaultId);
-        const { privateJwk, items } = await this.decryptGroupVault(groupVault);
+        const vault = await this.getVault(vaultId);
+        const { privateJwk, items } = await this.decryptVault(vault);
         const validName = this.validateName(name);
-        const encryptedData = this.cipher.encryptBytes(groupVault.publicJwk, privateJwk, buffer);
+        const encryptedData = this.cipher.encryptBytes(vault.publicJwk, privateJwk, buffer);
         const cid = await this.gatekeeper.addText(encryptedData);
         const sha256 = this.cipher.hashMessage(buffer);
         const type = await this.getMimeType(buffer);
@@ -3082,42 +3082,42 @@ export default class Keymaster implements KeymasterInterface {
             data,
         };
 
-        groupVault.items = this.cipher.encryptMessage(groupVault.publicJwk, privateJwk, JSON.stringify(items));
-        groupVault.sha256 = this.cipher.hashJSON(items);
+        vault.items = this.cipher.encryptMessage(vault.publicJwk, privateJwk, JSON.stringify(items));
+        vault.sha256 = this.cipher.hashJSON(items);
 
-        return this.updateAsset(vaultId, { groupVault });
+        return this.updateAsset(vaultId, { vault });
     }
 
-    async removeGroupVaultItem(vaultId: string, name: string): Promise<boolean> {
-        await this.checkGroupVaultOwner(vaultId);
+    async removeVaultItem(vaultId: string, name: string): Promise<boolean> {
+        await this.checkVaultOwner(vaultId);
 
-        const groupVault = await this.getGroupVault(vaultId);
-        const { privateJwk, items } = await this.decryptGroupVault(groupVault);
+        const vault = await this.getVault(vaultId);
+        const { privateJwk, items } = await this.decryptVault(vault);
 
         delete items[name];
 
-        groupVault.items = this.cipher.encryptMessage(groupVault.publicJwk, privateJwk, JSON.stringify(items));
-        groupVault.sha256 = this.cipher.hashJSON(items);
-        return this.updateAsset(vaultId, { groupVault });
+        vault.items = this.cipher.encryptMessage(vault.publicJwk, privateJwk, JSON.stringify(items));
+        vault.sha256 = this.cipher.hashJSON(items);
+        return this.updateAsset(vaultId, { vault });
     }
 
-    async listGroupVaultItems(vaultId: string, options?: ResolveDIDOptions): Promise<Record<string, any>> {
-        const groupVault = await this.getGroupVault(vaultId, options);
-        const { items } = await this.decryptGroupVault(groupVault);
+    async listVaultItems(vaultId: string, options?: ResolveDIDOptions): Promise<Record<string, any>> {
+        const vault = await this.getVault(vaultId, options);
+        const { items } = await this.decryptVault(vault);
 
         return items;
     }
 
-    async getGroupVaultItem(vaultId: string, name: string, options?: ResolveDIDOptions): Promise<Buffer | null> {
+    async getVaultItem(vaultId: string, name: string, options?: ResolveDIDOptions): Promise<Buffer | null> {
         try {
-            const groupVault = await this.getGroupVault(vaultId, options);
-            const { privateJwk, items } = await this.decryptGroupVault(groupVault);
+            const vault = await this.getVault(vaultId, options);
+            const { privateJwk, items } = await this.decryptVault(vault);
 
             if (items[name]) {
                 const encryptedData = items[name].data || await this.gatekeeper.getText(items[name].cid);
 
                 if (encryptedData) {
-                    const bytes = this.cipher.decryptBytes(groupVault.publicJwk, privateJwk, encryptedData);
+                    const bytes = this.cipher.decryptBytes(vault.publicJwk, privateJwk, encryptedData);
                     return Buffer.from(bytes);
                 }
             }
@@ -3277,21 +3277,21 @@ export default class Keymaster implements KeymasterInterface {
 
     async createDmail(
         message: DmailMessage,
-        options: GroupVaultOptions = {}
+        options: VaultOptions = {}
     ): Promise<string> {
         const dmail = await this.verifyDmail(message);
-        const did = await this.createGroupVault(options);
+        const did = await this.createVault(options);
 
         for (const toDID of dmail.to) {
-            await this.addGroupVaultMember(did, toDID);
+            await this.addVaultMember(did, toDID);
         }
 
         for (const ccDID of dmail.cc) {
-            await this.addGroupVaultMember(did, ccDID);
+            await this.addVaultMember(did, ccDID);
         }
 
         const buffer = Buffer.from(JSON.stringify({ dmail }), 'utf-8');
-        await this.addGroupVaultItem(did, DmailTags.DMAIL, buffer);
+        await this.addVaultItem(did, DmailTags.DMAIL, buffer);
         await this.fileDmail(did, [DmailTags.DRAFT]);
 
         return did;
@@ -3304,15 +3304,15 @@ export default class Keymaster implements KeymasterInterface {
         const dmail = await this.verifyDmail(message);
 
         for (const toDID of dmail.to) {
-            await this.addGroupVaultMember(did, toDID);
+            await this.addVaultMember(did, toDID);
         }
 
         for (const ccDID of dmail.cc) {
-            await this.addGroupVaultMember(did, ccDID);
+            await this.addVaultMember(did, ccDID);
         }
 
         const buffer = Buffer.from(JSON.stringify({ dmail }), 'utf-8');
-        return this.addGroupVaultItem(did, DmailTags.DMAIL, buffer);
+        return this.addVaultItem(did, DmailTags.DMAIL, buffer);
     }
 
     async sendDmail(did: string): Promise<string | null> {
@@ -3339,13 +3339,13 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async getDmailMessage(did: string, options?: ResolveDIDOptions): Promise<DmailMessage | null> {
-        const isGroupVault = await this.testGroupVault(did, options);
+        const isVault = await this.testVault(did, options);
 
-        if (!isGroupVault) {
+        if (!isVault) {
             return null;
         }
 
-        const buffer = await this.getGroupVaultItem(did, DmailTags.DMAIL, options);
+        const buffer = await this.getVaultItem(did, DmailTags.DMAIL, options);
 
         if (!buffer) {
             return null;
@@ -3361,7 +3361,7 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async listDmailAttachments(did: string, options?: ResolveDIDOptions): Promise<Record<string, any>> {
-        let items = await this.listGroupVaultItems(did, options);
+        let items = await this.listVaultItems(did, options);
 
         delete items[DmailTags.DMAIL]; // Remove the dmail item itself from attachments
 
@@ -3377,7 +3377,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('Cannot add attachment with reserved name "dmail"');
         }
 
-        return this.addGroupVaultItem(did, name, buffer);
+        return this.addVaultItem(did, name, buffer);
     }
 
     async removeDmailAttachment(
@@ -3388,14 +3388,14 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('Cannot remove attachment with reserved name "dmail"');
         }
 
-        return this.removeGroupVaultItem(did, name);
+        return this.removeVaultItem(did, name);
     }
 
     async getDmailAttachment(
         did: string,
         name: string
     ): Promise<Buffer | null> {
-        return this.getGroupVaultItem(did, name);
+        return this.getVaultItem(did, name);
     }
 
     async importDmail(did: string): Promise<boolean> {
