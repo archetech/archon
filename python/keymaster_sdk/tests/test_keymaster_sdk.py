@@ -223,8 +223,8 @@ def test_backup_recover_id():
     assert_equal(response, True)
 
     doc = keymaster.resolve_did(did)
-    vault = keymaster.resolve_did(doc["didDocumentData"]["vault"])
-    assert len(vault["didDocumentData"]["backup"]) > 0, "backup not present in vault"
+    backupStore = keymaster.resolve_did(doc["didDocumentData"]["backupStore"])
+    assert len(backupStore["didDocumentData"]["backup"]) > 0, "backup not present in backupStore"
 
     keymaster.remove_id(generated_ids.pop())
     assert_equal(response, True)
