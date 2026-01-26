@@ -442,7 +442,7 @@ export function UIProvider(
                     continue;
                 }
 
-                if (data.groupVault) {
+                if (data.vault) {
                     vaultList.push(name);
                     continue;
                 }

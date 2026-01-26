@@ -78,8 +78,8 @@ Options:
 Commands:
   accept-credential [options] <did>        Save verifiable credential for current ID
   add-group-member <group> <member>        Add a member to a group
-  add-group-vault-item <id> <file>         Add an item (file) to a group vault
-  add-group-vault-member <id> <member>     Add a member to a group vault
+  add-vault-item <id> <file>         Add an item (file) to a vault
+  add-vault-member <id> <member>     Add a member to a vault
   add-name <name> <did>                    Add a name for a DID
   backup-id                                Backup the current ID to its registry
   backup-wallet-did                        Backup wallet to encrypted DID and seed bank
@@ -94,7 +94,7 @@ Commands:
   create-challenge [options] [file]        Create a challenge (optionally from a file)
   create-challenge-cc [options] <did>      Create a challenge from a credential DID
   create-group [options] <groupName>       Create a new group
-  create-group-vault [options]             Create a group vault
+  create-vault [options]             Create a vault
   create-id [options] <name>               Create a new decentralized ID
   create-poll [options] <file>             Create a poll
   create-poll-template                     Create a poll template
@@ -111,7 +111,7 @@ Commands:
   get-asset <id>                           Get asset by name or DID
   get-credential <did>                     Get credential by DID
   get-group <did>                          Get group by DID
-  get-group-vault-item <id> <item> <file>  Save an item from a group vault to a file
+  get-vault-item <id> <item> <file>  Save an item from a vault to a file
   get-name <name>                          Get DID assigned to name
   get-schema <did>                         Get schema by DID
   help [command]                           display help for command
@@ -119,8 +119,8 @@ Commands:
   issue-credential [options] <file>        Sign and encrypt a bound credential file
   list-assets                              List assets owned by current ID
   list-credentials                         List credentials by current ID
-  list-group-vault-items <id>              List items in the group vault
-  list-group-vault-members <id>            List members of a group vault
+  list-vault-items <id>              List items in the vault
+  list-vault-members <id>            List members of a vault
   list-groups                              List groups owned by current ID
   list-ids                                 List IDs and show current ID
   list-issued                              List issued credentials
@@ -132,8 +132,8 @@ Commands:
   recover-id <did>                         Recovers the ID from the DID
   recover-wallet-did [did]                 Recover wallet from seed bank or encrypted DID
   remove-group-member <group> <member>     Remove a member from a group
-  remove-group-vault-item <id> <item>      Remove an item from a group vault
-  remove-group-vault-member <id> <member>  Remove a member from a group vault
+  remove-vault-item <id> <item>      Remove an item from a vault
+  remove-vault-member <id> <member>  Remove a member from a vault
   remove-id <name>                         Deletes named ID
   remove-name <name>                       Removes a name for a DID
   rename-id <oldName> <newName>            Renames the ID

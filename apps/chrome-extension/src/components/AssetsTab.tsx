@@ -6,7 +6,7 @@ import SchemaTab from "./SchemaTab";
 import ImageTab from "./ImageTab";
 import DocumentTab from "./DocumentTab";
 import GroupsTab from "./GroupsTab";
-import GroupVaultTab from "./GroupVaultTab";
+import VaultTab from "./VaultTab";
 import CloneAssetTab from "./CloneAssetTab";
 
 function AssetsTab({ subTab }: {subTab: string}) {
@@ -81,7 +81,7 @@ function AssetsTab({ subTab }: {subTab: string}) {
                 <GroupsTab />
             </TabPanel>
             <TabPanel value="vaults" sx={{ p: 0 }}>
-                <GroupVaultTab />
+                <VaultTab />
             </TabPanel>
             <TabPanel value="clone" sx={{ p: 0 }}>
                 <CloneAssetTab />

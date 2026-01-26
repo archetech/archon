@@ -24,7 +24,7 @@ import DmailDialog from "./DmailDialog";
 import { DmailMessage } from '@didcid/keymaster/types';
 import CopyResolveDID from "./CopyResolveDID";
 
-function GroupVaultTab() {
+function VaultTab() {
     const [registry, setRegistry] = useState<string>('hyperswarm');
     const [selectedVaultOwned, setSelectedVaultOwned] = useState<boolean>(false);
     const [selectedVaultName, setSelectedVaultName] = useState<string>('');
@@ -74,7 +74,7 @@ function GroupVaultTab() {
                     return;
                 }
                 try {
-                    await keymaster.removeGroupVaultMember(selectedVaultName, did);
+                    await keymaster.removeVaultMember(selectedVaultName, did);
                     await refreshVault(selectedVaultName);
                 } catch (err: any) {
                     setError(err);
@@ -92,7 +92,7 @@ function GroupVaultTab() {
                     return;
                 }
                 try {
-                    await keymaster.removeGroupVaultItem(selectedVaultName, name);
+                    await keymaster.removeVaultItem(selectedVaultName, name);
                     await refreshVault(selectedVaultName);
                 } catch (err: any) {
                     setError(err);
@@ -112,8 +112,8 @@ function GroupVaultTab() {
             setSelectedVaultOwned(docs.didDocument?.controller === currentDID);
             setVaultMember('');
 
-            const vaultMembers = await keymaster.listGroupVaultMembers(vaultName);
-            const vaultItems = await keymaster.listGroupVaultItems(vaultName);
+            const vaultMembers = await keymaster.listVaultMembers(vaultName);
+            const vaultItems = await keymaster.listVaultItems(vaultName);
 
             const members = Object.keys(vaultMembers);
             const items = Object.keys(vaultItems);
@@ -136,7 +136,7 @@ function GroupVaultTab() {
             return;
         }
         try {
-            const buffer = await keymaster.getGroupVaultItem(selectedVaultName, name);
+            const buffer = await keymaster.getVaultItem(selectedVaultName, name);
 
             if (!buffer) {
                 setError(`Item ${name} not found in vault ${selectedVaultName}`);
@@ -163,7 +163,7 @@ function GroupVaultTab() {
             return;
         }
         try {
-            const result = await keymaster.addGroupVaultMember(selectedVaultName, did);
+            const result = await keymaster.addVaultMember(selectedVaultName, did);
             if (result) {
                 await refreshVault(selectedVaultName);
             } else {
@@ -179,7 +179,7 @@ function GroupVaultTab() {
             return;
         }
         try {
-            const buffer = await keymaster.getGroupVaultItem(selectedVaultName, name);
+            const buffer = await keymaster.getVaultItem(selectedVaultName, name);
 
             if (!buffer) {
                 setError(`Item ${name} not found in vault ${selectedVaultName}`);
@@ -223,7 +223,7 @@ function GroupVaultTab() {
 
         setVaultName('');
         try {
-            await keymaster.createGroupVault({ registry, name });
+            await keymaster.createVault({ registry, name });
 
             await refreshNames();
             setSelectedVaultName(name);
@@ -257,7 +257,7 @@ function GroupVaultTab() {
                 password
             };
             const buffer = Buffer.from(JSON.stringify({ login }), 'utf-8');
-            const ok = await keymaster.addGroupVaultItem(selectedVaultName, name, buffer);
+            const ok = await keymaster.addVaultItem(selectedVaultName, name, buffer);
 
             setEditLoginOpen(false);
 
@@ -307,7 +307,7 @@ function GroupVaultTab() {
                         return;
                     }
 
-                    const ok = await keymaster.addGroupVaultItem(selectedVaultName, file.name, buffer);
+                    const ok = await keymaster.addVaultItem(selectedVaultName, file.name, buffer);
 
                     if (ok) {
                         setSuccess(`Item uploaded successfully: ${file.name}`);
@@ -663,4 +663,4 @@ function GroupVaultTab() {
     );
 }
 
-export default GroupVaultTab;
+export default VaultTab;

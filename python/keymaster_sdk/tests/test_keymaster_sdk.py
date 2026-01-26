@@ -223,8 +223,8 @@ def test_backup_recover_id():
     assert_equal(response, True)
 
     doc = keymaster.resolve_did(did)
-    vault = keymaster.resolve_did(doc["didDocumentData"]["vault"])
-    assert len(vault["didDocumentData"]["backup"]) > 0, "backup not present in vault"
+    backupStore = keymaster.resolve_did(doc["didDocumentData"]["backupStore"])
+    assert len(backupStore["didDocumentData"]["backup"]) > 0, "backup not present in backupStore"
 
     keymaster.remove_id(generated_ids.pop())
     assert_equal(response, True)
@@ -428,40 +428,40 @@ def test_images():
     assert_equal(valid, True)
 
 
-def test_group_vaults():
+def test_vaults():
     owner = generate_id()
     keymaster.create_id(owner, local_options)
 
-    vault_id = keymaster.create_group_vault(local_options)
+    vault_id = keymaster.create_vault(local_options)
     assert vault_id.startswith("did:")
 
-    gv = keymaster.get_group_vault(vault_id)
+    gv = keymaster.get_vault(vault_id)
     assert isinstance(gv, dict) and "keys" in gv and "items" in gv
-    assert_equal(keymaster.test_group_vault(vault_id), True)
+    assert_equal(keymaster.test_vault(vault_id), True)
 
     member = generate_id()
     member_did = keymaster.create_id(member, local_options)
 
     keymaster.set_current_id(owner)
 
-    assert_equal(keymaster.add_group_vault_member(vault_id, member_did), True)
+    assert_equal(keymaster.add_vault_member(vault_id, member_did), True)
 
-    members = keymaster.list_group_vault_members(vault_id)
+    members = keymaster.list_vault_members(vault_id)
     assert isinstance(members, dict) and member_did in members
 
     name = "hello.txt"
     data = b"hello world"
-    assert_equal(keymaster.add_group_vault_item(vault_id, name, data), True)
+    assert_equal(keymaster.add_vault_item(vault_id, name, data), True)
 
-    items = keymaster.list_group_vault_items(vault_id)
+    items = keymaster.list_vault_items(vault_id)
     assert isinstance(items, dict) and name in items
 
-    blob = keymaster.get_group_vault_item(vault_id, name)
+    blob = keymaster.get_vault_item(vault_id, name)
     assert blob == data
 
-    assert_equal(keymaster.remove_group_vault_item(vault_id, name), True)
+    assert_equal(keymaster.remove_vault_item(vault_id, name), True)
 
-    assert_equal(keymaster.remove_group_vault_member(vault_id, member_did), True)
+    assert_equal(keymaster.remove_vault_member(vault_id, member_did), True)
 
 
 def test_notices_create_update_and_refresh():

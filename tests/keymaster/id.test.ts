@@ -408,10 +408,10 @@ describe('backupId', () => {
         const ok = await keymaster.backupId();
 
         const doc = await keymaster.resolveDID(name);
-        const vault = await keymaster.resolveDID((doc.didDocumentData! as { vault: string }).vault);
+        const backupStore = await keymaster.resolveDID((doc.didDocumentData! as { backupStore: string }).backupStore);
 
         expect(ok).toBe(true);
-        expect((vault.didDocumentData as { backup: string }).backup.length > 0).toBe(true);
+        expect((backupStore.didDocumentData as { backup: string }).backup.length > 0).toBe(true);
     });
 
     it('should backup a non-current ID', async () => {
@@ -420,10 +420,10 @@ describe('backupId', () => {
         const ok = await keymaster.backupId('Alice');
 
         const doc = await keymaster.resolveDID(aliceDid);
-        const vault = await keymaster.resolveDID((doc.didDocumentData! as { vault: string }).vault);
+        const backupStore = await keymaster.resolveDID((doc.didDocumentData! as { backupStore: string }).backupStore);
 
         expect(ok).toBe(true);
-        expect((vault.didDocumentData as { backup: string }).backup.length > 0).toBe(true);
+        expect((backupStore.didDocumentData as { backup: string }).backup.length > 0).toBe(true);
     });
 });
 
