@@ -1164,18 +1164,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
-    function credentialPublished(did) {
-        if (!manifest) {
-            return false;
-        }
-
-        if (!manifest[did]) {
-            return false;
-        }
-
-        return manifest[did].credential === null;
-    }
-
     function credentialRevealed(did) {
         if (!manifest) {
             return false;
