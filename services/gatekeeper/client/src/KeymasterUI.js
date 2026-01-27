@@ -949,7 +949,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 if (visited.has(did)) return;
                 visited.add(did);
 
-                const doc = await keymaster.resolveDID(did);
+                let doc;
+                try {
+                    doc = await keymaster.resolveDID(did);
+                } catch {
+                    return;
+                }
+
                 const data = doc.didDocumentData;
 
                 // Check if this is a group - recurse into members
