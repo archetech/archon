@@ -57,6 +57,12 @@ const config = {
         "/node_modules/",
         "/kc-app/",
         "/client/"
+    ],
+    coveragePathIgnorePatterns: [
+        "/node_modules/",
+        "/packages/keymaster/src/db/cache.ts",
+        "/packages/keymaster/src/db/chrome.ts",
+        "/packages/keymaster/src/db/web.ts"
     ]
 };
 
