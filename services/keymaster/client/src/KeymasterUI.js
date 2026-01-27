@@ -584,7 +584,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 docList[name] = doc;
 
                 if (doc.didDocumentRegistration.type === 'agent') {
-                    agentList.push(name);
+                    if (!agentList.includes(name)) {
+                        agentList.push(name);
+                    }
                     continue;
                 }
 
