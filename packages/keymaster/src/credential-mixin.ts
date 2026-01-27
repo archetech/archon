@@ -67,7 +67,7 @@ export interface CredentialMixinRequirements {
 
 export function CredentialMixin<TBase extends Constructor<CredentialMixinRequirements>>(Base: TBase) {
     return class CredentialImpl extends Base {
-        _credential_isVerifiableCredential(obj: unknown): obj is VerifiableCredential {
+        _isVerifiableCredential(obj: unknown): obj is VerifiableCredential {
             if (typeof obj !== 'object' || !obj) {
                 return false;
             }
@@ -186,7 +186,7 @@ export function CredentialMixin<TBase extends Constructor<CredentialMixinRequire
             did = await this.lookupDID(did);
             const originalVC = await this.decryptJSON(did);
 
-            if (!this._credential_isVerifiableCredential(originalVC)) {
+            if (!this._isVerifiableCredential(originalVC)) {
                 throw new InvalidParameterError("did is not a credential");
             }
 
@@ -237,7 +237,7 @@ export function CredentialMixin<TBase extends Constructor<CredentialMixinRequire
                     try {
                         const credential = await this.decryptJSON(did);
 
-                        if (this._credential_isVerifiableCredential(credential) &&
+                        if (this._isVerifiableCredential(credential) &&
                             credential.issuer === id.did) {
                             issued.push(did);
                         }
@@ -255,7 +255,7 @@ export function CredentialMixin<TBase extends Constructor<CredentialMixinRequire
                 const credential = await this.lookupDID(did);
                 const vc = await this.decryptJSON(credential);
 
-                if (this._credential_isVerifiableCredential(vc) &&
+                if (this._isVerifiableCredential(vc) &&
                     vc.credentialSubject?.id !== id.did) {
                     return false;
                 }
@@ -272,7 +272,7 @@ export function CredentialMixin<TBase extends Constructor<CredentialMixinRequire
 
             const vc = await this.decryptJSON(did);
 
-            if (!this._credential_isVerifiableCredential(vc)) {
+            if (!this._isVerifiableCredential(vc)) {
                 return null;
             }
 
@@ -298,7 +298,7 @@ export function CredentialMixin<TBase extends Constructor<CredentialMixinRequire
             const id = await this.fetchIdInfo();
             const credential = await this.lookupDID(did);
             const vc = await this.decryptJSON(credential);
-            if (!this._credential_isVerifiableCredential(vc)) {
+            if (!this._isVerifiableCredential(vc)) {
                 throw new InvalidParameterError("did is not a credential");
             }
 
@@ -395,7 +395,7 @@ export function CredentialMixin<TBase extends Constructor<CredentialMixinRequire
                 try {
                     const doc = await this.decryptJSON(did);
 
-                    if (!this._credential_isVerifiableCredential(doc)) {
+                    if (!this._isVerifiableCredential(doc)) {
                         continue;
                     }
 
