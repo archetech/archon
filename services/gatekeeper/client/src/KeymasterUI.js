@@ -930,6 +930,15 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         try {
             if (!schemaPackDID) return;
 
+            // Resolve the pack DID first to get its info
+            const packDoc = await keymaster.resolveDID(schemaPackDID);
+            const packData = packDoc.didDocumentData;
+
+            if (!packData.group || !packData.group.members) {
+                showAlert('Schema pack DID is not a group');
+                return;
+            }
+
             // Recursively collect all schema DIDs from the group
             const schemaDIDs = [];
             const visited = new Set();
@@ -955,7 +964,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 }
             }
 
-            await collectSchemas(schemaPackDID);
+            // Collect schemas from all members
+            for (const memberDID of packData.group.members) {
+                await collectSchemas(memberDID);
+            }
 
             if (schemaDIDs.length === 0) {
                 showAlert('No schemas found in the pack');
@@ -968,9 +980,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             for (const { did, schema, doc } of schemaDIDs) {
                 let name = null;
 
-                // Priority 1: $credentialTypes joined with " - "
+                // Priority 1: last $credentialType
                 if (schema.$credentialTypes && Array.isArray(schema.$credentialTypes) && schema.$credentialTypes.length > 0) {
-                    name = schema.$credentialTypes.join(' - ');
+                    name = schema.$credentialTypes[schema.$credentialTypes.length - 1];
                 }
                 // Priority 2: schema title
                 else if (schema.title) {
@@ -986,6 +998,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     name = 'schema';
                 }
 
+                // Truncate name if too long (max 30 chars to leave room for suffix)
+                if (name.length > 30) {
+                    name = name.substring(0, 30);
+                }
+
                 // Ensure unique name
                 let uniqueName = name;
                 let suffix = 1;
@@ -996,6 +1013,17 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
                 await keymaster.addName(uniqueName, did);
                 existingNames.push(uniqueName);
+            }
+
+            // Also add the pack DID itself with the group's name
+            if (packData.group.name) {
+                let packName = packData.group.name;
+                let suffix = 1;
+                while (existingNames.includes(packName)) {
+                    packName = `${packData.group.name}-${suffix}`;
+                    suffix++;
+                }
+                await keymaster.addName(packName, packDoc.didDocument.id);
             }
 
             setSchemaPackDID('');
@@ -3294,7 +3322,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         </Grid>
                                         <Grid item>
                                             <Button variant="contained" color="primary" onClick={importSchemaPack} disabled={!schemaPackDID}>
-                                                Import Schema Pack
+                                                Import Pack
                                             </Button>
                                         </Grid>
                                     </Grid>
