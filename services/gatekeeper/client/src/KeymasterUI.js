@@ -963,7 +963,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             }
 
             // Import each schema with appropriate name
-            let genericCounter = 1;
             const existingNames = Object.keys(nameList);
 
             for (const { did, schema, doc } of schemaDIDs) {
@@ -984,11 +983,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
                 // Priority 4: Generic name
                 if (!name) {
-                    while (existingNames.includes(`schema-${genericCounter}`)) {
-                        genericCounter++;
-                    }
-                    name = `schema-${genericCounter}`;
-                    genericCounter++;
+                    name = 'schema';
                 }
 
                 // Ensure unique name
