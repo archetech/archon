@@ -246,10 +246,7 @@ describe('unpublishCredential', () => {
 
 describe('isVerifiableCredential', () => {
     it('should return false for non-object or null', async () => {
-        // @ts-expect-error Testing invalid usage, calling private func
         const res1 = keymaster._isVerifiableCredential(null);
-
-        // @ts-expect-error Testing invalid usage, calling private func
         const res2 = keymaster._isVerifiableCredential("");
 
         expect(res1).toBe(false);
