@@ -4356,7 +4356,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                                     </Button>
                                                                 </Grid>
                                                                 <Grid item>
-                                                                    <Button variant="contained" color="primary" onClick={() => publishCredential(did)} disabled={credentialPublished(did)}>
+                                                                    <Button variant="contained" color="primary" onClick={() => publishCredential(did)} disabled={!credentialUnpublished(did)}>
                                                                         Publish
                                                                     </Button>
                                                                 </Grid>
