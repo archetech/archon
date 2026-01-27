@@ -134,6 +134,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [selectedSchemaOwned, setSelectedSchemaOwned] = useState(false);
     const [selectedSchemaName, setSelectedSchemaName] = useState('');
     const [selectedSchema, setSelectedSchema] = useState('');
+    const [schemaPackDID, setSchemaPackDID] = useState('');
     const [agentList, setAgentList] = useState(null);
     const [credentialTab, setCredentialTab] = useState('');
     const [credentialDID, setCredentialDID] = useState('');
@@ -583,7 +584,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 docList[name] = doc;
 
                 if (doc.didDocumentRegistration.type === 'agent') {
-                    agentList.push(name);
+                    if (!agentList.includes(name)) {
+                        agentList.push(name);
+                    }
                     continue;
                 }
 
@@ -925,6 +928,123 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
+    async function importSchemaPack() {
+        try {
+            if (!schemaPackDID) return;
+
+            // Resolve the pack DID first to get its info
+            const packDoc = await keymaster.resolveDID(schemaPackDID);
+            const packData = packDoc.didDocumentData;
+
+            if (!packData.group || !packData.group.members) {
+                showAlert('Schema pack DID is not a group');
+                return;
+            }
+
+            // Recursively collect all schema DIDs from the group
+            const schemaDIDs = [];
+            const visited = new Set();
+
+            async function collectSchemas(did) {
+                if (visited.has(did)) return;
+                visited.add(did);
+
+                let doc;
+                try {
+                    doc = await keymaster.resolveDID(did);
+                } catch {
+                    return;
+                }
+
+                const data = doc.didDocumentData;
+
+                // Check if this is a group - recurse into members
+                if (data.group && data.group.members) {
+                    for (const memberDID of data.group.members) {
+                        await collectSchemas(memberDID);
+                    }
+                    return;
+                }
+
+                // Check if this is a schema - collect it
+                if (data.schema) {
+                    schemaDIDs.push({ did: doc.didDocument.id, schema: data.schema, doc });
+                }
+            }
+
+            // Collect schemas from all members
+            for (const memberDID of packData.group.members) {
+                await collectSchemas(memberDID);
+            }
+
+            if (schemaDIDs.length === 0) {
+                showAlert('No schemas found in the pack');
+                return;
+            }
+
+            // Import each schema with appropriate name
+            const existingNames = Object.keys(nameList);
+
+            for (const { did, schema, doc } of schemaDIDs) {
+                let name = null;
+
+                // Priority 1: last $credentialType
+                if (schema.$credentialTypes && Array.isArray(schema.$credentialTypes) && schema.$credentialTypes.length > 0) {
+                    name = schema.$credentialTypes[schema.$credentialTypes.length - 1];
+                }
+                // Priority 2: schema title
+                else if (schema.title) {
+                    name = schema.title;
+                }
+                // Priority 3: DID document data name field
+                else if (doc.didDocumentData?.name) {
+                    name = doc.didDocumentData.name;
+                }
+
+                // Priority 4: Generic name
+                if (!name) {
+                    name = 'schema';
+                }
+
+                // Truncate name if too long (max 30 chars to leave room for suffix)
+                if (name.length > 30) {
+                    name = name.substring(0, 30);
+                }
+
+                // Ensure unique name
+                let uniqueName = name;
+                let suffix = 1;
+                while (existingNames.includes(uniqueName)) {
+                    uniqueName = `${name}-${suffix}`;
+                    suffix++;
+                }
+
+                await keymaster.addName(uniqueName, did);
+                existingNames.push(uniqueName);
+            }
+
+            // Also add the pack DID itself with the group's name or a fallback
+            let basePackName = packData.group.name;
+            if (!basePackName) {
+                basePackName = 'schema-pack';
+            }
+
+            let packName = basePackName;
+            let suffix = 1;
+            while (existingNames.includes(packName)) {
+                packName = `${basePackName}-${suffix}`;
+                suffix++;
+            }
+            await keymaster.addName(packName, packDoc.didDocument.id);
+
+            setSchemaPackDID('');
+            refreshNames();
+            showSuccess(`Imported ${schemaDIDs.length} schema(s)`);
+        } catch (error) {
+            showError(error);
+        }
+    }
+
     async function editCredential() {
         try {
             const credentialBound = await keymaster.bindCredential(credentialSubject, { schema: credentialSchema });
@@ -1051,18 +1171,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         } catch (error) {
             showError(error);
         }
-    }
-
-    function credentialPublished(did) {
-        if (!manifest) {
-            return false;
-        }
-
-        if (!manifest[did]) {
-            return false;
-        }
-
-        return manifest[did].credential === null;
     }
 
     function credentialRevealed(did) {
@@ -3199,6 +3307,24 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                             <RegistrySelect />
                                         </Grid>
                                     </Grid>
+                                    <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
+                                        <Grid item>
+                                            <TextField
+                                                label="Schema Pack DID"
+                                                style={{ width: '300px' }}
+                                                value={schemaPackDID}
+                                                onChange={(e) => setSchemaPackDID(e.target.value.trim())}
+                                                fullWidth
+                                                margin="normal"
+                                                placeholder="did:mdip:..."
+                                            />
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={importSchemaPack} disabled={!schemaPackDID}>
+                                                Import Pack
+                                            </Button>
+                                        </Grid>
+                                    </Grid>
                                     {schemaList &&
                                         <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                             <Grid item>
@@ -4229,7 +4355,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                                     </Button>
                                                                 </Grid>
                                                                 <Grid item>
-                                                                    <Button variant="contained" color="primary" onClick={() => publishCredential(did)} disabled={credentialPublished(did)}>
+                                                                    <Button variant="contained" color="primary" onClick={() => publishCredential(did)} disabled={!credentialUnpublished(did)}>
                                                                         Publish
                                                                     </Button>
                                                                 </Grid>
