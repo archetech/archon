@@ -1,5 +1,10 @@
 export { default } from './keymaster.js';
+export { NoticeTags } from './notice-mixin.js';
 export { default as KeymasterClient } from './keymaster-client.js';
+export { VaultMixin } from './vault-mixin.js';
+export type { VaultMixinRequirements } from './vault-mixin.js';
+export { DmailMixin, DmailTags } from './dmail-mixin.js';
+export type { DmailMixinRequirements } from './dmail-mixin.js';
 export { default as WalletJsonMemory } from './db/json-memory.js';
 export { default as WalletWeb } from './db/web.js';
 export { default as WalletCache } from './db/cache.js';
