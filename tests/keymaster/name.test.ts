@@ -245,4 +245,28 @@ describe('listNames', () => {
 
         expect(Object.keys(names).length).toBe(0);
     });
+
+    it('should not mutate wallet.names when includeIDs is true', async () => {
+        const bob = await keymaster.createId('Bob');
+        const alice = await keymaster.createId('Alice');
+
+        await keymaster.addName('asset-1', bob);
+        await keymaster.addName('asset-2', bob);
+
+        // Call listNames with includeIDs: true
+        const namesWithIds = await keymaster.listNames({ includeIDs: true });
+
+        // Should include both names and IDs
+        expect(Object.keys(namesWithIds).length).toBe(4);
+        expect(namesWithIds['Bob']).toBe(bob);
+        expect(namesWithIds['Alice']).toBe(alice);
+
+        // But wallet.names should NOT be mutated
+        const walletData = await keymaster.loadWallet();
+        expect(Object.keys(walletData.names!).length).toBe(2);
+        expect(walletData.names!['Bob']).toBeUndefined();
+        expect(walletData.names!['Alice']).toBeUndefined();
+        expect(walletData.names!['asset-1']).toBe(bob);
+        expect(walletData.names!['asset-2']).toBe(bob);
+    });
 });
