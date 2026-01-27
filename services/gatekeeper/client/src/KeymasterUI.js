@@ -1023,16 +1023,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 existingNames.push(uniqueName);
             }
 
-            // Also add the pack DID itself with the group's name
-            if (packData.group.name) {
-                let packName = packData.group.name;
-                let suffix = 1;
-                while (existingNames.includes(packName)) {
-                    packName = `${packData.group.name}-${suffix}`;
-                    suffix++;
-                }
-                await keymaster.addName(packName, packDoc.didDocument.id);
+            // Also add the pack DID itself with the group's name or a fallback
+            let basePackName = packData.group.name;
+            if (!basePackName) {
+                basePackName = 'schema-pack';
             }
+
+            let packName = basePackName;
+            let suffix = 1;
+            while (existingNames.includes(packName)) {
+                packName = `${basePackName}-${suffix}`;
+                suffix++;
+            }
+            await keymaster.addName(packName, packDoc.didDocument.id);
 
             setSchemaPackDID('');
             refreshNames();
