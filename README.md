@@ -44,7 +44,7 @@ ARCHON_UID=1000                                        # Docker host UID
 ARCHON_GID=1002                                        # Docker host GID
 ARCHON_NODE_NAME=anon                                  # Hyperswarm node name
 ARCHON_NODE_ID=anon                                    # Node Keymaster DID name
-ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,BTC:testnet4,FTC:testnet5      # Supported DID Registries
+ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,BTC:testnet4,BTC:signet      # Supported DID Registries
 ...
 {adjust registry details for advanced users only}
 ```

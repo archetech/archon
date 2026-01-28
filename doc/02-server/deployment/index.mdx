@@ -58,9 +58,9 @@ All the Archon components illustrated above are composed together using Docker C
 - archon-gatekeeper-1 is the Archon Gatekeeper, a reference implementation of Archon exposing a REST [Gatekeeper API](../../gatekeeper-api.json) interface.
 - archon-keymaster-1 is the Archon Keymaster, which provides an interface to the server's keymaster wallet and expose a REST [Keymaster API](../../keymaster-api.json) to manage the server's Archon identity.
 - kc-hyperswarm-1 is the document distribution protocol service built on [Hyperswarm](https://github.com/holepunchto/hyperswarm).
-- kc-FTC/testnet5-mediator-1 is the Archon Mediator for [Feathercoin Testnet](https://feathercoin.com/)
+- kc-BTC/signet-mediator-1 is the Archon Mediator for [Bitcoin Signet](https://en.bitcoin.it/wiki/Signet)
 - kc-BTC/testnet4-mediator-1 is the Archon Mediator for [Bitcoin Testnet](https://github.com/bitcoin/)
-- kc-FTC/testnet5-node is a generic Feathercoin Testnet node
+- kc-BTC/signet-node is a generic Bitcoin Signet node
 - kc-BTC/testnet4-node is a generic [Bitcoin Testnet4](https://github.com/bitcoin/bitcoin/pull/29775) node
 - kc-signet-node is a generic [Bitcoin Signet] node
 
@@ -183,7 +183,7 @@ The `.env` file includes the following customizable environment variables. At a 
 | # Gatekeeper               |                        |                                                                                                      |
 | `ARCHON_DEBUG`                 | `false`                |                                                                                                      |
 | `ARCHON_GATEKEEPER_DB`         | `json`                 | Type of local data storage; leave as json for now with more options coming soon                      |
-| `ARCHON_GATEKEEPER_REGISTRIES` | `hyperswarm,BTC/testnet4,FTC/testnet5` | List of DID registries supported by this node. `TESS` is deprecated and can be removed if present    |
+| `ARCHON_GATEKEEPER_REGISTRIES` | `hyperswarm,BTC/testnet4,BTC/signet` | List of DID registries supported by this node. `TESS` is deprecated and can be removed if present    |
 | `ARCHON_GATEKEEPER_PORT`       | `4224`                 | Default Archon port for the Gatekeeper API                                                             |
 | `ARCHON_GATEKEEPER_VERIFY_DB`  | `true`                 |                                                                                                      |
 |                            |                        |                                                                                                      |
@@ -287,9 +287,9 @@ The Archon Gatekeeper uses [Hyperswarm](https://github.com/holepunchto/hyperswar
 
 #### Registry Services (BTC/testnet4)
 
-Archon uses immutable ledgers to record evidence of a decentralized consensus on the order of operations that form the history of a DID. The Archon protocol is blockchain agnostic and provides 2 Testnet examples to demonstrate the protocol's portability: Bitcoin Testnet4 and Feathercoin Testnet. Each DID is registered on a blockchain selected by the end-user at the time of creation. DID operations are batched and exported by the Archon Mediator to its associated blockchain node.
+Archon uses immutable ledgers to record evidence of a decentralized consensus on the order of operations that form the history of a DID. The Archon protocol is blockchain agnostic and provides 2 Testnet examples to demonstrate the protocol's portability: Bitcoin Testnet4 and Bitcoin Signet. Each DID is registered on a blockchain selected by the end-user at the time of creation. DID operations are batched and exported by the Archon Mediator to its associated blockchain node.
 
-In the example below, we use a generic bitcoin-code node configured to operate on testnet4. A similar service configuration block for Feathercoin Testnet is provided in the `kc` repository:
+In the example below, we use a generic bitcoin-core node configured to operate on testnet4. A similar service configuration block for Bitcoin Signet is provided in the `kc` repository:
 
 ```yaml
   BTC/testnet4-node:
@@ -334,7 +334,7 @@ Once the server requirements and dependencies are resolved, the next step will c
 ./start-node
 ```
 
-On the first run, the `start-node` command will take up to 30 minutes to prepare the docker containers needed by the Archon node. This will include Bitcoin Testnet and Feathercoin Testnet as registries. Full network sync time may take many hours.
+On the first run, the `start-node` command will take up to 30 minutes to prepare the docker containers needed by the Archon node. This will include Bitcoin Testnet and Bitcoin Signet as registries. Full network sync time may take many hours.
 
 The script contains 2 commands:
 
@@ -349,7 +349,7 @@ The `build` process will download numerous containers and dependencies as define
 
 ```log
 Oct 16 18:11:49 archon-gatekeeper start-node[3151048]: gatekeeper-1     | Server is running on port 4224, persisting with json
-Oct 16 18:11:49 archon-gatekeeper start-node[3151048]: gatekeeper-1     | Supported registries: hyperswarm,BTC/testnet4,FTC/testnet5,Signet
+Oct 16 18:11:49 archon-gatekeeper start-node[3151048]: gatekeeper-1     | Supported registries: hyperswarm,BTC/testnet4,BTC/signet,Signet
 Oct 16 18:11:50 archon-gatekeeper start-node[3151048]: gatekeeper-1     | GET /api/v1/ready 200 9.088 ms - 4
 Oct 16 18:11:50 archon-gatekeeper start-node[3151048]: hyperswarm-1     | Gatekeeper service is ready!
 ```
@@ -380,7 +380,7 @@ The `./kc show-wallet` command will show an updated JSON wallet containing the n
 
 #### DID Registries Setup
 
-Archon supports multiple decentralized registries: Bitcoin, Signet, Testnet4 and Feathercoin Testnet. More registries will become available over time. Decentralized registries are an important part of decentralizing identitity; the registry contains the concensus on order of Archon operations.
+Archon supports multiple decentralized registries: Bitcoin mainnet, Signet, and Testnet4. More registries will become available over time. Decentralized registries are an important part of decentralizing identity; the registry contains the consensus on order of Archon operations.
 
 By default, the Archon Satoshi Mediator will be looking for a wallet named `archon`. The Bitcoin Testnet4 node is configured to store its data in the `data/BTC/testnet4` directory.
 
@@ -407,7 +407,7 @@ You can view the `unconfirmed_balance` and `balance` of your wallet with the fol
 ./scripts/BTC/testnet4-cli/getwalletinfo
 ```
 
-The `BTC/testnet4-cli` script passes the command line arguments to the standard bitcoin node wallet operating inside the `BTC/testnet4-node` docker container. The commands above should also be replicated for other supported blockchains (ex: `./scripts/FTC/testnet5-cli`).
+The `BTC/testnet4-cli` script passes the command line arguments to the standard bitcoin node wallet operating inside the `BTC/testnet4-node` docker container. The commands above should also be replicated for other supported blockchains (ex: `./scripts/BTC/signet-cli`).
 
 ### Automated Restart using Systemd
 
@@ -478,7 +478,7 @@ Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #1 DONE 0.0s
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #3 [BTC/testnet4-mediator internal] load build definition from Dockerfile.sat
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #3 transferring dockerfile: 415B done
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #3 DONE 0.0s
-Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #4 [FTC/testnet5-node internal] load build definition from Dockerfile.ftc
+Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #4 [BTC/signet-node internal] load build definition from Dockerfile.sat
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #4 transferring dockerfile: 556B done
 Oct 28 16:34:14 archon-gatekeeper start-node[703548]: #4 DONE 0.0s
 ...
@@ -486,11 +486,11 @@ Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container archon-gatekeep
 Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container archon-keymaster-1  Created
 Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-hyperswarm-1  Created
 Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-mongodb-1  Created
-Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-FTC/testnet5-node-1  Created
+Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-BTC/signet-node-1  Created
 Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-BTC/testnet4-node-1  Created
-Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-FTC/testnet5-mediator-1  Created
+Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-BTC/signet-mediator-1  Created
 Oct 28 16:34:14 archon-gatekeeper start-node[703710]:  Container kc-BTC/testnet4-mediator-1  Created
-Oct 28 16:34:14 archon-gatekeeper start-node[703710]: Attaching to gatekeeper-1, hyperswarm-1, keymaster-1, mongodb-1, BTC/testnet4-mediator-1, BTC/testnet4-node-1, FTC/testnet5-mediator-1, FTC/testnet5-node-1
+Oct 28 16:34:14 archon-gatekeeper start-node[703710]: Attaching to gatekeeper-1, hyperswarm-1, keymaster-1, mongodb-1, BTC/testnet4-mediator-1, BTC/testnet4-node-1, BTC/signet-mediator-1, BTC/signet-node-1
 ```
 
 #### Log samples: Archon Gatekeeper Service
@@ -522,7 +522,7 @@ Oct 28 16:34:20 archon-gatekeeper start-node[703710]: gatekeeper-1     | 75 did:
 Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | 6987 did:cid:z3v8AuaiDEX5skrxB1bHH4aE5Jp6QcubQ7gqnpPWwFpedVSxtsF OK
 Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | verifyDb: 56.681s
 Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | Server is running on port 4224, persisting with json
-Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | Supported registries: hyperswarm,BTC/testnet4,FTC/testnet5
+Oct 28 16:35:30 archon-gatekeeper start-node[705212]: gatekeeper-1     | Supported registries: hyperswarm,BTC/testnet4,BTC/signet
 Oct 28 16:35:32 archon-gatekeeper node[95272]: Gatekeeper service is ready!
 Oct 28 16:35:32 archon-gatekeeper start-node[705212]: gatekeeper-1     | GET /api/v1/ready 200 - 7.745 ms
 ```
@@ -587,7 +587,7 @@ Once ready, the Keymaster will report being `ready` when queried on its local AP
 
 #### Log samples: Blockchain Node (BTC/testnet4)
 
-The `kc/docker-compose.yml` script will launch Bitcoin Testnet4 and Feathercoin Testnet nodes to be used as DID registries.
+The `kc/docker-compose.yml` script will launch Bitcoin Testnet4 and Signet nodes to be used as DID registries.
 
 The following logs are generated when the Bitcoin node is launched:
 
@@ -691,7 +691,7 @@ When using Docker as an operating environment, other ports are used within the D
 ```docker
 mongo:latest             27017/tcp kc-mongodb-1
 bitcoin-core:v27.99.0    48332/tcp kc-BTC/testnet4-node-1
-feathercoind             19337/tcp kc-FTC/testnet5-node-1
+bitcoin-core:signet      38333/tcp kc-BTC/signet-node-1
 ```
 
 None of the ports listed above should *ever* be directly addressable from the Internet. It is recommended that a firewall be set up to prevent access to these services.

@@ -15,7 +15,7 @@ const mockConsole = {
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
 const ipfs = new HeliaClient();
-const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'FTC:testnet5'] });
+const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet'] });
 const helper = new TestHelper(gatekeeper, cipher);
 
 beforeAll(async () => {
@@ -33,7 +33,7 @@ beforeEach(async () => {
 describe('getQueue', () => {
 
     it('should return empty list when no events in queue', async () => {
-        const registry = 'FTC:testnet5';
+        const registry = 'BTC:signet';
 
         const queue = await gatekeeper.getQueue(registry);
 
@@ -41,7 +41,7 @@ describe('getQueue', () => {
     });
 
     it('should return events in queue', async () => {
-        const registry = 'FTC:testnet5';
+        const registry = 'BTC:signet';
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair, { version: 1, registry });
         const did = await gatekeeper.createDID(agentOp);
@@ -69,7 +69,7 @@ describe('getQueue', () => {
 describe('clearQueue', () => {
 
     it('should clear non-empty queue', async () => {
-        const registry = 'FTC:testnet5';
+        const registry = 'BTC:signet';
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair, { version: 1, registry });
         const did = await gatekeeper.createDID(agentOp);
@@ -86,7 +86,7 @@ describe('clearQueue', () => {
     });
 
     it('should clear only specified events', async () => {
-        const registry = 'FTC:testnet5';
+        const registry = 'BTC:signet';
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair, { version: 1, registry });
         const did = await gatekeeper.createDID(agentOp);
@@ -118,12 +118,12 @@ describe('clearQueue', () => {
     });
 
     it('should return true if queue already empty', async () => {
-        const ok = await gatekeeper.clearQueue('FTC:testnet5', []);
+        const ok = await gatekeeper.clearQueue('BTC:signet', []);
         expect(ok).toBe(true);
     });
 
     it('should return true if invalid queue specified', async () => {
-        const registry = 'FTC:testnet5';
+        const registry = 'BTC:signet';
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair, { version: 1, registry });
         const did = await gatekeeper.createDID(agentOp);

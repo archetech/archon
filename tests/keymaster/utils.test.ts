@@ -28,7 +28,7 @@ afterAll(async () => {
 
 beforeEach(() => {
     const db = new DbJsonMemory('test');
-    gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'FTC:testnet5'] });
+    gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
@@ -355,7 +355,7 @@ describe('rotateKeys', () => {
     });
 
     it('should raise an exception if latest version is not confirmed', async () => {
-        await keymaster.createId('Alice', { registry: 'FTC:testnet5' });
+        await keymaster.createId('Alice', { registry: 'BTC:signet' });
         await keymaster.rotateKeys();
 
         try {
@@ -459,6 +459,6 @@ describe('listRegistries', () => {
 
         expect(registries.includes('local')).toBe(true);
         expect(registries.includes('hyperswarm')).toBe(true);
-        expect(registries.includes('FTC:testnet5')).toBe(true);
+        expect(registries.includes('BTC:signet')).toBe(true);
     });
 });
