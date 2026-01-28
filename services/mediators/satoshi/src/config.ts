@@ -38,8 +38,6 @@ function toChain(name: string | undefined): ChainName {
         return 'BTC:testnet4';
     case 'BTC:signet':
         return 'BTC:signet';
-    case 'BTC:signet':
-        return 'BTC:signet';
     default:
         throw new Error(`Unsupported chain "${name}"`);
     }
