@@ -1,4 +1,5 @@
 include:
+  - docker-compose.btc-mainnet.yml
   - docker-compose.btc-signet.yml
 #  - docker-compose.btc-testnet4.yml
 
