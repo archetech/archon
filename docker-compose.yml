@@ -168,26 +168,6 @@ services:
       - gatekeeper
       - keymaster
 
-  loki:
-    image: grafana/loki:3.0.0
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    volumes:
-      - ./observability/loki/loki-config.yml:/etc/loki/local-config.yaml
-      - ./data/loki:/loki
-    ports:
-      - "127.0.0.1:3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
-
-  promtail:
-    image: grafana/promtail:3.0.0
-    volumes:
-      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
-
   grafana:
     image: grafana/grafana:10.4.0
     user: "${ARCHON_UID}:${ARCHON_GID}"
@@ -202,4 +182,3 @@ services:
       - "127.0.0.1:3000:3000"
     depends_on:
       - prometheus
-      - loki
