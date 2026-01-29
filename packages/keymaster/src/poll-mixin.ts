@@ -186,7 +186,7 @@ export function PollMixin<TBase extends Constructor<PollMixinRequirements>>(Base
                 const results: PollResults = {
                     tally: [],
                     ballots: [],
-                }
+                };
 
                 results.tally.push({
                     vote: 0,
