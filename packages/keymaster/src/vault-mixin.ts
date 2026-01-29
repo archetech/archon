@@ -1,4 +1,3 @@
-import { fileTypeFromBuffer } from 'file-type';
 import {
     KeymasterError,
     InvalidParameterError,
@@ -42,6 +41,9 @@ export interface VaultMixinRequirements {
     getPublicKeyJwk(doc: DidCidDocument): EcdsaJwkPublic;
     decryptWithDerivedKeys(wallet: WalletFile, id: IDInfo, senderPublicJwk: EcdsaJwkPublic, ciphertext: string): Promise<string>;
     validateName(name: string, wallet?: WalletFile): string;
+
+    // From DocumentMixin
+    getMimeType(buffer: Buffer): Promise<string>;
 }
 
 export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Base: TBase) {
@@ -74,7 +76,7 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
                 sha256,
             };
 
-            await this._vault_addMemberKey(vault, id.did, vaultKeypair.privateJwk);
+            await this._addMemberKey(vault, id.did, vaultKeypair.privateJwk);
             return this.createAsset({ vault }, options);
         }
 
@@ -113,11 +115,11 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
         }
 
         async addVaultMember(vaultId: string, memberId: string): Promise<boolean> {
-            const owner = await this._vault_checkVaultOwner(vaultId);
+            const owner = await this._checkVaultOwner(vaultId);
 
             const idKeypair = await this.fetchKeyPair();
             const vault = await this.getVault(vaultId);
-            const { privateJwk, config, members } = await this._vault_decryptVault(vault);
+            const { privateJwk, config, members } = await this._decryptVault(vault);
             const memberDoc = await this.resolveDID(memberId, { confirm: true });
             const memberDID = this.getAgentDID(memberDoc);
 
@@ -130,16 +132,16 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
             const publicJwk = config.secretMembers ? idKeypair!.publicJwk : vault.publicJwk;
             vault.members = this.cipher.encryptMessage(publicJwk, privateJwk, JSON.stringify(members));
 
-            await this._vault_addMemberKey(vault, memberDID, privateJwk);
+            await this._addMemberKey(vault, memberDID, privateJwk);
             return this.updateAsset(vaultId, { vault });
         }
 
         async removeVaultMember(vaultId: string, memberId: string): Promise<boolean> {
-            const owner = await this._vault_checkVaultOwner(vaultId);
+            const owner = await this._checkVaultOwner(vaultId);
 
             const idKeypair = await this.fetchKeyPair();
             const vault = await this.getVault(vaultId);
-            const { privateJwk, config, members } = await this._vault_decryptVault(vault);
+            const { privateJwk, config, members } = await this._decryptVault(vault);
             const memberDoc = await this.resolveDID(memberId, { confirm: true });
             const memberDID = this.getAgentDID(memberDoc);
 
@@ -152,7 +154,7 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
             const publicJwk = config.secretMembers ? idKeypair!.publicJwk : vault.publicJwk;
             vault.members = this.cipher.encryptMessage(publicJwk, privateJwk, JSON.stringify(members));
 
-            const memberKeyId = this._vault_generateSaltedId(vault, memberDID);
+            const memberKeyId = this._generateSaltedId(vault, memberDID);
             delete vault.keys[memberKeyId];
 
             return this.updateAsset(vaultId, { vault });
@@ -160,25 +162,25 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
 
         async listVaultMembers(vaultId: string): Promise<Record<string, any>> {
             const vault = await this.getVault(vaultId);
-            const { members, isOwner } = await this._vault_decryptVault(vault);
+            const { members, isOwner } = await this._decryptVault(vault);
 
             if (isOwner) {
-                await this._vault_checkVaultVersion(vaultId, vault);
+                await this._checkVaultVersion(vaultId, vault);
             }
 
             return members;
         }
 
         async addVaultItem(vaultId: string, name: string, buffer: Buffer): Promise<boolean> {
-            await this._vault_checkVaultOwner(vaultId);
+            await this._checkVaultOwner(vaultId);
 
             const vault = await this.getVault(vaultId);
-            const { privateJwk, items } = await this._vault_decryptVault(vault);
+            const { privateJwk, items } = await this._decryptVault(vault);
             const validName = this.validateName(name);
             const encryptedData = this.cipher.encryptBytes(vault.publicJwk, privateJwk, buffer);
             const cid = await this.gatekeeper.addText(encryptedData);
             const sha256 = this.cipher.hashMessage(buffer);
-            const type = await this._vault_getMimeType(buffer);
+            const type = await this.getMimeType(buffer);
             const data = encryptedData.length < this.maxDataLength ? encryptedData : undefined;
 
             items[validName] = {
@@ -197,10 +199,10 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
         }
 
         async removeVaultItem(vaultId: string, name: string): Promise<boolean> {
-            await this._vault_checkVaultOwner(vaultId);
+            await this._checkVaultOwner(vaultId);
 
             const vault = await this.getVault(vaultId);
-            const { privateJwk, items } = await this._vault_decryptVault(vault);
+            const { privateJwk, items } = await this._decryptVault(vault);
 
             delete items[name];
 
@@ -211,7 +213,7 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
 
         async listVaultItems(vaultId: string, options?: ResolveDIDOptions): Promise<Record<string, any>> {
             const vault = await this.getVault(vaultId, options);
-            const { items } = await this._vault_decryptVault(vault);
+            const { items } = await this._decryptVault(vault);
 
             return items;
         }
@@ -219,7 +221,7 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
         async getVaultItem(vaultId: string, name: string, options?: ResolveDIDOptions): Promise<Buffer | null> {
             try {
                 const vault = await this.getVault(vaultId, options);
-                const { privateJwk, items } = await this._vault_decryptVault(vault);
+                const { privateJwk, items } = await this._decryptVault(vault);
 
                 if (items[name]) {
                     const encryptedData = items[name].data || await this.gatekeeper.getText(items[name].cid);
@@ -239,7 +241,7 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
 
         // ==================== Vault Helpers (internal use) ====================
 
-        _vault_generateSaltedId(vault: Vault, memberDID: string): string {
+        _generateSaltedId(vault: Vault, memberDID: string): string {
             if (!vault.version) {
                 return this.cipher.hashMessage(vault.salt + memberDID);
             }
@@ -248,10 +250,10 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
             return this.cipher.hashMessage(vault.salt + suffix);
         }
 
-        async _vault_decryptVault(vault: Vault) {
+        async _decryptVault(vault: Vault) {
             const wallet = await this.loadWallet();
             const id = await this.fetchIdInfo();
-            const myMemberId = this._vault_generateSaltedId(vault, id.did);
+            const myMemberId = this._generateSaltedId(vault, id.did);
             const myVaultKey = vault.keys[myMemberId];
 
             if (!myVaultKey) {
@@ -303,7 +305,7 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
             };
         }
 
-        async _vault_checkVaultOwner(vaultId: string): Promise<string> {
+        async _checkVaultOwner(vaultId: string): Promise<string> {
             const id = await this.fetchIdInfo();
             const vaultDoc = await this.resolveDID(vaultId);
             const controller = vaultDoc.didDocument?.controller;
@@ -315,30 +317,30 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
             return controller
         }
 
-        async _vault_addMemberKey(vault: Vault, memberDID: string, privateJwk: EcdsaJwkPrivate): Promise<void> {
+        async _addMemberKey(vault: Vault, memberDID: string, privateJwk: EcdsaJwkPrivate): Promise<void> {
             const memberDoc = await this.resolveDID(memberDID, { confirm: true });
             const memberPublicJwk = this.getPublicKeyJwk(memberDoc);
             const memberKey = this.cipher.encryptMessage(memberPublicJwk, privateJwk, JSON.stringify(privateJwk));
-            const memberKeyId = this._vault_generateSaltedId(vault, memberDID);
+            const memberKeyId = this._generateSaltedId(vault, memberDID);
             vault.keys[memberKeyId] = memberKey;
         }
 
-        async _vault_checkVaultVersion(vaultId: string, vault: Vault): Promise<void> {
+        async _checkVaultVersion(vaultId: string, vault: Vault): Promise<void> {
             if (vault.version === 1) {
                 return;
             }
 
             if (!vault.version) {
                 const id = await this.fetchIdInfo();
-                const { privateJwk, members } = await this._vault_decryptVault(vault);
+                const { privateJwk, members } = await this._decryptVault(vault);
 
                 vault.version = 1;
                 vault.keys = {};
 
-                await this._vault_addMemberKey(vault, id.did, privateJwk);
+                await this._addMemberKey(vault, id.did, privateJwk);
 
                 for (const memberDID of Object.keys(members)) {
-                    await this._vault_addMemberKey(vault, memberDID, privateJwk);
+                    await this._addMemberKey(vault, memberDID, privateJwk);
                 }
 
                 await this.updateAsset(vaultId, { vault });
@@ -348,28 +350,5 @@ export function VaultMixin<TBase extends Constructor<VaultMixinRequirements>>(Ba
             throw new KeymasterError('Unsupported vault version');
         }
 
-        async _vault_getMimeType(buffer: Buffer): Promise<string> {
-            // Try magic number detection
-            const result = await fileTypeFromBuffer(buffer);
-            if (result) return result.mime;
-
-            // Convert to UTF-8 string if decodable
-            const text = buffer.toString('utf8');
-
-            // Check for JSON
-            try {
-                JSON.parse(text);
-                return 'application/json';
-            } catch { }
-
-            // Default to plain text if printable ASCII
-            // eslint-disable-next-line
-            if (/^[\x09\x0A\x0D\x20-\x7E]*$/.test(text.replace(/\n/g, ''))) {
-                return 'text/plain';
-            }
-
-            // Fallback
-            return 'application/octet-stream';
-        }
     };
 }

@@ -59,7 +59,7 @@ export interface CredentialMixinRequirements {
 
     // Schema methods (from SchemaMixin)
     getSchema(id: string): Promise<unknown | null>;
-    _schema_generateSchema(schema: unknown): Record<string, unknown>;
+    _generateSchema(schema: unknown): Record<string, unknown>;
 
     // Notice methods
     createNotice(message: NoticeMessage, options?: CreateAssetOptions): Promise<string | null>;
@@ -116,7 +116,7 @@ export function CredentialMixin<TBase extends Constructor<CredentialMixinRequire
                 const schemaDoc = await this.getSchema(schemaDID) as { $credentialTypes?: string[]; properties?: Record<string, unknown> } | null;
 
                 if (!claims && schemaDoc) {
-                    claims = this._schema_generateSchema(schemaDoc);
+                    claims = this._generateSchema(schemaDoc);
                 }
 
                 // If schema has $credentialTypes, add them to credential types

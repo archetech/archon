@@ -35,10 +35,10 @@ export interface SchemaMixinRequirements {
 
 export function SchemaMixin<TBase extends Constructor<SchemaMixinRequirements>>(Base: TBase) {
     return class SchemaImpl extends Base {
-        _schema_validateSchema(schema: unknown): boolean {
+        _validateSchema(schema: unknown): boolean {
             try {
                 // Attempt to instantiate the schema
-                this._schema_generateSchema(schema);
+                this._generateSchema(schema);
                 return true;
             }
             catch (error) {
@@ -46,7 +46,7 @@ export function SchemaMixin<TBase extends Constructor<SchemaMixinRequirements>>(
             }
         }
 
-        _schema_generateSchema(schema: unknown): Record<string, unknown> {
+        _generateSchema(schema: unknown): Record<string, unknown> {
             if (
                 typeof schema !== 'object' ||
                 !schema ||
@@ -74,7 +74,7 @@ export function SchemaMixin<TBase extends Constructor<SchemaMixinRequirements>>(
                 schema = DefaultSchema;
             }
 
-            if (!this._schema_validateSchema(schema)) {
+            if (!this._validateSchema(schema)) {
                 throw new InvalidParameterError('schema');
             }
 
@@ -105,7 +105,7 @@ export function SchemaMixin<TBase extends Constructor<SchemaMixinRequirements>>(
             id: string,
             schema: unknown
         ): Promise<boolean> {
-            if (!this._schema_validateSchema(schema)) {
+            if (!this._validateSchema(schema)) {
                 throw new InvalidParameterError('schema');
             }
 
@@ -122,7 +122,7 @@ export function SchemaMixin<TBase extends Constructor<SchemaMixinRequirements>>(
                     return false;
                 }
 
-                return this._schema_validateSchema(schema);
+                return this._validateSchema(schema);
             }
             catch (error) {
                 return false;
@@ -153,7 +153,7 @@ export function SchemaMixin<TBase extends Constructor<SchemaMixinRequirements>>(
 
             const schemaDID = await this.lookupDID(schemaId);
             const schema = await this.getSchema(schemaDID);
-            const template = this._schema_generateSchema(schema);
+            const template = this._generateSchema(schema);
 
             template['$schema'] = schemaDID;
 
