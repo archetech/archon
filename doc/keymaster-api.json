@@ -912,7 +912,7 @@
                                 "local",
                                 "hyperswarm",
                                 "BTC:testnet4",
-                                "FTC:testnet5"
+                                "BTC:signet"
                               ]
                             },
                             "version": {
@@ -1168,7 +1168,7 @@
                           "local",
                           "hyperswarm",
                           "BTC:testnet4",
-                          "FTC:testnet5"
+                          "BTC:signet"
                         ]
                       }
                     }
@@ -1756,7 +1756,7 @@
                           "local",
                           "hyperswarm",
                           "BTC:testnet4",
-                          "FTC:testnet5"
+                          "BTC:signet"
                         ]
                       },
                       "validUntil": {

@@ -1,7 +1,7 @@
 include:
+  - docker-compose.btc-mainnet.yml
   - docker-compose.btc-signet.yml
 #  - docker-compose.btc-testnet4.yml
-  - docker-compose.ftc-testnet5.yml
 
 services:
   mongodb:
@@ -129,7 +129,7 @@ services:
       - VITE_EXPLORER_PORT=4000
       - VITE_GATEKEEPER_URL=http://localhost:4224
       - VITE_SEARCH_SERVER=http://localhost:4224
-      - VITE_OPERATION_NETWORKS=hyperswarm,local,ftc-testnet5,btc-testnet4
+      - VITE_OPERATION_NETWORKS=hyperswarm,local,BTC:signet,BTC:testnet4
     ports:
       - "4000:4000"
     depends_on:

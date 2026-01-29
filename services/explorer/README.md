@@ -1,6 +1,6 @@
 # DID Explorer
 
-A React-based DID (Decentralized Identifier) explorer designed for viewing and interacting with DIDs and DID Documents on Bitcoin, Feathercoin, and Hyperswarm networks. This explorer is developed using Vite with native TypeScript support.
+A React-based DID (Decentralized Identifier) explorer designed for viewing and interacting with DIDs and DID Documents on Bitcoin, Signet, and Hyperswarm networks. This explorer is developed using Vite with native TypeScript support.
 
 ## Project Setup
 

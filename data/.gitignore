@@ -3,7 +3,6 @@
 ipfs/
 mongodb/
 redis/
-ftc-testnet5/
 btc/
 btc-testnet4/
 btc-signet/

@@ -768,7 +768,7 @@ v1router.get('/export/wallet/encrypted', async (req, res) => {
  *                           enum: [ "agent", "asset" ]
  *                         registry:
  *                           type: string
- *                           enum: [ "local", "hyperswarm", "BTC:testnet4", "FTC:testnet5" ]
+ *                           enum: [ "local", "hyperswarm", "BTC:mainnet", "BTC:testnet4", "BTC:signet" ]
  *                         version:
  *                           type: integer
  *                         validUntil:
@@ -985,7 +985,7 @@ v1router.get('/ids', async (req, res) => {
  *                 properties:
  *                   registry:
  *                     type: string
- *                     enum: [ "local", "hyperswarm", "BTC:testnet4", "FTC:testnet5" ]
+ *                     enum: [ "local", "hyperswarm", "BTC:testnet4", "BTC:signet" ]
  *     responses:
  *       200:
  *         description: The DID created for the new ID.
@@ -1487,7 +1487,7 @@ v1router.get('/challenge', async (req, res) => {
  *                 properties:
  *                   registry:
  *                     type: string
- *                     enum: [ "local", "hyperswarm", "BTC:testnet4", "FTC:testnet5" ]
+ *                     enum: [ "local", "hyperswarm", "BTC:testnet4", "BTC:signet" ]
  *                   validUntil:
  *                     type: string
  *                     format: date-time

@@ -692,7 +692,7 @@
                             "local",
                             "hyperswarm",
                             "BTC:testnet4",
-                            "FTC:testnet5"
+                            "BTC:signet"
                           ],
                           "description": "Registry in which this DID is maintained."
                         },
@@ -1413,7 +1413,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "The name of the registry whose queue is being retrieved. Valid values may include \"local\", \"hyperswarm\", \"BTC:testnet4\", \"FTC:testnet5\", etc.\n"
+            "description": "The name of the registry whose queue is being retrieved. Valid values may include \"local\", \"hyperswarm\", \"BTC:testnet4\", \"BTC:signet\", etc.\n"
           }
         ],
         "responses": {
