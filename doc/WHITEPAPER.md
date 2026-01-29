@@ -97,7 +97,7 @@ Rather than mandating a single consensus mechanism, Archon supports multiple reg
 |----------|-------------------|------|----------|----------|
 | Hyperswarm | Seconds | Free | Eventual | Development, internal systems |
 | Bitcoin | ~60 minutes (6 blocks) | ~$0.001/batch | Strong | Enterprise, legal identity |
-| Feathercoin | ~15 minutes | ~$0.00001/batch | Strong | Cost-sensitive applications |
+| Signet | ~60 minutes (6 blocks) | Free | Strong | Testing, development |
 
 Users select their registry at DID creation based on their specific requirements, enabling a spectrum of security-cost trade-offs.
 
@@ -145,7 +145,7 @@ The Keymaster is the client-side wallet library responsible for:
 Mediators synchronize DID operations across network boundaries:
 
 - **Hyperswarm Mediator**: Distributes operations via P2P gossip protocol
-- **Satoshi Mediator**: Anchors operation batches to Bitcoin/Feathercoin via OP_RETURN
+- **Satoshi Mediator**: Anchors operation batches to Bitcoin/Signet via OP_RETURN
 
 ### 4.3 Data Flow
 
@@ -507,9 +507,9 @@ Blockchain registries provide cryptographic finality through proof-of-work:
 - Finality: Extremely strong (computational security)
 - Ordering: Block height + transaction index
 
-**Feathercoin (FTC)**
-- Confirmation time: ~15 minutes (6 blocks at 2.5 min/block)
-- Cost: ~$0.00001 per batch
+**Signet (Bitcoin Testnet)**
+- Confirmation time: ~60 minutes (6 blocks at ~10 min/block)
+- Cost: Free
 - Finality: Strong
 - Ordering: Block height + transaction index
 
@@ -522,7 +522,7 @@ Blockchain registries provide cryptographic finality through proof-of-work:
 
 ### 7.4 Blockchain Timestamping
 
-One of Archon's most powerful features is automatic cryptographic timestamping for all DID operations registered on blockchain-based registries. When a DID operation is anchored to Bitcoin, Feathercoin, or any other blockchain registry, it inherits an immutable, independently verifiable timestamp from the block in which it was confirmed.
+One of Archon's most powerful features is automatic cryptographic timestamping for all DID operations registered on blockchain-based registries. When a DID operation is anchored to Bitcoin, Signet, or any other blockchain registry, it inherits an immutable, independently verifiable timestamp from the block in which it was confirmed.
 
 #### How Timestamping Works
 
@@ -615,7 +615,7 @@ The timestamp system also enables proving that something *didn't* exist before a
 | Registry | Typical Precision | Verification |
 |----------|-------------------|--------------|
 | Bitcoin | ~10 minutes (block time) | Full node or SPV proof |
-| Feathercoin | ~2.5 minutes | Full node or SPV proof |
+| Signet | ~10 minutes | Full node or SPV proof |
 | Hyperswarm | Sub-second (self-asserted) | Peer attestation only |
 
 #### Use Cases for Timestamps

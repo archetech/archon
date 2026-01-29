@@ -30,7 +30,7 @@ afterAll(async () => {
 
 beforeEach(() => {
     const db = new DbJsonMemory('test');
-    gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'FTC:testnet5'] });
+    gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });

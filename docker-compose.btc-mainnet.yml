@@ -1,0 +1,34 @@
+services:
+  btc-mainnet-mediator:
+    build:
+      context: .
+      dockerfile: Dockerfile.satoshi
+    image: ghcr.io/archetech/satoshi-mediator
+    environment:
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_SAT_CHAIN=BTC:mainnet
+      - ARCHON_SAT_NETWORK=bitcoin
+      - ARCHON_SAT_HOST=${ARCHON_BTC_HOST}
+      - ARCHON_SAT_PORT=8332
+      - ARCHON_SAT_START_BLOCK=${ARCHON_BTC_START_BLOCK}
+      - ARCHON_SAT_USER=${ARCHON_BTC_USER}
+      - ARCHON_SAT_PASS=${ARCHON_BTC_PASS}
+      - ARCHON_SAT_WALLET=${ARCHON_BTC_WALLET}
+      - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_BTC_IMPORT_INTERVAL}
+      - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_BTC_EXPORT_INTERVAL}
+      - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_BTC_FEE_BLOCK_TARGET}
+      - ARCHON_SAT_FEE_FALLBACK_SAT_BYTE=${ARCHON_BTC_FEE_FALLBACK_SAT_BYTE}
+      - ARCHON_SAT_FEE_MAX=${ARCHON_BTC_FEE_MAX}
+      - ARCHON_SAT_RBF_ENABLED=${ARCHON_BTC_RBF_ENABLED}
+      - ARCHON_SAT_REIMPORT=${ARCHON_BTC_REIMPORT}
+      - ARCHON_SAT_DB=${ARCHON_BTC_DB}
+    volumes:
+      - ./data:/app/satoshi/data
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    depends_on:
+      - gatekeeper
+      - keymaster

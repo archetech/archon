@@ -16,7 +16,7 @@ const mockConsole = {
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
 const ipfs = new HeliaClient();
-const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'FTC:testnet5'] });
+const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet'] });
 const helper = new TestHelper(gatekeeper, cipher);
 
 beforeAll(async () => {
@@ -623,7 +623,7 @@ describe('processEvents', () => {
 
     it('should update events when DID is imported from its native registry', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'BTC:signet' });
         const did = await gatekeeper.createDID(agentOp);
         const doc = await gatekeeper.resolveDID(did);
         const updateOp = await helper.createUpdateOp(keypair, did, doc);
@@ -632,15 +632,15 @@ describe('processEvents', () => {
         await gatekeeper.deleteDID(deleteOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].registry = 'FTC:testnet5';
-        ops[1].registry = 'FTC:testnet5';
+        ops[0].registry = 'BTC:signet';
+        ops[1].registry = 'BTC:signet';
         ops[1].registration = {
             "height": 100,
             "index": 1,
             "txid": "mock1",
             "batch": "mock1"
         };
-        ops[2].registry = 'FTC:testnet5';
+        ops[2].registry = 'BTC:signet';
         ops[2].registration = {
             "height": 200,
             "index": 2,
@@ -657,15 +657,15 @@ describe('processEvents', () => {
 
     it('should resolve as confirmed when DID is imported from its native registry', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'BTC:signet' });
         const did = await gatekeeper.createDID(agentOp);
         const doc = await gatekeeper.resolveDID(did);
         const updateOp = await helper.createUpdateOp(keypair, did, doc);
         await gatekeeper.updateDID(updateOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].registry = 'FTC:testnet5';
-        ops[1].registry = 'FTC:testnet5';
+        ops[0].registry = 'BTC:signet';
+        ops[1].registry = 'BTC:signet';
         await gatekeeper.importBatch(ops);
         await gatekeeper.processEvents();
 
@@ -717,14 +717,14 @@ describe('processEvents', () => {
         const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'hyperswarm' });
         const did = await gatekeeper.createDID(agentOp);
 
-        // v2 update changes registry to FTC:testnet5 (so v3 confirmations should be on FTC:testnet5)
+        // v2 update changes registry to BTC:signet (so v3 confirmations should be on BTC:signet)
         const v1doc = await gatekeeper.resolveDID(did);
         v1doc.didDocumentData = { version: 2 };
-        v1doc.didDocumentRegistration = { ...v1doc.didDocumentRegistration!, registry: 'FTC:testnet5' };
+        v1doc.didDocumentRegistration = { ...v1doc.didDocumentRegistration!, registry: 'BTC:signet' };
         const updateOp1 = await helper.createUpdateOp(keypair, did, v1doc);
         await gatekeeper.updateDID(updateOp1);
 
-        // v3 update (created locally) should eventually be confirmed on FTC:testnet5
+        // v3 update (created locally) should eventually be confirmed on BTC:signet
         const v2doc = await gatekeeper.resolveDID(did);
         v2doc.didDocumentData = { version: 3 };
         const updateOp2 = await helper.createUpdateOp(keypair, did, v2doc);
@@ -735,10 +735,10 @@ describe('processEvents', () => {
         expect(localDoc.didDocumentMetadata!.versionSequence).toBe('3');
         expect(localDoc.didDocumentMetadata!.confirmed).toBe(false);
 
-        // Import confirmations: v2 confirmed on hyperswarm; v3 confirmed on FTC:testnet5
+        // Import confirmations: v2 confirmed on hyperswarm; v3 confirmed on BTC:signet
         const events = await gatekeeper.exportDID(did);
         events[1].registry = 'hyperswarm';
-        events[2].registry = 'FTC:testnet5';
+        events[2].registry = 'BTC:signet';
 
         await gatekeeper.importBatch(events);
         await gatekeeper.processEvents();
@@ -751,19 +751,19 @@ describe('processEvents', () => {
     it('should resolve with timestamp when available', async () => {
         const mockBlock1 = { hash: 'mockBlockid1', height: 100, time: 100 };
         const mockBlock2 = { hash: 'mockBlockid2', height: 101, time: 101 };
-        await gatekeeper.addBlock('FTC:testnet5', mockBlock1);
-        await gatekeeper.addBlock('FTC:testnet5', mockBlock2);
+        await gatekeeper.addBlock('BTC:signet', mockBlock1);
+        await gatekeeper.addBlock('BTC:signet', mockBlock2);
 
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'BTC:signet' });
         const did = await gatekeeper.createDID(agentOp);
         const doc = await gatekeeper.resolveDID(did);
         const updateOp = await helper.createUpdateOp(keypair, did, doc, { mockBlockid: mockBlock1.hash });
         await gatekeeper.updateDID(updateOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].registry = 'FTC:testnet5';
-        ops[1].registry = 'FTC:testnet5';
+        ops[0].registry = 'BTC:signet';
+        ops[1].registry = 'BTC:signet';
         ops[1].registration = {
             "height": 101,
             "index": 1,
@@ -777,7 +777,7 @@ describe('processEvents', () => {
         const doc2 = await gatekeeper.resolveDID(did);
 
         const expectedTimestamp = {
-            chain: 'FTC:testnet5',
+            chain: 'BTC:signet',
             opid: doc2.didDocumentMetadata!.versionId,
             lowerBound: {
                 blockid: mockBlock1.hash,
@@ -801,14 +801,14 @@ describe('processEvents', () => {
 
     it('should not overwrite events when verified DID is later synced from another registry', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'BTC:signet' });
         const did = await gatekeeper.createDID(agentOp);
         const doc = await gatekeeper.resolveDID(did);
         const updateOp = await helper.createUpdateOp(keypair, did, doc);
         await gatekeeper.updateDID(updateOp);
         const ops = await gatekeeper.exportDID(did);
-        ops[0].registry = 'FTC:testnet5';
-        ops[1].registry = 'FTC:testnet5';
+        ops[0].registry = 'BTC:signet';
+        ops[1].registry = 'BTC:signet';
         await gatekeeper.importBatch(ops);
 
         ops[0].registry = 'hyperswarm';
@@ -1002,7 +1002,7 @@ describe('processEvents', () => {
 
     it('should handle a reorg event', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { registry: 'BTC:signet' });
         const agentDID = await gatekeeper.createDID(agentOp);
         const agentDoc1 = await gatekeeper.resolveDID(agentDID);
 
@@ -1040,20 +1040,20 @@ describe('processEvents', () => {
         expect(agentDoc2.didDocumentData.mock).toBe(2);
 
         const event3 = {
-            registry: 'FTC:testnet5',
+            registry: 'BTC:signet',
             operation: updateOp1,
             ordinal: [31226, 1, 0],
             time: new Date().toISOString(),
         };
 
         const event4 = {
-            registry: 'FTC:testnet5',
+            registry: 'BTC:signet',
             operation: updateOp2,
             ordinal: [31226, 1, 1],
             time: new Date().toISOString(),
         };
 
-        // Simulate receiving the events in the imposed order from FTC:testnet5
+        // Simulate receiving the events in the imposed order from BTC:signet
         await gatekeeper.importBatch([event3, event4]);
         const response2 = await gatekeeper.processEvents();
         expect(response2.added).toBe(1);
@@ -1066,14 +1066,14 @@ describe('processEvents', () => {
 
     it('should handle deferred operation validation when asset ownership changes', async () => {
         const keypair1 = cipher.generateRandomJwk();
-        const agentOp1 = await helper.createAgentOp(keypair1, { version: 1, registry: 'FTC:testnet5' });
+        const agentOp1 = await helper.createAgentOp(keypair1, { version: 1, registry: 'BTC:signet' });
         const agentDID1 = await gatekeeper.createDID(agentOp1);
 
         const keypair2 = cipher.generateRandomJwk();
-        const agentOp2 = await helper.createAgentOp(keypair2, { version: 1, registry: 'FTC:testnet5' });
+        const agentOp2 = await helper.createAgentOp(keypair2, { version: 1, registry: 'BTC:signet' });
         const agentDID2 = await gatekeeper.createDID(agentOp2);
 
-        const assetOp = await helper.createAssetOp(agentDID1, keypair1, { registry: 'FTC:testnet5' });
+        const assetOp = await helper.createAssetOp(agentDID1, keypair1, { registry: 'BTC:signet' });
         const assetDID = await gatekeeper.createDID(assetOp);
         const assetDoc1 = await gatekeeper.resolveDID(assetDID);
 
@@ -1100,7 +1100,7 @@ describe('processEvents', () => {
         expect(assetDoc2.didDocumentMetadata!.confirmed).toBe(false);
 
         for (const event of events) {
-            event.registry = 'FTC:testnet5';
+            event.registry = 'BTC:signet';
         }
 
         await gatekeeper.importBatch(events);
@@ -1205,7 +1205,7 @@ describe('getDids', () => {
 
     it('should return all DIDs confirmed and resolved', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'BTC:signet' });
         const agentDID = await gatekeeper.createDID(agentOp);
         const agentDoc = await gatekeeper.resolveDID(agentDID);
 
@@ -1231,7 +1231,7 @@ describe('getDids', () => {
 
     it('should return all DIDs unconfirmed and resolved', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'BTC:signet' });
         const agentDID = await gatekeeper.createDID(agentOp);
         const agentDoc = await gatekeeper.resolveDID(agentDID);
 
@@ -1258,13 +1258,13 @@ describe('getDids', () => {
 
     it('should return all DIDs after specified time', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { registry: 'BTC:signet' });
         const agentDID = await gatekeeper.createDID(agentOp);
         const dids = [];
         const batch = [];
 
         for (let i = 0; i < 10; i++) {
-            const assetOp = await helper.createAssetOp(agentDID, keypair, { registry: 'FTC:testnet5' });
+            const assetOp = await helper.createAssetOp(agentDID, keypair, { registry: 'BTC:signet' });
             const assetDID = await gatekeeper.createDID(assetOp);
             const update = await gatekeeper.resolveDID(assetDID);
             update.didDocumentData = { mock: i + 1 };
@@ -1278,7 +1278,7 @@ describe('getDids', () => {
         let timestamp = Date.now();
 
         for (const op of batch) {
-            op.registry = 'FTC:testnet5';
+            op.registry = 'BTC:signet';
             timestamp += 3600000; // add 1 hour to timestamp for each op
             op.time = new Date(timestamp).toISOString();
         }
@@ -1299,13 +1299,13 @@ describe('getDids', () => {
 
     it('should return all DIDs before specified time', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { registry: 'BTC:signet' });
         const agentDID = await gatekeeper.createDID(agentOp);
         const dids = [];
         const batch = [];
 
         for (let i = 0; i < 10; i++) {
-            const assetOp = await helper.createAssetOp(agentDID, keypair, { registry: 'FTC:testnet5' });
+            const assetOp = await helper.createAssetOp(agentDID, keypair, { registry: 'BTC:signet' });
             const assetDID = await gatekeeper.createDID(assetOp);
             const update = await gatekeeper.resolveDID(assetDID);
             update.didDocumentData = { mock: i + 1 };
@@ -1319,7 +1319,7 @@ describe('getDids', () => {
         let timestamp = Date.now();
 
         for (const op of batch) {
-            op.registry = 'FTC:testnet5';
+            op.registry = 'BTC:signet';
             timestamp += 3600000; // add 1 hour to timestamp for each op
             op.time = new Date(timestamp).toISOString();
         }
@@ -1340,13 +1340,13 @@ describe('getDids', () => {
 
     it('should return all DIDs between specified times', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { registry: 'BTC:signet' });
         const agentDID = await gatekeeper.createDID(agentOp);
         const dids = [];
         const batch = [];
 
         for (let i = 0; i < 10; i++) {
-            const assetOp = await helper.createAssetOp(agentDID, keypair, { registry: 'FTC:testnet5' });
+            const assetOp = await helper.createAssetOp(agentDID, keypair, { registry: 'BTC:signet' });
             const assetDID = await gatekeeper.createDID(assetOp);
             const update = await gatekeeper.resolveDID(assetDID);
             update.didDocumentData = { mock: i + 1 };
@@ -1360,7 +1360,7 @@ describe('getDids', () => {
         let timestamp = Date.now();
 
         for (const op of batch) {
-            op.registry = 'FTC:testnet5';
+            op.registry = 'BTC:signet';
             timestamp += 3600000; // add 1 hour to timestamp for each op
             op.time = new Date(timestamp).toISOString();
         }

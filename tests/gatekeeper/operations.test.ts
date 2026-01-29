@@ -15,7 +15,7 @@ const mockConsole = {
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
 const ipfs = new HeliaClient();
-const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'FTC:testnet5'] });
+const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet'] });
 const helper = new TestHelper(gatekeeper, cipher);
 
 beforeAll(async () => {
@@ -268,11 +268,11 @@ describe('importBatchByCids', () => {
 
     it('should include registration metadata in events', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { registry: 'FTC:testnet5' });
+        const agentOp = await helper.createAgentOp(keypair, { registry: 'BTC:signet' });
         const cid = await ipfs.addJSON(agentOp);
 
         const metadata = {
-            registry: 'FTC:testnet5',
+            registry: 'BTC:signet',
             time: new Date().toISOString(),
             ordinal: [100, 1],
             registration: {

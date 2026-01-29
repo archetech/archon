@@ -1,6 +1,6 @@
 # Archon Satoshi mediator
 
-The Satoshi mediator is designed to operate with all blockchains derived from Bitcoin core, that support the standard RPC interface to the blockchain (Feathercoin, Litecoin, Tesseract, etc.)
+The Satoshi mediator is designed to operate with Bitcoin networks (such as mainnet, testnet, and signet) and other blockchains derived from Bitcoin Core (such as Litecoin, Tesseract, etc.) that support the standard RPC interface to the blockchain.
 
 The mediator has two responsibilities:
 - **Import**: Scans all confirmed transactions for Archon DIDs mentioned in the transaction's `OP_RETURN` field. If a DID is discovered, the mediator resolves it. If the DID is an Archon batch, it imports all the transactions in the batch to the Gatekeeper
