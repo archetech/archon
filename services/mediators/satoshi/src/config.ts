@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export type NetworkName = 'bitcoin' | 'testnet' | 'regtest';
-export type ChainName = 'BTC:mainnet' | 'BTC:testnet4' | 'BTC:signet' | 'BTC:signet';
+export type ChainName = 'BTC:mainnet' | 'BTC:testnet4' | 'BTC:signet';
 export type SatoshiDB = 'json' | 'sqlite' | 'mongodb' | 'redis';
 
 export interface AppConfig {
