@@ -768,7 +768,7 @@ v1router.get('/export/wallet/encrypted', async (req, res) => {
  *                           enum: [ "agent", "asset" ]
  *                         registry:
  *                           type: string
- *                           enum: [ "local", "hyperswarm", "BTC:testnet4", "BTC:signet" ]
+ *                           enum: [ "local", "hyperswarm", "BTC:mainnet", "BTC:testnet4", "BTC:signet" ]
  *                         version:
  *                           type: integer
  *                         validUntil:
