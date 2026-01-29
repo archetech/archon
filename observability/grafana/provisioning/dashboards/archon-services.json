@@ -407,7 +407,7 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": ["mean", "p95"],
+          "calcs": ["mean", "max"],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -420,17 +420,12 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"gatekeeper\"}[5m]))",
-          "legendFormat": "p95 {{route}}",
+          "expr": "sum by (route) (rate(http_request_duration_seconds_sum{job=\"gatekeeper\"}[5m])) / sum by (route) (rate(http_request_duration_seconds_count{job=\"gatekeeper\"}[5m]))",
+          "legendFormat": "avg {{route}}",
           "refId": "A"
-        },
-        {
-          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"gatekeeper\"}[5m]))",
-          "legendFormat": "p50 {{route}}",
-          "refId": "B"
         }
       ],
-      "title": "Gatekeeper Response Latency",
+      "title": "Gatekeeper Response Latency (avg)",
       "type": "timeseries"
     },
     {
@@ -490,7 +485,7 @@
       "id": 8,
       "options": {
         "legend": {
-          "calcs": ["mean", "p95"],
+          "calcs": ["mean", "max"],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -503,17 +498,12 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"keymaster\"}[5m]))",
-          "legendFormat": "p95 {{route}}",
+          "expr": "sum by (route) (rate(http_request_duration_seconds_sum{job=\"keymaster\"}[5m])) / sum by (route) (rate(http_request_duration_seconds_count{job=\"keymaster\"}[5m]))",
+          "legendFormat": "avg {{route}}",
           "refId": "A"
-        },
-        {
-          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"keymaster\"}[5m]))",
-          "legendFormat": "p50 {{route}}",
-          "refId": "B"
         }
       ],
-      "title": "Keymaster Response Latency",
+      "title": "Keymaster Response Latency (avg)",
       "type": "timeseries"
     },
     {
