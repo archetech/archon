@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'gatekeeper'
+    static_configs:
+      - targets: ['gatekeeper:4224']
+    metrics_path: '/metrics'
+
+  - job_name: 'keymaster'
+    static_configs:
+      - targets: ['keymaster:4226']
+    metrics_path: '/metrics'

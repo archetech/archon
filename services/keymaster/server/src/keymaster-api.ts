@@ -14,12 +14,98 @@ import WalletCache from '@didcid/keymaster/wallet/cache';
 import CipherNode from '@didcid/cipher/node';
 import { InvalidParameterError } from '@didcid/common/errors';
 import config from './config.js';
+import promClient from 'prom-client';
+import pino from 'pino';
+import { pinoHttp } from 'pino-http';
+
+// Initialize Prometheus metrics
+const register = promClient.register;
+promClient.collectDefaultMetrics({ register });
+
+// Custom metrics
+const httpRequestsTotal = new promClient.Counter({
+    name: 'http_requests_total',
+    help: 'Total number of HTTP requests',
+    labelNames: ['method', 'route', 'status'],
+});
+
+const httpRequestDuration = new promClient.Histogram({
+    name: 'http_request_duration_seconds',
+    help: 'HTTP request duration in seconds',
+    labelNames: ['method', 'route', 'status'],
+    buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5],
+});
+
+const walletOperationsTotal = new promClient.Counter({
+    name: 'wallet_operations_total',
+    help: 'Total number of wallet operations',
+    labelNames: ['operation', 'status'],
+});
+
+// Initialize structured logger
+const logger = pino({
+    level: process.env.LOG_LEVEL || 'info',
+});
+
+// Normalize paths to prevent high cardinality metrics
+function normalizePath(path: string): string {
+    // Remove query string
+    const basePath = path.split('?')[0];
+    // Normalize known dynamic segments
+    return basePath
+        .replace(/\/did\/[^/]+/g, '/did/:id')
+        .replace(/\/ids\/[^/]+/g, '/ids/:id')
+        .replace(/\/names\/[^/]+/g, '/names/:name')
+        .replace(/\/groups\/[^/]+/g, '/groups/:name')
+        .replace(/\/schemas\/[^/]+/g, '/schemas/:id')
+        .replace(/\/agents\/[^/]+/g, '/agents/:id')
+        .replace(/\/credentials\/held\/[^/]+/g, '/credentials/held/:did')
+        .replace(/\/credentials\/issued\/[^/]+/g, '/credentials/issued/:did')
+        .replace(/\/assets\/[^/]+/g, '/assets/:id')
+        .replace(/\/polls\/[^/]+/g, '/polls/:poll')
+        .replace(/\/images\/[^/]+/g, '/images/:id')
+        .replace(/\/documents\/[^/]+/g, '/documents/:id')
+        .replace(/\/ipfs\/data\/[^/]+/g, '/ipfs/data/:cid')
+        .replace(/\/vaults\/[^/]+\/members\/[^/]+/g, '/vaults/:id/members/:member')
+        .replace(/\/vaults\/[^/]+\/items\/[^/]+/g, '/vaults/:id/items/:name')
+        .replace(/\/vaults\/[^/]+/g, '/vaults/:id')
+        .replace(/\/dmail\/[^/]+\/attachments\/[^/]+/g, '/dmail/:id/attachments/:name')
+        .replace(/\/dmail\/[^/]+/g, '/dmail/:id')
+        .replace(/\/notices\/[^/]+/g, '/notices/:id');
+}
 
 const app = express();
 const v1router = express.Router();
 
-app.use(morgan('dev'));
+// HTTP request logging - use pino in production, morgan in development
+if (process.env.NODE_ENV === 'production') {
+    app.use(pinoHttp({ logger }));
+} else {
+    app.use(morgan('dev'));
+}
 app.use(express.json());
+
+// Metrics middleware - track HTTP requests
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = (Date.now() - start) / 1000;
+        const route = normalizePath(req.path);
+        httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
+        httpRequestDuration.observe({ method: req.method, route, status: res.statusCode }, duration);
+    });
+    next();
+});
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', register.contentType);
+        res.end(await register.metrics());
+    } catch (error: any) {
+        res.status(500).end(error.toString());
+    }
+});
 
 // Define __dirname in ES module scope
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1011,8 +1097,10 @@ v1router.post('/ids', async (req, res) => {
     try {
         const { name, options } = req.body;
         const did = await keymaster.createId(name, options);
+        walletOperationsTotal.inc({ operation: 'createId', status: 'success' });
         res.json({ did });
     } catch (error: any) {
+        walletOperationsTotal.inc({ operation: 'createId', status: 'error' });
         res.status(500).send({ error: error.toString() });
     }
 });

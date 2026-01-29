@@ -13,6 +13,59 @@ import DbMongo from '@didcid/gatekeeper/db/mongo';
 import { CheckDIDsResult, ResolveDIDOptions, Operation } from '@didcid/gatekeeper/types';
 import KuboClient from '@didcid/ipfs/kubo';
 import config from './config.js';
+import promClient from 'prom-client';
+import pino from 'pino';
+import { pinoHttp } from 'pino-http';
+
+// Initialize Prometheus metrics
+const register = promClient.register;
+promClient.collectDefaultMetrics({ register });
+
+// Custom metrics
+const httpRequestsTotal = new promClient.Counter({
+    name: 'http_requests_total',
+    help: 'Total number of HTTP requests',
+    labelNames: ['method', 'route', 'status'],
+});
+
+const httpRequestDuration = new promClient.Histogram({
+    name: 'http_request_duration_seconds',
+    help: 'HTTP request duration in seconds',
+    labelNames: ['method', 'route', 'status'],
+    buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5],
+});
+
+const didOperationsTotal = new promClient.Counter({
+    name: 'did_operations_total',
+    help: 'Total number of DID operations',
+    labelNames: ['operation', 'registry', 'status'],
+});
+
+const eventsQueueGauge = new promClient.Gauge({
+    name: 'events_queue_size',
+    help: 'Number of events in the queue',
+    labelNames: ['registry'],
+});
+
+// Initialize structured logger
+const logger = pino({
+    level: process.env.LOG_LEVEL || 'info',
+});
+
+// Normalize paths to prevent high cardinality metrics
+function normalizePath(path: string): string {
+    // Remove query string
+    const basePath = path.split('?')[0];
+    // Normalize known dynamic segments
+    return basePath
+        .replace(/\/did\/did:[^/]+/g, '/did/:did')
+        .replace(/\/block\/[^/]+\/latest/g, '/block/:registry/latest')
+        .replace(/\/block\/[^/]+/g, '/block/:registry')
+        .replace(/\/queue\/[^/]+\/clear/g, '/queue/:registry/clear')
+        .replace(/\/queue\/[^/]+/g, '/queue/:registry')
+        .replace(/\/events\/[^/]+/g, '/events/:registry')
+        .replace(/\/dids\/[^/]+/g, '/dids/:prefix');
+}
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -57,8 +110,35 @@ const v1router = express.Router();
 app.use(cors());
 app.options('*', cors());
 
-app.use(morgan('dev'));
+// HTTP request logging - use pino in production, morgan in development
+if (process.env.NODE_ENV === 'production') {
+    app.use(pinoHttp({ logger }));
+} else {
+    app.use(morgan('dev'));
+}
 app.use(express.json({ limit: config.jsonLimit }));
+
+// Metrics middleware - track HTTP requests
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = (Date.now() - start) / 1000;
+        const route = normalizePath(req.path);
+        httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
+        httpRequestDuration.observe({ method: req.method, route, status: res.statusCode }, duration);
+    });
+    next();
+});
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', register.contentType);
+        res.end(await register.metrics());
+    } catch (error: any) {
+        res.status(500).end(error.toString());
+    }
+});
 
 // Define __dirname in ES module scope
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -371,14 +451,20 @@ v1router.get('/status', async (req, res) => {
 v1router.post('/did', async (req, res) => {
     try {
         const operation = req.body;
+        const opType = operation?.type || 'unknown';
+        const registry = operation?.registration?.registry || 'unknown';
         let result;
         if (operation && operation.type === "create") {
             result = await gatekeeper.createDID(operation);
         } else {
             result = await gatekeeper.updateDID(operation);
         }
+        didOperationsTotal.inc({ operation: opType, registry, status: 'success' });
         res.json(result);
     } catch (error: any) {
+        const opType = req.body?.type || 'unknown';
+        const registry = req.body?.registration?.registry || 'unknown';
+        didOperationsTotal.inc({ operation: opType, registry, status: 'error' });
         console.error(error);
         res.status(500).send(error.toString());
     }
@@ -2040,6 +2126,19 @@ async function checkDids() {
     console.time('checkDIDs');
     didCheck = await gatekeeper.checkDIDs();
     console.timeEnd('checkDIDs');
+
+    // Update events queue metrics - reset first to clear stale data
+    eventsQueueGauge.reset();
+    if (didCheck.eventsQueue) {
+        const queueByRegistry: Record<string, number> = {};
+        for (const event of didCheck.eventsQueue) {
+            const registry = event.registry || 'unknown';
+            queueByRegistry[registry] = (queueByRegistry[registry] || 0) + 1;
+        }
+        for (const [registry, count] of Object.entries(queueByRegistry)) {
+            eventsQueueGauge.set({ registry }, count);
+        }
+    }
 }
 
 async function getStatus() {

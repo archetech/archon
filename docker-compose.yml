@@ -150,3 +150,35 @@ services:
       - "${ARCHON_REACT_WALLET_PORT:-4228}:${ARCHON_REACT_WALLET_PORT:-4228}"
     depends_on:
       - gatekeeper
+
+  # Observability Stack
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./data/prometheus:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    depends_on:
+      - gatekeeper
+      - keymaster
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+      - ./data/grafana:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
