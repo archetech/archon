@@ -47,6 +47,33 @@ const logger = pino({
     level: process.env.LOG_LEVEL || 'info',
 });
 
+// Normalize paths to prevent high cardinality metrics
+function normalizePath(path: string): string {
+    // Remove query string
+    const basePath = path.split('?')[0];
+    // Normalize known dynamic segments
+    return basePath
+        .replace(/\/did\/[^/]+/g, '/did/:id')
+        .replace(/\/ids\/[^/]+/g, '/ids/:id')
+        .replace(/\/names\/[^/]+/g, '/names/:name')
+        .replace(/\/groups\/[^/]+/g, '/groups/:name')
+        .replace(/\/schemas\/[^/]+/g, '/schemas/:id')
+        .replace(/\/agents\/[^/]+/g, '/agents/:id')
+        .replace(/\/credentials\/held\/[^/]+/g, '/credentials/held/:did')
+        .replace(/\/credentials\/issued\/[^/]+/g, '/credentials/issued/:did')
+        .replace(/\/assets\/[^/]+/g, '/assets/:id')
+        .replace(/\/polls\/[^/]+/g, '/polls/:poll')
+        .replace(/\/images\/[^/]+/g, '/images/:id')
+        .replace(/\/documents\/[^/]+/g, '/documents/:id')
+        .replace(/\/ipfs\/data\/[^/]+/g, '/ipfs/data/:cid')
+        .replace(/\/vaults\/[^/]+\/members\/[^/]+/g, '/vaults/:id/members/:member')
+        .replace(/\/vaults\/[^/]+\/items\/[^/]+/g, '/vaults/:id/items/:name')
+        .replace(/\/vaults\/[^/]+/g, '/vaults/:id')
+        .replace(/\/dmail\/[^/]+\/attachments\/[^/]+/g, '/dmail/:id/attachments/:name')
+        .replace(/\/dmail\/[^/]+/g, '/dmail/:id')
+        .replace(/\/notices\/[^/]+/g, '/notices/:id');
+}
+
 const app = express();
 const v1router = express.Router();
 
@@ -63,7 +90,7 @@ app.use((req, res, next) => {
     const start = Date.now();
     res.on('finish', () => {
         const duration = (Date.now() - start) / 1000;
-        const route = req.route?.path || req.path;
+        const route = normalizePath(req.path);
         httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
         httpRequestDuration.observe({ method: req.method, route, status: res.statusCode }, duration);
     });

@@ -749,7 +749,8 @@
       ],
       "title": "DID Operations Rate",
       "type": "timeseries"
-    }  ],
+    }
+  ],
   "refresh": "10s",
   "schemaVersion": 38,
   "tags": ["archon", "observability"],

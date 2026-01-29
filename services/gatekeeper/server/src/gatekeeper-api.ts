@@ -52,6 +52,21 @@ const logger = pino({
     level: process.env.LOG_LEVEL || 'info',
 });
 
+// Normalize paths to prevent high cardinality metrics
+function normalizePath(path: string): string {
+    // Remove query string
+    const basePath = path.split('?')[0];
+    // Normalize known dynamic segments
+    return basePath
+        .replace(/\/did\/did:[^/]+/g, '/did/:did')
+        .replace(/\/block\/[^/]+\/latest/g, '/block/:registry/latest')
+        .replace(/\/block\/[^/]+/g, '/block/:registry')
+        .replace(/\/queue\/[^/]+\/clear/g, '/queue/:registry/clear')
+        .replace(/\/queue\/[^/]+/g, '/queue/:registry')
+        .replace(/\/events\/[^/]+/g, '/events/:registry')
+        .replace(/\/dids\/[^/]+/g, '/dids/:prefix');
+}
+
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 
@@ -108,7 +123,7 @@ app.use((req, res, next) => {
     const start = Date.now();
     res.on('finish', () => {
         const duration = (Date.now() - start) / 1000;
-        const route = req.route?.path || req.path;
+        const route = normalizePath(req.path);
         httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
         httpRequestDuration.observe({ method: req.method, route, status: res.statusCode }, duration);
     });
@@ -2112,7 +2127,8 @@ async function checkDids() {
     didCheck = await gatekeeper.checkDIDs();
     console.timeEnd('checkDIDs');
 
-    // Update events queue metrics
+    // Update events queue metrics - reset first to clear stale data
+    eventsQueueGauge.reset();
     if (didCheck.eventsQueue) {
         const queueByRegistry: Record<string, number> = {};
         for (const event of didCheck.eventsQueue) {
