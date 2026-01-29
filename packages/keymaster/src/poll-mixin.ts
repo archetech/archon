@@ -202,8 +202,9 @@ export function PollMixin<TBase extends Constructor<PollMixinRequirements>>(Base
                     });
                 }
 
-                for (let voter in poll.ballots) {
-                    const ballot = poll.ballots[voter];
+                const ballots = poll.ballots ?? {};
+                for (const voter in ballots) {
+                    const ballot = ballots[voter];
                     const decrypted = await this.decryptJSON(ballot.ballot);
                     const vote = (decrypted as { vote: number }).vote;
                     if (results.ballots) {
