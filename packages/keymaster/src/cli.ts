@@ -898,7 +898,7 @@ program
         try {
             const { name, registry } = options;
             const data = fs.readFileSync(file);
-            const filename = file.split('/').pop();
+            const filename = path.basename(file);
             const did = await keymaster.createDocument(data, { filename, name, registry });
             console.log(did);
         }
