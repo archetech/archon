@@ -1688,9 +1688,10 @@ export default class Keymaster implements KeymasterInterface {
                 claims = this.generateSchema(schemaDoc);
             }
 
-            // If schema has $credentialTypes, add them to credential types
+            // If schema has $credentialTypes, add them to credential types (avoiding duplicates)
             if (schemaDoc?.$credentialTypes) {
-                vc.type.push(...schemaDoc.$credentialTypes);
+                const newTypes = schemaDoc.$credentialTypes.filter(t => !vc.type.includes(t));
+                vc.type.push(...newTypes);
             }
 
             vc.credentialSchema = {

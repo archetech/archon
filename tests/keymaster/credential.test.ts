@@ -343,6 +343,27 @@ describe('bindCredential', () => {
         expect(vc.credentialSchema!.id).toBe(schemaDid);
         expect(vc.issuer).toBe(issuer);
     });
+
+    it('should not duplicate VerifiableCredential when included in $credentialTypes', async () => {
+        await keymaster.createId('Issuer');
+        const subject = await keymaster.createId('Subject');
+
+        const schemaWithVC = {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "$credentialTypes": ["VerifiableCredential", "CustomCredential"],
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" }
+            }
+        };
+
+        await keymaster.setCurrentId('Issuer');
+        const schemaDid = await keymaster.createSchema(schemaWithVC);
+        const vc = await keymaster.bindCredential(subject, { schema: schemaDid });
+
+        expect(vc.type).toEqual(['VerifiableCredential', 'CustomCredential']);
+        expect(vc.type.filter(t => t === 'VerifiableCredential')).toHaveLength(1);
+    });
 });
 
 describe('issueCredential', () => {
