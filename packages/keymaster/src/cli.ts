@@ -1214,7 +1214,7 @@ program
     .action(async (id, file) => {
         try {
             const data = fs.readFileSync(file);
-            const name = file.split('/').pop()!;
+            const name = path.basename(file);
             const ok = await keymaster.addVaultItem(id, name, data);
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
