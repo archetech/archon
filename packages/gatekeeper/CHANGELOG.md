@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.1](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.3.0...@didcid/gatekeeper@0.3.1) (2026-01-30)
+
+**Note:** Version bump only for package @didcid/gatekeeper
+
+
+
+
+
+# [0.3.0](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.2.0...@didcid/gatekeeper@0.3.0) (2026-01-30)
+
+
+### Features
+
+* Support mainnet registries ([#34](https://github.com/archetech/archon/issues/34)) ([a206c9e](https://github.com/archetech/archon/commit/a206c9e24f29fabec45f3cb239b8ba88f0525e6d))
+
+
+
+
+
 # [0.2.0](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.1.3...@didcid/gatekeeper@0.2.0) (2026-01-22)
 
 **Note:** Version bump only for package @didcid/gatekeeper
