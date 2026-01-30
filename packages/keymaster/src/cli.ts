@@ -954,7 +954,7 @@ program
     .action(async (id, file) => {
         try {
             const data = fs.readFileSync(file);
-            const filename = file.split('/').pop();
+            const filename = path.basename(file);
             const ok = await keymaster.updateDocument(id, data, { filename });
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
