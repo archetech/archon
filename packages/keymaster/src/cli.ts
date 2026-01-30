@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { program } from 'commander';
 import fs from 'fs';
+import path from 'path';
 import dotenv from 'dotenv';
 
 import Keymaster from './keymaster.js';
@@ -1291,7 +1292,10 @@ async function run() {
         if (walletType === 'sqlite') {
             wallet = await WalletSQLite.create(walletPath);
         } else {
-            wallet = new WalletJson(walletPath);
+            // WalletJson expects (filename, folder) - parse the path
+            const walletDir = path.dirname(walletPath);
+            const walletFile = path.basename(walletPath);
+            wallet = new WalletJson(walletFile, walletDir);
         }
 
         // Initialize cipher

@@ -143,7 +143,7 @@
     "clean": "rm -rf dist",
     "build:esm": "tsc -p tsconfig.json",
     "bundle:cjs": "rollup -c rollup.cjs.config.js",
-    "build": "npm run clean && npm run build:esm && npm run bundle:cjs"
+    "build": "npm run clean && npm run build:esm && npm run bundle:cjs && chmod +x dist/esm/cli.js"
   },
   "keywords": [],
   "author": "David McFadzean <davidmc@gmail.com>",
