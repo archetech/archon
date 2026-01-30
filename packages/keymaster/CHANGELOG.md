@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.1](https://github.com/archetech/archon/compare/@didcid/keymaster@0.2.0...@didcid/keymaster@0.2.1) (2026-01-30)
+
+
+### Bug Fixes
+
+* Fix for duplicate credential types ([#37](https://github.com/archetech/archon/issues/37)) ([9613c46](https://github.com/archetech/archon/commit/9613c469a69b8c610df12bd64bea264a7cb6f8a9))
+
+
+### Features
+
+* Added import schema pack ([#29](https://github.com/archetech/archon/issues/29)) ([4af8acf](https://github.com/archetech/archon/commit/4af8acf4e9c15b36319f65f6a5b59a0c2c4bf2df))
+
+
+
+
+
 # [0.2.0](https://github.com/archetech/archon/compare/@didcid/keymaster@0.1.3...@didcid/keymaster@0.2.0) (2026-01-22)
 
 **Note:** Version bump only for package @didcid/keymaster
