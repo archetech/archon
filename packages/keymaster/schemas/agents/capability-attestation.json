@@ -1,0 +1,36 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Agent Capability Attestation",
+    "description": "Credential attesting to specific capabilities or competencies of an agent",
+    "type": "object",
+    "properties": {
+        "capability": {
+            "type": "string",
+            "description": "The capability being attested (e.g., 'lightning-node-management', 'credential-issuance')"
+        },
+        "level": {
+            "type": "string",
+            "enum": ["basic", "intermediate", "advanced", "expert"],
+            "description": "Proficiency level"
+        },
+        "domain": {
+            "type": "string",
+            "description": "Domain or context of the capability"
+        },
+        "evidence": {
+            "type": "string",
+            "description": "Reference to evidence supporting this attestation (could be a DID)"
+        },
+        "validUntil": {
+            "type": "string",
+            "format": "date",
+            "description": "Optional expiration date for the attestation"
+        },
+        "restrictions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Any restrictions or conditions on this capability"
+        }
+    },
+    "required": ["capability", "domain"]
+}

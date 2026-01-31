@@ -1,0 +1,48 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Infrastructure Authorization",
+    "description": "Credential where infrastructure (nodes, services) attests agent authorization",
+    "type": "object",
+    "properties": {
+        "infrastructureType": {
+            "type": "string",
+            "description": "Type of infrastructure (e.g., 'lightning-node', 'server', 'smart-contract')"
+        },
+        "infrastructureId": {
+            "type": "string",
+            "description": "Unique identifier for the infrastructure (pubkey, address, etc.)"
+        },
+        "infrastructureName": {
+            "type": "string",
+            "description": "Human-readable name"
+        },
+        "role": {
+            "type": "string",
+            "description": "Role authorized (e.g., 'manager', 'advisor', 'operator', 'viewer')"
+        },
+        "permissions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Specific permissions granted"
+        },
+        "signature": {
+            "type": "string",
+            "description": "Cryptographic signature from the infrastructure proving authorization"
+        },
+        "signedMessage": {
+            "type": "string",
+            "description": "The message that was signed"
+        },
+        "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When authorization begins"
+        },
+        "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When authorization expires (optional)"
+        }
+    },
+    "required": ["infrastructureType", "infrastructureId", "role", "signature", "signedMessage"]
+}
