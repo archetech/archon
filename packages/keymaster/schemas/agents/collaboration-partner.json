@@ -1,0 +1,36 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Agent Collaboration Partner",
+    "description": "Credential attesting to a collaboration relationship between agents and/or humans",
+    "type": "object",
+    "properties": {
+        "partnerName": {
+            "type": "string",
+            "description": "Name of the partner agent or human"
+        },
+        "partnerType": {
+            "type": "string",
+            "enum": ["agent", "human", "organization"],
+            "description": "Type of partner entity"
+        },
+        "relationship": {
+            "type": "string",
+            "description": "Nature of the collaboration (e.g., 'co-developer', 'advisor', 'operator')"
+        },
+        "establishedDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Date the collaboration was established (ISO 8601)"
+        },
+        "capabilities": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "What this collaboration enables"
+        },
+        "scope": {
+            "type": "string",
+            "description": "Scope or domain of the collaboration"
+        }
+    },
+    "required": ["partnerName", "partnerType", "relationship"]
+}

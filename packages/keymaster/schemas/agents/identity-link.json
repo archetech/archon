@@ -1,0 +1,35 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Agent Identity Link",
+    "description": "Credential linking an Archon DID to identity on another platform",
+    "type": "object",
+    "properties": {
+        "platform": {
+            "type": "string",
+            "description": "The platform being linked (e.g., 'nostr', 'lightning', 'github', 'twitter')"
+        },
+        "platformId": {
+            "type": "string",
+            "description": "The identifier on that platform (pubkey, username, address)"
+        },
+        "platformIdType": {
+            "type": "string",
+            "description": "Type of identifier (e.g., 'npub', 'hex-pubkey', 'lightning-address')"
+        },
+        "proofType": {
+            "type": "string",
+            "enum": ["self-attested", "signature", "dns", "on-chain", "social-post"],
+            "description": "How the link was proven"
+        },
+        "proofReference": {
+            "type": "string",
+            "description": "Reference to the proof (note ID, transaction, URL)"
+        },
+        "verifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the link was verified"
+        }
+    },
+    "required": ["platform", "platformId", "proofType"]
+}
