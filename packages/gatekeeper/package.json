@@ -1,6 +1,6 @@
 {
   "name": "@didcid/gatekeeper",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Archon Gatekeeper",
   "type": "module",
   "module": "./dist/esm/index.js",
