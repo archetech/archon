@@ -674,4 +674,32 @@ describe('getVaultItem', () => {
 
         expect(retrieved).toStrictEqual(smallDocument);
     });
+
+    it('should throw error when both inline data and IPFS retrieval fail', async () => {
+        // This tests the error path when neither inline data nor gatekeeper.getText() returns data
+        const largeDocument = Buffer.alloc(10 * 1024, 'X'); // 10KB - larger than 8KB threshold, no inline data
+        const itemName = 'large-doc.bin';
+
+        await keymaster.createId('Bob');
+        const did = await keymaster.createVault();
+        await keymaster.addVaultItem(did, itemName, largeDocument);
+
+        // Verify no inline data for large items
+        const items = await keymaster.listVaultItems(did);
+        expect(items[itemName]).toBeDefined();
+        expect(items[itemName].data).toBeUndefined(); // Large items don't have inline data
+        expect(items[itemName].cid).toBeDefined();
+
+        // Replace gatekeeper.getText to return null (simulating IPFS failure)
+        const originalGetText = gatekeeper.getText.bind(gatekeeper);
+        gatekeeper.getText = async () => null as any;
+
+        try {
+            await expect(keymaster.getVaultItem(did, itemName))
+                .rejects.toThrow(`Failed to retrieve data for item '${itemName}'`);
+        } finally {
+            // Restore original function
+            gatekeeper.getText = originalGetText;
+        }
+    });
 });
