@@ -620,16 +620,15 @@ describe('getVaultItem', () => {
         expect(item).toStrictEqual(mockDocument);
     });
 
-    it('should return null if caller is not a member', async () => {
+    it('should throw error if caller is not a member', async () => {
         await keymaster.createId('Alice');
         await keymaster.createId('Bob');
         const did = await keymaster.createVault();
         await keymaster.addVaultItem(did, mockDocumentName, mockDocument);
 
         await keymaster.setCurrentId('Alice');
-        const item = await keymaster.getVaultItem(did, mockDocumentName);
 
-        expect(item).toBe(null);
+        await expect(keymaster.getVaultItem(did, mockDocumentName)).rejects.toThrow('No access to vault');
     });
 
     it('should retrieve JSON', async () => {
@@ -648,5 +647,31 @@ describe('getVaultItem', () => {
         const itemLogin = JSON.parse(itemBuffer!.toString('utf-8'));
 
         expect(itemLogin).toStrictEqual({ login });
+    });
+
+    it('should retrieve small items using inline data field (regression test for #44)', async () => {
+        // Issue #44: getVaultItem returned "Item not found" for items that exist
+        // Root cause: Gatekeeper always returns a CID but doesn't always store data to IPFS.
+        // Small items (<8KB) store encrypted data inline in the 'data' field as a reliable fallback.
+        // The old code only tried gatekeeper.getText(cid) which fails when IPFS storage wasn't done.
+        // The fix: Check items[name].data first (reliable), fall back to gatekeeper.getText(cid)
+
+        const smallDocument = Buffer.from('Small test document', 'utf-8');
+        const itemName = 'small-doc.txt';
+
+        await keymaster.createId('Bob');
+        const did = await keymaster.createVault();
+        await keymaster.addVaultItem(did, itemName, smallDocument);
+
+        // Verify the item has inline data stored
+        const items = await keymaster.listVaultItems(did);
+        expect(items[itemName]).toBeDefined();
+        expect(items[itemName].data).toBeDefined(); // Small items should have inline data
+        expect(items[itemName].cid).toBeDefined();  // CID should also exist
+
+        // Retrieve the item - this should use the inline data field
+        const retrieved = await keymaster.getVaultItem(did, itemName);
+
+        expect(retrieved).toStrictEqual(smallDocument);
     });
 });

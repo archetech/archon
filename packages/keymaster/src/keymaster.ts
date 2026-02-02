@@ -3110,24 +3110,21 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async getVaultItem(vaultId: string, name: string, options?: ResolveDIDOptions): Promise<Buffer | null> {
-        try {
-            const vault = await this.getVault(vaultId, options);
-            const { privateJwk, items } = await this.decryptVault(vault);
+        const vault = await this.getVault(vaultId, options);
+        const { privateJwk, items } = await this.decryptVault(vault);
 
-            if (items[name]) {
-                const encryptedData = items[name].data || await this.gatekeeper.getText(items[name].cid);
-
-                if (encryptedData) {
-                    const bytes = this.cipher.decryptBytes(vault.publicJwk, privateJwk, encryptedData);
-                    return Buffer.from(bytes);
-                }
-            }
-
+        if (!items[name]) {
             return null;
         }
-        catch (error) {
-            return null;
+
+        const encryptedData = items[name].data || await this.gatekeeper.getText(items[name].cid);
+
+        if (!encryptedData) {
+            throw new KeymasterError(`Failed to retrieve data for item '${name}' (CID: ${items[name].cid})`);
         }
+
+        const bytes = this.cipher.decryptBytes(vault.publicJwk, privateJwk, encryptedData);
+        return Buffer.from(bytes);
     }
 
     async listDmail(): Promise<Record<string, DmailItem>> {
