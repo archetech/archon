@@ -989,8 +989,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 let name = null;
 
                 // Priority 1: last $credentialType
-                if (schema.$credentialTypes && Array.isArray(schema.$credentialTypes) && schema.$credentialTypes.length > 0) {
-                    name = schema.$credentialTypes[schema.$credentialTypes.length - 1];
+                if (schema.$credentialType && Array.isArray(schema.$credentialType) && schema.$credentialType.length > 0) {
+                    name = schema.$credentialType[schema.$credentialType.length - 1];
                 }
                 // Priority 2: schema title
                 else if (schema.title) {

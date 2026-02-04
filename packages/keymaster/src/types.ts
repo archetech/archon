@@ -311,8 +311,9 @@ export interface KeymasterInterface {
     getName(name: string): Promise<string | null>;
     removeName(name: string): Promise<boolean>;
 
-    // DID resolution
+    // DIDs
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;
+    updateDID(id: string, doc: DidCidDocument): Promise<boolean>;
 
     // Assets
     createAsset(data: unknown, options?: CreateAssetOptions): Promise<string>;

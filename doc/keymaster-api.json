@@ -911,6 +911,7 @@
                               "enum": [
                                 "local",
                                 "hyperswarm",
+                                "BTC:mainnet",
                                 "BTC:testnet4",
                                 "BTC:signet"
                               ]
@@ -991,6 +992,69 @@
                     "ok": {
                       "type": "boolean",
                       "description": "true if the DID was successfully revoked, otherwise false."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a DID document.",
+        "description": "Updates the DID document with the provided data.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The DID to update."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "doc": {
+                    "type": "object",
+                    "description": "The DID document fields to update."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Indicates whether the DID was successfully updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
                     }
                   }
                 }

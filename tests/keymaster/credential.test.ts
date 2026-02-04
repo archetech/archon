@@ -294,39 +294,13 @@ describe('bindCredential', () => {
         expect(vc.credentialSubject!.email).toEqual(expect.any(String));
     });
 
-    it('should create a credential with semantic types instead of schema', async () => {
-        const issuer = await keymaster.createId('ChessClub');
-        const member = await keymaster.createId('Bob');
-
-        await keymaster.setCurrentId('ChessClub');
-        const vc = await keymaster.bindCredential(member, {
-            types: ['DTGCredential', 'MembershipCredential'],
-            validUntil: '2027-01-06T10:00:00Z',
-        });
-
-        expect(vc.type).toContain('VerifiableCredential');
-        expect(vc.type).toContain('DTGCredential');
-        expect(vc.type).toContain('MembershipCredential');
-        expect(vc.credentialSchema).toBeUndefined();
-        expect(vc.issuer).toBe(issuer);
-        expect(vc.credentialSubject!.id).toBe(member);
-        expect(vc.validUntil).toBe('2027-01-06T10:00:00Z');
-
-        const did = await keymaster.issueCredential(vc);
-        const issued = await keymaster.decryptJSON(did) as VerifiableCredential;
-
-        expect(issued.type).toEqual(vc.type);
-        expect(issued.proof).toBeDefined();
-        expect(issued.proof!.proofPurpose).toBe('assertionMethod');
-    });
-
-    it('should auto-derive credential types from schema $credentialTypes', async () => {
+    it('should override credential types from schema $credentialType', async () => {
         const issuer = await keymaster.createId('ChessClub');
         const member = await keymaster.createId('Member');
 
         const membershipSchema = {
             "$schema": "http://json-schema.org/draft-07/schema#",
-            "$credentialTypes": ["DTGCredential", "MembershipCredential"],
+            "$credentialType": ["VerifiableCredential", "DTGCredential", "MembershipCredential"],
             "type": "object",
             "properties": {
                 "memberSince": { "type": "string" }
@@ -344,13 +318,38 @@ describe('bindCredential', () => {
         expect(vc.issuer).toBe(issuer);
     });
 
-    it('should not duplicate VerifiableCredential when included in $credentialTypes', async () => {
+    it('should override credential context from schema $credentialContext', async () => {
+        const issuer = await keymaster.createId('ContextOrg');
+        const member = await keymaster.createId('ContextMember');
+
+        const schemaWithContext = {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "$credentialContext": [
+                "https://example.org/credentials/v3",
+                "https://example.org/credentials/membership/v1"
+            ],
+            "type": "object",
+            "properties": {
+                "role": { "type": "string" }
+            }
+        };
+
+        await keymaster.setCurrentId('ContextOrg');
+        const schemaDid = await keymaster.createSchema(schemaWithContext);
+        const vc = await keymaster.bindCredential(member, { schema: schemaDid });
+
+        expect(vc['@context']).toEqual(schemaWithContext.$credentialContext);
+        expect(vc.credentialSchema).toBeDefined();
+        expect(vc.credentialSchema!.id).toBe(schemaDid);
+        expect(vc.issuer).toBe(issuer);
+    });
+
+    it('should use default types when schema has no $credentialType', async () => {
         await keymaster.createId('Issuer');
         const subject = await keymaster.createId('Subject');
 
-        const schemaWithVC = {
+        const schemaWithoutTypes = {
             "$schema": "http://json-schema.org/draft-07/schema#",
-            "$credentialTypes": ["VerifiableCredential", "CustomCredential"],
             "type": "object",
             "properties": {
                 "name": { "type": "string" }
@@ -358,11 +357,10 @@ describe('bindCredential', () => {
         };
 
         await keymaster.setCurrentId('Issuer');
-        const schemaDid = await keymaster.createSchema(schemaWithVC);
+        const schemaDid = await keymaster.createSchema(schemaWithoutTypes);
         const vc = await keymaster.bindCredential(subject, { schema: schemaDid });
 
-        expect(vc.type).toEqual(['VerifiableCredential', 'CustomCredential']);
-        expect(vc.type.filter(t => t === 'VerifiableCredential')).toHaveLength(1);
+        expect(vc.type).toEqual(['VerifiableCredential']);
     });
 });
 

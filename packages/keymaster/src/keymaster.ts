@@ -1653,10 +1653,9 @@ export default class Keymaster implements KeymasterInterface {
             validFrom?: string;
             validUntil?: string;
             claims?: Record<string, unknown>;
-            types?: string[];
         } = {}
     ): Promise<VerifiableCredential> {
-        let { schema, validFrom, validUntil, claims, types } = options;
+        let { schema, validFrom, validUntil, claims } = options;
 
         if (!validFrom) {
             validFrom = new Date().toISOString();
@@ -1670,7 +1669,7 @@ export default class Keymaster implements KeymasterInterface {
                 "https://www.w3.org/ns/credentials/v2",
                 "https://www.w3.org/ns/credentials/examples/v2"
             ],
-            type: ["VerifiableCredential", ...(types || [])],
+            type: ["VerifiableCredential"],
             issuer: id.did,
             validFrom,
             validUntil,
@@ -1682,16 +1681,20 @@ export default class Keymaster implements KeymasterInterface {
         // If schema provided, add credentialSchema and generate claims from schema
         if (schema) {
             const schemaDID = await this.lookupDID(schema);
-            const schemaDoc = await this.getSchema(schemaDID) as { $credentialTypes?: string[]; properties?: Record<string, unknown> } | null;
+            const schemaDoc = await this.getSchema(schemaDID) as { $credentialContext?: string[]; $credentialType?: string[]; properties?: Record<string, unknown> } | null;
 
             if (!claims && schemaDoc) {
                 claims = this.generateSchema(schemaDoc);
             }
 
-            // If schema has $credentialTypes, add them to credential types (avoiding duplicates)
-            if (schemaDoc?.$credentialTypes) {
-                const newTypes = schemaDoc.$credentialTypes.filter(t => !vc.type.includes(t));
-                vc.type.push(...newTypes);
+            // If schema has $credentialContext, use it for the credential context
+            if (schemaDoc?.$credentialContext?.length) {
+                vc["@context"] = schemaDoc.$credentialContext;
+            }
+
+            // If schema has $credentialType, use it for the credential type
+            if (schemaDoc?.$credentialType?.length) {
+                vc.type = schemaDoc.$credentialType;
             }
 
             vc.credentialSchema = {
@@ -1700,7 +1703,7 @@ export default class Keymaster implements KeymasterInterface {
             };
         }
 
-        if (claims) {
+        if (claims && Object.keys(claims).length) {
             vc.credentialSubject = {
                 id: subjectDID,
                 ...claims,

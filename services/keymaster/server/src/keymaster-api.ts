@@ -935,6 +935,58 @@ v1router.delete('/did/:id', async (req, res) => {
 
 /**
  * @swagger
+ * /did/{id}:
+ *   put:
+ *     summary: Update a DID document.
+ *     description: Updates the DID document with the provided data.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The DID to update.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               doc:
+ *                 type: object
+ *                 description: The DID document fields to update.
+ *     responses:
+ *       200:
+ *         description: Indicates whether the DID was successfully updated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.put('/did/:id', async (req, res) => {
+    try {
+        const ok = await keymaster.updateDID(req.params.id, req.body.doc);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /ids/current:
  *   get:
  *     summary: Retrieve the current ID name.

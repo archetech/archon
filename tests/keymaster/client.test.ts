@@ -1033,6 +1033,38 @@ describe('revokeDID', () => {
     });
 });
 
+describe('updateDID', () => {
+    const mockDID = 'did:example:1234567890abcdefghi';
+    const mockDoc = { didDocumentData: { schema: { title: 'Test Schema' } } };
+
+    it('should update DID', async () => {
+        nock(KeymasterURL)
+            .put(`${Endpoints.did}/${mockDID}`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.updateDID(mockDID, mockDoc);
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on updateDID server error', async () => {
+        nock(KeymasterURL)
+            .put(`${Endpoints.did}/${mockDID}`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.updateDID(mockDID, mockDoc);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('createAsset', () => {
     const mockAsset = { id: 'asset1', data: 'some data' };
     const mockDID = 'did:example:1234567890abcd';

@@ -424,6 +424,16 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async updateDID(id: string, doc: DidCidDocument): Promise<boolean> {
+        try {
+            const response = await axios.put(`${this.API}/did/${id}`, { doc });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async revokeDID(id: string): Promise<boolean> {
         try {
             const response = await axios.delete(`${this.API}/did/${id}`);
