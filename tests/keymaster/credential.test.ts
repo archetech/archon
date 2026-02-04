@@ -320,13 +320,13 @@ describe('bindCredential', () => {
         expect(issued.proof!.proofPurpose).toBe('assertionMethod');
     });
 
-    it('should auto-derive credential types from schema $credentialTypes', async () => {
+    it('should override credential types from schema $credentialType', async () => {
         const issuer = await keymaster.createId('ChessClub');
         const member = await keymaster.createId('Member');
 
         const membershipSchema = {
             "$schema": "http://json-schema.org/draft-07/schema#",
-            "$credentialTypes": ["DTGCredential", "MembershipCredential"],
+            "$credentialType": ["VerifiableCredential", "DTGCredential", "MembershipCredential"],
             "type": "object",
             "properties": {
                 "memberSince": { "type": "string" }
@@ -344,13 +344,12 @@ describe('bindCredential', () => {
         expect(vc.issuer).toBe(issuer);
     });
 
-    it('should not duplicate VerifiableCredential when included in $credentialTypes', async () => {
+    it('should use default types when schema has no $credentialType', async () => {
         await keymaster.createId('Issuer');
         const subject = await keymaster.createId('Subject');
 
-        const schemaWithVC = {
+        const schemaWithoutTypes = {
             "$schema": "http://json-schema.org/draft-07/schema#",
-            "$credentialTypes": ["VerifiableCredential", "CustomCredential"],
             "type": "object",
             "properties": {
                 "name": { "type": "string" }
@@ -358,11 +357,10 @@ describe('bindCredential', () => {
         };
 
         await keymaster.setCurrentId('Issuer');
-        const schemaDid = await keymaster.createSchema(schemaWithVC);
+        const schemaDid = await keymaster.createSchema(schemaWithoutTypes);
         const vc = await keymaster.bindCredential(subject, { schema: schemaDid });
 
-        expect(vc.type).toEqual(['VerifiableCredential', 'CustomCredential']);
-        expect(vc.type.filter(t => t === 'VerifiableCredential')).toHaveLength(1);
+        expect(vc.type).toEqual(['VerifiableCredential']);
     });
 });
 
