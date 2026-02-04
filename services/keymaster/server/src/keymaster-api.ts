@@ -968,6 +968,13 @@ v1router.delete('/did/:id', async (req, res) => {
  *                   type: boolean
  *       500:
  *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 v1router.put('/did/:id', async (req, res) => {
     try {
