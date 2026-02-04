@@ -1653,10 +1653,9 @@ export default class Keymaster implements KeymasterInterface {
             validFrom?: string;
             validUntil?: string;
             claims?: Record<string, unknown>;
-            types?: string[];
         } = {}
     ): Promise<VerifiableCredential> {
-        let { schema, validFrom, validUntil, claims, types } = options;
+        let { schema, validFrom, validUntil, claims } = options;
 
         if (!validFrom) {
             validFrom = new Date().toISOString();
@@ -1670,7 +1669,7 @@ export default class Keymaster implements KeymasterInterface {
                 "https://www.w3.org/ns/credentials/v2",
                 "https://www.w3.org/ns/credentials/examples/v2"
             ],
-            type: ["VerifiableCredential", ...(types || [])],
+            type: ["VerifiableCredential"],
             issuer: id.did,
             validFrom,
             validUntil,
