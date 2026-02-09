@@ -106,6 +106,28 @@ const gatekeeper = new Gatekeeper({
 const startTime = new Date();
 const app = express();
 const v1router = express.Router();
+const adminRouter = express.Router();
+
+// Admin API key middleware — when ARCHON_ADMIN_API_KEY is set, admin
+// routes require a matching Authorization: Bearer <key> header.
+// This provides defense-in-depth even when running behind a reverse proxy.
+function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction): void {
+    if (!config.adminApiKey) {
+        // No key configured — admin routes are unprotected (development mode).
+        // In production, set ARCHON_ADMIN_API_KEY to enable protection.
+        next();
+        return;
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.slice(7) !== config.adminApiKey) {
+        res.status(401).json({ error: 'Unauthorized — valid admin API key required' });
+        return;
+    }
+    next();
+}
+
+adminRouter.use(requireAdminKey);
 
 app.use(cors());
 app.options('*', cors());
@@ -866,7 +888,7 @@ v1router.post('/dids/', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/dids/remove', async (req, res) => {
+v1router.post('/dids/remove', requireAdminKey, async (req, res) => {
     try {
         const dids = req.body;
         const response = await gatekeeper.removeDIDs(dids);
@@ -1500,7 +1522,11 @@ v1router.get('/registries', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.get('/db/reset', async (req, res) => {
+v1router.get('/db/reset', requireAdminKey, async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+        res.status(403).json({ error: 'Database reset is disabled in production' });
+        return;
+    }
     try {
         await gatekeeper.resetDb();
         res.json(true);
@@ -1542,7 +1568,7 @@ v1router.get('/db/reset', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.get('/db/verify', async (req, res) => {
+v1router.get('/db/verify', requireAdminKey, async (req, res) => {
     try {
         const response = await gatekeeper.verifyDb();
         res.json(response);
@@ -2279,8 +2305,13 @@ async function main() {
     console.log(`DID prefix: ${JSON.stringify(gatekeeper.didPrefix)}`);
     console.log(`Supported registries: ${JSON.stringify(gatekeeper.supportedRegistries)}`);
 
-    const server = app.listen(config.port, () => {
-        console.log(`Server is running on port ${config.port}`);
+    const server = app.listen(config.port, config.bindAddress, () => {
+        console.log(`Server is running on ${config.bindAddress}:${config.port}`);
+        if (config.adminApiKey) {
+            console.log('Admin API key protection is ENABLED');
+        } else {
+            console.warn('Warning: ARCHON_ADMIN_API_KEY is not set — admin routes are unprotected');
+        }
         serverReady = true;
     });
 

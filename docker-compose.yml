@@ -37,6 +37,8 @@ services:
     image: ghcr.io/archetech/gatekeeper
     environment:
       - ARCHON_GATEKEEPER_PORT=4224
+      - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
       - ARCHON_GATEKEEPER_DB=${ARCHON_GATEKEEPER_DB}
       - ARCHON_GATEKEEPER_DID_PREFIX=${ARCHON_GATEKEEPER_DID_PREFIX}
       - ARCHON_GATEKEEPER_REGISTRIES=${ARCHON_GATEKEEPER_REGISTRIES}
@@ -63,6 +65,8 @@ services:
     image: ghcr.io/archetech/keymaster
     environment:
       - ARCHON_KEYMASTER_PORT=4226
+      - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       - ARCHON_DISABLE_SEARCH=${ARCHON_DISABLE_SEARCH:-false}
       - ARCHON_SEARCH_URL=http://gatekeeper:4224
@@ -161,9 +165,9 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=15d'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
     depends_on:
       - gatekeeper
       - keymaster

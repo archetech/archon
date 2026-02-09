@@ -1,0 +1,182 @@
+# Archon Reverse Proxy Configuration
+#
+# This nginx configuration exposes only public-safe Archon endpoints
+# to the internet and blocks access to admin/internal routes.
+#
+# Usage:
+#   1. Set ARCHON_BIND_ADDRESS=127.0.0.1 in your .env so services
+#      only accept connections from localhost (nginx).
+#   2. Set ARCHON_ADMIN_API_KEY to a strong random key for defense-in-depth.
+#   3. Copy this file to /etc/nginx/sites-available/ and adjust server_name.
+#   4. Enable with: ln -s /etc/nginx/sites-available/archon /etc/nginx/sites-enabled/
+#   5. Test with: nginx -t && systemctl reload nginx
+#
+# Generate an admin key:  openssl rand -hex 32
+# Generate TLS certs:     certbot --nginx -d your-domain.example.com
+
+upstream gatekeeper {
+    server 127.0.0.1:4224;
+}
+
+upstream keymaster {
+    server 127.0.0.1:4226;
+}
+
+# Rate limiting zones
+limit_req_zone $binary_remote_addr zone=api_general:10m rate=30r/s;
+limit_req_zone $binary_remote_addr zone=api_write:10m rate=5r/s;
+
+server {
+    listen 80;
+    server_name your-domain.example.com;
+
+    # Redirect HTTP to HTTPS in production
+    # return 301 https://$host$request_uri;
+
+    # ──────────────────────────────────────────────────
+    # Security headers
+    # ──────────────────────────────────────────────────
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # Uncomment when TLS is enabled:
+    # add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # ──────────────────────────────────────────────────
+    # GATEKEEPER — Public endpoints only
+    # ──────────────────────────────────────────────────
+
+    # Health & metadata
+    location = /api/v1/ready {
+        limit_req zone=api_general burst=10 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    location = /api/v1/version {
+        limit_req zone=api_general burst=10 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    location = /api/v1/registries {
+        limit_req zone=api_general burst=10 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    # DID operations (create/update/delete are signature-verified by gatekeeper)
+    location = /api/v1/did {
+        limit_req zone=api_write burst=20 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    location = /api/v1/did/generate {
+        limit_req zone=api_write burst=10 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    # DID resolution (GET /api/v1/did/{did})
+    location ~ ^/api/v1/did/did: {
+        limit_req zone=api_general burst=30 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    # DID listing/query
+    location = /api/v1/dids {
+        limit_req zone=api_general burst=20 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    # Search
+    location ~ ^/api/v1/search {
+        limit_req zone=api_general burst=20 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    location = /api/v1/query {
+        limit_req zone=api_general burst=10 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    # Blocks (public read)
+    location ~ ^/api/v1/block/ {
+        limit_req zone=api_general burst=20 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    # IPFS content retrieval
+    location ~ ^/api/v1/ipfs/ {
+        limit_req zone=api_general burst=20 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    # Gatekeeper web wallet (static files)
+    location / {
+        limit_req zone=api_general burst=30 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
+    # ──────────────────────────────────────────────────
+    # GATEKEEPER — Block all admin & internal routes
+    # ──────────────────────────────────────────────────
+
+    # Explicitly deny: /db/reset, /db/verify, /dids/remove,
+    # /dids/export, /dids/import, /batch/*, /queue/*, /events/*,
+    # /status, /metrics
+    location ~ ^/api/v1/(db|dids/(remove|export|import)|batch|queue|events|status) {
+        return 403;
+    }
+
+    location = /metrics {
+        return 403;
+    }
+
+    # ──────────────────────────────────────────────────
+    # KEYMASTER — typically not exposed externally at all.
+    # If you need the web wallet UI, expose only these:
+    # ──────────────────────────────────────────────────
+
+    # Uncomment the block below ONLY if you want to expose the
+    # keymaster web wallet. Most deployments should NOT do this.
+
+    # location /keymaster/ {
+    #     # Only the web wallet static files and public-safe read endpoints
+    #     # Rewrite to strip /keymaster prefix
+    #     rewrite ^/keymaster/(.*) /$1 break;
+    #
+    #     # Allow only safe read endpoints
+    #     location ~ ^/keymaster/api/v1/(ready|registries|did/|keys/verify) {
+    #         limit_req zone=api_general burst=10 nodelay;
+    #         proxy_pass http://keymaster;
+    #     }
+    #
+    #     # Block everything else (wallet, mnemonic, keys, ids, etc.)
+    #     location ~ ^/keymaster/api/ {
+    #         return 403;
+    #     }
+    #
+    #     # Static wallet UI files
+    #     proxy_pass http://keymaster;
+    # }
+
+    # ──────────────────────────────────────────────────
+    # Default: deny anything not explicitly allowed
+    # ──────────────────────────────────────────────────
+    location ~ ^/api/ {
+        return 403;
+    }
+}
+
+# ──────────────────────────────────────────────────
+# HTTPS server block (uncomment when TLS is ready)
+# ──────────────────────────────────────────────────
+# server {
+#     listen 443 ssl http2;
+#     server_name your-domain.example.com;
+#
+#     ssl_certificate /etc/letsencrypt/live/your-domain.example.com/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/your-domain.example.com/privkey.pem;
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers HIGH:!aNULL:!MD5;
+#
+#     # ... copy location blocks from above ...
+# }

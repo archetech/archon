@@ -77,6 +77,25 @@ function normalizePath(path: string): string {
 const app = express();
 const v1router = express.Router();
 
+// Admin API key middleware — when ARCHON_ADMIN_API_KEY is set, admin
+// routes require a matching Authorization: Bearer <key> header.
+// This provides defense-in-depth even when running behind a reverse proxy.
+function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction): void {
+    if (!config.adminApiKey) {
+        // No key configured — admin routes are unprotected (development mode).
+        // In production, set ARCHON_ADMIN_API_KEY to enable protection.
+        next();
+        return;
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.slice(7) !== config.adminApiKey) {
+        res.status(401).json({ error: 'Unauthorized — valid admin API key required' });
+        return;
+    }
+    next();
+}
+
 // HTTP request logging - use pino in production, morgan in development
 if (process.env.NODE_ENV === 'production') {
     app.use(pinoHttp({ logger }));
@@ -264,7 +283,7 @@ v1router.get('/registries', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.get('/wallet', async (req, res) => {
+v1router.get('/wallet', requireAdminKey, async (req, res) => {
     try {
         const wallet = await keymaster.loadWallet();
         res.json({ wallet });
@@ -345,7 +364,7 @@ v1router.get('/wallet', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.put('/wallet', async (req, res) => {
+v1router.put('/wallet', requireAdminKey, async (req, res) => {
     try {
         const { wallet } = req.body;
         const ok = await keymaster.saveWallet(wallet);
@@ -430,7 +449,7 @@ v1router.put('/wallet', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/new', async (req, res) => {
+v1router.post('/wallet/new', requireAdminKey, async (req, res) => {
     try {
         const { mnemonic, overwrite } = req.body;
         const wallet = await keymaster.newWallet(mnemonic, overwrite);
@@ -466,7 +485,7 @@ v1router.post('/wallet/new', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/backup', async (req, res) => {
+v1router.post('/wallet/backup', requireAdminKey, async (req, res) => {
     try {
         const ok = await keymaster.backupWallet();
         res.json({ ok });
@@ -536,7 +555,7 @@ v1router.post('/wallet/backup', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/recover', async (req, res) => {
+v1router.post('/wallet/recover', requireAdminKey, async (req, res) => {
     try {
         const wallet = await keymaster.recoverWallet();
         res.json({ wallet });
@@ -580,7 +599,7 @@ v1router.post('/wallet/recover', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/check', async (req, res) => {
+v1router.post('/wallet/check', requireAdminKey, async (req, res) => {
     try {
         const check = await keymaster.checkWallet();
         res.json({ check });
@@ -623,7 +642,7 @@ v1router.post('/wallet/check', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/fix', async (req, res) => {
+v1router.post('/wallet/fix', requireAdminKey, async (req, res) => {
     try {
         const fix = await keymaster.fixWallet();
         res.json({ fix });
@@ -658,7 +677,7 @@ v1router.post('/wallet/fix', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.get('/wallet/mnemonic', async (req, res) => {
+v1router.get('/wallet/mnemonic', requireAdminKey, async (req, res) => {
     try {
         const mnemonic = await keymaster.decryptMnemonic();
         res.json({ mnemonic });
@@ -717,7 +736,7 @@ v1router.get('/wallet/mnemonic', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.get('/export/wallet/encrypted', async (req, res) => {
+v1router.get('/export/wallet/encrypted', requireAdminKey, async (req, res) => {
     try {
         const wallet = await keymaster.exportEncryptedWallet();
         res.json({ wallet });
@@ -924,7 +943,7 @@ v1router.get('/did/:id', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.delete('/did/:id', async (req, res) => {
+v1router.delete('/did/:id', requireAdminKey, async (req, res) => {
     try {
         const ok = await keymaster.revokeDID(req.params.id);
         res.json({ ok });
@@ -1145,7 +1164,7 @@ v1router.get('/ids', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/ids', async (req, res) => {
+v1router.post('/ids', requireAdminKey, async (req, res) => {
     try {
         const { name, options } = req.body;
         const did = await keymaster.createId(name, options);
@@ -1240,7 +1259,7 @@ v1router.get('/ids/:id', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.delete('/ids/:id', async (req, res) => {
+v1router.delete('/ids/:id', requireAdminKey, async (req, res) => {
     try {
         const ok = await keymaster.removeId(req.params.id);
         res.json({ ok });
@@ -3186,7 +3205,7 @@ v1router.delete('/credentials/issued/:did', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/keys/rotate', async (req, res) => {
+v1router.post('/keys/rotate', requireAdminKey, async (req, res) => {
     try {
         const ok = await keymaster.rotateKeys();
         res.json({ ok });
@@ -3827,7 +3846,7 @@ v1router.put('/assets/:id', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/assets/:id/transfer', async (req, res) => {
+v1router.post('/assets/:id/transfer', requireAdminKey, async (req, res) => {
     try {
         const { controller } = req.body;
         const ok = await keymaster.transferAsset(req.params.id, controller);
@@ -6278,7 +6297,7 @@ async function initWallet() {
 
 const port = config.keymasterPort;
 
-const server = app.listen(port, async () => {
+const server = app.listen(port, config.bindAddress, async () => {
     gatekeeper = new GatekeeperClient();
 
     await gatekeeper.connect({
@@ -6292,8 +6311,13 @@ const server = app.listen(port, async () => {
     const cipher = new CipherNode();
     const defaultRegistry = config.defaultRegistry;
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase: config.keymasterPassphrase });
-    console.log(`Keymaster server running on port ${port}`);
+    console.log(`Keymaster server running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
+    if (config.adminApiKey) {
+        console.log('Admin API key protection is ENABLED');
+    } else {
+        console.warn('Warning: ARCHON_ADMIN_API_KEY is not set — admin routes are unprotected');
+    }
 
     try {
         await waitForNodeId();
