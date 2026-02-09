@@ -1301,6 +1301,19 @@ async function run() {
         // Initialize cipher
         const cipher = new CipherNode();
 
+        // For commands that need an existing wallet, verify it exists
+        const walletCreationCommands = ['create-wallet', 'new-wallet', 'import-wallet', 'restore-wallet-file'];
+        const commandName = process.argv[2];
+        if (commandName && !walletCreationCommands.includes(commandName)) {
+            const existing = await wallet.loadWallet();
+            if (!existing) {
+                console.error(`Error: Wallet not found at ${walletPath}`);
+                console.error('Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.');
+                console.error('To create a new wallet, run: keymaster create-wallet');
+                process.exit(1);
+            }
+        }
+
         // Initialize keymaster
         keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase });
 

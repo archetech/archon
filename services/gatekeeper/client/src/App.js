@@ -59,8 +59,8 @@ function App() {
         try {
             // check pass & convert to v1 if needed
             await instance.loadWallet();
-        } catch {
-            setPassphraseErrorText('Incorrect passphrase');
+        } catch (error) {
+            setPassphraseErrorText(error?.message || 'Failed to load wallet');
             return;
         }
 

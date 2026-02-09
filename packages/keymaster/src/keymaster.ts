@@ -3654,8 +3654,12 @@ export default class Keymaster implements KeymasterInterface {
         let mnemonic: string;
         try {
             mnemonic = await decMnemonic(stored.seed.mnemonicEnc!, this.passphrase);
-        } catch {
-            throw new KeymasterError('Incorrect passphrase.');
+        } catch (error: any) {
+            // OperationError is thrown by crypto.subtle.decrypt when the passphrase is wrong
+            if (error?.name === 'OperationError') {
+                throw new KeymasterError('Incorrect passphrase.');
+            }
+            throw error;
         }
 
         this._hdkeyCache = this.cipher.generateHDKey(mnemonic);
