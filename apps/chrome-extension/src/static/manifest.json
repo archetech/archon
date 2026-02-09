@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Archon Chrome Extension",
     "description": "Archon Chrome Extension",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "icons": {
         "16": "icon.png",
         "48": "icon.png",
