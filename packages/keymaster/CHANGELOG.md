@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.4](https://github.com/archetech/archon/compare/@didcid/keymaster@0.2.0...@didcid/keymaster@0.3.4) (2026-02-09)
+
+
+
+# 0.2.0 (2026-02-04)
+
+
+### Bug Fixes
+
+* Fix for duplicate credential types ([#37](https://github.com/archetech/archon/issues/37)) ([9613c46](https://github.com/archetech/archon/commit/9613c469a69b8c610df12bd64bea264a7cb6f8a9))
+* getVaultItem failed for small vault items ([#45](https://github.com/archetech/archon/issues/45)) ([a6fdd52](https://github.com/archetech/archon/commit/a6fdd5233ae2013879b28252d322e392211a59c2))
+
+
+### Features
+
+* Added import schema pack ([#29](https://github.com/archetech/archon/issues/29)) ([4af8acf](https://github.com/archetech/archon/commit/4af8acf4e9c15b36319f65f6a5b59a0c2c4bf2df))
+* Adds CLI to keymaster package ([#39](https://github.com/archetech/archon/issues/39)) ([894ce73](https://github.com/archetech/archon/commit/894ce732f5beaca37bb90ace6b760b8e80aba3e9))
+* Improve DTG credential support ([#48](https://github.com/archetech/archon/issues/48)) ([fb7e245](https://github.com/archetech/archon/commit/fb7e24538d93f36a310a36040e1608052969aba6))
+
+
+
+
+
 ## [0.3.3](https://github.com/archetech/archon/compare/@didcid/keymaster@0.2.0...@didcid/keymaster@0.3.3) (2026-02-02)
 
 
