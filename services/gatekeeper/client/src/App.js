@@ -60,7 +60,7 @@ function App() {
             // check pass & convert to v1 if needed
             await instance.loadWallet();
         } catch (error) {
-            setPassphraseErrorText(error?.message || 'Failed to load wallet');
+            setPassphraseErrorText(error?.error || error?.message || 'Failed to load wallet');
             return;
         }
 
