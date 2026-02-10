@@ -2,6 +2,7 @@
 import { program } from 'commander';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
 import Keymaster from './keymaster.js';
@@ -17,8 +18,12 @@ let keymaster: Keymaster;
 const UPDATE_OK = "OK";
 const UPDATE_FAILED = "Update failed";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', '..', 'package.json'), 'utf-8'));
+
 program
-    .version('0.2.0')
+    .version(pkg.version)
     .description('Keymaster CLI - Archon wallet management tool')
     .configureHelp({ sortSubcommands: true });
 
@@ -1300,6 +1305,19 @@ async function run() {
 
         // Initialize cipher
         const cipher = new CipherNode();
+
+        // For commands that need an existing wallet, verify it exists
+        const walletCreationCommands = ['create-wallet', 'new-wallet', 'import-wallet', 'restore-wallet-file'];
+        const commandName = process.argv[2];
+        if (commandName && !walletCreationCommands.includes(commandName)) {
+            const existing = await wallet.loadWallet();
+            if (!existing) {
+                console.error(`Error: Wallet not found at ${walletPath}`);
+                console.error('Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.');
+                console.error('To create a new wallet, run: keymaster create-wallet');
+                process.exit(1);
+            }
+        }
 
         // Initialize keymaster
         keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase });

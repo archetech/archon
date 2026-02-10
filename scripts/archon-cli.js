@@ -1,10 +1,16 @@
 import { program } from 'commander';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
 import KeymasterClient from '@didcid/keymaster/client';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
 
 let keymaster;
 
@@ -12,7 +18,7 @@ const UPDATE_OK = "OK";
 const UPDATE_FAILED = "Update failed";
 
 program
-    .version('0.1.0')
+    .version(pkg.version)
     .description('Archon CLI tool')
     .configureHelp({ sortSubcommands: true });
 

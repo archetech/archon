@@ -284,6 +284,26 @@ describe('saveWallet', () => {
             expect(error.message).toBe('Keymaster: Incorrect passphrase.');
         }
     });
+
+    it('should not mask non-passphrase errors as incorrect passphrase', async () => {
+        const corruptWallet: WalletEncFile = {
+            version: 1,
+            seed: {
+                mnemonicEnc: { salt: 'ok', iv: 'ok' } as any, // missing 'data' property
+            },
+            enc: 'dummy',
+        };
+
+        const wallet = new WalletJsonMemory();
+        const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+
+        try {
+            await keymaster.saveWallet(corruptWallet, true);
+            throw new ExpectedExceptionError();
+        } catch (error: any) {
+            expect(error.message).not.toBe('Keymaster: Incorrect passphrase.');
+        }
+    });
 });
 
 describe('decryptMnemonic', () => {
