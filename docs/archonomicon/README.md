@@ -10,6 +10,9 @@ The [Archetech](https://archetech.com) Nomicon
 ## Jurisdiction
 
 1. Only [Ulex 1.1](https://github.com/proftomwbell/Ulex/tree/master/versions/1.1) governs any claim or question arising under or related to this agreement, including the proper forum for resolving disputes, all rules applied therein, and the form and effect of any judgement.
+1. Projects that fall under the jurisdiction of Archonomicon:
+    * [Archon](https://github.com/archetech/archon)
+    * [Archon schemas](https://github.com/archetech/schemas)
 
 ## Conventions
 
