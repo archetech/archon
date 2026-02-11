@@ -100,7 +100,7 @@ export function UIProvider(
         setDocumentList,
         setIssuedStringOriginal,
         setIssuedEdit,
-        setAliasName,
+        setAlias,
         setDmailList,
         setAliasDID,
         setManifest,
@@ -470,7 +470,7 @@ export function UIProvider(
         setIssuedString("");
         setVaultList([]);
         setPollList([]);
-        setAliasName("");
+        setAlias("");
         setAliasDID("");
     }
 

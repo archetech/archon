@@ -40,21 +40,21 @@ const GroupsTab = () => {
             return;
         }
 
-        const name = groupName.trim();
-        if (name in aliasList) {
-            setError(`${name} already in use`);
+        const alias = groupName.trim();
+        if (alias in aliasList) {
+            setError(`${alias} already in use`);
             return;
         }
 
         setGroupName('');
 
         try {
-            const groupDID = await keymaster.createGroup(name, { registry });
-            await keymaster.addAlias(name, groupDID);
+            const groupDID = await keymaster.createGroup(alias, { registry });
+            await keymaster.addAlias(alias, groupDID);
 
             await refreshAliases();
-            setSelectedGroupName(name);
-            await refreshGroup(name);
+            setSelectedGroupName(alias);
+            await refreshGroup(alias);
         } catch (error: any) {
             setError(error);
         }
@@ -137,17 +137,17 @@ const GroupsTab = () => {
             return;
         }
 
-        const name = newName.trim();
-        if (name in aliasList) {
-            setError(`${name} already in use`);
+        const alias = newName.trim();
+        if (alias in aliasList) {
+            setError(`${alias} already in use`);
             return;
         }
 
         try {
-            await keymaster.addAlias(name, aliasList[selectedGroupName]);
+            await keymaster.addAlias(alias, aliasList[selectedGroupName]);
             await keymaster.removeAlias(selectedGroupName);
             await refreshAliases();
-            setSelectedGroupName(name);
+            setSelectedGroupName(alias);
             setRenameOldName("");
             setSuccess("Group renamed");
         } catch (error: any) {
@@ -224,17 +224,17 @@ const GroupsTab = () => {
                             variant="outlined"
                             size="small"
                             onChange={async (event) => {
-                                const name = event.target.value;
-                                setSelectedGroupName(name);
-                                await refreshGroup(name);
+                                const alias = event.target.value;
+                                setSelectedGroupName(alias);
+                                await refreshGroup(alias);
                             }}
                         >
                             <MenuItem value="" disabled>
                                 Select group
                             </MenuItem>
-                            {groupList.map((name, index) => (
-                                <MenuItem value={name} key={index}>
-                                    {name}
+                            {groupList.map((alias, index) => (
+                                <MenuItem value={alias} key={index}>
+                                    {alias}
                                 </MenuItem>
                             ))}
                         </Select>

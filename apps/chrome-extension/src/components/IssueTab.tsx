@@ -111,9 +111,9 @@ function IssueTab() {
                     <MenuItem value="" disabled>
                         Select subject
                     </MenuItem>
-                    {agentList.map((name, index) => (
-                        <MenuItem value={name} key={index}>
-                            {name}
+                    {agentList.map((alias, index) => (
+                        <MenuItem value={alias} key={index}>
+                            {alias}
                         </MenuItem>
                     ))}
                 </Select>
@@ -130,9 +130,9 @@ function IssueTab() {
                     <MenuItem value="" disabled>
                         Select schema
                     </MenuItem>
-                    {schemaList.map((name, index) => (
-                        <MenuItem value={name} key={index}>
-                            {name}
+                    {schemaList.map((alias, index) => (
+                        <MenuItem value={alias} key={index}>
+                            {alias}
                         </MenuItem>
                     ))}
                 </Select>

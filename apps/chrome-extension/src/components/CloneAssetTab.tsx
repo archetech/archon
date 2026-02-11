@@ -6,7 +6,7 @@ import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 
 function CloneAssetTab() {
-    const [aliasName, setAliasName] = useState("");
+    const [alias, setAlias] = useState("");
     const [aliasDID, setAliasDID] = useState("");
     const [registry, setRegistry] = useState<string>('hyperswarm');
 
@@ -20,16 +20,16 @@ function CloneAssetTab() {
             return;
         }
         try {
-            await keymaster.cloneAsset(aliasDID, { name: aliasName, registry });
+            await keymaster.cloneAsset(aliasDID, { alias, registry });
             await refreshAliases();
-            setAliasName("");
+            setAlias("");
             setAliasDID("");
         } catch (error: any) {
             setError("Only assets can be cloned");
         }
     }
 
-    const isDisabled = !aliasName || !aliasDID || !registry;
+    const isDisabled = !alias || !aliasDID || !registry;
 
     return (
         <Box className="flex-box mt-2">
@@ -38,8 +38,8 @@ function CloneAssetTab() {
                 size="small"
                 style={{ flex: "0 0 150px" }}
                 className="text-field single-line"
-                value={aliasName}
-                onChange={(e) => setAliasName(e.target.value)}
+                value={alias}
+                onChange={(e) => setAlias(e.target.value)}
                 slotProps={{
                     htmlInput: {
                         maxLength: 32,

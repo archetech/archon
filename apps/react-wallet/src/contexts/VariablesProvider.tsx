@@ -48,8 +48,8 @@ interface VariablesContextValue {
     setSelectedIssued: Dispatch<SetStateAction<string>>;
     dmailList: Record<string, DmailItem>;
     setDmailList: Dispatch<SetStateAction<Record<string, DmailItem>>>;
-    aliasName: string;
-    setAliasName: Dispatch<SetStateAction<string>>;
+    alias: string;
+    setAlias: Dispatch<SetStateAction<string>>;
     aliasDID: string;
     setAliasDID: Dispatch<SetStateAction<string>>;
     aliasList: Record<string, string>;
@@ -96,7 +96,7 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     const [credentialSubject, setCredentialSubject] = useState<string>("");
     const [credentialSchema, setCredentialSchema] = useState<string>("");
     const [credentialString, setCredentialString] = useState<string>("");
-    const [aliasName, setAliasName] = useState<string>("");
+    const [alias, setAlias] = useState<string>("");
     const [aliasDID, setAliasDID] = useState<string>("");
     const [dmailList, setDmailList] = useState<Record<string, DmailItem>>({});
     const [manifest, setManifest] = useState<Record<string, unknown> | undefined>(undefined);
@@ -146,8 +146,8 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
         setCredentialSchema,
         credentialString,
         setCredentialString,
-        aliasName,
-        setAliasName,
+        alias,
+        setAlias,
         aliasDID,
         setAliasDID,
         aliasList,

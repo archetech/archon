@@ -38,7 +38,7 @@ import CopyResolveDID from "./CopyResolveDID";
 
 function AliasedDIDs() {
     const [removeOpen, setRemoveOpen] = useState<boolean>(false);
-    const [removeName, setRemoveName] = useState<string>("");
+    const [removeAlias, setRemoveAlias] = useState<string>("");
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
     const [renameDID, setRenameDID] = useState<string>("");
@@ -69,7 +69,7 @@ function AliasedDIDs() {
     const { setError } = useSnackbar();
     const {
         agentList,
-        aliasName,
+        alias,
         aliasDID,
         documentList,
         groupList,
@@ -79,7 +79,7 @@ function AliasedDIDs() {
         pollList,
         schemaList,
         setAliasDID,
-        setAliasName,
+        setAlias,
         unresolvedList,
         vaultList,
     } = useVariablesContext();
@@ -113,11 +113,11 @@ function AliasedDIDs() {
         }
         return Object.entries({ ...aliasList, ...unresolvedList })
             .sort(([a], [b]) => a.localeCompare(b))
-            .filter(([name]) => {
-                const { kind } = getNameIcon(name);
+            .filter(([alias]) => {
+                const { kind } = getAliasIcon(alias);
                 const passesKind = (filter === "all" || kind === filter);
 
-                const reg = aliasRegistry[name];
+                const reg = aliasRegistry[alias];
                 const regTag: RegistryFilter = reg ?? "unresolved";
                 const passesRegistry = (registryFilter === "all" || regTag === registryFilter);
 
@@ -141,12 +141,12 @@ function AliasedDIDs() {
         }
     }, [openBrowser, setAliasDID]);
 
-    const allVisibleNames = mergedEntries.map(([name]) => name);
+    const allVisibleNames = mergedEntries.map(([alias]) => alias);
     const allSelectedOnPage = allVisibleNames.every((n) => selected.has(n));
     const someSelectedOnPage = allVisibleNames.some((n) => selected.has(n))
 
     async function clearFields() {
-        await setAliasName("");
+        await setAlias("");
         await setAliasDID("");
     }
 
@@ -155,7 +155,7 @@ function AliasedDIDs() {
             return;
         }
         try {
-            await keymaster.addAlias(aliasName, aliasDID);
+            await keymaster.addAlias(alias, aliasDID);
             await clearFields();
             await refreshAliases();
             requestBrowserRefresh(isBrowser);
@@ -169,13 +169,13 @@ function AliasedDIDs() {
             return;
         }
         try {
-            await keymaster.removeAlias(removeName);
+            await keymaster.removeAlias(removeAlias);
             await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
         setRemoveOpen(false);
-        setRemoveName("");
+        setRemoveAlias("");
     };
 
     const confirmBulkRemove = async () => {
@@ -241,7 +241,7 @@ function AliasedDIDs() {
         }
     };
 
-    function getNameIcon(name: string) {
+    function getAliasIcon(name: string) {
         const iconStyle = { verticalAlign: "middle", marginRight: 4 };
         if (agentList?.includes(name)) {
             return {
@@ -329,7 +329,7 @@ function AliasedDIDs() {
         <Box>
             <WarningModal
                 title="Remove DID"
-                warningText={`Are you sure you want to remove '${removeName}'?`}
+                warningText={`Are you sure you want to remove '${removeAlias}'?`}
                 isOpen={removeOpen}
                 onClose={() => setRemoveOpen(false)}
                 onSubmit={confirmRemove}
@@ -377,8 +377,8 @@ function AliasedDIDs() {
                 <TextField
                     label="Name"
                     variant="outlined"
-                    value={aliasName}
-                    onChange={(e) => setAliasName(e.target.value)}
+                    value={alias}
+                    onChange={(e) => setAlias(e.target.value)}
                     size="small"
                     className="text-field top-left short-name"
                     style={{ flex: "0 0 150px" }}
@@ -407,7 +407,7 @@ function AliasedDIDs() {
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={() => openBrowserWindow({ title: aliasName, did: aliasDID })}
+                    onClick={() => openBrowserWindow({ title: alias, did: aliasDID })}
                     className="button large bottom"
                     disabled={!aliasDID}
                 >
@@ -419,7 +419,7 @@ function AliasedDIDs() {
                     color="primary"
                     onClick={addAlias}
                     className="button large bottom"
-                    disabled={!aliasName || !aliasDID}
+                    disabled={!alias || !aliasDID}
                 >
                     Add
                 </Button>
@@ -429,7 +429,7 @@ function AliasedDIDs() {
                     color="primary"
                     onClick={clearFields}
                     className="button large bottom"
-                    disabled={!aliasName && !aliasDID}
+                    disabled={!alias && !aliasDID}
                 >
                     Clear
                 </Button>
@@ -507,7 +507,7 @@ function AliasedDIDs() {
             </Box>
 
             {mergedEntries.map(
-                ([name, did]: [string, string], index) => (
+                ([alias, did]: [string, string], index) => (
                     <Box
                         key={index}
                         display="flex"
@@ -519,8 +519,8 @@ function AliasedDIDs() {
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, minWidth: 0 }}>
                             <Checkbox
                                 size="small"
-                                checked={selected.has(name)}
-                                onChange={(e) => handleRowCheck(e, index, name)}
+                                checked={selected.has(alias)}
+                                onChange={(e) => handleRowCheck(e, index, alias)}
                             />
                             <Typography
                                 noWrap
@@ -530,18 +530,18 @@ function AliasedDIDs() {
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
-                                    color: getNameIcon(name).kind === "unknown" ? "red" : "text.primary",
+                                    color: getAliasIcon(alias).kind === "unknown" ? "red" : "text.primary",
                                 }}
                             >
-                                {getNameIcon(name).icon}
-                                {name}
+                                {getAliasIcon(alias).icon}
+                                {alias}
                             </Typography>
                         </Box>
                         <Box display="flex" alignItems="center">
                             <CopyResolveDID did={did} />
                             <Tooltip title="Rename">
                                 <IconButton
-                                    onClick={() => openRenameModal(name, did)}
+                                    onClick={() => openRenameModal(alias, did)}
                                     size="small"
                                 >
                                     <Edit />
@@ -550,7 +550,7 @@ function AliasedDIDs() {
                             <Tooltip title="Transfer">
                                 <IconButton
                                     onClick={() => {
-                                        setTransferName(name);
+                                        setTransferName(alias);
                                         setTransferOpen(true);
                                     }}
                                     size="small"
@@ -561,7 +561,7 @@ function AliasedDIDs() {
                             <Tooltip title="Revoke">
                                 <IconButton
                                     onClick={() => {
-                                        setRevokeName(name);
+                                        setRevokeName(alias);
                                         setRevokeOpen(true);
                                     }}
                                     size="small"
@@ -572,7 +572,7 @@ function AliasedDIDs() {
                             <Tooltip title="Delete">
                                 <IconButton
                                     onClick={() => {
-                                        setRemoveName(name);
+                                        setRemoveAlias(alias);
                                         setRemoveOpen(true);
                                     }}
                                     size="small"

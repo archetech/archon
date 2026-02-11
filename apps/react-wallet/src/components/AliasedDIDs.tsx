@@ -65,7 +65,7 @@ function AliasedDIDs() {
     const { setError } = useSnackbar();
     const {
         agentList,
-        aliasName,
+        alias,
         aliasDID,
         documentList,
         groupList,
@@ -75,7 +75,7 @@ function AliasedDIDs() {
         pollList,
         schemaList,
         setAliasDID,
-        setAliasName,
+        setAlias,
         unresolvedList,
         vaultList,
     } = useVariablesContext();
@@ -142,7 +142,7 @@ function AliasedDIDs() {
     const someSelectedOnPage = allVisibleNames.some((n) => selected.has(n))
 
     async function clearFields() {
-        setAliasName("");
+        setAlias("");
         setAliasDID("");
     }
 
@@ -151,7 +151,7 @@ function AliasedDIDs() {
             return;
         }
         try {
-            await keymaster.addAlias(aliasName, aliasDID);
+            await keymaster.addAlias(alias, aliasDID);
             await clearFields();
             await refreshAliases();
         } catch (error: any) {
@@ -372,8 +372,8 @@ function AliasedDIDs() {
                 <TextField
                     label="Name"
                     variant="outlined"
-                    value={aliasName}
-                    onChange={(e) => setAliasName(e.target.value)}
+                    value={alias}
+                    onChange={(e) => setAlias(e.target.value)}
                     size="small"
                     className="text-field top-left short-name"
                     style={{ flex: "0 0 150px" }}
@@ -419,7 +419,7 @@ function AliasedDIDs() {
                     color="primary"
                     onClick={addName}
                     className="button large bottom"
-                    disabled={!aliasName || !aliasDID}
+                    disabled={!alias || !aliasDID}
                 >
                     Add
                 </Button>
@@ -429,7 +429,7 @@ function AliasedDIDs() {
                     color="primary"
                     onClick={clearFields}
                     className="button large bottom"
-                    disabled={!aliasName && !aliasDID}
+                    disabled={!alias && !aliasDID}
                 >
                     Clear
                 </Button>

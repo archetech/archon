@@ -215,19 +215,19 @@ function VaultTab() {
             return;
         }
 
-        const name = vaultName.trim();
-        if (name in aliasList) {
-            setError(`${name} already in use`);
+        const alias = vaultName.trim();
+        if (alias in aliasList) {
+            setError(`${alias} already in use`);
             return;
         }
 
         setVaultName('');
         try {
-            await keymaster.createVault({ registry, name });
+            await keymaster.createVault({ registry, alias });
 
             await refreshAliases();
-            setSelectedVaultName(name);
-            await refreshVault(name);
+            setSelectedVaultName(alias);
+            await refreshVault(alias);
         } catch (error: any) {
             setError(error);
         }
@@ -434,17 +434,17 @@ function VaultTab() {
             return;
         }
 
-        const name = newName.trim();
-        if (name in aliasList) {
-            setError(`${name} already in use`);
+        const alias = newName.trim();
+        if (alias in aliasList) {
+            setError(`${alias} already in use`);
             return;
         }
 
         try {
-            await keymaster.addAlias(name, aliasList[selectedVaultName]);
+            await keymaster.addAlias(alias, aliasList[selectedVaultName]);
             await keymaster.removeAlias(selectedVaultName);
             await refreshAliases();
-            setSelectedVaultName(name);
+            setSelectedVaultName(alias);
             setRenameOldName("");
             setSuccess("Vault renamed");
         } catch (error: any) {
@@ -550,9 +550,9 @@ function VaultTab() {
                             <MenuItem value="" disabled>
                                 Select vault
                             </MenuItem>
-                            {vaultList.map((name) => (
-                                <MenuItem value={name} key={name}>
-                                    {name}
+                            {vaultList.map((alias) => (
+                                <MenuItem value={alias} key={alias}>
+                                    {alias}
                                 </MenuItem>
                             ))}
                         </Select>

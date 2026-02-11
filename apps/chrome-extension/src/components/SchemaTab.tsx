@@ -57,9 +57,9 @@ const SchemaTab = ()=> {
             return;
         }
 
-        const name = schemaName.trim();
-        if (name in aliasList) {
-            setError(`${name} already in use`);
+        const alias = schemaName.trim();
+        if (alias in aliasList) {
+            setError(`${alias} already in use`);
             return;
         }
 
@@ -67,11 +67,11 @@ const SchemaTab = ()=> {
 
         try {
             const schemaDID = await keymaster.createSchema(null, { registry });
-            await keymaster.addAlias(name, schemaDID);
+            await keymaster.addAlias(alias, schemaDID);
 
             await refreshAliases();
-            setSelectedSchemaName(name);
-            await editSchema(name);
+            setSelectedSchemaName(alias);
+            await editSchema(alias);
         } catch (error: any) {
             setError(error);
         }
@@ -88,17 +88,17 @@ const SchemaTab = ()=> {
             return;
         }
 
-        const name = newName.trim();
-        if (name in aliasList) {
-            setError(`${name} already in use`);
+        const alias = newName.trim();
+        if (alias in aliasList) {
+            setError(`${alias} already in use`);
             return;
         }
 
         try {
-            await keymaster.addAlias(name, aliasList[selectedSchemaName]);
+            await keymaster.addAlias(alias, aliasList[selectedSchemaName]);
             await keymaster.removeAlias(selectedSchemaName);
             await refreshAliases();
-            setSelectedSchemaName(name);
+            setSelectedSchemaName(alias);
             setRenameOldName("");
             setSuccess("Schema renamed");
         } catch (error: any) {
@@ -166,17 +166,17 @@ const SchemaTab = ()=> {
                         variant="outlined"
                         size="small"
                         onChange={async (event) => {
-                            const name = event.target.value;
-                            setSelectedSchemaName(name);
-                            await editSchema(name);
+                            const alias = event.target.value;
+                            setSelectedSchemaName(alias);
+                            await editSchema(alias);
                         }}
                     >
                         <MenuItem value="" disabled>
                             Select schema
                         </MenuItem>
-                        {schemaList.map((name, index) => (
-                            <MenuItem value={name} key={index}>
-                                {name}
+                        {schemaList.map((alias, index) => (
+                            <MenuItem value={alias} key={index}>
+                                {alias}
                             </MenuItem>
                         ))}
                     </Select>

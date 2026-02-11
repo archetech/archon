@@ -114,7 +114,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [newName, setNewName] = useState('');
     const [registry, setRegistry] = useState('');
     const [aliasList, setAliasList] = useState(null);
-    const [aliasName, setAliasName] = useState('');
+    const [alias, setAlias] = useState('');
     const [aliasDID, setAliasDID] = useState('');
     const [selectedName, setSelectedName] = useState('');
     const [aliasDocs, setAliasDocs] = useState('');
@@ -563,7 +563,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         const names = Object.keys(aliasList);
 
         setAliasList(aliasList);
-        setAliasName('');
+        setAlias('');
         setAliasDID('');
         setAliasDocs('');
 
@@ -576,47 +576,47 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         const vaultList = [];
         const pollList = [];
 
-        for (const name of names) {
+        for (const alias of names) {
             try {
-                const doc = await keymaster.resolveDID(name);
+                const doc = await keymaster.resolveDID(alias);
                 const data = doc.didDocumentData;
 
-                docList[name] = doc;
+                docList[alias] = doc;
 
                 if (doc.didDocumentRegistration.type === 'agent') {
-                    if (!agentList.includes(name)) {
-                        agentList.push(name);
+                    if (!agentList.includes(alias)) {
+                        agentList.push(alias);
                     }
                     continue;
                 }
 
                 if (data.group) {
-                    groupList.push(name);
+                    groupList.push(alias);
                     continue;
                 }
 
                 if (data.schema) {
-                    schemaList.push(name);
+                    schemaList.push(alias);
                     continue;
                 }
 
                 if (data.image) {
-                    imageList.push(name);
+                    imageList.push(alias);
                     continue;
                 }
 
                 if (data.document) {
-                    documentList.push(name);
+                    documentList.push(alias);
                     continue;
                 }
 
                 if (data.vault) {
-                    vaultList.push(name);
+                    vaultList.push(alias);
                     continue;
                 }
 
                 if (data.poll) {
-                    pollList.push(name);
+                    pollList.push(alias);
                     continue;
                 }
             }
@@ -671,38 +671,38 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setPollList(pollList);
     }
 
-    function getDID(name) {
-        if (name in docList) {
-            return docList[name].didDocument.id;
+    function getDID(alias) {
+        if (alias in docList) {
+            return docList[alias].didDocument.id;
         }
 
         return '';
     }
 
-    function getNameIcon(name) {
+    function getAliasIcon(alias) {
         const iconStyle = { verticalAlign: 'middle', marginRight: 4 };
 
-        if (agentList && agentList.includes(name)) {
+        if (agentList && agentList.includes(alias)) {
             return <PermIdentity style={iconStyle} />;
         }
 
-        if (vaultList && vaultList.includes(name)) {
+        if (vaultList && vaultList.includes(alias)) {
             return <Lock style={iconStyle} />;
         }
 
-        if (groupList && groupList.includes(name)) {
+        if (groupList && groupList.includes(alias)) {
             return <Groups style={iconStyle} />;
         }
 
-        if (schemaList && schemaList.includes(name)) {
+        if (schemaList && schemaList.includes(alias)) {
             return <Schema style={iconStyle} />;
         }
 
-        if (imageList && imageList.includes(name)) {
+        if (imageList && imageList.includes(alias)) {
             return <Image style={iconStyle} />;
         }
 
-        if (documentList && documentList.includes(name)) {
+        if (documentList && documentList.includes(alias)) {
             return <Article style={iconStyle} />;
         }
 
@@ -712,7 +712,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function addAlias() {
         try {
-            await keymaster.addAlias(aliasName, aliasDID);
+            await keymaster.addAlias(alias, aliasDID);
             refreshNames();
         } catch (error) {
             showError(error);
@@ -721,7 +721,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function cloneAsset() {
         try {
-            await keymaster.cloneAsset(aliasDID, { name: aliasName, registry });
+            await keymaster.cloneAsset(aliasDID, { alias: alias, registry });
             refreshNames();
         } catch (error) {
             const errorMessage = error.error || error.toString();
@@ -735,7 +735,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
-    async function resolveName(name) {
+    async function resolveAlias(name) {
         try {
             const trimmedName = name.trim();
             const docs = await keymaster.resolveDID(trimmedName);
@@ -749,10 +749,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
-    async function removeAlias(name) {
+    async function removeAlias(alias) {
         try {
-            if (window.confirm(`Are you sure you want to remove ${name}?`)) {
-                await keymaster.removeAlias(name);
+            if (window.confirm(`Are you sure you want to remove ${alias}?`)) {
+                await keymaster.removeAlias(alias);
                 refreshNames();
             }
         } catch (error) {
@@ -760,7 +760,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
-    async function changeName(oldName, did) {
+    async function changeAlias(oldName, did) {
         try {
             const newName = window.prompt("Rename DID:");
 
@@ -774,21 +774,21 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
-    async function revokeName(name) {
+    async function revokeAlias(alias) {
         try {
-            if (window.confirm(`Are you sure you want to revoke ${name}? This operation cannot be undone.`)) {
-                await keymaster.revokeDID(name);
-                resolveName(name);
-                showAlert(`Revoked ${name} can no longer be updated.`);
+            if (window.confirm(`Are you sure you want to revoke ${alias}? This operation cannot be undone.`)) {
+                await keymaster.revokeDID(alias);
+                resolveAlias(alias);
+                showAlert(`Revoked ${alias} can no longer be updated.`);
             }
         } catch (error) {
             showError(error);
         }
     }
 
-    async function transferName(name) {
+    async function transferAlias(alias) {
         try {
-            const docs = await keymaster.resolveDID(name);
+            const docs = await keymaster.resolveDID(alias);
 
             if (docs.didDocumentRegistration.type === 'agent') {
                 showAlert("Only asset DIDs may be transferred");
@@ -803,9 +803,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             const newController = window.prompt("Transfer asset to name or DID:");
 
             if (newController) {
-                await keymaster.transferAsset(name, newController);
-                resolveName(name);
-                showSuccess(`Transferred ${name} to ${newController}`);
+                await keymaster.transferAsset(alias, newController);
+                resolveAlias(alias);
+                showSuccess(`Transferred ${alias} to ${newController}`);
             }
         } catch (error) {
             showError(error);
@@ -829,14 +829,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 return;
             }
 
-            const name = groupName;
+            const alias = groupName;
             setGroupName('');
 
-            await keymaster.createGroup(name, { registry, name });
+            await keymaster.createGroup(alias, { registry, alias });
 
             refreshNames();
-            setSelectedGroupName(name);
-            refreshGroup(name);
+            setSelectedGroupName(alias);
+            refreshGroup(alias);
         } catch (error) {
             showError(error);
         }
@@ -892,14 +892,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 return;
             }
 
-            const name = schemaName;
+            const alias = schemaName;
             setSchemaName('');
 
-            await keymaster.createSchema(null, { registry, name });
+            await keymaster.createSchema(null, { registry, alias });
 
             refreshNames();
-            setSelectedSchemaName(name);
-            selectSchema(name);
+            setSelectedSchemaName(alias);
+            selectSchema(alias);
         } catch (error) {
             showError(error);
         }
@@ -1718,7 +1718,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function addDmailContact(senderDID) {
         setAliasDID(senderDID);
-        resolveName(senderDID);
+        resolveAlias(senderDID);
         setTab('names');
     }
 
@@ -1905,18 +1905,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
                     const aliasList = await keymaster.listAliases();
                     // Names have a 32-character limit. Truncating to 26 characters and appending a number if needed.
-                    let name = file.name.slice(0, 26);
+                    let alias = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in aliasList) {
-                        name = `${file.name.slice(0, 26)} (${count++})`;
+                    while (alias in aliasList) {
+                        alias = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.addAlias(name, did);
-                    showSuccess(`Image uploaded successfully: ${name}`);
+                    await keymaster.addAlias(alias, did);
+                    showSuccess(`Image uploaded successfully: ${alias}`);
 
                     refreshNames();
-                    selectImage(name);
+                    selectImage(alias);
                 } catch (error) {
                     // Catch errors from the Keymaster API or other logic
                     showError(`Error processing image: ${error}`);
@@ -2025,15 +2025,15 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     const buffer = Buffer.from(arrayBuffer);
                     // Names have a 32-character limit. Truncating to 26 characters and appending a number if needed.
                     const aliasList = await keymaster.listAliases();
-                    let name = file.name.slice(0, 26);
+                    let alias = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in aliasList) {
-                        name = `${file.name.slice(0, 26)} (${count++})`;
+                    while (alias in aliasList) {
+                        alias = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.createDocument(buffer, { registry, name, filename: file.name });
-                    showSuccess(`Document uploaded successfully: ${name}`);
+                    await keymaster.createDocument(buffer, { registry, alias, filename: file.name });
+                    showSuccess(`Document uploaded successfully: ${alias}`);
                     refreshNames();
                 } catch (error) {
                     // Catch errors from the Keymaster API or other logic
@@ -2136,14 +2136,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 return;
             }
 
-            const name = vaultName;
+            const alias = vaultName;
             setVaultName('');
 
-            await keymaster.createVault({ registry, name });
+            await keymaster.createVault({ registry, alias });
 
             refreshNames();
-            setSelectedVaultName(name);
-            refreshVault(name);
+            setSelectedVaultName(alias);
+            refreshVault(alias);
         } catch (error) {
             showError(error);
         }
@@ -2406,11 +2406,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             const extraNames = {};
             const polls = [];
 
-            for (const name of names) {
+            for (const alias of names) {
                 try {
-                    const doc = await keymaster.resolveDID(name);
+                    const doc = await keymaster.resolveDID(alias);
                     if (doc?.didDocumentData?.poll) {
-                        polls.push(name);
+                        polls.push(alias);
                     }
                 } catch { }
             }
@@ -2533,8 +2533,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     };
 
     const handleSelectPoll = async (evt) => {
-        const name = evt.target.value;
-        setSelectedPollName(name);
+        const alias = evt.target.value;
+        setSelectedPollName(alias);
         setSelectedPollDesc("");
         setSelectedOptionIdx(0);
         setSpoil(false);
@@ -2546,7 +2546,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setPollPublished(false);
 
         try {
-            const did = aliasList[name] ?? "";
+            const did = aliasList[alias] ?? "";
             if (!did) {
                 return;
             }
@@ -2704,18 +2704,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         (async () => {
             const map = {};
 
-            for (const name of pollList) {
-                const did = aliasList[name];
+            for (const alias of pollList) {
+                const did = aliasList[alias];
                 try {
                     const poll = await keymaster.getPoll(did);
                     if (!poll) {
-                        map[name] = false;
+                        map[alias] = false;
                         continue;
                     }
                     const group = await keymaster.getGroup(poll.roster);
-                    map[name] = !!group?.members?.includes(currentDID);
+                    map[alias] = !!group?.members?.includes(currentDID);
                 } catch {
-                    map[name] = false;
+                    map[alias] = false;
                 }
             }
             setEligiblePolls(map);
@@ -3174,8 +3174,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                 <TextField
                                                     label="Name"
                                                     style={{ width: '200px' }}
-                                                    value={aliasName}
-                                                    onChange={(e) => setAliasName(e.target.value)}
+                                                    value={alias}
+                                                    onChange={(e) => setAlias(e.target.value)}
                                                     fullWidth
                                                     margin="normal"
                                                     inputProps={{ maxLength: 20 }}
@@ -3193,17 +3193,17 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                 />
                                             </TableCell>
                                             <TableCell>
-                                                <Button variant="contained" color="primary" onClick={() => resolveName(aliasDID)} disabled={!aliasDID}>
+                                                <Button variant="contained" color="primary" onClick={() => resolveAlias(aliasDID)} disabled={!aliasDID}>
                                                     Resolve
                                                 </Button>
                                             </TableCell>
                                             <TableCell>
-                                                <Button variant="contained" color="primary" onClick={addAlias} disabled={!aliasName || !aliasDID}>
+                                                <Button variant="contained" color="primary" onClick={addAlias} disabled={!alias || !aliasDID}>
                                                     Add
                                                 </Button>
                                             </TableCell>
                                             <TableCell>
-                                                <Button variant="contained" color="primary" onClick={cloneAsset} disabled={!aliasName || !aliasDID || !registry}>
+                                                <Button variant="contained" color="primary" onClick={cloneAsset} disabled={!alias || !aliasDID || !registry}>
                                                     Clone
                                                 </Button>
                                             </TableCell>
@@ -3211,11 +3211,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                 <RegistrySelect />
                                             </TableCell>
                                         </TableRow>
-                                        {Object.entries(aliasList).map(([name, did], index) => (
+                                        {Object.entries(aliasList).map(([alias, did], index) => (
                                             <TableRow key={index}>
                                                 <TableCell>
-                                                    {getNameIcon(name)}
-                                                    {name}
+                                                    {getAliasIcon(alias)}
+                                                    {alias}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Typography style={{ fontSize: '.9em', fontFamily: 'Courier' }}>
@@ -3223,27 +3223,27 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                     </Typography>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => resolveName(name)}>
+                                                    <Button variant="contained" color="primary" onClick={() => resolveAlias(alias)}>
                                                         Resolve
                                                     </Button>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => changeName(name, did)}>
+                                                    <Button variant="contained" color="primary" onClick={() => changeAlias(alias, did)}>
                                                         Rename
                                                     </Button>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => removeAlias(name)}>
+                                                    <Button variant="contained" color="primary" onClick={() => removeAlias(alias)}>
                                                         Remove
                                                     </Button>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => revokeName(name)}>
+                                                    <Button variant="contained" color="primary" onClick={() => revokeAlias(alias)}>
                                                         Revoke
                                                     </Button>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => transferName(name)}>
+                                                    <Button variant="contained" color="primary" onClick={() => transferAlias(alias)}>
                                                         Transfer
                                                     </Button>
                                                 </TableCell>
@@ -3338,9 +3338,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                     <MenuItem value="" disabled>
                                                         Select schema
                                                     </MenuItem>
-                                                    {schemaList.map((name, index) => (
-                                                        <MenuItem value={name} key={index}>
-                                                            {name}
+                                                    {schemaList.map((alias, index) => (
+                                                        <MenuItem value={alias} key={index}>
+                                                            {alias}
                                                         </MenuItem>
                                                     ))}
                                                 </Select>
@@ -3420,9 +3420,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                     <MenuItem value="" disabled>
                                                         Select group
                                                     </MenuItem>
-                                                    {groupList.map((name, index) => (
-                                                        <MenuItem value={name} key={index}>
-                                                            {name}
+                                                    {groupList.map((alias, index) => (
+                                                        <MenuItem value={alias} key={index}>
+                                                            {alias}
                                                         </MenuItem>
                                                     ))}
                                                 </Select>
@@ -3538,9 +3538,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                         <MenuItem value="" disabled>
                                                             Select image
                                                         </MenuItem>
-                                                        {imageList.map((name, index) => (
-                                                            <MenuItem value={name} key={index}>
-                                                                {name}
+                                                        {imageList.map((alias, index) => (
+                                                            <MenuItem value={alias} key={index}>
+                                                                {alias}
                                                             </MenuItem>
                                                         ))}
                                                     </Select>
@@ -3664,9 +3664,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                         <MenuItem value="" disabled>
                                                             Select document
                                                         </MenuItem>
-                                                        {documentList.map((name, index) => (
-                                                            <MenuItem value={name} key={index}>
-                                                                {name}
+                                                        {documentList.map((alias, index) => (
+                                                            <MenuItem value={alias} key={index}>
+                                                                {alias}
                                                             </MenuItem>
                                                         ))}
                                                     </Select>
@@ -3796,9 +3796,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                     <MenuItem value="" disabled>
                                                         Select vault
                                                     </MenuItem>
-                                                    {vaultList.map((name, index) => (
-                                                        <MenuItem value={name} key={index}>
-                                                            {name}
+                                                    {vaultList.map((alias, index) => (
+                                                        <MenuItem value={alias} key={index}>
+                                                            {alias}
                                                         </MenuItem>
                                                     ))}
                                                 </Select>
@@ -4104,14 +4104,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                     <MenuItem value="">
                                                         Select poll
                                                     </MenuItem>
-                                                    {pollList.map((name) => (
-                                                        <MenuItem key={name} value={name}>
-                                                            {eligiblePolls[name] ? (
+                                                    {pollList.map((alias) => (
+                                                        <MenuItem key={alias} value={alias}>
+                                                            {eligiblePolls[alias] ? (
                                                                 <HowToVote fontSize="small" sx={{ mr: 1 }} />
                                                             ) : (
                                                                 <Block fontSize="small" sx={{ mr: 1 }} />
                                                             )}
-                                                            {name}
+                                                            {alias}
                                                         </MenuItem>
                                                     ))}
                                                 </Select>
@@ -4398,9 +4398,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                 <MenuItem value="" disabled>
                                                     Select subject
                                                 </MenuItem>
-                                                {agentList.map((name, index) => (
-                                                    <MenuItem value={name} key={index}>
-                                                        {name}
+                                                {agentList.map((alias, index) => (
+                                                    <MenuItem value={alias} key={index}>
+                                                        {alias}
                                                     </MenuItem>
                                                 ))}
                                             </Select>
@@ -4416,9 +4416,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                 <MenuItem value="" disabled>
                                                     Select schema
                                                 </MenuItem>
-                                                {schemaList.map((name, index) => (
-                                                    <MenuItem value={name} key={index}>
-                                                        {name}
+                                                {schemaList.map((alias, index) => (
+                                                    <MenuItem value={alias} key={index}>
+                                                        {alias}
                                                     </MenuItem>
                                                 ))}
                                             </Select>

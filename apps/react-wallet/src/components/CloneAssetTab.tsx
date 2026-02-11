@@ -7,7 +7,7 @@ import { useThemeContext } from "../contexts/ContextProviders";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 
 function CloneAssetTab() {
-    const [aliasName, setAliasName] = useState("");
+    const [alias, setAlias] = useState("");
     const [aliasDID, setAliasDID] = useState("");
     const [registry, setRegistry] = useState<string>('hyperswarm');
 
@@ -22,16 +22,16 @@ function CloneAssetTab() {
             return;
         }
         try {
-            await keymaster.cloneAsset(aliasDID, { name: aliasName, registry });
+            await keymaster.cloneAsset(aliasDID, { alias, registry });
             await refreshAliases();
-            setAliasName("");
+            setAlias("");
             setAliasDID("");
         } catch (error: any) {
             setError("Only assets can be cloned");
         }
     }
 
-    const isDisabled = !aliasName || !aliasDID || !registry;
+    const isDisabled = !alias || !aliasDID || !registry;
 
     return (
         <Box display="flex" flexDirection="column" sx={{ mt: 1, gap: 0, width: isTabletUp ? '70%' : '100%' }}>
@@ -44,8 +44,8 @@ function CloneAssetTab() {
                         borderBottomRightRadius: 0,
                     },
                 }}
-                value={aliasName}
-                onChange={(e) => setAliasName(e.target.value)}
+                value={alias}
+                onChange={(e) => setAlias(e.target.value)}
                 slotProps={{
                     htmlInput: {
                         maxLength: 32,

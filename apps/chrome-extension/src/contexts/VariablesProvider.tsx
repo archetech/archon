@@ -53,8 +53,8 @@ interface VariablesContextValue {
     setSelectedIssued: Dispatch<SetStateAction<string>>;
     dmailList: Record<string, DmailItem>;
     setDmailList: Dispatch<SetStateAction<Record<string, DmailItem>>>;
-    aliasName: string;
-    setAliasName: (value: string) => Promise<void>;
+    alias: string;
+    setAlias: (value: string) => Promise<void>;
     aliasDID: string;
     setAliasDID: (value: string) => Promise<void>;
     aliasList: Record<string, string>;
@@ -105,7 +105,7 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     const [credentialSubject, setCredentialSubject] = useState<string>("");
     const [credentialSchema, setCredentialSchema] = useState<string>("");
     const [credentialString, setCredentialString] = useState<string>("");
-    const [aliasName, setAliasNameState] = useState<string>("");
+    const [alias, setAliasState] = useState<string>("");
     const [aliasDID, setAliasDIDState] = useState<string>("");
     const [dmailList, setDmailList] = useState<Record<string, DmailItem>>({});
     const { isBrowser } = useWalletContext();
@@ -115,8 +115,8 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
         await storeState("heldDID", value);
     }
 
-    async function setAliasName(value: string) {
-        setAliasNameState(value);
+    async function setAlias(value: string) {
+        setAliasState(value);
         await storeState("aliasName", value);
     }
 
@@ -136,7 +136,7 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     }
 
     function resetCredentialState() {
-        setAliasNameState("");
+        setAliasState("");
         setAliasDIDState("");
         setHeldDIDState("");
         setCurrentIdState("");
@@ -149,7 +149,7 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
         }
 
         if (state.aliasName) {
-            setAliasNameState(state.aliasName);
+            setAliasState(state.aliasName);
         }
 
         if (state.aliasDID) {
@@ -223,8 +223,8 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
         setCredentialSchema,
         credentialString,
         setCredentialString,
-        aliasName,
-        setAliasName,
+        alias,
+        setAlias,
         aliasDID,
         setAliasDID,
         aliasList,

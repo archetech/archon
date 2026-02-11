@@ -118,18 +118,18 @@ const ImageTab = () => {
                     const did = await keymaster.createImage(buffer, { registry });
 
                     const aliasList = await keymaster.listAliases();
-                    let name = file.name.slice(0, 26);
+                    let alias = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in aliasList) {
-                        name = `${file.name.slice(0, 26)} (${count++})`;
+                    while (alias in aliasList) {
+                        alias = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.addAlias(name, did);
+                    await keymaster.addAlias(alias, did);
                     setSuccess(`Image uploaded successfully! DID: ${did}`);
 
                     await refreshAliases();
-                    setSelectedImageName(name);
+                    setSelectedImageName(alias);
                 } catch (error: any) {
                     setError(`Error processing image: ${error}`);
                 }
@@ -281,9 +281,9 @@ const ImageTab = () => {
                             <MenuItem value="" disabled>
                                 Select image
                             </MenuItem>
-                            {imageList.map((name, index) => (
-                                <MenuItem value={name} key={index}>
-                                    {name}
+                            {imageList.map((alias, index) => (
+                                <MenuItem value={alias} key={index}>
+                                    {alias}
                                 </MenuItem>
                             ))}
                         </Select>

@@ -244,7 +244,7 @@ function VaultTab() {
 
         setVaultName('');
         try {
-            await keymaster.createVault({ registry, name });
+            await keymaster.createVault({ registry, alias: name });
 
             await refreshAliases();
             setSelectedVaultName(name);

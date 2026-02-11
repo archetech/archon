@@ -119,18 +119,18 @@ const DocumentTab = () => {
                     });
 
                     const aliasList = await keymaster.listAliases();
-                    let name = file.name.slice(0, 26);
+                    let alias = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in aliasList) {
-                        name = `${file.name.slice(0, 26)} (${count++})`;
+                    while (alias in aliasList) {
+                        alias = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.addAlias(name, did);
-                    setSuccess(`Document uploaded successfully: ${name}`);
+                    await keymaster.addAlias(alias, did);
+                    setSuccess(`Document uploaded successfully: ${alias}`);
 
                     await refreshAliases();
-                    setSelectedDocumentName(name);
+                    setSelectedDocumentName(alias);
                 } catch (error: any) {
                     setError(`Error processing document: ${error}`);
                 }
@@ -297,9 +297,9 @@ const DocumentTab = () => {
                             <MenuItem value="" disabled>
                                 Select document
                             </MenuItem>
-                            {documentList.map((name, index) => (
-                                <MenuItem value={name} key={index}>
-                                    {name}
+                            {documentList.map((alias, index) => (
+                                <MenuItem value={alias} key={index}>
+                                    {alias}
                                 </MenuItem>
                             ))}
                         </Select>

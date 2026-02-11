@@ -78,7 +78,7 @@ const PollsTab: React.FC = () => {
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
     const [removeOpen, setRemoveOpen]   = useState(false);
-    const [removeName, setRemoveName]   = useState<string>("");
+    const [removeAlias, setRemoveAlias]   = useState<string>("");
     const [canVote, setCanVote] = useState<boolean>(false);
     const [eligiblePolls, setEligiblePolls] = useState<Record<string, boolean>>({});
 
@@ -124,19 +124,19 @@ const PollsTab: React.FC = () => {
     }, [currentId]);
 
     async function confirmRemovePoll() {
-        if (!keymaster || !removeName) {
+        if (!keymaster || !removeAlias) {
             return;
         }
         try {
-            await keymaster.removeAlias(removeName);
+            await keymaster.removeAlias(removeAlias);
             await refreshAliases();
             clearPollList();
-            setSuccess(`Removed '${removeName}'`);
+            setSuccess(`Removed '${removeAlias}'`);
         } catch (err: any) {
             setError(err);
         }
         setRemoveOpen(false);
-        setRemoveName("");
+        setRemoveAlias("");
     }
 
     const resetForm = () => {
@@ -416,7 +416,7 @@ const PollsTab: React.FC = () => {
         <Box>
             <WarningModal
                 title="Remove Poll"
-                warningText={`Are you sure you want to remove '${removeName}'?`}
+                warningText={`Are you sure you want to remove '${removeAlias}'?`}
                 isOpen={removeOpen}
                 onClose={() => setRemoveOpen(false)}
                 onSubmit={confirmRemovePoll}
@@ -585,14 +585,14 @@ const PollsTab: React.FC = () => {
                                     <MenuItem value="" disabled>
                                         Select poll
                                     </MenuItem>
-                                    {pollList.map((name: string) => (
-                                        <MenuItem key={name} value={name}>
-                                            {eligiblePolls[name] ? (
+                                    {pollList.map((alias: string) => (
+                                        <MenuItem key={alias} value={alias}>
+                                            {eligiblePolls[alias] ? (
                                                 <HowToVote fontSize="small" sx={{ mr: 1 }} />
                                             ) : (
                                                 <Block fontSize="small" sx={{ mr: 1 }} />
                                             )}
-                                            {name}
+                                            {alias}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -617,7 +617,7 @@ const PollsTab: React.FC = () => {
                                             sx={{ mt: 1, ml: 1 }}
                                             disabled={!selectedPollName}
                                             onClick={() => {
-                                                setRemoveName(selectedPollName);
+                                                setRemoveAlias(selectedPollName);
                                                 setRemoveOpen(true);
                                             }}
                                         >
