@@ -19,15 +19,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Setup env for Testing
         working-directory: ./tests/cli-tests
-        run: |
-          sudo apt update
-          sudo apt-get install -y expect
-          ./generate_test_env.sh
-          ln -s "$GITHUB_WORKSPACE/archon" /usr/local/bin/archon
-          ln -s "$GITHUB_WORKSPACE/admin" /usr/local/bin/admin
-          echo "/usr/local/bin" >> $GITHUB_PATH
+        run: ./generate_test_env.sh
 
       - name: Run Node
         run: |
@@ -36,12 +38,9 @@ jobs:
           sleep 30
 
       - name: Run cli-tests
-        working-directory: ./tests
         env:
-          ARCHON_GATEKEEPER_URL: http://localhost:4224
-          ARCHON_KEYMASTER_URL: http://localhost:4226
-        run: |
-          ./run_cli_tests.sh --ci-redis
+          CLI_TEST_CLEANUP: redis
+        run: npm run test:cli
 
       - name: Grab logs
         if: always()
@@ -60,9 +59,3 @@ jobs:
           name: docker-compose-logs
           path: docker-compose-logs.txt
 
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: E2E Artifacts
-          path: tests/test-results/cli-tests.xml

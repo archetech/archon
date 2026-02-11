@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/.bin/jest --runInBand --verbose --coverage",
+    "test:cli": "node --experimental-vm-modules node_modules/.bin/jest --config jest.config.cli.js --runInBand --verbose",
     "generate-openapi": "node swaggerConf.js",
     "lint": "eslint .",
     "build": "npm run build -w @didcid/browser-hdkey && npm run build -w @didcid/common && npm run build -w @didcid/ipfs && npm run build -w @didcid/cipher && npm run build -w @didcid/gatekeeper && npm run build -w @didcid/keymaster"
