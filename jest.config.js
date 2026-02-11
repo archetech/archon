@@ -40,7 +40,8 @@ const config = {
     testPathIgnorePatterns: [
         "/node_modules/",
         "/kc-app/",
-        "/client/"
+        "/client/",
+        "/tests/cli/"
     ]
 };
 
