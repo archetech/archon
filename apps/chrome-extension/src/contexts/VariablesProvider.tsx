@@ -57,10 +57,10 @@ interface VariablesContextValue {
     setAliasName: (value: string) => Promise<void>;
     aliasDID: string;
     setAliasDID: (value: string) => Promise<void>;
-    nameList: Record<string, string>;
-    setNameList: Dispatch<SetStateAction<Record<string, string>>>;
-    nameRegistry: Record<string, string>;
-    setNameRegistry: Dispatch<SetStateAction<Record<string, string>>>;
+    aliasList: Record<string, string>;
+    setAliasList: Dispatch<SetStateAction<Record<string, string>>>;
+    aliasRegistry: Record<string, string>;
+    setAliasRegistry: Dispatch<SetStateAction<Record<string, string>>>;
     unresolvedList: Record<string, string>;
     setUnresolvedList: Dispatch<SetStateAction<Record<string, string>>>;
     agentList: string[];
@@ -86,8 +86,8 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     const [registries, setRegistries] = useState<string[]>([]);
     const [heldList, setHeldList] = useState<string[]>([]);
     const [heldDID, setHeldDIDState] = useState<string>("");
-    const [nameList, setNameList] = useState<Record<string, string>>({});
-    const [nameRegistry, setNameRegistry] = useState<Record<string, string>>({});
+    const [aliasList, setAliasList] = useState<Record<string, string>>({});
+    const [aliasRegistry, setAliasRegistry] = useState<Record<string, string>>({});
     const [unresolvedList, setUnresolvedList] = useState<Record<string, string>>({});
     const [agentList, setAgentList] = useState<string[]>([]);
     const [pollList, setPollList] = useState<string[]>([]);
@@ -227,10 +227,10 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
         setAliasName,
         aliasDID,
         setAliasDID,
-        nameList,
-        setNameList,
-        nameRegistry,
-        setNameRegistry,
+        aliasList,
+        setAliasList,
+        aliasRegistry,
+        setAliasRegistry,
         unresolvedList,
         setUnresolvedList,
         agentList,

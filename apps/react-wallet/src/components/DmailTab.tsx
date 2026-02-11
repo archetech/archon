@@ -647,7 +647,7 @@ const DmailTab: React.FC = () => {
         }
         setOpenBrowser({
             did: senderDid,
-            tab: "names",
+            tab: "aliases",
         });
     }
 

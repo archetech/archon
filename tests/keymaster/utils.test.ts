@@ -144,7 +144,7 @@ describe('resolveDID', () => {
         const mockAnchor = { name: 'mockAnchor' };
         const dataDid = await keymaster.createAsset(mockAnchor);
 
-        await keymaster.addName('mock', dataDid);
+        await keymaster.addAlias('mock', dataDid);
 
         const doc1 = await keymaster.resolveDID(dataDid);
         const doc2 = await keymaster.resolveDID('mock');

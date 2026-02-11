@@ -245,7 +245,7 @@ describe('testImage', () => {
         const name = 'mockImage';
 
         await keymaster.createId('Bob');
-        await keymaster.createImage(mockImage, { name });
+        await keymaster.createImage(mockImage, { alias: name });
         const isImage = await keymaster.testImage(name);
 
         expect(isImage).toBe(true);

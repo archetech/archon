@@ -364,19 +364,19 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async listNames(): Promise<Record<string, string>> {
+    async listAliases(): Promise<Record<string, string>> {
         try {
-            const response = await axios.get(`${this.API}/names`);
-            return response.data.names;
+            const response = await axios.get(`${this.API}/aliases`);
+            return response.data.aliases;
         }
         catch (error) {
             throwError(error);
         }
     }
 
-    async addName(name: string, did: string): Promise<boolean> {
+    async addAlias(alias: string, did: string): Promise<boolean> {
         try {
-            const response = await axios.post(`${this.API}/names`, { name, did });
+            const response = await axios.post(`${this.API}/aliases`, { alias, did });
             return response.data.ok;
         }
         catch (error) {
@@ -384,9 +384,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async getName(name: string): Promise<string | null> {
+    async getAlias(alias: string): Promise<string | null> {
         try {
-            const response = await axios.get(`${this.API}/names/${name}`);
+            const response = await axios.get(`${this.API}/aliases/${alias}`);
             return response.data.did;
         }
         catch (error) {
@@ -394,9 +394,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async removeName(name: string): Promise<boolean> {
+    async removeAlias(alias: string): Promise<boolean> {
         try {
-            const response = await axios.delete(`${this.API}/names/${name}`);
+            const response = await axios.delete(`${this.API}/aliases/${alias}`);
             return response.data.ok;
         }
         catch (error) {

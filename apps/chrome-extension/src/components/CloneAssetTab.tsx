@@ -13,7 +13,7 @@ function CloneAssetTab() {
     const { keymaster } = useWalletContext();
     const { registries } = useVariablesContext();
     const { setError } = useSnackbar();
-    const { refreshNames } = useUIContext();
+    const { refreshAliases } = useUIContext();
 
     async function handleClone() {
         if (!keymaster) {
@@ -21,7 +21,7 @@ function CloneAssetTab() {
         }
         try {
             await keymaster.cloneAsset(aliasDID, { name: aliasName, registry });
-            await refreshNames();
+            await refreshAliases();
             setAliasName("");
             setAliasDID("");
         } catch (error: any) {

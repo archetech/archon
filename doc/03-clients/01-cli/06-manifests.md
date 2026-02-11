@@ -45,7 +45,7 @@ Example of `didDocumentData` with a manifest :
 Publishing a VC to a DID Manifest will make it known that the DID holder has received a particular Verifiable Credential without revealing the credential's values. In this example, we know that Bob has a social-media credential, but we do not know the details:
 
 ```sh
-$ archon add-name bob-twitter did:cid:test:z3v8Auaf3eZEUqJEu8xu1uUwxK3ZTLLXsfg9U7p6awPzyuD1AAT
+$ archon add-alias bob-twitter did:cid:test:z3v8Auaf3eZEUqJEu8xu1uUwxK3ZTLLXsfg9U7p6awPzyuD1AAT
 OK Saved
 ```
 

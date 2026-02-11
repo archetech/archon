@@ -56,13 +56,13 @@ function VaultTab() {
     const {
         currentDID,
         agentList,
-        nameList,
+        aliasList,
         vaultList,
         registries,
     } = useVariablesContext();
     const {
         getVaultItemIcon,
-        refreshNames,
+        refreshAliases,
     } = useUIContext();
 
     function removeVaultMember(did: string): void {
@@ -216,7 +216,7 @@ function VaultTab() {
         }
 
         const name = vaultName.trim();
-        if (name in nameList) {
+        if (name in aliasList) {
             setError(`${name} already in use`);
             return;
         }
@@ -225,7 +225,7 @@ function VaultTab() {
         try {
             await keymaster.createVault({ registry, name });
 
-            await refreshNames();
+            await refreshAliases();
             setSelectedVaultName(name);
             await refreshVault(name);
         } catch (error: any) {
@@ -435,15 +435,15 @@ function VaultTab() {
         }
 
         const name = newName.trim();
-        if (name in nameList) {
+        if (name in aliasList) {
             setError(`${name} already in use`);
             return;
         }
 
         try {
-            await keymaster.addName(name, nameList[selectedVaultName]);
-            await keymaster.removeName(selectedVaultName);
-            await refreshNames();
+            await keymaster.addAlias(name, aliasList[selectedVaultName]);
+            await keymaster.removeAlias(selectedVaultName);
+            await refreshAliases();
             setSelectedVaultName(name);
             setRenameOldName("");
             setSuccess("Vault renamed");
@@ -569,7 +569,7 @@ function VaultTab() {
                             </span>
                         </Tooltip>
 
-                        <CopyResolveDID did={nameList[selectedVaultName]} />
+                        <CopyResolveDID did={aliasList[selectedVaultName]} />
                     </Box>
                 )}
 

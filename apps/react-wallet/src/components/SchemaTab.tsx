@@ -16,11 +16,11 @@ const SchemaTab = ()=> {
         setSuccess,
     } = useSnackbar();
     const {
-        refreshNames,
+        refreshAliases,
     } = useUIContext();
     const {
         registries,
-        nameList,
+        aliasList,
         schemaList,
     } = useVariablesContext();
     const { isTabletUp } = useThemeContext();
@@ -62,7 +62,7 @@ const SchemaTab = ()=> {
         }
 
         const name = schemaName.trim();
-        if (name in nameList) {
+        if (name in aliasList) {
             setError(`${name} already in use`);
             return;
         }
@@ -71,9 +71,9 @@ const SchemaTab = ()=> {
 
         try {
             const schemaDID = await keymaster.createSchema(null, { registry });
-            await keymaster.addName(name, schemaDID);
+            await keymaster.addAlias(name, schemaDID);
 
-            await refreshNames();
+            await refreshAliases();
             setSelectedSchemaName(name);
             await editSchema(name);
         } catch (error: any) {
@@ -93,15 +93,15 @@ const SchemaTab = ()=> {
         }
 
         const name = newName.trim();
-        if (name in nameList) {
+        if (name in aliasList) {
             setError(`${name} already in use`);
             return;
         }
 
         try {
-            await keymaster.addName(name, nameList[selectedSchemaName]);
-            await keymaster.removeName(selectedSchemaName);
-            await refreshNames();
+            await keymaster.addAlias(name, aliasList[selectedSchemaName]);
+            await keymaster.removeAlias(selectedSchemaName);
+            await refreshAliases();
             setSelectedSchemaName(name);
             setRenameOldName("");
             setSuccess("Schema renamed");
@@ -216,7 +216,7 @@ const SchemaTab = ()=> {
                             </span>
                         </Tooltip>
 
-                        <CopyResolveDID did={nameList[selectedSchemaName] ?? ""} />
+                        <CopyResolveDID did={aliasList[selectedSchemaName] ?? ""} />
                     </Box>
                 </Box>
             }

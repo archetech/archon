@@ -79,12 +79,12 @@ describe('createAsset', () => {
         expect(doc.didDocumentData).toStrictEqual(mockAnchor);
     });
 
-    it('should create asset with specified name', async () => {
+    it('should create asset with specified alias', async () => {
         const ownerDid = await keymaster.createId('Bob');
         const mockAnchor = { name: 'mockAnchor' };
-        const mockName = 'mockName'
-        const dataDid = await keymaster.createAsset(mockAnchor, { name: mockName });
-        const doc = await keymaster.resolveDID(mockName);
+        const mockAlias = 'mockAlias'
+        const dataDid = await keymaster.createAsset(mockAnchor, { alias: mockAlias });
+        const doc = await keymaster.resolveDID(mockAlias);
 
         expect(doc.didDocument!.id).toBe(dataDid);
         expect(doc.didDocument!.controller).toBe(ownerDid);
@@ -104,10 +104,10 @@ describe('createAsset', () => {
     it('should throw an exception for an empty string anchor', async () => {
         try {
             await keymaster.createId('Bob');
-            await keymaster.createAsset({}, { name: 'Bob' });
+            await keymaster.createAsset({}, { alias: 'Bob' });
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid parameter: name already used');
+            expect(error.message).toBe('Invalid parameter: alias already used');
         }
     });
 
@@ -145,7 +145,7 @@ describe('cloneAsset', () => {
         await keymaster.createId('Bob');
         const mockData = { name: 'mockData' };
         const assetDid = await keymaster.createAsset(mockData);
-        await keymaster.addName('asset', assetDid);
+        await keymaster.addAlias('asset', assetDid);
         const cloneDid = await keymaster.cloneAsset('asset');
         const doc = await keymaster.resolveDID(cloneDid);
 
@@ -160,7 +160,7 @@ describe('cloneAsset', () => {
     it('should clone an empty asset', async () => {
         await keymaster.createId('Bob');
         const assetDid = await keymaster.createAsset({});
-        await keymaster.addName('asset', assetDid);
+        await keymaster.addAlias('asset', assetDid);
         const cloneDid = await keymaster.cloneAsset('asset');
         const doc = await keymaster.resolveDID(cloneDid);
 
@@ -223,7 +223,7 @@ describe('transferAsset', () => {
         await keymaster.createId('Bob');
         const mockAnchor = { name: 'mockAnchor' };
         const dataDid = await keymaster.createAsset(mockAnchor);
-        await keymaster.addName('asset', dataDid);
+        await keymaster.addAlias('asset', dataDid);
 
         const ok = await keymaster.transferAsset('asset', 'Alice');
         const doc = await keymaster.resolveDID(dataDid);

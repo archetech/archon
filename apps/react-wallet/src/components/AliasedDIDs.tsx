@@ -32,11 +32,10 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
-import { requestBrowserRefresh } from "../utils/utils";
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";
 
-function NamedDIDs() {
+function AliasedDIDs() {
     const [removeOpen, setRemoveOpen] = useState<boolean>(false);
     const [removeName, setRemoveName] = useState<string>("");
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
@@ -62,10 +61,7 @@ function NamedDIDs() {
     const [filter, setFilter] = useState<NameKind>("all");
     type RegistryFilter = "all" | "unresolved" | string;
     const [registryFilter, setRegistryFilter] = useState<RegistryFilter>("all");
-    const {
-        isBrowser,
-        keymaster,
-    } = useWalletContext();
+    const { keymaster } = useWalletContext();
     const { setError } = useSnackbar();
     const {
         agentList,
@@ -74,8 +70,8 @@ function NamedDIDs() {
         documentList,
         groupList,
         imageList,
-        nameList,
-        nameRegistry,
+        aliasList,
+        aliasRegistry,
         pollList,
         schemaList,
         setAliasDID,
@@ -85,17 +81,17 @@ function NamedDIDs() {
     } = useVariablesContext();
     const {
         openBrowser,
-        openBrowserWindow,
-        refreshNames,
+        setOpenBrowser,
+        refreshAliases,
     } = useUIContext();
 
     const registryOptions = useMemo(() => {
         const regs = new Set<string>();
-        Object.values(nameRegistry || {}).forEach((r) => {
+        Object.values(aliasRegistry || {}).forEach((r) => {
             if (r) regs.add(r);
         });
         return Array.from(regs).sort();
-    }, [nameRegistry]);
+    }, [aliasRegistry]);
 
     useEffect(() => {
         if (
@@ -108,23 +104,23 @@ function NamedDIDs() {
     }, [registryOptions, registryFilter]);
 
     const mergedEntries = useMemo(() => {
-        if (!nameList && !unresolvedList) {
+        if (!aliasList && !unresolvedList) {
             return [] as Array<[string, string]>;
         }
-        return Object.entries({ ...nameList, ...unresolvedList })
+        return Object.entries({ ...aliasList, ...unresolvedList })
             .sort(([a], [b]) => a.localeCompare(b))
             .filter(([name]) => {
                 const { kind } = getNameIcon(name);
                 const passesKind = (filter === "all" || kind === filter);
 
-                const reg = nameRegistry[name];
+                const reg = aliasRegistry[name];
                 const regTag: RegistryFilter = reg ?? "unresolved";
                 const passesRegistry = (registryFilter === "all" || regTag === registryFilter);
 
                 return passesKind && passesRegistry;
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [nameList, nameRegistry, unresolvedList, filter, registryFilter]);
+    }, [aliasList, aliasRegistry, unresolvedList, filter, registryFilter]);
 
     useEffect(() => {
         if (!openBrowser) {
@@ -132,7 +128,7 @@ function NamedDIDs() {
         }
         const { did, tab } = openBrowser;
 
-        if (tab !== "names") {
+        if (tab !== "aliases") {
             return;
         }
 
@@ -146,8 +142,8 @@ function NamedDIDs() {
     const someSelectedOnPage = allVisibleNames.some((n) => selected.has(n))
 
     async function clearFields() {
-        await setAliasName("");
-        await setAliasDID("");
+        setAliasName("");
+        setAliasDID("");
     }
 
     async function addName() {
@@ -155,10 +151,9 @@ function NamedDIDs() {
             return;
         }
         try {
-            await keymaster.addName(aliasName, aliasDID);
+            await keymaster.addAlias(aliasName, aliasDID);
             await clearFields();
-            await refreshNames();
-            requestBrowserRefresh(isBrowser);
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
@@ -169,8 +164,8 @@ function NamedDIDs() {
             return;
         }
         try {
-            await keymaster.removeName(removeName);
-            await refreshNames();
+            await keymaster.removeAlias(removeName);
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
@@ -185,8 +180,8 @@ function NamedDIDs() {
         }
         try {
             const names = Array.from(selected);
-            await Promise.allSettled(names.map((n) => keymaster.removeName(n)));
-            await refreshNames();
+            await Promise.allSettled(names.map((n) => keymaster.removeAlias(n)));
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
@@ -206,9 +201,9 @@ function NamedDIDs() {
             return;
         }
         try {
-            await keymaster.addName(newName, renameDID);
-            await keymaster.removeName(renameOldName);
-            await refreshNames();
+            await keymaster.addAlias(newName, renameDID);
+            await keymaster.removeAlias(renameOldName);
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
@@ -220,7 +215,7 @@ function NamedDIDs() {
         }
         try {
             await keymaster.revokeDID(revokeName);
-            await refreshNames();
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
@@ -235,7 +230,7 @@ function NamedDIDs() {
         }
         try {
             await keymaster.transferAsset(transferName, newController.trim());
-            await refreshNames();
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
@@ -407,7 +402,12 @@ function NamedDIDs() {
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={() => openBrowserWindow({ title: aliasName, did: aliasDID })}
+                    onClick={() => {
+                        setOpenBrowser({
+                            did: aliasDID,
+                            tab: "viewer"
+                        });
+                    }}
                     className="button large bottom"
                     disabled={!aliasDID}
                 >
@@ -441,13 +441,11 @@ function NamedDIDs() {
                         checked={allSelectedOnPage}
                         indeterminate={!allSelectedOnPage && someSelectedOnPage}
                         onChange={toggleSelectAllVisible}
-                        inputProps={{ "aria-label": "select all" }}
                         size="small"
                     />
                     <IconButton
                         size="small"
                         onClick={(e) => setBulkMenuAnchor(e.currentTarget)}
-                        aria-label="bulk actions"
                     >
                         <ArrowDropDown />
                     </IconButton>
@@ -588,4 +586,4 @@ function NamedDIDs() {
     );
 }
 
-export default NamedDIDs;
+export default AliasedDIDs;

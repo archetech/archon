@@ -23,7 +23,7 @@ import { useUIContext } from "../contexts/UIContext";
 import { useThemeContext } from "../contexts/ContextProviders";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
-import NamedDIDs from "./NamedDIDs";
+import AliasedDIDs from "./AliasedDIDs";
 import AssetsTab from "./AssetsTab";
 import DmailTab from "./DmailTab";
 import PollTab from "./PollTab";
@@ -222,8 +222,8 @@ function BrowserContent() {
                                 {displayComponent && (
                                     <Tab
                                         icon={<List />}
-                                        label={menuOpen ? "Named DIDs" : ""}
-                                        value="names"
+                                        label={menuOpen ? "Aliased DIDs" : ""}
+                                        value="aliases"
                                         iconPosition="start"
                                         className="sidebarTab"
                                         sx={{ gap: 0.25 }}
@@ -299,8 +299,8 @@ function BrowserContent() {
                             )}
 
                             {displayComponent && (
-                                <TabPanel value="names" sx={{ p: 0 }}>
-                                    <NamedDIDs />
+                                <TabPanel value="aliases" sx={{ p: 0 }}>
+                                    <AliasedDIDs />
                                 </TabPanel>
                             )}
 

@@ -73,9 +73,9 @@ program
     .description('Remove invalid DIDs from the wallet')
     .action(async () => {
         try {
-            const { idsRemoved, ownedRemoved, heldRemoved, namesRemoved } = await keymaster.fixWallet();
+            const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
 
-            console.log(`${idsRemoved} IDs and ${ownedRemoved} owned DIDs and ${heldRemoved} held DIDs and ${namesRemoved} names were removed`);
+            console.log(`${idsRemoved} IDs and ${ownedRemoved} owned DIDs and ${heldRemoved} held DIDs and ${aliasesRemoved} aliases were removed`);
         }
         catch (error) {
             console.error(error.error || error);
@@ -430,12 +430,12 @@ program
     .command('create-challenge [file]')
     .description('Create a challenge (optionally from a file)')
     // eslint-disable-next-line
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .action(async (file, options) => {
         try {
-            const { name } = options;
+            const { alias } = options;
             const challenge = file ? JSON.parse(fs.readFileSync(file).toString()) : undefined;
-            const did = await keymaster.createChallenge(challenge, { name });
+            const did = await keymaster.createChallenge(challenge, { alias });
             console.log(did);
         }
         catch (error) {
@@ -446,12 +446,12 @@ program
 program
     .command('create-challenge-cc <did>')
     .description('Create a challenge from a credential DID')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .action(async (credentialDID, options) => {
         try {
-            const { name } = options;
+            const { alias } = options;
             const challenge = { credentials: [{ schema: credentialDID }] };
-            const did = await keymaster.createChallenge(challenge, { name });
+            const did = await keymaster.createChallenge(challenge, { alias });
             console.log(did);
         }
         catch (error) {
@@ -475,13 +475,13 @@ program
 program
     .command('issue-credential <file>')
     .description('Sign and encrypt a bound credential file')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (file, options) => {
         try {
-            const { name, registry } = options;
+            const { alias, registry } = options;
             const vc = JSON.parse(fs.readFileSync(file).toString());
-            const did = await keymaster.issueCredential(vc, { registry, name });
+            const did = await keymaster.issueCredential(vc, { registry, alias });
             console.log(did);
         }
         catch (error) {
@@ -518,17 +518,17 @@ program
 program
     .command('accept-credential <did>')
     .description('Save verifiable credential for current ID')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .action(async (did, options) => {
-        const { name } = options;
+        const { alias } = options;
         try {
             const ok = await keymaster.acceptCredential(did);
 
             if (ok) {
                 console.log(UPDATE_OK);
 
-                if (name) {
-                    await keymaster.addName(name, did);
+                if (alias) {
+                    await keymaster.addAlias(alias, did);
                 }
             }
             else {
@@ -632,11 +632,11 @@ program
     });
 
 program
-    .command('add-name <name> <did>')
-    .description('Add a name for a DID')
-    .action(async (name, did) => {
+    .command('add-alias <alias> <did>')
+    .description('Add an alias for a DID')
+    .action(async (alias, did) => {
         try {
-            await keymaster.addName(name, did);
+            await keymaster.addAlias(alias, did);
             console.log(UPDATE_OK);
         }
         catch (error) {
@@ -645,12 +645,12 @@ program
     });
 
 program
-    .command('get-name <name>')
-    .description('Get DID assigned to name')
-    .action(async (name) => {
+    .command('get-alias <alias>')
+    .description('Get DID assigned to alias')
+    .action(async (alias) => {
         try {
-            const did = await keymaster.getName(name);
-            console.log(did || `${name} not found`);
+            const did = await keymaster.getAlias(alias);
+            console.log(did || `${alias} not found`);
         }
         catch (error) {
             console.error(error.error || error);
@@ -658,11 +658,11 @@ program
     });
 
 program
-    .command('remove-name <name>')
-    .description('Removes a name for a DID')
-    .action(async (name) => {
+    .command('remove-alias <alias>')
+    .description('Removes an alias for a DID')
+    .action(async (alias) => {
         try {
-            await keymaster.removeName(name);
+            await keymaster.removeAlias(alias);
             console.log(UPDATE_OK);
         }
         catch (error) {
@@ -671,17 +671,17 @@ program
     });
 
 program
-    .command('list-names')
-    .description('List DID names (aliases)')
+    .command('list-aliases')
+    .description('List DID aliases')
     .action(async () => {
         try {
-            const names = await keymaster.listNames();
+            const aliases = await keymaster.listAliases();
 
-            if (names) {
-                console.log(JSON.stringify(names, null, 4));
+            if (aliases) {
+                console.log(JSON.stringify(aliases, null, 4));
             }
             else {
-                console.log("No names defined");
+                console.log("No aliases defined");
             }
         }
         catch (error) {
@@ -692,12 +692,12 @@ program
 program
     .command('create-group <groupName>')
     .description('Create a new group')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (groupName, options) => {
         try {
-            const { name, registry } = options;
-            const did = await keymaster.createGroup(groupName, { name, registry });
+            const { alias, registry } = options;
+            const did = await keymaster.createGroup(groupName, { alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -773,13 +773,13 @@ program
 program
     .command('create-schema <file>')
     .description('Create a schema from a file')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (file, options) => {
         try {
-            const { name, registry } = options;
+            const { alias, registry } = options;
             const schema = JSON.parse(fs.readFileSync(file).toString());
-            const did = await keymaster.createSchema(schema, { name, registry });
+            const did = await keymaster.createSchema(schema, { alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -830,12 +830,12 @@ program
 program
     .command('create-asset')
     .description('Create an empty asset')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (options) => {
         try {
-            const { name, registry } = options;
-            const did = await keymaster.createAsset({}, { name, registry });
+            const { alias, registry } = options;
+            const did = await keymaster.createAsset({}, { alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -846,13 +846,13 @@ program
 program
     .command('create-asset-json <file>')
     .description('Create an asset from a JSON file')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (file, options) => {
         try {
-            const { name, registry } = options;
+            const { alias, registry } = options;
             const data = JSON.parse(fs.readFileSync(file).toString());
-            const did = await keymaster.createAsset(data, { name, registry });
+            const did = await keymaster.createAsset(data, { alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -863,13 +863,13 @@ program
 program
     .command('create-asset-image <file>')
     .description('Create an asset from an image file')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (file, options) => {
         try {
-            const { name, registry } = options;
+            const { alias, registry } = options;
             const data = fs.readFileSync(file);
-            const did = await keymaster.createImage(data, { name, registry });
+            const did = await keymaster.createImage(data, { alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -880,14 +880,14 @@ program
 program
     .command('create-asset-document <file>')
     .description('Create an asset from a document file')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (file, options) => {
         try {
-            const { name, registry } = options;
+            const { alias, registry } = options;
             const data = fs.readFileSync(file);
             const filename = file.split('/').pop();
-            const did = await keymaster.createDocument(data, { filename, name, registry });
+            const did = await keymaster.createDocument(data, { filename, alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -966,12 +966,12 @@ program
 program
     .command('clone-asset <id>')
     .description('Clone an asset')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (id, options) => {
         try {
-            const { name, registry } = options;
-            const did = await keymaster.cloneAsset(id, { name, registry });
+            const { alias, registry } = options;
+            const did = await keymaster.cloneAsset(id, { alias, registry });
             console.log(did);
         } catch (error) {
             console.error(error.error || error);
@@ -1034,13 +1034,13 @@ program
 program
     .command('create-poll <file>')
     .description('Create a poll')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (file, options) => {
         try {
-            const { name, registry } = options;
+            const { alias, registry } = options;
             const poll = JSON.parse(fs.readFileSync(file).toString());
-            const did = await keymaster.createPoll(poll, { name, registry });
+            const did = await keymaster.createPoll(poll, { alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -1167,7 +1167,7 @@ program
 program
     .command('create-vault')
     .description('Create a vault')
-    .option('-n, --name <name>', 'DID name')
+    .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .option('-s, --secretMembers', 'keep member list secret from each other')
     .action(async (options) => {

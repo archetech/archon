@@ -146,7 +146,7 @@
                         "current": {
                           "type": "string"
                         },
-                        "names": {
+                        "aliases": {
                           "type": "object",
                           "additionalProperties": {
                             "type": "string"
@@ -236,7 +236,7 @@
                       "current": {
                         "type": "string"
                       },
-                      "names": {
+                      "aliases": {
                         "type": "object",
                         "additionalProperties": {
                           "type": "string"
@@ -369,7 +369,7 @@
                         "current": {
                           "type": "string"
                         },
-                        "names": {
+                        "aliases": {
                           "type": "object",
                           "additionalProperties": {
                             "type": "string"
@@ -500,7 +500,7 @@
                         "current": {
                           "type": "string"
                         },
-                        "names": {
+                        "aliases": {
                           "type": "object",
                           "additionalProperties": {
                             "type": "string"
@@ -605,7 +605,7 @@
                         "heldRemoved": {
                           "type": "integer"
                         },
-                        "namesRemoved": {
+                        "aliasesRemoved": {
                           "type": "integer"
                         }
                       }
@@ -1565,23 +1565,23 @@
         }
       }
     },
-    "/names": {
+    "/aliases": {
       "get": {
-        "summary": "List all name-to-DID mappings in the wallet.",
+        "summary": "List all alias-to-DID mappings in the wallet.",
         "responses": {
           "200": {
-            "description": "A list of all name-to-DID mappings.",
+            "description": "A list of all alias-to-DID mappings.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "names": {
+                    "aliases": {
                       "type": "object",
                       "additionalProperties": {
                         "type": "string"
                       },
-                      "description": "An object where each key is a name, and each value is the associated DID."
+                      "description": "An object where each key is an alias, and each value is the associated DID."
                     }
                   }
                 }
@@ -1606,7 +1606,7 @@
         }
       },
       "post": {
-        "summary": "Add a new name-to-DID mapping.",
+        "summary": "Add a new alias-to-DID mapping.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1614,17 +1614,17 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": {
+                  "alias": {
                     "type": "string",
-                    "description": "The human-readable name to associate with the DID."
+                    "description": "The human-readable alias to associate with the DID."
                   },
                   "did": {
                     "type": "string",
-                    "description": "The DID that this name should refer to."
+                    "description": "The DID that this alias should refer to."
                   }
                 },
                 "required": [
-                  "name",
+                  "alias",
                   "did"
                 ]
               }
@@ -1665,24 +1665,24 @@
         }
       }
     },
-    "/names/{name}": {
+    "/aliases/{alias}": {
       "get": {
-        "summary": "Retrieve the DID associated with a specific name.",
-        "description": "Returns the DID for the provided human-readable name, if it exists.",
+        "summary": "Retrieve the DID associated with a specific alias.",
+        "description": "Returns the DID for the provided human-readable alias, if it exists.",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "alias",
             "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "The name for which you want the associated DID."
+            "description": "The alias for which you want the associated DID."
           }
         ],
         "responses": {
           "200": {
-            "description": "The DID associated with the requested name.",
+            "description": "The DID associated with the requested alias.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1697,7 +1697,7 @@
             }
           },
           "404": {
-            "description": "The requested name was not found.",
+            "description": "The requested alias was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1714,16 +1714,16 @@
         }
       },
       "delete": {
-        "summary": "Remove an existing name-to-DID mapping.",
+        "summary": "Remove an existing alias-to-DID mapping.",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "alias",
             "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "The name whose mapping should be removed."
+            "description": "The alias whose mapping should be removed."
           }
         ],
         "responses": {

@@ -103,7 +103,7 @@ describe('verifyRecipientList', () => {
         const alice = await keymaster.createId('Alice');
         const bob = await keymaster.createId('Bob');
         const charles = await keymaster.createId('Charles');
-        await keymaster.addName('Chuck', charles);
+        await keymaster.addAlias('Chuck', charles);
         const to = ['Alice', 'Bob', 'Chuck'];
 
         const verified = await keymaster.verifyRecipientList(to);
@@ -113,7 +113,7 @@ describe('verifyRecipientList', () => {
 
     it('should throw an exception on invalid list', async () => {
         await keymaster.createId('Alice');
-        await keymaster.createAsset({ mock: 'mock' }, { name: 'Asset' });
+        await keymaster.createAsset({ mock: 'mock' }, { alias: 'Asset' });
 
         try {
             await keymaster.verifyRecipientList(123 as any);

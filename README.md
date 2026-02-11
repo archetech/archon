@@ -80,7 +80,7 @@ Commands:
   add-group-member <group> <member>        Add a member to a group
   add-vault-item <id> <file>         Add an item (file) to a vault
   add-vault-member <id> <member>     Add a member to a vault
-  add-name <name> <did>                    Add a name for a DID
+  add-alias <alias> <did>                  Add an alias for a DID
   backup-id                                Backup the current ID to its registry
   backup-wallet-did                        Backup wallet to encrypted DID and seed bank
   backup-wallet-file <file>                Backup wallet to file
@@ -112,7 +112,7 @@ Commands:
   get-credential <did>                     Get credential by DID
   get-group <did>                          Get group by DID
   get-vault-item <id> <item> <file>  Save an item from a vault to a file
-  get-name <name>                          Get DID assigned to name
+  get-alias <alias>                        Get DID assigned to alias
   get-schema <did>                         Get schema by DID
   help [command]                           display help for command
   import-wallet <recovery-phrase>          Create new wallet from a recovery phrase
@@ -124,7 +124,7 @@ Commands:
   list-groups                              List groups owned by current ID
   list-ids                                 List IDs and show current ID
   list-issued                              List issued credentials
-  list-names                               List DID names (aliases)
+  list-aliases                             List DID aliases
   list-schemas                             List schemas owned by current ID
   perf-test [N]                            Performance test to create N credentials
   publish-credential <did>                 Publish the existence of a credential to the current user manifest
@@ -135,7 +135,7 @@ Commands:
   remove-vault-item <id> <item>      Remove an item from a vault
   remove-vault-member <id> <member>  Remove a member from a vault
   remove-id <name>                         Deletes named ID
-  remove-name <name>                       Removes a name for a DID
+  remove-alias <alias>                     Removes an alias for a DID
   rename-id <oldName> <newName>            Renames the ID
   resolve-did <did> [confirm]              Return document associated with DID
   resolve-did-version <did> <version>      Return specified version of document associated with DID

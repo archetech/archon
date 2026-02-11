@@ -113,7 +113,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [accessGranted, setAccessGranted] = useState(false);
     const [newName, setNewName] = useState('');
     const [registry, setRegistry] = useState('');
-    const [nameList, setNameList] = useState(null);
+    const [aliasList, setAliasList] = useState(null);
     const [aliasName, setAliasName] = useState('');
     const [aliasDID, setAliasDID] = useState('');
     const [selectedName, setSelectedName] = useState('');
@@ -242,7 +242,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     });
 
     const pollExpired = pollDeadline ? Date.now() > pollDeadline.getTime() : false;
-    const selectedPollDid = selectedPollName ? nameList[selectedPollName] ?? "" : "";
+    const selectedPollDid = selectedPollName ? aliasList[selectedPollName] ?? "" : "";
 
     const handleSnackbarClose = () => {
         setSnackbar((prev) => ({ ...prev, open: false }));
@@ -559,10 +559,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     }
 
     async function refreshNames() {
-        const nameList = await keymaster.listNames();
-        const names = Object.keys(nameList);
+        const aliasList = await keymaster.listAliases();
+        const names = Object.keys(aliasList);
 
-        setNameList(nameList);
+        setAliasList(aliasList);
         setAliasName('');
         setAliasDID('');
         setAliasDocs('');
@@ -710,9 +710,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         return <Token style={iconStyle} />;
     }
 
-    async function addName() {
+    async function addAlias() {
         try {
-            await keymaster.addName(aliasName, aliasDID);
+            await keymaster.addAlias(aliasName, aliasDID);
             refreshNames();
         } catch (error) {
             showError(error);
@@ -749,10 +749,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
-    async function removeName(name) {
+    async function removeAlias(name) {
         try {
             if (window.confirm(`Are you sure you want to remove ${name}?`)) {
-                await keymaster.removeName(name);
+                await keymaster.removeAlias(name);
                 refreshNames();
             }
         } catch (error) {
@@ -765,8 +765,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             const newName = window.prompt("Rename DID:");
 
             if (newName && newName !== oldName) {
-                await keymaster.addName(newName, did);
-                await keymaster.removeName(oldName);
+                await keymaster.addAlias(newName, did);
+                await keymaster.removeAlias(oldName);
                 refreshNames();
             }
         } catch (error) {
@@ -824,7 +824,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function createGroup() {
         try {
-            if (Object.keys(nameList).includes(groupName)) {
+            if (Object.keys(aliasList).includes(groupName)) {
                 alert(`${groupName} already in use`);
                 return;
             }
@@ -887,7 +887,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function createSchema() {
         try {
-            if (Object.keys(nameList).includes(schemaName)) {
+            if (Object.keys(aliasList).includes(schemaName)) {
                 alert(`${schemaName} already in use`);
                 return;
             }
@@ -983,7 +983,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             }
 
             // Import each schema with appropriate name
-            const existingNames = Object.keys(nameList);
+            const existingNames = Object.keys(aliasList);
 
             for (const { did, schema, doc } of schemaDIDs) {
                 let name = null;
@@ -1019,7 +1019,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     suffix++;
                 }
 
-                await keymaster.addName(uniqueName, did);
+                await keymaster.addAlias(uniqueName, did);
                 existingNames.push(uniqueName);
             }
 
@@ -1035,7 +1035,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 packName = `${basePackName}-${suffix}`;
                 suffix++;
             }
-            await keymaster.addName(packName, packDoc.didDocument.id);
+            await keymaster.addAlias(packName, packDoc.didDocument.id);
 
             setSchemaPackDID('');
             refreshNames();
@@ -1790,8 +1790,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 showError(`${checked} DIDs checked, no problems found`);
             }
             else if (window.confirm(`${checked} DIDs checked\n${invalid} invalid DIDs found\n${deleted} deleted DIDs found\n\nFix wallet?`)) {
-                const { idsRemoved, ownedRemoved, heldRemoved, namesRemoved } = await keymaster.fixWallet();
-                showError(`${idsRemoved} IDs removed\n${ownedRemoved} owned DIDs removed\n${heldRemoved} held DIDs removed\n${namesRemoved} names removed`);
+                const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
+                showError(`${idsRemoved} IDs removed\n${ownedRemoved} owned DIDs removed\n${heldRemoved} held DIDs removed\n${aliasesRemoved} aliases removed`);
                 refreshAll();
             }
 
@@ -1903,16 +1903,16 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     const buffer = Buffer.from(arrayBuffer);
                     const did = await keymaster.createImage(buffer, { registry });
 
-                    const nameList = await keymaster.listNames();
+                    const aliasList = await keymaster.listAliases();
                     // Names have a 32-character limit. Truncating to 26 characters and appending a number if needed.
                     let name = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in nameList) {
+                    while (name in aliasList) {
                         name = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.addName(name, did);
+                    await keymaster.addAlias(name, did);
                     showSuccess(`Image uploaded successfully: ${name}`);
 
                     refreshNames();
@@ -2024,11 +2024,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     const arrayBuffer = e.target.result;
                     const buffer = Buffer.from(arrayBuffer);
                     // Names have a 32-character limit. Truncating to 26 characters and appending a number if needed.
-                    const nameList = await keymaster.listNames();
+                    const aliasList = await keymaster.listAliases();
                     let name = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in nameList) {
+                    while (name in aliasList) {
                         name = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
@@ -2131,7 +2131,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function createVault() {
         try {
-            if (vaultName in nameList) {
+            if (vaultName in aliasList) {
                 alert(`${vaultName} already in use`);
                 return;
             }
@@ -2398,8 +2398,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     const refreshPoll = useCallback(async () => {
         try {
-            const walletNames = await keymaster.listNames();
-            const names = Object.keys(walletNames).sort((a, b) =>
+            const walletAliases = await keymaster.listAliases();
+            const names = Object.keys(walletAliases).sort((a, b) =>
                 a.localeCompare(b)
             );
 
@@ -2417,17 +2417,17 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
             if (!arraysEqual(polls, pollList)) {
                 for (const n of polls) {
-                    if (!(n in nameList)) {
-                        extraNames[n] = walletNames[n];
+                    if (!(n in aliasList)) {
+                        extraNames[n] = walletAliases[n];
                     }
                 }
                 if (Object.keys(extraNames).length) {
-                    setNameList((prev) => ({ ...prev, ...extraNames }));
+                    setAliasList((prev) => ({ ...prev, ...extraNames }));
                 }
                 setPollList(polls);
             }
         } catch { }
-    }, [keymaster, nameList, pollList]);
+    }, [keymaster, aliasList, pollList]);
 
     // Check notices and update DMail and polls every 30 seconds
     useEffect(() => {
@@ -2450,7 +2450,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             showError("Poll name is required");
             return null;
         }
-        if (pollName in nameList) {
+        if (pollName in aliasList) {
             showError(`Name "${pollName}" is already in use`);
             return null;
         }
@@ -2476,7 +2476,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return null;
         }
 
-        const roster = nameList[rosterDid] ?? rosterDid;
+        const roster = aliasList[rosterDid] ?? rosterDid;
 
         return {
             ...template,
@@ -2497,7 +2497,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             const did = await keymaster.createPoll(poll, { registry });
             setCreatedPollDid(did);
             setPollNoticeSent(false);
-            await keymaster.addName(pollName, did);
+            await keymaster.addAlias(pollName, did);
             await refreshNames();
             showSuccess(`Poll created: ${did}`);
         } catch (e) {
@@ -2510,7 +2510,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return;
         }
         try {
-            const group = await keymaster.getGroup(nameList[rosterDid] ?? rosterDid);
+            const group = await keymaster.getGroup(aliasList[rosterDid] ?? rosterDid);
             if (!group || group.members.length === 0) {
                 showError("Group not found or empty");
                 return;
@@ -2546,7 +2546,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setPollPublished(false);
 
         try {
-            const did = nameList[name] ?? "";
+            const did = aliasList[name] ?? "";
             if (!did) {
                 return;
             }
@@ -2681,7 +2681,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return;
         }
         try {
-            await keymaster.removeName(removePollName);
+            await keymaster.removeAlias(removePollName);
             await refreshNames();
             setSelectedPollName("");
             setSelectedPollDesc("");
@@ -2705,7 +2705,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             const map = {};
 
             for (const name of pollList) {
-                const did = nameList[name];
+                const did = aliasList[name];
                 try {
                     const poll = await keymaster.getPoll(did);
                     if (!poll) {
@@ -2720,7 +2720,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             }
             setEligiblePolls(map);
         })();
-    }, [pollList, nameList, keymaster, currentDID]);
+    }, [pollList, aliasList, keymaster, currentDID]);
 
     const openRenameModal = () => {
         setRenameOldPollName(selectedPollName);
@@ -2733,8 +2733,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return;
         }
         try {
-            await keymaster.addName(newName, selectedPollDid);
-            await keymaster.removeName(selectedPollName);
+            await keymaster.addAlias(newName, selectedPollDid);
+            await keymaster.removeAlias(selectedPollName);
             await refreshNames();
             setSelectedPollName(newName);
             setRenameOldPollName("");
@@ -3198,7 +3198,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                 </Button>
                                             </TableCell>
                                             <TableCell>
-                                                <Button variant="contained" color="primary" onClick={addName} disabled={!aliasName || !aliasDID}>
+                                                <Button variant="contained" color="primary" onClick={addAlias} disabled={!aliasName || !aliasDID}>
                                                     Add
                                                 </Button>
                                             </TableCell>
@@ -3211,7 +3211,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                 <RegistrySelect />
                                             </TableCell>
                                         </TableRow>
-                                        {Object.entries(nameList).map(([name, did], index) => (
+                                        {Object.entries(aliasList).map(([name, did], index) => (
                                             <TableRow key={index}>
                                                 <TableCell>
                                                     {getNameIcon(name)}
@@ -3233,7 +3233,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                     </Button>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => removeName(name)}>
+                                                    <Button variant="contained" color="primary" onClick={() => removeAlias(name)}>
                                                         Remove
                                                     </Button>
                                                 </TableCell>

@@ -15,11 +15,11 @@ const GroupsTab = () => {
     const { setError, setSuccess } = useSnackbar();
     const {
         groupList,
-        nameList,
+        aliasList,
         registries,
     } = useVariablesContext();
     const {
-        refreshNames,
+        refreshAliases,
         setOpenBrowser,
         openBrowserWindow,
     } = useUIContext();
@@ -41,7 +41,7 @@ const GroupsTab = () => {
         }
 
         const name = groupName.trim();
-        if (name in nameList) {
+        if (name in aliasList) {
             setError(`${name} already in use`);
             return;
         }
@@ -50,9 +50,9 @@ const GroupsTab = () => {
 
         try {
             const groupDID = await keymaster.createGroup(name, { registry });
-            await keymaster.addName(name, groupDID);
+            await keymaster.addAlias(name, groupDID);
 
-            await refreshNames();
+            await refreshAliases();
             setSelectedGroupName(name);
             await refreshGroup(name);
         } catch (error: any) {
@@ -138,15 +138,15 @@ const GroupsTab = () => {
         }
 
         const name = newName.trim();
-        if (name in nameList) {
+        if (name in aliasList) {
             setError(`${name} already in use`);
             return;
         }
 
         try {
-            await keymaster.addName(name, nameList[selectedGroupName]);
-            await keymaster.removeName(selectedGroupName);
-            await refreshNames();
+            await keymaster.addAlias(name, aliasList[selectedGroupName]);
+            await keymaster.removeAlias(selectedGroupName);
+            await refreshAliases();
             setSelectedGroupName(name);
             setRenameOldName("");
             setSuccess("Group renamed");
@@ -252,7 +252,7 @@ const GroupsTab = () => {
                             </span>
                         </Tooltip>
 
-                        <CopyResolveDID did={nameList[selectedGroupName]} />
+                        <CopyResolveDID did={aliasList[selectedGroupName]} />
                     </Box>
                 }
                 {selectedGroup &&
@@ -291,7 +291,7 @@ const GroupsTab = () => {
                             </Button>
                         </Box>
                         {selectedGroup.members.map((did: string, index: number) => {
-                            const alias = Object.keys(nameList).find((n) => nameList[n] === did) ?? undefined;
+                            const alias = Object.keys(aliasList).find((n) => aliasList[n] === did) ?? undefined;
 
                             return (
                                 <Box>

@@ -22,7 +22,7 @@ const Endpoints = {
     keys_decrypt_message: '/api/v1/keys/decrypt/message',
     keys_encrypt_json: '/api/v1/keys/encrypt/json',
     keys_decrypt_json: '/api/v1/keys/decrypt/json',
-    names: '/api/v1/names',
+    aliases: '/api/v1/aliases',
     did: '/api/v1/did',
     assets: '/api/v1/assets',
     challenge: '/api/v1/challenge',
@@ -832,29 +832,29 @@ describe('recoverId', () => {
     });
 });
 
-describe('listNames', () => {
-    const mockNames = ['name1', 'name2'];
+describe('listAliases', () => {
+    const mockAliases = ['name1', 'name2'];
 
-    it('should list names', async () => {
+    it('should list aliases', async () => {
         nock(KeymasterURL)
-            .get(Endpoints.names)
-            .reply(200, { names: mockNames });
+            .get(Endpoints.aliases)
+            .reply(200, { aliases: mockAliases });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const names = await keymaster.listNames();
+        const aliases = await keymaster.listAliases();
 
-        expect(names).toStrictEqual(mockNames);
+        expect(aliases).toStrictEqual(mockAliases);
     });
 
-    it('should throw exception on listNames server error', async () => {
+    it('should throw exception on listAliases server error', async () => {
         nock(KeymasterURL)
-            .get(Endpoints.names)
+            .get(Endpoints.aliases)
             .reply(500, ServerError);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
         try {
-            await keymaster.listNames();
+            await keymaster.listAliases();
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -863,31 +863,31 @@ describe('listNames', () => {
     });
 });
 
-describe('addName', () => {
-    const mockName = 'mockName';
+describe('addAlias', () => {
+    const mockAlias = 'mockAlias';
     const mockDID = 'mockDID';
 
-    it('should add name', async () => {
+    it('should add alias', async () => {
         nock(KeymasterURL)
-            .post(Endpoints.names)
+            .post(Endpoints.aliases)
             .reply(200, { ok: true });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const ok = await keymaster.addName(mockName, mockDID);
+        const ok = await keymaster.addAlias(mockAlias, mockDID);
 
         expect(ok).toStrictEqual(true);
     });
 
-    it('should throw exception on addName server error', async () => {
+    it('should throw exception on addAlias server error', async () => {
         nock(KeymasterURL)
-            .post(Endpoints.names)
+            .post(Endpoints.aliases)
             .reply(500, ServerError);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
         try {
             // @ts-expect-error Testing invalid usage, missing arg
-            await keymaster.addName(mockName);
+            await keymaster.addAlias(mockAlias);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -896,30 +896,30 @@ describe('addName', () => {
     });
 });
 
-describe('getName', () => {
-    const mockName = 'mockName';
+describe('getAlias', () => {
+    const mockAlias = 'mockAlias';
     const mockDID = 'mockDID';
 
-    it('should get name', async () => {
+    it('should get alias', async () => {
         nock(KeymasterURL)
-            .get(`${Endpoints.names}/${mockName}`)
+            .get(`${Endpoints.aliases}/${mockAlias}`)
             .reply(200, { did: mockDID });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const did = await keymaster.getName(mockName);
+        const did = await keymaster.getAlias(mockAlias);
 
         expect(did).toStrictEqual(mockDID);
     });
 
-    it('should throw exception on getName server error', async () => {
+    it('should throw exception on getAlias server error', async () => {
         nock(KeymasterURL)
-            .get(`${Endpoints.names}/${mockName}`)
+            .get(`${Endpoints.aliases}/${mockAlias}`)
             .reply(500, ServerError);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
         try {
-            await keymaster.getName(mockName);
+            await keymaster.getAlias(mockAlias);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -928,29 +928,29 @@ describe('getName', () => {
     });
 });
 
-describe('removeName', () => {
-    const mockName = 'mockName';
+describe('removeAlias', () => {
+    const mockAlias = 'mockAlias';
 
-    it('should remove name', async () => {
+    it('should remove alias', async () => {
         nock(KeymasterURL)
-            .delete(`${Endpoints.names}/${mockName}`)
+            .delete(`${Endpoints.aliases}/${mockAlias}`)
             .reply(200, { ok: true });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const ok = await keymaster.removeName(mockName);
+        const ok = await keymaster.removeAlias(mockAlias);
 
         expect(ok).toStrictEqual(true);
     });
 
-    it('should throw exception on removeName server error', async () => {
+    it('should throw exception on removeAlias server error', async () => {
         nock(KeymasterURL)
-            .delete(`${Endpoints.names}/${mockName}`)
+            .delete(`${Endpoints.aliases}/${mockAlias}`)
             .reply(500, ServerError);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
         try {
-            await keymaster.removeName(mockName);
+            await keymaster.removeAlias(mockAlias);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
