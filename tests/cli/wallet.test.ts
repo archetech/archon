@@ -47,4 +47,20 @@ describe('wallet', () => {
 
         expect(words).toHaveLength(12);
     });
+
+    test('import-wallet restores from mnemonic phrase', async () => {
+        await archon('new-wallet');
+        const mnemonic = 'borrow submit turtle wrist behind announce leaf soccer juice choice oven above';
+        const output = await archon('import-wallet', mnemonic);
+        const wallet = JSON.parse(output);
+
+        expect(wallet).toHaveProperty('version', 2);
+        expect(wallet).toHaveProperty('seed');
+        expect(wallet.seed).toHaveProperty('mnemonicEnc');
+        expect(wallet.seed.mnemonicEnc).toHaveProperty('salt');
+        expect(wallet.seed.mnemonicEnc).toHaveProperty('iv');
+        expect(wallet.seed.mnemonicEnc).toHaveProperty('data');
+        expect(wallet).toHaveProperty('counter');
+        expect(wallet).toHaveProperty('ids');
+    });
 });
