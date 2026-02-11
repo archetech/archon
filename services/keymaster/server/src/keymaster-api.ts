@@ -55,7 +55,7 @@ function normalizePath(path: string): string {
     return basePath
         .replace(/\/did\/[^/]+/g, '/did/:id')
         .replace(/\/ids\/[^/]+/g, '/ids/:id')
-        .replace(/\/names\/[^/]+/g, '/names/:name')
+        .replace(/\/aliases\/[^/]+/g, '/aliases/:alias')
         .replace(/\/groups\/[^/]+/g, '/groups/:name')
         .replace(/\/schemas\/[^/]+/g, '/schemas/:id')
         .replace(/\/agents\/[^/]+/g, '/agents/:id')
@@ -611,7 +611,7 @@ v1router.post('/wallet/check', async (req, res) => {
  *                       type: integer
  *                     heldRemoved:
  *                       type: integer
- *                     namesRemoved:
+ *                     aliasesRemoved:
  *                       type: integer
  *       500:
  *         description: Internal server error.
@@ -1401,22 +1401,22 @@ v1router.post('/ids/:id/recover', async (req, res) => {
 
 /**
  * @swagger
- * /names:
+ * /aliases:
  *   get:
- *     summary: List all name-to-DID mappings in the wallet.
+ *     summary: List all alias-to-DID mappings in the wallet.
  *     responses:
  *       200:
- *         description: A list of all name-to-DID mappings.
+ *         description: A list of all alias-to-DID mappings.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 names:
+ *                 aliases:
  *                   type: object
  *                   additionalProperties:
  *                     type: string
- *                   description: An object where each key is a name, and each value is the associated DID.
+ *                   description: An object where each key is an alias, and each value is the associated DID.
  *       500:
  *         description: Internal server error.
  *         content:
@@ -1427,10 +1427,10 @@ v1router.post('/ids/:id/recover', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.get('/names', async (req, res) => {
+v1router.get('/aliases', async (req, res) => {
     try {
-        const names = await keymaster.listNames();
-        res.json({ names });
+        const aliases = await keymaster.listAliases();
+        res.json({ aliases });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
     }
@@ -1438,9 +1438,9 @@ v1router.get('/names', async (req, res) => {
 
 /**
  * @swagger
- * /names:
+ * /aliases:
  *   post:
- *     summary: Add a new name-to-DID mapping.
+ *     summary: Add a new alias-to-DID mapping.
  *     requestBody:
  *       required: true
  *       content:
@@ -1448,14 +1448,14 @@ v1router.get('/names', async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               alias:
  *                 type: string
- *                 description: The human-readable name to associate with the DID.
+ *                 description: The human-readable alias to associate with the DID.
  *               did:
  *                 type: string
- *                 description: The DID that this name should refer to.
+ *                 description: The DID that this alias should refer to.
  *             required:
- *               - name
+ *               - alias
  *               - did
  *     responses:
  *       200:
@@ -1477,10 +1477,10 @@ v1router.get('/names', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/names', async (req, res) => {
+v1router.post('/aliases', async (req, res) => {
     try {
-        const { name, did } = req.body;
-        const ok = await keymaster.addName(name, did);
+        const { alias, did } = req.body;
+        const ok = await keymaster.addAlias(alias, did);
         res.json({ ok });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
@@ -1489,20 +1489,20 @@ v1router.post('/names', async (req, res) => {
 
 /**
  * @swagger
- * /names/{name}:
+ * /aliases/{alias}:
  *   get:
- *     summary: Retrieve the DID associated with a specific name.
- *     description: Returns the DID for the provided human-readable name, if it exists.
+ *     summary: Retrieve the DID associated with a specific alias.
+ *     description: Returns the DID for the provided human-readable alias, if it exists.
  *     parameters:
  *       - in: path
- *         name: name
+ *         name: alias
  *         required: true
  *         schema:
  *           type: string
- *         description: The name for which you want the associated DID.
+ *         description: The alias for which you want the associated DID.
  *     responses:
  *       200:
- *         description: The DID associated with the requested name.
+ *         description: The DID associated with the requested alias.
  *         content:
  *           application/json:
  *             schema:
@@ -1511,7 +1511,7 @@ v1router.post('/names', async (req, res) => {
  *                 did:
  *                   type: string
  *       404:
- *         description: The requested name was not found.
+ *         description: The requested alias was not found.
  *         content:
  *           application/json:
  *             schema:
@@ -1520,9 +1520,9 @@ v1router.post('/names', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.get('/names/:name', async (req, res) => {
+v1router.get('/aliases/:alias', async (req, res) => {
     try {
-        const did = await keymaster.getName(req.params.name);
+        const did = await keymaster.getAlias(req.params.alias);
         res.json({ did });
     } catch (error: any) {
         res.status(404).send(DIDNotFound);
@@ -1531,16 +1531,16 @@ v1router.get('/names/:name', async (req, res) => {
 
 /**
  * @swagger
- * /names/{name}:
+ * /aliases/{alias}:
  *   delete:
- *     summary: Remove an existing name-to-DID mapping.
+ *     summary: Remove an existing alias-to-DID mapping.
  *     parameters:
  *       - in: path
- *         name: name
+ *         name: alias
  *         required: true
  *         schema:
  *           type: string
- *         description: The name whose mapping should be removed.
+ *         description: The alias whose mapping should be removed.
  *     responses:
  *       200:
  *         description: Indicates whether the mapping was successfully removed.
@@ -1552,7 +1552,7 @@ v1router.get('/names/:name', async (req, res) => {
  *                 ok:
  *                   type: boolean
  *       400:
- *         description: The requested name was invalid or could not be removed.
+ *         description: The requested alias was invalid or could not be removed.
  *         content:
  *           application/json:
  *             schema:
@@ -1561,9 +1561,9 @@ v1router.get('/names/:name', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.delete('/names/:name', async (req, res) => {
+v1router.delete('/aliases/:alias', async (req, res) => {
     try {
-        const ok = await keymaster.removeName(req.params.name);
+        const ok = await keymaster.removeAlias(req.params.alias);
         res.json({ ok });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });
@@ -3616,9 +3616,9 @@ v1router.post('/schemas/:id/template', async (req, res) => {
  *                   controller:
  *                     type: string
  *                     description: Specific ID or DID to act as the asset’s controller. Defaults to the current ID.
- *                   name:
+ *                   alias:
  *                     type: string
- *                     description: A human-readable name for the asset.
+ *                     description: A human-readable alias for the asset.
 
  *     responses:
  *       200:

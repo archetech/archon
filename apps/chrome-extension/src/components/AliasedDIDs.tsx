@@ -36,9 +36,9 @@ import { requestBrowserRefresh } from "../utils/utils";
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";
 
-function NamedDIDs() {
+function AliasedDIDs() {
     const [removeOpen, setRemoveOpen] = useState<boolean>(false);
-    const [removeName, setRemoveName] = useState<string>("");
+    const [removeAlias, setRemoveAlias] = useState<string>("");
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
     const [renameDID, setRenameDID] = useState<string>("");
@@ -69,33 +69,33 @@ function NamedDIDs() {
     const { setError } = useSnackbar();
     const {
         agentList,
-        aliasName,
+        alias,
         aliasDID,
         documentList,
         groupList,
         imageList,
-        nameList,
-        nameRegistry,
+        aliasList,
+        aliasRegistry,
         pollList,
         schemaList,
         setAliasDID,
-        setAliasName,
+        setAlias,
         unresolvedList,
         vaultList,
     } = useVariablesContext();
     const {
         openBrowser,
         openBrowserWindow,
-        refreshNames,
+        refreshAliases,
     } = useUIContext();
 
     const registryOptions = useMemo(() => {
         const regs = new Set<string>();
-        Object.values(nameRegistry || {}).forEach((r) => {
+        Object.values(aliasRegistry || {}).forEach((r) => {
             if (r) regs.add(r);
         });
         return Array.from(regs).sort();
-    }, [nameRegistry]);
+    }, [aliasRegistry]);
 
     useEffect(() => {
         if (
@@ -108,23 +108,23 @@ function NamedDIDs() {
     }, [registryOptions, registryFilter]);
 
     const mergedEntries = useMemo(() => {
-        if (!nameList && !unresolvedList) {
+        if (!aliasList && !unresolvedList) {
             return [] as Array<[string, string]>;
         }
-        return Object.entries({ ...nameList, ...unresolvedList })
+        return Object.entries({ ...aliasList, ...unresolvedList })
             .sort(([a], [b]) => a.localeCompare(b))
-            .filter(([name]) => {
-                const { kind } = getNameIcon(name);
+            .filter(([alias]) => {
+                const { kind } = getAliasIcon(alias);
                 const passesKind = (filter === "all" || kind === filter);
 
-                const reg = nameRegistry[name];
+                const reg = aliasRegistry[alias];
                 const regTag: RegistryFilter = reg ?? "unresolved";
                 const passesRegistry = (registryFilter === "all" || regTag === registryFilter);
 
                 return passesKind && passesRegistry;
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [nameList, nameRegistry, unresolvedList, filter, registryFilter]);
+    }, [aliasList, aliasRegistry, unresolvedList, filter, registryFilter]);
 
     useEffect(() => {
         if (!openBrowser) {
@@ -132,7 +132,7 @@ function NamedDIDs() {
         }
         const { did, tab } = openBrowser;
 
-        if (tab !== "names") {
+        if (tab !== "aliases") {
             return;
         }
 
@@ -141,23 +141,23 @@ function NamedDIDs() {
         }
     }, [openBrowser, setAliasDID]);
 
-    const allVisibleNames = mergedEntries.map(([name]) => name);
+    const allVisibleNames = mergedEntries.map(([alias]) => alias);
     const allSelectedOnPage = allVisibleNames.every((n) => selected.has(n));
     const someSelectedOnPage = allVisibleNames.some((n) => selected.has(n))
 
     async function clearFields() {
-        await setAliasName("");
+        await setAlias("");
         await setAliasDID("");
     }
 
-    async function addName() {
+    async function addAlias() {
         if (!keymaster) {
             return;
         }
         try {
-            await keymaster.addName(aliasName, aliasDID);
+            await keymaster.addAlias(alias, aliasDID);
             await clearFields();
-            await refreshNames();
+            await refreshAliases();
             requestBrowserRefresh(isBrowser);
         } catch (error: any) {
             setError(error);
@@ -169,13 +169,13 @@ function NamedDIDs() {
             return;
         }
         try {
-            await keymaster.removeName(removeName);
-            await refreshNames();
+            await keymaster.removeAlias(removeAlias);
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
         setRemoveOpen(false);
-        setRemoveName("");
+        setRemoveAlias("");
     };
 
     const confirmBulkRemove = async () => {
@@ -185,8 +185,8 @@ function NamedDIDs() {
         }
         try {
             const names = Array.from(selected);
-            await Promise.allSettled(names.map((n) => keymaster.removeName(n)));
-            await refreshNames();
+            await Promise.allSettled(names.map((n) => keymaster.removeAlias(n)));
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
@@ -206,9 +206,9 @@ function NamedDIDs() {
             return;
         }
         try {
-            await keymaster.addName(newName, renameDID);
-            await keymaster.removeName(renameOldName);
-            await refreshNames();
+            await keymaster.addAlias(newName, renameDID);
+            await keymaster.removeAlias(renameOldName);
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
@@ -220,7 +220,7 @@ function NamedDIDs() {
         }
         try {
             await keymaster.revokeDID(revokeName);
-            await refreshNames();
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
@@ -235,13 +235,13 @@ function NamedDIDs() {
         }
         try {
             await keymaster.transferAsset(transferName, newController.trim());
-            await refreshNames();
+            await refreshAliases();
         } catch (error: any) {
             setError(error);
         }
     };
 
-    function getNameIcon(name: string) {
+    function getAliasIcon(name: string) {
         const iconStyle = { verticalAlign: "middle", marginRight: 4 };
         if (agentList?.includes(name)) {
             return {
@@ -329,7 +329,7 @@ function NamedDIDs() {
         <Box>
             <WarningModal
                 title="Remove DID"
-                warningText={`Are you sure you want to remove '${removeName}'?`}
+                warningText={`Are you sure you want to remove '${removeAlias}'?`}
                 isOpen={removeOpen}
                 onClose={() => setRemoveOpen(false)}
                 onSubmit={confirmRemove}
@@ -377,8 +377,8 @@ function NamedDIDs() {
                 <TextField
                     label="Name"
                     variant="outlined"
-                    value={aliasName}
-                    onChange={(e) => setAliasName(e.target.value)}
+                    value={alias}
+                    onChange={(e) => setAlias(e.target.value)}
                     size="small"
                     className="text-field top-left short-name"
                     style={{ flex: "0 0 150px" }}
@@ -407,7 +407,7 @@ function NamedDIDs() {
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={() => openBrowserWindow({ title: aliasName, did: aliasDID })}
+                    onClick={() => openBrowserWindow({ title: alias, did: aliasDID })}
                     className="button large bottom"
                     disabled={!aliasDID}
                 >
@@ -417,9 +417,9 @@ function NamedDIDs() {
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={addName}
+                    onClick={addAlias}
                     className="button large bottom"
-                    disabled={!aliasName || !aliasDID}
+                    disabled={!alias || !aliasDID}
                 >
                     Add
                 </Button>
@@ -429,7 +429,7 @@ function NamedDIDs() {
                     color="primary"
                     onClick={clearFields}
                     className="button large bottom"
-                    disabled={!aliasName && !aliasDID}
+                    disabled={!alias && !aliasDID}
                 >
                     Clear
                 </Button>
@@ -507,7 +507,7 @@ function NamedDIDs() {
             </Box>
 
             {mergedEntries.map(
-                ([name, did]: [string, string], index) => (
+                ([alias, did]: [string, string], index) => (
                     <Box
                         key={index}
                         display="flex"
@@ -519,8 +519,8 @@ function NamedDIDs() {
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, minWidth: 0 }}>
                             <Checkbox
                                 size="small"
-                                checked={selected.has(name)}
-                                onChange={(e) => handleRowCheck(e, index, name)}
+                                checked={selected.has(alias)}
+                                onChange={(e) => handleRowCheck(e, index, alias)}
                             />
                             <Typography
                                 noWrap
@@ -530,18 +530,18 @@ function NamedDIDs() {
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
-                                    color: getNameIcon(name).kind === "unknown" ? "red" : "text.primary",
+                                    color: getAliasIcon(alias).kind === "unknown" ? "red" : "text.primary",
                                 }}
                             >
-                                {getNameIcon(name).icon}
-                                {name}
+                                {getAliasIcon(alias).icon}
+                                {alias}
                             </Typography>
                         </Box>
                         <Box display="flex" alignItems="center">
                             <CopyResolveDID did={did} />
                             <Tooltip title="Rename">
                                 <IconButton
-                                    onClick={() => openRenameModal(name, did)}
+                                    onClick={() => openRenameModal(alias, did)}
                                     size="small"
                                 >
                                     <Edit />
@@ -550,7 +550,7 @@ function NamedDIDs() {
                             <Tooltip title="Transfer">
                                 <IconButton
                                     onClick={() => {
-                                        setTransferName(name);
+                                        setTransferName(alias);
                                         setTransferOpen(true);
                                     }}
                                     size="small"
@@ -561,7 +561,7 @@ function NamedDIDs() {
                             <Tooltip title="Revoke">
                                 <IconButton
                                     onClick={() => {
-                                        setRevokeName(name);
+                                        setRevokeName(alias);
                                         setRevokeOpen(true);
                                     }}
                                     size="small"
@@ -572,7 +572,7 @@ function NamedDIDs() {
                             <Tooltip title="Delete">
                                 <IconButton
                                     onClick={() => {
-                                        setRemoveName(name);
+                                        setRemoveAlias(alias);
                                         setRemoveOpen(true);
                                     }}
                                     size="small"
@@ -588,4 +588,4 @@ function NamedDIDs() {
     );
 }
 
-export default NamedDIDs;
+export default AliasedDIDs;

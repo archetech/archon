@@ -72,7 +72,7 @@ describe('loadWallet', () => {
 
         expect(wallet).toEqual(
             expect.objectContaining({
-                version: 1,
+                version: 2,
                 counter: 0,
                 seed: expect.objectContaining({
                     mnemonicEnc: {
@@ -114,7 +114,7 @@ describe('loadWallet', () => {
         const res = await keymaster.loadWallet();
         expect(res).toEqual(
             expect.objectContaining({
-                version: 1,
+                version: 2,
                 counter: 0,
                 seed: expect.objectContaining({
                     mnemonicEnc: expect.any(Object)
@@ -131,7 +131,7 @@ describe('loadWallet', () => {
         const res = await keymaster.loadWallet();
         expect(res).toEqual(
             expect.objectContaining({
-                version: 1,
+                version: 2,
                 counter: 0,
                 seed: expect.objectContaining({
                     mnemonicEnc: expect.any(Object)
@@ -259,7 +259,7 @@ describe('saveWallet', () => {
         const res = await wallet.loadWallet();
         expect(res).toEqual(
             expect.objectContaining({
-                version: 1,
+                version: 2,
                 enc: expect.any(String),
                 seed: expect.objectContaining({
                     mnemonicEnc: expect.any(Object),
@@ -322,7 +322,7 @@ describe('exportEncryptedWallet', () => {
         const res = await keymaster.exportEncryptedWallet();
         expect(res).toEqual(
             expect.objectContaining({
-                version: 1,
+                version: 2,
                 seed: expect.objectContaining({
                     mnemonicEnc: expect.any(Object)
                 }),
@@ -452,7 +452,7 @@ describe('recoverWallet', () => {
 
         expect(recovered).toEqual(
             expect.objectContaining({
-                version: 1,
+                version: 2,
                 counter: 1,
                 current: "Bob",
                 seed: expect.objectContaining({
@@ -575,7 +575,7 @@ describe('checkWallet', () => {
     it('should detect removed DIDs', async () => {
         const agentDID = await keymaster.createId('Alice');
         const schemaDID = await keymaster.createSchema();
-        await keymaster.addName('schema', schemaDID);
+        await keymaster.addAlias('schema', schemaDID);
         await gatekeeper.removeDIDs([agentDID, schemaDID]);
 
         const { checked, invalid, deleted } = await keymaster.checkWallet();
@@ -599,8 +599,8 @@ describe('checkWallet', () => {
 
     it('should detect revoked credentials in wallet', async () => {
         const credentials = await helper.setupCredentials();
-        await keymaster.addName('credential-0', credentials[0]);
-        await keymaster.addName('credential-2', credentials[2]);
+        await keymaster.addAlias('credential-0', credentials[0]);
+        await keymaster.addAlias('credential-2', credentials[2]);
         await keymaster.revokeCredential(credentials[0]);
         await keymaster.revokeCredential(credentials[2]);
 
@@ -614,48 +614,48 @@ describe('checkWallet', () => {
 
 describe('fixWallet', () => {
     it('should report no problems with empty wallet', async () => {
-        const { idsRemoved, ownedRemoved, heldRemoved, namesRemoved } = await keymaster.fixWallet();
+        const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
 
         expect(idsRemoved).toBe(0);
         expect(ownedRemoved).toBe(0);
         expect(heldRemoved).toBe(0);
-        expect(namesRemoved).toBe(0);
+        expect(aliasesRemoved).toBe(0);
     });
 
     it('should report no problems with wallet with only one ID', async () => {
         await keymaster.createId('Alice');
-        const { idsRemoved, ownedRemoved, heldRemoved, namesRemoved } = await keymaster.fixWallet();
+        const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
 
         expect(idsRemoved).toBe(0);
         expect(ownedRemoved).toBe(0);
         expect(heldRemoved).toBe(0);
-        expect(namesRemoved).toBe(0);
+        expect(aliasesRemoved).toBe(0);
     });
 
     it('should remove revoked ID', async () => {
         const agentDID = await keymaster.createId('Alice');
         await keymaster.revokeDID(agentDID);
 
-        const { idsRemoved, ownedRemoved, heldRemoved, namesRemoved } = await keymaster.fixWallet();
+        const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
 
         expect(idsRemoved).toBe(1);
         expect(ownedRemoved).toBe(0);
         expect(heldRemoved).toBe(0);
-        expect(namesRemoved).toBe(0);
+        expect(aliasesRemoved).toBe(0);
     });
 
     it('should remove deleted DIDs', async () => {
         const agentDID = await keymaster.createId('Alice');
         const schemaDID = await keymaster.createSchema();
-        await keymaster.addName('schema', schemaDID);
+        await keymaster.addAlias('schema', schemaDID);
         await gatekeeper.removeDIDs([agentDID, schemaDID]);
 
-        const { idsRemoved, ownedRemoved, heldRemoved, namesRemoved } = await keymaster.fixWallet();
+        const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
 
         expect(idsRemoved).toBe(1);
         expect(ownedRemoved).toBe(0);
         expect(heldRemoved).toBe(0);
-        expect(namesRemoved).toBe(1);
+        expect(aliasesRemoved).toBe(1);
     });
 
     it('should remove invalid DIDs', async () => {
@@ -663,27 +663,27 @@ describe('fixWallet', () => {
         await keymaster.addToOwned('did:cid:mock1');
         await keymaster.addToHeld('did:cid:mock2');
 
-        const { idsRemoved, ownedRemoved, heldRemoved, namesRemoved } = await keymaster.fixWallet();
+        const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
 
         expect(idsRemoved).toBe(0);
         expect(ownedRemoved).toBe(1);
         expect(heldRemoved).toBe(1);
-        expect(namesRemoved).toBe(0);
+        expect(aliasesRemoved).toBe(0);
     });
 
     it('should remove revoked credentials', async () => {
         const credentials = await helper.setupCredentials();
-        await keymaster.addName('credential-0', credentials[0]);
-        await keymaster.addName('credential-2', credentials[2]);
+        await keymaster.addAlias('credential-0', credentials[0]);
+        await keymaster.addAlias('credential-2', credentials[2]);
         await keymaster.revokeCredential(credentials[0]);
         await keymaster.revokeCredential(credentials[2]);
 
-        const { idsRemoved, ownedRemoved, heldRemoved, namesRemoved } = await keymaster.fixWallet();
+        const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
 
         expect(idsRemoved).toBe(0);
         expect(ownedRemoved).toBe(0);
         expect(heldRemoved).toBe(2);
-        expect(namesRemoved).toBe(2);
+        expect(aliasesRemoved).toBe(2);
     });
 });
 

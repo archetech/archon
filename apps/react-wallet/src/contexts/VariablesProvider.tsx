@@ -48,14 +48,14 @@ interface VariablesContextValue {
     setSelectedIssued: Dispatch<SetStateAction<string>>;
     dmailList: Record<string, DmailItem>;
     setDmailList: Dispatch<SetStateAction<Record<string, DmailItem>>>;
-    aliasName: string;
-    setAliasName: Dispatch<SetStateAction<string>>;
+    alias: string;
+    setAlias: Dispatch<SetStateAction<string>>;
     aliasDID: string;
     setAliasDID: Dispatch<SetStateAction<string>>;
-    nameList: Record<string, string>;
-    setNameList: Dispatch<SetStateAction<Record<string, string>>>;
-    nameRegistry: Record<string, string>;
-    setNameRegistry: Dispatch<SetStateAction<Record<string, string>>>;
+    aliasList: Record<string, string>;
+    setAliasList: Dispatch<SetStateAction<Record<string, string>>>;
+    aliasRegistry: Record<string, string>;
+    setAliasRegistry: Dispatch<SetStateAction<Record<string, string>>>;
     unresolvedList: Record<string, string>;
     setUnresolvedList: Dispatch<SetStateAction<Record<string, string>>>;
     agentList: string[];
@@ -77,8 +77,8 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     const [registry, setRegistry] = useState<string>("hyperswarm");
     const [registries, setRegistries] = useState<string[]>([]);
     const [heldList, setHeldList] = useState<string[]>([]);
-    const [nameList, setNameList] = useState<Record<string, string>>({});
-    const [nameRegistry, setNameRegistry] = useState<Record<string, string>>({});
+    const [aliasList, setAliasList] = useState<Record<string, string>>({});
+    const [aliasRegistry, setAliasRegistry] = useState<Record<string, string>>({});
     const [unresolvedList, setUnresolvedList] = useState<Record<string, string>>({});
     const [agentList, setAgentList] = useState<string[]>([]);
     const [pollList, setPollList] = useState<string[]>([]);
@@ -96,7 +96,7 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     const [credentialSubject, setCredentialSubject] = useState<string>("");
     const [credentialSchema, setCredentialSchema] = useState<string>("");
     const [credentialString, setCredentialString] = useState<string>("");
-    const [aliasName, setAliasName] = useState<string>("");
+    const [alias, setAlias] = useState<string>("");
     const [aliasDID, setAliasDID] = useState<string>("");
     const [dmailList, setDmailList] = useState<Record<string, DmailItem>>({});
     const [manifest, setManifest] = useState<Record<string, unknown> | undefined>(undefined);
@@ -146,14 +146,14 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
         setCredentialSchema,
         credentialString,
         setCredentialString,
-        aliasName,
-        setAliasName,
+        alias,
+        setAlias,
         aliasDID,
         setAliasDID,
-        nameList,
-        setNameList,
-        nameRegistry,
-        setNameRegistry,
+        aliasList,
+        setAliasList,
+        aliasRegistry,
+        setAliasRegistry,
         unresolvedList,
         setUnresolvedList,
         agentList,

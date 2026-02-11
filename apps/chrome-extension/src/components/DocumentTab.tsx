@@ -17,10 +17,10 @@ const gatekeeper = new GatekeeperClient();
 const DocumentTab = () => {
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
-    const { refreshNames } = useUIContext();
+    const { refreshAliases } = useUIContext();
     const {
         documentList,
-        nameList,
+        aliasList,
         registries,
     } = useVariablesContext();
     const [registry, setRegistry] = useState<string>("hyperswarm");
@@ -118,19 +118,19 @@ const DocumentTab = () => {
                         filename: file.name,
                     });
 
-                    const nameList = await keymaster.listNames();
-                    let name = file.name.slice(0, 26);
+                    const aliasList = await keymaster.listAliases();
+                    let alias = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in nameList) {
-                        name = `${file.name.slice(0, 26)} (${count++})`;
+                    while (alias in aliasList) {
+                        alias = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.addName(name, did);
-                    setSuccess(`Document uploaded successfully: ${name}`);
+                    await keymaster.addAlias(alias, did);
+                    setSuccess(`Document uploaded successfully: ${alias}`);
 
-                    await refreshNames();
-                    setSelectedDocumentName(name);
+                    await refreshAliases();
+                    setSelectedDocumentName(alias);
                 } catch (error: any) {
                     setError(`Error processing document: ${error}`);
                 }
@@ -222,10 +222,10 @@ const DocumentTab = () => {
             return;
         }
         try {
-            const did = nameList[selectedDocumentName];
-            await keymaster.addName(newName, did);
-            await keymaster.removeName(selectedDocumentName);
-            await refreshNames();
+            const did = aliasList[selectedDocumentName];
+            await keymaster.addAlias(newName, did);
+            await keymaster.removeAlias(selectedDocumentName);
+            await refreshAliases();
             setSelectedDocumentName(newName);
             await refreshDocument(newName);
             setSuccess("Document renamed");
@@ -297,9 +297,9 @@ const DocumentTab = () => {
                             <MenuItem value="" disabled>
                                 Select document
                             </MenuItem>
-                            {documentList.map((name, index) => (
-                                <MenuItem value={name} key={index}>
-                                    {name}
+                            {documentList.map((alias, index) => (
+                                <MenuItem value={alias} key={index}>
+                                    {alias}
                                 </MenuItem>
                             ))}
                         </Select>
@@ -336,7 +336,7 @@ const DocumentTab = () => {
                             </span>
                         </Tooltip>
 
-                        <CopyResolveDID did={nameList[selectedDocumentName]} />
+                        <CopyResolveDID did={aliasList[selectedDocumentName]} />
                     </Box>
                     {selectedDocument && selectedDocumentDocs && selectedDocumentDataUrl && (
                         <Box sx={{ mt: 2 }}>

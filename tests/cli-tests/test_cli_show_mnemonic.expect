@@ -2,7 +2,7 @@
 
 spawn bash archon new-wallet
 expect {
-    -re {"version"\s*:\s*1} {
+    -re {"version"\s*:\s*2} {
         send_user "\n✅ Wallet Reset Complete!\n"
     }
     timeout {

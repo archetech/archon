@@ -5,7 +5,7 @@ set timeout 10
 
 spawn bash archon new-wallet
 expect {
-    -re {"version"\s*:\s*1} {
+    -re {"version"\s*:\s*2} {
         send_user "\n✅ Wallet Reset Complete!\n"
     }
     timeout {
@@ -43,18 +43,18 @@ if {$captured_did eq ""} {
 }
 
 # Use the captured value in another function call
-spawn bash archon add-name qa $captured_did
+spawn bash archon add-alias qa $captured_did
 
 
 # Check List
-spawn bash archon list-names
+spawn bash archon list-aliases
 
 expect {
     # Pass if "qa" is found
     -re "qa" {
         puts "Success, found 'qa' in output \n✅"
     }
-    
+
     # Timeout handling
     timeout {
         puts "Timeout occurred \n❌"
@@ -81,7 +81,7 @@ foreach {key val} $argv {
 
         # Print result
         puts "Deleted wallet.json!"
-        
+
     } elseif {$key == "--local"} {
         # Delete Wallet
         set script_dir [file dirname [file normalize [info script]]]
@@ -101,7 +101,7 @@ foreach {key val} $argv {
         } else {
             puts "File not found: $abs_filepath"
         }
-        
+
     } elseif {$key == "--ci-redis"} {
         # Run docker exec to delete the file
         set result [exec docker compose exec redis redis-cli flushall]

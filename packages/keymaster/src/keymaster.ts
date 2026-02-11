@@ -109,7 +109,7 @@ export default class Keymaster implements KeymasterInterface {
     private cipher: Cipher;
     private readonly defaultRegistry: string;
     private readonly ephemeralRegistry: string;
-    private readonly maxNameLength: number;
+    private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
     private _walletCache?: WalletFile;
     private _hdkeyCache?: any;
@@ -135,7 +135,7 @@ export default class Keymaster implements KeymasterInterface {
 
         this.defaultRegistry = options.defaultRegistry || 'hyperswarm';
         this.ephemeralRegistry = 'hyperswarm';
-        this.maxNameLength = options.maxNameLength || 32;
+        this.maxAliasLength = options.maxAliasLength || 32;
         this.maxDataLength = 8 * 1024; // 8 KB max data to store in a JSON object
     }
 
@@ -180,8 +180,8 @@ export default class Keymaster implements KeymasterInterface {
             stored = await this.newWallet();
         }
 
-        const upgraded: WalletFile = await this.upgradeWallet(stored);
-        this._walletCache = await this.decryptWallet(upgraded);
+        const decrypted = await this.decryptWallet(stored);
+        this._walletCache = await this.upgradeWallet(decrypted);
         return this._walletCache;
     }
 
@@ -189,14 +189,14 @@ export default class Keymaster implements KeymasterInterface {
         wallet: StoredWallet,
         overwrite = true
     ): Promise<boolean> {
-        let upgraded: WalletFile = await this.upgradeWallet(wallet);
         // Decrypt if encrypted to verify passphrase and get decrypted form
-        const decrypted = await this.decryptWallet(upgraded);
-        let toStore: WalletEncFile = await this.encryptWalletForStorage(decrypted);
+        const decrypted = await this.decryptWallet(wallet);
+        const upgraded: WalletFile = await this.upgradeWallet(decrypted);
+        let toStore: WalletEncFile = await this.encryptWalletForStorage(upgraded);
 
         const ok = await this.db.saveWallet(toStore, overwrite);
         if (ok) {
-            this._walletCache = decrypted;
+            this._walletCache = upgraded;
         }
         return ok;
     }
@@ -217,7 +217,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const mnemonicEnc = await encMnemonic(mnemonic, this.passphrase);
         const wallet: WalletFile = {
-            version: 1,
+            version: 2,
             seed: { mnemonicEnc },
             counter: 0,
             ids: {}
@@ -301,10 +301,10 @@ export default class Keymaster implements KeymasterInterface {
             }
         }
 
-        if (wallet.names) {
-            for (const name of Object.keys(wallet.names)) {
+        if (wallet.aliases) {
+            for (const alias of Object.keys(wallet.aliases)) {
                 try {
-                    const doc = await this.resolveDID(wallet.names[name]);
+                    const doc = await this.resolveDID(wallet.aliases[alias]);
 
                     if (doc.didDocumentMetadata?.deactivated) {
                         deleted += 1;
@@ -325,7 +325,7 @@ export default class Keymaster implements KeymasterInterface {
         let idsRemoved = 0;
         let ownedRemoved = 0;
         let heldRemoved = 0;
-        let namesRemoved = 0;
+        let aliasesRemoved = 0;
 
         await this.mutateWallet(async (wallet) => {
 
@@ -391,11 +391,11 @@ export default class Keymaster implements KeymasterInterface {
                 }
             }
 
-            if (wallet.names) {
-                for (const name of Object.keys(wallet.names)) {
+            if (wallet.aliases) {
+                for (const alias of Object.keys(wallet.aliases)) {
                     let remove = false;
                     try {
-                        const doc = await this.resolveDID(wallet.names[name]);
+                        const doc = await this.resolveDID(wallet.aliases[alias]);
 
                         if (doc.didDocumentMetadata?.deactivated) {
                             remove = true;
@@ -405,14 +405,14 @@ export default class Keymaster implements KeymasterInterface {
                     }
 
                     if (remove) {
-                        delete wallet.names[name];
-                        namesRemoved++;
+                        delete wallet.aliases[alias];
+                        aliasesRemoved++;
                     }
                 }
             }
         });
 
-        return { idsRemoved, ownedRemoved, heldRemoved, namesRemoved };
+        return { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved };
     }
 
     async resolveSeedBank(): Promise<DidCidDocument> {
@@ -566,11 +566,11 @@ export default class Keymaster implements KeymasterInterface {
                     delete current[k as keyof StoredWallet];
                 }
 
-                // Upgrade the recovered wallet to the latest version if needed
-                wallet = await this.upgradeWallet(wallet);
-
                 // Decrypt the wallet if needed
                 wallet = isWalletEncFile(wallet) ? await this.decryptWalletFromStorage(wallet) : wallet;
+
+                // Upgrade the recovered wallet to the latest version if needed
+                wallet = await this.upgradeWallet(wallet);
 
                 // Copy all properties from the recovered wallet into the cleared current wallet
                 // This effectively replaces the current wallet with the recovered one
@@ -701,7 +701,7 @@ export default class Keymaster implements KeymasterInterface {
         data: unknown,
         options: CreateAssetOptions = {}
     ): Promise<string> {
-        let { registry = this.defaultRegistry, controller, validUntil, name } = options;
+        let { registry = this.defaultRegistry, controller, validUntil, alias } = options;
 
         if (validUntil) {
             const validate = new Date(validUntil);
@@ -711,9 +711,9 @@ export default class Keymaster implements KeymasterInterface {
             }
         }
 
-        if (name) {
+        if (alias) {
             const wallet = await this.loadWallet();
-            this.validateName(name, wallet);
+            this.validateAlias(alias, wallet, 'alias');
         }
 
         if (!data) {
@@ -746,8 +746,8 @@ export default class Keymaster implements KeymasterInterface {
             await this.addToOwned(did);
         }
 
-        if (name) {
-            await this.addName(name, did);
+        if (alias) {
+            await this.addAlias(alias, did);
         }
 
         return did;
@@ -1216,8 +1216,8 @@ export default class Keymaster implements KeymasterInterface {
 
         const wallet = await this.loadWallet();
 
-        if (wallet.names && name in wallet.names) {
-            return wallet.names[name];
+        if (wallet.aliases && name in wallet.aliases) {
+            return wallet.aliases[name];
         }
 
         if (wallet.ids && name in wallet.ids) {
@@ -1345,35 +1345,36 @@ export default class Keymaster implements KeymasterInterface {
         return id.owned || [];
     }
 
-    validateName(
-        name: string,
-        wallet?: WalletFile
+    validateAlias(
+        alias: string,
+        wallet?: WalletFile,
+        label: string = 'name'
     ) {
-        if (typeof name !== 'string' || !name.trim()) {
-            throw new InvalidParameterError('name must be a non-empty string');
+        if (typeof alias !== 'string' || !alias.trim()) {
+            throw new InvalidParameterError(`${label} must be a non-empty string`);
         }
 
-        name = name.trim(); // Remove leading/trailing whitespace
+        alias = alias.trim(); // Remove leading/trailing whitespace
 
-        if (name.length > this.maxNameLength) {
-            throw new InvalidParameterError(`name too long`);
+        if (alias.length > this.maxAliasLength) {
+            throw new InvalidParameterError(`${label} too long`);
         }
 
-        if (/[^\P{Cc}]/u.test(name)) {
-            throw new InvalidParameterError('name contains unprintable characters');
+        if (/[^\P{Cc}]/u.test(alias)) {
+            throw new InvalidParameterError(`${label} contains unprintable characters`);
         }
 
-        const alreadyUsedError = 'name already used';
+        const alreadyUsedError = `${label} already used`;
 
-        if (wallet && wallet.names && name in wallet.names) {
+        if (wallet && wallet.aliases && alias in wallet.aliases) {
             throw new InvalidParameterError(alreadyUsedError);
         }
 
-        if (wallet && wallet.ids && name in wallet.ids) {
+        if (wallet && wallet.ids && alias in wallet.ids) {
             throw new InvalidParameterError(alreadyUsedError);
         }
 
-        return name;
+        return alias;
     }
 
     async createId(
@@ -1404,7 +1405,7 @@ export default class Keymaster implements KeymasterInterface {
         const { registry = this.defaultRegistry } = options;
         const wallet = await this.loadWallet();
 
-        name = this.validateName(name, wallet);
+        name = this.validateAlias(name, wallet);
 
         const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
         const path = `m/44'/0'/${account}'/0/0`;
@@ -1459,7 +1460,7 @@ export default class Keymaster implements KeymasterInterface {
         name: string
     ): Promise<boolean> {
         await this.mutateWallet((wallet) => {
-            name = this.validateName(name);
+            name = this.validateAlias(name);
 
             if (!(id in wallet.ids)) {
                 throw new UnknownIDError();
@@ -1589,54 +1590,54 @@ export default class Keymaster implements KeymasterInterface {
         return ok;
     }
 
-    async listNames(
+    async listAliases(
         options: {
             includeIDs?: boolean
         } = {}
     ): Promise<Record<string, string>> {
         const { includeIDs = false } = options;
         const wallet = await this.loadWallet();
-        const names = { ...(wallet.names || {}) };
+        const aliases = { ...(wallet.aliases || {}) };
 
         if (includeIDs) {
             for (const [name, id] of Object.entries(wallet.ids || {})) {
-                names[name] = id.did;
+                aliases[name] = id.did;
             }
         }
 
-        return names;
+        return aliases;
     }
 
-    async addName(
-        name: string,
+    async addAlias(
+        alias: string,
         did: string
     ): Promise<boolean> {
         await this.mutateWallet((wallet) => {
-            if (!wallet.names) {
-                wallet.names = {};
+            if (!wallet.aliases) {
+                wallet.aliases = {};
             }
-            name = this.validateName(name, wallet);
-            wallet.names[name] = did;
+            alias = this.validateAlias(alias, wallet, 'alias');
+            wallet.aliases[alias] = did;
         });
         return true;
     }
 
-    async getName(name: string): Promise<string | null> {
+    async getAlias(alias: string): Promise<string | null> {
         const wallet = await this.loadWallet();
 
-        if (wallet.names && name in wallet.names) {
-            return wallet.names[name];
+        if (wallet.aliases && alias in wallet.aliases) {
+            return wallet.aliases[alias];
         }
 
         return null;
     }
 
-    async removeName(name: string): Promise<boolean> {
+    async removeAlias(alias: string): Promise<boolean> {
         await this.mutateWallet((wallet) => {
-            if (!wallet.names || !(name in wallet.names)) {
+            if (!wallet.aliases || !(alias in wallet.aliases)) {
                 return;
             }
-            delete wallet.names[name];
+            delete wallet.aliases[alias];
         });
         return true;
     }
@@ -3070,7 +3071,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const vault = await this.getVault(vaultId);
         const { privateJwk, items } = await this.decryptVault(vault);
-        const validName = this.validateName(name);
+        const validName = this.validateAlias(name);
         const encryptedData = this.cipher.encryptBytes(vault.publicJwk, privateJwk, buffer);
         const cid = await this.gatekeeper.addText(encryptedData);
         const sha256 = this.cipher.hashMessage(buffer);
@@ -3135,7 +3136,7 @@ export default class Keymaster implements KeymasterInterface {
         const id = await this.fetchIdInfo(undefined, wallet);
         const list = id.dmail || {};
         const dmailList: Record<string, DmailItem> = {};
-        const nameList = await this.listNames({ includeIDs: true });
+        const nameList = await this.listAliases({ includeIDs: true });
         const didToName: Record<string, string> = Object.entries(nameList).reduce((acc, [name, did]) => {
             acc[did] = name;
             return acc;
@@ -3181,7 +3182,7 @@ export default class Keymaster implements KeymasterInterface {
 
         for (const tag of tags) {
             try {
-                tagSet.add(this.validateName(tag));
+                tagSet.add(this.validateAlias(tag));
             }
             catch (error) {
                 throw new InvalidParameterError(`Invalid tag: '${tag}'`);
@@ -3222,7 +3223,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('list');
         }
 
-        const nameList = await this.listNames({ includeIDs: true });
+        const nameList = await this.listAliases({ includeIDs: true });
         let newList = [];
 
         for (const id of list) {
@@ -3516,9 +3517,9 @@ export default class Keymaster implements KeymasterInterface {
             const poll = await this.getPoll(noticeDID);
 
             if (poll) {
-                const names = await this.listNames();
+                const names = await this.listAliases();
                 if (!Object.values(names).includes(noticeDID)) {
-                    await this.addUnnamedPoll(noticeDID);
+                    await this.addUnaliasedPoll(noticeDID);
                 }
                 await this.addToNotices(did, [NoticeTags.POLL]);
 
@@ -3619,10 +3620,10 @@ export default class Keymaster implements KeymasterInterface {
         return payload && typeof payload.poll === "string" && typeof payload.vote === "number";
     }
 
-    private async addUnnamedPoll(did: string): Promise<void> {
+    private async addUnaliasedPoll(did: string): Promise<void> {
         const fallbackName = did.slice(-32);
         try {
-            await this.addName(fallbackName, did);
+            await this.addAlias(fallbackName, did);
         } catch { }
     }
 
@@ -3672,7 +3673,7 @@ export default class Keymaster implements KeymasterInterface {
         return wallet;
     }
 
-    private async decryptWallet(wallet: WalletFile): Promise<WalletFile> {
+    private async decryptWallet(wallet: any): Promise<WalletFile> {
         if (isWalletEncFile(wallet)) {
             wallet = await this.decryptWalletFromStorage(wallet);
         }
@@ -3685,7 +3686,15 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     private async upgradeWallet(wallet: any): Promise<WalletFile> {
-        if (wallet.version !== 1) {
+        if (wallet.version === 1) {
+            if (wallet.names && !wallet.aliases) {
+                wallet.aliases = wallet.names;
+                delete wallet.names;
+            }
+            wallet.version = 2;
+        }
+
+        if (wallet.version !== 2) {
             throw new KeymasterError("Unsupported wallet version.");
         }
 

@@ -36,8 +36,8 @@ Options:
 
 Commands:
   accept-credential [options] <did>       Save verifiable credential for current ID
+  add-alias <alias> <did>                 Add an alias for a DID
   add-group-member <group> <member>       Add a member to a group
-  add-name <name> <did>                   Add a name for a DID
   add-vault-item <id> <file>              Add an item (file) to a vault
   add-vault-member <id> <member>          Add a member to a vault
   backup-id                               Backup the current ID to its registry
@@ -66,21 +66,21 @@ Commands:
   encrypt-file <file> <did>               Encrypt a file for a DID
   encrypt-message <message> <did>         Encrypt a message for a DID
   fix-wallet                              Remove invalid DIDs from the wallet
+  get-alias <alias>                       Get DID assigned to alias
   get-asset <id>                          Get asset by name or DID
   get-credential <did>                    Get credential by DID
   get-group <did>                         Get group by DID
-  get-name <name>                         Get DID assigned to name
   get-schema <did>                        Get schema by DID
   get-vault-item <id> <item> <file>       Save an item from a vault to a file
   help [command]                          display help for command
   import-wallet <recovery-phrase>         Create new wallet from a recovery phrase
   issue-credential [options] <file>       Sign and encrypt a bound credential file
+  list-aliases                            List DID aliases
   list-assets                             List assets owned by current ID
   list-credentials                        List credentials by current ID
   list-groups                             List groups owned by current ID
   list-ids                                List IDs and show current ID
   list-issued                             List issued credentials
-  list-names                              List DID names (aliases)
   list-schemas                            List schemas owned by current ID
   list-vault-items <id>                   List items in the vault
   list-vault-members <id>                 List members of a vault
@@ -90,9 +90,9 @@ Commands:
   publish-poll <poll>                     Publish results to poll, hiding ballots
   recover-id <did>                        Recovers the ID from the DID
   recover-wallet-did [did]                Recover wallet from seed bank or encrypted DID
+  remove-alias <alias>                    Removes an alias for a DID
   remove-group-member <group> <member>    Remove a member from a group
   remove-id <name>                        Deletes named ID
-  remove-name <name>                      Removes a name for a DID
   remove-vault-item <id> <item>           Remove an item from a vault
   remove-vault-member <id> <member>       Remove a member from a vault
   rename-id <oldName> <newName>           Renames the ID

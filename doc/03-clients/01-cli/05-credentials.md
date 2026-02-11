@@ -71,7 +71,7 @@ did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7
 ```
 
 ```json
-$ archon list-names
+$ archon list-aliases
 {
     "social-media": "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
 }
@@ -116,13 +116,13 @@ $ archon resolve-did social-media
 }
 ```
 
-The command above created a DID document with the schema file provided. For convenience, the user's wallet now contains a named alias (social-media) to the new credential's DID.
+The command above created a DID document with the schema file provided. For convenience, the user's wallet now contains an alias (social-media) to the new credential's DID.
 
 ## Binding the Credential
 
 The Credential DID must now be bound to the Agent DID who is to become the Subject of the new credential. The binding process will generate a credential in JSON form that will be pre-populated with the DIDs of subject, issuer and credential type.
 
-In the command below, both `social-media` and `Bob`  are resolved to their respective DIDs using the named alias and identity names from the user's private wallet:
+In the command below, both `social-media` and `Bob`  are resolved to their respective DIDs using the alias and identity names from the user's private wallet:
 
 ```json
 $ archon bind-credential social-media Bob
@@ -270,7 +270,7 @@ $ archon show-wallet
         }
     },
     "current": "Bob",
-    "names": {
+    "aliases": {
         "social-media": "did:cid:test:z3v8AuaeAPf9JMuyYZ1D79D626uUzDQmRPwq4d8oB1Th6ztzAS7"
     }
 }

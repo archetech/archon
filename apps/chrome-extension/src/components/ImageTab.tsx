@@ -17,10 +17,10 @@ const gatekeeper = new GatekeeperClient();
 const ImageTab = () => {
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
-    const { refreshNames } = useUIContext();
+    const { refreshAliases } = useUIContext();
     const {
         imageList,
-        nameList,
+        aliasList,
         registries,
     } = useVariablesContext();
     const [registry, setRegistry] = useState<string>('hyperswarm');
@@ -117,19 +117,19 @@ const ImageTab = () => {
                     }
                     const did = await keymaster.createImage(buffer, { registry });
 
-                    const nameList = await keymaster.listNames();
-                    let name = file.name.slice(0, 26);
+                    const aliasList = await keymaster.listAliases();
+                    let alias = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in nameList) {
-                        name = `${file.name.slice(0, 26)} (${count++})`;
+                    while (alias in aliasList) {
+                        alias = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.addName(name, did);
+                    await keymaster.addAlias(alias, did);
                     setSuccess(`Image uploaded successfully! DID: ${did}`);
 
-                    await refreshNames();
-                    setSelectedImageName(name);
+                    await refreshAliases();
+                    setSelectedImageName(alias);
                 } catch (error: any) {
                     setError(`Error processing image: ${error}`);
                 }
@@ -207,10 +207,10 @@ const ImageTab = () => {
             return;
         }
         try {
-            const did = nameList[selectedImageName];
-            await keymaster.addName(newName, did);
-            await keymaster.removeName(selectedImageName);
-            await refreshNames();
+            const did = aliasList[selectedImageName];
+            await keymaster.addAlias(newName, did);
+            await keymaster.removeAlias(selectedImageName);
+            await refreshAliases();
             setSelectedImageName(newName);
             await refreshImage(newName);
             setSuccess("Image renamed");
@@ -281,9 +281,9 @@ const ImageTab = () => {
                             <MenuItem value="" disabled>
                                 Select image
                             </MenuItem>
-                            {imageList.map((name, index) => (
-                                <MenuItem value={name} key={index}>
-                                    {name}
+                            {imageList.map((alias, index) => (
+                                <MenuItem value={alias} key={index}>
+                                    {alias}
                                 </MenuItem>
                             ))}
                         </Select>
@@ -310,7 +310,7 @@ const ImageTab = () => {
                                 </IconButton>
                             </span>
                         </Tooltip>
-                        <CopyResolveDID did={nameList[selectedImageName]} />
+                        <CopyResolveDID did={aliasList[selectedImageName]} />
                     </Box>
                     {selectedImage && selectedImageDocs && selectedImageDataUrl && (
                         <Box sx={{ mt: 2 }}>

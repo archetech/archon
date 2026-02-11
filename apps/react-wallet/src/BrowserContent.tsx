@@ -40,7 +40,7 @@ import { useUIContext } from "./contexts/UIContext";
 import { useThemeContext } from "./contexts/ContextProviders";
 import { useSafeArea } from "./contexts/SafeAreaContext";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
-import NamedDIDs from "./components/NamedDIDs";
+import AliasedDIDs from "./components/AliasedDIDs";
 import AssetsTab from "./components/AssetsTab";
 import DmailTab from "./components/DmailTab";
 import PollTab from "./components/PollTab";
@@ -187,8 +187,8 @@ function BrowserContent() {
             )}
 
             {displayComponent && (
-                <TabPanel value="names" sx={{ p: 0 }}>
-                    <NamedDIDs />
+                <TabPanel value="aliases" sx={{ p: 0 }}>
+                    <AliasedDIDs />
                 </TabPanel>
             )}
 
@@ -338,10 +338,10 @@ function BrowserContent() {
                                                 icon={<ListIcon />}
                                                 label={
                                                     menuOpen
-                                                        ? "Named DIDs"
+                                                        ? "Aliased DIDs"
                                                         : ""
                                                 }
-                                                value="names"
+                                                value="aliases"
                                                 iconPosition="start"
                                             />
                                         )}
@@ -553,12 +553,12 @@ function BrowserContent() {
                                 </ListItemButton>
 
                                 <ListItemButton
-                                    onClick={() => selectFromMore("names")}
+                                    onClick={() => selectFromMore("aliases")}
                                 >
                                     <ListItemIcon>
                                         <ListIcon />
                                     </ListItemIcon>
-                                    <ListItemText primary="Named DIDs" />
+                                    <ListItemText primary="Aliased DIDs" />
                                 </ListItemButton>
 
                                 <ListItemButton

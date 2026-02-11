@@ -198,14 +198,14 @@ keymaster list-ids
 | `create-response <challenge>` | Respond to a challenge |
 | `verify-response <response>` | Verify a response |
 
-##### Names (Aliases)
+##### Aliases
 
 | Command | Description |
 |---------|-------------|
-| `add-name <name> <did>` | Add alias for DID |
-| `get-name <name>` | Get DID by alias |
-| `remove-name <name>` | Remove alias |
-| `list-names` | List all aliases |
+| `add-alias <alias> <did>` | Add alias for DID |
+| `get-alias <alias>` | Get DID by alias |
+| `remove-alias <alias>` | Remove alias |
+| `list-aliases` | List all aliases |
 
 ##### Groups
 
@@ -276,13 +276,13 @@ Many commands support these options:
 
 | Option | Description |
 |--------|-------------|
-| `-n, --name <name>` | Assign a name to created DID |
+| `-a, --alias <alias>` | Assign an alias to created DID |
 | `-r, --registry <registry>` | Specify DID registry |
 
 Example:
 ```bash
 keymaster create-id MyBot -r hyperswarm
-keymaster create-schema schema.json -n my-schema -r local
+keymaster create-schema schema.json -a my-schema -r local
 ```
 
 ### Client

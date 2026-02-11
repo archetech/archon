@@ -22,10 +22,10 @@ const gatekeeper = new GatekeeperClient();
 const DocumentTab = () => {
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
-    const { refreshNames } = useUIContext();
+    const { refreshAliases } = useUIContext();
     const {
         documentList,
-        nameList,
+        aliasList,
         registries,
     } = useVariablesContext();
     const { isTabletUp } = useThemeContext();
@@ -124,18 +124,18 @@ const DocumentTab = () => {
                         filename: file.name,
                     });
 
-                    const nameList = await keymaster.listNames();
+                    const aliasList = await keymaster.listAliases();
                     let name = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in nameList) {
+                    while (name in aliasList) {
                         name = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.addName(name, did);
+                    await keymaster.addAlias(name, did);
                     setSuccess(`Document uploaded successfully: ${name}`);
 
-                    await refreshNames();
+                    await refreshAliases();
                     setSelectedDocumentName(name);
                 } catch (error: any) {
                     setError(`Error processing document: ${error}`);
@@ -228,10 +228,10 @@ const DocumentTab = () => {
             return;
         }
         try {
-            const did = nameList[selectedDocumentName];
-            await keymaster.addName(newName, did);
-            await keymaster.removeName(selectedDocumentName);
-            await refreshNames();
+            const did = aliasList[selectedDocumentName];
+            await keymaster.addAlias(newName, did);
+            await keymaster.removeAlias(selectedDocumentName);
+            await refreshAliases();
             setSelectedDocumentName(newName);
             await refreshDocument(newName);
             setSuccess("Document renamed");
@@ -371,7 +371,7 @@ const DocumentTab = () => {
                                 </span>
                             </Tooltip>
 
-                            <CopyResolveDID did={nameList[selectedDocumentName]} />
+                            <CopyResolveDID did={aliasList[selectedDocumentName]} />
                         </Box>
                     </Box>
                 )}

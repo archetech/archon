@@ -51,12 +51,12 @@ describe('createGroup', () => {
         expect(doc.didDocumentData).toStrictEqual(expectedGroup);
     });
 
-    it('should create a new named group with a different DID name', async () => {
+    it('should create a new named group with a different DID alias', async () => {
         await keymaster.createId('Bob');
         const groupName = 'mockGroup';
-        const didName = 'mockName';
-        await keymaster.createGroup(groupName, { name: didName });
-        const doc = await keymaster.resolveDID(didName);
+        const didAlias = 'mockAlias';
+        await keymaster.createGroup(groupName, { alias: didAlias });
+        const doc = await keymaster.resolveDID(didAlias);
 
         const expectedGroup = {
             group: {
@@ -97,7 +97,7 @@ describe('addGroupMember', () => {
         const dataDid = await keymaster.createAsset(mockAnchor);
 
         const alias = 'mockAlias';
-        await keymaster.addName(alias, dataDid);
+        await keymaster.addAlias(alias, dataDid);
         const ok = await keymaster.addGroupMember(groupDid, alias);
         expect(ok).toBe(true);
 
@@ -132,7 +132,7 @@ describe('addGroupMember', () => {
         const dataDid = await keymaster.createAsset(mockAnchor);
 
         const alias = 'mockAlias';
-        await keymaster.addName(alias, groupDid);
+        await keymaster.addAlias(alias, groupDid);
         const ok = await keymaster.addGroupMember(alias, dataDid);
         expect(ok).toBe(true);
 
@@ -389,7 +389,7 @@ describe('removeGroupMember', () => {
         await keymaster.addGroupMember(groupDid, dataDid);
 
         const alias = 'mockAlias';
-        await keymaster.addName(alias, dataDid);
+        await keymaster.addAlias(alias, dataDid);
 
         const ok = await keymaster.removeGroupMember(groupDid, alias);
         expect(ok).toBe(true);

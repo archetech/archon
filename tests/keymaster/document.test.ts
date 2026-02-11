@@ -138,7 +138,7 @@ describe('updateDocument', () => {
         const filename = 'mockdoc.txt';
 
         await keymaster.createId('Bob');
-        await keymaster.createDocument(mockdoc_v1, { name, filename });
+        await keymaster.createDocument(mockdoc_v1, { alias: name, filename });
         const ok = await keymaster.updateDocument(name, mockdoc_v2, { filename });
         const doc = await keymaster.resolveDID(name);
 
@@ -163,7 +163,7 @@ describe('updateDocument', () => {
         const name = 'mockdoc';
 
         await keymaster.createId('Bob');
-        await keymaster.createDocument(mockdoc_v1, { name });
+        await keymaster.createDocument(mockdoc_v1, { alias: name });
         const ok = await keymaster.updateDocument(name, mockdoc_v2);
         const doc = await keymaster.resolveDID(name);
 
@@ -189,7 +189,7 @@ describe('updateDocument', () => {
         const filename = 'mockdoc';
 
         await keymaster.createId('Bob');
-        await keymaster.createDocument(mockdoc_v1, { name, filename });
+        await keymaster.createDocument(mockdoc_v1, { alias: name, filename });
         const ok = await keymaster.updateDocument(name, mockdoc_v2, { filename });
         const doc = await keymaster.resolveDID(name);
 
@@ -245,7 +245,7 @@ describe('testDocument', () => {
 
         await keymaster.createId('Bob');
         const name = 'mockDocument';
-        await keymaster.createDocument(mockDocument, { name });
+        await keymaster.createDocument(mockDocument, { alias: name });
         const isDocument = await keymaster.testDocument(name);
 
         expect(isDocument).toBe(true);

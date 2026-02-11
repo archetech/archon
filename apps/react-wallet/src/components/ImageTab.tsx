@@ -22,10 +22,10 @@ const gatekeeper = new GatekeeperClient();
 const ImageTab = () => {
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
-    const { refreshNames } = useUIContext();
+    const { refreshAliases } = useUIContext();
     const {
         imageList,
-        nameList,
+        aliasList,
         registries,
     } = useVariablesContext();
     const { isTabletUp } = useThemeContext();
@@ -123,18 +123,18 @@ const ImageTab = () => {
                     }
                     const did = await keymaster.createImage(buffer, { registry });
 
-                    const nameList = await keymaster.listNames();
+                    const aliasList = await keymaster.listAliases();
                     let name = file.name.slice(0, 26);
                     let count = 1;
 
-                    while (name in nameList) {
+                    while (name in aliasList) {
                         name = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.addName(name, did);
+                    await keymaster.addAlias(name, did);
                     setSuccess(`Image uploaded successfully! DID: ${did}`);
 
-                    await refreshNames();
+                    await refreshAliases();
                     setSelectedImageName(name);
                 } catch (error: any) {
                     setError(`Error processing image: ${error}`);
@@ -213,10 +213,10 @@ const ImageTab = () => {
             return;
         }
         try {
-            const did = nameList[selectedImageName];
-            await keymaster.addName(newName, did);
-            await keymaster.removeName(selectedImageName);
-            await refreshNames();
+            const did = aliasList[selectedImageName];
+            await keymaster.addAlias(newName, did);
+            await keymaster.removeAlias(selectedImageName);
+            await refreshAliases();
             setSelectedImageName(newName);
             await refreshImage(newName);
             setSuccess("Image renamed");
@@ -351,7 +351,7 @@ const ImageTab = () => {
                                 </span>
                             </Tooltip>
 
-                            <CopyResolveDID did={nameList[selectedImageName]} />
+                            <CopyResolveDID did={aliasList[selectedImageName]} />
                         </Box>
 
                     </Box>

@@ -46,12 +46,12 @@ const PollsTab: React.FC = () => {
         currentDID,
         currentId,
         groupList,
-        nameList,
+        aliasList,
         pollList,
         registries,
     } = useVariablesContext();
     const {
-        refreshNames
+        refreshAliases
     } = useUIContext();
     const [registry, setRegistry] = useState<string>("hyperswarm");
     const [pollName, setPollName] = useState<string>("");
@@ -78,12 +78,12 @@ const PollsTab: React.FC = () => {
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
     const [removeOpen, setRemoveOpen]   = useState(false);
-    const [removeName, setRemoveName]   = useState<string>("");
+    const [removeAlias, setRemoveAlias]   = useState<string>("");
     const [canVote, setCanVote] = useState<boolean>(false);
     const [eligiblePolls, setEligiblePolls] = useState<Record<string, boolean>>({});
 
     const pollExpired = pollDeadline ? Date.now() > pollDeadline.getTime() : false;
-    const selectedPollDid = selectedPollName ? nameList[selectedPollName] ?? "" : "";
+    const selectedPollDid = selectedPollName ? aliasList[selectedPollName] ?? "" : "";
 
     useEffect(() => {
         if (!keymaster || !currentDID || pollList.length === 0) {
@@ -94,7 +94,7 @@ const PollsTab: React.FC = () => {
             const map: Record<string, boolean> = {};
 
             for (const name of pollList) {
-                const did = nameList[name];
+                const did = aliasList[name];
                 try {
                     const poll= await keymaster.getPoll(did);
                     if (!poll) {
@@ -109,7 +109,7 @@ const PollsTab: React.FC = () => {
             }
             setEligiblePolls(map);
         })();
-    }, [pollList, nameList, keymaster, currentDID]);
+    }, [pollList, aliasList, keymaster, currentDID]);
 
     function clearPollList() {
         setSelectedPollName("");
@@ -124,19 +124,19 @@ const PollsTab: React.FC = () => {
     }, [currentId]);
 
     async function confirmRemovePoll() {
-        if (!keymaster || !removeName) {
+        if (!keymaster || !removeAlias) {
             return;
         }
         try {
-            await keymaster.removeName(removeName);
-            await refreshNames();
+            await keymaster.removeAlias(removeAlias);
+            await refreshAliases();
             clearPollList();
-            setSuccess(`Removed '${removeName}'`);
+            setSuccess(`Removed '${removeAlias}'`);
         } catch (err: any) {
             setError(err);
         }
         setRemoveOpen(false);
-        setRemoveName("");
+        setRemoveAlias("");
     }
 
     const resetForm = () => {
@@ -160,7 +160,7 @@ const PollsTab: React.FC = () => {
             setError("Poll name is required");
             return null;
         }
-        if (pollName in nameList) {
+        if (pollName in aliasList) {
             setError(`Name "${pollName}" is already in use`);
             return null;
         }
@@ -187,7 +187,7 @@ const PollsTab: React.FC = () => {
             return null;
         }
 
-        const roster = nameList[rosterDid] ?? rosterDid;
+        const roster = aliasList[rosterDid] ?? rosterDid;
 
         return {
             ...template,
@@ -212,8 +212,8 @@ const PollsTab: React.FC = () => {
             const did = await keymaster.createPoll(poll, { registry });
             setCreatedPollDid(did);
             setPollNoticeSent(false);
-            await keymaster.addName(pollName, did);
-            await refreshNames();
+            await keymaster.addAlias(pollName, did);
+            await refreshAliases();
             setSuccess(`Poll created: ${did}`);
         } catch (error: any) {
             setError(error);
@@ -234,7 +234,7 @@ const PollsTab: React.FC = () => {
         setBallotSent(false);
         setPollController("");
         try {
-            const did = nameList[name] ?? "";
+            const did = aliasList[name] ?? "";
             if (did) {
                 const poll = await keymaster.getPoll(did);
                 setSelectedPollDesc(poll?.description ?? "");
@@ -365,7 +365,7 @@ const PollsTab: React.FC = () => {
         }
 
         try {
-            const group = await keymaster.getGroup(nameList[rosterDid] ?? rosterDid);
+            const group = await keymaster.getGroup(aliasList[rosterDid] ?? rosterDid);
             if (!group || group.members.length === 0) {
                 setError("Group not found or empty");
                 return;
@@ -400,9 +400,9 @@ const PollsTab: React.FC = () => {
         }
 
         try {
-            await keymaster.addName(newName, selectedPollDid);
-            await keymaster.removeName(selectedPollName);
-            await refreshNames();
+            await keymaster.addAlias(newName, selectedPollDid);
+            await keymaster.removeAlias(selectedPollName);
+            await refreshAliases();
             setSelectedPollName(newName);
             setRenameOldName("");
             setSuccess("Poll renamed");
@@ -416,7 +416,7 @@ const PollsTab: React.FC = () => {
         <Box>
             <WarningModal
                 title="Remove Poll"
-                warningText={`Are you sure you want to remove '${removeName}'?`}
+                warningText={`Are you sure you want to remove '${removeAlias}'?`}
                 isOpen={removeOpen}
                 onClose={() => setRemoveOpen(false)}
                 onSubmit={confirmRemovePoll}
@@ -585,14 +585,14 @@ const PollsTab: React.FC = () => {
                                     <MenuItem value="" disabled>
                                         Select poll
                                     </MenuItem>
-                                    {pollList.map((name: string) => (
-                                        <MenuItem key={name} value={name}>
-                                            {eligiblePolls[name] ? (
+                                    {pollList.map((alias: string) => (
+                                        <MenuItem key={alias} value={alias}>
+                                            {eligiblePolls[alias] ? (
                                                 <HowToVote fontSize="small" sx={{ mr: 1 }} />
                                             ) : (
                                                 <Block fontSize="small" sx={{ mr: 1 }} />
                                             )}
-                                            {name}
+                                            {alias}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -617,7 +617,7 @@ const PollsTab: React.FC = () => {
                                             sx={{ mt: 1, ml: 1 }}
                                             disabled={!selectedPollName}
                                             onClick={() => {
-                                                setRemoveName(selectedPollName);
+                                                setRemoveAlias(selectedPollName);
                                                 setRemoveOpen(true);
                                             }}
                                         >

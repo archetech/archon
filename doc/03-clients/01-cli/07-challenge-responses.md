@@ -17,7 +17,7 @@ $ archon create-challenge-cc social-media sm-challenge
 did:cid:test:z3v8AuaaxRxwZCPUnpCc4RoV5CZjeYVJepmJTVeJrpvyyB6LmwN
 ```
 
-In the command above, `social-media` is a named alias in Alice's wallet that resolves to the DID of the social-medial credential in examples above. `sm-challenge` is a new named alias in Alice's wallet that contains the DID of the new challenge document:
+In the command above, `social-media` is an alias in Alice's wallet that resolves to the DID of the social-medial credential in examples above. `sm-challenge` is a new alias in Alice's wallet that contains the DID of the new challenge document:
 
 ```json
 $ archon resolve-did sm-challenge
@@ -62,7 +62,7 @@ When presented with a challenge, a user can prepare a Verifiable Presentation of
 1. Next, the user can optionally create their own alias to interact with the challenge DID:
 
     ```sh
-    $ archon add-name sm-challenge did:cid:test:z3v8AuaaxRxwZCPUnpCc4RoV5CZjeYVJepmJTVeJrpvyyB6LmwN
+    $ archon add-alias sm-challenge did:cid:test:z3v8AuaaxRxwZCPUnpCc4RoV5CZjeYVJepmJTVeJrpvyyB6LmwN
     ```
 
     > [!NOTE]

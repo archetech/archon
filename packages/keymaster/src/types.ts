@@ -38,7 +38,7 @@ export interface WalletFile {
     counter: number;
     ids: Record<string, IDInfo>;
     current?: string;
-    names?: Record<string, string>;
+    aliases?: Record<string, string>;
     [key: string]: any; // Allow custom metadata fields
 }
 
@@ -52,14 +52,14 @@ export interface FixWalletResult {
     idsRemoved: number;
     ownedRemoved: number;
     heldRemoved: number;
-    namesRemoved: number;
+    aliasesRemoved: number;
 }
 
 export interface CreateAssetOptions {
     registry?: string;
     controller?: string;
     validUntil?: string;
-    name?: string;
+    alias?: string;
 }
 
 export interface FileAssetOptions extends CreateAssetOptions {
@@ -225,7 +225,7 @@ export interface KeymasterOptions {
     wallet: WalletBase;
     cipher: Cipher;
     defaultRegistry?: string;
-    maxNameLength?: number;
+    maxAliasLength?: number;
 }
 
 export interface EncryptedMessage {
@@ -305,11 +305,11 @@ export interface KeymasterInterface {
     backupId(id?: string): Promise<boolean>;
     recoverId(did: string): Promise<string>;
 
-    // Name system
-    listNames(): Promise<Record<string, string>>;
-    addName(name: string, did: string): Promise<boolean>;
-    getName(name: string): Promise<string | null>;
-    removeName(name: string): Promise<boolean>;
+    // Alias system
+    listAliases(): Promise<Record<string, string>>;
+    addAlias(alias: string, did: string): Promise<boolean>;
+    getAlias(alias: string): Promise<string | null>;
+    removeAlias(alias: string): Promise<boolean>;
 
     // DIDs
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;

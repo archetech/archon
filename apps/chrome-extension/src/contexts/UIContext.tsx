@@ -43,7 +43,7 @@ interface UIContextValue {
     refreshAll: () => Promise<void>;
     resetCurrentID: () => Promise<void>;
     refreshHeld: () => Promise<void>;
-    refreshNames: () => Promise<void>;
+    refreshAliases: () => Promise<void>;
     refreshInbox: () => Promise<void>;
 }
 
@@ -115,8 +115,8 @@ export function UIProvider(
         setHeldList,
         setIssuedList,
         setIssuedString,
-        setNameList,
-        setNameRegistry,
+        setAliasList,
+        setAliasRegistry,
         setUnresolvedList,
         setGroupList,
         setSchemaList,
@@ -163,8 +163,8 @@ export function UIProvider(
             return;
         }
 
-        const walletNames = await keymaster.listNames();
-        const names = Object.keys(walletNames);
+        const walletAliases = await keymaster.listAliases();
+        const names = Object.keys(walletAliases);
         names.sort((a, b) => a.localeCompare(b));
         const polls: string[] = [];
 
@@ -185,14 +185,14 @@ export function UIProvider(
                 return prevPolls;
             }
 
-            setNameList(prevNames => {
-                const extraNames: Record<string, string> = {};
+            setAliasList(prevAliases => {
+                const extraAliases: Record<string, string> = {};
                 for (const name of polls) {
-                    if (!(name in prevNames)) {
-                        extraNames[name] = walletNames[name];
+                    if (!(name in prevAliases)) {
+                        extraAliases[name] = walletAliases[name];
                     }
                 }
-                return Object.keys(extraNames).length ? { ...prevNames, ...extraNames } : prevNames;
+                return Object.keys(extraAliases).length ? { ...prevAliases, ...extraAliases } : prevAliases;
             });
 
             return polls;
@@ -378,18 +378,18 @@ export function UIProvider(
         }
     }
 
-    async function refreshNames(cid?: string) {
+    async function refreshAliases(cid?: string) {
         if (!keymaster) {
             return;
         }
 
-        let nameList: Record<string, string> = {};
+        let aliasList: Record<string, string> = {};
         let unresolvedList: Record<string, string> = {};
         const registryMap: Record<string, string> = {};
 
-        const allNames = await keymaster.listNames();
-        const allNamesSorted = Object.fromEntries(
-            Object.entries(allNames).sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+        const allAliases = await keymaster.listAliases();
+        const allAliasesSorted = Object.fromEntries(
+            Object.entries(allAliases).sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
         );
 
         const { valid: agentList, invalid } = await getValidIds();
@@ -405,10 +405,10 @@ export function UIProvider(
         const pollList = [];
         const documentList = [];
 
-        for (const [name, did] of Object.entries(allNamesSorted)) {
+        for (const [name, did] of Object.entries(allAliasesSorted)) {
             try {
                 const doc = await keymaster.resolveDID(name);
-                nameList[name] = did;
+                aliasList[name] = did;
 
                 const reg = doc.didDocumentRegistration?.registry;
                 if (reg) {
@@ -457,9 +457,9 @@ export function UIProvider(
             }
         }
 
-        setNameList(nameList);
+        setAliasList(aliasList);
         setUnresolvedList(unresolvedList);
-        setNameRegistry(registryMap);
+        setAliasRegistry(registryMap);
 
         const uniqueSortedAgents = [...new Set(agentList)]
             .sort((a, b) => a.localeCompare(b));
@@ -523,7 +523,7 @@ export function UIProvider(
         await setCurrentId(cid);
         await refreshHeld();
         await refreshCurrentDID(cid);
-        await refreshNames(cid);
+        await refreshAliases(cid);
         await refreshIssued();
     }
 
@@ -531,7 +531,7 @@ export function UIProvider(
         resetCredentialState();
         setCurrentDID("");
         setManifest({});
-        setNameList({});
+        setAliasList({});
         setSchemaList([]);
         setAgentList([]);
         setHeldList([]);
@@ -715,7 +715,7 @@ export function UIProvider(
         refreshAll,
         resetCurrentID,
         refreshHeld,
-        refreshNames,
+        refreshAliases,
         refreshInbox,
     }
 

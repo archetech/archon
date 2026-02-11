@@ -48,10 +48,10 @@ const PollsTab: React.FC = () => {
         currentId,
         registries,
         groupList,
-        nameList,
+        aliasList,
         pollList,
     } = useVariablesContext();
-    const { refreshNames } = useUIContext();
+    const { refreshAliases } = useUIContext();
     const { isTabletUp } = useThemeContext();
     const [registry, setRegistry] = useState<string>("hyperswarm");
     const [pollName, setPollName] = useState<string>("");
@@ -83,7 +83,7 @@ const PollsTab: React.FC = () => {
     const [eligiblePolls, setEligiblePolls] = useState<Record<string, boolean>>({});
 
     const pollExpired = pollDeadline ? Date.now() > pollDeadline.getTime() : false;
-    const selectedPollDid = selectedPollName ? nameList[selectedPollName] ?? "" : "";
+    const selectedPollDid = selectedPollName ? aliasList[selectedPollName] ?? "" : "";
 
     useEffect(() => {
         if (!keymaster || !currentDID || pollList.length === 0) {
@@ -94,7 +94,7 @@ const PollsTab: React.FC = () => {
             const map: Record<string, boolean> = {};
 
             for (const name of pollList) {
-                const did = nameList[name];
+                const did = aliasList[name];
                 try {
                     const poll= await keymaster.getPoll(did);
                     if (!poll) {
@@ -109,7 +109,7 @@ const PollsTab: React.FC = () => {
             }
             setEligiblePolls(map);
         })();
-    }, [pollList, nameList, keymaster, currentDID]);
+    }, [pollList, aliasList, keymaster, currentDID]);
 
     function clearPollList() {
         setSelectedPollName("");
@@ -128,8 +128,8 @@ const PollsTab: React.FC = () => {
             return;
         }
         try {
-            await keymaster.removeName(removeName);
-            await refreshNames();
+            await keymaster.removeAlias(removeName);
+            await refreshAliases();
             clearPollList();
             setSuccess(`Removed '${removeName}'`);
         } catch (err: any) {
@@ -160,7 +160,7 @@ const PollsTab: React.FC = () => {
             setError("Poll name is required");
             return null;
         }
-        if (pollName in nameList) {
+        if (pollName in aliasList) {
             setError(`Name "${pollName}" is already in use`);
             return null;
         }
@@ -187,7 +187,7 @@ const PollsTab: React.FC = () => {
             return null;
         }
 
-        const roster = nameList[rosterDid] ?? rosterDid;
+        const roster = aliasList[rosterDid] ?? rosterDid;
 
         return {
             ...template,
@@ -212,8 +212,8 @@ const PollsTab: React.FC = () => {
             const did = await keymaster.createPoll(poll, { registry });
             setCreatedPollDid(did);
             setPollNoticeSent(false);
-            await keymaster.addName(pollName, did);
-            await refreshNames();
+            await keymaster.addAlias(pollName, did);
+            await refreshAliases();
             setSuccess(`Poll created: ${did}`);
         } catch (error: any) {
             setError(error);
@@ -234,7 +234,7 @@ const PollsTab: React.FC = () => {
         setBallotSent(false);
         setPollController("");
         try {
-            const did = nameList[name] ?? "";
+            const did = aliasList[name] ?? "";
             if (did) {
                 const poll = await keymaster.getPoll(did);
                 setSelectedPollDesc(poll?.description ?? "");
@@ -365,7 +365,7 @@ const PollsTab: React.FC = () => {
         }
 
         try {
-            const group = await keymaster.getGroup(nameList[rosterDid] ?? rosterDid);
+            const group = await keymaster.getGroup(aliasList[rosterDid] ?? rosterDid);
             if (!group || group.members.length === 0) {
                 setError("Group not found or empty");
                 return;
@@ -400,9 +400,9 @@ const PollsTab: React.FC = () => {
         }
 
         try {
-            await keymaster.addName(newName, selectedPollDid);
-            await keymaster.removeName(selectedPollName);
-            await refreshNames();
+            await keymaster.addAlias(newName, selectedPollDid);
+            await keymaster.removeAlias(selectedPollName);
+            await refreshAliases();
             setSelectedPollName(newName);
             setRenameOldName("");
             setSuccess("Poll renamed");
