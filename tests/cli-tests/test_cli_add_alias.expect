@@ -5,7 +5,7 @@ set timeout 10
 
 spawn bash archon new-wallet
 expect {
-    -re {"version"\s*:\s*1} {
+    -re {"version"\s*:\s*2} {
         send_user "\n✅ Wallet Reset Complete!\n"
     }
     timeout {
@@ -43,14 +43,14 @@ if {$captured_did eq ""} {
 }
 
 # Use the captured value in another function call
-spawn bash archon add-name qa $captured_did
+spawn bash archon add-alias qa $captured_did
 
 expect {
     "OK" {
-        send_user "\n✅ Name added successfully!\n"
+        send_user "\n✅ Alias added successfully!\n"
     }
     timeout {
-        send_user "\n❌ Timeout adding name.\n"
+        send_user "\n❌ Timeout adding alias.\n"
         exit 1
     }
     eof {
@@ -60,20 +60,20 @@ expect {
 }
 
 # Check List
-spawn bash archon list-names
+spawn bash archon list-aliases
 
 expect {
     # Pass if "qa" is found
     -re "qa" {
         puts "Success, found 'qa' in output \n✅"
     }
-    
+
     # Timeout handling
     timeout {
         puts "Timeout occurred \n❌"
         exit 1
     }
-    
+
     # Default match (successful case)
     eof {
         puts "Process completed successfully \n✅"
@@ -81,12 +81,12 @@ expect {
     }
 }
 
-# Remove the name
-spawn bash archon remove-name "qa"
+# Remove the alias
+spawn bash archon remove-alias "qa"
 # Wait for the output and check if 'qa' is present
 expect {
     "OK" {
-        send_user "\n✅ Test Passed: name is removed!\n"
+        send_user "\n✅ Test Passed: alias is removed!\n"
     }
     timeout {
         send_user "\n❌ Test Failed: 'qa' not found in output.\n"
@@ -95,7 +95,7 @@ expect {
 }
 
 # Check List
-spawn bash archon list-names
+spawn bash archon list-aliases
 
 expect {
     # Negative match to fail if "qa" is found
@@ -103,13 +103,13 @@ expect {
         puts "Error: Unexpected 'qa' found in output \n❌"
         exit 1
     }
-    
+
     # Timeout handling
     timeout {
         puts "Timeout occurred \n❌"
         exit 1
     }
-    
+
     # Default match (successful case)
     eof {
         puts "Process completed successfully \n✅"
@@ -135,7 +135,7 @@ foreach {key val} $argv {
 
         # Print result
         puts "Deleted wallet.json!"
-        
+
     } elseif {$key == "--local"} {
         # Delete Wallet
         set script_dir [file dirname [file normalize [info script]]]
@@ -155,7 +155,7 @@ foreach {key val} $argv {
         } else {
             puts "File not found: $abs_filepath"
         }
-        
+
     } elseif {$key == "--ci-redis"} {
         # Run docker exec to delete the file
         set result [exec docker compose exec redis redis-cli flushall]

@@ -5,7 +5,7 @@ set timeout 10
 
 spawn bash archon new-wallet
 expect {
-    -re {"version"\s*:\s*1} {
+    -re {"version"\s*:\s*2} {
         send_user "\n✅ Wallet Reset Complete!\n"
     }
     timeout {
@@ -43,7 +43,7 @@ if {$captured_did eq ""} {
 }
 
 # Use the captured value in another function call
-spawn bash archon add-name qa $captured_did
+spawn bash archon add-alias qa $captured_did
 
 # Backup Id
 spawn bash archon backup-id
