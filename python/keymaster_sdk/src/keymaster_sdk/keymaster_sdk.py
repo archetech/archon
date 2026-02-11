@@ -363,28 +363,28 @@ def encrypt_json(json, receiver, options=None):
     return response["did"]
 
 
-def list_names():
+def list_aliases():
     response = proxy_request(
         "GET",
-        f"{_keymaster_api}/names",
+        f"{_keymaster_api}/aliases",
     )
-    return response["names"]
+    return response["aliases"]
 
 
-def add_name(name, did):
+def add_alias(alias, did):
     response = proxy_request(
-        "POST", f"{_keymaster_api}/names", json={"name": name, "did": did}
+        "POST", f"{_keymaster_api}/aliases", json={"alias": alias, "did": did}
     )
     return response["ok"]
 
 
-def get_name(name):
-    response = proxy_request("GET", f"{_keymaster_api}/names/{name}")
+def get_alias(alias):
+    response = proxy_request("GET", f"{_keymaster_api}/aliases/{alias}")
     return response["did"]
 
 
-def remove_name(name):
-    response = proxy_request("DELETE", f"{_keymaster_api}/names/{name}")
+def remove_alias(alias):
+    response = proxy_request("DELETE", f"{_keymaster_api}/aliases/{alias}")
     return response["ok"]
 
 

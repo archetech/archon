@@ -256,19 +256,19 @@ def test_encrypt_decrypt_message():
     assert_equal(response, msg)
 
 
-def test_names():
+def test_aliases():
     alice = generate_id()
     alice_id = keymaster.create_id(alice, local_options)
 
-    response = keymaster.remove_name("Bob")
+    response = keymaster.remove_alias("Bob")
 
-    response = keymaster.add_name("Bob", alice_id)
+    response = keymaster.add_alias("Bob", alice_id)
     assert_equal(response, True)
 
-    response = keymaster.list_names()
-    assert "Bob" in response, "expected name not found in list_names response"
+    response = keymaster.list_aliases()
+    assert "Bob" in response, "expected alias not found in list_aliases response"
 
-    response = keymaster.remove_name("Bob")
+    response = keymaster.remove_alias("Bob")
     assert_equal(response, True)
 
 
