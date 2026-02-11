@@ -1,4 +1,4 @@
-import { archon, resetAll, freshWalletWithId } from './helpers';
+import { archon, resetAll, freshWalletWithId, dockerExec } from './helpers';
 
 afterAll(async () => {
     await resetAll();
@@ -49,7 +49,7 @@ describe('wallet', () => {
     });
 
     test('import-wallet restores from mnemonic phrase', async () => {
-        await archon('new-wallet');
+        await dockerExec('redis', 'redis-cli', 'flushall');
         const mnemonic = 'borrow submit turtle wrist behind announce leaf soccer juice choice oven above';
         const output = await archon('import-wallet', mnemonic);
         const wallet = JSON.parse(output);
