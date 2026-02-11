@@ -1,9 +1,9 @@
-import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { archon, resetAll, parseDid } from './helpers';
+import { archon, resetAll, parseDid, dockerExec } from './helpers';
 
 const exec = promisify(execFile);
 
@@ -39,14 +39,14 @@ beforeAll(async () => {
 }, 60000);
 
 afterAll(async () => {
-    // Clean up temp files
+    // Clean up temp directory
     try {
-        unlinkSync(join(tempDir, 'qa-credential-final.json'));
+        rmSync(tempDir, { recursive: true, force: true });
     } catch { /* ignore */ }
 
     // Clean up container file
     try {
-        await exec('docker', ['compose', 'exec', '-T', 'cli', 'rm', '-f', '/app/share/qa-credential-final.json']);
+        await dockerExec('cli', 'rm', '-f', '/app/share/qa-credential-final.json');
     } catch { /* ignore */ }
 
     await resetAll();

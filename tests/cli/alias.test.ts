@@ -1,4 +1,4 @@
-import { archon, resetAll, freshWalletWithId, parseDid } from './helpers';
+import { archon, resetAll, freshWalletWithId } from './helpers';
 
 afterAll(async () => {
     await resetAll();
