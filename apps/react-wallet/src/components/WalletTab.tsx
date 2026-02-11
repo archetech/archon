@@ -87,7 +87,7 @@ const WalletTab = () => {
             const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } =
                 await keymaster.fixWallet();
             setSuccess(
-                `${idsRemoved} IDs removed\n${ownedRemoved} owned DIDs removed\n${heldRemoved} held DIDs removed\n${aliasesRemoved} names removed`
+                `${idsRemoved} IDs removed\n${ownedRemoved} owned DIDs removed\n${heldRemoved} held DIDs removed\n${aliasesRemoved} aliases removed`
             );
         } catch (error: any) {
             setError(error);
