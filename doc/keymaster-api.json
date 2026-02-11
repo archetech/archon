@@ -146,7 +146,7 @@
                         "current": {
                           "type": "string"
                         },
-                        "aliases": {
+                        "names": {
                           "type": "object",
                           "additionalProperties": {
                             "type": "string"
@@ -236,7 +236,7 @@
                       "current": {
                         "type": "string"
                       },
-                      "aliases": {
+                      "names": {
                         "type": "object",
                         "additionalProperties": {
                           "type": "string"
@@ -369,7 +369,7 @@
                         "current": {
                           "type": "string"
                         },
-                        "aliases": {
+                        "names": {
                           "type": "object",
                           "additionalProperties": {
                             "type": "string"
@@ -500,7 +500,7 @@
                         "current": {
                           "type": "string"
                         },
-                        "aliases": {
+                        "names": {
                           "type": "object",
                           "additionalProperties": {
                             "type": "string"
@@ -1743,7 +1743,7 @@
             }
           },
           "400": {
-            "description": "The requested name was invalid or could not be removed.",
+            "description": "The requested alias was invalid or could not be removed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4217,9 +4217,9 @@
                         "type": "string",
                         "description": "Specific ID or DID to act as the asset’s controller. Defaults to the current ID."
                       },
-                      "name": {
+                      "alias": {
                         "type": "string",
-                        "description": "A human-readable name for the asset."
+                        "description": "A human-readable alias for the asset."
                       }
                     }
                   }
