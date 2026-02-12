@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.8](https://github.com/archetech/archon/compare/@didcid/keymaster@0.3.7...@didcid/keymaster@0.3.8) (2026-02-12)
+
+
+### Features
+
+* Added update-credential to agent CLI ([#66](https://github.com/archetech/archon/issues/66)) ([002fce1](https://github.com/archetech/archon/commit/002fce1dcf2edb8c621eb77501cdf0abeed90484))
+
+
+
+
+
 ## [0.3.7](https://github.com/archetech/archon/compare/@didcid/keymaster@0.2.0...@didcid/keymaster@0.3.7) (2026-02-12)
 
 

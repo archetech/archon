@@ -1273,6 +1273,197 @@ program
         }
     });
 
+// Dmail commands
+program
+    .command('create-dmail <file>')
+    .description('Create a new dmail from a JSON file')
+    .option('-a, --alias <alias>', 'DID alias')
+    .option('-r, --registry <registry>', 'registry to use')
+    .action(async (file, options) => {
+        try {
+            const { alias, registry } = options;
+            const message = JSON.parse(fs.readFileSync(file).toString());
+            const did = await keymaster.createDmail(message, { alias, registry });
+            console.log(did);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('update-dmail <did> <file>')
+    .description('Update an existing dmail from a JSON file')
+    .action(async (did, file) => {
+        try {
+            const message = JSON.parse(fs.readFileSync(file).toString());
+            const ok = await keymaster.updateDmail(did, message);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('send-dmail <did>')
+    .description('Send a dmail and return the notice DID')
+    .action(async (did) => {
+        try {
+            const notice = await keymaster.sendDmail(did);
+            if (notice) {
+                console.log(notice);
+            } else {
+                console.error('Send failed');
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('get-dmail <did>')
+    .description('Get a dmail message by DID')
+    .action(async (did) => {
+        try {
+            const message = await keymaster.getDmailMessage(did);
+            if (message) {
+                console.log(JSON.stringify(message, null, 4));
+            } else {
+                console.error('Dmail not found');
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('list-dmail')
+    .description('List dmails for current ID')
+    .action(async () => {
+        try {
+            const dmails = await keymaster.listDmail();
+            console.log(JSON.stringify(dmails, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('file-dmail <did> <tags>')
+    .description('Assign tags to a dmail (comma-separated, e.g. inbox,unread)')
+    .action(async (did, tags) => {
+        try {
+            const tagList = tags.split(',').map((t: string) => t.trim());
+            const ok = await keymaster.fileDmail(did, tagList);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('refresh-dmail')
+    .description('Check for new dmails and clean up expired notices')
+    .action(async () => {
+        try {
+            const ok = await keymaster.refreshNotices();
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('import-dmail <did>')
+    .description('Import a dmail into inbox with unread tag')
+    .action(async (did) => {
+        try {
+            const ok = await keymaster.importDmail(did);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('remove-dmail <did>')
+    .description('Delete a dmail')
+    .action(async (did) => {
+        try {
+            const ok = await keymaster.removeDmail(did);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('add-dmail-attachment <did> <file>')
+    .description('Add a file attachment to a dmail')
+    .action(async (did, file) => {
+        try {
+            const data = fs.readFileSync(file);
+            const name = path.basename(file);
+            const ok = await keymaster.addDmailAttachment(did, name, data);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('remove-dmail-attachment <did> <name>')
+    .description('Remove an attachment from a dmail')
+    .action(async (did, name) => {
+        try {
+            const ok = await keymaster.removeDmailAttachment(did, name);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('get-dmail-attachment <did> <name> <file>')
+    .description('Save a dmail attachment to a file')
+    .action(async (did, name, file) => {
+        try {
+            const data = await keymaster.getDmailAttachment(did, name);
+            if (data) {
+                fs.writeFileSync(file, data);
+                console.log(`Data written to ${file}`);
+            } else {
+                console.error(`Attachment ${name} not found`);
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('list-dmail-attachments <did>')
+    .description('List attachments of a dmail')
+    .action(async (did) => {
+        try {
+            const attachments = await keymaster.listDmailAttachments(did);
+            console.log(JSON.stringify(attachments, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
 // Initialize and run
 async function run() {
     // Handle --help and --version without full initialization

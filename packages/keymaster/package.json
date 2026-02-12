@@ -1,6 +1,6 @@
 {
   "name": "@didcid/keymaster",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Archon Keymaster",
   "type": "module",
   "module": "./dist/esm/index.js",
