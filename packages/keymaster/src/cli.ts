@@ -543,6 +543,20 @@ program
     });
 
 program
+    .command('update-credential <did> <file>')
+    .description('Update an issued credential')
+    .action(async (did, file) => {
+        try {
+            const vc = JSON.parse(fs.readFileSync(file).toString());
+            const ok = await keymaster.updateCredential(did, vc);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('revoke-credential <did>')
     .description('Revokes a verifiable credential')
     .action(async (did) => {
