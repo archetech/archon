@@ -4,7 +4,7 @@ services:
     volumes:
       - ./data/btc-signet:/root/.bitcoin
     ports:
-      - 38332:38332
+      - 127.0.0.1:38332:38332
 
   btc-signet-mediator:
     build:

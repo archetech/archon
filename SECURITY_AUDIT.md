@@ -60,10 +60,7 @@ The cryptographic implementation (cipher package) uses sound primitives (secp256
 | C-01 | ✅ Mitigated | Auth | No authentication on API endpoints → admin key middleware added | `services/gatekeeper/server/`, `services/keymaster/server/` |
 | C-02 | ✅ Mitigated | Auth | Unauthenticated DB reset via GET request → admin key + production guard | `services/gatekeeper/server/` — `GET /db/reset` |
 | C-03 | ✅ Mitigated | Auth | Mnemonic exposed via unauthenticated endpoint → admin key required | `services/keymaster/server/` — `GET /api/v1/wallet/mnemonic` |
-| C-04 | 🔴 Critical | Secrets | Encrypted wallet committed to Git | `data/wallet.json` |
-| C-05 | 🔴 Critical | Infra | Redis bound to 0.0.0.0 with no authentication | `data/redis.conf` |
-| C-06 | 🔴 Critical | Infra | Bitcoin RPC hardcoded credentials + `rpcallowip=0.0.0.0/0` | `data/btc-signet/bitcoin.conf`, `data/btc-testnet4/bitcoin.conf` |
-| C-07 | 🔴 Critical | Infra | MongoDB running without authentication | `docker-compose.yml` — `mongodb` service |
+| C-04 | ✅ Mitigated | Secrets | Encrypted wallet committed to Git → `data/.gitignore` excludes `*.json`; file was never committed | `data/wallet.json` |
 | H-01 | ✅ Mitigated | Transport | No TLS → bind address + nginx proxy config provided | All server files |
 | H-02 | 🟠 High | Headers | No security headers (helmet) | `services/gatekeeper/server/`, `services/keymaster/server/` |
 | H-03 | ✅ Mitigated | DoS | No rate limiting → nginx proxy rate limiting provided | All API servers |
@@ -94,6 +91,9 @@ The cryptographic implementation (cipher package) uses sound primitives (secp256
 | L-07 | 🔵 Low | Deps | `@capacitor/core` on alpha pre-release | `apps/react-wallet/package.json` |
 | L-08 | 🔵 Low | Deps | Express 4.x in maintenance mode | `services/*/server/package.json` |
 | L-09 | 🔵 Low | Observability | Prometheus metrics endpoints publicly accessible | Both API servers — `/metrics` |
+| L-10 | 🔵 Low | Infra | Redis has no authentication, but is bound to localhost and isolated in Docker | `data/redis.conf` |
+| L-11 | 🔵 Low | Infra | Bitcoin RPC hardcoded credentials → signet port bound to localhost; testnet4 not exposed; test networks only | `data/btc-signet/bitcoin.conf`, `data/btc-testnet4/bitcoin.conf` |
+| L-12 | 🔵 Low | Infra | MongoDB has no authentication, but is bound to localhost and isolated in Docker | `docker-compose.yml` — `mongodb` service |
 
 ---
 
@@ -156,98 +156,21 @@ ARCHON_ADMIN_API_KEY=$(openssl rand -hex 32)  # Defense-in-depth for admin route
 
 ### C-04: Encrypted Wallet Committed to Git
 
-**Severity:** 🔴 Critical
+**Severity:** ✅ Mitigated
 **Category:** Secrets Management
 **Affected:** `data/wallet.json`
 
-The file `data/wallet.json` contains an encrypted wallet with:
-- AES-GCM encrypted mnemonic seed (salt, IV, ciphertext)
-- Full encrypted wallet blob
+**Status:** This finding was a false positive. The `data/.gitignore` already contains a `*.json` rule that excludes `wallet.json`, and `git log --all -- data/wallet.json` confirms the file was never committed to the repository.
 
-This file is committed to the repository. Even though the mnemonic is encrypted, the `.gitignore` does not exclude it. If the passphrase is weak, guessable, or leaked, the entire key material is compromised. Additionally, Git history preserves all past versions of the file.
+~~The file `data/wallet.json` contains an encrypted wallet with:~~
+~~- AES-GCM encrypted mnemonic seed (salt, IV, ciphertext)~~
+~~- Full encrypted wallet blob~~
 
-**Impact:** Encrypted secrets in version control are accessible to anyone with repo access. A weak passphrase enables offline brute-force.
+~~This file is committed to the repository. Even though the mnemonic is encrypted, the `.gitignore` does not exclude it. If the passphrase is weak, guessable, or leaked, the entire key material is compromised. Additionally, Git history preserves all past versions of the file.~~
 
-**Recommendation:**
-1. Add `data/wallet.json` and `data/*.db` to `.gitignore`
-2. Remove `data/wallet.json` from Git history using `git filter-repo`
-3. Rotate all keys derived from the committed wallet
-4. Never commit wallet/key material to version control, even if encrypted
+~~**Impact:** Encrypted secrets in version control are accessible to anyone with repo access. A weak passphrase enables offline brute-force.~~
 
----
-
-### C-05: Redis Bound to All Interfaces Without Authentication
-
-**Severity:** 🔴 Critical
-**Category:** Infrastructure Security
-**Affected:** `data/redis.conf`
-
-```properties
-bind 0.0.0.0
-port 6379
-# No requirepass directive
-# No ACL configuration
-```
-
-Redis listens on all network interfaces with zero authentication. Any process on the same network can read, write, and delete all data. Redis can also be exploited for remote code execution via `EVAL` if reachable.
-
-**Impact:** Full database compromise. Unauthorized data access, modification, and deletion.
-
-**Recommendation:**
-```properties
-bind 127.0.0.1
-requirepass <strong_random_password>
-rename-command FLUSHALL ""
-rename-command FLUSHDB ""
-rename-command CONFIG ""
-```
-
----
-
-### C-06: Hardcoded Bitcoin RPC Credentials + Unrestricted Access
-
-**Severity:** 🔴 Critical
-**Category:** Secrets Management / Infrastructure
-**Affected:** `data/btc-signet/bitcoin.conf`, `data/btc-testnet4/bitcoin.conf`
-
-```properties
-rpcuser=signet
-rpcpassword=signet
-rpcbind=0.0.0.0
-rpcallowip=0.0.0.0/0
-```
-
-Trivially guessable RPC credentials are hardcoded and checked into version control. The RPC server is bound to all interfaces and accepts connections from any IP address.
-
-**Impact:** Anyone with network access can execute wallet operations, transfer funds, and manipulate Bitcoin node state.
-
-**Recommendation:**
-1. Use environment variables or Docker secrets for RPC credentials
-2. Restrict `rpcallowip` to Docker internal network CIDR
-3. Bind RPC to `127.0.0.1` or container-internal interface
-4. Add these config files to `.gitignore` and use templates
-
----
-
-### C-07: MongoDB Running Without Authentication
-
-**Severity:** 🔴 Critical
-**Category:** Infrastructure Security
-**Affected:** `docker-compose.yml` — `mongodb` service
-
-MongoDB is deployed with default settings (no `--auth` flag, no user/password). Connection strings throughout the codebase use `mongodb://mongodb:27017` with no credentials.
-
-**Impact:** Any service or attacker on the Docker network has unrestricted read/write access to the entire database.
-
-**Recommendation:**
-```yaml
-mongodb:
-  image: mongo:8.0.4
-  command: mongod --auth
-  environment:
-    - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
-    - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASS}
-```
+**Recommendation:** No action required — existing controls are sufficient.
 
 ---
 
@@ -634,6 +557,41 @@ Both services use Express ^4.21.0. Express 5 is now available with improved secu
 ### L-09: Prometheus Metrics Publicly Accessible
 
 Both API servers expose `/metrics` endpoints without authentication, leaking operational data (memory usage, request counts, timing, etc.).
+
+### L-10: Redis Has No Authentication (Downgraded from C-05)
+
+While Redis has no `requirepass` configured, the host port binding in `docker-compose.yml` is `127.0.0.1:6379:6379` (localhost only), and Redis is isolated within the Docker bridge network. It is not reachable from external networks. Access is limited to other containers in the compose stack and local host processes.
+
+**Remaining risk:** A compromised container could perform lateral movement to Redis. Adding `requirepass` would provide defense-in-depth.
+
+**Recommendation:** Consider adding authentication as a hardening measure:
+```properties
+requirepass <strong_random_password>
+```
+
+### L-11: Bitcoin RPC Hardcoded Credentials (Downgraded from C-06)
+
+Simple RPC credentials exist in `bitcoin.conf` files for signet and testnet4. However, the signet RPC port is now bound to `127.0.0.1:38332` (localhost only), and testnet4 has no port mapping at all. Both are test networks with no real funds. Access is limited to the Docker network and local host processes.
+
+**Remaining risk:** Credentials are in Git history. A compromised container could access the Bitcoin RPC within the Docker network.
+
+**Recommendation:** Consider switching to `rpcauth` (hashed credentials) and moving passwords to `.env`.
+
+### L-12: MongoDB Has No Authentication (Downgraded from C-07)
+
+MongoDB is deployed without authentication, but the port is bound to `127.0.0.1:27017:27017` (localhost only) and is isolated within the Docker bridge network. It is not reachable from external networks. Access is limited to other containers in the compose stack and local host processes.
+
+**Remaining risk:** A compromised container could access MongoDB without credentials within the Docker network.
+
+**Recommendation:** Consider enabling authentication as a hardening measure:
+```yaml
+mongodb:
+  image: mongo:8.0.4
+  command: mongod --auth
+  environment:
+    - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+    - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASS}
+```
 
 ---
 
