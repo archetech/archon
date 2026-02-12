@@ -1394,7 +1394,7 @@ program
 
 program
     .command('remove-dmail <did>')
-    .description('Remove a dmail from inbox')
+    .description('Delete a dmail')
     .action(async (did) => {
         try {
             const ok = await keymaster.removeDmail(did);
