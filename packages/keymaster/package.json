@@ -1,6 +1,6 @@
 {
   "name": "@didcid/keymaster",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Archon Keymaster",
   "type": "module",
   "module": "./dist/esm/index.js",
@@ -151,7 +151,7 @@
   "dependencies": {
     "@didcid/cipher": "^0.1.3",
     "@didcid/common": "^0.1.3",
-    "@didcid/gatekeeper": "^0.3.4",
+    "@didcid/gatekeeper": "^0.3.5",
     "axios": "^1.7.7",
     "commander": "^11.1.0",
     "dotenv": "^16.4.5",
