@@ -10,6 +10,7 @@ const config = {
     didPrefix: process.env.ARCHON_GATEKEEPER_DID_PREFIX || 'did:cid',
     registries: process.env.ARCHON_GATEKEEPER_REGISTRIES ? process.env.ARCHON_GATEKEEPER_REGISTRIES.split(',') : undefined,
     jsonLimit: process.env.ARCHON_GATEKEEPER_JSON_LIMIT || '4mb',
+    uploadLimit: process.env.ARCHON_GATEKEEPER_UPLOAD_LIMIT || '10mb',
     gcInterval: process.env.ARCHON_GATEKEEPER_GC_INTERVAL ? parseInt(process.env.ARCHON_GATEKEEPER_GC_INTERVAL) : 15,
     statusInterval: process.env.ARCHON_GATEKEEPER_STATUS_INTERVAL ? parseInt(process.env.ARCHON_GATEKEEPER_STATUS_INTERVAL) : 5,
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',

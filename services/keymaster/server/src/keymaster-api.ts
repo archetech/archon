@@ -4535,7 +4535,7 @@ v1router.post('/polls/:poll/unpublish', async (req, res) => {
  *                   type: string
  */
 // eslint-disable-next-line
-v1router.post('/images', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
+v1router.post('/images', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const data = req.body;
         const headers = req.headers;
@@ -4591,7 +4591,7 @@ v1router.post('/images', express.raw({ type: 'application/octet-stream', limit: 
  *                 error:
  *                   type: string
  */
-v1router.put('/images/:id', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
+v1router.put('/images/:id', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const data = req.body;
         const ok = await keymaster.updateImage(req.params.id, data);
@@ -4753,7 +4753,7 @@ v1router.post('/images/:id/test', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/documents', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
+v1router.post('/documents', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const data = req.body;
         const headers = req.headers;
@@ -4817,7 +4817,7 @@ v1router.post('/documents', express.raw({ type: 'application/octet-stream', limi
  *                 error:
  *                   type: string
  */
-v1router.put('/documents/:id', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
+v1router.put('/documents/:id', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const data = req.body;
         const headers = req.headers;
@@ -5339,7 +5339,7 @@ v1router.get('/vaults/:id/members', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/vaults/:id/items', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
+v1router.post('/vaults/:id/items', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const vaultId = req.params.id;
         const data = req.body;
@@ -5972,7 +5972,7 @@ v1router.get('/dmail/:id/attachments', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/dmail/:id/attachments', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
+v1router.post('/dmail/:id/attachments', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const dmailId = req.params.id;
         const data = req.body;

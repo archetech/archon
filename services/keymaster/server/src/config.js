@@ -11,6 +11,7 @@ const config = {
     keymasterPassphrase: process.env.ARCHON_ENCRYPTED_PASSPHRASE || '',
     walletCache: process.env.ARCHON_WALLET_CACHE ? process.env.ARCHON_WALLET_CACHE === 'true' : false,
     defaultRegistry: process.env.ARCHON_DEFAULT_REGISTRY,
+    uploadLimit: process.env.ARCHON_KEYMASTER_UPLOAD_LIMIT || '10mb',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
 };
 
