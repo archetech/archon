@@ -979,6 +979,19 @@ program
     });
 
 program
+    .command('get-property <id> <key>')
+    .description('Get a property value from an asset')
+    .action(async (id, key) => {
+        try {
+            const data = await keymaster.resolveAsset(id);
+            console.log(JSON.stringify(data[key], null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
     .command('set-property <id> <key> [value]')
     .description('Assign a key-value pair to an asset')
     .action(async (id, key, value) => {

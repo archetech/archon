@@ -42,6 +42,7 @@ Commands:
   get-credential <did>                    Get credential by DID
   get-group <did>                         Get group by DID
   get-name <name>                         Get DID assigned to name
+  get-property <id> <key>                 Get a property value from an asset
   get-schema <did>                        Get schema by DID
   get-vault-item <id> <item> <file>       Save an item from a vault to a file
   help [command]                          display help for command
