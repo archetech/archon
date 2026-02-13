@@ -1742,7 +1742,7 @@ v1router.get('/ipfs/json/:cid', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/ipfs/text', express.text({ type: 'text/plain', limit: '10mb' }), async (req, res) => {
+v1router.post('/ipfs/text', express.text({ type: 'text/plain', limit: config.uploadLimit }), async (req, res) => {
     try {
         const response = await gatekeeper.addText(req.body);
         res.send(response);
@@ -1824,7 +1824,7 @@ v1router.get('/ipfs/text/:cid', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/ipfs/data', express.raw({ type: 'application/octet-stream', limit: '10mb' }), async (req, res) => {
+v1router.post('/ipfs/data', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const data = req.body;
         const response = await gatekeeper.addData(data);
