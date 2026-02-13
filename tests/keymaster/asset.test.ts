@@ -374,13 +374,13 @@ describe('resolveAsset', () => {
     });
 });
 
-describe('updateAsset', () => {
+describe('mergeData', () => {
     it('should update an asset', async () => {
         await keymaster.createId('Bob');
         const mockAsset1 = { name: 'original' };
         const mockAsset2 = { name: 'updated' };
         const did = await keymaster.createAsset(mockAsset1);
-        const ok = await keymaster.updateAsset(did, mockAsset2);
+        const ok = await keymaster.mergeData(did, mockAsset2);
         const asset = await keymaster.resolveAsset(did);
 
         expect(ok).toBe(true);
@@ -392,19 +392,19 @@ describe('updateAsset', () => {
         const mockAsset1 = { key1: 'val1' };
         const mockAsset2 = { key2: 'val2' };
         const did = await keymaster.createAsset(mockAsset1);
-        const ok = await keymaster.updateAsset(did, mockAsset2);
+        const ok = await keymaster.mergeData(did, mockAsset2);
         const asset = await keymaster.resolveAsset(did);
 
         expect(ok).toBe(true);
         expect(asset).toStrictEqual({ key1: 'val1', key2: 'val2' });
     });
 
-    it('should remove a property when updated to be undefined ', async () => {
+    it('should remove a property when set to null', async () => {
         await keymaster.createId('Bob');
         const mockAsset1 = { key1: 'val1', key2: 'val2' };
-        const mockAsset2 = { key2: undefined };
+        const mockAsset2 = { key2: null };
         const did = await keymaster.createAsset(mockAsset1);
-        const ok = await keymaster.updateAsset(did, mockAsset2);
+        const ok = await keymaster.mergeData(did, mockAsset2);
         const asset = await keymaster.resolveAsset(did);
 
         expect(ok).toBe(true);

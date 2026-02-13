@@ -636,7 +636,7 @@ async function main(): Promise<void> {
     knownNodes[nodeDID] = nodeInfo;
 
     await exportLoop();
-    await keymaster.updateAsset(nodeDID, { node: nodeInfo });
+    await keymaster.mergeData(nodeDID, { node: nodeInfo });
     await connectionLoop();
 }
 

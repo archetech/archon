@@ -1160,7 +1160,7 @@ describe('resolveAsset', () => {
     });
 });
 
-describe('updateAsset', () => {
+describe('mergeData', () => {
     const mockAssetId = 'asset1';
     const mockAsset = { id: mockAssetId, data: 'some data' };
 
@@ -1170,12 +1170,12 @@ describe('updateAsset', () => {
             .reply(200, { ok: true });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const ok = await keymaster.updateAsset(mockAssetId, mockAsset);
+        const ok = await keymaster.mergeData(mockAssetId, mockAsset);
 
         expect(ok).toBe(true);
     });
 
-    it('should throw exception on resolveAsset server error', async () => {
+    it('should throw exception on mergeData server error', async () => {
         nock(KeymasterURL)
             .put(`${Endpoints.assets}/${mockAssetId}`)
             .reply(500, ServerError);
@@ -1183,7 +1183,7 @@ describe('updateAsset', () => {
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
         try {
-            await keymaster.updateAsset(mockAssetId, mockAsset);
+            await keymaster.mergeData(mockAssetId, mockAsset);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

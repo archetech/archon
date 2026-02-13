@@ -497,7 +497,7 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async updateAsset(id: string, data: Record<string, unknown>): Promise<boolean> {
+    async mergeData(id: string, data: Record<string, unknown>): Promise<boolean> {
         try {
             const response = await axios.put(`${this.API}/assets/${id}`, { data });
             return response.data.ok;

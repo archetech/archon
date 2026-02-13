@@ -914,7 +914,7 @@ program
     .action(async (id, file) => {
         try {
             const data = JSON.parse(fs.readFileSync(file).toString());
-            const ok = await keymaster.updateAsset(id, data);
+            const ok = await keymaster.mergeData(id, data);
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
@@ -983,21 +983,18 @@ program
     .description('Assign a key-value pair to an asset')
     .action(async (id, key, value) => {
         try {
-            const data = await keymaster.resolveAsset(id);
+            let parsed = null;
 
             if (value) {
                 try {
-                    data[key] = JSON.parse(value);
+                    parsed = JSON.parse(value);
                 }
                 catch {
-                    data[key] = value;
+                    parsed = value;
                 }
             }
-            else {
-                delete data[key];
-            }
 
-            const ok = await keymaster.updateAsset(id, data);
+            const ok = await keymaster.mergeData(id, { [key]: parsed });
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {

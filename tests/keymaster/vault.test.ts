@@ -350,7 +350,7 @@ describe('listVaultMembers', () => {
         try {
             const vault = await keymaster.getVault(did);
             vault.version = 999; // Simulate unsupported version
-            await keymaster.updateAsset(did, { vault });
+            await keymaster.mergeData(did, { vault });
             await keymaster.listVaultMembers(did);
             throw new ExpectedExceptionError();
         } catch (error: any) {

@@ -3792,7 +3792,7 @@ v1router.get('/assets/:id', async (req, res) => {
 v1router.put('/assets/:id', async (req, res) => {
     try {
         const { data } = req.body;
-        const ok = await keymaster.updateAsset(req.params.id, data);
+        const ok = await keymaster.mergeData(req.params.id, data);
         res.json({ ok });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });

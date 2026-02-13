@@ -805,7 +805,7 @@ export default class Keymaster implements KeymasterInterface {
     ): Promise<boolean> {
         const image = await this.generateImageAsset(buffer);
 
-        return this.updateAsset(id, { image });
+        return this.mergeData(id, { image });
     }
 
     async getImage(id: string): Promise<ImageAsset | null> {
@@ -893,7 +893,7 @@ export default class Keymaster implements KeymasterInterface {
         const filename = options.filename || 'document';
         const document = await this.generateFileAsset(filename, buffer);
 
-        return this.updateAsset(id, { document });
+        return this.mergeData(id, { document });
     }
 
     async getDocument(id: string): Promise<FileAsset | null> {
@@ -1281,17 +1281,18 @@ export default class Keymaster implements KeymasterInterface {
         return doc.didDocumentData;
     }
 
-    async updateAsset(
+    async mergeData(
         did: string,
         data: Record<string, unknown>
     ): Promise<boolean> {
         const doc = await this.resolveDID(did);
-        const currentData = doc.didDocumentData || {};
+        const currentData = doc.didDocumentData as Record<string, unknown> || {};
 
-        const updatedData = {
-            ...currentData,
-            ...data
-        };
+        const updatedData = { ...currentData, ...data };
+
+        for (const key of Object.keys(updatedData)) {
+            if (updatedData[key] === null) delete updatedData[key];
+        }
 
         return this.updateDID(did, { didDocumentData: updatedData });
     }
@@ -2259,7 +2260,7 @@ export default class Keymaster implements KeymasterInterface {
         members.add(memberDID);
         group.members = Array.from(members);
 
-        return this.updateAsset(groupDID, { group });
+        return this.mergeData(groupDID, { group });
     }
 
     async removeGroupMember(
@@ -2291,7 +2292,7 @@ export default class Keymaster implements KeymasterInterface {
         members.delete(memberDID);
         group.members = Array.from(members);
 
-        return this.updateAsset(groupDID, { group });
+        return this.mergeData(groupDID, { group });
     }
 
     async testGroup(
@@ -2418,7 +2419,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('schema');
         }
 
-        return this.updateAsset(id, { schema });
+        return this.mergeData(id, { schema });
     }
 
     // TBD add optional 2nd parameter that will validate JSON against the schema
@@ -2778,7 +2779,7 @@ export default class Keymaster implements KeymasterInterface {
             received: new Date().toISOString(),
         };
 
-        return this.updateAsset(didPoll, { poll });
+        return this.mergeData(didPoll, { poll });
     }
 
     async publishPoll(
@@ -2813,7 +2814,7 @@ export default class Keymaster implements KeymasterInterface {
 
         poll.results = view.results;
 
-        return this.updateAsset(pollId, { poll });
+        return this.mergeData(pollId, { poll });
     }
 
     async unpublishPoll(pollId: string): Promise<boolean> {
@@ -2833,7 +2834,7 @@ export default class Keymaster implements KeymasterInterface {
 
         delete poll.results;
 
-        return this.updateAsset(pollId, { poll });
+        return this.mergeData(pollId, { poll });
     }
 
     async createVault(options: VaultOptions = {}): Promise<string> {
@@ -2988,7 +2989,7 @@ export default class Keymaster implements KeymasterInterface {
                 await this.addMemberKey(vault, memberDID, privateJwk);
             }
 
-            await this.updateAsset(vaultId, { vault });
+            await this.mergeData(vaultId, { vault });
             return;
         }
 
@@ -3028,7 +3029,7 @@ export default class Keymaster implements KeymasterInterface {
         vault.members = this.cipher.encryptMessage(publicJwk, privateJwk, JSON.stringify(members));
 
         await this.addMemberKey(vault, memberDID, privateJwk);
-        return this.updateAsset(vaultId, { vault });
+        return this.mergeData(vaultId, { vault });
     }
 
     async removeVaultMember(vaultId: string, memberId: string): Promise<boolean> {
@@ -3052,7 +3053,7 @@ export default class Keymaster implements KeymasterInterface {
         const memberKeyId = this.generateSaltedId(vault, memberDID);
         delete vault.keys[memberKeyId];
 
-        return this.updateAsset(vaultId, { vault });
+        return this.mergeData(vaultId, { vault });
     }
 
     async listVaultMembers(vaultId: string): Promise<Record<string, any>> {
@@ -3090,7 +3091,7 @@ export default class Keymaster implements KeymasterInterface {
         vault.items = this.cipher.encryptMessage(vault.publicJwk, privateJwk, JSON.stringify(items));
         vault.sha256 = this.cipher.hashJSON(items);
 
-        return this.updateAsset(vaultId, { vault });
+        return this.mergeData(vaultId, { vault });
     }
 
     async removeVaultItem(vaultId: string, name: string): Promise<boolean> {
@@ -3103,7 +3104,7 @@ export default class Keymaster implements KeymasterInterface {
 
         vault.items = this.cipher.encryptMessage(vault.publicJwk, privateJwk, JSON.stringify(items));
         vault.sha256 = this.cipher.hashJSON(items);
-        return this.updateAsset(vaultId, { vault });
+        return this.mergeData(vaultId, { vault });
     }
 
     async listVaultItems(vaultId: string, options?: ResolveDIDOptions): Promise<Record<string, any>> {
@@ -3452,7 +3453,7 @@ export default class Keymaster implements KeymasterInterface {
         message: NoticeMessage,
     ): Promise<boolean> {
         const notice = await this.verifyNotice(message);
-        return this.updateAsset(id, { notice });
+        return this.mergeData(id, { notice });
     }
 
     async addToNotices(
