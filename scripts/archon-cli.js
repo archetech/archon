@@ -980,10 +980,11 @@ program
 
 program
     .command('get-property <id> <key>')
-    .description('Get a property value from an asset')
+    .description('Get a property value from a DID')
     .action(async (id, key) => {
         try {
-            const data = await keymaster.resolveAsset(id);
+            const doc = await keymaster.resolveDID(id);
+            const data = doc.didDocumentData || {};
             console.log(JSON.stringify(data[key], null, 4));
         }
         catch (error) {
@@ -993,7 +994,7 @@ program
 
 program
     .command('set-property <id> <key> [value]')
-    .description('Assign a key-value pair to an asset')
+    .description('Assign a key-value pair to a DID')
     .action(async (id, key, value) => {
         try {
             let parsed = null;
