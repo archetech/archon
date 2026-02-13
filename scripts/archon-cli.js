@@ -985,7 +985,11 @@ program
         try {
             const doc = await keymaster.resolveDID(id);
             const data = doc.didDocumentData || {};
-            console.log(JSON.stringify(data[key], null, 4));
+            const value = data[key];
+
+            if (value !== undefined) {
+                console.log(JSON.stringify(value, null, 4));
+            }
         }
         catch (error) {
             console.error(error.error || error);

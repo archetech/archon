@@ -1016,7 +1016,11 @@ program
         try {
             const doc = await keymaster.resolveDID(id);
             const data = doc.didDocumentData as Record<string, unknown> || {};
-            console.log(JSON.stringify(data[key], null, 4));
+            const value = data[key];
+
+            if (value !== undefined) {
+                console.log(JSON.stringify(value, null, 4));
+            }
         }
         catch (error: any) {
             console.error(error.error || error.message || error);
