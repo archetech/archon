@@ -319,7 +319,7 @@ export interface KeymasterInterface {
     createAsset(data: unknown, options?: CreateAssetOptions): Promise<string>;
     listAssets(owner?: string): Promise<string[]>;
     resolveAsset(did: string, options?: ResolveDIDOptions): Promise<unknown | null>;
-    updateAsset(did: string, data: Record<string, unknown>): Promise<boolean>;
+    mergeData(did: string, data: Record<string, unknown>): Promise<boolean>;
 
     // Encryption
     encryptMessage(msg: string, receiver: string, options?: EncryptOptions): Promise<string>;
