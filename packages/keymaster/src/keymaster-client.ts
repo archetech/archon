@@ -17,7 +17,7 @@ import {
     Group,
     Vault,
     VaultOptions,
-    ImageAsset,
+    ImageFileAsset,
     IssueCredentialsOptions,
     KeymasterClientOptions,
     KeymasterInterface,
@@ -951,14 +951,14 @@ export default class KeymasterClient implements KeymasterInterface {
 
     async createImage(
         data: Buffer,
-        options: CreateAssetOptions = {}
+        options: FileAssetOptions = {}
     ): Promise<string> {
         try {
             const response = await axios.post(`${this.API}/images`, data, {
                 headers: {
                     // eslint-disable-next-line
                     'Content-Type': 'application/octet-stream',
-                    'X-Options': JSON.stringify(options), // Pass options as a custom header
+                    'X-Options': JSON.stringify(options),
                 }
             });
             return response.data.did;
@@ -970,12 +970,14 @@ export default class KeymasterClient implements KeymasterInterface {
 
     async updateImage(
         id: string,
-        data: Buffer
+        data: Buffer,
+        options: FileAssetOptions = {}
     ): Promise<boolean> {
         try {
             const response = await axios.put(`${this.API}/images/${id}`, data, {
                 headers: {
-                    'Content-Type': 'application/octet-stream'
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify(options),
                 }
             });
             return response.data.ok;
@@ -985,10 +987,10 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async getImage(id: string): Promise<ImageAsset | null> {
+    async getImage(id: string): Promise<ImageFileAsset | null> {
         try {
             const response = await axios.get(`${this.API}/images/${id}`);
-            return response.data.image;
+            return response.data;
         }
         catch (error) {
             throwError(error);

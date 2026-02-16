@@ -53,10 +53,13 @@ describe('createImage', () => {
         expect(doc.didDocument!.controller).toBe(ownerDid);
 
         const expected = {
-            image: {
+            file: {
                 cid,
+                filename: 'image',
                 bytes: 392,
                 type: 'image/png',
+            },
+            image: {
                 width: 100,
                 height: 100,
             }
@@ -104,10 +107,13 @@ describe('updateImage', () => {
         expect(doc.didDocument!.controller).toBe(ownerDid);
 
         const expected = {
-            image: {
+            file: {
                 cid,
+                filename: 'image',
                 bytes: 522,
                 type: 'image/jpg',
+            },
+            image: {
                 width: 200,
                 height: 200,
             }
@@ -137,10 +143,13 @@ describe('updateImage', () => {
         expect(doc.didDocument!.controller).toBe(ownerDid);
 
         const expected = {
-            image: {
+            file: {
                 cid,
+                filename: 'image',
                 bytes: 779,
                 type: 'image/png',
+            },
+            image: {
                 width: 200,
                 height: 200,
             }
@@ -188,10 +197,11 @@ describe('getImage', () => {
         const image = await keymaster.getImage(did);
 
         expect(image).not.toBeNull();
-        expect(image!.type).toStrictEqual('image/png');
-        expect(image!.width).toStrictEqual(100);
-        expect(image!.height).toStrictEqual(100);
-        expect(image!.bytes).toStrictEqual(392);
+        expect(image!.file.type).toStrictEqual('image/png');
+        expect(image!.file.bytes).toStrictEqual(392);
+        expect(image!.file.data).toStrictEqual(mockImage);
+        expect(image!.image.width).toStrictEqual(100);
+        expect(image!.image.height).toStrictEqual(100);
     });
 
     it('should return null on invalid did', async () => {

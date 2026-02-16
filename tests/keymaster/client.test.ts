@@ -2511,17 +2511,20 @@ describe('updateImage', () => {
 
 describe('getImage', () => {
     const mockImageId = 'image1';
-    const mockImage = { cid: 'mockCID', height: 100, width: 100, type: 'png' };
+    const mockImageAsset = {
+        file: { cid: 'mockCID', filename: 'image', type: 'image/png', bytes: 392 },
+        image: { width: 100, height: 100 },
+    };
 
     it('should get image', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.images}/${mockImageId}`)
-            .reply(200, { image: mockImage });
+            .reply(200, mockImageAsset);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const schema = await keymaster.getImage(mockImageId);
+        const result = await keymaster.getImage(mockImageId);
 
-        expect(schema).toStrictEqual(mockImage);
+        expect(result).toStrictEqual(mockImageAsset);
     });
 
     it('should throw exception on getImage server error', async () => {

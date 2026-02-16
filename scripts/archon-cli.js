@@ -869,7 +869,8 @@ program
         try {
             const { alias, registry } = options;
             const data = fs.readFileSync(file);
-            const did = await keymaster.createImage(data, { alias, registry });
+            const filename = path.basename(file);
+            const did = await keymaster.createImage(data, { filename, alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -927,12 +928,12 @@ program
     .description('Save an image asset to a file')
     .action(async (id, file) => {
         try {
-            const image = await keymaster.getImage(id);
-            if (!image || !image.data) {
+            const imageAsset = await keymaster.getImage(id);
+            if (!imageAsset || !imageAsset.file.data) {
                 console.error('Image not found');
                 return;
             }
-            fs.writeFileSync(file, image.data);
+            fs.writeFileSync(file, imageAsset.file.data);
             console.log(`Data written to ${file}`);
         }
         catch (error) {
@@ -978,7 +979,8 @@ program
     .action(async (id, file) => {
         try {
             const data = fs.readFileSync(file);
-            const ok = await keymaster.updateImage(id, data);
+            const filename = path.basename(file);
+            const ok = await keymaster.updateImage(id, data, { filename });
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
