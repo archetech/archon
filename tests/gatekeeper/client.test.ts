@@ -89,6 +89,7 @@ describe('isReady', () => {
     it('should timeout if not ready', async () => {
         nock(GatekeeperURL)
             .get(Endpoints.ready)
+            .times(3)
             .reply(200, 'false');
 
         const gatekeeper = await GatekeeperClient.create({

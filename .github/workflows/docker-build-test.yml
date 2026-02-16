@@ -52,10 +52,17 @@ jobs:
         run: |
           ./stop-node
 
-      - name: Upload docker logs & artifacts
+      - name: Upload docker logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: docker-compose-logs
           path: docker-compose-logs.txt
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: E2E Artifacts
+          path: e2e-results.xml
 
