@@ -340,7 +340,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             setDmailCc('');
             setDmailDID('');
             setSelectedImageName('');
-            setSelectedDocumentName('');
+            setSelectedFileName('');
             setSelectedVaultName('');
             setSelectedVault(null);
             setSelectedPollName("");
