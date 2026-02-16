@@ -19,7 +19,7 @@ Commands:
   check-wallet                            Validate DIDs in wallet
   clone-asset [options] <id>              Clone an asset
   create-asset [options]                  Create an empty asset
-  create-asset-document [options] <file>  Create an asset from a document file
+  create-asset-file [options] <file>      Create an asset from a file
   create-asset-image [options] <file>     Create an asset from an image file
   create-asset-json [options] <file>      Create an asset from a JSON file
   create-challenge [options] [file]       Create a challenge (optionally from a file)
@@ -39,6 +39,9 @@ Commands:
   encrypt-message <message> <did>         Encrypt a message for a DID
   fix-wallet                              Remove invalid DIDs from the wallet
   get-asset <id>                          Get asset by name or DID
+  get-asset-file <id> <file>              Save a file asset to a file
+  get-asset-image <id> <file>             Save an image asset to a file
+  get-asset-json <id> <file>              Save a JSON asset to a file
   get-credential <did>                    Get credential by DID
   get-group <did>                         Get group by DID
   get-name <name>                         Get DID assigned to name
@@ -86,7 +89,7 @@ Commands:
   transfer-asset <id> <controller>        Transfer asset to a new controller
   unpublish-credential <did>              Remove a credential from the current user manifest
   unpublish-poll <poll>                   Remove results from poll
-  update-asset-document <id> <file>       Update an asset from a document file
+  update-asset-file <id> <file>           Update an asset from a file
   update-asset-image <id> <file>          Update an asset from an image file
   update-asset-json <id> <file>           Update an asset from a JSON file
   update-poll <ballot>                    Add a ballot to the poll

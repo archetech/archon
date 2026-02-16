@@ -67,7 +67,7 @@ function AliasedDIDs() {
         agentList,
         alias,
         aliasDID,
-        documentList,
+        fileList,
         groupList,
         imageList,
         aliasList,
@@ -263,9 +263,9 @@ function AliasedDIDs() {
                 icon: <Image style={iconStyle}/>, kind: "image"
             };
         }
-        if (documentList?.includes(name)) {
+        if (fileList?.includes(name)) {
             return {
-                icon: <Article style={iconStyle}/>, kind: "document"
+                icon: <Article style={iconStyle}/>, kind: "file"
             };
         }
         if (pollList?.includes(name)) {

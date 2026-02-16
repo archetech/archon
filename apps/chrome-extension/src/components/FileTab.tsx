@@ -14,22 +14,22 @@ import CopyResolveDID from "./CopyResolveDID";
 
 const gatekeeper = new GatekeeperClient();
 
-const DocumentTab = () => {
+const FileTab = () => {
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
     const { refreshAliases } = useUIContext();
     const {
-        documentList,
+        fileList,
         aliasList,
         registries,
     } = useVariablesContext();
     const [registry, setRegistry] = useState<string>("hyperswarm");
-    const [selectedDocumentName, setSelectedDocumentName] = useState<string>("");
-    const [selectedDocument, setSelectedDocument] = useState<FileAsset | null>(null);
-    const [selectedDocumentDocs, setSelectedDocumentDocs] = useState<DidCidDocument | null>(null);
-    const [selectedDocumentDataUrl, setSelectedDocumentDataUrl] = useState<string>("");
-    const [docVersion, setDocVersion] = useState<number>(1);
-    const [docVersionMax, setDocVersionMax] = useState<number>(1);
+    const [selectedFileName, setSelectedFileName] = useState<string>("");
+    const [selectedFile, setSelectedFile] = useState<FileAsset | null>(null);
+    const [selectedFileDocs, setSelectedFileDocs] = useState<DidCidDocument | null>(null);
+    const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>("");
+    const [fileVersion, setFileVersion] = useState<number>(1);
+    const [fileVersionMax, setFileVersionMax] = useState<number>(1);
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
 
@@ -42,49 +42,49 @@ const DocumentTab = () => {
     }, []);
 
     useEffect(() => {
-        if (selectedDocumentName) {
-            setDocVersionMax(1);
-            refreshDocument(selectedDocumentName);
+        if (selectedFileName) {
+            setFileVersionMax(1);
+            refreshFile(selectedFileName);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedDocumentName]);
+    }, [selectedFileName]);
 
-    async function refreshDocument(documentName: string, version?: number) {
+    async function refreshFile(fileName: string, version?: number) {
         if (!keymaster) {
             return;
         }
         try {
-            const docs = await keymaster.resolveDID(documentName, version ? { versionSequence: version } : {});
-            setSelectedDocumentDocs(docs);
+            const docs = await keymaster.resolveDID(fileName, version ? { versionSequence: version } : {});
+            setSelectedFileDocs(docs);
 
             const currentVersion = docs.didDocumentMetadata?.version ?? 1;
-            setDocVersion(currentVersion);
+            setFileVersion(currentVersion);
             if (version === undefined) {
-                setDocVersionMax(currentVersion);
+                setFileVersionMax(currentVersion);
             }
 
-            const docAsset = docs.didDocumentData as { document?: FileAsset };
-            if (!docAsset.document || !docAsset.document.cid) {
-                setError(`No document data found in version ${currentVersion}`);
+            const fileAsset = docs.didDocumentData as { file?: FileAsset };
+            if (!fileAsset.file || !fileAsset.file.cid) {
+                setError(`No file data found in version ${currentVersion}`);
                 return;
             }
-            setSelectedDocument(docAsset.document);
+            setSelectedFile(fileAsset.file);
 
-            const raw = await gatekeeper.getData(docAsset.document.cid);
+            const raw = await gatekeeper.getData(fileAsset.file.cid);
             if (!raw) {
-                setError(`Could not fetch data for CID: ${docAsset.document.cid}`);
+                setError(`Could not fetch data for CID: ${fileAsset.file.cid}`);
                 return;
             }
 
             const base64 = raw.toString("base64");
-            const dataUrl = `data:${docAsset.document.type};base64,${base64}`;
-            setSelectedDocumentDataUrl(dataUrl);
+            const dataUrl = `data:${fileAsset.file.type};base64,${base64}`;
+            setSelectedFileDataUrl(dataUrl);
         } catch (error: any) {
             setError(error);
         }
     }
 
-    async function uploadDocument(event: ChangeEvent<HTMLInputElement>) {
+    async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
         if (!keymaster) {
             return;
         }
@@ -113,7 +113,7 @@ const DocumentTab = () => {
                         return;
                     }
 
-                    const did = await keymaster.createDocument(buffer, {
+                    const did = await keymaster.createFile(buffer, {
                         registry,
                         filename: file.name,
                     });
@@ -127,12 +127,12 @@ const DocumentTab = () => {
                     }
 
                     await keymaster.addAlias(alias, did);
-                    setSuccess(`Document uploaded successfully: ${alias}`);
+                    setSuccess(`File uploaded successfully: ${alias}`);
 
                     await refreshAliases();
-                    setSelectedDocumentName(alias);
+                    setSelectedFileName(alias);
                 } catch (error: any) {
-                    setError(`Error processing document: ${error}`);
+                    setError(`Error processing file: ${error}`);
                 }
             };
 
@@ -142,12 +142,12 @@ const DocumentTab = () => {
 
             reader.readAsArrayBuffer(file);
         } catch (error: any) {
-            setError(`Error uploading document: ${error}`);
+            setError(`Error uploading file: ${error}`);
         }
     }
 
-    async function updateDocument(event: ChangeEvent<HTMLInputElement>) {
-        if (!keymaster || !selectedDocumentName) {
+    async function updateFile(event: ChangeEvent<HTMLInputElement>) {
+        if (!keymaster || !selectedFileName) {
             return;
         }
         try {
@@ -175,14 +175,14 @@ const DocumentTab = () => {
                         return;
                     }
 
-                    await keymaster.updateDocument(selectedDocumentName, buffer, {
+                    await keymaster.updateFile(selectedFileName, buffer, {
                         filename: file.name,
                     });
 
-                    setSuccess(`Document updated successfully`);
-                    await refreshDocument(selectedDocumentName);
+                    setSuccess(`File updated successfully`);
+                    await refreshFile(selectedFileName);
                 } catch (error: any) {
-                    setError(`Error updating document: ${error}`);
+                    setError(`Error updating file: ${error}`);
                 }
             };
 
@@ -192,43 +192,43 @@ const DocumentTab = () => {
 
             reader.readAsArrayBuffer(file);
         } catch (error: any) {
-            setError(`Error uploading document: ${error}`);
+            setError(`Error uploading file: ${error}`);
         }
     }
 
-    function downloadDocument() {
-        if (!selectedDocument || !selectedDocumentDataUrl) {
+    function downloadFile() {
+        if (!selectedFile || !selectedFileDataUrl) {
             return;
         }
 
         const link = document.createElement("a");
-        link.href = selectedDocumentDataUrl;
-        link.download = selectedDocument.filename || "download.bin";
+        link.href = selectedFileDataUrl;
+        link.download = selectedFile.filename || "download.bin";
         link.click();
     }
 
     function handleVersionChange(newVer: number) {
-        refreshDocument(selectedDocumentName, newVer);
+        refreshFile(selectedFileName, newVer);
     }
 
     function openRenameModal() {
-        setRenameOldName(selectedDocumentName);
+        setRenameOldName(selectedFileName);
         setRenameOpen(true);
     }
 
     async function handleRenameSubmit(newName: string) {
         setRenameOpen(false);
-        if (!keymaster || !newName || newName === selectedDocumentName) {
+        if (!keymaster || !newName || newName === selectedFileName) {
             return;
         }
         try {
-            const did = aliasList[selectedDocumentName];
+            const did = aliasList[selectedFileName];
             await keymaster.addAlias(newName, did);
-            await keymaster.removeAlias(selectedDocumentName);
+            await keymaster.removeAlias(selectedFileName);
             await refreshAliases();
-            setSelectedDocumentName(newName);
-            await refreshDocument(newName);
-            setSuccess("Document renamed");
+            setSelectedFileName(newName);
+            await refreshFile(newName);
+            setSuccess("File renamed");
         } catch (error: any) {
             setError(error);
         }
@@ -238,7 +238,7 @@ const DocumentTab = () => {
         <Box>
             <TextInputModal
                 isOpen={renameOpen}
-                title="Rename Document"
+                title="Rename File"
                 description={`Rename '${renameOldName}'`}
                 label="New Name"
                 confirmText="Rename"
@@ -266,28 +266,28 @@ const DocumentTab = () => {
 
                 <Button
                     variant="contained"
-                    onClick={() => document.getElementById("documentUpload")!.click()}
+                    onClick={() => document.getElementById("fileUpload")!.click()}
                     size="small"
                     className="button-right"
                     disabled={!registry}
                 >
-                    Upload Document
+                    Upload File
                 </Button>
                 <input
                     type="file"
-                    id="documentUpload"
+                    id="fileUpload"
                     accept=".pdf,.doc,.docx,.txt"
                     style={{ display: "none" }}
-                    onChange={uploadDocument}
+                    onChange={uploadFile}
                 />
             </Box>
 
-            {documentList && (
+            {fileList && (
                 <Box>
                     <Box className="flex-box mt-2">
                         <Select
-                            value={selectedDocumentName}
-                            onChange={(event) => setSelectedDocumentName(event.target.value)}
+                            value={selectedFileName}
+                            onChange={(event) => setSelectedFileName(event.target.value)}
                             size="small"
                             variant="outlined"
                             className="select-small-left"
@@ -295,9 +295,9 @@ const DocumentTab = () => {
                             displayEmpty
                         >
                             <MenuItem value="" disabled>
-                                Select document
+                                Select file
                             </MenuItem>
-                            {documentList.map((alias, index) => (
+                            {fileList.map((alias, index) => (
                                 <MenuItem value={alias} key={index}>
                                     {alias}
                                 </MenuItem>
@@ -305,75 +305,75 @@ const DocumentTab = () => {
                         </Select>
                         <Button
                             variant="contained"
-                            onClick={() => document.getElementById("documentUpdate")!.click()}
+                            onClick={() => document.getElementById("fileUpdate")!.click()}
                             size="small"
                             className="button-center"
-                            disabled={!selectedDocumentName}
+                            disabled={!selectedFileName}
                         >
                             Update
                         </Button>
                         <input
                             type="file"
-                            id="documentUpdate"
+                            id="fileUpdate"
                             accept=".pdf,.doc,.docx,.txt"
                             style={{ display: "none" }}
-                            onChange={updateDocument}
+                            onChange={updateFile}
                         />
                         <Button
                             variant="contained"
                             size="small"
-                            onClick={downloadDocument}
+                            onClick={downloadFile}
                             className="button-right"
-                            disabled={!selectedDocument || !selectedDocumentDataUrl}
+                            disabled={!selectedFile || !selectedFileDataUrl}
                         >
                             Download
                         </Button>
-                        <Tooltip title="Rename Document">
+                        <Tooltip title="Rename File">
                             <span>
-                                <IconButton size="small" onClick={openRenameModal} disabled={!selectedDocumentName} sx={{ ml: 1 }}>
+                                <IconButton size="small" onClick={openRenameModal} disabled={!selectedFileName} sx={{ ml: 1 }}>
                                     <Edit fontSize="small" />
                                 </IconButton>
                             </span>
                         </Tooltip>
 
-                        <CopyResolveDID did={aliasList[selectedDocumentName]} />
+                        <CopyResolveDID did={aliasList[selectedFileName]} />
                     </Box>
-                    {selectedDocument && selectedDocumentDocs && selectedDocumentDataUrl && (
+                    {selectedFile && selectedFileDocs && selectedFileDataUrl && (
                         <Box sx={{ mt: 2 }}>
                             <VersionNavigator
-                                version={docVersion}
-                                maxVersion={docVersionMax}
+                                version={fileVersion}
+                                maxVersion={fileVersionMax}
                                 onVersionChange={handleVersionChange}
                             />
 
                             <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
                                 <Box>
-                                    <strong>DID:</strong> {selectedDocumentDocs.didDocument!.id}
+                                    <strong>DID:</strong> {selectedFileDocs.didDocument!.id}
                                 </Box>
                                 <Box>
-                                    <strong>CID:</strong> {selectedDocument.cid}
+                                    <strong>CID:</strong> {selectedFile.cid}
                                 </Box>
                                 <Box>
-                                    <strong>Filename:</strong> {selectedDocument.filename}
+                                    <strong>Filename:</strong> {selectedFile.filename}
                                 </Box>
                                 <Box>
                                     <strong>Created:</strong>{" "}
-                                    {selectedDocumentDocs.didDocumentMetadata!.created}
+                                    {selectedFileDocs.didDocumentMetadata!.created}
                                 </Box>
                                 <Box>
                                     <strong>Updated:</strong>{" "}
-                                    {selectedDocumentDocs.didDocumentMetadata!.updated ||
-                                        selectedDocumentDocs.didDocumentMetadata!.created}
+                                    {selectedFileDocs.didDocumentMetadata!.updated ||
+                                        selectedFileDocs.didDocumentMetadata!.created}
                                 </Box>
                                 <Box>
                                     <strong>Version:</strong>{" "}
-                                    {selectedDocumentDocs.didDocumentMetadata!.version}
+                                    {selectedFileDocs.didDocumentMetadata!.version}
                                 </Box>
                                 <Box>
-                                    <strong>File size:</strong> {selectedDocument.bytes} bytes
+                                    <strong>File size:</strong> {selectedFile.bytes} bytes
                                 </Box>
                                 <Box>
-                                    <strong>Document type:</strong> {selectedDocument.type}
+                                    <strong>File type:</strong> {selectedFile.type}
                                 </Box>
                             </Box>
                         </Box>
@@ -384,4 +384,4 @@ const DocumentTab = () => {
     );
 };
 
-export default DocumentTab;
+export default FileTab;

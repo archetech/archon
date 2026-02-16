@@ -387,11 +387,11 @@ export interface KeymasterInterface {
     getImage(id: string): Promise<ImageAsset | null>;
     testImage(id: string): Promise<boolean>;
 
-    // Documents
-    createDocument(data: Buffer, options?: FileAssetOptions): Promise<string>;
-    updateDocument(did: string, data: Buffer, options?: FileAssetOptions): Promise<boolean>;
-    getDocument(id: string): Promise<FileAsset | null>;
-    testDocument(id: string): Promise<boolean>;
+    // Files
+    createFile(data: Buffer, options?: FileAssetOptions): Promise<string>;
+    updateFile(did: string, data: Buffer, options?: FileAssetOptions): Promise<boolean>;
+    getFile(id: string): Promise<FileAsset | null>;
+    testFile(id: string): Promise<boolean>;
 
     // Vaults
     createVault(options?: VaultOptions): Promise<string>;

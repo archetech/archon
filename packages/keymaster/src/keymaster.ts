@@ -875,37 +875,47 @@ export default class Keymaster implements KeymasterInterface {
         return file;
     }
 
-    async createDocument(
+    async createFile(
         buffer: Buffer,
         options: FileAssetOptions = {}
     ): Promise<string> {
-        const filename = options.filename || 'document';
-        const document = await this.generateFileAsset(filename, buffer);
+        const filename = options.filename || 'file';
+        const file = await this.generateFileAsset(filename, buffer);
 
-        return this.createAsset({ document }, options);
+        return this.createAsset({ file }, options);
     }
 
-    async updateDocument(
+    async updateFile(
         id: string,
         buffer: Buffer,
         options: FileAssetOptions = {}
     ): Promise<boolean> {
-        const filename = options.filename || 'document';
-        const document = await this.generateFileAsset(filename, buffer);
+        const filename = options.filename || 'file';
+        const file = await this.generateFileAsset(filename, buffer);
 
-        return this.mergeData(id, { document });
+        return this.mergeData(id, { file });
     }
 
-    async getDocument(id: string): Promise<FileAsset | null> {
-        const asset = await this.resolveAsset(id) as { document?: FileAsset };
+    async getFile(id: string): Promise<FileAsset | null> {
+        const asset = await this.resolveAsset(id) as { file?: FileAsset };
+        const file = asset.file;
 
-        return asset.document ?? null;
+        if (!file || !file.cid) {
+            return null;
+        }
+
+        const buffer = await this.gatekeeper.getData(file.cid);
+        if (buffer) {
+            file.data = buffer;
+        }
+
+        return file;
     }
 
-    async testDocument(id: string): Promise<boolean> {
+    async testFile(id: string): Promise<boolean> {
         try {
-            const document = await this.getDocument(id);
-            return document !== null;
+            const file = await this.getFile(id);
+            return file !== null;
         }
         catch (error) {
             return false;

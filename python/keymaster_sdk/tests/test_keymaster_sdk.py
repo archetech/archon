@@ -387,20 +387,20 @@ def test_revoke_did():
     assert doc["didDocumentMetadata"].get("deactivated") is True, "DID not marked deactivated"
 
 
-def test_documents():
+def test_files():
     data = b"hello world"
-    did = keymaster.create_document(data, local_options)
-    assert did.startswith("did:"), "Invalid DID returned from create_document"
+    did = keymaster.create_file(data, local_options)
+    assert did.startswith("did:"), "Invalid DID returned from create_file"
 
-    doc = keymaster.get_document(did)
-    assert "cid" in doc, "Missing CID in document metadata"
-    assert "bytes" in doc and doc["bytes"] > 0, "Document size missing or invalid"
+    doc = keymaster.get_file(did)
+    assert "cid" in doc, "Missing CID in file metadata"
+    assert "bytes" in doc and doc["bytes"] > 0, "File size missing or invalid"
 
-    new_data = b"updated document"
-    ok = keymaster.update_document(did, new_data, local_options)
+    new_data = b"updated file"
+    ok = keymaster.update_file(did, new_data, local_options)
     assert_equal(ok, True)
 
-    result = keymaster.test_document(did)
+    result = keymaster.test_file(did)
     assert_equal(result, True)
 
 
@@ -470,8 +470,8 @@ def test_notices_create_update_and_refresh():
     alice_id = keymaster.create_id(alice, local_options)
     bob_id = keymaster.create_id(bob, local_options)
 
-    did1 = keymaster.create_document(b"doc-1", local_options)
-    did2 = keymaster.create_document(b"doc-2", local_options)
+    did1 = keymaster.create_file(b"doc-1", local_options)
+    did2 = keymaster.create_file(b"doc-2", local_options)
 
     message1 = {"to": [alice_id, bob_id], "dids": [did1, did2]}
     notice_did = keymaster.create_notice(message1, local_options)

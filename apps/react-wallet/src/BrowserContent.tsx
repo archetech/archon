@@ -73,7 +73,7 @@ function BrowserContent() {
         [darkMode]
     );
 
-    const assetTabs = ["groups", "schemas", "images", "documents", "vaults"];
+    const assetTabs = ["groups", "schemas", "images", "files", "vaults"];
     const displayComponent = validId && currentId !== "";
 
     useEffect(() => {

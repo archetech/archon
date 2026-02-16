@@ -1005,12 +1005,12 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async createDocument(
+    async createFile(
         data: Buffer,
         options: FileAssetOptions = {}
     ): Promise<string> {
         try {
-            const response = await axios.post(`${this.API}/documents`, data, {
+            const response = await axios.post(`${this.API}/files`, data, {
                 headers: {
                     'Content-Type': 'application/octet-stream',
                     'X-Options': JSON.stringify(options), // Pass options as a custom header
@@ -1023,13 +1023,13 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async updateDocument(
+    async updateFile(
         id: string,
         data: Buffer,
         options: FileAssetOptions = {}
     ): Promise<boolean> {
         try {
-            const response = await axios.put(`${this.API}/documents/${id}`, data, {
+            const response = await axios.put(`${this.API}/files/${id}`, data, {
                 headers: {
                     'Content-Type': 'application/octet-stream',
                     'X-Options': JSON.stringify(options), // Pass options as a custom header
@@ -1042,19 +1042,19 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async getDocument(id: string): Promise<FileAsset | null> {
+    async getFile(id: string): Promise<FileAsset | null> {
         try {
-            const response = await axios.get(`${this.API}/documents/${id}`);
-            return response.data.document;
+            const response = await axios.get(`${this.API}/files/${id}`);
+            return response.data.file;
         }
         catch (error) {
             throwError(error);
         }
     }
 
-    async testDocument(id: string): Promise<boolean> {
+    async testFile(id: string): Promise<boolean> {
         try {
-            const response = await axios.post(`${this.API}/documents/${id}/test`);
+            const response = await axios.post(`${this.API}/files/${id}/test`);
             return response.data.test;
         }
         catch (error) {

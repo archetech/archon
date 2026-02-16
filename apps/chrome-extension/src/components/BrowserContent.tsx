@@ -49,7 +49,7 @@ function BrowserContent() {
     const [activeSubTab, setActiveSubTab] = useState<string>("");
     const [assetSubTab, setAssetSubTab] = useState<string>("schemas");
 
-    const assetTabs = ["groups", "schemas", "images", "documents", "vaults"];
+    const assetTabs = ["groups", "schemas", "images", "files", "vaults"];
     const displayComponent = validId && currentId !== "";
 
     useEffect(() => {

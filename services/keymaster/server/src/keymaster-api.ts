@@ -64,7 +64,7 @@ function normalizePath(path: string): string {
         .replace(/\/assets\/[^/]+/g, '/assets/:id')
         .replace(/\/polls\/[^/]+/g, '/polls/:poll')
         .replace(/\/images\/[^/]+/g, '/images/:id')
-        .replace(/\/documents\/[^/]+/g, '/documents/:id')
+        .replace(/\/files\/[^/]+/g, '/files/:id')
         .replace(/\/ipfs\/data\/[^/]+/g, '/ipfs/data/:cid')
         .replace(/\/vaults\/[^/]+\/members\/[^/]+/g, '/vaults/:id/members/:member')
         .replace(/\/vaults\/[^/]+\/items\/[^/]+/g, '/vaults/:id/items/:name')
@@ -4710,11 +4710,11 @@ v1router.post('/images/:id/test', async (req, res) => {
 
 /**
  * @swagger
- * /documents:
+ * /files:
  *   post:
- *     summary: Upload a binary document and create a DID for it.
+ *     summary: Upload a binary file and create a DID for it.
  *     description: >
- *       Accepts binary data as the request body and creates a DID for the uploaded document. Additional options can be passed via the `X-Options` header.
+ *       Accepts binary data as the request body and creates a DID for the uploaded file. Additional options can be passed via the `X-Options` header.
  *     requestBody:
  *       required: true
  *       content:
@@ -4722,7 +4722,7 @@ v1router.post('/images/:id/test', async (req, res) => {
  *           schema:
  *             type: string
  *             format: binary
- *       description: The binary document data to store as a DID asset.
+ *       description: The binary file data to store as a DID asset.
  *     parameters:
  *       - in: header
  *         name: X-Options
@@ -4730,11 +4730,11 @@ v1router.post('/images/:id/test', async (req, res) => {
  *         schema:
  *           type: string
  *         description: >
- *           A JSON string containing additional options for the document creation process.
+ *           A JSON string containing additional options for the file creation process.
  *           Example: `{"registry":"local","validUntil":"2025-12-31T23:59:59Z"}`
  *     responses:
  *       200:
- *         description: The DID created for the uploaded document.
+ *         description: The DID created for the uploaded file.
  *         content:
  *           application/json:
  *             schema:
@@ -4742,7 +4742,7 @@ v1router.post('/images/:id/test', async (req, res) => {
  *               properties:
  *                 did:
  *                   type: string
- *                   description: The DID representing the uploaded document.
+ *                   description: The DID representing the uploaded file.
  *       500:
  *         description: Internal server error.
  *         content:
@@ -4753,12 +4753,12 @@ v1router.post('/images/:id/test', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/documents', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
+v1router.post('/files', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const data = req.body;
         const headers = req.headers;
         const options = typeof headers['x-options'] === 'string' ? JSON.parse(headers['x-options']) : {};
-        const did = await keymaster.createDocument(data, options);
+        const did = await keymaster.createFile(data, options);
 
         res.json({ did });
     } catch (error: any) {
@@ -4768,25 +4768,25 @@ v1router.post('/documents', express.raw({ type: 'application/octet-stream', limi
 
 /**
  * @swagger
- * /documents/{id}:
+ * /files/{id}:
  *   put:
- *     summary: Update an existing binary document.
+ *     summary: Update an existing binary file.
  *     description: >
- *       Updates the binary data of an existing document identified by its DID. Additional options can be passed via the `X-Options` header.
+ *       Updates the binary data of an existing file identified by its DID. Additional options can be passed via the `X-Options` header.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the document to update.
+ *         description: The DID of the file to update.
  *       - in: header
  *         name: X-Options
  *         required: false
  *         schema:
  *           type: string
  *         description: >
- *           A JSON string containing additional options for the document update process.
+ *           A JSON string containing additional options for the file update process.
  *           Example: `{"registry":"local","validUntil":"2025-12-31T23:59:59Z"}`
  *     requestBody:
  *       required: true
@@ -4795,7 +4795,7 @@ v1router.post('/documents', express.raw({ type: 'application/octet-stream', limi
  *           schema:
  *             type: string
  *             format: binary
- *       description: The new binary document data to replace the existing one.
+ *       description: The new binary file data to replace the existing one.
  *     responses:
  *       200:
  *         description: Indicates whether the update was successful.
@@ -4817,12 +4817,12 @@ v1router.post('/documents', express.raw({ type: 'application/octet-stream', limi
  *                 error:
  *                   type: string
  */
-v1router.put('/documents/:id', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
+v1router.put('/files/:id', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const data = req.body;
         const headers = req.headers;
         const options = typeof headers['x-options'] === 'string' ? JSON.parse(headers['x-options']) : {};
-        const ok = await keymaster.updateDocument(req.params.id, data, options);
+        const ok = await keymaster.updateFile(req.params.id, data, options);
 
         res.json({ ok });
     } catch (error: any) {
@@ -4832,41 +4832,41 @@ v1router.put('/documents/:id', express.raw({ type: 'application/octet-stream', l
 
 /**
  * @swagger
- * /documents/{id}:
+ * /files/{id}:
  *   get:
- *     summary: Retrieve a binary document by its DID.
+ *     summary: Retrieve a binary file by its DID.
  *     description: >
- *       Fetches the binary document data and metadata associated with the specified DID.
+ *       Fetches the binary file data and metadata associated with the specified DID.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the document to retrieve.
+ *         description: The DID of the file to retrieve.
  *     responses:
  *       200:
- *         description: Successfully retrieved the document data and metadata.
+ *         description: Successfully retrieved the file data and metadata.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 document:
+ *                 file:
  *                   type: object
- *                   description: The document data and metadata.
+ *                   description: The file data and metadata.
  *                   properties:
  *                     type:
  *                       type: string
- *                       description: The MIME type of the document (e.g., "application/pdf").
+ *                       description: The MIME type of the file (e.g., "application/pdf").
  *                     bytes:
  *                       type: integer
- *                       description: The size of the document in bytes.
+ *                       description: The size of the file in bytes.
  *                     cid:
  *                       type: string
- *                       description: The Content Identifier (CID) of the document.
+ *                       description: The Content Identifier (CID) of the file.
  *       404:
- *         description: Document not found.
+ *         description: File not found.
  *         content:
  *           application/json:
  *             schema:
@@ -4874,12 +4874,12 @@ v1router.put('/documents/:id', express.raw({ type: 'application/octet-stream', l
  *               properties:
  *                 error:
  *                   type: string
- *                   description: Error message indicating the document was not found.
+ *                   description: Error message indicating the file was not found.
  */
-v1router.get('/documents/:id', async (req, res) => {
+v1router.get('/files/:id', async (req, res) => {
     try {
-        const document = await keymaster.getDocument(req.params.id);
-        res.json({ document });
+        const file = await keymaster.getFile(req.params.id);
+        res.json({ file });
     } catch (error: any) {
         res.status(404).send({ error: error.toString() });
     }
@@ -4887,18 +4887,18 @@ v1router.get('/documents/:id', async (req, res) => {
 
 /**
  * @swagger
- * /documents/{id}/test:
+ * /files/{id}/test:
  *   post:
- *     summary: Test if the specified document is valid.
+ *     summary: Test if the specified file is valid.
  *     description: >
- *       Checks whether the document associated with the given DID is valid or meets specific criteria.
+ *       Checks whether the file associated with the given DID is valid or meets specific criteria.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the document to test.
+ *         description: The DID of the file to test.
  *     responses:
  *       200:
  *         description: The result of the test.
@@ -4909,7 +4909,7 @@ v1router.get('/documents/:id', async (req, res) => {
  *               properties:
  *                 test:
  *                   type: boolean
- *                   description: true if the document is valid, otherwise `false`.
+ *                   description: true if the file is valid, otherwise `false`.
  *       400:
  *         description: Invalid request or test criteria not met.
  *         content:
@@ -4921,9 +4921,9 @@ v1router.get('/documents/:id', async (req, res) => {
  *                   type: string
  *                   description: Error message indicating why the test failed.
  */
-v1router.post('/documents/:id/test', async (req, res) => {
+v1router.post('/files/:id/test', async (req, res) => {
     try {
-        const test = await keymaster.testDocument(req.params.id);
+        const test = await keymaster.testFile(req.params.id);
         res.json({ test });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });

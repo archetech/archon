@@ -878,8 +878,8 @@ program
     });
 
 program
-    .command('create-asset-document <file>')
-    .description('Create an asset from a document file')
+    .command('create-asset-file <file>')
+    .description('Create an asset from a file')
     .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (file, options) => {
@@ -887,7 +887,7 @@ program
             const { alias, registry } = options;
             const data = fs.readFileSync(file);
             const filename = file.split('/').pop();
-            const did = await keymaster.createDocument(data, { filename, alias, registry });
+            const did = await keymaster.createFile(data, { filename, alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -902,6 +902,56 @@ program
         try {
             const asset = await keymaster.resolveAsset(id);
             console.log(JSON.stringify(asset, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
+    .command('get-asset-json <id> <file>')
+    .description('Save a JSON asset to a file')
+    .action(async (id, file) => {
+        try {
+            const asset = await keymaster.resolveAsset(id);
+            fs.writeFileSync(file, JSON.stringify(asset, null, 4));
+            console.log(`Data written to ${file}`);
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
+    .command('get-asset-image <id> <file>')
+    .description('Save an image asset to a file')
+    .action(async (id, file) => {
+        try {
+            const image = await keymaster.getImage(id);
+            if (!image || !image.data) {
+                console.error('Image not found');
+                return;
+            }
+            fs.writeFileSync(file, image.data);
+            console.log(`Data written to ${file}`);
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
+    .command('get-asset-file <id> <file>')
+    .description('Save a file asset to a file')
+    .action(async (id, file) => {
+        try {
+            const fileAsset = await keymaster.getFile(id);
+            if (!fileAsset || !fileAsset.data) {
+                console.error('File not found');
+                return;
+            }
+            fs.writeFileSync(file, fileAsset.data);
+            console.log(`Data written to ${file}`);
         }
         catch (error) {
             console.error(error.error || error);
@@ -937,13 +987,13 @@ program
     });
 
 program
-    .command('update-asset-document <id> <file>')
-    .description('Update an asset from a document file')
+    .command('update-asset-file <id> <file>')
+    .description('Update an asset from a file')
     .action(async (id, file) => {
         try {
             const data = fs.readFileSync(file);
             const filename = file.split('/').pop();
-            const ok = await keymaster.updateDocument(id, data, { filename });
+            const ok = await keymaster.updateFile(id, data, { filename });
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {

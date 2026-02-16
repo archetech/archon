@@ -187,14 +187,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [selectedImageURL, setSelectedImageURL] = useState('');
     const [imageVersion, setImageVersion] = useState(1);
     const [imageVersionMax, setImageVersionMax] = useState(1);
-    const [documentList, setDocumentList] = useState(null);
-    const [selectedDocumentName, setSelectedDocumentName] = useState('');
-    const [selectedDocument, setSelectedDocument] = useState('');
-    const [selectedDocumentOwned, setSelectedDocumentOwned] = useState(false);
-    const [selectedDocumentDocs, setSelectedDocumentDocs] = useState('');
-    const [selectedDocumentURL, setSelectedDocumentURL] = useState('');
-    const [documentVersion, setDocumentVersion] = useState(1);
-    const [documentVersionMax, setDocumentVersionMax] = useState(1);
+    const [fileList, setFileList] = useState(null);
+    const [selectedFileName, setSelectedFileName] = useState('');
+    const [selectedFile, setSelectedFile] = useState('');
+    const [selectedFileOwned, setSelectedFileOwned] = useState(false);
+    const [selectedFileDocs, setSelectedFileDocs] = useState('');
+    const [selectedFileURL, setSelectedFileURL] = useState('');
+    const [fileVersion, setFileVersion] = useState(1);
+    const [fileVersionMax, setFileVersionMax] = useState(1);
     const [vaultList, setVaultList] = useState(null);
     const [vaultName, setVaultName] = useState('');
     const [selectedVaultName, setSelectedVaultName] = useState('');
@@ -340,7 +340,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             setDmailCc('');
             setDmailDID('');
             setSelectedImageName('');
-            setSelectedDocumentName('');
+            setSelectedFileName('');
             setSelectedVaultName('');
             setSelectedVault(null);
             setSelectedPollName("");
@@ -572,7 +572,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         const groupList = [];
         const schemaList = [];
         const imageList = [];
-        const documentList = [];
+        const fileList = [];
         const vaultList = [];
         const pollList = [];
 
@@ -605,8 +605,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     continue;
                 }
 
-                if (data.document) {
-                    documentList.push(alias);
+                if (data.file) {
+                    fileList.push(alias);
                     continue;
                 }
 
@@ -659,7 +659,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             setSelectedImage(null);
         }
 
-        setDocumentList(documentList);
+        setFileList(fileList);
 
         setVaultList(vaultList);
 
@@ -702,7 +702,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return <Image style={iconStyle} />;
         }
 
-        if (documentList && documentList.includes(alias)) {
+        if (fileList && fileList.includes(alias)) {
             return <Article style={iconStyle} />;
         }
 
@@ -2006,7 +2006,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
-    async function uploadDocument(event) {
+    async function uploadFile(event) {
         try {
             const fileInput = event.target; // Reference to the input element
             const file = fileInput.files[0];
@@ -2032,8 +2032,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                         alias = `${file.name.slice(0, 26)} (${count++})`;
                     }
 
-                    await keymaster.createDocument(buffer, { registry, alias, filename: file.name });
-                    showSuccess(`Document uploaded successfully: ${alias}`);
+                    await keymaster.createFile(buffer, { registry, alias, filename: file.name });
+                    showSuccess(`File uploaded successfully: ${alias}`);
                     refreshNames();
                 } catch (error) {
                     // Catch errors from the Keymaster API or other logic
@@ -2051,7 +2051,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
-    async function updateDocument(event) {
+    async function updateFile(event) {
         try {
             const fileInput = event.target; // Reference to the input element
             const file = fileInput.files[0];
@@ -2069,12 +2069,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     const arrayBuffer = e.target.result;
                     const buffer = Buffer.from(arrayBuffer);
 
-                    await keymaster.updateDocument(selectedDocumentName, buffer, { filename: file.name });
-                    showSuccess(`Document updated successfully`);
-                    selectDocument(selectedDocumentName);
+                    await keymaster.updateFile(selectedFileName, buffer, { filename: file.name });
+                    showSuccess(`File updated successfully`);
+                    selectFile(selectedFileName);
                 } catch (error) {
                     // Catch errors from the Keymaster API or other logic
-                    showError(`Error processing document: ${error}`);
+                    showError(`Error processing file: ${error}`);
                 }
             };
 
@@ -2088,42 +2088,42 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
-    async function selectDocument(documentName) {
+    async function selectFile(fileName) {
         try {
-            const docs = await keymaster.resolveDID(documentName);
+            const docs = await keymaster.resolveDID(fileName);
             const versions = docs.didDocumentMetadata.version ?? 1;
-            const document = docs.didDocumentData.document;
+            const file = docs.didDocumentData.file;
 
-            setSelectedDocumentName(documentName);
-            setSelectedDocumentDocs(docs);
-            setSelectedDocument(document);
-            setSelectedDocumentOwned(docs.didDocumentMetadata.isOwned);
-            setSelectedDocumentURL(`/api/v1/ipfs/data/${document.cid}`)
-            setDocumentVersion(versions);
-            setDocumentVersionMax(versions);
+            setSelectedFileName(fileName);
+            setSelectedFileDocs(docs);
+            setSelectedFile(file);
+            setSelectedFileOwned(docs.didDocumentMetadata.isOwned);
+            setSelectedFileURL(`/api/v1/ipfs/data/${file.cid}`)
+            setFileVersion(versions);
+            setFileVersionMax(versions);
         } catch (error) {
             showError(error);
         }
     }
 
-    async function selectDocumentVersion(version) {
+    async function selectFileVersion(version) {
         try {
-            const docs = await keymaster.resolveDID(selectedDocumentName, { versionSequence: version });
-            const document = docs.didDocumentData.document;
+            const docs = await keymaster.resolveDID(selectedFileName, { versionSequence: version });
+            const file = docs.didDocumentData.file;
 
-            setSelectedDocumentDocs(docs);
-            setSelectedDocument(document);
-            setSelectedDocumentURL(`/api/v1/ipfs/data/${document.cid}`)
-            setDocumentVersion(version);
+            setSelectedFileDocs(docs);
+            setSelectedFile(file);
+            setSelectedFileURL(`/api/v1/ipfs/data/${file.cid}`)
+            setFileVersion(version);
         } catch (error) {
             showError(error);
         }
     }
 
-    async function downloadDocument() {
+    async function downloadFile() {
         const link = document.createElement('a');
-        link.href = selectedDocumentURL;
-        link.download = selectedDocument.filename;
+        link.href = selectedFileURL;
+        link.download = selectedFile.filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link); // Clean up the DOM
@@ -3280,7 +3280,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                     <Tab key="schemas" value="schemas" label={'Schemas'} icon={<Schema />} />
                                     <Tab key="groups" value="groups" label={'Groups'} icon={<Groups />} />
                                     <Tab key="images" value="images" label={'Images'} icon={<Image />} />
-                                    <Tab key="documents" value="documents" label={'Documents'} icon={<Article />} />
+                                    <Tab key="files" value="files" label={'Files'} icon={<Article />} />
                                     <Tab key="vaults" value="vaults" label={'Vaults'} icon={<Lock />} />
                                 </Tabs>
                             </Box>
@@ -3625,7 +3625,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                     }
                                 </Box>
                             }
-                            {assetsTab === 'documents' &&
+                            {assetsTab === 'files' &&
                                 <Box>
                                     <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                         <Grid item>
@@ -3635,36 +3635,36 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                             <Button
                                                 variant="contained"
                                                 color="primary"
-                                                onClick={() => document.getElementById('documentUpload').click()}
+                                                onClick={() => document.getElementById('fileUpload').click()}
                                                 disabled={!registry}
                                             >
-                                                Upload Document...
+                                                Upload File...
                                             </Button>
                                             <input
                                                 type="file"
-                                                id="documentUpload"
+                                                id="fileUpload"
                                                 accept=".pdf,.doc,.docx,.txt"
                                                 style={{ display: 'none' }}
-                                                onChange={uploadDocument}
+                                                onChange={uploadFile}
                                             />
                                         </Grid>
                                     </Grid>
                                     <p />
-                                    {documentList &&
+                                    {fileList &&
                                         <Box>
                                             <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                                 <Grid item>
                                                     <Select
                                                         style={{ width: '300px' }}
-                                                        value={selectedDocumentName}
+                                                        value={selectedFileName}
                                                         fullWidth
                                                         displayEmpty
-                                                        onChange={(event) => selectDocument(event.target.value)}
+                                                        onChange={(event) => selectFile(event.target.value)}
                                                     >
                                                         <MenuItem value="" disabled>
-                                                            Select document
+                                                            Select file
                                                         </MenuItem>
-                                                        {documentList.map((alias, index) => (
+                                                        {fileList.map((alias, index) => (
                                                             <MenuItem value={alias} key={index}>
                                                                 {alias}
                                                             </MenuItem>
@@ -3674,32 +3674,32 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                 <Grid item>
                                                     <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                                         <Grid item>
-                                                            <Tooltip title={!selectedDocumentOwned ? "You must own the document to update." : ""}>
+                                                            <Tooltip title={!selectedFileOwned ? "You must own the file to update." : ""}>
                                                                 <span>
                                                                     <Button
                                                                         variant="contained"
                                                                         color="primary"
-                                                                        onClick={() => document.getElementById('documentUpdate').click()}
-                                                                        disabled={!selectedDocumentName || !selectedDocumentOwned}
+                                                                        onClick={() => document.getElementById('fileUpdate').click()}
+                                                                        disabled={!selectedFileName || !selectedFileOwned}
                                                                     >
-                                                                        Update document...
+                                                                        Update file...
                                                                     </Button>
                                                                 </span>
                                                             </Tooltip>
                                                             <input
                                                                 type="file"
-                                                                id="documentUpdate"
+                                                                id="fileUpdate"
                                                                 accept=".pdf,.doc,.docx,.txt"
                                                                 style={{ display: 'none' }}
-                                                                onChange={updateDocument}
+                                                                onChange={updateFile}
                                                             />
                                                         </Grid>
                                                         <Grid item>
                                                             <Button
                                                                 variant="contained"
                                                                 color="primary"
-                                                                onClick={() => downloadDocument()}
-                                                                disabled={!selectedDocumentName}
+                                                                onClick={() => downloadFile()}
+                                                                disabled={!selectedFileName}
                                                             >
                                                                 Download
                                                             </Button>
@@ -3708,12 +3708,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                 </Grid>
                                             </Grid>
                                             <p />
-                                            {selectedDocument && selectedDocumentDocs &&
+                                            {selectedFile && selectedFileDocs &&
                                                 <div className="container">
                                                     <VersionsNavigator
-                                                        version={documentVersion}
-                                                        maxVersion={documentVersionMax}
-                                                        selectVersion={selectDocumentVersion}
+                                                        version={fileVersion}
+                                                        maxVersion={fileVersionMax}
+                                                        selectVersion={selectFileVersion}
                                                     />
                                                     <br />
                                                     <TableContainer>
@@ -3721,35 +3721,35 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                             <TableBody>
                                                                 <TableRow>
                                                                     <TableCell>DID</TableCell>
-                                                                    <TableCell>{selectedDocumentDocs.didDocument.id}</TableCell>
+                                                                    <TableCell>{selectedFileDocs.didDocument.id}</TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
                                                                     <TableCell>CID</TableCell>
-                                                                    <TableCell>{selectedDocument.cid}</TableCell>
+                                                                    <TableCell>{selectedFile.cid}</TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
                                                                     <TableCell>Created</TableCell>
-                                                                    <TableCell>{selectedDocumentDocs.didDocumentMetadata.created}</TableCell>
+                                                                    <TableCell>{selectedFileDocs.didDocumentMetadata.created}</TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
                                                                     <TableCell>Updated</TableCell>
-                                                                    <TableCell>{selectedDocumentDocs.didDocumentMetadata.updated || selectedDocumentDocs.didDocumentMetadata.created}</TableCell>
+                                                                    <TableCell>{selectedFileDocs.didDocumentMetadata.updated || selectedFileDocs.didDocumentMetadata.created}</TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
                                                                     <TableCell>Version</TableCell>
-                                                                    <TableCell>{documentVersion} of {documentVersionMax}</TableCell>
+                                                                    <TableCell>{fileVersion} of {fileVersionMax}</TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
-                                                                    <TableCell>Document name</TableCell>
-                                                                    <TableCell>{selectedDocument.filename}</TableCell>
+                                                                    <TableCell>File name</TableCell>
+                                                                    <TableCell>{selectedFile.filename}</TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
-                                                                    <TableCell>Document size</TableCell>
-                                                                    <TableCell>{selectedDocument.bytes} bytes</TableCell>
+                                                                    <TableCell>File size</TableCell>
+                                                                    <TableCell>{selectedFile.bytes} bytes</TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
-                                                                    <TableCell>Document type</TableCell>
-                                                                    <TableCell>{selectedDocument.type}</TableCell>
+                                                                    <TableCell>File type</TableCell>
+                                                                    <TableCell>{selectedFile.type}</TableCell>
                                                                 </TableRow>
                                                             </TableBody>
                                                         </Table>
