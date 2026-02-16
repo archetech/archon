@@ -234,11 +234,11 @@ keymaster list-ids
 | `create-asset` | Create empty asset |
 | `create-asset-json <file>` | Create from JSON file |
 | `create-asset-image <file>` | Create from image |
-| `create-asset-document <file>` | Create from document |
+| `create-asset-file <file>` | Create from file |
 | `get-asset <id>` | Get asset by ID |
 | `update-asset-json <id> <file>` | Update with JSON |
 | `update-asset-image <id> <file>` | Update with image |
-| `update-asset-document <id> <file>` | Update with document |
+| `update-asset-file <id> <file>` | Update with file |
 | `transfer-asset <id> <controller>` | Transfer ownership |
 | `clone-asset <id>` | Clone an asset |
 | `set-property <id> <key> [value]` | Set asset property |

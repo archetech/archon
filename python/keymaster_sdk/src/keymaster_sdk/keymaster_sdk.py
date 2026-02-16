@@ -858,13 +858,13 @@ def test_image(identifier):
     return response["test"]
 
 
-def create_document(data, options=None):
+def create_file(data, options=None):
     if options is None:
         options = {}
     headers = {"Content-Type": "application/octet-stream"}
     if options:
         headers["X-Options"] = json.dumps(options)
-    resp = requests.post(f"{_keymaster_api}/documents", data=data, headers=headers)
+    resp = requests.post(f"{_keymaster_api}/files", data=data, headers=headers)
     try:
         resp.raise_for_status()
     except requests.HTTPError:
@@ -872,13 +872,13 @@ def create_document(data, options=None):
     return resp.json()["did"]
 
 
-def update_document(identifier, data, options=None):
+def update_file(identifier, data, options=None):
     if options is None:
         options = {}
     headers = {"Content-Type": "application/octet-stream"}
     if options:
         headers["X-Options"] = json.dumps(options)
-    resp = requests.put(f"{_keymaster_api}/documents/{identifier}", data=data, headers=headers)
+    resp = requests.put(f"{_keymaster_api}/files/{identifier}", data=data, headers=headers)
     try:
         resp.raise_for_status()
     except requests.HTTPError:
@@ -886,11 +886,11 @@ def update_document(identifier, data, options=None):
     return resp.json()["ok"]
 
 
-def get_document(identifier):
-    response = proxy_request("GET", f"{_keymaster_api}/documents/{identifier}")
-    return response["document"]
+def get_file(identifier):
+    response = proxy_request("GET", f"{_keymaster_api}/files/{identifier}")
+    return response["file"]
 
 
-def test_document(identifier):
-    response = proxy_request("POST", f"{_keymaster_api}/documents/{identifier}/test")
+def test_file(identifier):
+    response = proxy_request("POST", f"{_keymaster_api}/files/{identifier}/test")
     return response["test"]

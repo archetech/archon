@@ -909,8 +909,8 @@ program
     });
 
 program
-    .command('create-asset-document <file>')
-    .description('Create an asset from a document file')
+    .command('create-asset-file <file>')
+    .description('Create an asset from a file')
     .option('-a, --alias <alias>', 'DID alias')
     .option('-r, --registry <registry>', 'registry to use')
     .action(async (file, options) => {
@@ -918,7 +918,7 @@ program
             const { alias, registry } = options;
             const data = fs.readFileSync(file);
             const filename = path.basename(file);
-            const did = await keymaster.createDocument(data, { filename, alias, registry });
+            const did = await keymaster.createFile(data, { filename, alias, registry });
             console.log(did);
         }
         catch (error: any) {
@@ -968,13 +968,13 @@ program
     });
 
 program
-    .command('update-asset-document <id> <file>')
-    .description('Update an asset from a document file')
+    .command('update-asset-file <id> <file>')
+    .description('Update an asset from a file')
     .action(async (id, file) => {
         try {
             const data = fs.readFileSync(file);
             const filename = path.basename(file);
-            const ok = await keymaster.updateDocument(id, data, { filename });
+            const ok = await keymaster.updateFile(id, data, { filename });
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error: any) {

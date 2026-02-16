@@ -97,7 +97,7 @@ export function UIProvider(
         setPollList,
         setSelectedIssued,
         setImageList,
-        setDocumentList,
+        setFileList,
         setIssuedStringOriginal,
         setIssuedEdit,
         setAlias,
@@ -340,7 +340,7 @@ export function UIProvider(
         const groupList = [];
         const vaultList = [];
         const pollList = [];
-        const documentList = [];
+        const fileList = [];
 
         for (const [name, did] of Object.entries(allNamesSorted)) {
             try {
@@ -374,8 +374,8 @@ export function UIProvider(
                     continue;
                 }
 
-                if (data.document) {
-                    documentList.push(name);
+                if (data.file) {
+                    fileList.push(name);
                     continue;
                 }
 
@@ -416,7 +416,7 @@ export function UIProvider(
         }
 
         setImageList(imageList);
-        setDocumentList(documentList);
+        setFileList(fileList);
         setVaultList(vaultList);
         setPollList(pollList);
     }

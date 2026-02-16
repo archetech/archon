@@ -39,8 +39,8 @@ interface VariablesContextValue {
     setGroupList: Dispatch<SetStateAction<string[]>>;
     imageList: string[];
     setImageList: Dispatch<SetStateAction<string[]>>;
-    documentList: string[];
-    setDocumentList: Dispatch<SetStateAction<string[]>>;
+    fileList: string[];
+    setFileList: Dispatch<SetStateAction<string[]>>;
     issuedList: string[];
     setIssuedList: Dispatch<SetStateAction<string[]>>;
     issuedString: string;
@@ -93,7 +93,7 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     const [pollList, setPollList] = useState<string[]>([]);
     const [groupList, setGroupList] = useState<string[]>([]);
     const [imageList, setImageList] = useState<string[]>([]);
-    const [documentList, setDocumentList] = useState<string[]>([]);
+    const [fileList, setFileList] = useState<string[]>([]);
     const [schemaList, setSchemaList] = useState<string[]>([]);
     const [vaultList, setVaultList] = useState<string[]>([]);
     const [issuedList, setIssuedList] = useState<string[]>([]);
@@ -199,8 +199,8 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
         setGroupList,
         imageList,
         setImageList,
-        documentList,
-        setDocumentList,
+        fileList,
+        setFileList,
         schemaList,
         setSchemaList,
         vaultList,

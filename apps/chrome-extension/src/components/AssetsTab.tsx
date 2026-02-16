@@ -4,7 +4,7 @@ import {TabContext, TabList, TabPanel} from "@mui/lab";
 import {ControlPointDuplicate, Description, Groups, Image, Lock, Schema} from "@mui/icons-material";
 import SchemaTab from "./SchemaTab";
 import ImageTab from "./ImageTab";
-import DocumentTab from "./DocumentTab";
+import FileTab from "./FileTab";
 import GroupsTab from "./GroupsTab";
 import VaultTab from "./VaultTab";
 import CloneAssetTab from "./CloneAssetTab";
@@ -44,8 +44,8 @@ function AssetsTab({ subTab }: {subTab: string}) {
                     <Tab
                         icon={<Description sx={{ mb: 0.5 }} />}
                         iconPosition="top"
-                        value="documents"
-                        label="Documents"
+                        value="files"
+                        label="Files"
                     />
                     <Tab
                         icon={<Groups sx={{ mb: 0.5 }} />}
@@ -74,8 +74,8 @@ function AssetsTab({ subTab }: {subTab: string}) {
             <TabPanel value="images" sx={{ p: 0 }}>
                 <ImageTab />
             </TabPanel>
-            <TabPanel value="documents" sx={{ p: 0 }}>
-                <DocumentTab />
+            <TabPanel value="files" sx={{ p: 0 }}>
+                <FileTab />
             </TabPanel>
             <TabPanel value="groups" sx={{ p: 0 }}>
                 <GroupsTab />
