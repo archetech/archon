@@ -121,11 +121,11 @@ const PopupContent = () => {
                                 </ListItemIcon>
                                 <ListItemText primary="Credentials" />
                             </MenuItem>
-                            <MenuItem onClick={() => handleMenuClick("documents")} sx={denseItemSx}>
+                            <MenuItem onClick={() => handleMenuClick("files")} sx={denseItemSx}>
                                 <ListItemIcon>
                                     <Description fontSize="small" />
                                 </ListItemIcon>
-                                <ListItemText primary="Documents" />
+                                <ListItemText primary="Files" />
                             </MenuItem>
                             <MenuItem onClick={() => handleMenuClick("groups")} sx={denseItemSx}>
                                 <ListItemIcon>
