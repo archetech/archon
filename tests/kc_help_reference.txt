@@ -39,8 +39,8 @@ Commands:
   encrypt-message <message> <did>         Encrypt a message for a DID
   fix-wallet                              Remove invalid DIDs from the wallet
   get-asset <id>                          Get asset by name or DID
-  get-asset-file <id> <file>              Save a file asset to a file
-  get-asset-image <id> <file>             Save an image asset to a file
+  get-asset-file <id> [file]              Save a file asset to a file
+  get-asset-image <id> [file]             Save an image asset to a file
   get-asset-json <id> <file>              Save a JSON asset to a file
   get-credential <did>                    Get credential by DID
   get-group <did>                         Get group by DID

@@ -924,7 +924,7 @@ program
     });
 
 program
-    .command('get-asset-image <id> <file>')
+    .command('get-asset-image <id> [file]')
     .description('Save an image asset to a file')
     .action(async (id, file) => {
         try {
@@ -933,8 +933,9 @@ program
                 console.error('Image not found');
                 return;
             }
-            fs.writeFileSync(file, imageAsset.file.data);
-            console.log(`Data written to ${file}`);
+            const outputFile = file || imageAsset.file.filename;
+            fs.writeFileSync(outputFile, imageAsset.file.data);
+            console.log(`Data written to ${outputFile}`);
         }
         catch (error) {
             console.error(error.error || error);
@@ -942,7 +943,7 @@ program
     });
 
 program
-    .command('get-asset-file <id> <file>')
+    .command('get-asset-file <id> [file]')
     .description('Save a file asset to a file')
     .action(async (id, file) => {
         try {
@@ -951,8 +952,9 @@ program
                 console.error('File not found');
                 return;
             }
-            fs.writeFileSync(file, fileAsset.data);
-            console.log(`Data written to ${file}`);
+            const outputFile = file || fileAsset.filename;
+            fs.writeFileSync(outputFile, fileAsset.data);
+            console.log(`Data written to ${outputFile}`);
         }
         catch (error) {
             console.error(error.error || error);
