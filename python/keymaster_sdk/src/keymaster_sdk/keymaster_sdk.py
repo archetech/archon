@@ -838,8 +838,12 @@ def create_image(data, options=None):
     return resp.json()["did"]
 
 
-def update_image(identifier, data):
+def update_image(identifier, data, options=None):
+    if options is None:
+        options = {}
     headers = {"Content-Type": "application/octet-stream"}
+    if options:
+        headers["X-Options"] = json.dumps(options)
     resp = requests.put(f"{_keymaster_api}/images/{identifier}", data=data, headers=headers)
     try:
         resp.raise_for_status()
@@ -850,7 +854,7 @@ def update_image(identifier, data):
 
 def get_image(identifier):
     response = proxy_request("GET", f"{_keymaster_api}/images/{identifier}")
-    return response["image"]
+    return response
 
 
 def test_image(identifier):

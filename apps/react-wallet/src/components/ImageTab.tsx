@@ -5,7 +5,7 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
-import { ImageAsset } from "@didcid/keymaster/types";
+import { ImageFileAsset, FileAsset, ImageAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import GatekeeperClient from "@didcid/gatekeeper/client";
 import VersionNavigator from "./VersionNavigator";
@@ -31,7 +31,7 @@ const ImageTab = () => {
     const { isTabletUp } = useThemeContext();
     const [registry, setRegistry] = useState<string>('hyperswarm');
     const [selectedImageName, setSelectedImageName] = useState<string>('');
-    const [selectedImage, setSelectedImage] = useState<ImageAsset | null>(null);
+    const [selectedImage, setSelectedImage] = useState<ImageFileAsset | null>(null);
     const [selectedImageDocs, setSelectedImageDocs] = useState<DidCidDocument | null>(null);
     const [selectedImageDataUrl, setSelectedImageDataUrl] = useState<string>("");
     const [imageVersion, setImageVersion] = useState<number>(1);
@@ -70,21 +70,21 @@ const ImageTab = () => {
                 setImageVersionMax(currentVersion);
             }
 
-            const docAsset = docs.didDocumentData as { image?: ImageAsset };
-            if (!docAsset.image || !docAsset.image.cid) {
+            const docAsset = docs.didDocumentData as { file?: FileAsset; image?: ImageAsset };
+            if (!docAsset.file || !docAsset.file.cid || !docAsset.image) {
                 setError(`No image data found in version ${currentVersion}`);
                 return;
             }
-            setSelectedImage(docAsset.image);
+            setSelectedImage({ file: docAsset.file, image: docAsset.image });
 
-            const raw = await gatekeeper.getData(docAsset.image.cid);
+            const raw = await gatekeeper.getData(docAsset.file.cid);
             if (!raw) {
-                setError(`Could not fetch data for CID: ${docAsset.image.cid}`);
+                setError(`Could not fetch data for CID: ${docAsset.file.cid}`);
                 return;
             }
 
             const base64 = raw.toString("base64");
-            const dataUrl = `data:${docAsset.image.type};base64,${base64}`;
+            const dataUrl = `data:${docAsset.file.type};base64,${base64}`;
             setSelectedImageDataUrl(dataUrl);
         } catch (error: any) {
             setError(error);
@@ -375,7 +375,7 @@ const ImageTab = () => {
 
                         <img
                             src={selectedImageDataUrl}
-                            alt={selectedImage.cid}
+                            alt={selectedImage.file.cid}
                             style={{ width: '100%', height: 'auto' }}
                         />
                     </Box>
@@ -386,7 +386,7 @@ const ImageTab = () => {
                                 <strong>DID:</strong> {selectedImageDocs.didDocument!.id}
                             </Box>
                             <Box>
-                                <strong>CID:</strong> {selectedImage.cid}
+                                <strong>CID:</strong> {selectedImage.file.cid}
                             </Box>
                             <Box>
                                 <strong>Created:</strong> {selectedImageDocs.didDocumentMetadata!.created}
@@ -400,13 +400,13 @@ const ImageTab = () => {
                                 <strong>Version:</strong> {selectedImageDocs.didDocumentMetadata!.version}
                             </Box>
                             <Box>
-                                <strong>File size:</strong> {selectedImage.bytes} bytes
+                                <strong>File size:</strong> {selectedImage.file.bytes} bytes
                             </Box>
                             <Box>
-                                <strong>Image size:</strong> {selectedImage.width} x {selectedImage.height} pixels
+                                <strong>Image size:</strong> {selectedImage.image.width} x {selectedImage.image.height} pixels
                             </Box>
                             <Box>
-                                <strong>Image type:</strong> {selectedImage.type}
+                                <strong>Image type:</strong> {selectedImage.file.type}
                             </Box>
                         </Box>
                     </Box>

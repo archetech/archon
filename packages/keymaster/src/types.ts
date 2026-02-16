@@ -180,13 +180,18 @@ export interface BinaryAsset {
     data?: Buffer;
 }
 
-export interface ImageAsset extends BinaryAsset {
+export interface ImageAsset {
     width: number;
     height: number;
 }
 
 export interface FileAsset extends BinaryAsset {
     filename: string;
+}
+
+export interface ImageFileAsset {
+    file: FileAsset;
+    image: ImageAsset;
 }
 
 export interface Vault {
@@ -382,9 +387,9 @@ export interface KeymasterInterface {
     unpublishPoll(pollId: string): Promise<boolean>;
 
     // Images
-    createImage(data: Buffer, options?: CreateAssetOptions): Promise<string>;
-    updateImage(did: string, data: Buffer): Promise<boolean>;
-    getImage(id: string): Promise<ImageAsset | null>;
+    createImage(data: Buffer, options?: FileAssetOptions): Promise<string>;
+    updateImage(did: string, data: Buffer, options?: FileAssetOptions): Promise<boolean>;
+    getImage(id: string): Promise<ImageFileAsset | null>;
     testImage(id: string): Promise<boolean>;
 
     // Files

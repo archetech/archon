@@ -4562,6 +4562,13 @@ v1router.post('/images', express.raw({ type: 'application/octet-stream', limit: 
  *         schema:
  *           type: string
  *         description: The DID of the image to update.
+ *       - in: header
+ *         name: X-Options
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: >
+ *           A JSON string containing additional options (e.g., filename).
  *     requestBody:
  *       required: true
  *       content:
@@ -4594,7 +4601,9 @@ v1router.post('/images', express.raw({ type: 'application/octet-stream', limit: 
 v1router.put('/images/:id', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
     try {
         const data = req.body;
-        const ok = await keymaster.updateImage(req.params.id, data);
+        const headers = req.headers;
+        const options = typeof headers['x-options'] === 'string' ? JSON.parse(headers['x-options']) : {};
+        const ok = await keymaster.updateImage(req.params.id, data, options);
 
         res.json({ ok });
     } catch (error: any) {
@@ -4608,7 +4617,7 @@ v1router.put('/images/:id', express.raw({ type: 'application/octet-stream', limi
  *   get:
  *     summary: Retrieve an image by its DID.
  *     description: >
- *       Fetches the image data and metadata associated with the specified DID.
+ *       Fetches the image file data and metadata associated with the specified DID.
  *     parameters:
  *       - in: path
  *         name: id
@@ -4624,25 +4633,32 @@ v1router.put('/images/:id', express.raw({ type: 'application/octet-stream', limi
  *             schema:
  *               type: object
  *               properties:
- *                 image:
+ *                 file:
  *                   type: object
- *                   description: The image data and metadata.
+ *                   description: The file data and metadata.
  *                   properties:
+ *                     cid:
+ *                       type: string
+ *                       description: The Content Identifier (CID) of the image.
+ *                     filename:
+ *                       type: string
+ *                       description: The filename of the image.
  *                     type:
  *                       type: string
  *                       description: The MIME type of the image (e.g., "image/png").
+ *                     bytes:
+ *                       type: integer
+ *                       description: The size of the image in bytes.
+ *                 image:
+ *                   type: object
+ *                   description: The image-specific metadata.
+ *                   properties:
  *                     width:
  *                       type: integer
  *                       description: The width of the image in pixels.
  *                     height:
  *                       type: integer
  *                       description: The height of the image in pixels.
- *                     bytes:
- *                       type: integer
- *                       description: The size of the image in bytes.
- *                     cid:
- *                       type: string
- *                       description: The Content Identifier (CID) of the image.
  *       404:
  *         description: Image not found.
  *         content:
@@ -4656,8 +4672,8 @@ v1router.put('/images/:id', express.raw({ type: 'application/octet-stream', limi
  */
 v1router.get('/images/:id', async (req, res) => {
     try {
-        const image = await keymaster.getImage(req.params.id);
-        res.json({ image });
+        const imageAsset = await keymaster.getImage(req.params.id);
+        res.json(imageAsset);
     } catch (error: any) {
         res.status(404).send({ error: error.toString() });
     }

@@ -869,7 +869,8 @@ program
         try {
             const { alias, registry } = options;
             const data = fs.readFileSync(file);
-            const did = await keymaster.createImage(data, { alias, registry });
+            const filename = path.basename(file);
+            const did = await keymaster.createImage(data, { filename, alias, registry });
             console.log(did);
         }
         catch (error) {
@@ -923,17 +924,18 @@ program
     });
 
 program
-    .command('get-asset-image <id> <file>')
+    .command('get-asset-image <id> [file]')
     .description('Save an image asset to a file')
     .action(async (id, file) => {
         try {
-            const image = await keymaster.getImage(id);
-            if (!image || !image.data) {
+            const imageAsset = await keymaster.getImage(id);
+            if (!imageAsset || !imageAsset.file.data) {
                 console.error('Image not found');
                 return;
             }
-            fs.writeFileSync(file, image.data);
-            console.log(`Data written to ${file}`);
+            const outputFile = file || imageAsset.file.filename;
+            fs.writeFileSync(outputFile, imageAsset.file.data);
+            console.log(`Data written to ${outputFile}`);
         }
         catch (error) {
             console.error(error.error || error);
@@ -941,7 +943,7 @@ program
     });
 
 program
-    .command('get-asset-file <id> <file>')
+    .command('get-asset-file <id> [file]')
     .description('Save a file asset to a file')
     .action(async (id, file) => {
         try {
@@ -950,8 +952,9 @@ program
                 console.error('File not found');
                 return;
             }
-            fs.writeFileSync(file, fileAsset.data);
-            console.log(`Data written to ${file}`);
+            const outputFile = file || fileAsset.filename;
+            fs.writeFileSync(outputFile, fileAsset.data);
+            console.log(`Data written to ${outputFile}`);
         }
         catch (error) {
             console.error(error.error || error);
@@ -978,7 +981,8 @@ program
     .action(async (id, file) => {
         try {
             const data = fs.readFileSync(file);
-            const ok = await keymaster.updateImage(id, data);
+            const filename = path.basename(file);
+            const ok = await keymaster.updateImage(id, data, { filename });
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {

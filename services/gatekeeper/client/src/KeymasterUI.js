@@ -1976,13 +1976,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
             const docs = await keymaster.resolveDID(imageName);
             const versions = docs.didDocumentMetadata.version ?? 1;
-            const image = docs.didDocumentData.image;
+            const data = docs.didDocumentData;
 
             setSelectedImageName(imageName);
             setSelectedImageDocs(docs);
-            setSelectedImage(image);
+            setSelectedImage({ file: data.file, image: data.image });
             setSelectedImageOwned(docs.didDocumentMetadata.isOwned);
-            setSelectedImageURL(`/api/v1/ipfs/data/${image.cid}`);
+            setSelectedImageURL(`/api/v1/ipfs/data/${data.file.cid}`);
             setImageVersion(versions);
             setImageVersionMax(versions);
         } catch (error) {
@@ -1995,11 +1995,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             setSelectedImageURL('');
 
             const docs = await keymaster.resolveDID(selectedImageName, { versionSequence: version });
-            const image = docs.didDocumentData.image;
+            const data = docs.didDocumentData;
 
             setSelectedImageDocs(docs);
-            setSelectedImage(image);
-            setSelectedImageURL(`/api/v1/ipfs/data/${image.cid}`);
+            setSelectedImage({ file: data.file, image: data.image });
+            setSelectedImageURL(`/api/v1/ipfs/data/${data.file.cid}`);
             setImageVersion(version);
         } catch (error) {
             showError(error);
@@ -3589,7 +3589,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                                     </TableRow>
                                                                     <TableRow>
                                                                         <TableCell>CID</TableCell>
-                                                                        <TableCell>{selectedImage.cid}</TableCell>
+                                                                        <TableCell>{selectedImage.file.cid}</TableCell>
                                                                     </TableRow>
                                                                     <TableRow>
                                                                         <TableCell>Created</TableCell>
@@ -3605,15 +3605,15 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                                     </TableRow>
                                                                     <TableRow>
                                                                         <TableCell>File size</TableCell>
-                                                                        <TableCell>{selectedImage.bytes} bytes</TableCell>
+                                                                        <TableCell>{selectedImage.file.bytes} bytes</TableCell>
                                                                     </TableRow>
                                                                     <TableRow>
                                                                         <TableCell>Image size</TableCell>
-                                                                        <TableCell>{selectedImage.width} x {selectedImage.height} pixels</TableCell>
+                                                                        <TableCell>{selectedImage.image.width} x {selectedImage.image.height} pixels</TableCell>
                                                                     </TableRow>
                                                                     <TableRow>
                                                                         <TableCell>Image type</TableCell>
-                                                                        <TableCell>{selectedImage.type}</TableCell>
+                                                                        <TableCell>{selectedImage.file.type}</TableCell>
                                                                     </TableRow>
                                                                 </TableBody>
                                                             </Table>

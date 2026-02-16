@@ -34,6 +34,7 @@ import {
     VaultOptions,
     IDInfo,
     ImageAsset,
+    ImageFileAsset,
     IssueCredentialsOptions,
     KeymasterInterface,
     KeymasterOptions,
@@ -769,7 +770,7 @@ export default class Keymaster implements KeymasterInterface {
         return this.createAsset(cloneData, options);
     }
 
-    async generateImageAsset(buffer: Buffer): Promise<ImageAsset> {
+    async generateImageAsset(filename: string, buffer: Buffer): Promise<ImageFileAsset> {
         let metadata;
 
         try {
@@ -780,48 +781,56 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const cid = await this.gatekeeper.addData(buffer);
-        const image: ImageAsset = {
+
+        const file: FileAsset = {
             cid,
+            filename,
+            type: `image/${metadata.type}`,
             bytes: buffer.length,
-            ...metadata,
-            type: `image/${metadata.type}`
         };
 
-        return image;
+        const image: ImageAsset = {
+            width: metadata.width!,
+            height: metadata.height!,
+        };
+
+        return { file, image };
     }
 
     async createImage(
         buffer: Buffer,
-        options: CreateAssetOptions = {}
+        options: FileAssetOptions = {}
     ): Promise<string> {
-        const image = await this.generateImageAsset(buffer);
+        const filename = options.filename || 'image';
+        const { file, image } = await this.generateImageAsset(filename, buffer);
 
-        return this.createAsset({ image }, options);
+        return this.createAsset({ file, image }, options);
     }
 
     async updateImage(
         id: string,
-        buffer: Buffer
+        buffer: Buffer,
+        options: FileAssetOptions = {}
     ): Promise<boolean> {
-        const image = await this.generateImageAsset(buffer);
+        const filename = options.filename || 'image';
+        const { file, image } = await this.generateImageAsset(filename, buffer);
 
-        return this.mergeData(id, { image });
+        return this.mergeData(id, { file, image });
     }
 
-    async getImage(id: string): Promise<ImageAsset | null> {
-        const asset = await this.resolveAsset(id) as { image?: ImageAsset };
-        const image = asset.image;
+    async getImage(id: string): Promise<ImageFileAsset | null> {
+        const asset = await this.resolveAsset(id) as { file?: FileAsset; image?: ImageAsset };
 
-        if (!image || !image.cid) {
+        if (!asset.file || !asset.file.cid || !asset.image) {
             return null;
         }
 
-        const buffer = await this.gatekeeper.getData(image.cid);
+        const buffer = await this.gatekeeper.getData(asset.file.cid);
         if (buffer) {
-            image.data = buffer;
+            asset.file.data = buffer;
         }
 
-        return image;
+        return { file: asset.file, image: asset.image };
     }
 
     async testImage(id: string): Promise<boolean> {

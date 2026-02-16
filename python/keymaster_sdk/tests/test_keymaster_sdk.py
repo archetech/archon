@@ -413,10 +413,12 @@ def test_images():
     assert did.startswith("did:"), "Invalid DID returned from create_image"
 
     meta = keymaster.get_image(did)
-    assert isinstance(meta.get("type"), str) and meta["type"].startswith("image/"), "Missing/invalid MIME type"
-    assert meta.get("width") == 1 and meta.get("height") == 1, "Unexpected image dimensions"
-    assert meta.get("bytes", 0) > 0, "Image byte size missing/invalid"
-    assert "cid" in meta, "CID missing from image metadata"
+    file_meta = meta.get("file", {})
+    image_meta = meta.get("image", {})
+    assert isinstance(file_meta.get("type"), str) and file_meta["type"].startswith("image/"), "Missing/invalid MIME type"
+    assert image_meta.get("width") == 1 and image_meta.get("height") == 1, "Unexpected image dimensions"
+    assert file_meta.get("bytes", 0) > 0, "Image byte size missing/invalid"
+    assert "cid" in file_meta, "CID missing from image metadata"
 
     png_2x1 = base64.b64decode(
         b"iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAQAAAD4c0wSAAAADUlEQVR4nGNgYGBgAAAABQABVqg3tQAAAABJRU5ErkJggg=="

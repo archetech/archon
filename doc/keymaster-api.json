@@ -5322,6 +5322,15 @@
               "type": "string"
             },
             "description": "The DID of the image to update."
+          },
+          {
+            "in": "header",
+            "name": "X-Options",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "A JSON string containing additional options (e.g., filename).\n"
           }
         ],
         "requestBody": {
@@ -5372,7 +5381,7 @@
       },
       "get": {
         "summary": "Retrieve an image by its DID.",
-        "description": "Fetches the image data and metadata associated with the specified DID.\n",
+        "description": "Fetches the image file data and metadata associated with the specified DID.\n",
         "parameters": [
           {
             "in": "path",
@@ -5392,14 +5401,32 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "image": {
+                    "file": {
                       "type": "object",
-                      "description": "The image data and metadata.",
+                      "description": "The file data and metadata.",
                       "properties": {
+                        "cid": {
+                          "type": "string",
+                          "description": "The Content Identifier (CID) of the image."
+                        },
+                        "filename": {
+                          "type": "string",
+                          "description": "The filename of the image."
+                        },
                         "type": {
                           "type": "string",
                           "description": "The MIME type of the image (e.g., \"image/png\")."
                         },
+                        "bytes": {
+                          "type": "integer",
+                          "description": "The size of the image in bytes."
+                        }
+                      }
+                    },
+                    "image": {
+                      "type": "object",
+                      "description": "The image-specific metadata.",
+                      "properties": {
                         "width": {
                           "type": "integer",
                           "description": "The width of the image in pixels."
@@ -5407,14 +5434,6 @@
                         "height": {
                           "type": "integer",
                           "description": "The height of the image in pixels."
-                        },
-                        "bytes": {
-                          "type": "integer",
-                          "description": "The size of the image in bytes."
-                        },
-                        "cid": {
-                          "type": "string",
-                          "description": "The Content Identifier (CID) of the image."
                         }
                       }
                     }
@@ -5493,10 +5512,10 @@
         }
       }
     },
-    "/documents": {
+    "/files": {
       "post": {
-        "summary": "Upload a binary document and create a DID for it.",
-        "description": "Accepts binary data as the request body and creates a DID for the uploaded document. Additional options can be passed via the `X-Options` header.\n",
+        "summary": "Upload a binary file and create a DID for it.",
+        "description": "Accepts binary data as the request body and creates a DID for the uploaded file. Additional options can be passed via the `X-Options` header.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -5507,7 +5526,7 @@
               }
             }
           },
-          "description": "The binary document data to store as a DID asset."
+          "description": "The binary file data to store as a DID asset."
         },
         "parameters": [
           {
@@ -5517,12 +5536,12 @@
             "schema": {
               "type": "string"
             },
-            "description": "A JSON string containing additional options for the document creation process. Example: `{\"registry\":\"local\",\"validUntil\":\"2025-12-31T23:59:59Z\"}`\n"
+            "description": "A JSON string containing additional options for the file creation process. Example: `{\"registry\":\"local\",\"validUntil\":\"2025-12-31T23:59:59Z\"}`\n"
           }
         ],
         "responses": {
           "200": {
-            "description": "The DID created for the uploaded document.",
+            "description": "The DID created for the uploaded file.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5530,7 +5549,7 @@
                   "properties": {
                     "did": {
                       "type": "string",
-                      "description": "The DID representing the uploaded document."
+                      "description": "The DID representing the uploaded file."
                     }
                   }
                 }
@@ -5555,10 +5574,10 @@
         }
       }
     },
-    "/documents/{id}": {
+    "/files/{id}": {
       "put": {
-        "summary": "Update an existing binary document.",
-        "description": "Updates the binary data of an existing document identified by its DID. Additional options can be passed via the `X-Options` header.\n",
+        "summary": "Update an existing binary file.",
+        "description": "Updates the binary data of an existing file identified by its DID. Additional options can be passed via the `X-Options` header.\n",
         "parameters": [
           {
             "in": "path",
@@ -5567,7 +5586,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "The DID of the document to update."
+            "description": "The DID of the file to update."
           },
           {
             "in": "header",
@@ -5576,7 +5595,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "A JSON string containing additional options for the document update process. Example: `{\"registry\":\"local\",\"validUntil\":\"2025-12-31T23:59:59Z\"}`\n"
+            "description": "A JSON string containing additional options for the file update process. Example: `{\"registry\":\"local\",\"validUntil\":\"2025-12-31T23:59:59Z\"}`\n"
           }
         ],
         "requestBody": {
@@ -5589,7 +5608,7 @@
               }
             }
           },
-          "description": "The new binary document data to replace the existing one."
+          "description": "The new binary file data to replace the existing one."
         },
         "responses": {
           "200": {
@@ -5626,8 +5645,8 @@
         }
       },
       "get": {
-        "summary": "Retrieve a binary document by its DID.",
-        "description": "Fetches the binary document data and metadata associated with the specified DID.\n",
+        "summary": "Retrieve a binary file by its DID.",
+        "description": "Fetches the binary file data and metadata associated with the specified DID.\n",
         "parameters": [
           {
             "in": "path",
@@ -5636,32 +5655,32 @@
             "schema": {
               "type": "string"
             },
-            "description": "The DID of the document to retrieve."
+            "description": "The DID of the file to retrieve."
           }
         ],
         "responses": {
           "200": {
-            "description": "Successfully retrieved the document data and metadata.",
+            "description": "Successfully retrieved the file data and metadata.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "document": {
+                    "file": {
                       "type": "object",
-                      "description": "The document data and metadata.",
+                      "description": "The file data and metadata.",
                       "properties": {
                         "type": {
                           "type": "string",
-                          "description": "The MIME type of the document (e.g., \"application/pdf\")."
+                          "description": "The MIME type of the file (e.g., \"application/pdf\")."
                         },
                         "bytes": {
                           "type": "integer",
-                          "description": "The size of the document in bytes."
+                          "description": "The size of the file in bytes."
                         },
                         "cid": {
                           "type": "string",
-                          "description": "The Content Identifier (CID) of the document."
+                          "description": "The Content Identifier (CID) of the file."
                         }
                       }
                     }
@@ -5671,7 +5690,7 @@
             }
           },
           "404": {
-            "description": "Document not found.",
+            "description": "File not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5679,7 +5698,7 @@
                   "properties": {
                     "error": {
                       "type": "string",
-                      "description": "Error message indicating the document was not found."
+                      "description": "Error message indicating the file was not found."
                     }
                   }
                 }
@@ -5689,10 +5708,10 @@
         }
       }
     },
-    "/documents/{id}/test": {
+    "/files/{id}/test": {
       "post": {
-        "summary": "Test if the specified document is valid.",
-        "description": "Checks whether the document associated with the given DID is valid or meets specific criteria.\n",
+        "summary": "Test if the specified file is valid.",
+        "description": "Checks whether the file associated with the given DID is valid or meets specific criteria.\n",
         "parameters": [
           {
             "in": "path",
@@ -5701,7 +5720,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "The DID of the document to test."
+            "description": "The DID of the file to test."
           }
         ],
         "responses": {
@@ -5714,7 +5733,7 @@
                   "properties": {
                     "test": {
                       "type": "boolean",
-                      "description": "true if the document is valid, otherwise `false`."
+                      "description": "true if the file is valid, otherwise `false`."
                     }
                   }
                 }
