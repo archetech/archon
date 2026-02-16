@@ -940,6 +940,56 @@ program
     });
 
 program
+    .command('get-asset-json <id> <file>')
+    .description('Save a JSON asset to a file')
+    .action(async (id, file) => {
+        try {
+            const asset = await keymaster.resolveAsset(id);
+            fs.writeFileSync(file, JSON.stringify(asset, null, 4));
+            console.log(`Data written to ${file}`);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('get-asset-image <id> <file>')
+    .description('Save an image asset to a file')
+    .action(async (id, file) => {
+        try {
+            const image = await keymaster.getImage(id);
+            if (!image || !image.data) {
+                console.error('Image not found');
+                return;
+            }
+            fs.writeFileSync(file, image.data);
+            console.log(`Data written to ${file}`);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('get-asset-file <id> <file>')
+    .description('Save a file asset to a file')
+    .action(async (id, file) => {
+        try {
+            const fileAsset = await keymaster.getFile(id);
+            if (!fileAsset || !fileAsset.data) {
+                console.error('File not found');
+                return;
+            }
+            fs.writeFileSync(file, fileAsset.data);
+            console.log(`Data written to ${file}`);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('update-asset-json <id> <file>')
     .description('Update an asset from a JSON file')
     .action(async (id, file) => {

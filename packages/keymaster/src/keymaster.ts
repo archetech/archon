@@ -898,8 +898,18 @@ export default class Keymaster implements KeymasterInterface {
 
     async getFile(id: string): Promise<FileAsset | null> {
         const asset = await this.resolveAsset(id) as { file?: FileAsset };
+        const file = asset.file;
 
-        return asset.file ?? null;
+        if (!file || !file.cid) {
+            return null;
+        }
+
+        const buffer = await this.gatekeeper.getData(file.cid);
+        if (buffer) {
+            file.data = buffer;
+        }
+
+        return file;
     }
 
     async testFile(id: string): Promise<boolean> {
