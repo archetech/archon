@@ -4562,6 +4562,13 @@ v1router.post('/images', express.raw({ type: 'application/octet-stream', limit: 
  *         schema:
  *           type: string
  *         description: The DID of the image to update.
+ *       - in: header
+ *         name: X-Options
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: >
+ *           A JSON string containing additional options (e.g., filename).
  *     requestBody:
  *       required: true
  *       content:
@@ -4570,14 +4577,6 @@ v1router.post('/images', express.raw({ type: 'application/octet-stream', limit: 
  *             type: string
  *             format: binary
  *       description: The new image data to replace the existing one.
- *     parameters:
- *       - in: header
- *         name: X-Options
- *         required: false
- *         schema:
- *           type: string
- *           description: >
- *             A JSON string containing additional options (e.g., filename).
  *     responses:
  *       200:
  *         description: Indicates whether the update was successful.
