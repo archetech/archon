@@ -218,14 +218,12 @@ describe('getFile', () => {
         const did = await keymaster.createFile(mockFile, { filename });
         const asset = await keymaster.getFile(did);
 
-        const file = {
-            cid,
-            filename,
-            bytes: 31,
-            type: 'text/plain',
-        };
-
-        expect(asset).toStrictEqual(file);
+        expect(asset).toBeTruthy();
+        expect(asset!.cid).toBe(cid);
+        expect(asset!.filename).toBe(filename);
+        expect(asset!.bytes).toBe(31);
+        expect(asset!.type).toBe('text/plain');
+        expect(asset!.data).toStrictEqual(mockFile);
     });
 });
 
