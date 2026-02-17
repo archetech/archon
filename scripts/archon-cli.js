@@ -1135,7 +1135,7 @@ program
     .description('Vote in a poll')
     .action(async (poll, vote, spoil) => {
         try {
-            const did = await keymaster.votePoll(poll, vote, spoil);
+            const did = await keymaster.votePoll(poll, parseInt(vote), { spoil: spoil === 'true' });
             console.log(did);
         }
         catch (error) {
