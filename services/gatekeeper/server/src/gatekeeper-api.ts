@@ -595,8 +595,8 @@ v1router.post("/did/generate", async (req, res) => {
  *     description: >
  *       Resolves a DID Document from the local database. If local resolution fails,
  *       falls back to a configurable universal resolver (default: https://dev.uniresolver.io).
- *       Set `ARCHON_GATEKEEPER_RESOLVER` env var to override the resolver URL, or set it to
- *       an empty string to disable the fallback.
+ *       Set `ARCHON_GATEKEEPER_FALLBACK_URL` to override the resolver URL (empty string disables fallback).
+ *       Set `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` to override the timeout in milliseconds (default: 5000).
  *
  *     parameters:
  *       - in: path
@@ -754,15 +754,15 @@ v1router.post("/did/generate", async (req, res) => {
  *         description: Internal Server Error.
  */
 async function resolveFromUniversalResolver(did: string): Promise<any | null> {
-    if (!config.resolverURL) {
+    if (!config.fallbackURL) {
         return null;
     }
 
     try {
-        const baseURL = config.resolverURL.replace(/\/+$/, '');
+        const baseURL = config.fallbackURL.replace(/\/+$/, '');
         const url = `${baseURL}/1.0/identifiers/${encodeURIComponent(did)}`;
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        const timeout = setTimeout(() => controller.abort(), config.fallbackTimeout);
 
         const response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeout);
