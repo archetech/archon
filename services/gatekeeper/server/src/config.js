@@ -14,6 +14,8 @@ const config = {
     gcInterval: process.env.ARCHON_GATEKEEPER_GC_INTERVAL ? parseInt(process.env.ARCHON_GATEKEEPER_GC_INTERVAL) : 15,
     statusInterval: process.env.ARCHON_GATEKEEPER_STATUS_INTERVAL ? parseInt(process.env.ARCHON_GATEKEEPER_STATUS_INTERVAL) : 5,
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
+    fallbackURL: process.env.ARCHON_GATEKEEPER_FALLBACK_URL || 'https://dev.uniresolver.io',
+    fallbackTimeout: process.env.ARCHON_GATEKEEPER_FALLBACK_TIMEOUT ? parseInt(process.env.ARCHON_GATEKEEPER_FALLBACK_TIMEOUT) : 5000,
 };
 
 export default config;

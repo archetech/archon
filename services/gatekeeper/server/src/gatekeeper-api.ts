@@ -592,6 +592,11 @@ v1router.post("/did/generate", async (req, res) => {
  * /did/{did}:
  *   get:
  *     summary: Resolve a DID Document
+ *     description: >
+ *       Resolves a DID Document from the local database. If local resolution fails,
+ *       falls back to a configurable universal resolver (default: https://dev.uniresolver.io).
+ *       Set `ARCHON_GATEKEEPER_FALLBACK_URL` to override the resolver URL (empty string disables fallback).
+ *       Set `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` to override the timeout in milliseconds (default: 5000).
  *
  *     parameters:
  *       - in: path
@@ -748,6 +753,34 @@ v1router.post("/did/generate", async (req, res) => {
  *       500:
  *         description: Internal Server Error.
  */
+async function resolveFromUniversalResolver(did: string): Promise<any | null> {
+    if (!config.fallbackURL) {
+        return null;
+    }
+
+    try {
+        const baseURL = config.fallbackURL.replace(/\/+$/, '');
+        const url = `${baseURL}/1.0/identifiers/${encodeURIComponent(did)}`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), config.fallbackTimeout);
+
+        try {
+            const response = await fetch(url, { signal: controller.signal });
+
+            if (!response.ok) {
+                return null;
+            }
+
+            return await response.json();
+        } finally {
+            clearTimeout(timeout);
+        }
+    } catch (error) {
+        logger.error({ did, error }, 'Universal resolver fallback failed');
+        return null;
+    }
+}
+
 v1router.get('/did/:did', async (req, res) => {
     try {
         const options: ResolveDIDOptions = {};
@@ -773,6 +806,15 @@ v1router.get('/did/:did', async (req, res) => {
         }
 
         const doc = await gatekeeper.resolveDID(req.params.did, options);
+
+        if (doc.didResolutionMetadata?.error) {
+            const resolved = await resolveFromUniversalResolver(req.params.did);
+            if (resolved) {
+                res.json(resolved);
+                return;
+            }
+        }
+
         res.json(doc);
     } catch (error: any) {
         res.status(404).send({ error: 'DID not found' });
