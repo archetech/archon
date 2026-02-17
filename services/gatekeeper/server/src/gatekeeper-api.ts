@@ -764,15 +764,19 @@ async function resolveFromUniversalResolver(did: string): Promise<any | null> {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), config.fallbackTimeout);
 
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeout);
+        try {
+            const response = await fetch(url, { signal: controller.signal });
 
-        if (!response.ok) {
-            return null;
+            if (!response.ok) {
+                return null;
+            }
+
+            return await response.json();
+        } finally {
+            clearTimeout(timeout);
         }
-
-        return await response.json();
-    } catch {
+    } catch (error) {
+        logger.error({ did, error }, 'Universal resolver fallback failed');
         return null;
     }
 }
