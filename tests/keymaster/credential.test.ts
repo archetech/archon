@@ -730,7 +730,7 @@ describe('acceptCredential', () => {
     });
 });
 
-describe('non-DID credentialSubject', () => {
+describe('external credentialSubject', () => {
     it('should bind credential with mailto: URI subject', async () => {
         await keymaster.createId('Alice');
 
@@ -826,5 +826,20 @@ describe('non-DID credentialSubject', () => {
 
         const issued = await keymaster.listIssued();
         expect(issued).toContain(did);
+    });
+
+    it('should issue credential with did:key subject (non-secp256k1)', async () => {
+        await keymaster.createId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const didKey = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
+        const boundCredential = await keymaster.bindCredential(didKey, { schema: credentialDid });
+
+        expect(boundCredential.credentialSubject.id).toBe(didKey);
+
+        const did = await keymaster.issueCredential(boundCredential);
+        const credential = await keymaster.getCredential(did);
+        expect(credential).not.toBeNull();
+        expect(credential!.credentialSubject!.id).toBe(didKey);
     });
 });

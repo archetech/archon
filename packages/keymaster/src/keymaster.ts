@@ -1765,7 +1765,7 @@ export default class Keymaster implements KeymasterInterface {
         const signed = await this.addProof(credential);
         const subjectId = credential.credentialSubject!.id;
 
-        if (this.isDID(subjectId)) {
+        if (this.isManagedDID(subjectId)) {
             return this.encryptJSON(signed, subjectId, { ...options, includeHash: true });
         }
 
@@ -1784,7 +1784,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const subjectId = vc.credentialSubject!.id;
 
-        if (!this.isDID(subjectId)) {
+        if (!this.isManagedDID(subjectId)) {
             return null;
         }
 
@@ -1799,8 +1799,8 @@ export default class Keymaster implements KeymasterInterface {
         return this.createNotice(message, { registry, validUntil, ...options });
     }
 
-    private isDID(value: string): boolean {
-        return value.startsWith('did:');
+    private isManagedDID(value: string): boolean {
+        return value.startsWith('did:cid:');
     }
 
     private isVerifiableCredential(obj: unknown): obj is VerifiableCredential {
@@ -1843,7 +1843,7 @@ export default class Keymaster implements KeymasterInterface {
         const msgHash = this.cipher.hashMessage(msg);
         let encrypted: EncryptedMessage;
 
-        if (this.isDID(holder)) {
+        if (this.isManagedDID(holder)) {
             const holderDoc = await this.resolveDID(holder, { confirm: true });
             const receivePublicJwk = this.getPublicKeyJwk(holderDoc);
             encrypted = {
