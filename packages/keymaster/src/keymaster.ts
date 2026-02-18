@@ -487,7 +487,7 @@ export default class Keymaster implements KeymasterInterface {
         const keypair = await this.hdKeyPair();
         const seedBank = await this.resolveSeedBank();
         const msg = JSON.stringify(wallet);
-        const backup = this.cipher.encryptMessage(keypair.publicJwk, keypair.privateJwk, msg);
+        const backup = this.cipher.encryptMessage(keypair.publicJwk, msg);
 
         const operation: Operation = {
             type: "create",
@@ -551,7 +551,7 @@ export default class Keymaster implements KeymasterInterface {
                 throw new InvalidParameterError('Asset "backup" is missing or not a string');
             }
 
-            const backup = this.cipher.decryptMessage(keypair.publicJwk, keypair.privateJwk, castData.backup);
+            const backup = this.cipher.decryptMessage(keypair.privateJwk, castData.backup, keypair.publicJwk);
             let wallet = JSON.parse(backup);
 
             if (isWalletFile(wallet)) {
@@ -941,7 +941,6 @@ export default class Keymaster implements KeymasterInterface {
             includeHash = false,
         } = options;
 
-        const id = await this.fetchIdInfo();
         const senderKeypair = await this.fetchKeyPair();
         if (!senderKeypair) {
             throw new KeymasterError('No valid sender keypair');
@@ -950,13 +949,11 @@ export default class Keymaster implements KeymasterInterface {
         const doc = await this.resolveDID(receiver, { confirm: true });
         const receivePublicJwk = this.getPublicKeyJwk(doc);
 
-        const cipher_sender = encryptForSender ? this.cipher.encryptMessage(senderKeypair.publicJwk, senderKeypair.privateJwk, msg) : null;
-        const cipher_receiver = this.cipher.encryptMessage(receivePublicJwk, senderKeypair.privateJwk, msg);
+        const cipher_sender = encryptForSender ? this.cipher.encryptMessage(senderKeypair.publicJwk, msg) : null;
+        const cipher_receiver = this.cipher.encryptMessage(receivePublicJwk, msg);
         const cipher_hash = includeHash ? this.cipher.hashMessage(msg) : null;
 
         const encrypted: EncryptedMessage = {
-            sender: id.did,
-            created: new Date().toISOString(),
             cipher_hash,
             cipher_sender,
             cipher_receiver,
@@ -975,7 +972,7 @@ export default class Keymaster implements KeymasterInterface {
             const didkey = hdkey.derive(path);
             const receiverKeypair = this.cipher.generateJwk(didkey.privateKey!);
             try {
-                return this.cipher.decryptMessage(senderPublicJwk, receiverKeypair.privateJwk, ciphertext);
+                return this.cipher.decryptMessage(receiverKeypair.privateJwk, ciphertext, senderPublicJwk);
             }
             catch (error) {
                 index -= 1;
@@ -988,7 +985,9 @@ export default class Keymaster implements KeymasterInterface {
     async decryptMessage(did: string): Promise<string> {
         const wallet = await this.loadWallet();
         const id = await this.fetchIdInfo();
-        const asset = await this.resolveAsset(did);
+
+        const msgDoc = await this.resolveDID(did);
+        const asset = msgDoc.didDocumentData;
 
         if (!asset) {
             throw new InvalidParameterError('did not encrypted');
@@ -1001,10 +1000,19 @@ export default class Keymaster implements KeymasterInterface {
 
         const crypt = (castAsset.encrypted ? castAsset.encrypted : castAsset) as EncryptedMessage;
 
-        const doc = await this.resolveDID(crypt.sender, { confirm: true, versionTime: crypt.created });
-        const senderPublicJwk = this.getPublicKeyJwk(doc);
+        // Derive sender and created from the message DID document,
+        // falling back to fields in the asset for legacy messages
+        const sender = crypt.sender || msgDoc.didDocument?.controller;
+        const created = crypt.created || msgDoc.didDocumentMetadata?.created;
 
-        const ciphertext = (crypt.sender === id.did && crypt.cipher_sender) ? crypt.cipher_sender : crypt.cipher_receiver;
+        if (!sender) {
+            throw new InvalidParameterError('Sender DID could not be determined from message or DID document');
+        }
+
+        const senderDoc = await this.resolveDID(sender, { confirm: true, versionTime: created });
+        const senderPublicJwk = this.getPublicKeyJwk(senderDoc);
+
+        const ciphertext = (sender === id.did && crypt.cipher_sender) ? crypt.cipher_sender : crypt.cipher_receiver;
         return await this.decryptWithDerivedKeys(wallet, id, senderPublicJwk, ciphertext!);
     }
 
@@ -1513,7 +1521,7 @@ export default class Keymaster implements KeymasterInterface {
             id: idInfo,
         };
         const msg = JSON.stringify(data);
-        const backup = this.cipher.encryptMessage(keypair.publicJwk, keypair.privateJwk, msg);
+        const backup = this.cipher.encryptMessage(keypair.publicJwk, msg);
         const doc = await this.resolveDID(idInfo.did);
         const registry = doc.didDocumentRegistration?.registry;
         if (!registry) {
@@ -1545,7 +1553,7 @@ export default class Keymaster implements KeymasterInterface {
                 throw new InvalidDIDError('backup not found in backupStore');
             }
 
-            const backup = this.cipher.decryptMessage(keypair.publicJwk, keypair.privateJwk, backupStore.backup);
+            const backup = this.cipher.decryptMessage(keypair.privateJwk, backupStore.backup, keypair.publicJwk);
             const data = JSON.parse(backup) as { name: string; id: IDInfo };
 
             await this.mutateWallet((wallet) => {
@@ -1804,7 +1812,6 @@ export default class Keymaster implements KeymasterInterface {
         const signed = await this.addProof(credential);
         const msg = JSON.stringify(signed);
 
-        const id = await this.fetchIdInfo();
         const senderKeypair = await this.fetchKeyPair();
         if (!senderKeypair) {
             throw new KeymasterError('No valid sender keypair');
@@ -1813,13 +1820,11 @@ export default class Keymaster implements KeymasterInterface {
         const holder = credential.credentialSubject.id;
         const holderDoc = await this.resolveDID(holder, { confirm: true });
         const receivePublicJwk = this.getPublicKeyJwk(holderDoc);
-        const cipher_sender = this.cipher.encryptMessage(senderKeypair.publicJwk, senderKeypair.privateJwk, msg);
-        const cipher_receiver = this.cipher.encryptMessage(receivePublicJwk, senderKeypair.privateJwk, msg);
+        const cipher_sender = this.cipher.encryptMessage(senderKeypair.publicJwk, msg);
+        const cipher_receiver = this.cipher.encryptMessage(receivePublicJwk, msg);
         const msgHash = this.cipher.hashMessage(msg);
 
         const encrypted: EncryptedMessage = {
-            sender: id.did,
-            created: new Date().toISOString(),
             cipher_hash: msgHash,
             cipher_sender: cipher_sender,
             cipher_receiver: cipher_receiver,
@@ -2866,10 +2871,10 @@ export default class Keymaster implements KeymasterInterface {
         const salt = this.cipher.generateRandomSalt();
         const vaultKeypair = this.cipher.generateRandomJwk();
         const keys = {};
-        const config = this.cipher.encryptMessage(idKeypair!.publicJwk, vaultKeypair.privateJwk, JSON.stringify(options));
+        const config = this.cipher.encryptMessage(idKeypair!.publicJwk, JSON.stringify(options));
         const publicJwk = options.secretMembers ? idKeypair!.publicJwk : vaultKeypair.publicJwk; // If secret, encrypt for the owner only
-        const members = this.cipher.encryptMessage(publicJwk, vaultKeypair.privateJwk, JSON.stringify({}));
-        const items = this.cipher.encryptMessage(vaultKeypair.publicJwk, vaultKeypair.privateJwk, JSON.stringify({}));
+        const members = this.cipher.encryptMessage(publicJwk, JSON.stringify({}));
+        const items = this.cipher.encryptMessage(vaultKeypair.publicJwk, JSON.stringify({}));
         const sha256 = this.cipher.hashJSON({});
         const vault = {
             version,
@@ -2951,14 +2956,14 @@ export default class Keymaster implements KeymasterInterface {
         }
         else {
             try {
-                const membersJSON = this.cipher.decryptMessage(vault.publicJwk, privateJwk, vault.members);
+                const membersJSON = this.cipher.decryptMessage(privateJwk, vault.members, vault.publicJwk);
                 members = JSON.parse(membersJSON);
             }
             catch (error) {
             }
         }
 
-        const itemsJSON = this.cipher.decryptMessage(vault.publicJwk, privateJwk, vault.items);
+        const itemsJSON = this.cipher.decryptMessage(privateJwk, vault.items, vault.publicJwk);
         const items = JSON.parse(itemsJSON);
 
         return {
@@ -2985,7 +2990,7 @@ export default class Keymaster implements KeymasterInterface {
     private async addMemberKey(vault: Vault, memberDID: string, privateJwk: EcdsaJwkPrivate): Promise<void> {
         const memberDoc = await this.resolveDID(memberDID, { confirm: true });
         const memberPublicJwk = this.getPublicKeyJwk(memberDoc);
-        const memberKey = this.cipher.encryptMessage(memberPublicJwk, privateJwk, JSON.stringify(privateJwk));
+        const memberKey = this.cipher.encryptMessage(memberPublicJwk, JSON.stringify(privateJwk));
         const memberKeyId = this.generateSaltedId(vault, memberDID);
         vault.keys[memberKeyId] = memberKey;
     }
@@ -3045,7 +3050,7 @@ export default class Keymaster implements KeymasterInterface {
 
         members[memberDID] = { added: new Date().toISOString() };
         const publicJwk = config.secretMembers ? idKeypair!.publicJwk : vault.publicJwk;
-        vault.members = this.cipher.encryptMessage(publicJwk, privateJwk, JSON.stringify(members));
+        vault.members = this.cipher.encryptMessage(publicJwk, JSON.stringify(members));
 
         await this.addMemberKey(vault, memberDID, privateJwk);
         return this.mergeData(vaultId, { vault });
@@ -3056,7 +3061,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const idKeypair = await this.fetchKeyPair();
         const vault = await this.getVault(vaultId);
-        const { privateJwk, config, members } = await this.decryptVault(vault);
+        const { config, members } = await this.decryptVault(vault);
         const memberDoc = await this.resolveDID(memberId, { confirm: true });
         const memberDID = this.getAgentDID(memberDoc);
 
@@ -3067,7 +3072,7 @@ export default class Keymaster implements KeymasterInterface {
 
         delete members[memberDID];
         const publicJwk = config.secretMembers ? idKeypair!.publicJwk : vault.publicJwk;
-        vault.members = this.cipher.encryptMessage(publicJwk, privateJwk, JSON.stringify(members));
+        vault.members = this.cipher.encryptMessage(publicJwk, JSON.stringify(members));
 
         const memberKeyId = this.generateSaltedId(vault, memberDID);
         delete vault.keys[memberKeyId];
@@ -3090,9 +3095,9 @@ export default class Keymaster implements KeymasterInterface {
         await this.checkVaultOwner(vaultId);
 
         const vault = await this.getVault(vaultId);
-        const { privateJwk, items } = await this.decryptVault(vault);
+        const { items } = await this.decryptVault(vault);
         const validName = this.validateAlias(name);
-        const encryptedData = this.cipher.encryptBytes(vault.publicJwk, privateJwk, buffer);
+        const encryptedData = this.cipher.encryptBytes(vault.publicJwk, buffer);
         const cid = await this.gatekeeper.addText(encryptedData);
         const sha256 = this.cipher.hashMessage(buffer);
         const type = await this.getMimeType(buffer);
@@ -3107,7 +3112,7 @@ export default class Keymaster implements KeymasterInterface {
             data,
         };
 
-        vault.items = this.cipher.encryptMessage(vault.publicJwk, privateJwk, JSON.stringify(items));
+        vault.items = this.cipher.encryptMessage(vault.publicJwk, JSON.stringify(items));
         vault.sha256 = this.cipher.hashJSON(items);
 
         return this.mergeData(vaultId, { vault });
@@ -3117,11 +3122,11 @@ export default class Keymaster implements KeymasterInterface {
         await this.checkVaultOwner(vaultId);
 
         const vault = await this.getVault(vaultId);
-        const { privateJwk, items } = await this.decryptVault(vault);
+        const { items } = await this.decryptVault(vault);
 
         delete items[name];
 
-        vault.items = this.cipher.encryptMessage(vault.publicJwk, privateJwk, JSON.stringify(items));
+        vault.items = this.cipher.encryptMessage(vault.publicJwk, JSON.stringify(items));
         vault.sha256 = this.cipher.hashJSON(items);
         return this.mergeData(vaultId, { vault });
     }
@@ -3147,7 +3152,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new KeymasterError(`Failed to retrieve data for item '${name}' (CID: ${items[name].cid})`);
         }
 
-        const bytes = this.cipher.decryptBytes(vault.publicJwk, privateJwk, encryptedData);
+        const bytes = this.cipher.decryptBytes(privateJwk, encryptedData, vault.publicJwk);
         return Buffer.from(bytes);
     }
 
@@ -3663,10 +3668,10 @@ export default class Keymaster implements KeymasterInterface {
         const safeSeed: Seed = { mnemonicEnc: seed.mnemonicEnc };
 
         const hdkey = await this.getHDKeyFromCacheOrMnemonic(decrypted);
-        const { publicJwk, privateJwk } = this.cipher.generateJwk(hdkey.privateKey!);
+        const { publicJwk } = this.cipher.generateJwk(hdkey.privateKey!);
 
         const plaintext = JSON.stringify(rest);
-        const enc = this.cipher.encryptMessage(publicJwk, privateJwk, plaintext);
+        const enc = this.cipher.encryptMessage(publicJwk, plaintext);
 
         return { version: version!, seed: safeSeed, enc };
     }
@@ -3686,7 +3691,7 @@ export default class Keymaster implements KeymasterInterface {
         this._hdkeyCache = this.cipher.generateHDKey(mnemonic);
         const { publicJwk, privateJwk } = this.cipher.generateJwk(this._hdkeyCache.privateKey!);
 
-        const plaintext = this.cipher.decryptMessage(publicJwk, privateJwk, stored.enc);
+        const plaintext = this.cipher.decryptMessage(privateJwk, stored.enc, publicJwk);
         const data = JSON.parse(plaintext);
 
         const wallet: WalletFile = { version: stored.version, seed: stored.seed, ...data };

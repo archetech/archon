@@ -48,24 +48,34 @@ export interface Cipher {
     verifySig(msgHash: string, sigHex: string, publicJwk: EcdsaJwkPublic): boolean,
 
     encryptBytes(
-        pubKey: EcdsaJwkPublic,
-        privKey: EcdsaJwkPrivate,
+        recipientPubKey: EcdsaJwkPublic,
         data: Uint8Array,
     ): string,
 
     decryptBytes(
+        recipientPrivKey: EcdsaJwkPrivate,
+        ciphertext: string,
+        legacyPubKey?: EcdsaJwkPublic,
+    ): Uint8Array,
+
+    encryptMessage(
+        recipientPubKey: EcdsaJwkPublic,
+        message: string,
+    ): string,
+
+    decryptMessage(
+        recipientPrivKey: EcdsaJwkPrivate,
+        ciphertext: string,
+        legacyPubKey?: EcdsaJwkPublic,
+    ): string,
+
+    decryptBytesLegacy(
         pubKey: EcdsaJwkPublic,
         privKey: EcdsaJwkPrivate,
         ciphertext: string,
     ): Uint8Array,
 
-    encryptMessage(
-        pubKey: EcdsaJwkPublic,
-        privKey: EcdsaJwkPrivate,
-        message: string,
-    ): string,
-
-    decryptMessage(
+    decryptMessageLegacy(
         pubKey: EcdsaJwkPublic,
         privKey: EcdsaJwkPrivate,
         ciphertext: string,

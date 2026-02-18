@@ -164,8 +164,8 @@ describe('encryptJSON', () => {
         await keymaster.resolveDID(bob);
 
         const did = await keymaster.encryptJSON(mockJson, bob);
-        const data = await keymaster.resolveAsset(did);
-        expect((data as { encrypted: EncryptedMessage }).encrypted.sender).toStrictEqual(bob);
+        const doc = await keymaster.resolveDID(did);
+        expect(doc.didDocument?.controller).toStrictEqual(bob);
     });
 });
 

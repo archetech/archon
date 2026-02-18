@@ -174,7 +174,7 @@ function App() {
 
             const hdkey = cipher.generateHDKey(mnemonic);
             const { publicJwk, privateJwk } = cipher.generateJwk(hdkey.privateKey);
-            cipher.decryptMessage(publicJwk, privateJwk, stored.enc);
+            cipher.decryptMessage(privateJwk, stored.enc, publicJwk);
 
             setRecoveredMnemonic(mnemonic);
             setShowRecoverMnemonic(false);
