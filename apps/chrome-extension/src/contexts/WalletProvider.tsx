@@ -252,7 +252,7 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
 
             const hdkey = cipher.generateHDKey(mnemonic);
             const { publicJwk, privateJwk } = cipher.generateJwk(hdkey.privateKey!);
-            cipher.decryptMessage(publicJwk, privateJwk, stored.enc);
+            cipher.decryptMessageLegacy(publicJwk, privateJwk, stored.enc);
 
             setRecoveredMnemonic(mnemonic);
             setShowRecoverMnemonic(false);
