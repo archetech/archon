@@ -1691,7 +1691,13 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const id = await this.fetchIdInfo();
-        const subjectDID = await this.lookupDID(subjectId);
+
+        let subjectURI: string;
+        try {
+            subjectURI = await this.lookupDID(subjectId);
+        } catch {
+            subjectURI = subjectId;
+        }
 
         const vc: VerifiableCredential = {
             "@context": [
@@ -1703,7 +1709,7 @@ export default class Keymaster implements KeymasterInterface {
             validFrom,
             validUntil,
             credentialSubject: {
-                id: subjectDID,
+                id: subjectURI,
             },
         };
 
@@ -1734,7 +1740,7 @@ export default class Keymaster implements KeymasterInterface {
 
         if (claims && Object.keys(claims).length) {
             vc.credentialSubject = {
-                id: subjectDID,
+                id: subjectURI,
                 ...claims,
             };
         }
@@ -1757,7 +1763,13 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const signed = await this.addProof(credential);
-        return this.encryptJSON(signed, credential.credentialSubject!.id, { ...options, includeHash: true });
+        const subjectId = credential.credentialSubject!.id;
+
+        if (this.isDID(subjectId)) {
+            return this.encryptJSON(signed, subjectId, { ...options, includeHash: true });
+        }
+
+        return this.encryptJSON(signed, id.did, { ...options, includeHash: true, encryptForSender: false });
     }
 
     async sendCredential(
@@ -1770,15 +1782,25 @@ export default class Keymaster implements KeymasterInterface {
             return null;
         }
 
+        const subjectId = vc.credentialSubject!.id;
+
+        if (!this.isDID(subjectId)) {
+            return null;
+        }
+
         const registry = this.ephemeralRegistry;
         const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Default to 7 days
 
         const message: NoticeMessage = {
-            to: [vc.credentialSubject!.id],
+            to: [subjectId],
             dids: [did],
         };
 
         return this.createNotice(message, { registry, validUntil, ...options });
+    }
+
+    private isDID(value: string): boolean {
+        return value.startsWith('did:');
     }
 
     private isVerifiableCredential(obj: unknown): obj is VerifiableCredential {
@@ -1818,17 +1840,25 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const holder = credential.credentialSubject.id;
-        const holderDoc = await this.resolveDID(holder, { confirm: true });
-        const receivePublicJwk = this.getPublicKeyJwk(holderDoc);
-        const cipher_sender = this.cipher.encryptMessage(senderKeypair.publicJwk, msg);
-        const cipher_receiver = this.cipher.encryptMessage(receivePublicJwk, msg);
         const msgHash = this.cipher.hashMessage(msg);
+        let encrypted: EncryptedMessage;
 
-        const encrypted: EncryptedMessage = {
-            cipher_hash: msgHash,
-            cipher_sender: cipher_sender,
-            cipher_receiver: cipher_receiver,
-        };
+        if (this.isDID(holder)) {
+            const holderDoc = await this.resolveDID(holder, { confirm: true });
+            const receivePublicJwk = this.getPublicKeyJwk(holderDoc);
+            encrypted = {
+                cipher_hash: msgHash,
+                cipher_sender: this.cipher.encryptMessage(senderKeypair.publicJwk, msg),
+                cipher_receiver: this.cipher.encryptMessage(receivePublicJwk, msg),
+            };
+        } else {
+            encrypted = {
+                cipher_hash: msgHash,
+                cipher_sender: null,
+                cipher_receiver: this.cipher.encryptMessage(senderKeypair.publicJwk, msg),
+            };
+        }
+
         return this.updateDID(did, { didDocumentData: { encrypted } });
     }
 

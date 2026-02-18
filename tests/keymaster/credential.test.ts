@@ -729,3 +729,102 @@ describe('acceptCredential', () => {
         expect(ok).toBe(false);
     });
 });
+
+describe('non-DID credentialSubject', () => {
+    it('should bind credential with mailto: URI subject', async () => {
+        await keymaster.createId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential('mailto:bob@example.com', { schema: credentialDid });
+
+        expect(boundCredential.credentialSubject.id).toBe('mailto:bob@example.com');
+    });
+
+    it('should bind credential with https: URI subject', async () => {
+        await keymaster.createId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential('https://example.com/users/bob', { schema: credentialDid });
+
+        expect(boundCredential.credentialSubject.id).toBe('https://example.com/users/bob');
+    });
+
+    it('should issue credential with non-DID subject and issuer can decrypt', async () => {
+        await keymaster.createId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential('mailto:bob@example.com', { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        const credential = await keymaster.getCredential(did);
+        expect(credential).not.toBeNull();
+        expect(credential!.credentialSubject!.id).toBe('mailto:bob@example.com');
+        expect(credential!.issuer).toContain('did:');
+        expect(credential!.proof).toBeDefined();
+    });
+
+    it('should return null when sending credential with non-DID subject', async () => {
+        await keymaster.createId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential('mailto:bob@example.com', { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        const result = await keymaster.sendCredential(did);
+        expect(result).toBeNull();
+    });
+
+    it('should update credential with non-DID subject', async () => {
+        await keymaster.createId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential('mailto:bob@example.com', { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        const credential = await keymaster.getCredential(did);
+        credential!.credentialSubject!.email = 'updated@example.com';
+
+        const ok = await keymaster.updateCredential(did, credential!);
+        expect(ok).toBe(true);
+
+        const updated = await keymaster.getCredential(did);
+        expect(updated!.credentialSubject!.email).toBe('updated@example.com');
+        expect(updated!.credentialSubject!.id).toBe('mailto:bob@example.com');
+    });
+
+    it('should revoke credential with non-DID subject', async () => {
+        await keymaster.createId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential('mailto:bob@example.com', { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        const ok = await keymaster.revokeCredential(did);
+        expect(ok).toBe(true);
+
+        const revoked = await keymaster.resolveDID(did);
+        expect(revoked.didDocumentMetadata!.deactivated).toBe(true);
+    });
+
+    it('should return false when accepting credential with non-DID subject', async () => {
+        await keymaster.createId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential('mailto:bob@example.com', { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        const ok = await keymaster.acceptCredential(did);
+        expect(ok).toBe(false);
+    });
+
+    it('should include non-DID subject credentials in listIssued', async () => {
+        await keymaster.createId('Alice');
+
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential('mailto:bob@example.com', { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        const issued = await keymaster.listIssued();
+        expect(issued).toContain(did);
+    });
+});
