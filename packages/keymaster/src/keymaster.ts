@@ -1005,7 +1005,11 @@ export default class Keymaster implements KeymasterInterface {
         const sender = crypt.sender || msgDoc.didDocument?.controller;
         const created = crypt.created || msgDoc.didDocumentMetadata?.created;
 
-        const senderDoc = await this.resolveDID(sender!, { confirm: true, versionTime: created });
+        if (!sender) {
+            throw new InvalidParameterError('Sender DID could not be determined from message or DID document');
+        }
+
+        const senderDoc = await this.resolveDID(sender, { confirm: true, versionTime: created });
         const senderPublicJwk = this.getPublicKeyJwk(senderDoc);
 
         const ciphertext = (sender === id.did && crypt.cipher_sender) ? crypt.cipher_sender : crypt.cipher_receiver;

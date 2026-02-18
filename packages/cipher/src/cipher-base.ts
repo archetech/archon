@@ -92,7 +92,7 @@ export default abstract class CipherBase implements Cipher {
         if (legacyPubKey) {
             return this.decryptBytesLegacy(legacyPubKey, recipientPrivKey, ciphertext);
         }
-        throw new Error('Cannot decrypt: not a JWE and no legacy keys provided. Use decryptBytesLegacy for old ciphertext.');
+        throw new Error('Cannot decrypt: not a JWE and no legacy public key provided. Pass legacyPubKey as the third argument for old ciphertext.');
     }
 
     encryptMessage(recipientPubKey: EcdsaJwkPublic, message: string): string {
