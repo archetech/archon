@@ -18,7 +18,7 @@ import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 import PassphraseModal from "../modals/PassphraseModal";
 import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
-import { encMnemonic } from '@didcid/keymaster/encryption';
+import { encryptWithPassphrase } from '@didcid/cipher/passphrase';
 import { takeDeepLink } from '../utils/deepLinkQueue';
 import { extractDid } from '../utils/utils';
 import {
@@ -314,7 +314,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 return;
             }
 
-            const mnemonicEnc = await encMnemonic(recoveredMnemonic, newPassphrase);
+            const mnemonicEnc = await encryptWithPassphrase(recoveredMnemonic, newPassphrase);
             const updated = {
                 version: base.version,
                 seed: { mnemonicEnc },

@@ -12,7 +12,7 @@ import KeymasterUI from './KeymasterUI.js';
 import PassphraseModal from './PassphraseModal';
 import WarningModal from './WarningModal';
 import MnemonicModal from './MnemonicModal';
-import { encMnemonic } from '@didcid/keymaster/encryption';
+import { encryptWithPassphrase } from '@didcid/cipher/passphrase';
 import './App.css';
 
 global.Buffer = Buffer;
@@ -199,7 +199,7 @@ function App() {
                 return;
             }
 
-            const mnemonicEnc = await encMnemonic(recoveredMnemonic, newPassphrase);
+            const mnemonicEnc = await encryptWithPassphrase(recoveredMnemonic, newPassphrase);
             const updated = {
                 version: base.version,
                 seed: { mnemonicEnc },

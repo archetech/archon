@@ -1,4 +1,3 @@
-
 import { pbkdf2Async } from '@noble/hashes/pbkdf2';
 import { sha512 } from '@noble/hashes/sha512';
 import { gcm } from '@noble/ciphers/aes';
@@ -18,18 +17,18 @@ function getIterations(): number {
     return ENC_ITER_DEFAULT;
 }
 
-export async function encMnemonic(mnemonic: string, pass: string) {
+export async function encryptWithPassphrase(plaintext: string, pass: string) {
     const salt = randomBytes(SALT_LEN);
     const iv = randomBytes(IV_LEN);
     const key = await deriveKey(pass, salt);
 
     const cipher = gcm(key, iv);
-    const ct = cipher.encrypt(new TextEncoder().encode(mnemonic));
+    const ct = cipher.encrypt(new TextEncoder().encode(plaintext));
 
     return { salt: b64(salt), iv: b64(iv), data: b64(ct) };
 }
 
-export async function decMnemonic(blob: { salt: string; iv: string; data: string }, pass: string) {
+export async function decryptWithPassphrase(blob: { salt: string; iv: string; data: string }, pass: string) {
     const salt = ub64(blob.salt);
     const iv = ub64(blob.iv);
     const data = ub64(blob.data);
