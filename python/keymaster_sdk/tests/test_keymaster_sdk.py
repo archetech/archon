@@ -72,8 +72,8 @@ def test_encrypt_decrypt_json():
     alice_id = keymaster.create_id(alice, local_options)
 
     did = keymaster.encrypt_json(json, alice_id, local_options)
-    data = keymaster.resolve_asset(did)
-    assert_equal(data["encrypted"]["sender"], alice_id)
+    doc = keymaster.resolve_did(did)
+    assert_equal(doc["didDocument"]["controller"], alice_id)
 
     response = keymaster.decrypt_json(did)
     assert_equal(response, json)
