@@ -551,7 +551,7 @@ export default class Keymaster implements KeymasterInterface {
                 throw new InvalidParameterError('Asset "backup" is missing or not a string');
             }
 
-            const backup = this.decryptMessageCompat(keypair.publicJwk, keypair.privateJwk, castData.backup);
+            const backup = this.cipher.decryptMessage(keypair.privateJwk, castData.backup, keypair.publicJwk);
             let wallet = JSON.parse(backup);
 
             if (isWalletFile(wallet)) {
@@ -962,23 +962,8 @@ export default class Keymaster implements KeymasterInterface {
         return await this.createAsset({ encrypted }, options);
     }
 
-    private decryptMessageCompat(pubKey: EcdsaJwkPublic, privKey: EcdsaJwkPrivate, ciphertext: string): string {
-        if (ciphertext.startsWith('eyJ')) {
-            return this.cipher.decryptMessage(privKey, ciphertext);
-        }
-        return this.cipher.decryptMessageLegacy(pubKey, privKey, ciphertext);
-    }
-
-    private decryptBytesCompat(pubKey: EcdsaJwkPublic, privKey: EcdsaJwkPrivate, ciphertext: string): Uint8Array {
-        if (ciphertext.startsWith('eyJ')) {
-            return this.cipher.decryptBytes(privKey, ciphertext);
-        }
-        return this.cipher.decryptBytesLegacy(pubKey, privKey, ciphertext);
-    }
-
     private async decryptWithDerivedKeys(wallet: WalletFile, id: IDInfo, senderPublicJwk: EcdsaJwkPublic, ciphertext: string): Promise<string> {
         const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
-        const isJwe = ciphertext.startsWith('eyJ');
 
         // Try all private keys for this ID, starting with the most recent and working backward
         let index = id.index;
@@ -987,10 +972,7 @@ export default class Keymaster implements KeymasterInterface {
             const didkey = hdkey.derive(path);
             const receiverKeypair = this.cipher.generateJwk(didkey.privateKey!);
             try {
-                if (isJwe) {
-                    return this.cipher.decryptMessage(receiverKeypair.privateJwk, ciphertext);
-                }
-                return this.cipher.decryptMessageLegacy(senderPublicJwk, receiverKeypair.privateJwk, ciphertext);
+                return this.cipher.decryptMessage(receiverKeypair.privateJwk, ciphertext, senderPublicJwk);
             }
             catch (error) {
                 index -= 1;
@@ -1567,7 +1549,7 @@ export default class Keymaster implements KeymasterInterface {
                 throw new InvalidDIDError('backup not found in backupStore');
             }
 
-            const backup = this.decryptMessageCompat(keypair.publicJwk, keypair.privateJwk, backupStore.backup);
+            const backup = this.cipher.decryptMessage(keypair.privateJwk, backupStore.backup, keypair.publicJwk);
             const data = JSON.parse(backup) as { name: string; id: IDInfo };
 
             await this.mutateWallet((wallet) => {
@@ -2970,14 +2952,14 @@ export default class Keymaster implements KeymasterInterface {
         }
         else {
             try {
-                const membersJSON = this.decryptMessageCompat(vault.publicJwk, privateJwk, vault.members);
+                const membersJSON = this.cipher.decryptMessage(privateJwk, vault.members, vault.publicJwk);
                 members = JSON.parse(membersJSON);
             }
             catch (error) {
             }
         }
 
-        const itemsJSON = this.decryptMessageCompat(vault.publicJwk, privateJwk, vault.items);
+        const itemsJSON = this.cipher.decryptMessage(privateJwk, vault.items, vault.publicJwk);
         const items = JSON.parse(itemsJSON);
 
         return {
@@ -3166,7 +3148,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new KeymasterError(`Failed to retrieve data for item '${name}' (CID: ${items[name].cid})`);
         }
 
-        const bytes = this.decryptBytesCompat(vault.publicJwk, privateJwk, encryptedData);
+        const bytes = this.cipher.decryptBytes(privateJwk, encryptedData, vault.publicJwk);
         return Buffer.from(bytes);
     }
 
@@ -3705,7 +3687,7 @@ export default class Keymaster implements KeymasterInterface {
         this._hdkeyCache = this.cipher.generateHDKey(mnemonic);
         const { publicJwk, privateJwk } = this.cipher.generateJwk(this._hdkeyCache.privateKey!);
 
-        const plaintext = this.decryptMessageCompat(publicJwk, privateJwk, stored.enc);
+        const plaintext = this.cipher.decryptMessage(privateJwk, stored.enc, publicJwk);
         const data = JSON.parse(plaintext);
 
         const wallet: WalletFile = { version: stored.version, seed: stored.seed, ...data };

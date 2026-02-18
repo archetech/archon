@@ -55,6 +55,7 @@ export interface Cipher {
     decryptBytes(
         recipientPrivKey: EcdsaJwkPrivate,
         ciphertext: string,
+        legacyPubKey?: EcdsaJwkPublic,
     ): Uint8Array,
 
     encryptMessage(
@@ -65,6 +66,7 @@ export interface Cipher {
     decryptMessage(
         recipientPrivKey: EcdsaJwkPrivate,
         ciphertext: string,
+        legacyPubKey?: EcdsaJwkPublic,
     ): string,
 
     decryptBytesLegacy(

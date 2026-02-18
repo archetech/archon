@@ -85,9 +85,12 @@ export default abstract class CipherBase implements Cipher {
         return buildJweCompact(recipientPubKey, data);
     }
 
-    decryptBytes(recipientPrivKey: EcdsaJwkPrivate, ciphertext: string): Uint8Array {
+    decryptBytes(recipientPrivKey: EcdsaJwkPrivate, ciphertext: string, legacyPubKey?: EcdsaJwkPublic): Uint8Array {
         if (isJweCompact(ciphertext)) {
             return parseJweCompact(recipientPrivKey, ciphertext);
+        }
+        if (legacyPubKey) {
+            return this.decryptBytesLegacy(legacyPubKey, recipientPrivKey, ciphertext);
         }
         throw new Error('Cannot decrypt: not a JWE and no legacy keys provided. Use decryptBytesLegacy for old ciphertext.');
     }
@@ -97,8 +100,8 @@ export default abstract class CipherBase implements Cipher {
         return this.encryptBytes(recipientPubKey, data);
     }
 
-    decryptMessage(recipientPrivKey: EcdsaJwkPrivate, ciphertext: string): string {
-        const data = this.decryptBytes(recipientPrivKey, ciphertext);
+    decryptMessage(recipientPrivKey: EcdsaJwkPrivate, ciphertext: string, legacyPubKey?: EcdsaJwkPublic): string {
+        const data = this.decryptBytes(recipientPrivKey, ciphertext, legacyPubKey);
         return bytesToUtf8(data);
     }
 
