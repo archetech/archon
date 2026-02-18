@@ -3711,8 +3711,9 @@ export default class Keymaster implements KeymasterInterface {
         try {
             mnemonic = await decMnemonic(stored.seed.mnemonicEnc!, this.passphrase);
         } catch (error: any) {
-            // OperationError is thrown by crypto.subtle.decrypt when the passphrase is wrong
-            if (error?.name === 'OperationError') {
+            const msg = error?.message || '';
+            // OperationError: Web Crypto API (legacy); 'invalid ghash tag': @noble/ciphers
+            if (error?.name === 'OperationError' || msg.includes('invalid ghash tag')) {
                 throw new KeymasterError('Incorrect passphrase.');
             }
             throw error;
