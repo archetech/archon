@@ -16,7 +16,7 @@ interface PassphraseModalProps {
     isOpen: boolean,
     title: string,
     errorText: string,
-    onSubmit: (passphrase: string) => void,
+    onSubmit: (passphrase: string) => void | Promise<void>,
     onClose?: () => void,
     encrypt: boolean,
     showCancel?: boolean,
@@ -59,7 +59,7 @@ const PassphraseModal: React.FC<PassphraseModalProps> = (
         await new Promise(requestAnimationFrame);
 
         try {
-            onSubmit(passphrase);
+            await onSubmit(passphrase);
             setPassphrase("");
             setConfirmPassphrase("");
         } finally {

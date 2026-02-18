@@ -115,8 +115,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             try {
                 // check pass & convert to v1 if needed
                 await instance.loadWallet();
-            } catch {
-                setPassphraseErrorText(INCORRECT_PASSPHRASE);
+            } catch (error: any) {
+                const message = error?.message || String(error);
+                if (message.includes('Incorrect passphrase')) {
+                    setPassphraseErrorText(INCORRECT_PASSPHRASE);
+                } else {
+                    setPassphraseErrorText(message);
+                }
                 return false;
             }
         }
@@ -151,8 +156,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 // check pass
                 await km.loadWallet();
                 await walletWeb.saveWallet(pendingWallet as StoredWallet, true);
-            } catch {
-                setPassphraseErrorText(INCORRECT_PASSPHRASE);
+            } catch (error: any) {
+                const message = error?.message || String(error);
+                if (message.includes('Incorrect passphrase')) {
+                    setPassphraseErrorText(INCORRECT_PASSPHRASE);
+                } else {
+                    setPassphraseErrorText(message);
+                }
                 return;
             }
         }
