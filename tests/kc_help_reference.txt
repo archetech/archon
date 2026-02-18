@@ -96,5 +96,6 @@ Commands:
   use-id <name>                           Set the current ID
   verify-file <file>                      Verify the proof in a JSON file
   verify-response <response>              Decrypt and validate a response to a challenge
+  view-credential <did>                   Decrypt and display a credential in human-readable format
   view-poll <poll>                        View poll details
   vote-poll <poll> <vote> [spoil]         Vote in a poll
