@@ -7,6 +7,7 @@ import { managedNonce } from '@noble/ciphers/webcrypto/utils'
 import { bytesToUtf8, utf8ToBytes } from '@noble/ciphers/utils';
 import { base64url } from 'multiformats/bases/base64';
 import { Cipher, HDKeyJSON, EcdsaJwkPublic, EcdsaJwkPrivate, EcdsaJwkPair } from './types.js';
+import { buildJweCompact, parseJweCompact, isJweCompact } from './jwe.js';
 import canonicalizeModule from 'canonicalize';
 const canonicalize = canonicalizeModule as unknown as (input: unknown) => string;
 
@@ -80,17 +81,28 @@ export default abstract class CipherBase implements Cipher {
         return secp.verify(signature, msgHash, compressedPublicKeyBytes);
     }
 
-    encryptBytes(pubKey: EcdsaJwkPublic, privKey: EcdsaJwkPrivate, data: Uint8Array): string {
-        const priv = base64url.baseDecode(privKey.d);
-        const pub = this.convertJwkToCompressedBytes(pubKey);
-        const ss = secp.getSharedSecret(priv, pub);
-        const key = ss.slice(0, 32);
-        const chacha = managedNonce(xchacha20poly1305)(key);
-        const ciphertext = chacha.encrypt(data);
-        return base64url.baseEncode(ciphertext);
+    encryptBytes(recipientPubKey: EcdsaJwkPublic, data: Uint8Array): string {
+        return buildJweCompact(recipientPubKey, data);
     }
 
-    decryptBytes(pubKey: EcdsaJwkPublic, privKey: EcdsaJwkPrivate, ciphertext: string): Uint8Array {
+    decryptBytes(recipientPrivKey: EcdsaJwkPrivate, ciphertext: string): Uint8Array {
+        if (isJweCompact(ciphertext)) {
+            return parseJweCompact(recipientPrivKey, ciphertext);
+        }
+        throw new Error('Cannot decrypt: not a JWE and no legacy keys provided. Use decryptBytesLegacy for old ciphertext.');
+    }
+
+    encryptMessage(recipientPubKey: EcdsaJwkPublic, message: string): string {
+        const data = utf8ToBytes(message);
+        return this.encryptBytes(recipientPubKey, data);
+    }
+
+    decryptMessage(recipientPrivKey: EcdsaJwkPrivate, ciphertext: string): string {
+        const data = this.decryptBytes(recipientPrivKey, ciphertext);
+        return bytesToUtf8(data);
+    }
+
+    decryptBytesLegacy(pubKey: EcdsaJwkPublic, privKey: EcdsaJwkPrivate, ciphertext: string): Uint8Array {
         const priv = base64url.baseDecode(privKey.d);
         const pub = this.convertJwkToCompressedBytes(pubKey);
         const ss = secp.getSharedSecret(priv, pub);
@@ -100,13 +112,8 @@ export default abstract class CipherBase implements Cipher {
         return chacha.decrypt(cipherdata);
     }
 
-    encryptMessage(pubKey: EcdsaJwkPublic, privKey: EcdsaJwkPrivate, message: string): string {
-        const data = utf8ToBytes(message);
-        return this.encryptBytes(pubKey, privKey, data);
-    }
-
-    decryptMessage(pubKey: EcdsaJwkPublic, privKey: EcdsaJwkPrivate, ciphertext: string): string {
-        const data = this.decryptBytes(pubKey, privKey, ciphertext);
+    decryptMessageLegacy(pubKey: EcdsaJwkPublic, privKey: EcdsaJwkPrivate, ciphertext: string): string {
+        const data = this.decryptBytesLegacy(pubKey, privKey, ciphertext);
         return bytesToUtf8(data);
     }
 
