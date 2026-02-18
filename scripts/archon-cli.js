@@ -567,6 +567,45 @@ program
     });
 
 program
+    .command('view-credential <did>')
+    .description('Decrypt and display a credential in human-readable format')
+    .action(async (did) => {
+        try {
+            const credential = await keymaster.getCredential(did);
+
+            if (!credential) {
+                console.error('Credential not found');
+                return;
+            }
+
+            console.log(`Credential: ${did}`);
+            console.log(`Type:       ${credential.type.join(', ')}`);
+            console.log(`Issuer:     ${credential.issuer}`);
+            console.log(`Subject:    ${credential.credentialSubject?.id}`);
+            console.log(`Valid from: ${credential.validFrom}`);
+
+            if (credential.validUntil) {
+                console.log(`Valid until: ${credential.validUntil}`);
+            }
+
+            if (credential.credentialSchema) {
+                console.log(`Schema:     ${credential.credentialSchema.id}`);
+            }
+
+            const { id, ...claims } = credential.credentialSubject || {};
+            if (Object.keys(claims).length) {
+                console.log(`Claims:     ${JSON.stringify(claims, null, 4)}`);
+            }
+
+            const isValid = await keymaster.verifyProof(credential);
+            console.log(`Proof:      ${isValid ? 'valid' : 'INVALID'}`);
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
     .command('publish-credential <did>')
     .description('Publish the existence of a credential to the current user manifest')
     .action(async (did) => {

@@ -46,6 +46,7 @@ describe('help', () => {
             'show-wallet',
             'use-id',
             'verify-file',
+            'view-credential',
         ];
 
         for (const cmd of expectedCommands) {
