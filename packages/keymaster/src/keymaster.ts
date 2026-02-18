@@ -941,7 +941,6 @@ export default class Keymaster implements KeymasterInterface {
             includeHash = false,
         } = options;
 
-        const id = await this.fetchIdInfo();
         const senderKeypair = await this.fetchKeyPair();
         if (!senderKeypair) {
             throw new KeymasterError('No valid sender keypair');
@@ -955,8 +954,6 @@ export default class Keymaster implements KeymasterInterface {
         const cipher_hash = includeHash ? this.cipher.hashMessage(msg) : null;
 
         const encrypted: EncryptedMessage = {
-            sender: id.did,
-            created: new Date().toISOString(),
             cipher_hash,
             cipher_sender,
             cipher_receiver,
@@ -1006,7 +1003,9 @@ export default class Keymaster implements KeymasterInterface {
     async decryptMessage(did: string): Promise<string> {
         const wallet = await this.loadWallet();
         const id = await this.fetchIdInfo();
-        const asset = await this.resolveAsset(did);
+
+        const msgDoc = await this.resolveDID(did);
+        const asset = msgDoc.didDocumentData;
 
         if (!asset) {
             throw new InvalidParameterError('did not encrypted');
@@ -1019,10 +1018,15 @@ export default class Keymaster implements KeymasterInterface {
 
         const crypt = (castAsset.encrypted ? castAsset.encrypted : castAsset) as EncryptedMessage;
 
-        const doc = await this.resolveDID(crypt.sender, { confirm: true, versionTime: crypt.created });
-        const senderPublicJwk = this.getPublicKeyJwk(doc);
+        // Derive sender and created from the message DID document,
+        // falling back to fields in the asset for legacy messages
+        const sender = crypt.sender || msgDoc.didDocument?.controller;
+        const created = crypt.created || msgDoc.didDocumentMetadata?.created;
 
-        const ciphertext = (crypt.sender === id.did && crypt.cipher_sender) ? crypt.cipher_sender : crypt.cipher_receiver;
+        const senderDoc = await this.resolveDID(sender!, { confirm: true, versionTime: created });
+        const senderPublicJwk = this.getPublicKeyJwk(senderDoc);
+
+        const ciphertext = (sender === id.did && crypt.cipher_sender) ? crypt.cipher_sender : crypt.cipher_receiver;
         return await this.decryptWithDerivedKeys(wallet, id, senderPublicJwk, ciphertext!);
     }
 
@@ -1822,7 +1826,6 @@ export default class Keymaster implements KeymasterInterface {
         const signed = await this.addProof(credential);
         const msg = JSON.stringify(signed);
 
-        const id = await this.fetchIdInfo();
         const senderKeypair = await this.fetchKeyPair();
         if (!senderKeypair) {
             throw new KeymasterError('No valid sender keypair');
@@ -1836,8 +1839,6 @@ export default class Keymaster implements KeymasterInterface {
         const msgHash = this.cipher.hashMessage(msg);
 
         const encrypted: EncryptedMessage = {
-            sender: id.did,
-            created: new Date().toISOString(),
             cipher_hash: msgHash,
             cipher_sender: cipher_sender,
             cipher_receiver: cipher_receiver,

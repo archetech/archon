@@ -234,8 +234,8 @@ export interface KeymasterOptions {
 }
 
 export interface EncryptedMessage {
-    sender: string;
-    created: string;
+    sender?: string;
+    created?: string;
     cipher_hash?: string | null;
     cipher_sender?: string | null;
     cipher_receiver?: string | null;
