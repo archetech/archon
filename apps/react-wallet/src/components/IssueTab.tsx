@@ -4,10 +4,13 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import CredentialForm from "./CredentialForm";
 import {
+    Autocomplete,
     Box,
     Button,
     Select,
-    MenuItem, FormControl,
+    MenuItem,
+    FormControl,
+    TextField,
 } from "@mui/material";
 import DisplayDID from "./DisplayDID";
 import { useThemeContext } from "../contexts/ContextProviders";
@@ -75,15 +78,11 @@ function IssueTab() {
             }
             try {
                 const credentialObject = JSON.parse(credentialString);
-                if (
-                    !credentialObject.type ||
-                    !Array.isArray(credentialObject.type) ||
-                    credentialObject.type.length < 2
-                ) {
+                if (!credentialObject.credentialSchema?.id) {
                     setError("Invalid credential object");
                     return;
                 }
-                const schemaDID = credentialObject.type[1];
+                const schemaDID = credentialObject.credentialSchema.id;
                 const schemaObject = await keymaster.getSchema(schemaDID);
                 setSchemaObject(schemaObject);
             } catch (error: any) {
@@ -100,25 +99,21 @@ function IssueTab() {
     return (
         <Box sx={{ width: isTabletUp ? '70%' : '100%' }}>
             <Box display="flex" flexDirection="column" sx={{ mb: 2 }}>
-                <Select
+                <Autocomplete
+                    freeSolo
+                    options={agentList || []}
                     value={credentialSubject}
-                    onChange={(event) =>
-                        setCredentialSubject(event.target.value)
-                    }
-                    size="small"
-                    displayEmpty
-                    variant="outlined"
-                    className="select-small-top"
-                >
-                    <MenuItem value="" disabled>
-                        Select subject
-                    </MenuItem>
-                    {agentList.map((name, index) => (
-                        <MenuItem value={name} key={index}>
-                            {name}
-                        </MenuItem>
-                    ))}
-                </Select>
+                    onInputChange={(_e, value) => setCredentialSubject(value.trim())}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            label="Subject (name, DID, or URI)"
+                            size="small"
+                            variant="outlined"
+                            className="select-small-top"
+                        />
+                    )}
+                />
                 <Select
                     value={credentialSchema}
                     onChange={(event) =>
