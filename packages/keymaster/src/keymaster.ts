@@ -3805,9 +3805,22 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     private async addUnaliasedPoll(did: string, name?: string): Promise<void> {
-        const aliasName = name || did.slice(-32);
+        const baseName = name || did.slice(-32);
+        const aliases = await this.listAliases();
+
+        let candidate = baseName;
+        let suffix = 2;
+
+        while (candidate in aliases) {
+            if (aliases[candidate] === did) {
+                return; // Already aliased to this DID
+            }
+            candidate = `${baseName}-${suffix}`;
+            suffix++;
+        }
+
         try {
-            await this.addAlias(aliasName, did);
+            await this.addAlias(candidate, did);
         } catch { }
     }
 
