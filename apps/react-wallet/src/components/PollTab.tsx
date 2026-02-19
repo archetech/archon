@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from "react";
 import {
+    Autocomplete,
     Box,
     Button,
     IconButton,
@@ -20,9 +21,11 @@ import {
     AddCircleOutline,
     BarChart,
     Block,
+    Close,
     Delete,
     Edit,
     HowToVote,
+    PersonAdd,
 } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
@@ -47,6 +50,7 @@ const PollsTab: React.FC = () => {
         currentId,
         registries,
         aliasList,
+        agentList,
         pollList,
     } = useVariablesContext();
     const { refreshAliases } = useUIContext();
@@ -58,6 +62,8 @@ const PollsTab: React.FC = () => {
 
     const [deadline, setDeadline] = useState<string>("");
     const [createdPollDid, setCreatedPollDid] = useState<string>("");
+    const [voterInput, setVoterInput] = useState<string>("");
+    const [voters, setVoters] = useState<Record<string, any>>({});
     const [selectedPollName, setSelectedPollName] = useState<string>("");
     const [selectedPollDesc, setSelectedPollDesc] = useState<string>("");
     const [pollOptions, setPollOptions] = useState<string[]>([]);
@@ -116,6 +122,30 @@ const PollsTab: React.FC = () => {
         clearPollList();
     }, [currentId]);
 
+    // Persist createdPollDid across navigation
+    useEffect(() => {
+        if (createdPollDid) {
+            sessionStorage.setItem('createdPollDid', createdPollDid);
+        }
+    }, [createdPollDid]);
+
+    useEffect(() => {
+        const saved = sessionStorage.getItem('createdPollDid');
+        if (saved && keymaster && !createdPollDid) {
+            // Verify the poll still exists before restoring
+            keymaster.getPoll(saved).then((config) => {
+                if (config) {
+                    setCreatedPollDid(saved);
+                    refreshVoters(saved);
+                } else {
+                    sessionStorage.removeItem('createdPollDid');
+                }
+            }).catch(() => {
+                sessionStorage.removeItem('createdPollDid');
+            });
+        }
+    }, [keymaster]);
+
     async function confirmRemovePoll() {
         if (!keymaster || !removeName) {
             return;
@@ -139,6 +169,9 @@ const PollsTab: React.FC = () => {
         setDeadline("");
         setCreatedPollDid("");
         setPollNoticeSent(false);
+        setVoterInput("");
+        setVoters({});
+        sessionStorage.removeItem('createdPollDid');
     };
 
     const buildPoll = async (): Promise<PollConfig | null> => {
@@ -177,6 +210,7 @@ const PollsTab: React.FC = () => {
 
         return {
             ...template,
+            name: pollName.trim(),
             description: description.trim(),
             options,
             deadline: new Date(deadline).toISOString(),
@@ -200,6 +234,37 @@ const PollsTab: React.FC = () => {
             await keymaster.addAlias(pollName, did);
             await refreshAliases();
             setSuccess(`Poll created: ${did}`);
+        } catch (error: any) {
+            setError(error);
+        }
+    };
+
+    const refreshVoters = async (pollDid: string) => {
+        if (!keymaster) return;
+        try {
+            const map = await keymaster.listPollVoters(pollDid);
+            setVoters(map);
+        } catch {
+            setVoters({});
+        }
+    };
+
+    const handleAddVoter = async () => {
+        if (!keymaster || !createdPollDid || !voterInput.trim()) return;
+        try {
+            await keymaster.addPollVoter(createdPollDid, voterInput.trim());
+            setVoterInput("");
+            await refreshVoters(createdPollDid);
+        } catch (error: any) {
+            setError(error);
+        }
+    };
+
+    const handleRemoveVoter = async (did: string) => {
+        if (!keymaster || !createdPollDid) return;
+        try {
+            await keymaster.removePollVoter(createdPollDid, did);
+            await refreshVoters(createdPollDid);
         } catch (error: any) {
             setError(error);
         }
@@ -346,6 +411,7 @@ const PollsTab: React.FC = () => {
             if (noticeDid) {
                 setSuccess("Poll notice sent");
                 setPollNoticeSent(true);
+                sessionStorage.removeItem('createdPollDid');
             } else {
                 setError("Failed to send poll");
             }
@@ -508,6 +574,82 @@ const PollsTab: React.FC = () => {
                             Create
                         </Button>
                     </Box>
+
+                    {createdPollDid && (
+                        <Box sx={{ mb: 2 }}>
+                            <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                Voters
+                            </Typography>
+                            <Box display="flex" sx={{ gap: 1, mb: 1 }}>
+                                <Autocomplete
+                                    freeSolo
+                                    options={agentList || []}
+                                    value={voterInput}
+                                    onChange={(_e, newVal) => setVoterInput(newVal || "")}
+                                    onInputChange={(_e, newInput) => setVoterInput(newInput)}
+                                    sx={{ flex: 1, minWidth: 0 }}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            fullWidth
+                                            size="small"
+                                            label="Name or DID"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    handleAddVoter();
+                                                }
+                                            }}
+                                            slotProps={{
+                                                htmlInput: {
+                                                    ...params.inputProps,
+                                                    maxLength: 80,
+                                                },
+                                            }}
+                                        />
+                                    )}
+                                />
+                                <Button
+                                    variant="contained"
+                                    onClick={handleAddVoter}
+                                    disabled={!voterInput.trim()}
+                                    sx={{ minWidth: 'auto', px: 2 }}
+                                >
+                                    <PersonAdd />
+                                </Button>
+                            </Box>
+                            {Object.keys(voters).length > 0 && (
+                                <Box sx={{ mb: 1 }}>
+                                    {Object.keys(voters).map((did) => (
+                                        <Box
+                                            key={did}
+                                            display="flex"
+                                            alignItems="center"
+                                            sx={{ py: 0.5 }}
+                                        >
+                                            <Typography
+                                                variant="body2"
+                                                sx={{
+                                                    flex: 1,
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                {did}
+                                            </Typography>
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => handleRemoveVoter(did)}
+                                            >
+                                                <Close fontSize="small" />
+                                            </IconButton>
+                                        </Box>
+                                    ))}
+                                </Box>
+                            )}
+                        </Box>
+                    )}
 
                     <Box display="flex" flexDirection="row" sx={{ mb: 2, gap: 1, width: "100%" }}>
                         <Button

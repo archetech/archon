@@ -3940,6 +3940,8 @@ v1router.post('/assets/:id/clone', async (req, res) => {
  *                   properties:
  *                     version:
  *                       type: integer
+ *                     name:
+ *                       type: string
  *                     description:
  *                       type: string
  *                     options:
@@ -4032,6 +4034,9 @@ v1router.get('/polls', async (req, res) => {
  *                     type: integer
  *                     default: 2
  *                     description: Must be 2.
+ *                   name:
+ *                     type: string
+ *                     description: A short name for the poll (used as alias when imported).
  *                   description:
  *                     type: string
  *                     description: A short description or question for the poll.
@@ -4048,6 +4053,7 @@ v1router.get('/polls', async (req, res) => {
  *                     description: The date-time by which the poll closes (must be in the future).
  *                 required:
  *                   - version
+ *                   - name
  *                   - description
  *                   - options
  *                   - deadline

@@ -2537,6 +2537,7 @@ export default class Keymaster implements KeymasterInterface {
 
         return {
             version: 2,
+            name: 'poll-name',
             description: 'What is this poll about?',
             options: ['yes', 'no', 'abstain'],
             deadline: nextWeek.toISOString(),
@@ -2549,6 +2550,10 @@ export default class Keymaster implements KeymasterInterface {
     ): Promise<string> {
         if (config.version !== 2) {
             throw new InvalidParameterError('poll.version');
+        }
+
+        if (!config.name) {
+            throw new InvalidParameterError('poll.name');
         }
 
         if (!config.description) {
@@ -3698,7 +3703,7 @@ export default class Keymaster implements KeymasterInterface {
             if (poll) {
                 const names = await this.listAliases();
                 if (!Object.values(names).includes(noticeDID)) {
-                    await this.addUnaliasedPoll(noticeDID);
+                    await this.addUnaliasedPoll(noticeDID, poll.name);
                 }
                 await this.addToNotices(did, [NoticeTags.POLL]);
 
@@ -3799,10 +3804,10 @@ export default class Keymaster implements KeymasterInterface {
         return payload && typeof payload.poll === "string" && typeof payload.vote === "number";
     }
 
-    private async addUnaliasedPoll(did: string): Promise<void> {
-        const fallbackName = did.slice(-32);
+    private async addUnaliasedPoll(did: string, name?: string): Promise<void> {
+        const aliasName = name || did.slice(-32);
         try {
-            await this.addAlias(fallbackName, did);
+            await this.addAlias(aliasName, did);
         } catch { }
     }
 

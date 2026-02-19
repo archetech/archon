@@ -152,6 +152,7 @@ export interface PollResults {
 
 export interface PollConfig {
     version: 2;
+    name: string;
     description: string;
     options: string[];
     deadline: string;

@@ -212,6 +212,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [optionsStr, setOptionsStr] = useState("yes, no, abstain");
     const [deadline, setDeadline] = useState("");
     const [createdPollDid, setCreatedPollDid] = useState("");
+    const [voterInput, setVoterInput] = useState("");
+    const [voters, setVoters] = useState({});
     const [selectedPollName, setSelectedPollName] = useState("");
     const [selectedPollDesc, setSelectedPollDesc] = useState("");
     const [pollOptions, setPollOptions] = useState([]);
@@ -2379,6 +2381,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setDeadline("");
         setCreatedPollDid("");
         setPollNoticeSent(false);
+        setVoterInput("");
+        setVoters({});
     };
 
     const arraysEqual = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -2475,6 +2479,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
         return {
             ...template,
+            name: pollName.trim(),
             description: description.trim(),
             options,
             deadline: new Date(deadline).toISOString(),
@@ -2494,6 +2499,36 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             await keymaster.addAlias(pollName, did);
             await refreshNames();
             showSuccess(`Poll created: ${did}`);
+        } catch (e) {
+            showError(e);
+        }
+    };
+
+    const refreshVoters = async (pollDid) => {
+        try {
+            const map = await keymaster.listPollVoters(pollDid);
+            setVoters(map);
+        } catch {
+            setVoters({});
+        }
+    };
+
+    const handleAddVoter = async () => {
+        if (!createdPollDid || !voterInput.trim()) return;
+        try {
+            await keymaster.addPollVoter(createdPollDid, voterInput.trim());
+            setVoterInput("");
+            await refreshVoters(createdPollDid);
+        } catch (e) {
+            showError(e);
+        }
+    };
+
+    const handleRemoveVoter = async (did) => {
+        if (!createdPollDid) return;
+        try {
+            await keymaster.removePollVoter(createdPollDid, did);
+            await refreshVoters(createdPollDid);
         } catch (e) {
             showError(e);
         }
@@ -4043,7 +4078,76 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
                                     {createdPollDid && (
                                         <Box sx={{ mt: 2 }}>
-                                            <Typography variant="body2">{createdPollDid}</Typography>
+                                            <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                Voters
+                                            </Typography>
+                                            <Box display="flex" sx={{ gap: 1, mb: 1 }}>
+                                                <Autocomplete
+                                                    freeSolo
+                                                    options={agentList || []}
+                                                    value={voterInput}
+                                                    onChange={(_e, newVal) => setVoterInput(newVal || "")}
+                                                    onInputChange={(_e, newInput) => setVoterInput(newInput)}
+                                                    sx={{ flex: 1, minWidth: 0 }}
+                                                    renderInput={(params) => (
+                                                        <TextField
+                                                            {...params}
+                                                            fullWidth
+                                                            size="small"
+                                                            label="Name or DID"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    handleAddVoter();
+                                                                }
+                                                            }}
+                                                            inputProps={{
+                                                                ...params.inputProps,
+                                                                maxLength: 80,
+                                                            }}
+                                                        />
+                                                    )}
+                                                />
+                                                <Button
+                                                    variant="contained"
+                                                    onClick={handleAddVoter}
+                                                    disabled={!voterInput.trim()}
+                                                    sx={{ minWidth: 'auto', px: 2 }}
+                                                >
+                                                    <PersonAdd />
+                                                </Button>
+                                            </Box>
+                                            {Object.keys(voters).length > 0 && (
+                                                <Box sx={{ mb: 1 }}>
+                                                    {Object.keys(voters).map((did) => (
+                                                        <Box
+                                                            key={did}
+                                                            display="flex"
+                                                            alignItems="center"
+                                                            sx={{ py: 0.5 }}
+                                                        >
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{
+                                                                    flex: 1,
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    whiteSpace: 'nowrap',
+                                                                }}
+                                                            >
+                                                                {did}
+                                                            </Typography>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleRemoveVoter(did)}
+                                                            >
+                                                                <Clear fontSize="small" />
+                                                            </IconButton>
+                                                        </Box>
+                                                    ))}
+                                                </Box>
+                                            )}
+                                            <Typography variant="body2" sx={{ mt: 1 }}>{createdPollDid}</Typography>
                                         </Box>
                                     )}
                                 </Box>

@@ -41,6 +41,7 @@ describe('pollTemplate', () => {
 
         const expectedTemplate = {
             version: 2,
+            name: 'poll-name',
             description: 'What is this poll about?',
             options: ['yes', 'no', 'abstain'],
             deadline: expect.any(String),
@@ -73,6 +74,16 @@ describe('createPoll', () => {
         }
         catch (error: any) {
             expect(error.message).toBe('Invalid parameter: poll.version');
+        }
+
+        try {
+            const poll = JSON.parse(JSON.stringify(template));
+            delete poll.name;
+            await owner.createPoll(poll);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: poll.name');
         }
 
         try {
