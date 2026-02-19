@@ -32,7 +32,7 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import PollResultsModal from "../modals/PollResultsModal";
-import {NoticeMessage, PollConfig, PollResults} from "@didcid/keymaster/types";
+import {PollConfig, PollResults} from "@didcid/keymaster/types";
 import TextInputModal from "../modals/TextInputModal";
 import WarningModal from "../modals/WarningModal";
 import CopyResolveDID from "./CopyResolveDID";
@@ -400,26 +400,10 @@ const PollsTab: React.FC = () => {
         }
 
         try {
-            const membersMap = await keymaster.listPollVoters(createdPollDid);
-            const members = Object.keys(membersMap);
-            if (members.length === 0) {
-                setError("No poll voters found");
-                return;
-            }
-            const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-            const message: NoticeMessage = { to: members, dids: [createdPollDid] };
-            const noticeDid = await keymaster.createNotice(message, {
-                registry: "hyperswarm",
-                validUntil,
-            });
-
-            if (noticeDid) {
-                setSuccess("Poll notice sent");
-                setPollNoticeSent(true);
-                sessionStorage.removeItem('createdPollDid');
-            } else {
-                setError("Failed to send poll");
-            }
+            await keymaster.sendPoll(createdPollDid);
+            setSuccess("Poll notice sent");
+            setPollNoticeSent(true);
+            sessionStorage.removeItem('createdPollDid');
         } catch (error: any) {
             setError(error);
         }

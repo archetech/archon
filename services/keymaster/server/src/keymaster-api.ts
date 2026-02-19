@@ -4331,6 +4331,44 @@ v1router.get('/polls/:poll/view', async (req, res) => {
 
 /**
  * @swagger
+ * /polls/{poll}/send:
+ *   post:
+ *     summary: Send a poll notice to all voters.
+ *     parameters:
+ *       - in: path
+ *         name: poll
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 did:
+ *                   type: string
+ *       500:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/polls/:poll/send', async (req, res) => {
+    try {
+        const did = await keymaster.sendPoll(req.params.poll);
+        res.json({ did });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /polls/{poll}/vote:
  *   post:
  *     summary: Cast a vote in a poll.

@@ -936,6 +936,16 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async sendPoll(pollId: string): Promise<string> {
+        try {
+            const response = await axios.post(`${this.API}/polls/${pollId}/send`);
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async sendBallot(ballotDid: string, pollId: string): Promise<string> {
         try {
             const response = await axios.post(`${this.API}/polls/ballot/send`, { ballot: ballotDid, poll: pollId });

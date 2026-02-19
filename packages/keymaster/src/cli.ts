@@ -1254,6 +1254,19 @@ program
     });
 
 program
+    .command('send-poll <poll>')
+    .description('Send a poll notice to all voters')
+    .action(async (poll) => {
+        try {
+            const did = await keymaster.sendPoll(poll);
+            console.log(did);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('send-ballot <ballot> <poll>')
     .description('Send a ballot to the poll owner')
     .action(async (ballot, poll) => {

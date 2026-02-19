@@ -2852,6 +2852,31 @@ export default class Keymaster implements KeymasterInterface {
         return await this.encryptJSON(ballot, owner, options);
     }
 
+    async sendPoll(pollId: string): Promise<string> {
+        const didPoll = await this.lookupDID(pollId);
+        const config = await this.getPoll(didPoll);
+
+        if (!config) {
+            throw new InvalidParameterError('pollId');
+        }
+
+        const members = await this.listVaultMembers(didPoll);
+        const voters = Object.keys(members);
+
+        if (voters.length === 0) {
+            throw new KeymasterError('No poll voters found');
+        }
+
+        const registry = this.ephemeralRegistry;
+        const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const message: NoticeMessage = {
+            to: voters,
+            dids: [didPoll],
+        };
+
+        return this.createNotice(message, { registry, validUntil });
+    }
+
     async sendBallot(ballotDid: string, pollId: string): Promise<string> {
         const didPoll = await this.lookupDID(pollId);
         const config = await this.getPoll(didPoll);

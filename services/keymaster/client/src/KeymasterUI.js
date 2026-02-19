@@ -2568,25 +2568,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return;
         }
         try {
-            const membersMap = await keymaster.listPollVoters(createdPollDid);
-            const members = Object.keys(membersMap);
-            if (members.length === 0) {
-                showError("No poll voters found");
-                return;
-            }
-            const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-            const message = { to: members, dids: [createdPollDid] };
-            const notice = await keymaster.createNotice(message, {
-                registry: "hyperswarm",
-                validUntil,
-            });
-            if (notice) {
-                showSuccess("Poll notice sent");
-                setPollNoticeSent(true);
-                sessionStorage.removeItem('createdPollDid');
-            } else {
-                showError("Failed to send poll");
-            }
+            await keymaster.sendPoll(createdPollDid);
+            showSuccess("Poll notice sent");
+            setPollNoticeSent(true);
+            sessionStorage.removeItem('createdPollDid');
         } catch (e) {
             showError(e);
         }
