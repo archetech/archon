@@ -871,7 +871,7 @@ export default class KeymasterClient implements KeymasterInterface {
         options?: VaultOptions
     ): Promise<string> {
         try {
-            const response = await axios.post(`${this.API}/polls`, { config, options });
+            const response = await axios.post(`${this.API}/polls`, { poll: config, options });
             return response.data.did;
         }
         catch (error) {
@@ -892,7 +892,7 @@ export default class KeymasterClient implements KeymasterInterface {
     async testPoll(id: string): Promise<boolean> {
         try {
             const response = await axios.get(`${this.API}/polls/${id}/test`);
-            return response.data.ok;
+            return response.data.test;
         }
         catch (error) {
             throwError(error);

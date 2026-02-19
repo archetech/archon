@@ -166,7 +166,7 @@ export interface ViewPollResult {
     isEligible: boolean;
     voteExpired: boolean;
     hasVoted: boolean;
-    voters?: string[];
+    ballots?: string[];
     results?: PollResults;
 }
 

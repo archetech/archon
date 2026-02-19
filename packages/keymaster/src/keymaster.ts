@@ -2671,7 +2671,7 @@ export default class Keymaster implements KeymasterInterface {
 
         let isEligible = false;
         let hasVoted = false;
-        const voters: string[] = [];
+        const ballots: string[] = [];
 
         try {
             const vault = await this.getVault(pollId);
@@ -2681,12 +2681,12 @@ export default class Keymaster implements KeymasterInterface {
             const items = await this.listVaultItems(pollId);
             for (const itemName of Object.keys(items)) {
                 if (itemName !== PollItems.POLL && itemName !== PollItems.RESULTS) {
-                    voters.push(itemName);
+                    ballots.push(itemName);
                 }
             }
 
             const myBallotKey = this.generateBallotKey(vault, id.did);
-            hasVoted = voters.includes(myBallotKey);
+            hasVoted = ballots.includes(myBallotKey);
         }
         catch {
             isEligible = false;
@@ -2700,7 +2700,7 @@ export default class Keymaster implements KeymasterInterface {
             isEligible,
             voteExpired,
             hasVoted,
-            voters,
+            ballots,
         };
 
         if (isOwner) {
@@ -2828,7 +2828,7 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         if (!isEligible) {
-            throw new InvalidParameterError('voter not in roster');
+            throw new InvalidParameterError('voter is not a poll member');
         }
 
         const expired = Date.now() > new Date(config.deadline).getTime();
@@ -2854,6 +2854,12 @@ export default class Keymaster implements KeymasterInterface {
 
     async sendBallot(ballotDid: string, pollId: string): Promise<string> {
         const didPoll = await this.lookupDID(pollId);
+        const config = await this.getPoll(didPoll);
+
+        if (!config) {
+            throw new InvalidParameterError('pollId is not a valid poll');
+        }
+
         const pollDoc = await this.resolveDID(didPoll);
         const ownerDid = pollDoc.didDocument?.controller;
 
@@ -2939,7 +2945,7 @@ export default class Keymaster implements KeymasterInterface {
         const isMember = !!members[didVoter] || didVoter === id.did;
 
         if (!isMember) {
-            throw new InvalidParameterError('voter not in roster');
+            throw new InvalidParameterError('voter is not a poll member');
         }
 
         const expired = Date.now() > new Date(config.deadline).getTime();

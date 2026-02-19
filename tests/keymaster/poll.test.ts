@@ -510,7 +510,8 @@ describe('sendBallot', () => {
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
-            expect(error.message).toBeDefined();
+            expect(error).not.toBeInstanceOf(ExpectedExceptionError);
+            expect(error.message).toBe('Invalid parameter: pollId is not a valid poll');
         }
     });
 });
