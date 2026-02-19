@@ -1189,11 +1189,11 @@ program
     });
 
 program
-    .command('add-poll-member <poll> <member>')
+    .command('add-poll-voter <poll> <member>')
     .description('Add a voter to the poll')
     .action(async (poll, member) => {
         try {
-            const ok = await keymaster.addPollMember(poll, member);
+            const ok = await keymaster.addPollVoter(poll, member);
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error: any) {
@@ -1202,11 +1202,11 @@ program
     });
 
 program
-    .command('remove-poll-member <poll> <member>')
+    .command('remove-poll-voter <poll> <member>')
     .description('Remove a voter from the poll')
     .action(async (poll, member) => {
         try {
-            const ok = await keymaster.removePollMember(poll, member);
+            const ok = await keymaster.removePollVoter(poll, member);
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error: any) {
@@ -1215,11 +1215,11 @@ program
     });
 
 program
-    .command('list-poll-members <poll>')
+    .command('list-poll-voters <poll>')
     .description('List eligible voters in the poll')
     .action(async (poll) => {
         try {
-            const members = await keymaster.listPollMembers(poll);
+            const members = await keymaster.listPollVoters(poll);
             console.log(JSON.stringify(members, null, 4));
         }
         catch (error: any) {

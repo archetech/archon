@@ -4571,16 +4571,10 @@
                     "template": {
                       "type": "object",
                       "properties": {
-                        "type": {
-                          "type": "string"
-                        },
                         "version": {
                           "type": "integer"
                         },
                         "description": {
-                          "type": "string"
-                        },
-                        "roster": {
                           "type": "string"
                         },
                         "options": {
@@ -4669,7 +4663,7 @@
         }
       },
       "post": {
-        "summary": "Create a new poll.",
+        "summary": "Create a new poll (backed by a vault).",
         "requestBody": {
           "required": true,
           "content": {
@@ -4679,28 +4673,16 @@
                 "properties": {
                   "poll": {
                     "type": "object",
-                    "description": "The poll definition containing the required fields.",
+                    "description": "The poll configuration.",
                     "properties": {
-                      "type": {
-                        "type": "string",
-                        "enum": [
-                          "poll"
-                        ],
-                        "default": "poll",
-                        "description": "Must be \"poll\"."
-                      },
                       "version": {
                         "type": "integer",
-                        "default": 1,
-                        "description": "Must be 1 (only version 1 is supported)."
+                        "default": 2,
+                        "description": "Must be 2."
                       },
                       "description": {
                         "type": "string",
                         "description": "A short description or question for the poll."
-                      },
-                      "roster": {
-                        "type": "string",
-                        "description": "The DID or name of a group defining who is eligible to vote."
                       },
                       "options": {
                         "type": "array",
@@ -4718,17 +4700,15 @@
                       }
                     },
                     "required": [
-                      "type",
                       "version",
                       "description",
-                      "roster",
                       "options",
                       "deadline"
                     ]
                   },
                   "options": {
                     "type": "object",
-                    "description": "Additional parameters for poll creation.",
+                    "description": "Vault creation options.",
                     "properties": {
                       "registry": {
                         "type": "string",
@@ -4737,27 +4717,7 @@
                       "validUntil": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Expiration timestamp for the poll DID itself (not the poll’s internal deadline)."
-                      },
-                      "retries": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Number of times to retry poll creation if it fails initially."
-                      },
-                      "delay": {
-                        "type": "integer",
-                        "default": 1000,
-                        "description": "Delay in milliseconds between retries."
-                      },
-                      "encryptForSender": {
-                        "type": "boolean",
-                        "default": true,
-                        "description": "Include an encrypted copy for the poll creator if encryption is used."
-                      },
-                      "includeHash": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Whether to embed a hash of the poll in the DID asset."
+                        "description": "Expiration timestamp for the poll DID."
                       },
                       "controller": {
                         "type": "string",
@@ -4780,6 +4740,130 @@
                   "properties": {
                     "did": {
                       "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/polls/ballot/send": {
+      "post": {
+        "summary": "Send a ballot to the poll owner via notice.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ballot": {
+                    "type": "string",
+                    "description": "The DID of the ballot to send."
+                  },
+                  "poll": {
+                    "type": "string",
+                    "description": "The DID of the poll."
+                  }
+                },
+                "required": [
+                  "ballot",
+                  "poll"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The DID of the notice sent to the poll owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "did": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/polls/ballot/{did}": {
+      "get": {
+        "summary": "View ballot details.",
+        "description": "Returns ballot details. The poll owner can see the vote; others see only metadata.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "did",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The DID of the ballot."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ballot details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ballot": {
+                      "type": "object",
+                      "properties": {
+                        "poll": {
+                          "type": "string"
+                        },
+                        "voter": {
+                          "type": "string"
+                        },
+                        "vote": {
+                          "type": "integer"
+                        },
+                        "option": {
+                          "type": "string"
+                        }
+                      }
                     }
                   }
                 }
@@ -4828,7 +4912,7 @@
                   "properties": {
                     "poll": {
                       "type": "object",
-                      "description": "The poll data (type, version, options, roster, ballots, etc.)."
+                      "description": "The poll config (type, version, description, options, deadline)."
                     }
                   }
                 }
@@ -4954,7 +5038,7 @@
     "/polls/{poll}/vote": {
       "post": {
         "summary": "Cast a vote in a poll.",
-        "description": "Casts a vote in the specified poll. The vote is recorded as a ballot DID, which should be submitted to the poll owner.\n",
+        "description": "Casts a vote in the specified poll. The ballot is encrypted for the poll owner only.\n",
         "parameters": [
           {
             "in": "path",
@@ -4993,28 +5077,7 @@
                       "validUntil": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Expiration for the ballot DID, if ephemeral."
-                      },
-                      "retries": {
-                        "type": "integer",
-                        "default": 0
-                      },
-                      "delay": {
-                        "type": "integer",
-                        "default": 1000
-                      },
-                      "encryptForSender": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Whether to store an encrypted copy for the voter. Typically false for a secret ballot."
-                      },
-                      "includeHash": {
-                        "type": "boolean",
-                        "default": false
-                      },
-                      "controller": {
-                        "type": "string",
-                        "description": "Which ID or DID to assign as the ballot’s controller. Defaults to the poll's owner, but usually not changed here."
+                        "description": "Expiration for the ballot DID."
                       }
                     }
                   }
@@ -5028,7 +5091,7 @@
         },
         "responses": {
           "200": {
-            "description": "The DID representing the newly created ballot (to be submitted to the poll owner).",
+            "description": "The DID representing the newly created ballot (to be sent to the poll owner).",
             "content": {
               "application/json": {
                 "schema": {
@@ -5118,7 +5181,7 @@
     },
     "/polls/{poll}/publish": {
       "post": {
-        "summary": "Publish final poll results to the poll’s DID Document.",
+        "summary": "Publish final poll results to the poll vault.",
         "parameters": [
           {
             "in": "path",
@@ -5190,7 +5253,7 @@
     },
     "/polls/{poll}/unpublish": {
       "post": {
-        "summary": "Remove previously published poll results from the poll's DID Document.",
+        "summary": "Remove previously published poll results from the poll vault.",
         "parameters": [
           {
             "in": "path",
@@ -5231,6 +5294,176 @@
           },
           "500": {
             "description": "Internal server error or invalid poll ownership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/polls/{poll}/voters": {
+      "post": {
+        "summary": "Add a voter to a poll.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "poll",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The DID or name of the poll."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "memberId": {
+                    "type": "string",
+                    "description": "The DID of the voter to add."
+                  }
+                },
+                "required": [
+                  "memberId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Indicates whether the voter was successfully added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List all voters of a poll.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "poll",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The DID or name of the poll."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An object containing all voter DIDs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "voters": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/polls/{poll}/voters/{voter}": {
+      "delete": {
+        "summary": "Remove a voter from a poll.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "poll",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The DID or name of the poll."
+          },
+          {
+            "in": "path",
+            "name": "voter",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The DID of the voter to remove."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Indicates whether the voter was successfully removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {

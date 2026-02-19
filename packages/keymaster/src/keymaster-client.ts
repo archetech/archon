@@ -990,9 +990,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async addPollMember(pollId: string, memberId: string): Promise<boolean> {
+    async addPollVoter(pollId: string, memberId: string): Promise<boolean> {
         try {
-            const response = await axios.post(`${this.API}/polls/${pollId}/members`, { member: memberId });
+            const response = await axios.post(`${this.API}/polls/${pollId}/voters`, { memberId });
             return response.data.ok;
         }
         catch (error) {
@@ -1000,9 +1000,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async removePollMember(pollId: string, memberId: string): Promise<boolean> {
+    async removePollVoter(pollId: string, memberId: string): Promise<boolean> {
         try {
-            const response = await axios.delete(`${this.API}/polls/${pollId}/members/${memberId}`);
+            const response = await axios.delete(`${this.API}/polls/${pollId}/voters/${memberId}`);
             return response.data.ok;
         }
         catch (error) {
@@ -1010,10 +1010,10 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async listPollMembers(pollId: string): Promise<Record<string, any>> {
+    async listPollVoters(pollId: string): Promise<Record<string, any>> {
         try {
-            const response = await axios.get(`${this.API}/polls/${pollId}/members`);
-            return response.data.members;
+            const response = await axios.get(`${this.API}/polls/${pollId}/voters`);
+            return response.data.voters;
         }
         catch (error) {
             throwError(error);

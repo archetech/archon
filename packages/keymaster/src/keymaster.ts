@@ -2625,7 +2625,7 @@ export default class Keymaster implements KeymasterInterface {
         return polls;
     }
 
-    async addPollMember(pollId: string, memberId: string): Promise<boolean> {
+    async addPollVoter(pollId: string, memberId: string): Promise<boolean> {
         const config = await this.getPoll(pollId);
         if (!config) {
             throw new InvalidParameterError('pollId');
@@ -2634,7 +2634,7 @@ export default class Keymaster implements KeymasterInterface {
         return this.addVaultMember(pollId, memberId);
     }
 
-    async removePollMember(pollId: string, memberId: string): Promise<boolean> {
+    async removePollVoter(pollId: string, memberId: string): Promise<boolean> {
         const config = await this.getPoll(pollId);
         if (!config) {
             throw new InvalidParameterError('pollId');
@@ -2643,7 +2643,7 @@ export default class Keymaster implements KeymasterInterface {
         return this.removeVaultMember(pollId, memberId);
     }
 
-    async listPollMembers(pollId: string): Promise<Record<string, any>> {
+    async listPollVoters(pollId: string): Promise<Record<string, any>> {
         const config = await this.getPoll(pollId);
         if (!config) {
             throw new InvalidParameterError('pollId');

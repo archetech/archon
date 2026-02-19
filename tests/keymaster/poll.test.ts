@@ -237,17 +237,17 @@ describe('getPoll', () => {
     });
 });
 
-describe('addPollMember', () => {
-    it('should add a member to the poll', async () => {
+describe('addPollVoter', () => {
+    it('should add a voter to the poll', async () => {
         await owner.createId('Bob');
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
 
-        const ok = await owner.addPollMember(pollDid, aliceDid);
+        const ok = await owner.addPollVoter(pollDid, aliceDid);
         expect(ok).toBe(true);
 
-        const members = await owner.listPollMembers(pollDid);
+        const members = await owner.listPollVoters(pollDid);
         expect(members[aliceDid]).toBeDefined();
     });
 
@@ -255,7 +255,7 @@ describe('addPollMember', () => {
         const bobDid = await owner.createId('Bob');
 
         try {
-            await owner.addPollMember(bobDid, bobDid);
+            await owner.addPollVoter(bobDid, bobDid);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -264,18 +264,18 @@ describe('addPollMember', () => {
     });
 });
 
-describe('removePollMember', () => {
-    it('should remove a member from the poll', async () => {
+describe('removePollVoter', () => {
+    it('should remove a voter from the poll', async () => {
         await owner.createId('Bob');
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
 
-        await owner.addPollMember(pollDid, aliceDid);
-        const ok = await owner.removePollMember(pollDid, aliceDid);
+        await owner.addPollVoter(pollDid, aliceDid);
+        const ok = await owner.removePollVoter(pollDid, aliceDid);
         expect(ok).toBe(true);
 
-        const members = await owner.listPollMembers(pollDid);
+        const members = await owner.listPollVoters(pollDid);
         expect(members[aliceDid]).toBeUndefined();
     });
 
@@ -283,7 +283,7 @@ describe('removePollMember', () => {
         const bobDid = await owner.createId('Bob');
 
         try {
-            await owner.removePollMember(bobDid, bobDid);
+            await owner.removePollVoter(bobDid, bobDid);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -292,25 +292,25 @@ describe('removePollMember', () => {
     });
 });
 
-describe('listPollMembers', () => {
-    it('should list all poll members', async () => {
+describe('listPollVoters', () => {
+    it('should list all poll voters', async () => {
         await owner.createId('Bob');
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
 
-        await owner.addPollMember(pollDid, aliceDid);
-        const members = await owner.listPollMembers(pollDid);
+        await owner.addPollVoter(pollDid, aliceDid);
+        const members = await owner.listPollVoters(pollDid);
 
         expect(Object.keys(members)).toContain(aliceDid);
     });
 
-    it('should return empty members for a new poll', async () => {
+    it('should return empty voters for a new poll', async () => {
         await owner.createId('Bob');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
 
-        const members = await owner.listPollMembers(pollDid);
+        const members = await owner.listPollVoters(pollDid);
         expect(Object.keys(members).length).toBe(0);
     });
 
@@ -318,7 +318,7 @@ describe('listPollMembers', () => {
         const bobDid = await owner.createId('Bob');
 
         try {
-            await owner.listPollMembers(bobDid);
+            await owner.listPollVoters(bobDid);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -350,12 +350,12 @@ describe('viewPoll', () => {
         expect(view.results!.final).toBe(false);
     });
 
-    it('should show voter as eligible when added as member', async () => {
+    it('should show voter as eligible when added as voter', async () => {
         await owner.createId('Bob');
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
-        await owner.addPollMember(pollDid, aliceDid);
+        await owner.addPollVoter(pollDid, aliceDid);
 
         const view = await voter.viewPoll(pollDid);
 
@@ -364,7 +364,7 @@ describe('viewPoll', () => {
         expect(view.hasVoted).toBe(false);
     });
 
-    it('should throw when non-member tries to view poll', async () => {
+    it('should throw when non-voter tries to view poll', async () => {
         await owner.createId('Bob');
         await voter.createId('Alice');
         const template = await owner.pollTemplate();
@@ -407,12 +407,12 @@ describe('votePoll', () => {
         });
     });
 
-    it('should return a valid ballot for a vault member', async () => {
+    it('should return a valid ballot for a poll voter', async () => {
         await owner.createId('Bob');
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
-        await owner.addPollMember(pollDid, aliceDid);
+        await owner.addPollVoter(pollDid, aliceDid);
 
         const ballotDid = await voter.votePoll(pollDid, 2);
 
@@ -483,7 +483,7 @@ describe('sendBallot', () => {
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
-        await owner.addPollMember(pollDid, aliceDid);
+        await owner.addPollVoter(pollDid, aliceDid);
 
         const ballotDid = await voter.votePoll(pollDid, 1);
         const noticeDid = await voter.sendBallot(ballotDid, pollDid);
@@ -510,7 +510,7 @@ describe('viewBallot', () => {
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
-        await owner.addPollMember(pollDid, aliceDid);
+        await owner.addPollVoter(pollDid, aliceDid);
 
         const ballotDid = await voter.votePoll(pollDid, 2);
         const result = await owner.viewBallot(ballotDid);
@@ -526,7 +526,7 @@ describe('viewBallot', () => {
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
-        await owner.addPollMember(pollDid, aliceDid);
+        await owner.addPollVoter(pollDid, aliceDid);
 
         const ballotDid = await voter.votePoll(pollDid, 1);
 
@@ -551,12 +551,12 @@ describe('updatePoll', () => {
         expect(ok).toBe(true);
     });
 
-    it('should update poll with ballot from a vault member', async () => {
+    it('should update poll with ballot from a poll voter', async () => {
         await owner.createId('Bob');
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
-        await owner.addPollMember(pollDid, aliceDid);
+        await owner.addPollVoter(pollDid, aliceDid);
 
         const ballotDid = await voter.votePoll(pollDid, 2);
         const ok = await owner.updatePoll(ballotDid);
@@ -673,7 +673,7 @@ describe('publishPoll', () => {
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
-        await owner.addPollMember(pollDid, aliceDid);
+        await owner.addPollVoter(pollDid, aliceDid);
 
         const bobBallot = await owner.votePoll(pollDid, 1);
         await owner.updatePoll(bobBallot);
@@ -713,7 +713,7 @@ describe('unpublishPoll', () => {
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
-        await owner.addPollMember(pollDid, aliceDid);
+        await owner.addPollVoter(pollDid, aliceDid);
 
         const ballotDid = await owner.votePoll(pollDid, 1);
         await owner.updatePoll(ballotDid);

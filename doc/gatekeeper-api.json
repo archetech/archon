@@ -515,6 +515,7 @@
     "/did/{did}": {
       "get": {
         "summary": "Resolve a DID Document",
+        "description": "Resolves a DID Document from the local database. If local resolution fails, falls back to a configurable universal resolver (default: https://dev.uniresolver.io). Set `ARCHON_GATEKEEPER_FALLBACK_URL` to override the resolver URL (empty string disables fallback). Set `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` to override the timeout in milliseconds (default: 5000).\n",
         "parameters": [
           {
             "in": "path",

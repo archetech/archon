@@ -2504,10 +2504,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return;
         }
         try {
-            const membersMap = await keymaster.listPollMembers(createdPollDid);
+            const membersMap = await keymaster.listPollVoters(createdPollDid);
             const members = Object.keys(membersMap);
             if (members.length === 0) {
-                showError("No poll members found");
+                showError("No poll voters found");
                 return;
             }
             const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();

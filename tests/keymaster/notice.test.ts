@@ -207,7 +207,7 @@ describe('importNotice', () => {
 
         const template = await keymaster.pollTemplate();
         const pollDID = await keymaster.createPoll(template);
-        await keymaster.addPollMember(pollDID, alice);
+        await keymaster.addPollVoter(pollDID, alice);
 
         const notice: NoticeMessage = {
             to: [alice],
@@ -234,7 +234,7 @@ describe('importNotice', () => {
 
         const template = await keymaster.pollTemplate();
         const pollDID = await keymaster.createPoll(template);
-        await keymaster.addPollMember(pollDID, alice);
+        await keymaster.addPollVoter(pollDID, alice);
 
         await keymaster.setCurrentId('Alice');
         const ballotDid = await keymaster.votePoll(

@@ -392,9 +392,9 @@ export interface KeymasterInterface {
     updatePoll(ballot: string): Promise<boolean>;
     publishPoll(pollId: string, options?: { reveal?: boolean }): Promise<boolean>;
     unpublishPoll(pollId: string): Promise<boolean>;
-    addPollMember(pollId: string, memberId: string): Promise<boolean>;
-    removePollMember(pollId: string, memberId: string): Promise<boolean>;
-    listPollMembers(pollId: string): Promise<Record<string, any>>;
+    addPollVoter(pollId: string, memberId: string): Promise<boolean>;
+    removePollVoter(pollId: string, memberId: string): Promise<boolean>;
+    listPollVoters(pollId: string): Promise<Record<string, any>>;
 
     // Images
     createImage(data: Buffer, options?: FileAssetOptions): Promise<string>;

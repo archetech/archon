@@ -62,7 +62,7 @@ function normalizePath(path: string): string {
         .replace(/\/credentials\/held\/[^/]+/g, '/credentials/held/:did')
         .replace(/\/credentials\/issued\/[^/]+/g, '/credentials/issued/:did')
         .replace(/\/assets\/[^/]+/g, '/assets/:id')
-        .replace(/\/polls\/[^/]+\/members\/[^/]+/g, '/polls/:poll/members/:member')
+        .replace(/\/polls\/[^/]+\/voters\/[^/]+/g, '/polls/:poll/voters/:voter')
         .replace(/\/polls\/ballot\/[^/]+/g, '/polls/ballot/:did')
         .replace(/\/polls\/[^/]+/g, '/polls/:poll')
         .replace(/\/images\/[^/]+/g, '/images/:id')
@@ -4549,9 +4549,9 @@ v1router.post('/polls/:poll/unpublish', async (req, res) => {
 
 /**
  * @swagger
- * /polls/{poll}/members:
+ * /polls/{poll}/voters:
  *   post:
- *     summary: Add a member to a poll.
+ *     summary: Add a voter to a poll.
  *     parameters:
  *       - in: path
  *         name: poll
@@ -4568,12 +4568,12 @@ v1router.post('/polls/:poll/unpublish', async (req, res) => {
  *             properties:
  *               memberId:
  *                 type: string
- *                 description: The DID of the member to add.
+ *                 description: The DID of the voter to add.
  *             required:
  *               - memberId
  *     responses:
  *       200:
- *         description: Indicates whether the member was successfully added.
+ *         description: Indicates whether the voter was successfully added.
  *         content:
  *           application/json:
  *             schema:
@@ -4591,10 +4591,10 @@ v1router.post('/polls/:poll/unpublish', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/polls/:poll/members', async (req, res) => {
+v1router.post('/polls/:poll/voters', async (req, res) => {
     try {
         const { memberId } = req.body;
-        const ok = await keymaster.addPollMember(req.params.poll, memberId);
+        const ok = await keymaster.addPollVoter(req.params.poll, memberId);
         res.json({ ok });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
@@ -4603,9 +4603,9 @@ v1router.post('/polls/:poll/members', async (req, res) => {
 
 /**
  * @swagger
- * /polls/{poll}/members/{member}:
+ * /polls/{poll}/voters/{voter}:
  *   delete:
- *     summary: Remove a member from a poll.
+ *     summary: Remove a voter from a poll.
  *     parameters:
  *       - in: path
  *         name: poll
@@ -4614,14 +4614,14 @@ v1router.post('/polls/:poll/members', async (req, res) => {
  *           type: string
  *         description: The DID or name of the poll.
  *       - in: path
- *         name: member
+ *         name: voter
  *         required: true
  *         schema:
  *           type: string
- *         description: The DID of the member to remove.
+ *         description: The DID of the voter to remove.
  *     responses:
  *       200:
- *         description: Indicates whether the member was successfully removed.
+ *         description: Indicates whether the voter was successfully removed.
  *         content:
  *           application/json:
  *             schema:
@@ -4639,9 +4639,9 @@ v1router.post('/polls/:poll/members', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.delete('/polls/:poll/members/:member', async (req, res) => {
+v1router.delete('/polls/:poll/voters/:voter', async (req, res) => {
     try {
-        const ok = await keymaster.removePollMember(req.params.poll, req.params.member);
+        const ok = await keymaster.removePollVoter(req.params.poll, req.params.voter);
         res.json({ ok });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
@@ -4650,9 +4650,9 @@ v1router.delete('/polls/:poll/members/:member', async (req, res) => {
 
 /**
  * @swagger
- * /polls/{poll}/members:
+ * /polls/{poll}/voters:
  *   get:
- *     summary: List all members of a poll.
+ *     summary: List all voters of a poll.
  *     parameters:
  *       - in: path
  *         name: poll
@@ -4662,13 +4662,13 @@ v1router.delete('/polls/:poll/members/:member', async (req, res) => {
  *         description: The DID or name of the poll.
  *     responses:
  *       200:
- *         description: An object containing all member DIDs.
+ *         description: An object containing all voter DIDs.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 members:
+ *                 voters:
  *                   type: object
  *       500:
  *         description: Internal server error.
@@ -4680,10 +4680,10 @@ v1router.delete('/polls/:poll/members/:member', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.get('/polls/:poll/members', async (req, res) => {
+v1router.get('/polls/:poll/voters', async (req, res) => {
     try {
-        const members = await keymaster.listPollMembers(req.params.poll);
-        res.json({ members });
+        const voters = await keymaster.listPollVoters(req.params.poll);
+        res.json({ voters });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
     }
