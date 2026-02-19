@@ -4,10 +4,12 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import CredentialForm from "./CredentialForm";
 import {
+    Autocomplete,
     Box,
     Button,
     Select,
     MenuItem,
+    TextField,
 } from "@mui/material";
 import DisplayDID from "./DisplayDID";
 
@@ -73,15 +75,11 @@ function IssueTab() {
             }
             try {
                 const credentialObject = JSON.parse(credentialString);
-                if (
-                    !credentialObject.type ||
-                    !Array.isArray(credentialObject.type) ||
-                    credentialObject.type.length < 2
-                ) {
+                if (!credentialObject.credentialSchema?.id) {
                     setError("Invalid credential object");
                     return;
                 }
-                const schemaDID = credentialObject.type[1];
+                const schemaDID = credentialObject.credentialSchema.id;
                 const schemaObject = await keymaster.getSchema(schemaDID);
                 setSchemaObject(schemaObject);
             } catch (error: any) {
@@ -98,25 +96,22 @@ function IssueTab() {
     return (
         <Box>
             <Box className="flex-row" sx={{ mb: 2 }}>
-                <Select
-                    style={{ width: "300px" }}
+                <Autocomplete
+                    freeSolo
+                    options={agentList || []}
                     value={credentialSubject}
-                    onChange={(event) =>
-                        setCredentialSubject(event.target.value)
-                    }
-                    displayEmpty
-                    variant="outlined"
-                    className="select-small-left"
-                >
-                    <MenuItem value="" disabled>
-                        Select subject
-                    </MenuItem>
-                    {agentList.map((alias, index) => (
-                        <MenuItem value={alias} key={index}>
-                            {alias}
-                        </MenuItem>
-                    ))}
-                </Select>
+                    onInputChange={(_e, value) => setCredentialSubject(value.trim())}
+                    style={{ width: "300px" }}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            label="Subject (name, DID, or URI)"
+                            size="small"
+                            variant="outlined"
+                            className="select-small-left"
+                        />
+                    )}
+                />
                 <Select
                     style={{ width: "300px" }}
                     value={credentialSchema}

@@ -202,7 +202,10 @@ const CredentialForm: React.FC<CredentialsFormProps> = ({
             return "";
         }
 
-        baseCredentialObj.credential = formCredential;
+        baseCredentialObj.credentialSubject = {
+            ...baseCredentialObj.credentialSubject,
+            ...formCredential,
+        };
         return JSON.stringify(baseCredentialObj, null, 2);
     };
 

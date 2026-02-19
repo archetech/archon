@@ -4388,22 +4388,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                 <Box>
                                     <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                         <Grid item>
-                                            <Select
-                                                style={{ width: '300px' }}
+                                            <Autocomplete
+                                                freeSolo
+                                                options={agentList || []}
                                                 value={credentialSubject}
-                                                fullWidth
-                                                displayEmpty
-                                                onChange={(event) => setCredentialSubject(event.target.value)}
-                                            >
-                                                <MenuItem value="" disabled>
-                                                    Select subject
-                                                </MenuItem>
-                                                {agentList.map((alias, index) => (
-                                                    <MenuItem value={alias} key={index}>
-                                                        {alias}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
+                                                onInputChange={(_e, value) => setCredentialSubject(value.trim())}
+                                                style={{ width: '300px' }}
+                                                renderInput={(params) => (
+                                                    <TextField
+                                                        {...params}
+                                                        label="Subject (name, DID, or URI)"
+                                                    />
+                                                )}
+                                            />
                                         </Grid>
                                         <Grid item>
                                             <Select
