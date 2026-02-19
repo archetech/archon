@@ -61,7 +61,7 @@ import {
     EcdsaJwkPublic,
 } from '@didcid/cipher/types';
 import { isValidDID } from '@didcid/ipfs/utils';
-import { decMnemonic, encMnemonic } from "./encryption.js";
+import { decryptWithPassphrase, encryptWithPassphrase } from '@didcid/cipher/passphrase';
 
 function hexToBase64url(hex: string): string {
     const bytes = Buffer.from(hex, 'hex');
@@ -216,7 +216,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('mnemonic');
         }
 
-        const mnemonicEnc = await encMnemonic(mnemonic, this.passphrase);
+        const mnemonicEnc = await encryptWithPassphrase(mnemonic, this.passphrase);
         const wallet: WalletFile = {
             version: 2,
             seed: { mnemonicEnc },
@@ -238,7 +238,7 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async getMnemonicForDerivation(wallet: WalletFile): Promise<string> {
-        return decMnemonic(wallet.seed.mnemonicEnc!, this.passphrase!);
+        return decryptWithPassphrase(wallet.seed.mnemonicEnc!, this.passphrase!);
     }
 
     async checkWallet(): Promise<CheckWalletResult> {
@@ -557,7 +557,7 @@ export default class Keymaster implements KeymasterInterface {
             if (isWalletFile(wallet)) {
                 const mnemonic = await this.decryptMnemonic();
                 // Backup might have a different mnemonic passphase so re-encrypt
-                wallet.seed.mnemonicEnc = await encMnemonic(mnemonic, this.passphrase);
+                wallet.seed.mnemonicEnc = await encryptWithPassphrase(mnemonic, this.passphrase);
             }
 
             await this.mutateWallet(async (current) => {
@@ -3709,10 +3709,11 @@ export default class Keymaster implements KeymasterInterface {
     private async decryptWalletFromStorage(stored: WalletEncFile): Promise<WalletFile> {
         let mnemonic: string;
         try {
-            mnemonic = await decMnemonic(stored.seed.mnemonicEnc!, this.passphrase);
+            mnemonic = await decryptWithPassphrase(stored.seed.mnemonicEnc!, this.passphrase);
         } catch (error: any) {
-            // OperationError is thrown by crypto.subtle.decrypt when the passphrase is wrong
-            if (error?.name === 'OperationError') {
+            const msg = error?.message || '';
+            // OperationError: Web Crypto API (legacy); 'invalid ghash tag': @noble/ciphers
+            if (error?.name === 'OperationError' || msg.includes('invalid ghash tag')) {
                 throw new KeymasterError('Incorrect passphrase.');
             }
             throw error;

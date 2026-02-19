@@ -11,7 +11,8 @@ const external = [
 const config = {
     input: {
         'cipher-node': 'dist/esm/cipher-node.js',
-        'cipher-web': 'dist/esm/cipher-web.js'
+        'cipher-web': 'dist/esm/cipher-web.js',
+        'passphrase': 'dist/esm/passphrase.js'
     },
     output: {
         dir: 'dist/cjs',

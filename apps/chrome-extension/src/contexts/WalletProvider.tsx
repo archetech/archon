@@ -18,7 +18,7 @@ import { StoredWallet, WalletBase } from "@didcid/keymaster/types";
 import PassphraseModal from "../modals/PassphraseModal";
 import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
-import { encMnemonic } from '@didcid/keymaster/encryption';
+import { encryptWithPassphrase } from '@didcid/cipher/passphrase';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 
 const gatekeeper = new GatekeeperClient();
@@ -277,7 +277,7 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
                 return;
             }
 
-            const mnemonicEnc = await encMnemonic(recoveredMnemonic, newPassphrase);
+            const mnemonicEnc = await encryptWithPassphrase(recoveredMnemonic, newPassphrase);
             const updated = {
                 version: base.version,
                 seed: { mnemonicEnc },

@@ -64,7 +64,7 @@ module.exports = {
             "@didcid/keymaster/wallet/typeGuards": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/typeGuards.js"),
             "@didcid/keymaster/types": path.resolve(__dirname, "../../packages/keymaster/dist/types/types.d.js"),
             "@didcid/keymaster/search": path.resolve(__dirname, "../../packages/keymaster/dist/esm/search-client.js"),
-            "@didcid/keymaster/encryption": path.resolve(__dirname, "../../packages/keymaster/dist/esm/encryption.js"),
+            "@didcid/cipher/passphrase": path.resolve(__dirname, "../../packages/cipher/dist/esm/passphrase.js"),
             "@didcid/keymaster": path.resolve(__dirname, "../../packages/keymaster/dist/esm/keymaster.js"),
         },
         fallback: {

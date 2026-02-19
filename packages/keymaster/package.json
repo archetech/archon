@@ -37,11 +37,6 @@
       "require": "./dist/cjs/keymaster-client.cjs",
       "types": "./dist/types/keymaster-client.d.ts"
     },
-    "./encryption": {
-      "import": "./dist/esm/encryption.js",
-      "require": "./dist/cjs/encryption.cjs",
-      "types": "./dist/types/encryption.d.ts"
-    },
     "./wallet/json": {
       "import": "./dist/esm/db/json.js",
       "require": "./dist/cjs/db/json.cjs",
@@ -100,9 +95,6 @@
     "*": {
       "client": [
         "./dist/types/keymaster-client.d.ts"
-      ],
-      "encryption": [
-        "./dist/types/encryption.d.ts"
       ],
       "wallet/json": [
         "./dist/types/db/json.d.ts"

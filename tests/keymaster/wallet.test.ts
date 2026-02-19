@@ -8,8 +8,7 @@ import { ExpectedExceptionError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import { TestHelper } from './helper.ts';
-import { disableSubtle } from './testUtils.ts';
-import { encMnemonic, decMnemonic } from '@didcid/keymaster/encryption';
+
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -699,32 +698,3 @@ describe('updateWallet', () => {
     });
 });
 
-describe('no WebCrypto subtle', () => {
-    let restore: () => void;
-
-    beforeAll(async () => {
-        restore = disableSubtle();
-    });
-
-    afterAll(async () => {
-        restore();
-    });
-
-    it('encMnemonic will throw without crypto subtle', async () => {
-        try {
-            await encMnemonic("", PASSPHRASE);
-            throw new ExpectedExceptionError();
-        } catch (error: any) {
-            expect(error.message).toBe('Web Cryptography API not available');
-        }
-    });
-
-    it('decMnemonic will throw without crypto subtle', async () => {
-        try {
-            await decMnemonic(MOCK_WALLET_V1_ENCRYPTED, PASSPHRASE);
-            throw new ExpectedExceptionError();
-        } catch (error: any) {
-            expect(error.message).toBe('Web Cryptography API not available');
-        }
-    });
-});

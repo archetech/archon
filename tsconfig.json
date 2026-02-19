@@ -61,8 +61,8 @@
       "@didcid/keymaster/types": [
         "packages/keymaster/src/types.ts"
       ],
-      "@didcid/keymaster/encryption": [
-        "packages/keymaster/src/encryption.ts"
+      "@didcid/cipher/passphrase": [
+        "packages/cipher/src/passphrase.ts"
       ],
       "@didcid/keymaster/search": [
         "packages/keymaster/src/search-client.ts"

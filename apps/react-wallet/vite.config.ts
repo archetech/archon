@@ -14,6 +14,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
+            "@didcid/cipher/passphrase": path.resolve(__dirname, "../../packages/cipher/dist/esm/passphrase.js"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),
             "@didcid/common/errors": path.resolve(__dirname, "../../packages/common/dist/esm/errors.js"),
             "@didcid/gatekeeper/client": path.resolve(__dirname, "../../packages/gatekeeper/dist/esm/gatekeeper-client.js"),
@@ -24,7 +25,7 @@ export default defineConfig({
             "@didcid/keymaster/wallet/typeGuards": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/typeGuards.js"),
             "@didcid/keymaster/types": path.resolve(__dirname, "../../packages/keymaster/dist/types/types.d.js"),
             "@didcid/keymaster/search": path.resolve(__dirname, "../../packages/keymaster/dist/esm/search-client.js"),
-            "@didcid/keymaster/encryption": path.resolve(__dirname, "../../packages/keymaster/dist/esm/encryption.js"),
+
             "@didcid/keymaster": path.resolve(__dirname, "../../packages/keymaster/dist/esm/keymaster.js"),
             buffer: 'buffer',
         }
