@@ -1170,11 +1170,11 @@ program
     });
 
 program
-    .command('vote-poll <poll> <vote> [spoil]')
-    .description('Vote in a poll')
-    .action(async (poll, vote, spoil) => {
+    .command('vote-poll <poll> <vote>')
+    .description('Vote in a poll (0 to spoil)')
+    .action(async (poll, vote) => {
         try {
-            const did = await keymaster.votePoll(poll, vote, spoil);
+            const did = await keymaster.votePoll(poll, parseInt(vote));
             console.log(did);
         }
         catch (error) {

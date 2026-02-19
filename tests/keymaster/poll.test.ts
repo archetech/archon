@@ -421,12 +421,12 @@ describe('votePoll', () => {
         expect(ballotDid).toBeDefined();
     });
 
-    it('should allow a spoiled ballot', async () => {
+    it('should allow a spoiled ballot with vote 0', async () => {
         await owner.createId('Bob');
         const template = await owner.pollTemplate();
         const pollDid = await owner.createPoll(template);
 
-        const ballotDid = await owner.votePoll(pollDid, 1, { spoil: true });
+        const ballotDid = await owner.votePoll(pollDid, 0);
         const ballot = await owner.decryptJSON(ballotDid);
 
         expect(ballot).toStrictEqual({

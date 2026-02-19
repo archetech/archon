@@ -2789,10 +2789,8 @@ export default class Keymaster implements KeymasterInterface {
     async votePoll(
         pollId: string,
         vote: number,
-        options: { spoil?: boolean; registry?: string; validUntil?: string } = {}
+        options: { registry?: string; validUntil?: string } = {}
     ): Promise<string> {
-        const { spoil = false } = options;
-
         const id = await this.fetchIdInfo();
         const didPoll = await this.lookupDID(pollId);
         const doc = await this.resolveDID(didPoll);
@@ -2834,26 +2832,16 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('poll has expired');
         }
 
-        let ballot;
+        const max = config.options.length;
 
-        if (spoil) {
-            ballot = {
-                poll: didPoll,
-                vote: 0,
-            };
+        if (!Number.isInteger(vote) || vote < 0 || vote > max) {
+            throw new InvalidParameterError('vote');
         }
-        else {
-            const max = config.options.length;
 
-            if (!Number.isInteger(vote) || vote < 1 || vote > max) {
-                throw new InvalidParameterError('vote');
-            }
-
-            ballot = {
-                poll: didPoll,
-                vote: vote,
-            };
-        }
+        const ballot = {
+            poll: didPoll,
+            vote: vote,
+        };
 
         // Encrypt for owner only (secret ballot)
         return await this.encryptJSON(ballot, owner, { ...options, encryptForSender: false });

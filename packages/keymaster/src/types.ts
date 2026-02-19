@@ -386,7 +386,7 @@ export interface KeymasterInterface {
     testPoll(id: string): Promise<boolean>;
     listPolls(owner?: string): Promise<string[]>;
     viewPoll(pollId: string): Promise<ViewPollResult>;
-    votePoll(pollId: string, vote: number, options?: { spoil?: boolean; registry?: string; validUntil?: string }): Promise<string>;
+    votePoll(pollId: string, vote: number, options?: { registry?: string; validUntil?: string }): Promise<string>;
     sendBallot(ballotDid: string, pollId: string): Promise<string>;
     viewBallot(ballotDid: string): Promise<ViewBallotResult>;
     updatePoll(ballot: string): Promise<boolean>;

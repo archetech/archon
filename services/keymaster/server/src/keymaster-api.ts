@@ -4346,15 +4346,11 @@ v1router.get('/polls/:poll/view', async (req, res) => {
  *             properties:
  *               vote:
  *                 type: integer
- *                 description: The numerical option index (1-based). Use 0 or set `spoil` in options to cast a spoiled ballot.
+ *                 description: The numerical option index (1-based). Use 0 to cast a spoiled ballot.
  *               options:
  *                 type: object
  *                 description: Additional vote parameters.
  *                 properties:
- *                   spoil:
- *                     type: boolean
- *                     default: false
- *                     description: If true, casts a spoiled ballot (vote=0).
  *                   registry:
  *                     type: string
  *                     description: Where to create the ballot DID (e.g., "local", "hyperswarm").

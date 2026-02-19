@@ -249,11 +249,10 @@ const PollsTab: React.FC = () => {
             return;
         }
         try {
-            const voteVal = selectedOptionIdx + 1;
+            const voteVal = spoil ? 0 : selectedOptionIdx + 1;
             const ballotDid = await keymaster.votePoll(
                 selectedPollDid,
                 voteVal,
-                spoil ? { spoil: true } : undefined
             );
             setLastBallotDid(ballotDid);
             setHasVoted(true);

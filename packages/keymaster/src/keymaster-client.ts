@@ -923,7 +923,6 @@ export default class KeymasterClient implements KeymasterInterface {
         pollId: string,
         vote: number,
         options?: {
-            spoil?: boolean;
             registry?: string;
             validUntil?: string
         }
