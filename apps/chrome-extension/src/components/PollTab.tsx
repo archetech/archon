@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from "react";
 import {
-    Autocomplete,
     Box,
     Button,
     IconButton,
@@ -30,7 +29,7 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
 import PollResultsModal from "../modals/PollResultsModal";
-import {NoticeMessage, Poll, PollResults} from "@didcid/keymaster/types";
+import {NoticeMessage, PollConfig, PollResults} from "@didcid/keymaster/types";
 import TextInputModal from "../modals/TextInputModal";
 import WarningModal from "../modals/WarningModal";
 import CopyResolveDID from "./CopyResolveDID";
@@ -45,7 +44,6 @@ const PollsTab: React.FC = () => {
     const {
         currentDID,
         currentId,
-        groupList,
         aliasList,
         pollList,
         registries,
@@ -57,7 +55,6 @@ const PollsTab: React.FC = () => {
     const [pollName, setPollName] = useState<string>("");
     const [description, setDescription] = useState<string>("");
     const [optionsStr, setOptionsStr] = useState<string>("yes, no, abstain");
-    const [rosterDid, setRosterDid] = useState<string>("");
     const [deadline, setDeadline] = useState<string>("");
     const [createdPollDid, setCreatedPollDid] = useState<string>("");
     const [selectedPollName, setSelectedPollName] = useState<string>("");
@@ -96,13 +93,8 @@ const PollsTab: React.FC = () => {
             for (const name of pollList) {
                 const did = aliasList[name];
                 try {
-                    const poll= await keymaster.getPoll(did);
-                    if (!poll) {
-                        map[name] = false;
-                        continue;
-                    }
-                    const group  = await keymaster.getGroup(poll.roster);
-                    map[name] = !!group?.members?.includes(currentDID);
+                    const poll = await keymaster.getPoll(did);
+                    map[name] = !!poll;
                 } catch {
                     map[name] = false;
                 }
@@ -143,18 +135,17 @@ const PollsTab: React.FC = () => {
         setPollName("");
         setDescription("");
         setOptionsStr("yes, no, abstain");
-        setRosterDid("");
         setDeadline("");
         setCreatedPollDid("");
         setPollNoticeSent(false);
     };
 
-    const buildPoll = async (): Promise<Poll | null> => {
+    const buildPoll = async (): Promise<PollConfig | null> => {
         if (!keymaster) {
             return null;
         }
 
-        const template: Poll = await keymaster.pollTemplate();
+        const template: PollConfig = await keymaster.pollTemplate();
 
         if (!pollName || !pollName.trim()) {
             setError("Poll name is required");
@@ -166,10 +157,6 @@ const PollsTab: React.FC = () => {
         }
         if (!description.trim()) {
             setError("Description is required");
-            return null;
-        }
-        if (!rosterDid.trim()) {
-            setError("Roster DID / name is required");
             return null;
         }
         if (!deadline) {
@@ -187,15 +174,12 @@ const PollsTab: React.FC = () => {
             return null;
         }
 
-        const roster = aliasList[rosterDid] ?? rosterDid;
-
         return {
             ...template,
             description: description.trim(),
-            roster,
             options,
             deadline: new Date(deadline).toISOString(),
-        } as Poll;
+        } as PollConfig;
     };
 
     const handleCreatePoll = async () => {
@@ -246,22 +230,12 @@ const PollsTab: React.FC = () => {
                     setPollController(didDoc.didDocument?.controller ?? "");
                 }
 
-                if (poll) {
-                    const group = await keymaster.getGroup(poll.roster);
-                    const eligible = !!group?.members?.includes(currentDID);
-                    setCanVote(eligible);
-                }
-
-                if (poll?.results) {
-                    setPollResults(poll.results);
+                const view = await keymaster.viewPoll(did);
+                setCanVote(view.isEligible);
+                setHasVoted(view.hasVoted);
+                if (view.results) {
+                    setPollResults(view.results);
                     setPollPublished(true);
-                }
-
-                if (currentDID && poll?.ballots && poll.ballots[currentDID]) {
-                    const ballotId = poll.ballots[currentDID].ballot;
-                    setLastBallotDid(ballotId);
-                    setHasVoted(true);
-                    setBallotSent(true);
                 }
             }
         } catch (error: any) {
@@ -298,22 +272,13 @@ const PollsTab: React.FC = () => {
     };
 
     async function handleSendBallot() {
-        if (!keymaster || !lastBallotDid || !pollController) {
+        if (!keymaster || !lastBallotDid || !selectedPollDid) {
             return;
         }
         try {
-            const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-            const message: NoticeMessage = { to: [pollController], dids: [lastBallotDid] };
-            const notice = await keymaster.createNotice(message, {
-                registry: "hyperswarm",
-                validUntil,
-            });
-            if (notice) {
-                setSuccess("Ballot sent");
-                setBallotSent(true);
-            } else {
-                setError("Failed to send ballot");
-            }
+            await keymaster.sendBallot(lastBallotDid, selectedPollDid);
+            setSuccess("Ballot sent");
+            setBallotSent(true);
         } catch (error: any) {
             setError(error);
         }
@@ -332,9 +297,9 @@ const PollsTab: React.FC = () => {
                 setSuccess("Poll unpublished");
             } else {
                 await keymaster.publishPoll(selectedPollDid);
-                const poll = await keymaster.getPoll(selectedPollDid);
-                if (poll?.results) {
-                    setPollResults(poll.results);
+                const view = await keymaster.viewPoll(selectedPollDid);
+                if (view.results) {
+                    setPollResults(view.results);
                 }
                 setPollPublished(true);
                 setSuccess("Poll published");
@@ -365,13 +330,14 @@ const PollsTab: React.FC = () => {
         }
 
         try {
-            const group = await keymaster.getGroup(aliasList[rosterDid] ?? rosterDid);
-            if (!group || group.members.length === 0) {
-                setError("Group not found or empty");
+            const membersMap = await keymaster.listPollMembers(createdPollDid);
+            const members = Object.keys(membersMap);
+            if (members.length === 0) {
+                setError("No poll members found");
                 return;
             }
             const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-            const message: NoticeMessage = { to: group.members, dids: [createdPollDid] };
+            const message: NoticeMessage = { to: members, dids: [createdPollDid] };
             const noticeDid = await keymaster.createNotice(message, {
                 registry: "hyperswarm",
                 validUntil,
@@ -491,21 +457,6 @@ const PollsTab: React.FC = () => {
                         helperText="Between 2 and 10 options"
                     />
 
-                    <Autocomplete
-                        freeSolo
-                        options={groupList}
-                        value={rosterDid}
-                        onInputChange={(_e, value) => setRosterDid(value.trim())}
-                        renderInput={(params) => (
-                            <TextField
-                                {...params}
-                                label="Group DID or Name"
-                                placeholder="did:test:... or friendly‑name"
-                                sx={{ mb: 2 }}
-                            />
-                        )}
-                    />
-
                     <TextField
                         fullWidth
                         type="datetime-local"
@@ -541,7 +492,7 @@ const PollsTab: React.FC = () => {
                                 borderTopLeftRadius: 0,
                                 borderBottomLeftRadius: 0,
                             }}
-                            disabled={!pollName || !description || !optionsStr || !rosterDid || !deadline}
+                            disabled={!pollName || !description || !optionsStr || !deadline}
                         >
                             Create
                         </Button>
@@ -551,7 +502,7 @@ const PollsTab: React.FC = () => {
                             color="secondary"
                             sx={{ height: 56, ml: 1 }}
                             onClick={handleSendPoll}
-                            disabled={!createdPollDid || pollNoticeSent || !rosterDid}
+                            disabled={!createdPollDid || pollNoticeSent}
                         >
                             Send
                         </Button>

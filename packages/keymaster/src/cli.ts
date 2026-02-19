@@ -1179,9 +1179,48 @@ program
     .action(async (file, options) => {
         try {
             const { alias, registry } = options;
-            const poll = JSON.parse(fs.readFileSync(file).toString());
-            const did = await keymaster.createPoll(poll, { alias, registry });
+            const config = JSON.parse(fs.readFileSync(file).toString());
+            const did = await keymaster.createPoll(config, { alias, registry });
             console.log(did);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('add-poll-member <poll> <member>')
+    .description('Add a voter to the poll')
+    .action(async (poll, member) => {
+        try {
+            const ok = await keymaster.addPollMember(poll, member);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('remove-poll-member <poll> <member>')
+    .description('Remove a voter from the poll')
+    .action(async (poll, member) => {
+        try {
+            const ok = await keymaster.removePollMember(poll, member);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('list-poll-members <poll>')
+    .description('List eligible voters in the poll')
+    .action(async (poll) => {
+        try {
+            const members = await keymaster.listPollMembers(poll);
+            console.log(JSON.stringify(members, null, 4));
         }
         catch (error: any) {
             console.error(error.error || error.message || error);
@@ -1208,6 +1247,32 @@ program
         try {
             const did = await keymaster.votePoll(poll, vote, spoil);
             console.log(did);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('send-ballot <ballot> <poll>')
+    .description('Send a ballot to the poll owner')
+    .action(async (ballot, poll) => {
+        try {
+            const did = await keymaster.sendBallot(ballot, poll);
+            console.log(did);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('view-ballot <ballot>')
+    .description('View ballot details')
+    .action(async (ballot) => {
+        try {
+            const result = await keymaster.viewBallot(ballot);
+            console.log(JSON.stringify(result, null, 4));
         }
         catch (error: any) {
             console.error(error.error || error.message || error);

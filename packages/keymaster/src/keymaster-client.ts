@@ -22,9 +22,10 @@ import {
     KeymasterClientOptions,
     KeymasterInterface,
     NoticeMessage,
-    Poll,
+    PollConfig,
     StoredWallet,
     VerifiableCredential,
+    ViewBallotResult,
     ViewPollResult,
     WaitUntilReadyOptions,
     WalletFile,
@@ -855,7 +856,7 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async pollTemplate(): Promise<Poll> {
+    async pollTemplate(): Promise<PollConfig> {
         try {
             const response = await axios.get(`${this.API}/templates/poll`);
             return response.data.template;
@@ -866,11 +867,11 @@ export default class KeymasterClient implements KeymasterInterface {
     }
 
     async createPoll(
-        poll: Poll,
-        options?: CreateAssetOptions
+        config: PollConfig,
+        options?: VaultOptions
     ): Promise<string> {
         try {
-            const response = await axios.post(`${this.API}/polls`, { poll, options });
+            const response = await axios.post(`${this.API}/polls`, { config, options });
             return response.data.did;
         }
         catch (error) {
@@ -878,10 +879,30 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    public async getPoll(pollId: string): Promise<Poll | null> {
+    public async getPoll(pollId: string): Promise<PollConfig | null> {
         try {
             const response = await axios.get(`${this.API}/polls/${pollId}`);
             return response.data.poll;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async testPoll(id: string): Promise<boolean> {
+        try {
+            const response = await axios.get(`${this.API}/polls/${id}/test`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listPolls(owner?: string): Promise<string[]> {
+        try {
+            const response = await axios.get(`${this.API}/polls`, { params: { owner } });
+            return response.data.polls;
         }
         catch (error) {
             throwError(error);
@@ -916,6 +937,26 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async sendBallot(ballotDid: string, pollId: string): Promise<string> {
+        try {
+            const response = await axios.post(`${this.API}/polls/ballot/send`, { ballot: ballotDid, poll: pollId });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async viewBallot(ballotDid: string): Promise<ViewBallotResult> {
+        try {
+            const response = await axios.get(`${this.API}/polls/ballot/${ballotDid}`);
+            return response.data.ballot;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async updatePoll(ballot: string): Promise<boolean> {
         try {
             const response = await axios.put(`${this.API}/polls/update`, { ballot });
@@ -943,6 +984,36 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await axios.post(`${this.API}/polls/${pollId}/unpublish`);
             return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addPollMember(pollId: string, memberId: string): Promise<boolean> {
+        try {
+            const response = await axios.post(`${this.API}/polls/${pollId}/members`, { member: memberId });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removePollMember(pollId: string, memberId: string): Promise<boolean> {
+        try {
+            const response = await axios.delete(`${this.API}/polls/${pollId}/members/${memberId}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listPollMembers(pollId: string): Promise<Record<string, any>> {
+        try {
+            const response = await axios.get(`${this.API}/polls/${pollId}/members`);
+            return response.data.members;
         }
         catch (error) {
             throwError(error);

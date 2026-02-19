@@ -39,9 +39,10 @@ import {
     KeymasterInterface,
     KeymasterOptions,
     NoticeMessage,
-    Poll,
+    PollConfig,
     PollResults,
     PossiblyProofed,
+    ViewBallotResult,
     StoredWallet,
     VerifiableCredential,
     ViewPollResult,
@@ -101,6 +102,11 @@ export enum NoticeTags {
     BALLOT = "ballot",
     POLL = "poll",
     CREDENTIAL = "credential",
+}
+
+export enum PollItems {
+    CONFIG = 'config',
+    RESULTS = 'results',
 }
 
 export default class Keymaster implements KeymasterInterface {
@@ -2524,63 +2530,45 @@ export default class Keymaster implements KeymasterInterface {
         return template;
     }
 
-    async pollTemplate(): Promise<Poll> {
+    async pollTemplate(): Promise<PollConfig> {
         const now = new Date();
         const nextWeek = new Date();
         nextWeek.setDate(now.getDate() + 7);
 
         return {
             type: 'poll',
-            version: 1,
+            version: 2,
             description: 'What is this poll about?',
-            roster: 'DID of the eligible voter group',
             options: ['yes', 'no', 'abstain'],
             deadline: nextWeek.toISOString(),
         };
     }
 
     async createPoll(
-        poll: Poll,
-        options: CreateAssetOptions = {}
+        config: PollConfig,
+        options: VaultOptions = {}
     ): Promise<string> {
-        if (poll.type !== 'poll') {
+        if (config.type !== 'poll') {
             throw new InvalidParameterError('poll');
         }
 
-        if (poll.version !== 1) {
+        if (config.version !== 2) {
             throw new InvalidParameterError('poll.version');
         }
 
-        if (!poll.description) {
+        if (!config.description) {
             throw new InvalidParameterError('poll.description');
         }
 
-        if (!poll.options || !Array.isArray(poll.options) || poll.options.length < 2 || poll.options.length > 10) {
+        if (!config.options || !Array.isArray(config.options) || config.options.length < 2 || config.options.length > 10) {
             throw new InvalidParameterError('poll.options');
         }
 
-        if (!poll.roster) {
-            // eslint-disable-next-line
-            throw new InvalidParameterError('poll.roster');
-        }
-
-        try {
-            const isValidGroup = await this.testGroup(poll.roster);
-
-            if (!isValidGroup) {
-                throw new InvalidParameterError('poll.roster');
-            }
-        }
-        catch {
-            throw new InvalidParameterError('poll.roster');
-        }
-
-        if (!poll.deadline) {
-            // eslint-disable-next-line
+        if (!config.deadline) {
             throw new InvalidParameterError('poll.deadline');
         }
 
-        const deadline = new Date(poll.deadline);
+        const deadline = new Date(config.deadline);
 
         if (isNaN(deadline.getTime())) {
             throw new InvalidParameterError('poll.deadline');
@@ -2590,32 +2578,43 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('poll.deadline');
         }
 
-        return this.createAsset({ poll }, options);
+        const vaultDid = await this.createVault(options);
+        const buffer = Buffer.from(JSON.stringify(config), 'utf-8');
+        await this.addVaultItem(vaultDid, PollItems.CONFIG, buffer);
+
+        return vaultDid;
     }
 
-    async getPoll(id: string): Promise<Poll | null> {
-        const asset = await this.resolveAsset(id);
-
-        // TEMP during did:cid, return old version poll
-        const castOldAsset = asset as Poll;
-        if (castOldAsset.options) {
-            return castOldAsset;
-        }
-
-        const castAsset = asset as { poll?: Poll };
-        if (!castAsset.poll) {
+    async getPoll(id: string): Promise<PollConfig | null> {
+        const isVault = await this.testVault(id);
+        if (!isVault) {
             return null;
         }
 
-        return castAsset.poll;
+        try {
+            const buffer = await this.getVaultItem(id, PollItems.CONFIG);
+            if (!buffer) {
+                return null;
+            }
+
+            const config = JSON.parse(buffer.toString('utf-8'));
+            if (config.type !== 'poll') {
+                return null;
+            }
+
+            return config as PollConfig;
+        }
+        catch {
+            return null;
+        }
     }
 
     async testPoll(id: string): Promise<boolean> {
         try {
-            const poll = await this.getPoll(id);
-            return poll !== null;
+            const config = await this.getPoll(id);
+            return config !== null;
         }
-        catch (error) {
+        catch {
             return false;
         }
     }
@@ -2635,86 +2634,165 @@ export default class Keymaster implements KeymasterInterface {
         return polls;
     }
 
-    async viewPoll(pollId: string): Promise<ViewPollResult> {
-        const id = await this.fetchIdInfo();
-        const poll = await this.getPoll(pollId);
-
-        if (!poll) {
+    async addPollMember(pollId: string, memberId: string): Promise<boolean> {
+        const config = await this.getPoll(pollId);
+        if (!config) {
             throw new InvalidParameterError('pollId');
         }
 
-        let hasVoted = false;
+        return this.addVaultMember(pollId, memberId);
+    }
 
-        if (poll.ballots) {
-            hasVoted = !!poll.ballots[id.did];
+    async removePollMember(pollId: string, memberId: string): Promise<boolean> {
+        const config = await this.getPoll(pollId);
+        if (!config) {
+            throw new InvalidParameterError('pollId');
         }
 
-        const voteExpired = Date.now() > new Date(poll.deadline).getTime();
-        const isEligible = await this.testGroup(poll.roster, id.did);
+        return this.removeVaultMember(pollId, memberId);
+    }
+
+    async listPollMembers(pollId: string): Promise<Record<string, any>> {
+        const config = await this.getPoll(pollId);
+        if (!config) {
+            throw new InvalidParameterError('pollId');
+        }
+
+        return this.listVaultMembers(pollId);
+    }
+
+    async viewPoll(pollId: string): Promise<ViewPollResult> {
+        const id = await this.fetchIdInfo();
+        const config = await this.getPoll(pollId);
+
+        if (!config) {
+            throw new InvalidParameterError('pollId');
+        }
+
         const doc = await this.resolveDID(pollId);
+        const isOwner = (doc.didDocument?.controller === id.did);
+        const voteExpired = Date.now() > new Date(config.deadline).getTime();
+
+        let isEligible = false;
+        let hasVoted = false;
+        const voters: string[] = [];
+
+        try {
+            const vault = await this.getVault(pollId);
+            const members = await this.listVaultMembers(pollId);
+            isEligible = isOwner || !!members[id.did];
+
+            const items = await this.listVaultItems(pollId);
+            for (const itemName of Object.keys(items)) {
+                if (itemName !== PollItems.CONFIG && itemName !== PollItems.RESULTS) {
+                    voters.push(itemName);
+                }
+            }
+
+            const myBallotKey = this.generateBallotKey(vault, id.did);
+            hasVoted = voters.includes(myBallotKey);
+        }
+        catch {
+            isEligible = false;
+        }
 
         const view: ViewPollResult = {
-            description: poll.description,
-            options: poll.options,
-            deadline: poll.deadline,
-            isOwner: (doc.didDocument?.controller === id.did),
-            isEligible: isEligible,
-            voteExpired: voteExpired,
-            hasVoted: hasVoted,
+            description: config.description,
+            options: config.options,
+            deadline: config.deadline,
+            isOwner,
+            isEligible,
+            voteExpired,
+            hasVoted,
+            voters,
         };
 
-        if (id.did === doc.didDocument?.controller) {
-            let voted = 0;
-
-            const results: PollResults = {
-                tally: [],
-                ballots: [],
-            }
-
-            results.tally.push({
-                vote: 0,
-                option: 'spoil',
-                count: 0,
-            });
-
-            for (let i = 0; i < poll.options.length; i++) {
-                results.tally.push({
-                    vote: i + 1,
-                    option: poll.options[i],
-                    count: 0,
-                });
-            }
-
-            for (let voter in poll.ballots) {
-                const ballot = poll.ballots[voter];
-                const decrypted = await this.decryptJSON(ballot.ballot);
-                const vote = (decrypted as { vote: number }).vote;
-                if (results.ballots) {
-                    results.ballots.push({
-                        ...ballot,
-                        voter,
-                        vote,
-                        option: poll.options[vote - 1],
-                    });
+        if (isOwner) {
+            view.results = await this.computePollResults(pollId, config);
+        }
+        else {
+            try {
+                const resultsBuffer = await this.getVaultItem(pollId, PollItems.RESULTS);
+                if (resultsBuffer) {
+                    view.results = JSON.parse(resultsBuffer.toString('utf-8'));
                 }
-                voted += 1;
-                results.tally[vote].count += 1;
             }
-
-            const roster = await this.getGroup(poll.roster);
-            const total = roster!.members.length;
-
-            results.votes = {
-                eligible: total,
-                received: voted,
-                pending: total - voted,
-            };
-            results.final = voteExpired || (voted === total);
-
-            view.results = results;
+            catch { }
         }
 
         return view;
+    }
+
+    private async computePollResults(pollId: string, config: PollConfig): Promise<PollResults> {
+        const vault = await this.getVault(pollId);
+        const members = await this.listVaultMembers(pollId);
+        const items = await this.listVaultItems(pollId);
+
+        const results: PollResults = {
+            tally: [],
+            ballots: [],
+        };
+
+        results.tally.push({ vote: 0, option: 'spoil', count: 0 });
+        for (let i = 0; i < config.options.length; i++) {
+            results.tally.push({ vote: i + 1, option: config.options[i], count: 0 });
+        }
+
+        // Build ballotKey → memberDID mapping
+        const keyToMember: Record<string, string> = {};
+        for (const memberDID of Object.keys(members)) {
+            const ballotKey = this.generateBallotKey(vault, memberDID);
+            keyToMember[ballotKey] = memberDID;
+        }
+
+        // Include owner in mapping
+        const id = await this.fetchIdInfo();
+        const ownerKey = this.generateBallotKey(vault, id.did);
+        keyToMember[ownerKey] = id.did;
+
+        let voted = 0;
+
+        for (const [itemName, itemMeta] of Object.entries(items)) {
+            if (itemName === PollItems.CONFIG || itemName === PollItems.RESULTS) {
+                continue;
+            }
+
+            const ballotBuffer = await this.getVaultItem(pollId, itemName);
+            if (!ballotBuffer) {
+                continue;
+            }
+
+            const ballotDid = ballotBuffer.toString('utf-8');
+            const decrypted = await this.decryptJSON(ballotDid) as { vote: number };
+            const vote = decrypted.vote;
+            const voterDID = keyToMember[itemName] || itemName;
+
+            if (results.ballots) {
+                results.ballots.push({
+                    voter: voterDID,
+                    vote,
+                    option: vote === 0 ? 'spoil' : config.options[vote - 1],
+                    received: (itemMeta as any).added || '',
+                });
+            }
+
+            voted += 1;
+            if (vote >= 0 && vote < results.tally.length) {
+                results.tally[vote].count += 1;
+            }
+        }
+
+        const total = Object.keys(members).length + 1; // +1 for owner
+        const voteExpired = Date.now() > new Date(config.deadline).getTime();
+
+        results.votes = {
+            eligible: total,
+            received: voted,
+            pending: total - voted,
+        };
+        results.final = voteExpired || (voted === total);
+
+        return results;
     }
 
     async votePoll(
@@ -2727,22 +2805,39 @@ export default class Keymaster implements KeymasterInterface {
         const id = await this.fetchIdInfo();
         const didPoll = await this.lookupDID(pollId);
         const doc = await this.resolveDID(didPoll);
-        const poll = await this.getPoll(pollId);
-        if (!poll) {
+        const config = await this.getPoll(pollId);
+
+        if (!config) {
             throw new InvalidParameterError('pollId');
         }
 
-        const eligible = await this.testGroup(poll.roster, id.did);
-        const expired = Date.now() > new Date(poll.deadline).getTime();
         const owner = doc.didDocument?.controller;
 
         if (!owner) {
-            throw new KeymasterError('owner mising from poll');
+            throw new KeymasterError('owner missing from poll');
         }
 
-        if (!eligible) {
+        // Check vault membership
+        let isEligible = false;
+        if (id.did === owner) {
+            isEligible = true;
+        }
+        else {
+            try {
+                const vault = await this.getVault(didPoll);
+                await this.decryptVault(vault);
+                isEligible = true;
+            }
+            catch {
+                isEligible = false;
+            }
+        }
+
+        if (!isEligible) {
             throw new InvalidParameterError('voter not in roster');
         }
+
+        const expired = Date.now() > new Date(config.deadline).getTime();
 
         if (expired) {
             throw new InvalidParameterError('poll has expired');
@@ -2757,7 +2852,7 @@ export default class Keymaster implements KeymasterInterface {
             };
         }
         else {
-            const max = poll.options.length;
+            const max = config.options.length;
 
             if (!Number.isInteger(vote) || vote < 1 || vote > max) {
                 throw new InvalidParameterError('vote');
@@ -2769,8 +2864,56 @@ export default class Keymaster implements KeymasterInterface {
             };
         }
 
-        // Encrypt for receiver only
+        // Encrypt for owner only (secret ballot)
         return await this.encryptJSON(ballot, owner, { ...options, encryptForSender: false });
+    }
+
+    async sendBallot(ballotDid: string, pollId: string): Promise<string> {
+        const didPoll = await this.lookupDID(pollId);
+        const pollDoc = await this.resolveDID(didPoll);
+        const ownerDid = pollDoc.didDocument?.controller;
+
+        if (!ownerDid) {
+            throw new KeymasterError('poll owner not found');
+        }
+
+        const registry = this.ephemeralRegistry;
+        const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const message: NoticeMessage = {
+            to: [ownerDid],
+            dids: [ballotDid],
+        };
+
+        return this.createNotice(message, { registry, validUntil });
+    }
+
+    async viewBallot(ballotDid: string): Promise<ViewBallotResult> {
+        const docBallot = await this.resolveDID(ballotDid);
+        const voter = docBallot.didDocument?.controller;
+
+        const result: ViewBallotResult = {
+            poll: '',
+            voter: voter || undefined,
+        };
+
+        try {
+            const data = await this.decryptJSON(ballotDid) as { poll: string; vote: number };
+            result.poll = data.poll;
+            result.vote = data.vote;
+
+            const config = await this.getPoll(data.poll);
+            if (config && data.vote > 0 && data.vote <= config.options.length) {
+                result.option = config.options[data.vote - 1];
+            }
+            else if (data.vote === 0) {
+                result.option = 'spoil';
+            }
+        }
+        catch {
+            // Caller cannot decrypt (not the owner) — return limited info
+        }
+
+        return result;
     }
 
     async updatePoll(ballot: string): Promise<boolean> {
@@ -2784,7 +2927,7 @@ export default class Keymaster implements KeymasterInterface {
         try {
             dataBallot = await this.decryptJSON(didBallot) as { poll: string; vote: number };
 
-            if (!dataBallot.poll || !dataBallot.vote) {
+            if (!dataBallot.poll || dataBallot.vote === undefined) {
                 throw new InvalidParameterError('ballot');
             }
         }
@@ -2795,9 +2938,9 @@ export default class Keymaster implements KeymasterInterface {
         const didPoll = dataBallot.poll;
         const docPoll = await this.resolveDID(didPoll);
         const didOwner = docPoll.didDocument!.controller!;
-        const poll = await this.getPoll(didPoll);
+        const config = await this.getPoll(didPoll);
 
-        if (!poll) {
+        if (!config) {
             throw new KeymasterError('Cannot find poll related to ballot');
         }
 
@@ -2805,35 +2948,34 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('only owner can update a poll');
         }
 
-        const eligible = await this.testGroup(poll.roster, didVoter);
+        // Check voter is a vault member
+        const vault = await this.getVault(didPoll);
+        const voterBallotKey = this.generateBallotKey(vault, didVoter);
+        const members = await this.listVaultMembers(didPoll);
+        const isMember = !!members[didVoter] || didVoter === id.did;
 
-        if (!eligible) {
+        if (!isMember) {
             throw new InvalidParameterError('voter not in roster');
         }
 
-        const expired = Date.now() > new Date(poll.deadline).getTime();
+        const expired = Date.now() > new Date(config.deadline).getTime();
 
         if (expired) {
             throw new InvalidParameterError('poll has expired');
         }
 
-        const max = poll.options.length;
+        const max = config.options.length;
         const vote = dataBallot.vote;
 
-        if (!vote || vote < 0 || vote > max) {
+        if (vote < 0 || vote > max) {
             throw new InvalidParameterError('ballot.vote');
         }
 
-        if (!poll.ballots) {
-            poll.ballots = {};
-        }
+        // Store ballot DID as vault item keyed by voter's ballot key
+        const buffer = Buffer.from(didBallot, 'utf-8');
+        await this.addVaultItem(didPoll, voterBallotKey, buffer);
 
-        poll.ballots[didVoter] = {
-            ballot: didBallot,
-            received: new Date().toISOString(),
-        };
-
-        return this.mergeData(didPoll, { poll });
+        return true;
     }
 
     async publishPoll(
@@ -2850,25 +2992,26 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('only owner can publish a poll');
         }
 
-        const view = await this.viewPoll(pollId);
+        const config = await this.getPoll(pollId);
 
-        if (!view.results?.final) {
-            throw new InvalidParameterError('poll not final');
-        }
-
-        if (!reveal && view.results.ballots) {
-            delete view.results.ballots;
-        }
-
-        const poll = await this.getPoll(pollId);
-
-        if (!poll) {
+        if (!config) {
             throw new InvalidParameterError(pollId);
         }
 
-        poll.results = view.results;
+        const results = await this.computePollResults(pollId, config);
 
-        return this.mergeData(pollId, { poll });
+        if (!results.final) {
+            throw new InvalidParameterError('poll not final');
+        }
+
+        if (!reveal) {
+            delete results.ballots;
+        }
+
+        const buffer = Buffer.from(JSON.stringify(results), 'utf-8');
+        await this.addVaultItem(pollId, PollItems.RESULTS, buffer);
+
+        return true;
     }
 
     async unpublishPoll(pollId: string): Promise<boolean> {
@@ -2880,15 +3023,13 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError(pollId);
         }
 
-        const poll = await this.getPoll(pollId);
+        const config = await this.getPoll(pollId);
 
-        if (!poll) {
+        if (!config) {
             throw new InvalidParameterError(pollId);
         }
 
-        delete poll.results;
-
-        return this.mergeData(pollId, { poll });
+        return this.removeVaultItem(pollId, PollItems.RESULTS);
     }
 
     async createVault(options: VaultOptions = {}): Promise<string> {
@@ -2939,6 +3080,10 @@ export default class Keymaster implements KeymasterInterface {
         catch (error) {
             return false;
         }
+    }
+
+    private generateBallotKey(vault: Vault, memberDID: string): string {
+        return this.generateSaltedId(vault, memberDID).slice(0, this.maxAliasLength);
     }
 
     private generateSaltedId(vault: Vault, memberDID: string): string {

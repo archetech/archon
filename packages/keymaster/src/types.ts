@@ -137,11 +137,10 @@ export interface PollResults {
         count: number;
     }>;
     ballots?: Array<{
-        ballot: string;
-        received: string;
         voter: string;
         vote: number;
         option: string;
+        received: string;
     }>;
     votes?: {
         eligible: number;
@@ -151,15 +150,12 @@ export interface PollResults {
     final?: boolean;
 }
 
-export interface Poll {
-    type: string;
-    version: number;
+export interface PollConfig {
+    type: 'poll';
+    version: 2;
     description: string;
-    roster: string;
     options: string[];
     deadline: string;
-    ballots?: Record<string, { ballot: string; received: string }>;
-    results?: PollResults;
 }
 
 export interface ViewPollResult {
@@ -170,7 +166,15 @@ export interface ViewPollResult {
     isEligible: boolean;
     voteExpired: boolean;
     hasVoted: boolean;
+    voters?: string[];
     results?: PollResults;
+}
+
+export interface ViewBallotResult {
+    poll: string;
+    voter?: string;
+    vote?: number;
+    option?: string;
 }
 
 export interface BinaryAsset {
@@ -377,14 +381,21 @@ export interface KeymasterInterface {
     verifyResponse(responseDid: string, options?: { retries?: number; delay?: number }): Promise<ChallengeResponse>;
 
     // Polls
-    pollTemplate(): Promise<Poll>;
-    createPoll(poll: Poll, options?: CreateAssetOptions): Promise<string>;
-    getPoll(pollId: string): Promise<Poll | null>;
+    pollTemplate(): Promise<PollConfig>;
+    createPoll(config: PollConfig, options?: VaultOptions): Promise<string>;
+    getPoll(pollId: string): Promise<PollConfig | null>;
+    testPoll(id: string): Promise<boolean>;
+    listPolls(owner?: string): Promise<string[]>;
     viewPoll(pollId: string): Promise<ViewPollResult>;
     votePoll(pollId: string, vote: number, options?: { spoil?: boolean; registry?: string; validUntil?: string }): Promise<string>;
+    sendBallot(ballotDid: string, pollId: string): Promise<string>;
+    viewBallot(ballotDid: string): Promise<ViewBallotResult>;
     updatePoll(ballot: string): Promise<boolean>;
     publishPoll(pollId: string, options?: { reveal?: boolean }): Promise<boolean>;
     unpublishPoll(pollId: string): Promise<boolean>;
+    addPollMember(pollId: string, memberId: string): Promise<boolean>;
+    removePollMember(pollId: string, memberId: string): Promise<boolean>;
+    listPollMembers(pollId: string): Promise<Record<string, any>>;
 
     // Images
     createImage(data: Buffer, options?: FileAssetOptions): Promise<string>;

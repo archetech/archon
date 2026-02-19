@@ -210,7 +210,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [pollName, setPollName] = useState("");
     const [description, setDescription] = useState("");
     const [optionsStr, setOptionsStr] = useState("yes, no, abstain");
-    const [rosterDid, setRosterDid] = useState("");
     const [deadline, setDeadline] = useState("");
     const [createdPollDid, setCreatedPollDid] = useState("");
     const [selectedPollName, setSelectedPollName] = useState("");
@@ -611,12 +610,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 }
 
                 if (data.vault) {
-                    vaultList.push(alias);
-                    continue;
-                }
-
-                if (data.poll) {
-                    pollList.push(alias);
+                    const isPoll = await keymaster.testPoll(alias);
+                    if (isPoll) {
+                        pollList.push(alias);
+                    } else {
+                        vaultList.push(alias);
+                    }
                     continue;
                 }
             }
@@ -2377,7 +2376,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setPollName("");
         setDescription("");
         setOptionsStr("yes, no, abstain");
-        setRosterDid("");
         setDeadline("");
         setCreatedPollDid("");
         setPollNoticeSent(false);
@@ -2409,8 +2407,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             for (const alias of names) {
                 try {
                     const doc = await keymaster.resolveDID(alias);
-                    if (doc?.didDocumentData?.poll) {
-                        polls.push(alias);
+                    if (doc?.didDocumentData?.vault) {
+                        const isPoll = await keymaster.testPoll(alias);
+                        if (isPoll) {
+                            polls.push(alias);
+                        }
                     }
                 } catch { }
             }
@@ -2458,10 +2459,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             showError("Description is required");
             return null;
         }
-        if (!rosterDid.trim()) {
-            showError("Roster DID / name is required");
-            return null;
-        }
         if (!deadline) {
             showError("Deadline is required");
             return null;
@@ -2476,12 +2473,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return null;
         }
 
-        const roster = aliasList[rosterDid] ?? rosterDid;
-
         return {
             ...template,
             description: description.trim(),
-            roster,
             options,
             deadline: new Date(deadline).toISOString(),
         };
@@ -2510,13 +2504,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return;
         }
         try {
-            const group = await keymaster.getGroup(aliasList[rosterDid] ?? rosterDid);
-            if (!group || group.members.length === 0) {
-                showError("Group not found or empty");
+            const membersMap = await keymaster.listPollMembers(createdPollDid);
+            const members = Object.keys(membersMap);
+            if (members.length === 0) {
+                showError("No poll members found");
                 return;
             }
             const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-            const message = { to: group.members, dids: [createdPollDid] };
+            const message = { to: members, dids: [createdPollDid] };
             const notice = await keymaster.createNotice(message, {
                 registry: "hyperswarm",
                 validUntil,
@@ -2559,22 +2554,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             const didDoc = await keymaster.resolveDID(did);
             setPollController(didDoc?.didDocument?.controller ?? "");
 
-            if (poll?.results) {
-                setPollResults(poll.results);
+            const view = await keymaster.viewPoll(did);
+            setCanVote(view.isEligible);
+            setHasVoted(view.hasVoted);
+            if (view.results) {
+                setPollResults(view.results);
                 setPollPublished(true);
-            }
-
-            if (poll) {
-                const group = await keymaster.getGroup(poll.roster);
-                const eligible = !!group?.members?.includes(currentDID);
-                setCanVote(eligible);
-            }
-
-            if (currentDID && poll?.ballots && poll.ballots[currentDID]) {
-                const ballotId = poll.ballots[currentDID].ballot;
-                setLastBallotDid(ballotId);
-                setHasVoted(true);
-                setBallotSent(true);
             }
         } catch (e) {
             showError(e);
@@ -2609,24 +2594,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     };
 
     const handleSendBallot = async () => {
-        if (!lastBallotDid || !pollController) {
+        if (!lastBallotDid || !selectedPollDid) {
             return;
         }
         try {
-            const validUntil = new Date(
-                Date.now() + 7 * 24 * 60 * 60 * 1000
-            ).toISOString();
-            const message = { to: [pollController], dids: [lastBallotDid] };
-            const notice = await keymaster.createNotice(message, {
-                registry: "hyperswarm",
-                validUntil,
-            });
-            if (notice) {
-                showSuccess("Ballot sent");
-                setBallotSent(true);
-            } else {
-                showError("Failed to send ballot");
-            }
+            await keymaster.sendBallot(lastBallotDid, selectedPollDid);
+            showSuccess("Ballot sent");
+            setBallotSent(true);
         } catch (e) {
             showError(e);
         }
@@ -2644,8 +2618,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 showSuccess("Poll unpublished");
             } else {
                 await keymaster.publishPoll(selectedPollDid);
-                const poll = await keymaster.getPoll(selectedPollDid);
-                if (poll?.results) setPollResults(poll.results);
+                const view = await keymaster.viewPoll(selectedPollDid);
+                if (view.results) setPollResults(view.results);
                 setPollPublished(true);
                 showSuccess("Poll published");
             }
@@ -2708,12 +2682,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 const did = aliasList[alias];
                 try {
                     const poll = await keymaster.getPoll(did);
-                    if (!poll) {
-                        map[alias] = false;
-                        continue;
-                    }
-                    const group = await keymaster.getGroup(poll.roster);
-                    map[alias] = !!group?.members?.includes(currentDID);
+                    map[alias] = !!poll;
                 } catch {
                     map[alias] = false;
                 }
@@ -4030,15 +3999,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         onChange={(e) => setOptionsStr(e.target.value)}
                                         sx={{ mb: 2 }}
                                         helperText="Between 2 and 10 options"
-                                    />
-                                    <Autocomplete
-                                        freeSolo
-                                        options={groupList}
-                                        value={rosterDid}
-                                        onInputChange={(_, v) => setRosterDid(v.trim())}
-                                        renderInput={(params) => (
-                                            <TextField {...params} label="Roster DID / name" sx={{ mb: 2 }} />
-                                        )}
                                     />
                                     <TextField
                                         fullWidth
