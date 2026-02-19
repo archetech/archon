@@ -40,7 +40,6 @@ describe('pollTemplate', () => {
         const template = await owner.pollTemplate();
 
         const expectedTemplate = {
-            type: 'poll',
             version: 2,
             description: 'What is this poll about?',
             options: ['yes', 'no', 'abstain'],
@@ -65,16 +64,6 @@ describe('createPoll', () => {
     it('should not create a poll from an invalid template', async () => {
         await owner.createId('Bob');
         const template = await owner.pollTemplate();
-
-        try {
-            const poll = JSON.parse(JSON.stringify(template));
-            poll.type = "wrong type";
-            await owner.createPoll(poll);
-            throw new ExpectedExceptionError();
-        }
-        catch (error: any) {
-            expect(error.message).toBe('Invalid parameter: poll');
-        }
 
         try {
             const poll = JSON.parse(JSON.stringify(template));

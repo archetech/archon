@@ -3938,8 +3938,6 @@ v1router.post('/assets/:id/clone', async (req, res) => {
  *                 template:
  *                   type: object
  *                   properties:
- *                     type:
- *                       type: string
  *                     version:
  *                       type: integer
  *                     description:
@@ -4030,11 +4028,6 @@ v1router.get('/polls', async (req, res) => {
  *                 type: object
  *                 description: The poll configuration.
  *                 properties:
- *                   type:
- *                     type: string
- *                     enum: [ "poll" ]
- *                     default: "poll"
- *                     description: Must be "poll".
  *                   version:
  *                     type: integer
  *                     default: 2
@@ -4054,7 +4047,6 @@ v1router.get('/polls', async (req, res) => {
  *                     format: date-time
  *                     description: The date-time by which the poll closes (must be in the future).
  *                 required:
- *                   - type
  *                   - version
  *                   - description
  *                   - options

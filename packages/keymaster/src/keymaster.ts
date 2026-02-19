@@ -105,7 +105,7 @@ export enum NoticeTags {
 }
 
 export enum PollItems {
-    CONFIG = 'config',
+    POLL = 'poll',
     RESULTS = 'results',
 }
 
@@ -2536,7 +2536,6 @@ export default class Keymaster implements KeymasterInterface {
         nextWeek.setDate(now.getDate() + 7);
 
         return {
-            type: 'poll',
             version: 2,
             description: 'What is this poll about?',
             options: ['yes', 'no', 'abstain'],
@@ -2548,10 +2547,6 @@ export default class Keymaster implements KeymasterInterface {
         config: PollConfig,
         options: VaultOptions = {}
     ): Promise<string> {
-        if (config.type !== 'poll') {
-            throw new InvalidParameterError('poll');
-        }
-
         if (config.version !== 2) {
             throw new InvalidParameterError('poll.version');
         }
@@ -2580,7 +2575,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const vaultDid = await this.createVault(options);
         const buffer = Buffer.from(JSON.stringify(config), 'utf-8');
-        await this.addVaultItem(vaultDid, PollItems.CONFIG, buffer);
+        await this.addVaultItem(vaultDid, PollItems.POLL, buffer);
 
         return vaultDid;
     }
@@ -2592,16 +2587,12 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         try {
-            const buffer = await this.getVaultItem(id, PollItems.CONFIG);
+            const buffer = await this.getVaultItem(id, PollItems.POLL);
             if (!buffer) {
                 return null;
             }
 
             const config = JSON.parse(buffer.toString('utf-8'));
-            if (config.type !== 'poll') {
-                return null;
-            }
-
             return config as PollConfig;
         }
         catch {
@@ -2684,7 +2675,7 @@ export default class Keymaster implements KeymasterInterface {
 
             const items = await this.listVaultItems(pollId);
             for (const itemName of Object.keys(items)) {
-                if (itemName !== PollItems.CONFIG && itemName !== PollItems.RESULTS) {
+                if (itemName !== PollItems.POLL && itemName !== PollItems.RESULTS) {
                     voters.push(itemName);
                 }
             }
@@ -2753,7 +2744,7 @@ export default class Keymaster implements KeymasterInterface {
         let voted = 0;
 
         for (const [itemName, itemMeta] of Object.entries(items)) {
-            if (itemName === PollItems.CONFIG || itemName === PollItems.RESULTS) {
+            if (itemName === PollItems.POLL || itemName === PollItems.RESULTS) {
                 continue;
             }
 

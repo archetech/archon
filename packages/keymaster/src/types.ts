@@ -151,7 +151,6 @@ export interface PollResults {
 }
 
 export interface PollConfig {
-    type: 'poll';
     version: 2;
     description: string;
     options: string[];
