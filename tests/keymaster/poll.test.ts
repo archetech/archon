@@ -521,7 +521,7 @@ describe('viewBallot', () => {
         expect(result.option).toBe('no');
     });
 
-    it('should return limited info when caller cannot decrypt', async () => {
+    it('should allow voter to view their own ballot', async () => {
         await owner.createId('Bob');
         const aliceDid = await voter.createId('Alice');
         const template = await owner.pollTemplate();
@@ -530,12 +530,12 @@ describe('viewBallot', () => {
 
         const ballotDid = await voter.votePoll(pollDid, 1);
 
-        // Voter cannot decrypt (ballot was encrypted for owner only)
         const result = await voter.viewBallot(ballotDid);
 
         expect(result.voter).toBe(aliceDid);
-        expect(result.poll).toBe('');
-        expect(result.vote).toBeUndefined();
+        expect(result.poll).toBe(pollDid);
+        expect(result.vote).toBe(1);
+        expect(result.option).toBe('yes');
     });
 });
 

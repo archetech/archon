@@ -2843,8 +2843,8 @@ export default class Keymaster implements KeymasterInterface {
             vote: vote,
         };
 
-        // Encrypt for owner only (secret ballot)
-        return await this.encryptJSON(ballot, owner, { ...options, encryptForSender: false });
+        // Encrypt for owner and sender (voter can view their own ballot)
+        return await this.encryptJSON(ballot, owner, options);
     }
 
     async sendBallot(ballotDid: string, pollId: string): Promise<string> {
