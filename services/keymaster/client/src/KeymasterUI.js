@@ -2383,7 +2383,35 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setPollNoticeSent(false);
         setVoterInput("");
         setVoters({});
+        sessionStorage.removeItem('createdPollDid');
     };
+
+    // Persist createdPollDid across navigation
+    useEffect(() => {
+        if (createdPollDid) {
+            sessionStorage.setItem('createdPollDid', createdPollDid);
+        }
+    }, [createdPollDid]);
+
+    useEffect(() => {
+        const saved = sessionStorage.getItem('createdPollDid');
+        if (saved && keymaster && !createdPollDid) {
+            keymaster.getPoll(saved).then((config) => {
+                if (config) {
+                    setCreatedPollDid(saved);
+                    setPollName(config.name || "");
+                    setDescription(config.description || "");
+                    setOptionsStr(config.options?.join(", ") || "");
+                    setDeadline(config.deadline ? config.deadline.slice(0, 16) : "");
+                    refreshVoters(saved);
+                } else {
+                    sessionStorage.removeItem('createdPollDid');
+                }
+            }).catch(() => {
+                sessionStorage.removeItem('createdPollDid');
+            });
+        }
+    }, [keymaster]);
 
     const arraysEqual = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
@@ -2554,6 +2582,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             if (notice) {
                 showSuccess("Poll notice sent");
                 setPollNoticeSent(true);
+                sessionStorage.removeItem('createdPollDid');
             } else {
                 showError("Failed to send poll");
             }
@@ -4013,6 +4042,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         value={pollName}
                                         onChange={(e) => setPollName(e.target.value)}
                                         sx={{ mb: 2 }}
+                                        disabled={!!createdPollDid}
                                         inputProps={{ maxLength: 32 }}
                                     />
                                     <TextField
@@ -4022,6 +4052,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         sx={{ mb: 2 }}
+                                        disabled={!!createdPollDid}
                                         inputProps={{ maxLength: 200 }}
                                     />
                                     <TextField
@@ -4032,6 +4063,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         value={optionsStr}
                                         onChange={(e) => setOptionsStr(e.target.value)}
                                         sx={{ mb: 2 }}
+                                        disabled={!!createdPollDid}
                                         helperText="Between 2 and 10 options"
                                     />
                                     <TextField
@@ -4041,21 +4073,24 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         value={deadline}
                                         onChange={(e) => setDeadline(e.target.value)}
                                         sx={{ mb: 2 }}
+                                        disabled={!!createdPollDid}
                                         InputLabelProps={{ shrink: true }}
                                     />
-                                    <Select
-                                        value={registry}
-                                        onChange={(e) => setRegistry(e.target.value)}
-                                        sx={{ minWidth: 200, mb: 2 }}
-                                    >
-                                        {registries.map((r) => (
-                                            <MenuItem key={r} value={r}>
-                                                {r}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
 
                                     <Box sx={{ mt: 2 }}>
+                                        {!createdPollDid && (
+                                        <>
+                                        <Select
+                                            value={registry}
+                                            onChange={(e) => setRegistry(e.target.value)}
+                                            sx={{ minWidth: 200, mb: 2 }}
+                                        >
+                                            {registries.map((r) => (
+                                                <MenuItem key={r} value={r}>
+                                                    {r}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
                                         <Button
                                             variant="contained"
                                             onClick={handleCreatePoll}
@@ -4063,6 +4098,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         >
                                             Create
                                         </Button>
+                                        </>
+                                        )}
                                         <Button
                                             variant="outlined"
                                             onClick={handleSendPoll}

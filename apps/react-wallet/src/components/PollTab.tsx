@@ -136,6 +136,10 @@ const PollsTab: React.FC = () => {
             keymaster.getPoll(saved).then((config) => {
                 if (config) {
                     setCreatedPollDid(saved);
+                    setPollName(config.name || "");
+                    setDescription(config.description || "");
+                    setOptionsStr(config.options?.join(", ") || "");
+                    setDeadline(config.deadline ? config.deadline.slice(0, 16) : "");
                     refreshVoters(saved);
                 } else {
                     sessionStorage.removeItem('createdPollDid');
@@ -501,6 +505,7 @@ const PollsTab: React.FC = () => {
                         value={pollName}
                         onChange={(e) => setPollName(e.target.value)}
                         sx={{ mb: 2 }}
+                        disabled={!!createdPollDid}
                         slotProps={{
                             htmlInput: {
                                 maxLength: 32,
@@ -516,6 +521,7 @@ const PollsTab: React.FC = () => {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         sx={{ mb: 2 }}
+                        disabled={!!createdPollDid}
                         slotProps={{
                             htmlInput: {
                                 maxLength: 200,
@@ -529,6 +535,7 @@ const PollsTab: React.FC = () => {
                         value={optionsStr}
                         onChange={(e) => setOptionsStr(e.target.value)}
                         sx={{ mb: 2 }}
+                        disabled={!!createdPollDid}
                         helperText="Between 2 and 10 options"
                     />
 
@@ -540,8 +547,10 @@ const PollsTab: React.FC = () => {
                         value={deadline}
                         onChange={(e) => setDeadline(e.target.value)}
                         sx={{ mb: 2 }}
+                        disabled={!!createdPollDid}
                     />
 
+                    {!createdPollDid && (
                     <Box className="flex-box" sx={{ mb: 2 }}>
                         <FormControl fullWidth>
                             <Select
@@ -574,6 +583,7 @@ const PollsTab: React.FC = () => {
                             Create
                         </Button>
                     </Box>
+                    )}
 
                     {createdPollDid && (
                         <Box sx={{ mb: 2 }}>
