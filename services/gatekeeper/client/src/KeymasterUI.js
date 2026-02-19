@@ -2411,6 +2411,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 sessionStorage.removeItem('createdPollDid');
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [keymaster]);
 
     const arraysEqual = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);

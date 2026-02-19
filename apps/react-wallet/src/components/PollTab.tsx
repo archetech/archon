@@ -148,6 +148,7 @@ const PollsTab: React.FC = () => {
                 sessionStorage.removeItem('createdPollDid');
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [keymaster]);
 
     async function confirmRemovePoll() {
@@ -551,38 +552,38 @@ const PollsTab: React.FC = () => {
                     />
 
                     {!createdPollDid && (
-                    <Box className="flex-box" sx={{ mb: 2 }}>
-                        <FormControl fullWidth>
-                            <Select
-                                value={registry}
-                                onChange={(e) => setRegistry(e.target.value)}
-                                sx={{
-                                    borderTopRightRadius: 0,
-                                    borderBottomRightRadius: 0,
-                                }}
-                            >
-                                {registries.map((r) => (
-                                    <MenuItem key={r} value={r}>
-                                        {r}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                        <Box className="flex-box" sx={{ mb: 2 }}>
+                            <FormControl fullWidth>
+                                <Select
+                                    value={registry}
+                                    onChange={(e) => setRegistry(e.target.value)}
+                                    sx={{
+                                        borderTopRightRadius: 0,
+                                        borderBottomRightRadius: 0,
+                                    }}
+                                >
+                                    {registries.map((r) => (
+                                        <MenuItem key={r} value={r}>
+                                            {r}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
 
-                        <Button
-                            variant="contained"
-                            onClick={handleCreatePoll}
-                            sx={{
-                                borderTopLeftRadius: 0,
-                                borderBottomLeftRadius: 0,
-                            }}
-                            size="large"
-                            fullWidth
-                            disabled={!pollName || !description || !optionsStr || !deadline}
-                        >
+                            <Button
+                                variant="contained"
+                                onClick={handleCreatePoll}
+                                sx={{
+                                    borderTopLeftRadius: 0,
+                                    borderBottomLeftRadius: 0,
+                                }}
+                                size="large"
+                                fullWidth
+                                disabled={!pollName || !description || !optionsStr || !deadline}
+                            >
                             Create
-                        </Button>
-                    </Box>
+                            </Button>
+                        </Box>
                     )}
 
                     {createdPollDid && (
