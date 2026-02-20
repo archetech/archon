@@ -20,6 +20,25 @@ App.addListener('appUrlOpen', ({ url }) => {
     }
 })();
 
+// Web: check browser URL for ?challenge= or ?credential= query params
+if (window.location.search) {
+    const params = new URLSearchParams(window.location.search);
+    const challenge = params.get('challenge');
+    const credential = params.get('credential');
+
+    let deepLinkUrl: string | null = null;
+    if (challenge?.startsWith('did:')) {
+        deepLinkUrl = `archon://auth?challenge=${encodeURIComponent(challenge)}`;
+    } else if (credential?.startsWith('did:')) {
+        deepLinkUrl = `archon://accept?credential=${encodeURIComponent(credential)}`;
+    }
+
+    if (deepLinkUrl) {
+        queueDeepLink(deepLinkUrl);
+        window.dispatchEvent(new Event('archon:deepLinkQueued'));
+    }
+}
+
 (async () => {
     try {
         const has = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
