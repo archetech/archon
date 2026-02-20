@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.4.0](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.2.0...@didcid/gatekeeper@0.4.0) (2026-02-20)
+
+
+### Bug Fixes
+
+* Better error message for missing wallet ([#53](https://github.com/archetech/archon/issues/53)) ([1a8dad0](https://github.com/archetech/archon/commit/1a8dad05a8a1eafb5d89e88224b913657d1f0530))
+* getVaultItem failed for small vault items ([#45](https://github.com/archetech/archon/issues/45)) ([a6fdd52](https://github.com/archetech/archon/commit/a6fdd5233ae2013879b28252d322e392211a59c2))
+
+
+### Features
+
+* Added update-credential to agent CLI ([#66](https://github.com/archetech/archon/issues/66)) ([002fce1](https://github.com/archetech/archon/commit/002fce1dcf2edb8c621eb77501cdf0abeed90484))
+* Adds CLI to keymaster package ([#39](https://github.com/archetech/archon/issues/39)) ([894ce73](https://github.com/archetech/archon/commit/894ce732f5beaca37bb90ace6b760b8e80aba3e9))
+* Adds get-property command to CLI ([#73](https://github.com/archetech/archon/issues/73)) ([310d7fe](https://github.com/archetech/archon/commit/310d7fe5d95976b8ca37ec12b7d6dc16cc52f65a))
+* Support mainnet registries ([#34](https://github.com/archetech/archon/issues/34)) ([a206c9e](https://github.com/archetech/archon/commit/a206c9e24f29fabec45f3cb239b8ba88f0525e6d))
+
+
+
+
+
 ## [0.3.7](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.2.0...@didcid/gatekeeper@0.3.7) (2026-02-16)
 
 
