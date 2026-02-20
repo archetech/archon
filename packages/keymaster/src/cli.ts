@@ -1698,7 +1698,7 @@ async function run() {
         const cipher = new CipherNode();
 
         // For commands that need an existing wallet, verify it exists
-        const walletCreationCommands = ['create-wallet', 'new-wallet', 'import-wallet', 'restore-wallet-file'];
+        const walletCreationCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file'];
         const commandName = process.argv[2];
         if (commandName && !walletCreationCommands.includes(commandName)) {
             const existing = await wallet.loadWallet();
