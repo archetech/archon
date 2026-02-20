@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Keymaster API",
-    "version": "1.4.0-beta",
+    "version": "0.4.0",
     "description": "Documentation for Keymaster API"
   },
   "paths": {
@@ -4574,6 +4574,9 @@
                         "version": {
                           "type": "integer"
                         },
+                        "name": {
+                          "type": "string"
+                        },
                         "description": {
                           "type": "string"
                         },
@@ -4680,6 +4683,10 @@
                         "default": 2,
                         "description": "Must be 2."
                       },
+                      "name": {
+                        "type": "string",
+                        "description": "A short name for the poll (used as alias when imported)."
+                      },
                       "description": {
                         "type": "string",
                         "description": "A short description or question for the poll."
@@ -4701,6 +4708,7 @@
                     },
                     "required": [
                       "version",
+                      "name",
                       "description",
                       "options",
                       "deadline"
@@ -5035,6 +5043,51 @@
         }
       }
     },
+    "/polls/{poll}/send": {
+      "post": {
+        "summary": "Send a poll notice to all voters.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "poll",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "did": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/polls/{poll}/vote": {
       "post": {
         "summary": "Cast a vote in a poll.",
@@ -5059,17 +5112,12 @@
                 "properties": {
                   "vote": {
                     "type": "integer",
-                    "description": "The numerical option index (1-based). Use 0 or set `spoil` in options to cast a spoiled ballot."
+                    "description": "The numerical option index (1-based). Use 0 to cast a spoiled ballot."
                   },
                   "options": {
                     "type": "object",
                     "description": "Additional vote parameters.",
                     "properties": {
-                      "spoil": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "If true, casts a spoiled ballot (vote=0)."
-                      },
                       "registry": {
                         "type": "string",
                         "description": "Where to create the ballot DID (e.g., \"local\", \"hyperswarm\")."
