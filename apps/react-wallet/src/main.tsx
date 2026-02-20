@@ -5,7 +5,6 @@ import "./extension.css";
 import "./utils/polyfills";
 import { App } from '@capacitor/app';
 import { queueDeepLink } from './utils/deepLinkQueue';
-import { extractDid } from './utils/utils';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
 App.addListener('appUrlOpen', ({ url }) => {
@@ -23,9 +22,19 @@ App.addListener('appUrlOpen', ({ url }) => {
 
 // Web: check browser URL for ?challenge= or ?credential= query params
 if (window.location.search) {
-    const did = extractDid(window.location.href);
-    if (did) {
-        queueDeepLink(window.location.href);
+    const params = new URLSearchParams(window.location.search);
+    const challenge = params.get('challenge');
+    const credential = params.get('credential');
+
+    let deepLinkUrl: string | null = null;
+    if (challenge?.startsWith('did:')) {
+        deepLinkUrl = `archon://auth?challenge=${encodeURIComponent(challenge)}`;
+    } else if (credential?.startsWith('did:')) {
+        deepLinkUrl = `archon://accept?credential=${encodeURIComponent(credential)}`;
+    }
+
+    if (deepLinkUrl) {
+        queueDeepLink(deepLinkUrl);
         window.dispatchEvent(new Event('archon:deepLinkQueued'));
     }
 }
