@@ -62,6 +62,8 @@ function normalizePath(path: string): string {
         .replace(/\/credentials\/held\/[^/]+/g, '/credentials/held/:did')
         .replace(/\/credentials\/issued\/[^/]+/g, '/credentials/issued/:did')
         .replace(/\/assets\/[^/]+/g, '/assets/:id')
+        .replace(/\/polls\/[^/]+\/voters\/[^/]+/g, '/polls/:poll/voters/:voter')
+        .replace(/\/polls\/ballot\/[^/]+/g, '/polls/ballot/:did')
         .replace(/\/polls\/[^/]+/g, '/polls/:poll')
         .replace(/\/images\/[^/]+/g, '/images/:id')
         .replace(/\/files\/[^/]+/g, '/files/:id')
@@ -3936,13 +3938,11 @@ v1router.post('/assets/:id/clone', async (req, res) => {
  *                 template:
  *                   type: object
  *                   properties:
- *                     type:
- *                       type: string
  *                     version:
  *                       type: integer
- *                     description:
+ *                     name:
  *                       type: string
- *                     roster:
+ *                     description:
  *                       type: string
  *                     options:
  *                       type: array
@@ -4018,7 +4018,7 @@ v1router.get('/polls', async (req, res) => {
  * @swagger
  * /polls:
  *   post:
- *     summary: Create a new poll.
+ *     summary: Create a new poll (backed by a vault).
  *     requestBody:
  *       required: true
  *       content:
@@ -4028,23 +4028,18 @@ v1router.get('/polls', async (req, res) => {
  *             properties:
  *               poll:
  *                 type: object
- *                 description: The poll definition containing the required fields.
+ *                 description: The poll configuration.
  *                 properties:
- *                   type:
- *                     type: string
- *                     enum: [ "poll" ]
- *                     default: "poll"
- *                     description: Must be "poll".
  *                   version:
  *                     type: integer
- *                     default: 1
- *                     description: Must be 1 (only version 1 is supported).
+ *                     default: 2
+ *                     description: Must be 2.
+ *                   name:
+ *                     type: string
+ *                     description: A short name for the poll (used as alias when imported).
  *                   description:
  *                     type: string
  *                     description: A short description or question for the poll.
- *                   roster:
- *                     type: string
- *                     description: The DID or name of a group defining who is eligible to vote.
  *                   options:
  *                     type: array
  *                     description: A list of possible choices for the poll (at least 2, up to 10).
@@ -4057,15 +4052,14 @@ v1router.get('/polls', async (req, res) => {
  *                     format: date-time
  *                     description: The date-time by which the poll closes (must be in the future).
  *                 required:
- *                   - type
  *                   - version
+ *                   - name
  *                   - description
- *                   - roster
  *                   - options
  *                   - deadline
  *               options:
  *                 type: object
- *                 description: Additional parameters for poll creation.
+ *                 description: Vault creation options.
  *                 properties:
  *                   registry:
  *                     type: string
@@ -4073,23 +4067,7 @@ v1router.get('/polls', async (req, res) => {
  *                   validUntil:
  *                     type: string
  *                     format: date-time
- *                     description: Expiration timestamp for the poll DID itself (not the poll’s internal deadline).
- *                   retries:
- *                     type: integer
- *                     default: 0
- *                     description: Number of times to retry poll creation if it fails initially.
- *                   delay:
- *                     type: integer
- *                     default: 1000
- *                     description: Delay in milliseconds between retries.
- *                   encryptForSender:
- *                     type: boolean
- *                     default: true
- *                     description: Include an encrypted copy for the poll creator if encryption is used.
- *                   includeHash:
- *                     type: boolean
- *                     default: false
- *                     description: Whether to embed a hash of the poll in the DID asset.
+ *                     description: Expiration timestamp for the poll DID.
  *                   controller:
  *                     type: string
  *                     description: The ID/DID that should own/control this poll. Defaults to the current ID if omitted.
@@ -4125,6 +4103,108 @@ v1router.post('/polls', async (req, res) => {
 
 /**
  * @swagger
+ * /polls/ballot/send:
+ *   post:
+ *     summary: Send a ballot to the poll owner via notice.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ballot:
+ *                 type: string
+ *                 description: The DID of the ballot to send.
+ *               poll:
+ *                 type: string
+ *                 description: The DID of the poll.
+ *             required:
+ *               - ballot
+ *               - poll
+ *     responses:
+ *       200:
+ *         description: The DID of the notice sent to the poll owner.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 did:
+ *                   type: string
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/polls/ballot/send', async (req, res) => {
+    try {
+        const { ballot, poll } = req.body;
+        const did = await keymaster.sendBallot(ballot, poll);
+        res.json({ did });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /polls/ballot/{did}:
+ *   get:
+ *     summary: View ballot details.
+ *     description: Returns ballot details. The poll owner can see the vote; others see only metadata.
+ *     parameters:
+ *       - in: path
+ *         name: did
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The DID of the ballot.
+ *     responses:
+ *       200:
+ *         description: Ballot details.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ballot:
+ *                   type: object
+ *                   properties:
+ *                     poll:
+ *                       type: string
+ *                     voter:
+ *                       type: string
+ *                     vote:
+ *                       type: integer
+ *                     option:
+ *                       type: string
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.get('/polls/ballot/:did', async (req, res) => {
+    try {
+        const ballot = await keymaster.viewBallot(req.params.did);
+        res.json({ ballot });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /polls/{poll}:
  *   get:
  *     summary: Retrieve the raw poll data by DID or name.
@@ -4145,7 +4225,7 @@ v1router.post('/polls', async (req, res) => {
  *               properties:
  *                 poll:
  *                   type: object
- *                   description: The poll data (type, version, options, roster, ballots, etc.).
+ *                   description: The poll config (type, version, description, options, deadline).
  *       500:
  *         description: Internal server error or poll not found.
  *         content:
@@ -4251,11 +4331,49 @@ v1router.get('/polls/:poll/view', async (req, res) => {
 
 /**
  * @swagger
+ * /polls/{poll}/send:
+ *   post:
+ *     summary: Send a poll notice to all voters.
+ *     parameters:
+ *       - in: path
+ *         name: poll
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 did:
+ *                   type: string
+ *       500:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/polls/:poll/send', async (req, res) => {
+    try {
+        const did = await keymaster.sendPoll(req.params.poll);
+        res.json({ did });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /polls/{poll}/vote:
  *   post:
  *     summary: Cast a vote in a poll.
  *     description: >
- *       Casts a vote in the specified poll. The vote is recorded as a ballot DID, which should be submitted to the poll owner.
+ *       Casts a vote in the specified poll. The ballot is encrypted for the poll owner only.
  *     parameters:
  *       - in: path
  *         name: poll
@@ -4272,43 +4390,23 @@ v1router.get('/polls/:poll/view', async (req, res) => {
  *             properties:
  *               vote:
  *                 type: integer
- *                 description: The numerical option index (1-based). Use 0 or set `spoil` in options to cast a spoiled ballot.
+ *                 description: The numerical option index (1-based). Use 0 to cast a spoiled ballot.
  *               options:
  *                 type: object
  *                 description: Additional vote parameters.
  *                 properties:
- *                   spoil:
- *                     type: boolean
- *                     default: false
- *                     description: If true, casts a spoiled ballot (vote=0).
  *                   registry:
  *                     type: string
  *                     description: Where to create the ballot DID (e.g., "local", "hyperswarm").
  *                   validUntil:
  *                     type: string
  *                     format: date-time
- *                     description: Expiration for the ballot DID, if ephemeral.
- *                   retries:
- *                     type: integer
- *                     default: 0
- *                   delay:
- *                     type: integer
- *                     default: 1000
- *                   encryptForSender:
- *                     type: boolean
- *                     default: false
- *                     description: Whether to store an encrypted copy for the voter. Typically false for a secret ballot.
- *                   includeHash:
- *                     type: boolean
- *                     default: false
- *                   controller:
- *                     type: string
- *                     description: Which ID or DID to assign as the ballot’s controller. Defaults to the poll's owner, but usually not changed here.
+ *                     description: Expiration for the ballot DID.
  *             required:
  *               - vote
  *     responses:
  *       200:
- *         description: The DID representing the newly created ballot (to be submitted to the poll owner).
+ *         description: The DID representing the newly created ballot (to be sent to the poll owner).
  *         content:
  *           application/json:
  *             schema:
@@ -4387,7 +4485,7 @@ v1router.put('/polls/update', async (req, res) => {
  * @swagger
  * /polls/{poll}/publish:
  *   post:
- *     summary: Publish final poll results to the poll’s DID Document.
+ *     summary: Publish final poll results to the poll vault.
  *     parameters:
  *       - in: path
  *         name: poll
@@ -4445,7 +4543,7 @@ v1router.post('/polls/:poll/publish', async (req, res) => {
  * @swagger
  * /polls/{poll}/unpublish:
  *   post:
- *     summary: Remove previously published poll results from the poll's DID Document.
+ *     summary: Remove previously published poll results from the poll vault.
  *     parameters:
  *       - in: path
  *         name: poll
@@ -4484,6 +4582,148 @@ v1router.post('/polls/:poll/unpublish', async (req, res) => {
     try {
         const ok = await keymaster.unpublishPoll(req.params.poll);
         res.json({ ok });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /polls/{poll}/voters:
+ *   post:
+ *     summary: Add a voter to a poll.
+ *     parameters:
+ *       - in: path
+ *         name: poll
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The DID or name of the poll.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               memberId:
+ *                 type: string
+ *                 description: The DID of the voter to add.
+ *             required:
+ *               - memberId
+ *     responses:
+ *       200:
+ *         description: Indicates whether the voter was successfully added.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/polls/:poll/voters', async (req, res) => {
+    try {
+        const { memberId } = req.body;
+        const ok = await keymaster.addPollVoter(req.params.poll, memberId);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /polls/{poll}/voters/{voter}:
+ *   delete:
+ *     summary: Remove a voter from a poll.
+ *     parameters:
+ *       - in: path
+ *         name: poll
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The DID or name of the poll.
+ *       - in: path
+ *         name: voter
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The DID of the voter to remove.
+ *     responses:
+ *       200:
+ *         description: Indicates whether the voter was successfully removed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.delete('/polls/:poll/voters/:voter', async (req, res) => {
+    try {
+        const ok = await keymaster.removePollVoter(req.params.poll, req.params.voter);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /polls/{poll}/voters:
+ *   get:
+ *     summary: List all voters of a poll.
+ *     parameters:
+ *       - in: path
+ *         name: poll
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The DID or name of the poll.
+ *     responses:
+ *       200:
+ *         description: An object containing all voter DIDs.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 voters:
+ *                   type: object
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.get('/polls/:poll/voters', async (req, res) => {
+    try {
+        const voters = await keymaster.listPollVoters(req.params.poll);
+        res.json({ voters });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
     }

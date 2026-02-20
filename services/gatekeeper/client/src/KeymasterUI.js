@@ -210,9 +210,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [pollName, setPollName] = useState("");
     const [description, setDescription] = useState("");
     const [optionsStr, setOptionsStr] = useState("yes, no, abstain");
-    const [rosterDid, setRosterDid] = useState("");
     const [deadline, setDeadline] = useState("");
     const [createdPollDid, setCreatedPollDid] = useState("");
+    const [voterInput, setVoterInput] = useState("");
+    const [voters, setVoters] = useState({});
     const [selectedPollName, setSelectedPollName] = useState("");
     const [selectedPollDesc, setSelectedPollDesc] = useState("");
     const [pollOptions, setPollOptions] = useState([]);
@@ -611,12 +612,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 }
 
                 if (data.vault) {
-                    vaultList.push(alias);
-                    continue;
-                }
-
-                if (data.poll) {
-                    pollList.push(alias);
+                    const isPoll = await keymaster.testPoll(alias);
+                    if (isPoll) {
+                        pollList.push(alias);
+                    } else {
+                        vaultList.push(alias);
+                    }
                     continue;
                 }
             }
@@ -2377,11 +2378,41 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         setPollName("");
         setDescription("");
         setOptionsStr("yes, no, abstain");
-        setRosterDid("");
         setDeadline("");
         setCreatedPollDid("");
         setPollNoticeSent(false);
+        setVoterInput("");
+        setVoters({});
+        sessionStorage.removeItem('createdPollDid');
     };
+
+    // Persist createdPollDid across navigation
+    useEffect(() => {
+        if (createdPollDid) {
+            sessionStorage.setItem('createdPollDid', createdPollDid);
+        }
+    }, [createdPollDid]);
+
+    useEffect(() => {
+        const saved = sessionStorage.getItem('createdPollDid');
+        if (saved && keymaster && !createdPollDid) {
+            keymaster.getPoll(saved).then((config) => {
+                if (config) {
+                    setCreatedPollDid(saved);
+                    setPollName(config.name || "");
+                    setDescription(config.description || "");
+                    setOptionsStr(config.options?.join(", ") || "");
+                    setDeadline(config.deadline ? config.deadline.slice(0, 16) : "");
+                    refreshVoters(saved);
+                } else {
+                    sessionStorage.removeItem('createdPollDid');
+                }
+            }).catch(() => {
+                sessionStorage.removeItem('createdPollDid');
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [keymaster]);
 
     const arraysEqual = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
@@ -2409,8 +2440,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             for (const alias of names) {
                 try {
                     const doc = await keymaster.resolveDID(alias);
-                    if (doc?.didDocumentData?.poll) {
-                        polls.push(alias);
+                    if (doc?.didDocumentData?.vault) {
+                        const isPoll = await keymaster.testPoll(alias);
+                        if (isPoll) {
+                            polls.push(alias);
+                        }
                     }
                 } catch { }
             }
@@ -2458,10 +2492,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             showError("Description is required");
             return null;
         }
-        if (!rosterDid.trim()) {
-            showError("Roster DID / name is required");
-            return null;
-        }
         if (!deadline) {
             showError("Deadline is required");
             return null;
@@ -2476,12 +2506,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return null;
         }
 
-        const roster = aliasList[rosterDid] ?? rosterDid;
-
         return {
             ...template,
+            name: pollName.trim(),
             description: description.trim(),
-            roster,
             options,
             deadline: new Date(deadline).toISOString(),
         };
@@ -2505,28 +2533,45 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     };
 
+    const refreshVoters = async (pollDid) => {
+        try {
+            const map = await keymaster.listPollVoters(pollDid);
+            setVoters(map);
+        } catch {
+            setVoters({});
+        }
+    };
+
+    const handleAddVoter = async () => {
+        if (!createdPollDid || !voterInput.trim()) return;
+        try {
+            await keymaster.addPollVoter(createdPollDid, voterInput.trim());
+            setVoterInput("");
+            await refreshVoters(createdPollDid);
+        } catch (e) {
+            showError(e);
+        }
+    };
+
+    const handleRemoveVoter = async (did) => {
+        if (!createdPollDid) return;
+        try {
+            await keymaster.removePollVoter(createdPollDid, did);
+            await refreshVoters(createdPollDid);
+        } catch (e) {
+            showError(e);
+        }
+    };
+
     const handleSendPoll = async () => {
         if (!createdPollDid) {
             return;
         }
         try {
-            const group = await keymaster.getGroup(aliasList[rosterDid] ?? rosterDid);
-            if (!group || group.members.length === 0) {
-                showError("Group not found or empty");
-                return;
-            }
-            const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-            const message = { to: group.members, dids: [createdPollDid] };
-            const notice = await keymaster.createNotice(message, {
-                registry: "hyperswarm",
-                validUntil,
-            });
-            if (notice) {
-                showSuccess("Poll notice sent");
-                setPollNoticeSent(true);
-            } else {
-                showError("Failed to send poll");
-            }
+            await keymaster.sendPoll(createdPollDid);
+            showSuccess("Poll notice sent");
+            setPollNoticeSent(true);
+            sessionStorage.removeItem('createdPollDid');
         } catch (e) {
             showError(e);
         }
@@ -2559,22 +2604,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             const didDoc = await keymaster.resolveDID(did);
             setPollController(didDoc?.didDocument?.controller ?? "");
 
-            if (poll?.results) {
-                setPollResults(poll.results);
+            const view = await keymaster.viewPoll(did);
+            setCanVote(view.isEligible);
+            setHasVoted(view.hasVoted);
+            if (view.results) {
+                setPollResults(view.results);
                 setPollPublished(true);
-            }
-
-            if (poll) {
-                const group = await keymaster.getGroup(poll.roster);
-                const eligible = !!group?.members?.includes(currentDID);
-                setCanVote(eligible);
-            }
-
-            if (currentDID && poll?.ballots && poll.ballots[currentDID]) {
-                const ballotId = poll.ballots[currentDID].ballot;
-                setLastBallotDid(ballotId);
-                setHasVoted(true);
-                setBallotSent(true);
             }
         } catch (e) {
             showError(e);
@@ -2587,11 +2622,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             return;
         }
         try {
-            const voteVal = selectedOptionIdx + 1;
+            const voteVal = spoil ? 0 : selectedOptionIdx + 1;
             const ballotDid = await keymaster.votePoll(
                 selectedPollDid,
                 voteVal,
-                spoil ? { spoil: true } : undefined
             );
             setLastBallotDid(ballotDid);
             setHasVoted(true);
@@ -2609,24 +2643,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     };
 
     const handleSendBallot = async () => {
-        if (!lastBallotDid || !pollController) {
+        if (!lastBallotDid || !selectedPollDid) {
             return;
         }
         try {
-            const validUntil = new Date(
-                Date.now() + 7 * 24 * 60 * 60 * 1000
-            ).toISOString();
-            const message = { to: [pollController], dids: [lastBallotDid] };
-            const notice = await keymaster.createNotice(message, {
-                registry: "hyperswarm",
-                validUntil,
-            });
-            if (notice) {
-                showSuccess("Ballot sent");
-                setBallotSent(true);
-            } else {
-                showError("Failed to send ballot");
-            }
+            await keymaster.sendBallot(lastBallotDid, selectedPollDid);
+            showSuccess("Ballot sent");
+            setBallotSent(true);
         } catch (e) {
             showError(e);
         }
@@ -2644,8 +2667,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 showSuccess("Poll unpublished");
             } else {
                 await keymaster.publishPoll(selectedPollDid);
-                const poll = await keymaster.getPoll(selectedPollDid);
-                if (poll?.results) setPollResults(poll.results);
+                const view = await keymaster.viewPoll(selectedPollDid);
+                if (view.results) setPollResults(view.results);
                 setPollPublished(true);
                 showSuccess("Poll published");
             }
@@ -2708,12 +2731,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 const did = aliasList[alias];
                 try {
                     const poll = await keymaster.getPoll(did);
-                    if (!poll) {
-                        map[alias] = false;
-                        continue;
-                    }
-                    const group = await keymaster.getGroup(poll.roster);
-                    map[alias] = !!group?.members?.includes(currentDID);
+                    map[alias] = !!poll;
                 } catch {
                     map[alias] = false;
                 }
@@ -4010,6 +4028,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         value={pollName}
                                         onChange={(e) => setPollName(e.target.value)}
                                         sx={{ mb: 2 }}
+                                        disabled={!!createdPollDid}
                                         inputProps={{ maxLength: 32 }}
                                     />
                                     <TextField
@@ -4019,6 +4038,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         sx={{ mb: 2 }}
+                                        disabled={!!createdPollDid}
                                         inputProps={{ maxLength: 200 }}
                                     />
                                     <TextField
@@ -4029,16 +4049,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         value={optionsStr}
                                         onChange={(e) => setOptionsStr(e.target.value)}
                                         sx={{ mb: 2 }}
+                                        disabled={!!createdPollDid}
                                         helperText="Between 2 and 10 options"
-                                    />
-                                    <Autocomplete
-                                        freeSolo
-                                        options={groupList}
-                                        value={rosterDid}
-                                        onInputChange={(_, v) => setRosterDid(v.trim())}
-                                        renderInput={(params) => (
-                                            <TextField {...params} label="Roster DID / name" sx={{ mb: 2 }} />
-                                        )}
                                     />
                                     <TextField
                                         fullWidth
@@ -4047,21 +4059,24 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         value={deadline}
                                         onChange={(e) => setDeadline(e.target.value)}
                                         sx={{ mb: 2 }}
+                                        disabled={!!createdPollDid}
                                         InputLabelProps={{ shrink: true }}
                                     />
-                                    <Select
-                                        value={registry}
-                                        onChange={(e) => setRegistry(e.target.value)}
-                                        sx={{ minWidth: 200, mb: 2 }}
-                                    >
-                                        {registries.map((r) => (
-                                            <MenuItem key={r} value={r}>
-                                                {r}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
 
                                     <Box sx={{ mt: 2 }}>
+                                        {!createdPollDid && (
+                                        <>
+                                        <Select
+                                            value={registry}
+                                            onChange={(e) => setRegistry(e.target.value)}
+                                            sx={{ minWidth: 200, mb: 2 }}
+                                        >
+                                            {registries.map((r) => (
+                                                <MenuItem key={r} value={r}>
+                                                    {r}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
                                         <Button
                                             variant="contained"
                                             onClick={handleCreatePoll}
@@ -4069,6 +4084,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         >
                                             Create
                                         </Button>
+                                        </>
+                                        )}
                                         <Button
                                             variant="outlined"
                                             onClick={handleSendPoll}
@@ -4084,7 +4101,76 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
                                     {createdPollDid && (
                                         <Box sx={{ mt: 2 }}>
-                                            <Typography variant="body2">{createdPollDid}</Typography>
+                                            <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                Voters
+                                            </Typography>
+                                            <Box display="flex" sx={{ gap: 1, mb: 1 }}>
+                                                <Autocomplete
+                                                    freeSolo
+                                                    options={agentList || []}
+                                                    value={voterInput}
+                                                    onChange={(_e, newVal) => setVoterInput(newVal || "")}
+                                                    onInputChange={(_e, newInput) => setVoterInput(newInput)}
+                                                    sx={{ flex: 1, minWidth: 0 }}
+                                                    renderInput={(params) => (
+                                                        <TextField
+                                                            {...params}
+                                                            fullWidth
+                                                            size="small"
+                                                            label="Name or DID"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    handleAddVoter();
+                                                                }
+                                                            }}
+                                                            inputProps={{
+                                                                ...params.inputProps,
+                                                                maxLength: 80,
+                                                            }}
+                                                        />
+                                                    )}
+                                                />
+                                                <Button
+                                                    variant="contained"
+                                                    onClick={handleAddVoter}
+                                                    disabled={!voterInput.trim()}
+                                                    sx={{ minWidth: 'auto', px: 2 }}
+                                                >
+                                                    <PersonAdd />
+                                                </Button>
+                                            </Box>
+                                            {Object.keys(voters).length > 0 && (
+                                                <Box sx={{ mb: 1 }}>
+                                                    {Object.keys(voters).map((did) => (
+                                                        <Box
+                                                            key={did}
+                                                            display="flex"
+                                                            alignItems="center"
+                                                            sx={{ py: 0.5 }}
+                                                        >
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{
+                                                                    flex: 1,
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    whiteSpace: 'nowrap',
+                                                                }}
+                                                            >
+                                                                {did}
+                                                            </Typography>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleRemoveVoter(did)}
+                                                            >
+                                                                <Clear fontSize="small" />
+                                                            </IconButton>
+                                                        </Box>
+                                                    ))}
+                                                </Box>
+                                            )}
+                                            <Typography variant="body2" sx={{ mt: 1 }}>{createdPollDid}</Typography>
                                         </Box>
                                     )}
                                 </Box>

@@ -173,8 +173,11 @@ export function UIProvider(
                 const doc = await keymaster.resolveDID(name);
                 const data = doc.didDocumentData as Record<string, unknown>;
 
-                if (data.poll) {
-                    polls.push(name);
+                if (data.vault) {
+                    const isPoll = await keymaster.testPoll(name);
+                    if (isPoll) {
+                        polls.push(name);
+                    }
                 }
             }
             catch { }
@@ -443,12 +446,12 @@ export function UIProvider(
                 }
 
                 if (data.vault) {
-                    vaultList.push(name);
-                    continue;
-                }
-
-                if (data.poll) {
-                    pollList.push(name);
+                    const isPoll = await keymaster.testPoll(name);
+                    if (isPoll) {
+                        pollList.push(name);
+                    } else {
+                        vaultList.push(name);
+                    }
                     continue;
                 }
             }
