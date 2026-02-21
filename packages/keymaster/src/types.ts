@@ -302,6 +302,7 @@ export interface KeymasterInterface {
     checkWallet(): Promise<CheckWalletResult>;
     fixWallet(): Promise<FixWalletResult>;
     decryptMnemonic(): Promise<string>;
+    changePassphrase(newPassphrase: string): Promise<boolean>;
     exportEncryptedWallet(): Promise<WalletEncFile>;
 
     // IDs

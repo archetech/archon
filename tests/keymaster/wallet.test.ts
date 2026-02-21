@@ -316,6 +316,57 @@ describe('decryptMnemonic', () => {
     });
 });
 
+describe('changePassphrase', () => {
+    it('should re-encrypt wallet with new passphrase', async () => {
+        const did = await keymaster.createId('Bob');
+        const mnemonicBefore = await keymaster.decryptMnemonic();
+
+        const ok = await keymaster.changePassphrase('new-passphrase');
+        expect(ok).toBe(true);
+
+        // Wallet still works with the instance (passphrase updated in memory)
+        const walletAfter = await keymaster.loadWallet();
+        expect(walletAfter.ids['Bob'].did).toBe(did);
+
+        // Mnemonic is unchanged
+        const mnemonicAfter = await keymaster.decryptMnemonic();
+        expect(mnemonicAfter).toBe(mnemonicBefore);
+    });
+
+    it('should load with new passphrase after change', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.changePassphrase('new-passphrase');
+
+        // Create a fresh keymaster with the new passphrase against the same wallet store
+        const km2 = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'new-passphrase' });
+        const loaded = await km2.loadWallet();
+        expect(loaded.ids).toHaveProperty('Bob');
+    });
+
+    it('should fail to load with old passphrase after change', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.changePassphrase('new-passphrase');
+
+        const km2 = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+        try {
+            await km2.loadWallet();
+            throw new ExpectedExceptionError();
+        } catch (error: any) {
+            expect(error.message).toBe('Keymaster: Incorrect passphrase.');
+        }
+    });
+
+    it('should throw on empty passphrase', async () => {
+        await keymaster.loadWallet();
+        try {
+            await keymaster.changePassphrase('');
+            throw new ExpectedExceptionError();
+        } catch (error: any) {
+            expect(error).not.toBeInstanceOf(ExpectedExceptionError);
+        }
+    });
+});
+
 describe('exportEncryptedWallet', () => {
     it('should export the wallet in encrypted form', async () => {
         const res = await keymaster.exportEncryptedWallet();

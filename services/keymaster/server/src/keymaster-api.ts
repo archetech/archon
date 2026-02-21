@@ -690,6 +690,54 @@ v1router.get('/wallet/mnemonic', requireAdminKey, async (req, res) => {
 
 /**
  * @swagger
+ * /wallet/passphrase:
+ *   post:
+ *     summary: Change the wallet passphrase.
+ *     description: >
+ *       Re-encrypts the wallet mnemonic with a new passphrase.
+ *       All DIDs and derived identities are preserved.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               passphrase:
+ *                 type: string
+ *                 description: The new passphrase.
+ *     responses:
+ *       200:
+ *         description: Passphrase changed successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/wallet/passphrase', requireAdminKey, async (req, res) => {
+    try {
+        const { passphrase } = req.body;
+        const ok = await keymaster.changePassphrase(passphrase);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /export/wallet/encrypted:
  *   get:
  *     summary: Export the wallet in encrypted form.
