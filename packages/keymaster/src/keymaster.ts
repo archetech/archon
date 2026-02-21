@@ -110,7 +110,7 @@ export enum PollItems {
 }
 
 export default class Keymaster implements KeymasterInterface {
-    private readonly passphrase: string;
+    private passphrase: string;
     private gatekeeper: GatekeeperInterface;
     private db: WalletBase;
     private cipher: Cipher;
@@ -245,6 +245,29 @@ export default class Keymaster implements KeymasterInterface {
 
     async getMnemonicForDerivation(wallet: WalletFile): Promise<string> {
         return decryptWithPassphrase(wallet.seed.mnemonicEnc!, this.passphrase!);
+    }
+
+    async changePassphrase(newPassphrase: string): Promise<boolean> {
+        if (!newPassphrase) {
+            throw new InvalidParameterError('newPassphrase');
+        }
+
+        const wallet = await this.loadWallet();
+        const mnemonic = await decryptWithPassphrase(wallet.seed.mnemonicEnc!, this.passphrase);
+        const mnemonicEnc = await encryptWithPassphrase(mnemonic, newPassphrase);
+
+        wallet.seed.mnemonicEnc = mnemonicEnc;
+        this.passphrase = newPassphrase;
+        this._walletCache = wallet;
+
+        const encrypted = await this.encryptWalletForStorage(wallet);
+        const ok = await this.db.saveWallet(encrypted, true);
+
+        if (!ok) {
+            throw new KeymasterError('Failed to save wallet with new passphrase');
+        }
+
+        return true;
     }
 
     async checkWallet(): Promise<CheckWalletResult> {

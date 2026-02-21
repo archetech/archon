@@ -56,6 +56,19 @@ program
     });
 
 program
+    .command('change-passphrase <new-passphrase>')
+    .description('Re-encrypt wallet with a new passphrase')
+    .action(async (newPassphrase) => {
+        try {
+            const ok = await keymaster.changePassphrase(newPassphrase);
+            console.log(ok ? 'OK' : 'Failed');
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('check-wallet')
     .description('Validate DIDs in wallet')
     .action(async () => {

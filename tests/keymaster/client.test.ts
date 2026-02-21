@@ -14,6 +14,7 @@ const Endpoints = {
     wallet_check: '/api/v1/wallet/check',
     wallet_fix: '/api/v1/wallet/fix',
     wallet_mnemonic: '/api/v1/wallet/mnemonic',
+    wallet_passphrase: '/api/v1/wallet/passphrase',
     registries: '/api/v1/registries',
     ids: '/api/v1/ids',
     ids_current: '/api/v1/ids/current',
@@ -365,6 +366,35 @@ describe('decryptMnemonic', () => {
 
         try {
             await keymaster.decryptMnemonic();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('changePassphrase', () => {
+    it('should change passphrase', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.wallet_passphrase)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.changePassphrase('new-passphrase');
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on changePassphrase server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.wallet_passphrase)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.changePassphrase('new-passphrase');
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

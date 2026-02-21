@@ -151,6 +151,19 @@ program
     });
 
 program
+    .command('change-passphrase <new-passphrase>')
+    .description('Re-encrypt wallet with a new passphrase')
+    .action(async (newPassphrase) => {
+        try {
+            const ok = await keymaster.changePassphrase(newPassphrase);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
     .command('backup-wallet-did')
     .description('Backup wallet to encrypted DID and seed bank')
     .action(async () => {

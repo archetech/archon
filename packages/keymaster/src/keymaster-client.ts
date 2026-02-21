@@ -208,6 +208,16 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async changePassphrase(newPassphrase: string): Promise<boolean> {
+        try {
+            const response = await axios.post(`${this.API}/wallet/passphrase`, { passphrase: newPassphrase });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async listRegistries(): Promise<string[]> {
         try {
             const response = await axios.get(`${this.API}/registries`);
