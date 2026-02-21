@@ -685,7 +685,10 @@
                     "type": "string",
                     "description": "The new passphrase."
                   }
-                }
+                },
+                "required": [
+                  "passphrase"
+                ]
               }
             }
           }

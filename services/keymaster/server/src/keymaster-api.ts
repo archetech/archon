@@ -706,6 +706,8 @@ v1router.get('/wallet/mnemonic', requireAdminKey, async (req, res) => {
  *               passphrase:
  *                 type: string
  *                 description: The new passphrase.
+ *             required:
+ *               - passphrase
  *     responses:
  *       200:
  *         description: Passphrase changed successfully.
