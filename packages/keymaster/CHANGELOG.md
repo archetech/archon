@@ -3,6 +3,48 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.1](https://github.com/archetech/archon/compare/@didcid/keymaster@0.2.0...@didcid/keymaster@0.4.1) (2026-02-21)
+
+
+### Bug Fixes
+
+* Allow create-id to auto-create wallet ([#102](https://github.com/archetech/archon/issues/102)) ([#103](https://github.com/archetech/archon/issues/103)) ([bb6bc7a](https://github.com/archetech/archon/commit/bb6bc7a57d6bcfed679812b8489ab43ab9f10731)), closes [#53](https://github.com/archetech/archon/issues/53)
+* Better error message for missing wallet ([#53](https://github.com/archetech/archon/issues/53)) ([1a8dad0](https://github.com/archetech/archon/commit/1a8dad05a8a1eafb5d89e88224b913657d1f0530))
+* Incorrect passphrase on react-wallet ([#97](https://github.com/archetech/archon/issues/97)) ([5ce0523](https://github.com/archetech/archon/commit/5ce05238ecb2dd6e5a4a647ab0429a9cf9bdb6a4))
+
+
+### Features
+
+* Add change-passphrase command ([#111](https://github.com/archetech/archon/issues/111)) ([#112](https://github.com/archetech/archon/issues/112)) ([b6b24bb](https://github.com/archetech/archon/commit/b6b24bb6c32da91edebcf85e1212420975da70ed))
+* Added update-credential to agent CLI ([#66](https://github.com/archetech/archon/issues/66)) ([002fce1](https://github.com/archetech/archon/commit/002fce1dcf2edb8c621eb77501cdf0abeed90484))
+* Adds dmail commands to agent CLI ([#67](https://github.com/archetech/archon/issues/67)) ([c5648b3](https://github.com/archetech/archon/commit/c5648b32b9c468e7dd2ead8225cbfc8ba28f929b))
+* Adds get-property command to CLI ([#73](https://github.com/archetech/archon/issues/73)) ([310d7fe](https://github.com/archetech/archon/commit/310d7fe5d95976b8ca37ec12b7d6dc16cc52f65a))
+* Adds view-credential command ([#96](https://github.com/archetech/archon/issues/96)) ([560a472](https://github.com/archetech/archon/commit/560a4727679a2b0e7154e26aef6ff3370b616d6c))
+* Adopt W3C JWE standard for encryption ([#90](https://github.com/archetech/archon/issues/90)) ([2321ca7](https://github.com/archetech/archon/commit/2321ca7fd6e074bac1f4b8fa7c12e58d4b45b181))
+* Allow any URI as credentialSubject.id per W3C VC Data Model v2 ([#92](https://github.com/archetech/archon/issues/92)) ([80d9f29](https://github.com/archetech/archon/commit/80d9f29a9653a93c19356c499512682794d270ce))
+* Refactor polls to use vault-based architecture ([#88](https://github.com/archetech/archon/issues/88)) ([#100](https://github.com/archetech/archon/issues/100)) ([8fa9eef](https://github.com/archetech/archon/commit/8fa9eef5230daf853c6f29194b72bbbec5de041a)), closes [#1](https://github.com/archetech/archon/issues/1) [#7](https://github.com/archetech/archon/issues/7) [#8](https://github.com/archetech/archon/issues/8) [#6](https://github.com/archetech/archon/issues/6) [#5](https://github.com/archetech/archon/issues/5) [#9](https://github.com/archetech/archon/issues/9)
+
+
+
+# 0.2.0 (2026-02-04)
+
+
+### Bug Fixes
+
+* Fix for duplicate credential types ([#37](https://github.com/archetech/archon/issues/37)) ([9613c46](https://github.com/archetech/archon/commit/9613c469a69b8c610df12bd64bea264a7cb6f8a9))
+* getVaultItem failed for small vault items ([#45](https://github.com/archetech/archon/issues/45)) ([a6fdd52](https://github.com/archetech/archon/commit/a6fdd5233ae2013879b28252d322e392211a59c2))
+
+
+### Features
+
+* Added import schema pack ([#29](https://github.com/archetech/archon/issues/29)) ([4af8acf](https://github.com/archetech/archon/commit/4af8acf4e9c15b36319f65f6a5b59a0c2c4bf2df))
+* Adds CLI to keymaster package ([#39](https://github.com/archetech/archon/issues/39)) ([894ce73](https://github.com/archetech/archon/commit/894ce732f5beaca37bb90ace6b760b8e80aba3e9))
+* Improve DTG credential support ([#48](https://github.com/archetech/archon/issues/48)) ([fb7e245](https://github.com/archetech/archon/commit/fb7e24538d93f36a310a36040e1608052969aba6))
+
+
+
+
+
 # [0.4.0](https://github.com/archetech/archon/compare/@didcid/keymaster@0.2.0...@didcid/keymaster@0.4.0) (2026-02-20)
 
 

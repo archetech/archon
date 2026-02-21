@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.1](https://github.com/archetech/archon/compare/@didcid/cipher@0.1.3...@didcid/cipher@0.2.1) (2026-02-21)
+
+
+### Bug Fixes
+
+* Incorrect passphrase on react-wallet ([#97](https://github.com/archetech/archon/issues/97)) ([5ce0523](https://github.com/archetech/archon/commit/5ce05238ecb2dd6e5a4a647ab0429a9cf9bdb6a4))
+
+
+### Features
+
+* Adopt W3C JWE standard for encryption ([#90](https://github.com/archetech/archon/issues/90)) ([2321ca7](https://github.com/archetech/archon/commit/2321ca7fd6e074bac1f4b8fa7c12e58d4b45b181))
+
+
+
+
+
 # [0.2.0](https://github.com/archetech/archon/compare/@didcid/cipher@0.1.3...@didcid/cipher@0.2.0) (2026-02-20)
 
 
