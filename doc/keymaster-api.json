@@ -670,6 +670,60 @@
         }
       }
     },
+    "/wallet/passphrase": {
+      "post": {
+        "summary": "Change the wallet passphrase.",
+        "description": "Re-encrypts the wallet mnemonic with a new passphrase. All DIDs and derived identities are preserved.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "passphrase": {
+                    "type": "string",
+                    "description": "The new passphrase."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Passphrase changed successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/export/wallet/encrypted": {
       "get": {
         "summary": "Export the wallet in encrypted form.",
