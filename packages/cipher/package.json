@@ -1,6 +1,6 @@
 {
   "name": "@didcid/cipher",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Archon cipher lib",
   "type": "module",
   "main": "./dist/cjs/cipher-web.cjs",
