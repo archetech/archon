@@ -1885,6 +1885,24 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
+    async function changePassphrase() {
+        try {
+            const newPass = window.prompt("Enter new passphrase:");
+            if (!newPass) {
+                return;
+            }
+            const confirm = window.prompt("Confirm new passphrase:");
+            if (newPass !== confirm) {
+                window.alert("Passphrases do not match");
+                return;
+            }
+            await keymaster.changePassphrase(newPass);
+            showSuccess('Passphrase changed');
+        } catch (error) {
+            showError(error);
+        }
+    }
+
     async function uploadImage(event) {
         try {
             const fileInput = event.target; // Reference to the input element
@@ -5359,6 +5377,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                 <Grid item>
                                     <Button variant="contained" color="primary" onClick={uploadWallet}>
                                         Upload...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={changePassphrase}>
+                                        Change Passphrase...
                                     </Button>
                                 </Grid>
                             </Grid>

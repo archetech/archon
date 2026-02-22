@@ -7,8 +7,9 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
+import PassphraseModal from "../modals/PassphraseModal";
 import WalletWeb from "@didcid/keymaster/wallet/web";
-import {clearSessionPassphrase} from "../utils/sessionPassphrase";
+import {clearSessionPassphrase, setSessionPassphrase} from "../utils/sessionPassphrase";
 
 const WalletTab = () => {
     const [open, setOpen] = useState<boolean>(false);
@@ -18,6 +19,8 @@ const WalletTab = () => {
     const [checkingWallet, setCheckingWallet] = useState<boolean>(false);
     const [showFixModal, setShowFixModal] = useState<boolean>(false);
     const [checkResultMessage, setCheckResultMessage] = useState<string>("");
+    const [showChangePassphrase, setShowChangePassphrase] = useState<boolean>(false);
+    const [changePassError, setChangePassError] = useState<string>("");
     const {
         keymaster,
         initialiseWallet,
@@ -215,6 +218,21 @@ const WalletTab = () => {
         }
     }
 
+    async function handleChangePassphrase(newPassphrase: string) {
+        if (!keymaster) {
+            return;
+        }
+        try {
+            await keymaster.changePassphrase(newPassphrase);
+            setSessionPassphrase(newPassphrase);
+            setShowChangePassphrase(false);
+            setChangePassError("");
+            setSuccess("Passphrase changed");
+        } catch (error: any) {
+            setChangePassError(error?.message || "Failed to change passphrase");
+        }
+    }
+
     return (
         <Box sx={{ overflowX: "hidden" }}>
             <WarningModal
@@ -237,6 +255,16 @@ const WalletTab = () => {
                 isOpen={showMnemonicModal}
                 onSubmit={handleMnemonicSubmit}
                 onClose={handleMnemonicModalClose}
+            />
+
+            <PassphraseModal
+                isOpen={showChangePassphrase}
+                title="Change Passphrase"
+                errorText={changePassError}
+                onSubmit={handleChangePassphrase}
+                onClose={() => { setShowChangePassphrase(false); setChangePassError(""); }}
+                encrypt={true}
+                showCancel={true}
             />
 
             <Box
@@ -325,6 +353,16 @@ const WalletTab = () => {
                                 Show Mnemonic
                             </Button>
                         )}
+
+                        <Button
+                            className="mini-margin"
+                            variant="contained"
+                            color="primary"
+                            onClick={() => setShowChangePassphrase(true)}
+                            sx={{ width: '100%', mb: 1 }}
+                        >
+                            Change Passphrase
+                        </Button>
 
                         <Button
                             className="mini-margin"
