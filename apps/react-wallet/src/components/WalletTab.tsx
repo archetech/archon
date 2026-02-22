@@ -9,7 +9,7 @@ import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
 import PassphraseModal from "../modals/PassphraseModal";
 import WalletWeb from "@didcid/keymaster/wallet/web";
-import {clearSessionPassphrase, setSessionPassphrase} from "../utils/sessionPassphrase";
+import { clearSessionPassphrase, setSessionPassphrase } from "../utils/sessionPassphrase";
 
 const WalletTab = () => {
     const [open, setOpen] = useState<boolean>(false);

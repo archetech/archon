@@ -1891,9 +1891,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             if (!newPass) {
                 return;
             }
-            const confirm = window.prompt("Confirm new passphrase:");
-            if (newPass !== confirm) {
-                window.alert("Passphrases do not match");
+            const confirmPassphrase = window.prompt("Confirm new passphrase:");
+            if (newPass !== confirmPassphrase) {
+                showError("Passphrases do not match");
                 return;
             }
             await keymaster.changePassphrase(newPass);
