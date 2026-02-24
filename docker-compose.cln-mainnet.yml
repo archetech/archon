@@ -16,8 +16,6 @@ services:
       - HIVE_COMMS_ENABLED=true
       - HIVE_ARCHON_ENABLED=true
       - HIVE_ARCHON_VERSION=${ARCHON_CLN_ARCHON_VERSION:-v0.1.0}
-      - RTL_ENABLED=${ARCHON_CLN_RTL_ENABLED:-false}
-      - RTL_PASSWORD=${ARCHON_CLN_RTL_PASSWORD:-changeme}
       - LOG_LEVEL=${ARCHON_CLN_LOG_LEVEL:-info}
     volumes:
       - ./data/cln-mainnet:/data/lightning
