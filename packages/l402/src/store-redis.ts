@@ -2,6 +2,15 @@ import { Redis } from 'ioredis';
 import { randomBytes } from 'crypto';
 import type { L402Store, MacaroonRecord, PaymentRecord, PendingInvoiceData, RateLimitResult } from './types.js';
 
+function safeJsonParse<T>(value: string | undefined, fallback: T): T {
+    if (!value) return fallback;
+    try {
+        return JSON.parse(value);
+    } catch {
+        return fallback;
+    }
+}
+
 export class L402StoreRedis implements L402Store {
     private redis: InstanceType<typeof Redis>;
 
@@ -41,7 +50,7 @@ export class L402StoreRedis implements L402Store {
         return {
             id: data.id,
             did: data.did,
-            scope: JSON.parse(data.scope),
+            scope: safeJsonParse<string[]>(data.scope, []),
             createdAt: parseInt(data.createdAt, 10),
             expiresAt: parseInt(data.expiresAt, 10),
             maxUses: parseInt(data.maxUses, 10),
@@ -95,7 +104,7 @@ export class L402StoreRedis implements L402Store {
             amountSat: parseInt(data.amountSat, 10),
             createdAt: parseInt(data.createdAt, 10),
             macaroonId: data.macaroonId,
-            scope: data.scope ? JSON.parse(data.scope) : undefined,
+            scope: data.scope ? safeJsonParse<string[] | undefined>(data.scope, undefined) : undefined,
         };
     }
 
@@ -142,6 +151,37 @@ export class L402StoreRedis implements L402Store {
         await this.redis.expire(key, windowSeconds);
     }
 
+    async checkAndRecordRequest(did: string, maxRequests: number, windowSeconds: number): Promise<RateLimitResult> {
+        const key = `l402:ratelimit:${did}`;
+        const now = Math.floor(Date.now() / 1000);
+        const windowStart = now - windowSeconds;
+        const member = `${now}-${randomBytes(8).toString('hex')}`;
+
+        // Use MULTI/EXEC for atomicity: clean old entries, add new one, count, get oldest
+        const pipeline = this.redis.multi();
+        pipeline.zremrangebyscore(key, '-inf', windowStart);
+        pipeline.zadd(key, now, member);
+        pipeline.zcard(key);
+        pipeline.zrange(key, 0, 0, 'WITHSCORES');
+        pipeline.expire(key, windowSeconds);
+        const results = await pipeline.exec();
+
+        // results[2] = [null, count], results[3] = [null, [member, score]]
+        const count = (results?.[2]?.[1] as number) || 0;
+        const oldest = (results?.[3]?.[1] as string[]) || [];
+
+        const allowed = count <= maxRequests;
+        if (!allowed) {
+            // Remove the entry we just added since request is denied
+            await this.redis.zrem(key, member);
+        }
+
+        const remaining = Math.max(0, maxRequests - (allowed ? count : count - 1));
+        const resetAt = oldest.length >= 2 ? parseInt(oldest[1], 10) + windowSeconds : now + windowSeconds;
+
+        return { allowed, remaining, resetAt };
+    }
+
     async savePendingInvoice(data: PendingInvoiceData): Promise<void> {
         const key = `l402:pending:${data.paymentHash}`;
         await this.redis.hmset(key, {
@@ -175,7 +215,7 @@ export class L402StoreRedis implements L402Store {
             macaroonId: data.macaroonId,
             serializedMacaroon: data.serializedMacaroon || '',
             did: data.did,
-            scope: JSON.parse(data.scope),
+            scope: safeJsonParse<string[]>(data.scope, []),
             amountSat: parseInt(data.amountSat, 10),
             expiresAt: parseInt(data.expiresAt, 10),
             createdAt: parseInt(data.createdAt, 10),

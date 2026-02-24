@@ -16,3 +16,13 @@ export async function recordRequest(
 ): Promise<void> {
     return store.recordRequest(did, windowSeconds);
 }
+
+/** Atomically check rate limit and record the request if allowed */
+export async function checkAndRecordRequest(
+    store: L402Store,
+    did: string,
+    maxRequests: number,
+    windowSeconds: number
+): Promise<RateLimitResult> {
+    return store.checkAndRecordRequest(did, maxRequests, windowSeconds);
+}

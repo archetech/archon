@@ -196,6 +196,16 @@ describe('L402 Macaroon', () => {
             const { paymentHash } = generateTestPreimage();
             expect(verifyPreimage('', paymentHash)).toBe(false);
         });
+
+        it('should return false for non-hex paymentHash', () => {
+            const { preimage } = generateTestPreimage();
+            expect(verifyPreimage(preimage, 'not-hex-value!')).toBe(false);
+        });
+
+        it('should return false for empty paymentHash', () => {
+            const { preimage } = generateTestPreimage();
+            expect(verifyPreimage(preimage, '')).toBe(false);
+        });
     });
 
     describe('createMacaroon validation', () => {

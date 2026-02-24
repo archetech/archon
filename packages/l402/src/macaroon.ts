@@ -87,6 +87,9 @@ export function verifyPreimage(preimage: string, paymentHash: string): boolean {
     if (!/^[0-9a-f]+$/i.test(preimage) || preimage.length === 0) {
         return false;
     }
+    if (!/^[0-9a-f]+$/i.test(paymentHash) || paymentHash.length === 0) {
+        return false;
+    }
     const hashBuf = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest();
     const expectedBuf = Buffer.from(paymentHash, 'hex');
     if (hashBuf.length !== expectedBuf.length) {

@@ -54,12 +54,16 @@ export function conditionsToCaveats(conditions: string[]): L402CaveatSet {
         case 'scope':
             caveats.scope = value.split(',').map(s => s.trim());
             break;
-        case 'expiry':
-            caveats.expiry = parseInt(value, 10);
+        case 'expiry': {
+            const expiry = parseInt(value, 10);
+            if (!isNaN(expiry)) caveats.expiry = expiry;
             break;
-        case 'max_uses':
-            caveats.maxUses = parseInt(value, 10);
+        }
+        case 'max_uses': {
+            const maxUses = parseInt(value, 10);
+            if (!isNaN(maxUses)) caveats.maxUses = maxUses;
             break;
+        }
         case 'payment_hash':
             caveats.paymentHash = value;
             break;

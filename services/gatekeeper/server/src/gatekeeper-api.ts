@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { EventEmitter } from 'events';
+import { timingSafeEqual } from 'crypto';
 import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonCache from '@didcid/gatekeeper/db/json-cache';
 import DbRedis from '@didcid/gatekeeper/db/redis';
@@ -156,7 +157,13 @@ function requireAdminKey(req: express.Request, res: express.Response, next: expr
     }
 
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.slice(7) !== config.adminApiKey) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Unauthorized — valid admin API key required' });
+        return;
+    }
+    const providedKey = Buffer.from(authHeader.slice(7));
+    const expectedKey = Buffer.from(config.adminApiKey);
+    if (providedKey.length !== expectedKey.length || !timingSafeEqual(providedKey, expectedKey)) {
         res.status(401).json({ error: 'Unauthorized — valid admin API key required' });
         return;
     }
@@ -2259,17 +2266,22 @@ if (config.l402Enabled) {
     v1router.post('/l402/pay', async (req, res) => {
         try {
             // Capture the response data by wrapping res.json
+            let responseStatusCode = 200;
             let responseData: any = null;
+            const originalStatus = res.status.bind(res);
             const originalJson = res.json.bind(res);
+            res.status = (code: number) => { responseStatusCode = code; return originalStatus(code); };
             res.json = (data: any) => { responseData = data; return originalJson(data); };
 
             await handlePaymentCompletion(l402Options!, req, res);
 
-            if (responseData) {
+            if (responseData && responseStatusCode === 200) {
                 const method = responseData.method || 'unknown';
                 const amountSat = responseData.amountSat || 0;
                 l402PaymentsTotal.inc({ method, status: 'success' });
                 l402RevenueSatsTotal.inc({ method }, amountSat);
+            } else if (responseData) {
+                l402PaymentsTotal.inc({ method: 'unknown', status: 'rejected' });
             }
         } catch (error: any) {
             l402PaymentsTotal.inc({ method: 'unknown', status: 'error' });

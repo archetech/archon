@@ -73,13 +73,37 @@ export class L402StoreMemory implements L402Store {
         this.rateLimits.set(did, timestamps);
     }
 
+    async checkAndRecordRequest(did: string, maxRequests: number, windowSeconds: number): Promise<RateLimitResult> {
+        const now = Math.floor(Date.now() / 1000);
+        const windowStart = now - windowSeconds;
+        const timestamps = (this.rateLimits.get(did) || []).filter(t => t > windowStart);
+
+        const allowed = timestamps.length < maxRequests;
+        if (allowed) {
+            timestamps.push(now);
+        }
+        this.rateLimits.set(did, timestamps);
+
+        const remaining = Math.max(0, maxRequests - timestamps.length);
+        const resetAt = timestamps.length > 0 ? timestamps[0] + windowSeconds : now + windowSeconds;
+
+        return { allowed, remaining, resetAt };
+    }
+
     async savePendingInvoice(data: PendingInvoiceData): Promise<void> {
         this.pendingInvoices.set(data.paymentHash, { ...data });
     }
 
     async getPendingInvoice(paymentHash: string): Promise<PendingInvoiceData | null> {
         const data = this.pendingInvoices.get(paymentHash);
-        return data ? { ...data } : null;
+        if (!data) return null;
+        // Auto-clean expired pending invoices
+        const now = Math.floor(Date.now() / 1000);
+        if (data.expiresAt > 0 && now >= data.expiresAt) {
+            this.pendingInvoices.delete(paymentHash);
+            return null;
+        }
+        return { ...data };
     }
 
     async deletePendingInvoice(paymentHash: string): Promise<void> {

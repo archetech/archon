@@ -71,7 +71,7 @@ export {
 export { verifyPayment } from './payment.js';
 
 // Rate Limiter
-export { checkLimit, recordRequest } from './rate-limiter.js';
+export { checkLimit, recordRequest, checkAndRecordRequest } from './rate-limiter.js';
 
 // Pricing
 export { routeToScope, getPriceForOperation, loadPricingFromEnv } from './pricing.js';

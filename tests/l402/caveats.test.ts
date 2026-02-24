@@ -97,6 +97,16 @@ describe('L402 Caveats', () => {
             expect(caveats.did).toBeUndefined();
             expect(caveats.scope).toBeUndefined();
         });
+
+        it('should skip NaN expiry values', () => {
+            const caveats = conditionsToCaveats(['expiry = not-a-number']);
+            expect(caveats.expiry).toBeUndefined();
+        });
+
+        it('should skip NaN max_uses values', () => {
+            const caveats = conditionsToCaveats(['max_uses = abc']);
+            expect(caveats.maxUses).toBeUndefined();
+        });
     });
 
     describe('validateCaveatSet', () => {

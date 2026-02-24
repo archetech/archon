@@ -96,6 +96,8 @@ export interface L402Store {
     // Rate limiting
     checkRateLimit(did: string, maxRequests: number, windowSeconds: number): Promise<RateLimitResult>;
     recordRequest(did: string, windowSeconds: number): Promise<void>;
+    /** Atomically check rate limit and record the request if allowed */
+    checkAndRecordRequest(did: string, maxRequests: number, windowSeconds: number): Promise<RateLimitResult>;
 
     // Pending invoices
     savePendingInvoice(data: PendingInvoiceData): Promise<void>;

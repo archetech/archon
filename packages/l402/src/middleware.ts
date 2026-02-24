@@ -3,7 +3,7 @@ import { randomBytes, createHash } from 'crypto';
 import macaroonsJs from 'macaroons.js';
 const { MacaroonsBuilder: MacBuilder } = macaroonsJs;
 import { createMacaroon, verifyMacaroon, extractCaveats, verifyPreimage } from './macaroon.js';
-import { checkLimit, recordRequest } from './rate-limiter.js';
+import { checkLimit, checkAndRecordRequest } from './rate-limiter.js';
 import { createInvoice } from './lightning.js';
 import { redeemCashuToken } from './cashu.js';
 import { routeToScope, getPriceForOperation } from './pricing.js';
@@ -81,6 +81,18 @@ export function createL402Middleware(options: L402MiddlewareOptions): RequestHan
             if (cashuHeader && options.cashu && options.pricing) {
                 const price = getPriceForOperation(options.pricing, req.method, path, req.body);
                 if (price) {
+                    // Rate limit direct Cashu payments (use IP since DID is not authenticated)
+                    const cashuRateLimitId = `ip:${req.ip || 'unknown'}`;
+                    const cashuRateResult = await checkAndRecordRequest(
+                        options.store,
+                        cashuRateLimitId,
+                        options.rateLimitRequests,
+                        options.rateLimitWindowSeconds
+                    );
+                    if (!cashuRateResult.allowed) {
+                        throw new RateLimitExceededError();
+                    }
+
                     try {
                         // Redeem atomically first to prevent double-spend (TOCTOU)
                         const redemption = await redeemCashuToken(options.cashu, cashuHeader);
@@ -179,16 +191,20 @@ async function handleMacaroonAuth(
     // Extract caveats to get payment hash and DID before full verification
     const caveats = extractCaveats(l402.macaroon);
 
-    // Check if the macaroon has been revoked
+    // Look up the macaroon record — reject if not found (prevents bypass after store TTL expiry)
     const macaroonId = getMacaroonId(l402.macaroon);
     const record = await options.store.getMacaroon(macaroonId);
 
-    if (record && record.revoked) {
+    if (!record) {
+        throw new InvalidMacaroonError('No macaroon record found');
+    }
+
+    if (record.revoked) {
         throw new MacaroonRevokedError();
     }
 
     // Build verification context
-    const currentUses = record?.currentUses ?? 0;
+    const currentUses = record.currentUses;
     const context = {
         did,
         scope,
@@ -209,10 +225,6 @@ async function handleMacaroonAuth(
         // For Cashu, the proof of payment is that a payment was recorded for this macaroon
         // via handlePaymentCompletion (the Cashu token was redeemed at that point).
         // The l402.proof here is a receipt/reference; verify a payment record exists.
-        if (!record) {
-            throw new PaymentVerificationError('No macaroon record found');
-        }
-        // Verify that a payment was actually recorded for this macaroon
         const payments = await options.store.getPaymentsByDid(record.did);
         const hasCashuPayment = payments.some(
             p => p.macaroonId === macaroonId && p.method === 'cashu'
@@ -229,9 +241,9 @@ async function handleMacaroonAuth(
         throw new InvalidMacaroonError('Macaroon verification failed');
     }
 
-    // Enforce rate limits on authenticated requests too
+    // Enforce rate limits on authenticated requests (atomic check-and-record)
     const rateLimitId = did || `ip:${req.ip || 'unknown'}`;
-    const rateLimitResult = await checkLimit(
+    const rateLimitResult = await checkAndRecordRequest(
         options.store,
         rateLimitId,
         options.rateLimitRequests,
@@ -242,12 +254,7 @@ async function handleMacaroonAuth(
     }
 
     // Increment usage counter
-    if (record) {
-        await options.store.incrementUsage(macaroonId);
-    }
-
-    // Record the request for rate limiting
-    await recordRequest(options.store, rateLimitId, options.rateLimitWindowSeconds);
+    await options.store.incrementUsage(macaroonId);
 
     options.hooks?.onMacaroonVerification?.('success');
     next();
@@ -260,9 +267,10 @@ async function handleChallenge(
 ): Promise<void> {
     const did = req.headers['x-did'] as string | undefined;
 
-    // Always check rate limits — use DID if available, otherwise fall back to IP
-    const rateLimitId = did || `ip:${req.ip || 'unknown'}`;
-    const rateLimitResult = await checkLimit(
+    // Always check rate limits — use IP for unauthenticated challenge requests
+    // to prevent DID header spoofing from creating unlimited rate-limit buckets
+    const rateLimitId = `ip:${req.ip || 'unknown'}`;
+    const rateLimitResult = await checkAndRecordRequest(
         options.store,
         rateLimitId,
         options.rateLimitRequests,
@@ -389,7 +397,7 @@ function getMacaroonId(macaroonStr: string): string {
         const macaroon = MacBuilder.deserialize(macaroonStr);
         return macaroon.identifier;
     } catch {
-        return '';
+        throw new InvalidMacaroonError('Malformed macaroon');
     }
 }
 
@@ -440,8 +448,11 @@ export async function handlePaymentCompletion(
             // Redeem atomically first to prevent double-spend (TOCTOU)
             const redemption = await redeemCashuToken(options.cashu, cashuToken);
             if (redemption.amount < pending.amountSat) {
+                // Delete the pending invoice — the user's tokens are already redeemed
+                // and cannot be recovered. Keeping the invoice would be misleading.
+                await options.store.deletePendingInvoice(paymentHash);
                 res.status(400).json({
-                    error: 'Insufficient Cashu payment',
+                    error: 'Insufficient Cashu payment — tokens have been redeemed but amount was insufficient. The pending invoice has been removed.',
                     required: pending.amountSat,
                     provided: redemption.amount,
                 });
@@ -449,8 +460,8 @@ export async function handlePaymentCompletion(
             }
             verifiedAmountSat = redemption.amount;
             method = 'cashu';
-        } catch (error: any) {
-            res.status(400).json({ error: `Cashu verification failed: ${error.message}` });
+        } catch {
+            res.status(400).json({ error: 'Cashu payment verification failed' });
             return;
         }
     } else {

@@ -176,6 +176,49 @@ describe('L402 Store (Memory)', () => {
         });
     });
 
+    describe('checkAndRecordRequest', () => {
+        it('should atomically check and record', async () => {
+            const result = await store.checkAndRecordRequest('did:cid:test', 5, 3600);
+            expect(result.allowed).toBe(true);
+            expect(result.remaining).toBe(4);
+
+            // Verify the request was recorded
+            const check = await store.checkRateLimit('did:cid:test', 5, 3600);
+            expect(check.remaining).toBe(4);
+        });
+
+        it('should deny when at limit and not record', async () => {
+            for (let i = 0; i < 5; i++) {
+                await store.recordRequest('did:cid:test', 3600);
+            }
+
+            const result = await store.checkAndRecordRequest('did:cid:test', 5, 3600);
+            expect(result.allowed).toBe(false);
+
+            // Verify no extra request was recorded
+            const check = await store.checkRateLimit('did:cid:test', 10, 3600);
+            expect(check.remaining).toBe(5);
+        });
+    });
+
+    describe('Pending Invoice auto-cleanup', () => {
+        it('should return null for expired pending invoices', async () => {
+            await store.savePendingInvoice({
+                paymentHash: 'expired-hash',
+                macaroonId: 'mac-001',
+                serializedMacaroon: 'token',
+                did: 'did:cid:test',
+                scope: ['resolveDID'],
+                amountSat: 100,
+                expiresAt: Math.floor(Date.now() / 1000) - 100,
+                createdAt: Math.floor(Date.now() / 1000) - 3700,
+            });
+
+            const retrieved = await store.getPendingInvoice('expired-hash');
+            expect(retrieved).toBeNull();
+        });
+    });
+
     describe('clear', () => {
         it('should clear all data', async () => {
             await store.saveMacaroon({

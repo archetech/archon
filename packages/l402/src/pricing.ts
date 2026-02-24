@@ -24,13 +24,22 @@ function normalizePath(p: string): string {
     return p.length > 1 ? p.replace(/\/+$/, '') : p;
 }
 
+// Pre-compute normalized keys for exact match lookup
+const NORMALIZED_SCOPE_MAP: Record<string, string> = {};
+for (const [pattern, scope] of Object.entries(ROUTE_SCOPE_MAP)) {
+    const separatorIdx = pattern.indexOf(':');
+    const method = pattern.slice(0, separatorIdx);
+    const path = normalizePath(pattern.slice(separatorIdx + 1));
+    NORMALIZED_SCOPE_MAP[`${method}:${path}`] = scope;
+}
+
 export function routeToScope(method: string, path: string): string {
     const normalizedPath = normalizePath(path);
 
-    // Try exact match first (with both original and normalized path patterns)
+    // Try exact match first (against normalized keys)
     const key = `${method}:${normalizedPath}`;
-    if (ROUTE_SCOPE_MAP[key]) {
-        return ROUTE_SCOPE_MAP[key];
+    if (NORMALIZED_SCOPE_MAP[key]) {
+        return NORMALIZED_SCOPE_MAP[key];
     }
 
     // Try parameterized matches

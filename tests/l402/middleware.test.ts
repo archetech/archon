@@ -196,14 +196,15 @@ describe('L402 Middleware', () => {
                 rateLimitWindowSeconds: 3600,
             });
 
-            // Fill up the rate limit
+            // Fill up the rate limit by IP (challenge path uses IP, not DID)
             for (let i = 0; i < 2; i++) {
-                await store.recordRequest(TEST_DID, 3600);
+                await store.recordRequest('ip:127.0.0.1', 3600);
             }
 
             const middleware = createL402Middleware(limitedOptions);
             const req = createMockReq({
                 path: '/api/v1/did/did:cid:test',
+                ip: '127.0.0.1',
                 headers: { 'x-did': TEST_DID },
             });
             const res = createMockRes();
@@ -675,8 +676,118 @@ describe('L402 Middleware', () => {
         });
     });
 
+    describe('Macaroon auth without store record', () => {
+        it('should reject a valid macaroon with no store record', async () => {
+            const { preimage, paymentHash } = generateTestPreimage();
+
+            const caveatSet = {
+                scope: ['resolveDID'],
+                expiry: Math.floor(Date.now() / 1000) + 3600,
+                paymentHash,
+            };
+            const token = createMacaroon(TEST_ROOT_SECRET, TEST_LOCATION, caveatSet);
+
+            // Do NOT save a macaroon record to the store
+
+            const middleware = createL402Middleware(options);
+            const req = createMockReq({
+                path: '/api/v1/did/did:cid:test',
+                method: 'GET',
+                headers: {
+                    authorization: `L402 ${token.macaroon}:${preimage}`,
+                },
+            });
+            const res = createMockRes();
+
+            await middleware(req as any, res as any, () => {});
+
+            expect(res.statusCode).toBe(401);
+            expect(res.body.error).toContain('No macaroon record found');
+        });
+    });
+
+    describe('Malformed macaroon', () => {
+        it('should reject a malformed macaroon with 401', async () => {
+            const middleware = createL402Middleware(options);
+            const req = createMockReq({
+                path: '/api/v1/did/did:cid:test',
+                method: 'GET',
+                headers: {
+                    authorization: 'L402 not-a-valid-macaroon:somepreimage',
+                },
+            });
+            const res = createMockRes();
+
+            await middleware(req as any, res as any, () => {});
+
+            expect(res.statusCode).toBe(401);
+        });
+    });
+
+    describe('Challenge rate recording', () => {
+        it('should record challenge requests in rate limiter', async () => {
+            const limitedOptions = createTestMiddlewareOptions({
+                store,
+                rateLimitRequests: 2,
+                rateLimitWindowSeconds: 3600,
+                cln: undefined, // no CLN to simplify — returns 402 without invoice
+            });
+
+            const middleware = createL402Middleware(limitedOptions);
+
+            // First request
+            const req1 = createMockReq({ path: '/api/v1/did/did:cid:test', ip: '10.0.0.1' });
+            const res1 = createMockRes();
+            await middleware(req1 as any, res1 as any, () => {});
+            expect(res1.statusCode).toBe(402);
+
+            // Second request
+            const req2 = createMockReq({ path: '/api/v1/did/did:cid:test', ip: '10.0.0.1' });
+            const res2 = createMockRes();
+            await middleware(req2 as any, res2 as any, () => {});
+            expect(res2.statusCode).toBe(402);
+
+            // Third request should be rate limited
+            const req3 = createMockReq({ path: '/api/v1/did/did:cid:test', ip: '10.0.0.1' });
+            const res3 = createMockRes();
+            await middleware(req3 as any, res3 as any, () => {});
+            expect(res3.statusCode).toBe(429);
+        });
+
+        it('should use IP not X-DID for challenge rate limiting', async () => {
+            const limitedOptions = createTestMiddlewareOptions({
+                store,
+                rateLimitRequests: 1,
+                rateLimitWindowSeconds: 3600,
+                cln: undefined,
+            });
+
+            const middleware = createL402Middleware(limitedOptions);
+
+            // First request with fake DID
+            const req1 = createMockReq({
+                path: '/api/v1/did/did:cid:test',
+                ip: '10.0.0.2',
+                headers: { 'x-did': 'did:cid:fake1' },
+            });
+            const res1 = createMockRes();
+            await middleware(req1 as any, res1 as any, () => {});
+            expect(res1.statusCode).toBe(402);
+
+            // Second request with different fake DID but same IP — should be rate limited
+            const req2 = createMockReq({
+                path: '/api/v1/did/did:cid:test',
+                ip: '10.0.0.2',
+                headers: { 'x-did': 'did:cid:fake2' },
+            });
+            const res2 = createMockRes();
+            await middleware(req2 as any, res2 as any, () => {});
+            expect(res2.statusCode).toBe(429);
+        });
+    });
+
     describe('handlePaymentCompletion (expiry)', () => {
-        it('should reject payment for expired pending invoice', async () => {
+        it('should reject payment for expired pending invoice (memory store auto-cleans)', async () => {
             const { preimage, paymentHash } = generateTestPreimage();
 
             await store.savePendingInvoice({
@@ -697,12 +808,50 @@ describe('L402 Middleware', () => {
 
             await handlePaymentCompletion(options, req as any, res as any);
 
-            expect(res.statusCode).toBe(410);
-            expect(res.body.error).toBe('Invoice has expired');
+            // Memory store auto-cleans expired invoices on read, so returns 404
+            expect(res.statusCode).toBe(404);
 
-            // Pending invoice should be cleaned up
             const pending = await store.getPendingInvoice(paymentHash);
             expect(pending).toBeNull();
+        });
+
+        it('should return 410 when invoice is found but expired (explicit expiry check)', async () => {
+            const { preimage, paymentHash } = generateTestPreimage();
+
+            // Use a far-future expiry that won't be auto-cleaned, then manually
+            // verify the middleware's explicit expiry check works by monkey-patching
+            const futureExpiry = Math.floor(Date.now() / 1000) + 3600;
+            await store.savePendingInvoice({
+                paymentHash,
+                macaroonId: 'mac-001',
+                serializedMacaroon: 'test-serialized-token',
+                did: TEST_DID,
+                scope: ['resolveDID'],
+                amountSat: 100,
+                expiresAt: futureExpiry,
+                createdAt: Math.floor(Date.now() / 1000),
+            });
+
+            // Directly mutate the stored data to simulate Redis returning a not-yet-TTL'd
+            // but logically expired invoice
+            const original = store.getPendingInvoice.bind(store);
+            store.getPendingInvoice = async (hash: string) => {
+                const data = await original(hash);
+                if (data) {
+                    data.expiresAt = Math.floor(Date.now() / 1000) - 10; // expired
+                }
+                return data;
+            };
+
+            const req = createMockReq({
+                body: { paymentHash, preimage },
+            });
+            const res = createMockRes();
+
+            await handlePaymentCompletion(options, req as any, res as any);
+
+            expect(res.statusCode).toBe(410);
+            expect(res.body.error).toBe('Invoice has expired');
         });
     });
 });

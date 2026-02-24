@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { checkInvoice, verifyPreimage } from './lightning.js';
-import { verifyCashuToken } from './cashu.js';
+import { redeemCashuToken } from './cashu.js';
 import { PaymentVerificationError } from './errors.js';
 import type { L402MiddlewareOptions, PaymentVerificationResult } from './types.js';
 
@@ -56,6 +56,11 @@ async function verifyLightningPayment(
     };
 }
 
+/**
+ * Redeems a Cashu token at the mint (atomically prevents double-spend) and returns
+ * verification result. Uses redeemCashuToken, not verifyCashuToken, to ensure
+ * the token is actually consumed.
+ */
 async function verifyCashuPayment(
     options: L402MiddlewareOptions,
     tokenStr: string
@@ -64,7 +69,7 @@ async function verifyCashuPayment(
         throw new PaymentVerificationError('Cashu not configured');
     }
 
-    const payment = await verifyCashuToken(options.cashu, tokenStr);
+    const redemption = await redeemCashuToken(options.cashu, tokenStr);
 
     // Derive a payment hash from the Cashu token for tracking
     const paymentHash = createHash('sha256').update(tokenStr).digest('hex');
@@ -73,6 +78,6 @@ async function verifyCashuPayment(
         method: 'cashu',
         verified: true,
         paymentHash,
-        amountSat: payment.amount,
+        amountSat: redemption.amount,
     };
 }
