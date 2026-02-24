@@ -69,6 +69,21 @@
       ],
       "@didcid/keymaster/wallet/*": [
         "packages/keymaster/src/db/*"
+      ],
+      "@didcid/l402": [
+        "packages/l402/src/index.ts"
+      ],
+      "@didcid/l402/types": [
+        "packages/l402/src/types.ts"
+      ],
+      "@didcid/l402/middleware": [
+        "packages/l402/src/middleware.ts"
+      ],
+      "@didcid/l402/store/memory": [
+        "packages/l402/src/store-memory.ts"
+      ],
+      "@didcid/l402/store/redis": [
+        "packages/l402/src/store-redis.ts"
       ]
     }
   },

@@ -1,0 +1,88 @@
+{
+  "name": "@didcid/l402",
+  "version": "0.4.0",
+  "description": "Archon L402 payment protocol with DID-bound macaroons",
+  "type": "module",
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.cjs",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./types": {
+      "types": "./dist/types/types.d.ts"
+    },
+    "./middleware": {
+      "import": "./dist/esm/middleware.js",
+      "require": "./dist/cjs/middleware.cjs",
+      "types": "./dist/types/middleware.d.ts"
+    },
+    "./store/memory": {
+      "import": "./dist/esm/store-memory.js",
+      "require": "./dist/cjs/store-memory.cjs",
+      "types": "./dist/types/store-memory.d.ts"
+    },
+    "./store/redis": {
+      "import": "./dist/esm/store-redis.js",
+      "require": "./dist/cjs/store-redis.cjs",
+      "types": "./dist/types/store-redis.d.ts"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "types": [
+        "./dist/types/types.d.ts"
+      ],
+      "middleware": [
+        "./dist/types/middleware.d.ts"
+      ],
+      "store/memory": [
+        "./dist/types/store-memory.d.ts"
+      ],
+      "store/redis": [
+        "./dist/types/store-redis.d.ts"
+      ]
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build:esm": "tsc -p tsconfig.json",
+    "bundle:cjs": "rollup -c rollup.cjs.config.js",
+    "build": "npm run clean && npm run build:esm && npm run bundle:cjs"
+  },
+  "keywords": [],
+  "author": "David McFadzean <davidmc@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@cashu/cashu-ts": "^2.5.0",
+    "@didcid/common": "*",
+    "axios": "^1.7.0",
+    "ioredis": "^5.4.0",
+    "macaroons.js": "^0.3.8"
+  },
+  "peerDependencies": {
+    "express": "^4.18.0 || ^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/archetech/archon.git"
+  }
+}

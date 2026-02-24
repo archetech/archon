@@ -16,6 +16,17 @@ import config from './config.js';
 import promClient from 'prom-client';
 import pino from 'pino';
 import { pinoHttp } from 'pino-http';
+import {
+    createL402Middleware,
+    handlePaymentCompletion,
+    handleRevokeMacaroon,
+    handleL402Status,
+    handleGetPayments,
+    loadPricingFromEnv,
+    L402StoreMemory,
+    L402StoreRedis,
+} from '@didcid/l402';
+import type { L402MiddlewareOptions, L402Store } from '@didcid/l402';
 
 // Initialize Prometheus metrics
 const register = promClient.register;
@@ -45,6 +56,31 @@ const eventsQueueGauge = new promClient.Gauge({
     name: 'events_queue_size',
     help: 'Number of events in the queue',
     labelNames: ['registry'],
+});
+
+// L402 metrics
+const l402PaymentsTotal = new promClient.Counter({
+    name: 'l402_payments_total',
+    help: 'Total number of L402 payments',
+    labelNames: ['method', 'status'],
+});
+
+const l402ChallengesTotal = new promClient.Counter({
+    name: 'l402_challenges_total',
+    help: 'Total number of L402 challenges issued',
+    labelNames: ['did_known'],
+});
+
+const l402MacaroonVerificationsTotal = new promClient.Counter({
+    name: 'l402_macaroon_verifications_total',
+    help: 'Total number of L402 macaroon verifications',
+    labelNames: ['result'],
+});
+
+const l402RevenueSatsTotal = new promClient.Counter({
+    name: 'l402_revenue_sats_total',
+    help: 'Total L402 revenue in satoshis',
+    labelNames: ['method'],
 });
 
 // Initialize structured logger
@@ -2168,6 +2204,106 @@ v1router.post('/query', async (req, res) => {
         res.status(500).json({ error: error.toString() });
     }
 });
+
+// L402 payment protocol middleware
+let l402Options: L402MiddlewareOptions | null = null;
+
+if (config.l402Enabled) {
+    if (!config.l402RootSecret || config.l402RootSecret.length < 32) {
+        throw new Error('ARCHON_L402_ROOT_SECRET must be set to at least 32 characters when L402 is enabled');
+    }
+
+    const l402Store: L402Store = config.l402Store === 'memory'
+        ? new L402StoreMemory()
+        : new L402StoreRedis(process.env.ARCHON_REDIS_URL);
+
+    l402Options = {
+        rootSecret: config.l402RootSecret,
+        location: `http://localhost:${config.port}`,
+        cln: config.l402ClnRestUrl ? {
+            restUrl: config.l402ClnRestUrl,
+            rune: config.l402ClnRune,
+        } : undefined,
+        cashu: config.l402CashuMintUrl ? {
+            mintUrl: config.l402CashuMintUrl,
+            trustedMints: config.l402CashuTrustedMints.length > 0
+                ? config.l402CashuTrustedMints
+                : [config.l402CashuMintUrl],
+        } : undefined,
+        defaults: {
+            amountSat: config.l402DefaultAmountSat,
+            expirySeconds: config.l402DefaultExpirySeconds,
+            scopes: config.l402DefaultScopes,
+        },
+        rateLimitRequests: config.l402RateLimitRequests,
+        rateLimitWindowSeconds: config.l402RateLimitWindowSeconds,
+        store: l402Store,
+        gatekeeper: {
+            resolveDID: (did: string) => gatekeeper.resolveDID(did),
+        },
+        pricing: loadPricingFromEnv(),
+        hooks: {
+            onChallenge: (didKnown: boolean) => {
+                l402ChallengesTotal.inc({ did_known: String(didKnown) });
+            },
+            onMacaroonVerification: (result: string) => {
+                l402MacaroonVerificationsTotal.inc({ result });
+            },
+        },
+    };
+
+    const requireL402 = createL402Middleware(l402Options);
+    v1router.use(requireL402);
+
+    // L402 payment completion endpoint
+    v1router.post('/l402/pay', async (req, res) => {
+        try {
+            // Capture the response data by wrapping res.json
+            let responseData: any = null;
+            const originalJson = res.json.bind(res);
+            res.json = (data: any) => { responseData = data; return originalJson(data); };
+
+            await handlePaymentCompletion(l402Options!, req, res);
+
+            if (responseData) {
+                const method = responseData.method || 'unknown';
+                const amountSat = responseData.amountSat || 0;
+                l402PaymentsTotal.inc({ method, status: 'success' });
+                l402RevenueSatsTotal.inc({ method }, amountSat);
+            }
+        } catch (error: any) {
+            l402PaymentsTotal.inc({ method: 'unknown', status: 'error' });
+            res.status(500).json({ error: error.toString() });
+        }
+    });
+
+    // L402 admin routes
+    v1router.get('/l402/status', requireAdminKey, async (req, res) => {
+        try {
+            await handleL402Status(l402Options!, req, res);
+        } catch (error: any) {
+            res.status(500).json({ error: error.toString() });
+        }
+    });
+
+    v1router.post('/l402/revoke', requireAdminKey, async (req, res) => {
+        try {
+            await handleRevokeMacaroon(l402Options!, req, res);
+        } catch (error: any) {
+            res.status(500).json({ error: error.toString() });
+        }
+    });
+
+    v1router.get('/l402/payments/:did', requireAdminKey, async (req, res) => {
+        try {
+            await handleGetPayments(l402Options!, req, res);
+        } catch (error: any) {
+            res.status(500).json({ error: error.toString() });
+        }
+    });
+
+    console.log('L402 payment protocol enabled');
+}
 
 app.use('/api/v1', v1router);
 
