@@ -23,9 +23,15 @@ services:
         done
 
         echo "[rtl-init] Creating rune..."
+        set -e
         mkdir -p /data/lightning/rtl
         RUNE=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+
+        if [ -z "$$RUNE" ]; then
+            echo "[rtl-init] ERROR: Failed to create rune"
+            exit 1
+        fi
 
         echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE"
         echo "[rtl-init] Rune created successfully"

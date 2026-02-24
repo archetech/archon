@@ -11,22 +11,22 @@ NODE_NAME="${RTL_NODE_NAME:-archon}"
 RTL_PASS="${RTL_PASSWORD:-changeme}"
 
 # Wait for rune file (created by rtl-init sidecar)
-echo "[rtl-init] Waiting for rune file at $RUNE_FILE..."
+echo "[rtl] Waiting for rune file at $RUNE_FILE..."
 timeout=120
 elapsed=0
 while [ ! -f "$RUNE_FILE" ]; do
     sleep 2
     elapsed=$((elapsed + 2))
     if [ $elapsed -ge $timeout ]; then
-        echo "[rtl-init] ERROR: Rune file not found after ${timeout}s"
+        echo "[rtl] ERROR: Rune file not found after ${timeout}s"
         exit 1
     fi
 done
-echo "[rtl-init] Rune file found"
+echo "[rtl] Rune file found"
 
 # Generate config if it doesn't exist
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "[rtl-init] Generating RTL-Config.json..."
+    echo "[rtl] Generating RTL-Config.json..."
     cat > "$CONFIG_FILE" << EOF
 {
   "multiPass": "$RTL_PASS",
@@ -60,10 +60,10 @@ if [ ! -f "$CONFIG_FILE" ]; then
   ]
 }
 EOF
-    echo "[rtl-init] Config generated"
+    echo "[rtl] Config generated"
 else
-    echo "[rtl-init] RTL-Config.json already exists, skipping"
+    echo "[rtl] RTL-Config.json already exists, skipping"
 fi
 
-echo "[rtl-init] Starting RTL..."
+echo "[rtl] Starting RTL..."
 exec node rtl
