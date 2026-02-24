@@ -1,0 +1,32 @@
+services:
+  drawbridge:
+    build:
+      context: .
+      dockerfile: Dockerfile.drawbridge
+    image: ghcr.io/archetech/drawbridge
+    entrypoint: ["/bin/sh", "/scripts/drawbridge-entrypoint.sh"]
+    environment:
+      - ARCHON_DRAWBRIDGE_PORT=4230
+      - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_DRAWBRIDGE_CLN_REST_URL=https://cln-mainnet-node:3001
+      - ARCHON_DRAWBRIDGE_CLN_RUNE=${ARCHON_DRAWBRIDGE_CLN_RUNE:-}
+      - ARCHON_DRAWBRIDGE_MACAROON_SECRET=${ARCHON_DRAWBRIDGE_MACAROON_SECRET:-}
+      - ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS=${ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS:-10}
+      - ARCHON_DRAWBRIDGE_INVOICE_EXPIRY=${ARCHON_DRAWBRIDGE_INVOICE_EXPIRY:-3600}
+      - ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX=${ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX:-100}
+      - ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW:-60}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - ${ARCHON_DRAWBRIDGE_PORT:-4230}:4230
+    volumes:
+      - ./scripts/drawbridge-entrypoint.sh:/scripts/drawbridge-entrypoint.sh:ro
+      - ./data/drawbridge:/data/drawbridge
+      - ./data/cln-mainnet:/data/lightning:ro
+    depends_on:
+      gatekeeper:
+        condition: service_started
+      redis:
+        condition: service_started

@@ -1,0 +1,48 @@
+services:
+  drawbridge-init:
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        RUNE_FILE=/data/lightning/drawbridge/rune.txt
+        RPC_SOCKET=/data/lightning/bitcoin/bitcoin/lightning-rpc
+
+        if [ -f "$$RUNE_FILE" ]; then
+            echo "[drawbridge-init] Rune already exists, skipping"
+            exit 0
+        fi
+
+        echo "[drawbridge-init] Waiting for lightningd..."
+        timeout=300; elapsed=0
+        while ! lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" getinfo >/dev/null 2>&1; do
+            sleep 2; elapsed=$$((elapsed + 2))
+            if [ $$elapsed -ge $$timeout ]; then
+                echo "[drawbridge-init] ERROR: lightningd not ready after $${timeout}s"
+                exit 1
+            fi
+        done
+
+        echo "[drawbridge-init] Creating rune..."
+        set -e
+        mkdir -p /data/lightning/drawbridge
+        RUNE=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
+            restrictions='[["method^invoice","method^listinvoices"]]' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+
+        if [ -z "$$RUNE" ]; then
+            echo "[drawbridge-init] ERROR: Failed to create rune"
+            exit 1
+        fi
+
+        echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE"
+        echo "[drawbridge-init] Rune created successfully (restricted to invoice methods)"
+    volumes:
+      - ./data/cln-mainnet:/data/lightning
+    depends_on:
+      - cln-mainnet-node
+    restart: "no"
+
+  drawbridge:
+    depends_on:
+      drawbridge-init:
+        condition: service_completed_successfully
