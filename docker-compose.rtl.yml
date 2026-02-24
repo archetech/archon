@@ -12,12 +12,12 @@ services:
             exit 0
         fi
 
-        echo "[rtl-init] Waiting for lightningd socket..."
-        timeout=120; elapsed=0
-        while [ ! -S "$$RPC_SOCKET" ]; do
+        echo "[rtl-init] Waiting for lightningd..."
+        timeout=300; elapsed=0
+        while ! lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" getinfo >/dev/null 2>&1; do
             sleep 2; elapsed=$$((elapsed + 2))
             if [ $$elapsed -ge $$timeout ]; then
-                echo "[rtl-init] ERROR: Socket not found after $${timeout}s"
+                echo "[rtl-init] ERROR: lightningd not ready after $${timeout}s"
                 exit 1
             fi
         done
