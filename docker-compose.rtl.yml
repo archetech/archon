@@ -1,0 +1,56 @@
+services:
+  rtl-init:
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        RUNE_FILE=/data/lightning/rtl/rune.txt
+        RPC_SOCKET=/data/lightning/bitcoin/bitcoin/lightning-rpc
+
+        if [ -f "$$RUNE_FILE" ]; then
+            echo "[rtl-init] Rune already exists, skipping"
+            exit 0
+        fi
+
+        echo "[rtl-init] Waiting for lightningd socket..."
+        timeout=120; elapsed=0
+        while [ ! -S "$$RPC_SOCKET" ]; do
+            sleep 2; elapsed=$$((elapsed + 2))
+            if [ $$elapsed -ge $$timeout ]; then
+                echo "[rtl-init] ERROR: Socket not found after $${timeout}s"
+                exit 1
+            fi
+        done
+
+        echo "[rtl-init] Creating rune..."
+        mkdir -p /data/lightning/rtl
+        RUNE=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+
+        echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE"
+        echo "[rtl-init] Rune created successfully"
+    volumes:
+      - ./data/cln-mainnet:/data/lightning
+    depends_on:
+      - cln-mainnet-node
+    restart: "no"
+
+  rtl:
+    image: shahanafarooqui/rtl:0.15.1
+    entrypoint: ["/bin/sh", "/scripts/rtl-entrypoint.sh"]
+    environment:
+      - RTL_CONFIG_PATH=/data
+      - CLN_REST_HOST=cln-mainnet-node
+      - CLN_REST_PORT=3001
+      - RTL_NODE_NAME=${ARCHON_CLN_ALIAS:-archon}
+      - RTL_PASSWORD=${ARCHON_RTL_PASSWORD:-changeme}
+    volumes:
+      - ./scripts/rtl-entrypoint.sh:/scripts/rtl-entrypoint.sh:ro
+      - ./data/cln-mainnet/rtl:/data
+    ports:
+      - "127.0.0.1:${ARCHON_RTL_PORT:-3002}:3000"
+    depends_on:
+      rtl-init:
+        condition: service_completed_successfully
+      cln-mainnet-node:
+        condition: service_started
