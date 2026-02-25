@@ -7,3 +7,5 @@ btc/
 btc-testnet4/
 btc-signet/
 cln-mainnet/
+drawbridge/*
+!drawbridge/.gitkeep
