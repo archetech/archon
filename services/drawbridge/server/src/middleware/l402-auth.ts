@@ -24,11 +24,15 @@ import type {
 // Routes that bypass L402 auth
 const UNPROTECTED_PATHS = ['/ready', '/version', '/status', '/metrics'];
 const UNPROTECTED_PREFIXES = ['/l402/'];
+// GET-only prefixes: read operations that should be publicly accessible
+const UNPROTECTED_GET_PREFIXES = ['/did/', '/ipfs/'];
 
-function isProtectedRoute(path: string): boolean {
+function isProtectedRoute(method: string, path: string): boolean {
     const basePath = path.replace(/^\/api\/v1/, '');
-    return !UNPROTECTED_PATHS.includes(basePath) &&
-        !UNPROTECTED_PREFIXES.some(prefix => basePath.startsWith(prefix));
+    if (UNPROTECTED_PATHS.includes(basePath)) return false;
+    if (UNPROTECTED_PREFIXES.some(prefix => basePath.startsWith(prefix))) return false;
+    if (method === 'GET' && UNPROTECTED_GET_PREFIXES.some(prefix => basePath.startsWith(prefix))) return false;
+    return true;
 }
 
 function parseL402Header(authHeader: string): { macaroon: string; proof: string } | null {
@@ -52,7 +56,7 @@ export function createL402Middleware(options: L402Options): RequestHandler {
     return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         const path = req.path;
 
-        if (!isProtectedRoute(path)) {
+        if (!isProtectedRoute(req.method, path)) {
             next();
             return;
         }
