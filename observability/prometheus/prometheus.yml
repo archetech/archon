@@ -21,3 +21,8 @@ scrape_configs:
     static_configs:
       - targets: ['drawbridge:4230']
     metrics_path: '/metrics'
+
+  - job_name: 'hyperswarm-mediator'
+    static_configs:
+      - targets: ['hyperswarm-mediator:4232']
+    metrics_path: '/metrics'
