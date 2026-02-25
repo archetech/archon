@@ -26,6 +26,9 @@ services:
       - ARCHON_SAT_RBF_ENABLED=${ARCHON_BTC_RBF_ENABLED}
       - ARCHON_SAT_REIMPORT=${ARCHON_BTC_REIMPORT}
       - ARCHON_SAT_DB=${ARCHON_BTC_DB}
+      - ARCHON_SAT_METRICS_PORT=4234
+    ports:
+      - "127.0.0.1:4234:4234"
     volumes:
       - ./data:/app/satoshi/data
     user: "${ARCHON_UID}:${ARCHON_GID}"

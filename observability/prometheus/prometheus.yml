@@ -26,3 +26,13 @@ scrape_configs:
     static_configs:
       - targets: ['hyperswarm-mediator:4232']
     metrics_path: '/metrics'
+
+  - job_name: 'btc-mainnet-mediator'
+    static_configs:
+      - targets: ['btc-mainnet-mediator:4234']
+    metrics_path: '/metrics'
+
+  - job_name: 'btc-signet-mediator'
+    static_configs:
+      - targets: ['btc-signet-mediator:4236']
+    metrics_path: '/metrics'

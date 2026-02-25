@@ -27,6 +27,7 @@ export interface AppConfig {
     reimport: boolean;
     db: SatoshiDB;
     dbName: string;
+    metricsPort: number;
 }
 
 function toChain(name: string | undefined): ChainName {
@@ -95,6 +96,7 @@ const config: AppConfig = {
     reimport: process.env.ARCHON_SAT_REIMPORT ? (process.env.ARCHON_SAT_REIMPORT === 'true') : true,
     db: toDB(process.env.ARCHON_SAT_DB),
     dbName: process.env.ARCHON_SAT_DB_NAME || toChain(process.env.ARCHON_SAT_CHAIN).replace(/:/g, '-'),
+    metricsPort: process.env.ARCHON_SAT_METRICS_PORT ? parseInt(process.env.ARCHON_SAT_METRICS_PORT) : 4234,
 };
 
 export default config;
