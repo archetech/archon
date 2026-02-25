@@ -11,6 +11,7 @@ const config = {
     nodeName: process.env.ARCHON_NODE_NAME || 'anon',
     protocol: process.env.ARCHON_PROTOCOL || '/ARCHON/v0.1',
     exportInterval: process.env.ARCHON_HYPR_EXPORT_INTERVAL ? parseInt(process.env.ARCHON_HYPR_EXPORT_INTERVAL) : 2,
+    metricsPort: process.env.ARCHON_HYPR_METRICS_PORT ? parseInt(process.env.ARCHON_HYPR_METRICS_PORT) : 4232,
 };
 
 export default config;
