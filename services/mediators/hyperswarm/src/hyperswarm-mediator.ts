@@ -175,12 +175,15 @@ function startMetricsServer(): void {
             res.set('Content-Type', register.contentType);
             res.end(await register.metrics());
         } catch (error: any) {
-            res.status(500).end(error.toString());
+            console.error('Metrics endpoint error:', error);
+            res.status(500).end('Internal Server Error');
         }
     });
 
     app.listen(config.metricsPort, () => {
         console.log(`Metrics server listening on port ${config.metricsPort}`);
+    }).on('error', (err) => {
+        console.error('Metrics server failed to start:', err);
     });
 }
 

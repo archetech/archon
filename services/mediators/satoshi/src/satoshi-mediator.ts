@@ -144,12 +144,15 @@ function startMetricsServer(): void {
             res.set('Content-Type', register.contentType);
             res.end(await register.metrics());
         } catch (error: any) {
-            res.status(500).end(error.toString());
+            console.error('Metrics endpoint error:', error);
+            res.status(500).end('Internal Server Error');
         }
     });
 
     app.listen(config.metricsPort, () => {
         console.log(`Metrics server listening on port ${config.metricsPort}`);
+    }).on('error', (err) => {
+        console.error('Metrics server failed to start:', err);
     });
 }
 
@@ -614,58 +617,60 @@ async function anchorBatch(): Promise<void> {
     const end = satoshiAnchorBatchDuration.startTimer();
 
     try {
-        const walletInfo = await btcClient.getWalletInfo();
+        try {
+            const walletInfo = await btcClient.getWalletInfo();
 
-        if (walletInfo.balance < config.feeMax) {
-            const address = await btcClient.getNewAddress('funds', 'bech32');
-            console.log(`Wallet has insufficient funds (${walletInfo.balance}). Send ${config.chain} to ${address}`);
-            return;
-        }
-    }
-    catch {
-        console.log(`${config.chain} node not accessible`);
-        return;
-    }
-
-    const operations = await gatekeeper.getQueue(REGISTRY);
-
-    if (operations.length > 0) {
-        console.log(JSON.stringify(operations, null, 4));
-
-        // Save each operation to IPFS and collect CIDs (canonicalize for deterministic CIDs)
-        const cids = await Promise.all(operations.map(op => {
-            const canonical = JSON.parse(cipher.canonicalizeJSON(op));
-            return gatekeeper.addJSON(canonical);
-        }));
-        const batch = { version: 1, ops: cids };
-        const did = await keymaster.createAsset({ batch }, { registry: 'hyperswarm', controller: config.nodeID });
-        const txid = await createOpReturnTxn(did);
-
-        if (txid) {
-            const ok = await gatekeeper.clearQueue(REGISTRY, operations);
-
-            if (ok) {
-                satoshiBatchesAnchored.inc();
-                const blockCount = await btcClient.getBlockCount();
-                await jsonPersister.updateDb(async (db) => {
-                    (db.registered ??= []).push({
-                        did,
-                        txid: txid!
-                    });
-                    db.pending = {
-                        txids: [txid!],
-                        blockCount
-                    };
-                    db.lastExport = new Date().toISOString();
-                });
+            if (walletInfo.balance < config.feeMax) {
+                const address = await btcClient.getNewAddress('funds', 'bech32');
+                console.log(`Wallet has insufficient funds (${walletInfo.balance}). Send ${config.chain} to ${address}`);
+                return;
             }
         }
-    }
-    else {
-        console.log(`empty ${REGISTRY} queue`);
-    }
+        catch {
+            console.log(`${config.chain} node not accessible`);
+            return;
+        }
 
-    end();
+        const operations = await gatekeeper.getQueue(REGISTRY);
+
+        if (operations.length > 0) {
+            console.log(JSON.stringify(operations, null, 4));
+
+            // Save each operation to IPFS and collect CIDs (canonicalize for deterministic CIDs)
+            const cids = await Promise.all(operations.map(op => {
+                const canonical = JSON.parse(cipher.canonicalizeJSON(op));
+                return gatekeeper.addJSON(canonical);
+            }));
+            const batch = { version: 1, ops: cids };
+            const did = await keymaster.createAsset({ batch }, { registry: 'hyperswarm', controller: config.nodeID });
+            const txid = await createOpReturnTxn(did);
+
+            if (txid) {
+                const ok = await gatekeeper.clearQueue(REGISTRY, operations);
+
+                if (ok) {
+                    satoshiBatchesAnchored.inc();
+                    const blockCount = await btcClient.getBlockCount();
+                    await jsonPersister.updateDb(async (db) => {
+                        (db.registered ??= []).push({
+                            did,
+                            txid: txid!
+                        });
+                        db.pending = {
+                            txids: [txid!],
+                            blockCount
+                        };
+                        db.lastExport = new Date().toISOString();
+                    });
+                }
+            }
+        }
+        else {
+            console.log(`empty ${REGISTRY} queue`);
+        }
+    } finally {
+        end();
+    }
 }
 
 async function importLoop(): Promise<void> {
