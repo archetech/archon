@@ -33,6 +33,9 @@ services:
       - ARCHON_SAT_RBF_ENABLED=${ARCHON_SIGNET_RBF_ENABLED}
       - ARCHON_SAT_REIMPORT=${ARCHON_SIGNET_REIMPORT}
       - ARCHON_SAT_DB=${ARCHON_SIGNET_DB}
+      - ARCHON_SAT_METRICS_PORT=4236
+    ports:
+      - "127.0.0.1:4236:4236"
     volumes:
       - ./data:/app/satoshi/data
     user: "${ARCHON_UID}:${ARCHON_GID}"

@@ -108,7 +108,10 @@ services:
       - ARCHON_NODE_NAME=${ARCHON_NODE_NAME}
       - ARCHON_PROTOCOL=${ARCHON_PROTOCOL}
       - ARCHON_HYPR_EXPORT_INTERVAL=${ARCHON_HYPR_EXPORT_INTERVAL}
+      - ARCHON_HYPR_METRICS_PORT=4232
     user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "127.0.0.1:4232:4232"
     depends_on:
       - gatekeeper
       - keymaster

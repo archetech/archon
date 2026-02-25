@@ -16,5 +16,7 @@ COPY services/mediators/satoshi ./satoshi/
 WORKDIR /app/satoshi
 RUN npm ci && npm run build
 
+EXPOSE 4234
+
 # Run...
 CMD ["node", "dist/satoshi-mediator.js"]

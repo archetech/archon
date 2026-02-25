@@ -47,6 +47,23 @@ const eventsQueueGauge = new promClient.Gauge({
     labelNames: ['registry'],
 });
 
+const didsTotalGauge = new promClient.Gauge({
+    name: 'gatekeeper_dids_total',
+    help: 'Total number of DIDs',
+});
+
+const didsByTypeGauge = new promClient.Gauge({
+    name: 'gatekeeper_dids_by_type',
+    help: 'Number of DIDs by type',
+    labelNames: ['type'],
+});
+
+const didsByRegistryGauge = new promClient.Gauge({
+    name: 'gatekeeper_dids_by_registry',
+    help: 'Number of DIDs by registry',
+    labelNames: ['registry'],
+});
+
 // Initialize structured logger
 const logger = pino({
     level: process.env.LOG_LEVEL || 'info',
@@ -2205,6 +2222,23 @@ async function checkDids() {
         }
         for (const [registry, count] of Object.entries(queueByRegistry)) {
             eventsQueueGauge.set({ registry }, count);
+        }
+    }
+
+    // Update DID count gauges
+    didsTotalGauge.set(didCheck.total || 0);
+
+    didsByTypeGauge.reset();
+    if (didCheck.byType) {
+        for (const [type, count] of Object.entries(didCheck.byType)) {
+            didsByTypeGauge.set({ type }, count as number);
+        }
+    }
+
+    didsByRegistryGauge.reset();
+    if (didCheck.byRegistry) {
+        for (const [registry, count] of Object.entries(didCheck.byRegistry)) {
+            didsByRegistryGauge.set({ registry }, count as number);
         }
     }
 }

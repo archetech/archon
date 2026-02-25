@@ -10,6 +10,8 @@ import config from './config.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
 import { DidRegistration } from '@didcid/gatekeeper/types';
+import express from 'express';
+import promClient from 'prom-client';
 
 const REGISTRY = config.chain;
 const SMART_FEE_MODE = "CONSERVATIVE";
@@ -29,6 +31,130 @@ const btcClient = new BtcClient({
 let jsonPersister: MediatorDbInterface;
 let importRunning = false;
 let exportRunning = false;
+
+// --- Prometheus metrics setup ---
+const register = promClient.register;
+promClient.collectDefaultMetrics({ register });
+
+// Gauges — updated on each /metrics scrape from db state
+const satoshiBlockHeight = new promClient.Gauge({
+    name: 'satoshi_block_height',
+    help: 'Current scanned block height',
+});
+
+const satoshiBlockCount = new promClient.Gauge({
+    name: 'satoshi_block_count',
+    help: 'Total blockchain height',
+});
+
+const satoshiBlocksPending = new promClient.Gauge({
+    name: 'satoshi_blocks_pending',
+    help: 'Remaining blocks to scan',
+});
+
+const satoshiBlocksScanned = new promClient.Gauge({
+    name: 'satoshi_blocks_scanned',
+    help: 'Total blocks scanned',
+});
+
+const satoshiTxnsScanned = new promClient.Gauge({
+    name: 'satoshi_txns_scanned',
+    help: 'Total transactions scanned',
+});
+
+const satoshiDidsDiscovered = new promClient.Gauge({
+    name: 'satoshi_dids_discovered',
+    help: 'Total DIDs found on chain',
+});
+
+const satoshiDidsRegistered = new promClient.Gauge({
+    name: 'satoshi_dids_registered',
+    help: 'Total DIDs anchored to chain',
+});
+
+const satoshiPendingTxs = new promClient.Gauge({
+    name: 'satoshi_pending_txs',
+    help: 'Count of pending broadcast transactions',
+});
+
+const satoshiImportLoopRunning = new promClient.Gauge({
+    name: 'satoshi_import_loop_running',
+    help: '1 if import loop is currently executing',
+});
+
+const satoshiExportLoopRunning = new promClient.Gauge({
+    name: 'satoshi_export_loop_running',
+    help: '1 if export loop is currently executing',
+});
+
+// Counters
+const satoshiImportErrors = new promClient.Counter({
+    name: 'satoshi_import_errors_total',
+    help: 'Failed import attempts',
+});
+
+const satoshiReorgs = new promClient.Counter({
+    name: 'satoshi_reorgs_total',
+    help: 'Chain reorganization events detected',
+});
+
+const satoshiBatchesAnchored = new promClient.Counter({
+    name: 'satoshi_batches_anchored_total',
+    help: 'Successful batch anchors to blockchain',
+});
+
+const satoshiRbfBumps = new promClient.Counter({
+    name: 'satoshi_rbf_bumps_total',
+    help: 'Replace-by-fee fee bumps',
+});
+
+// Histograms
+const satoshiImportBatchDuration = new promClient.Histogram({
+    name: 'satoshi_import_batch_duration_seconds',
+    help: 'Duration of importBatch operations in seconds',
+    buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60],
+});
+
+const satoshiAnchorBatchDuration = new promClient.Histogram({
+    name: 'satoshi_anchor_batch_duration_seconds',
+    help: 'Duration of anchorBatch operations in seconds',
+    buckets: [0.5, 1, 2, 5, 10, 30, 60, 120],
+});
+
+async function updateGauges(): Promise<void> {
+    const db = await loadDb();
+    satoshiBlockHeight.set(db.height);
+    satoshiBlockCount.set(db.blockCount);
+    satoshiBlocksPending.set(db.blocksPending);
+    satoshiBlocksScanned.set(db.blocksScanned);
+    satoshiTxnsScanned.set(db.txnsScanned);
+    satoshiDidsDiscovered.set(db.discovered.length);
+    satoshiDidsRegistered.set(db.registered.length);
+    satoshiPendingTxs.set(db.pending?.txids?.length ?? 0);
+    satoshiImportLoopRunning.set(importRunning ? 1 : 0);
+    satoshiExportLoopRunning.set(exportRunning ? 1 : 0);
+}
+
+function startMetricsServer(): void {
+    const app = express();
+
+    app.get('/metrics', async (_req, res) => {
+        try {
+            await updateGauges();
+            res.set('Content-Type', register.contentType);
+            res.end(await register.metrics());
+        } catch (error: any) {
+            console.error('Metrics endpoint error:', error);
+            res.status(500).end('Internal Server Error');
+        }
+    });
+
+    app.listen(config.metricsPort, () => {
+        console.log(`Metrics server listening on port ${config.metricsPort}`);
+    }).on('error', (err) => {
+        console.error('Metrics server failed to start:', err);
+    });
+}
 
 async function loadDb(): Promise<MediatorDb> {
     const newDb: MediatorDb = {
@@ -72,6 +198,7 @@ async function resolveScanStart(blockCount: number): Promise<number> {
         return db.height + 1;
     }
 
+    satoshiReorgs.inc();
     console.log(`Reorg detected at height ${db.height}, rewinding to a confirmed block...`);
 
     let height = db.height;
@@ -239,12 +366,16 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
     };
 
     let update: DiscoveredItem = { ...item };
+    const end = satoshiImportBatchDuration.startTimer();
 
     try {
         update.imported = await gatekeeper.importBatchByCids(cids, metadata);
         update.processed = await gatekeeper.processEvents();
     } catch (error) {
+        satoshiImportErrors.inc();
         update.error = JSON.stringify(error);
+    } finally {
+        end();
     }
 
     console.log(JSON.stringify(update, null, 4));
@@ -441,6 +572,7 @@ async function replaceByFee(): Promise<boolean> {
     const result = await btcClient.bumpFee(txid, { fee_rate });
 
     if (result.txid) {
+        satoshiRbfBumps.inc();
         const txid = result.txid;
         console.log(`RBF: Transaction broadcast with txid: ${txid}`);
         await jsonPersister.updateDb((db) => {
@@ -482,55 +614,62 @@ async function anchorBatch(): Promise<void> {
         return;
     }
 
+    const end = satoshiAnchorBatchDuration.startTimer();
+
     try {
-        const walletInfo = await btcClient.getWalletInfo();
+        try {
+            const walletInfo = await btcClient.getWalletInfo();
 
-        if (walletInfo.balance < config.feeMax) {
-            const address = await btcClient.getNewAddress('funds', 'bech32');
-            console.log(`Wallet has insufficient funds (${walletInfo.balance}). Send ${config.chain} to ${address}`);
-            return;
-        }
-    }
-    catch {
-        console.log(`${config.chain} node not accessible`);
-        return;
-    }
-
-    const operations = await gatekeeper.getQueue(REGISTRY);
-
-    if (operations.length > 0) {
-        console.log(JSON.stringify(operations, null, 4));
-
-        // Save each operation to IPFS and collect CIDs (canonicalize for deterministic CIDs)
-        const cids = await Promise.all(operations.map(op => {
-            const canonical = JSON.parse(cipher.canonicalizeJSON(op));
-            return gatekeeper.addJSON(canonical);
-        }));
-        const batch = { version: 1, ops: cids };
-        const did = await keymaster.createAsset({ batch }, { registry: 'hyperswarm', controller: config.nodeID });
-        const txid = await createOpReturnTxn(did);
-
-        if (txid) {
-            const ok = await gatekeeper.clearQueue(REGISTRY, operations);
-
-            if (ok) {
-                const blockCount = await btcClient.getBlockCount();
-                await jsonPersister.updateDb(async (db) => {
-                    (db.registered ??= []).push({
-                        did,
-                        txid: txid!
-                    });
-                    db.pending = {
-                        txids: [txid!],
-                        blockCount
-                    };
-                    db.lastExport = new Date().toISOString();
-                });
+            if (walletInfo.balance < config.feeMax) {
+                const address = await btcClient.getNewAddress('funds', 'bech32');
+                console.log(`Wallet has insufficient funds (${walletInfo.balance}). Send ${config.chain} to ${address}`);
+                return;
             }
         }
-    }
-    else {
-        console.log(`empty ${REGISTRY} queue`);
+        catch {
+            console.log(`${config.chain} node not accessible`);
+            return;
+        }
+
+        const operations = await gatekeeper.getQueue(REGISTRY);
+
+        if (operations.length > 0) {
+            console.log(JSON.stringify(operations, null, 4));
+
+            // Save each operation to IPFS and collect CIDs (canonicalize for deterministic CIDs)
+            const cids = await Promise.all(operations.map(op => {
+                const canonical = JSON.parse(cipher.canonicalizeJSON(op));
+                return gatekeeper.addJSON(canonical);
+            }));
+            const batch = { version: 1, ops: cids };
+            const did = await keymaster.createAsset({ batch }, { registry: 'hyperswarm', controller: config.nodeID });
+            const txid = await createOpReturnTxn(did);
+
+            if (txid) {
+                const ok = await gatekeeper.clearQueue(REGISTRY, operations);
+
+                if (ok) {
+                    satoshiBatchesAnchored.inc();
+                    const blockCount = await btcClient.getBlockCount();
+                    await jsonPersister.updateDb(async (db) => {
+                        (db.registered ??= []).push({
+                            did,
+                            txid: txid!
+                        });
+                        db.pending = {
+                            txids: [txid!],
+                            blockCount
+                        };
+                        db.lastExport = new Date().toISOString();
+                    });
+                }
+            }
+        }
+        else {
+            console.log(`empty ${REGISTRY} queue`);
+        }
+    } finally {
+        end();
     }
 }
 
@@ -717,6 +856,8 @@ async function main() {
         intervalSeconds: 5,
         chatty: true,
     });
+
+    startMetricsServer();
 
     await syncBlocks();
 

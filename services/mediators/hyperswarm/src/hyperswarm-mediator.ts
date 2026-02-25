@@ -4,6 +4,8 @@ import b4a from 'b4a';
 import { sha256 } from '@noble/hashes/sha256';
 import asyncLib from 'async';
 import { EventEmitter } from 'events';
+import express from 'express';
+import promClient from 'prom-client';
 
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import KeymasterClient from '@didcid/keymaster/client';
@@ -71,6 +73,120 @@ let swarm: Hyperswarm | null = null;
 let nodeKey = '';
 let nodeInfo: NodeInfo;
 
+// --- Prometheus metrics setup ---
+const register = promClient.register;
+promClient.collectDefaultMetrics({ register });
+
+const mediatorActiveConnections = new promClient.Gauge({
+    name: 'mediator_active_connections',
+    help: 'Number of currently active hyperswarm peer connections',
+});
+
+const mediatorImportQueueDepth = new promClient.Gauge({
+    name: 'mediator_import_queue_depth',
+    help: 'Number of tasks in the import queue',
+});
+
+const mediatorExportQueueDepth = new promClient.Gauge({
+    name: 'mediator_export_queue_depth',
+    help: 'Number of tasks in the export queue',
+});
+
+const mediatorSyncQueueDepth = new promClient.Gauge({
+    name: 'mediator_sync_queue_depth',
+    help: 'Number of tasks in the sync queue',
+});
+
+const mediatorKnownNodes = new promClient.Gauge({
+    name: 'mediator_known_nodes',
+    help: 'Number of known DID nodes',
+});
+
+const mediatorKnownPeers = new promClient.Gauge({
+    name: 'mediator_known_peers',
+    help: 'Number of known IPFS peers',
+});
+
+const mediatorMessagesReceived = new promClient.Counter({
+    name: 'mediator_messages_received_total',
+    help: 'Total messages received from peers',
+    labelNames: ['type'],
+});
+
+const mediatorMessagesRelayed = new promClient.Counter({
+    name: 'mediator_messages_relayed_total',
+    help: 'Total messages relayed to peers',
+});
+
+const mediatorOperationsImported = new promClient.Counter({
+    name: 'mediator_operations_imported_total',
+    help: 'Total operations imported from peers',
+});
+
+const mediatorOperationsExported = new promClient.Counter({
+    name: 'mediator_operations_exported_total',
+    help: 'Total operations exported to peers',
+});
+
+const mediatorConnectionsTotal = new promClient.Counter({
+    name: 'mediator_connections_total',
+    help: 'Total connection events',
+    labelNames: ['event'],
+});
+
+const mediatorDuplicateBatches = new promClient.Counter({
+    name: 'mediator_duplicate_batches_total',
+    help: 'Total duplicate batches detected and skipped',
+});
+
+const mediatorErrors = new promClient.Counter({
+    name: 'mediator_errors_total',
+    help: 'Total errors encountered',
+    labelNames: ['operation'],
+});
+
+const mediatorImportBatchDuration = new promClient.Histogram({
+    name: 'mediator_import_batch_duration_seconds',
+    help: 'Duration of importBatch operations in seconds',
+    buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10, 30, 60],
+});
+
+const mediatorExportDbDuration = new promClient.Histogram({
+    name: 'mediator_export_db_duration_seconds',
+    help: 'Duration of shareDb (export) operations in seconds',
+    buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120],
+});
+
+function updateGauges(): void {
+    mediatorActiveConnections.set(Object.keys(connectionInfo).length);
+    mediatorImportQueueDepth.set(importQueue.length());
+    mediatorExportQueueDepth.set(exportQueue.length());
+    mediatorSyncQueueDepth.set(syncQueue.length());
+    mediatorKnownNodes.set(Object.keys(knownNodes).length);
+    mediatorKnownPeers.set(Object.keys(knownPeers).length);
+}
+
+function startMetricsServer(): void {
+    const app = express();
+
+    app.get('/metrics', async (_req, res) => {
+        try {
+            updateGauges();
+            res.set('Content-Type', register.contentType);
+            res.end(await register.metrics());
+        } catch (error: any) {
+            console.error('Metrics endpoint error:', error);
+            res.status(500).end('Internal Server Error');
+        }
+    });
+
+    app.listen(config.metricsPort, () => {
+        console.log(`Metrics server listening on port ${config.metricsPort}`);
+    }).on('error', (err) => {
+        console.error('Metrics server failed to start:', err);
+    });
+}
+
 goodbye(() => {
     if (swarm) {
         swarm.destroy();
@@ -114,6 +230,7 @@ let syncQueue = asyncLib.queue<HyperswarmConnection, asyncLib.ErrorCallback>(
             conn.write(json);
         }
         catch (error) {
+            mediatorErrors.inc({ operation: 'sync' });
             console.log('sync error:', error);
         }
         callback();
@@ -139,6 +256,7 @@ function addConnection(conn: HyperswarmConnection): void {
         did: '',
         lastSeen: new Date().getTime(),
     };
+    mediatorConnectionsTotal.inc({ event: 'established' });
 
     const peerNames = Object.values(connectionInfo).map(info => info.peerName);
     console.log(`--- ${peerNames.length} nodes connected, detected nodes: ${peerNames.join(', ')}`);
@@ -149,6 +267,7 @@ function closeConnection(peerKey: string): void {
     console.log(`* connection closed with: ${conn.peerName} (${conn.nodeName}) *`);
 
     delete connectionInfo[peerKey];
+    mediatorConnectionsTotal.inc({ event: 'closed' });
 }
 
 function shortName(peerKey: string): string {
@@ -170,6 +289,7 @@ function sendBatch(conn: HyperswarmConnection, batch: Operation[]): number {
 
     if (json.length < limit) {
         conn.write(json);
+        mediatorOperationsExported.inc(batch.length);
         console.log(` * sent ${batch.length} ops in ${json.length} bytes`);
         return batch.length;
     }
@@ -193,6 +313,7 @@ function isStringArray(arr: any[]): arr is string[] {
 }
 
 async function shareDb(conn: HyperswarmConnection): Promise<void> {
+    const end = mediatorExportDbDuration.startTimer();
     console.time('shareDb');
     try {
         const batchSize = 1000; // export DIDs in batches of 1000 for scalability
@@ -223,7 +344,11 @@ async function shareDb(conn: HyperswarmConnection): Promise<void> {
         }
     }
     catch (error) {
+        mediatorErrors.inc({ operation: 'export' });
         console.log(error);
+    }
+    finally {
+        end();
     }
     console.timeEnd('shareDb');
 }
@@ -244,6 +369,7 @@ async function relayMsg(msg: HyperMessage): Promise<void> {
 
         if (!msg.relays.includes(peerKey)) {
             conn.connection.write(json);
+            mediatorMessagesRelayed.inc();
             console.log(`* relaying to: ${conn.peerName} (${conn.nodeName}) ${lastSeen} *`);
         }
         else {
@@ -255,6 +381,7 @@ async function relayMsg(msg: HyperMessage): Promise<void> {
 async function importBatch(batch: Operation[]): Promise<void> {
     // The batch we receive from other hyperswarm nodes includes just operations.
     // We have to wrap the operations in new events before submitting to our gatekeeper for importing
+    const end = mediatorImportBatchDuration.startTimer();
     try {
         const hash = cipher.hashJSON(batch);
         const events = [];
@@ -276,9 +403,14 @@ async function importBatch(batch: Operation[]): Promise<void> {
         const response = await gatekeeper.importBatch(events);
         console.timeEnd('importBatch');
         console.log(`* ${JSON.stringify(response)}`);
+        mediatorOperationsImported.inc(batch.length);
     }
     catch (error) {
+        mediatorErrors.inc({ operation: 'import' });
         console.error(`importBatch error: ${error}`);
+    }
+    finally {
+        end();
     }
 }
 
@@ -327,6 +459,7 @@ let importQueue = asyncLib.queue<ImportQueueTask, asyncLib.ErrorCallback>(
             }
         }
         catch (error) {
+            mediatorErrors.inc({ operation: 'import' });
             console.log('mergeBatch error:', error);
         }
         callback();
@@ -344,6 +477,7 @@ let exportQueue = asyncLib.queue<ExportQueueTask, asyncLib.ErrorCallback>(
             }
         }
         catch (error) {
+            mediatorErrors.inc({ operation: 'export' });
             console.log('shareDb error:', error);
         }
         callback();
@@ -409,6 +543,7 @@ async function addPeer(did: string): Promise<void> {
         if (!(did in badPeers)) {
             // Store time of first error so we can later implement a retry mechanism
             badPeers[did] = Date.now();
+            mediatorErrors.inc({ operation: 'peer' });
             console.error(`Error adding IPFS peer: ${did}`, error);
         }
     }
@@ -422,12 +557,14 @@ async function receiveMsg(peerKey: string, json: string): Promise<void> {
         msg = JSON.parse(json);
     }
     catch (error) {
+        mediatorErrors.inc({ operation: 'parse' });
         const jsonPreview = json.length > 80 ? `${json.slice(0, 40)}...${json.slice(-40)}` : json;
         console.log(`received invalid message from: ${conn.peerName}, JSON: ${jsonPreview}`);
         return;
     }
 
     const nodeName = msg.node || 'anon';
+    mediatorMessagesReceived.inc({ type: msg.type });
 
     console.log(`received ${msg.type} from: ${shortName(peerKey)} (${nodeName})`);
     connectionInfo[peerKey].lastSeen = new Date().getTime();
@@ -435,6 +572,8 @@ async function receiveMsg(peerKey: string, json: string): Promise<void> {
     if (msg.type === 'batch') {
         if (newBatch(msg.data)) {
             importQueue.push({ name: peerKey, msg });
+        } else {
+            mediatorDuplicateBatches.inc();
         }
         return;
     }
@@ -444,6 +583,8 @@ async function receiveMsg(peerKey: string, json: string): Promise<void> {
             importQueue.push({ name: peerKey, msg });
             msg.relays.push(peerKey);
             await relayMsg(msg);
+        } else {
+            mediatorDuplicateBatches.inc();
         }
         return;
     }
@@ -491,6 +632,7 @@ async function exportLoop(): Promise<void> {
     try {
         await flushQueue();
     } catch (error) {
+        mediatorErrors.inc({ operation: 'export' });
         console.error(`Error in exportLoop: ${error}`);
     }
 
@@ -634,6 +776,8 @@ async function main(): Promise<void> {
     };
 
     knownNodes[nodeDID] = nodeInfo;
+
+    startMetricsServer();
 
     await exportLoop();
     await keymaster.mergeData(nodeDID, { node: nodeInfo });
