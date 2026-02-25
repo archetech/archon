@@ -20,34 +20,35 @@ export async function createInvoice(
     const amountMsat = amountSat * 1000;
 
     try {
-    const response = await axios.post(
-        `${config.restUrl}/v1/invoice`,
-        {
-            amount_msat: amountMsat,
-            label,
-            description: memo,
-        },
-        {
-            headers: {
-                'Rune': config.rune,
-                'Content-Type': 'application/json',
+        const response = await axios.post(
+            `${config.restUrl}/v1/invoice`,
+            {
+                amount_msat: amountMsat,
+                label,
+                description: memo,
             },
-            httpsAgent,
-        }
-    );
+            {
+                headers: {
+                    'Rune': config.rune,
+                    'Content-Type': 'application/json',
+                },
+                httpsAgent,
+            }
+        );
 
-    const data = response.data;
+        const data = response.data;
 
-    return {
-        paymentRequest: data.bolt11,
-        paymentHash: data.payment_hash,
-        amountSat,
-        expiry: data.expires_at ? data.expires_at - Math.floor(Date.now() / 1000) : 3600,
-        label,
-    };
+        return {
+            paymentRequest: data.bolt11,
+            paymentHash: data.payment_hash,
+            amountSat,
+            expiry: data.expires_at ? data.expires_at - Math.floor(Date.now() / 1000) : 3600,
+            label,
+        };
     } catch (error: any) {
         if (error instanceof LightningUnavailableError) throw error;
-        throw new LightningUnavailableError(error.code || error.message);
+        const detail = error.response?.data?.message || error.response?.data?.error || error.code || error.message;
+        throw new LightningUnavailableError(String(detail));
     }
 }
 

@@ -28,12 +28,12 @@ else
 fi
 
 # --- CLN rune ---
-if [ -f "$RUNE_FILE" ]; then
+if [ -n "$ARCHON_DRAWBRIDGE_CLN_RUNE" ]; then
+    echo "[drawbridge] Using rune from environment"
+elif [ -f "$RUNE_FILE" ]; then
     echo "[drawbridge] Loading rune from $RUNE_FILE"
     . "$RUNE_FILE"
     export ARCHON_DRAWBRIDGE_CLN_RUNE="$LIGHTNING_RUNE"
-elif [ -n "$ARCHON_DRAWBRIDGE_CLN_RUNE" ]; then
-    echo "[drawbridge] Using rune from environment"
 else
     echo "[drawbridge] WARNING: No rune found — Lightning invoices will not work"
 fi
