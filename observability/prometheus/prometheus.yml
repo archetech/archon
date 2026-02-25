@@ -16,3 +16,8 @@ scrape_configs:
     static_configs:
       - targets: ['keymaster:4226']
     metrics_path: '/metrics'
+
+  - job_name: 'drawbridge'
+    static_configs:
+      - targets: ['drawbridge:4230']
+    metrics_path: '/metrics'
