@@ -152,27 +152,45 @@ export class RedisStore implements DrawbridgeStore {
     async checkAndRecordRequest(did: string, maxRequests: number, windowSeconds: number): Promise<RateLimitResult> {
         const key = `${PREFIX}:ratelimit:${did}`;
         const now = Math.floor(Date.now() / 1000);
-        const windowStart = now - windowSeconds;
         const member = `${now}-${randomBytes(8).toString('hex')}`;
 
-        const pipeline = this.redis.multi();
-        pipeline.zremrangebyscore(key, '-inf', windowStart);
-        pipeline.zadd(key, now, member);
-        pipeline.zcard(key);
-        pipeline.zrange(key, 0, 0, 'WITHSCORES');
-        pipeline.expire(key, windowSeconds);
-        const results = await pipeline.exec();
+        // Atomic check-and-record via Lua to avoid race conditions
+        const luaScript = `
+            local key = KEYS[1]
+            local windowStart = tonumber(ARGV[1])
+            local now = tonumber(ARGV[2])
+            local maxReqs = tonumber(ARGV[3])
+            local member = ARGV[4]
+            local windowSecs = tonumber(ARGV[5])
 
-        const count = (results?.[2]?.[1] as number) || 0;
-        const oldest = (results?.[3]?.[1] as string[]) || [];
+            redis.call('ZREMRANGEBYSCORE', key, '-inf', windowStart)
+            local count = redis.call('ZCARD', key)
 
-        const allowed = count <= maxRequests;
-        if (!allowed) {
-            await this.redis.zrem(key, member);
-        }
+            if count < maxReqs then
+                redis.call('ZADD', key, now, member)
+                redis.call('EXPIRE', key, windowSecs)
+                count = count + 1
+                local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+                local resetAt = (oldest[2] and tonumber(oldest[2]) + windowSecs) or (now + windowSecs)
+                return {1, count, resetAt}
+            else
+                redis.call('EXPIRE', key, windowSecs)
+                local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+                local resetAt = (oldest[2] and tonumber(oldest[2]) + windowSecs) or (now + windowSecs)
+                return {0, count, resetAt}
+            end
+        `;
 
-        const remaining = Math.max(0, maxRequests - (allowed ? count : count - 1));
-        const resetAt = oldest.length >= 2 ? parseInt(oldest[1], 10) + windowSeconds : now + windowSeconds;
+        const windowStart = now - windowSeconds;
+        const result = await this.redis.eval(
+            luaScript, 1, key,
+            String(windowStart), String(now), String(maxRequests), member, String(windowSeconds)
+        ) as number[];
+
+        const allowed = result[0] === 1;
+        const count = result[1];
+        const resetAt = result[2];
+        const remaining = Math.max(0, maxRequests - count);
 
         return { allowed, remaining, resetAt };
     }

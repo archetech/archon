@@ -46,3 +46,10 @@ export class InsufficientScopeError extends DrawbridgeError {
         this.name = 'InsufficientScopeError';
     }
 }
+
+export class LightningUnavailableError extends DrawbridgeError {
+    constructor(detail?: string) {
+        super(detail ? `Lightning service unavailable: ${detail}` : 'Lightning service unavailable');
+        this.name = 'LightningUnavailableError';
+    }
+}

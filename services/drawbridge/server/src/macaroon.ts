@@ -208,10 +208,10 @@ export function verifyMacaroon(
 }
 
 export function verifyPreimage(preimage: string, paymentHash: string): boolean {
-    if (!/^[0-9a-f]+$/i.test(preimage) || preimage.length === 0) {
+    if (!/^[0-9a-f]{64}$/i.test(preimage)) {
         return false;
     }
-    if (!/^[0-9a-f]+$/i.test(paymentHash) || paymentHash.length === 0) {
+    if (!/^[0-9a-f]{64}$/i.test(paymentHash)) {
         return false;
     }
     const hashBuf = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest();

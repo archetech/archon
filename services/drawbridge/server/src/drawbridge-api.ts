@@ -191,7 +191,8 @@ async function main() {
                 memoryUsage: process.memoryUsage(),
             });
         } catch (error: any) {
-            res.status(502).json({ error: `Upstream gatekeeper error: ${error.message || error}` });
+            logger.error({ err: error }, 'Gatekeeper status error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -220,7 +221,8 @@ async function main() {
             const result = await gatekeeper.listRegistries();
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -229,7 +231,8 @@ async function main() {
             const result = await gatekeeper.createDID(req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -238,7 +241,8 @@ async function main() {
             const result = await gatekeeper.generateDID(req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -253,7 +257,8 @@ async function main() {
             const result = await gatekeeper.resolveDID(req.params.did as string, Object.keys(options).length ? options : undefined);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -262,7 +267,8 @@ async function main() {
             const result = await gatekeeper.getDIDs(req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -271,7 +277,8 @@ async function main() {
             const result = await gatekeeper.exportDIDs(req.body?.dids);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -280,7 +287,8 @@ async function main() {
             const result = await gatekeeper.importDIDs(req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -289,7 +297,8 @@ async function main() {
             const result = await gatekeeper.removeDIDs(req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -298,7 +307,8 @@ async function main() {
             const result = await gatekeeper.exportBatch(req.body?.dids);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -307,7 +317,8 @@ async function main() {
             const result = await gatekeeper.importBatch(req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -316,7 +327,8 @@ async function main() {
             const result = await gatekeeper.importBatchByCids(req.body.cids, req.body.metadata);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -325,7 +337,8 @@ async function main() {
             const result = await gatekeeper.getQueue(req.params.registry as string);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -334,7 +347,8 @@ async function main() {
             const result = await gatekeeper.clearQueue(req.params.registry as string, req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -343,7 +357,8 @@ async function main() {
             const result = await gatekeeper.processEvents();
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -354,7 +369,8 @@ async function main() {
             const result = await gatekeeper.addJSON(req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -363,7 +379,8 @@ async function main() {
             const result = await gatekeeper.getJSON(req.params.cid as string);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -372,7 +389,8 @@ async function main() {
             const result = await gatekeeper.addText(req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -381,7 +399,8 @@ async function main() {
             const result = await gatekeeper.getText(req.params.cid as string);
             res.send(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -390,7 +409,8 @@ async function main() {
             const result = await gatekeeper.addData(req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -404,7 +424,8 @@ async function main() {
                 res.status(404).send('Not found');
             }
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -415,7 +436,8 @@ async function main() {
             const result = await gatekeeper.getBlock(req.params.registry as string);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -425,7 +447,8 @@ async function main() {
             const result = await gatekeeper.getBlock(req.params.registry as string, blockId);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -434,7 +457,8 @@ async function main() {
             const result = await gatekeeper.addBlock(req.params.registry as string, req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -446,7 +470,8 @@ async function main() {
             const result = await gatekeeper.searchDocs(q);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -455,7 +480,8 @@ async function main() {
             const result = await gatekeeper.queryDocs(req.body?.where || req.body);
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -466,7 +492,8 @@ async function main() {
             const result = await gatekeeper.resetDb();
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -475,7 +502,8 @@ async function main() {
             const result = await gatekeeper.verifyDb();
             res.json(result);
         } catch (error: any) {
-            res.status(502).send(error.toString());
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
@@ -499,9 +527,13 @@ async function main() {
     });
 
     // Graceful shutdown
-    const shutdown = () => {
+    const shutdown = async () => {
         logger.info('Shutting down Drawbridge...');
-        server.close(() => {
+        server.close(async () => {
+            try {
+                await (store as any).disconnect?.();
+                logger.info('Redis connection closed');
+            } catch { /* ignore */ }
             logger.info('Server closed');
             process.exit(0);
         });

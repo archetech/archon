@@ -13,7 +13,14 @@ elif [ -f "$SECRET_FILE" ]; then
 else
     echo "[drawbridge] Generating macaroon secret..."
     mkdir -p "$(dirname "$SECRET_FILE")"
-    SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+    SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" || {
+        echo "[drawbridge] ERROR: Failed to generate macaroon secret"
+        exit 1
+    }
+    if [ -z "$SECRET" ]; then
+        echo "[drawbridge] ERROR: Generated empty macaroon secret"
+        exit 1
+    fi
     echo "$SECRET" > "$SECRET_FILE"
     chmod 600 "$SECRET_FILE"
     export ARCHON_DRAWBRIDGE_MACAROON_SECRET="$SECRET"

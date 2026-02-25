@@ -11,6 +11,7 @@ import {
     RateLimitExceededError,
     InsufficientScopeError,
     PaymentVerificationError,
+    LightningUnavailableError,
 } from '../errors.js';
 import type {
     L402Options,
@@ -101,9 +102,8 @@ export function createL402Middleware(options: L402Options): RequestHandler {
                 return;
             }
 
-            const message = error instanceof Error ? error.message : 'Internal Drawbridge error';
             options.logger?.error?.({ err: error }, 'L402 middleware error');
-            if (message.includes('Lightning not configured') || message.includes('ECONNREFUSED')) {
+            if (error instanceof LightningUnavailableError) {
                 res.status(503).json({ error: 'Lightning service unavailable' });
             } else {
                 res.status(500).json({ error: 'Internal Drawbridge error' });
@@ -116,7 +116,7 @@ async function handleMacaroonAuth(
     options: L402Options,
     l402: { macaroon: string; proof: string },
     req: Request,
-    _res: Response,
+    res: Response,
     next: NextFunction
 ): Promise<void> {
     const scope = routeToScope(req.method, req.path);
@@ -167,7 +167,12 @@ async function handleMacaroonAuth(
         throw new RateLimitExceededError();
     }
 
-    await options.store.incrementUsage(macaroonId);
+    // Defer usage increment until response completes successfully
+    res.once('finish', () => {
+        if (res.statusCode < 500) {
+            options.store.incrementUsage(macaroonId);
+        }
+    });
 
     options.hooks?.onMacaroonVerification?.('success');
     next();
@@ -180,16 +185,16 @@ async function handleChallenge(
 ): Promise<void> {
     const did = req.headers['x-did'] as string | undefined;
 
-    // Rate limit challenge requests by IP
+    // Check rate limit before doing work, but only record after success
     const rateLimitId = `ip:${req.ip || 'unknown'}`;
-    const rateLimitResult = await checkAndRecordRequest(
+    const rateLimitCheck = await checkLimit(
         options.store,
         rateLimitId,
         options.rateLimitRequests,
         options.rateLimitWindowSeconds
     );
 
-    if (!rateLimitResult.allowed) {
+    if (!rateLimitCheck.allowed) {
         throw new RateLimitExceededError();
     }
 
@@ -213,6 +218,9 @@ async function handleChallenge(
         : `Drawbridge: ${scope} (${amountSat} sats)`;
 
     const invoice = await createInvoice(options.cln, amountSat, memo);
+
+    // Record rate limit only after successful invoice creation
+    await options.store.recordRequest(rateLimitId, options.rateLimitWindowSeconds);
 
     // Create macaroon with caveats
     const expiryTime = Math.floor(Date.now() / 1000) + options.defaults.expirySeconds;

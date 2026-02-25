@@ -1,6 +1,7 @@
 import axios from 'axios';
 import https from 'https';
 import { randomBytes } from 'crypto';
+import { LightningUnavailableError } from './errors.js';
 import type { ClnConfig, LightningInvoice, LightningPaymentResult } from './types.js';
 
 // CLN REST uses a self-signed certificate
@@ -12,12 +13,13 @@ export async function createInvoice(
     memo: string
 ): Promise<LightningInvoice> {
     if (!config.rune) {
-        throw new Error('Lightning not configured: ARCHON_DRAWBRIDGE_CLN_RUNE is not set');
+        throw new LightningUnavailableError('CLN rune is not configured');
     }
 
     const label = `drawbridge-${Date.now()}-${randomBytes(4).toString('hex')}`;
     const amountMsat = amountSat * 1000;
 
+    try {
     const response = await axios.post(
         `${config.restUrl}/v1/invoice`,
         {
@@ -43,6 +45,10 @@ export async function createInvoice(
         expiry: data.expires_at ? data.expires_at - Math.floor(Date.now() / 1000) : 3600,
         label,
     };
+    } catch (error: any) {
+        if (error instanceof LightningUnavailableError) throw error;
+        throw new LightningUnavailableError(error.code || error.message);
+    }
 }
 
 export async function checkInvoice(
