@@ -730,6 +730,7 @@ async function main(): Promise<void> {
 
     await keymaster.connect({
         url: config.keymasterURL,
+        apiKey: config.adminApiKey,
         waitUntilReady: true,
         intervalSeconds: 5,
         chatty: true,
