@@ -1,11 +1,12 @@
 import { Cipher, EcdsaJwkPublic, NostrKeys } from '@didcid/cipher/types';
-export type { NostrKeys } from '@didcid/cipher/types';
 import {
     GatekeeperInterface,
     DidCidDocument,
     ResolveDIDOptions,
     Proof,
 } from '@didcid/gatekeeper/types';
+
+export type { NostrKeys } from '@didcid/cipher/types';
 
 export interface Seed {
     /** Passphrase-encrypted mnemonic */
