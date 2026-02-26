@@ -4,10 +4,23 @@ import json
 
 _base_url = os.environ.get("ARCHON_KEYMASTER_URL", "http://localhost:4226")
 _keymaster_api = _base_url + "/api/v1"
+_session = requests.Session()
+_admin_api_key = os.environ.get("ARCHON_ADMIN_API_KEY", "")
+if _admin_api_key:
+    _session.headers["Authorization"] = f"Bearer {_admin_api_key}"
 
 
 class KeymasterError(Exception):
     """An error occurred while communicating with the Keymaster API."""
+
+
+def set_api_key(api_key: str):
+    global _admin_api_key
+    _admin_api_key = api_key
+    if api_key:
+        _session.headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        _session.headers.pop("Authorization", None)
 
 
 def proxy_request(method, url, **kwargs):
@@ -27,7 +40,7 @@ def proxy_request(method, url, **kwargs):
         code and response text from the server.
     """
     try:
-        response = requests.request(method, url, **kwargs)
+        response = _session.request(method, url, **kwargs)
         response.raise_for_status()
         return response.json()
     except requests.HTTPError as e:
@@ -690,7 +703,7 @@ def remove_dmail_attachment(identifier, name):
 def get_dmail_attachment(identifier, name):
     safe = requests.utils.quote(str(name), safe="")
     url = f"{_keymaster_api}/dmail/{identifier}/attachments/{safe}"
-    resp = requests.get(url)
+    resp = _session.get(url)
     try:
         resp.raise_for_status()
     except requests.HTTPError:
@@ -805,7 +818,7 @@ def list_vault_items(vault_id):
 def get_vault_item(vault_id, name):
     safe = requests.utils.quote(str(name), safe="")
     url = f"{_keymaster_api}/vaults/{vault_id}/items/{safe}"
-    resp = requests.get(url)
+    resp = _session.get(url)
     try:
         resp.raise_for_status()
     except requests.HTTPError:
@@ -816,7 +829,7 @@ def get_vault_item(vault_id, name):
 def get_ipfs_data(cid):
     safe_cid = requests.utils.quote(str(cid), safe="")
     url = f"{_keymaster_api}/ipfs/data/{safe_cid}"
-    resp = requests.get(url)
+    resp = _session.get(url)
     try:
         resp.raise_for_status()
     except requests.HTTPError:
@@ -830,7 +843,7 @@ def create_image(data, options=None):
     headers = {"Content-Type": "application/octet-stream"}
     if options:
         headers["X-Options"] = json.dumps(options)
-    resp = requests.post(f"{_keymaster_api}/images", data=data, headers=headers)
+    resp = _session.post(f"{_keymaster_api}/images", data=data, headers=headers)
     try:
         resp.raise_for_status()
     except requests.HTTPError:
@@ -844,7 +857,7 @@ def update_image(identifier, data, options=None):
     headers = {"Content-Type": "application/octet-stream"}
     if options:
         headers["X-Options"] = json.dumps(options)
-    resp = requests.put(f"{_keymaster_api}/images/{identifier}", data=data, headers=headers)
+    resp = _session.put(f"{_keymaster_api}/images/{identifier}", data=data, headers=headers)
     try:
         resp.raise_for_status()
     except requests.HTTPError:
@@ -868,7 +881,7 @@ def create_file(data, options=None):
     headers = {"Content-Type": "application/octet-stream"}
     if options:
         headers["X-Options"] = json.dumps(options)
-    resp = requests.post(f"{_keymaster_api}/files", data=data, headers=headers)
+    resp = _session.post(f"{_keymaster_api}/files", data=data, headers=headers)
     try:
         resp.raise_for_status()
     except requests.HTTPError:
@@ -882,7 +895,7 @@ def update_file(identifier, data, options=None):
     headers = {"Content-Type": "application/octet-stream"}
     if options:
         headers["X-Options"] = json.dumps(options)
-    resp = requests.put(f"{_keymaster_api}/files/{identifier}", data=data, headers=headers)
+    resp = _session.put(f"{_keymaster_api}/files/{identifier}", data=data, headers=headers)
     try:
         resp.raise_for_status()
     except requests.HTTPError:

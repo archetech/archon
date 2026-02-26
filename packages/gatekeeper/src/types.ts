@@ -122,6 +122,7 @@ export interface ImportEventsResult {
 
 export interface GatekeeperClientOptions {
     url?: string;
+    apiKey?: string;
     console?: typeof console;
     waitUntilReady?: boolean;
     intervalSeconds?: number;

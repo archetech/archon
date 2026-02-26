@@ -251,6 +251,7 @@ export interface PossiblyProofed {
 
 export interface RestClientOptions {
     url?: string;
+    apiKey?: string;
     console?: any;
     waitUntilReady?: boolean;
     intervalSeconds?: number;

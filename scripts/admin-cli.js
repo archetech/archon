@@ -462,7 +462,8 @@ program
     });
 
 async function run() {
-    gatekeeper.connect({ url: gatekeeperURL });
+    const adminApiKey = process.env.ARCHON_ADMIN_API_KEY;
+    gatekeeper.connect({ url: gatekeeperURL, apiKey: adminApiKey });
     program.parse(process.argv);
 }
 

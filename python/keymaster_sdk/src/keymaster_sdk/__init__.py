@@ -79,6 +79,7 @@ from .keymaster_sdk import (
     send_dmail,
     set_current_id,
     set_schema,
+    set_api_key,
     set_url,
     save_wallet,
     test_agent,

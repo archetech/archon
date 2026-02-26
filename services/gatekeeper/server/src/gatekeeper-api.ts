@@ -1021,7 +1021,7 @@ v1router.post('/dids/remove', requireAdminKey, async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/dids/export', async (req, res) => {
+v1router.post('/dids/export', requireAdminKey, async (req, res) => {
     try {
         const { dids } = req.body;
         const response = await gatekeeper.exportDIDs(dids);
@@ -1124,7 +1124,7 @@ v1router.post('/dids/export', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/dids/import', async (req, res) => {
+v1router.post('/dids/import', requireAdminKey, async (req, res) => {
     try {
         const dids = req.body;
         const response = await gatekeeper.importDIDs(dids);
@@ -1204,7 +1204,7 @@ v1router.post('/dids/import', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/batch/export', async (req, res) => {
+v1router.post('/batch/export', requireAdminKey, async (req, res) => {
     try {
         const { dids } = req.body;
         const response = await gatekeeper.exportBatch(dids);
@@ -1301,7 +1301,7 @@ v1router.post('/batch/export', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/batch/import', async (req, res) => {
+v1router.post('/batch/import', requireAdminKey, async (req, res) => {
     try {
         const batch = req.body;
         const response = await gatekeeper.importBatch(batch);
@@ -1368,7 +1368,7 @@ v1router.post('/batch/import', async (req, res) => {
  *                 total:
  *                   type: number
  */
-v1router.post('/batch/import/cids', async (req, res) => {
+v1router.post('/batch/import/cids', requireAdminKey, async (req, res) => {
     try {
         const { cids, metadata } = req.body;
         const response = await gatekeeper.importBatchByCids(cids, metadata);
@@ -1445,7 +1445,7 @@ v1router.post('/batch/import/cids', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.get('/queue/:registry', async (req, res) => {
+v1router.get('/queue/:registry', requireAdminKey, async (req, res) => {
     try {
         const queue = await gatekeeper.getQueue(req.params.registry);
         res.json(queue);
@@ -1519,7 +1519,7 @@ v1router.get('/queue/:registry', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/queue/:registry/clear', async (req, res) => {
+v1router.post('/queue/:registry/clear', requireAdminKey, async (req, res) => {
     try {
         const events = req.body;
         const queue = await gatekeeper.clearQueue(req.params.registry, events);
@@ -1681,7 +1681,7 @@ v1router.get('/db/verify', requireAdminKey, async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/events/process', async (req, res) => {
+v1router.post('/events/process', requireAdminKey, async (req, res) => {
     try {
         const response = await gatekeeper.processEvents();
         res.json(response);
@@ -2092,7 +2092,7 @@ v1router.get('/block/:registry/:blockId', async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/block/:registry', async (req, res) => {
+v1router.post('/block/:registry', requireAdminKey, async (req, res) => {
     try {
         const { registry } = req.params;
         const block = req.body;

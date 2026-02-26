@@ -1,3 +1,4 @@
+import fs from 'fs';
 import express from 'express';
 import morgan from 'morgan';
 import path from 'path';
@@ -138,12 +139,26 @@ const serveClient = (process.env.ARCHON_KEYMASTER_SERVE_CLIENT ?? 'true').toLowe
 if (serveClient) {
     const clientBuildDir = path.join(__dirname, '../../client/build');
 
-    // Serve the React frontend
-    app.use(express.static(clientBuildDir));
+    // Serve the React frontend (index: false so our fallback handles it)
+    app.use(express.static(clientBuildDir, { index: false }));
+
+    // SPA fallback — inject server config into index.html
+    const indexPath = path.join(clientBuildDir, 'index.html');
+    let indexHtml = '';
+    try {
+        indexHtml = fs.readFileSync(indexPath, 'utf-8');
+    } catch {
+        // Client build not available
+    }
 
     app.use((req, res, next) => {
         if (!req.path.startsWith('/api')) {
-            res.sendFile(path.join(clientBuildDir, 'index.html'));
+            if (!indexHtml) {
+                res.status(404).send('Client build not found');
+                return;
+            }
+            const configScript = `<script>window.__ARCHON_CONFIG__=${JSON.stringify({ passphraseRequired: !!config.keymasterPassphrase })};</script>`;
+            res.send(indexHtml.replace('</head>', `${configScript}</head>`));
         } else {
             next();
         }
@@ -187,6 +202,26 @@ v1router.get('/ready', async (req, res) => {
         res.status(500).send({ error: error.toString() });
     }
 });
+
+v1router.post('/login', async (req, res) => {
+    const { passphrase } = req.body;
+
+    if (!config.keymasterPassphrase) {
+        // No passphrase configured — return key directly (dev mode)
+        res.json({ adminApiKey: config.adminApiKey || '' });
+        return;
+    }
+
+    if (passphrase !== config.keymasterPassphrase) {
+        res.status(401).json({ error: 'Incorrect passphrase' });
+        return;
+    }
+
+    res.json({ adminApiKey: config.adminApiKey || '' });
+});
+
+// All routes below require admin API key (when configured)
+v1router.use(requireAdminKey);
 
 /**
  * @swagger
@@ -285,7 +320,7 @@ v1router.get('/registries', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.get('/wallet', requireAdminKey, async (req, res) => {
+v1router.get('/wallet', async (req, res) => {
     try {
         const wallet = await keymaster.loadWallet();
         res.json({ wallet });
@@ -366,7 +401,7 @@ v1router.get('/wallet', requireAdminKey, async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.put('/wallet', requireAdminKey, async (req, res) => {
+v1router.put('/wallet', async (req, res) => {
     try {
         const { wallet } = req.body;
         const ok = await keymaster.saveWallet(wallet);
@@ -451,7 +486,7 @@ v1router.put('/wallet', requireAdminKey, async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/new', requireAdminKey, async (req, res) => {
+v1router.post('/wallet/new', async (req, res) => {
     try {
         const { mnemonic, overwrite } = req.body;
         const wallet = await keymaster.newWallet(mnemonic, overwrite);
@@ -487,7 +522,7 @@ v1router.post('/wallet/new', requireAdminKey, async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/backup', requireAdminKey, async (req, res) => {
+v1router.post('/wallet/backup', async (req, res) => {
     try {
         const ok = await keymaster.backupWallet();
         res.json({ ok });
@@ -557,7 +592,7 @@ v1router.post('/wallet/backup', requireAdminKey, async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/recover', requireAdminKey, async (req, res) => {
+v1router.post('/wallet/recover', async (req, res) => {
     try {
         const wallet = await keymaster.recoverWallet();
         res.json({ wallet });
@@ -601,7 +636,7 @@ v1router.post('/wallet/recover', requireAdminKey, async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/check', requireAdminKey, async (req, res) => {
+v1router.post('/wallet/check', async (req, res) => {
     try {
         const check = await keymaster.checkWallet();
         res.json({ check });
@@ -644,7 +679,7 @@ v1router.post('/wallet/check', requireAdminKey, async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/fix', requireAdminKey, async (req, res) => {
+v1router.post('/wallet/fix', async (req, res) => {
     try {
         const fix = await keymaster.fixWallet();
         res.json({ fix });
@@ -679,7 +714,7 @@ v1router.post('/wallet/fix', requireAdminKey, async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.get('/wallet/mnemonic', requireAdminKey, async (req, res) => {
+v1router.get('/wallet/mnemonic', async (req, res) => {
     try {
         const mnemonic = await keymaster.decryptMnemonic();
         res.json({ mnemonic });
@@ -728,7 +763,7 @@ v1router.get('/wallet/mnemonic', requireAdminKey, async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/wallet/passphrase', requireAdminKey, async (req, res) => {
+v1router.post('/wallet/passphrase', async (req, res) => {
     try {
         const { passphrase } = req.body;
         const ok = await keymaster.changePassphrase(passphrase);
@@ -788,7 +823,7 @@ v1router.post('/wallet/passphrase', requireAdminKey, async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.get('/export/wallet/encrypted', requireAdminKey, async (req, res) => {
+v1router.get('/export/wallet/encrypted', async (req, res) => {
     try {
         const wallet = await keymaster.exportEncryptedWallet();
         res.json({ wallet });
@@ -995,7 +1030,7 @@ v1router.get('/did/:id', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.delete('/did/:id', requireAdminKey, async (req, res) => {
+v1router.delete('/did/:id', async (req, res) => {
     try {
         const ok = await keymaster.revokeDID(req.params.id);
         res.json({ ok });
@@ -1216,7 +1251,7 @@ v1router.get('/ids', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/ids', requireAdminKey, async (req, res) => {
+v1router.post('/ids', async (req, res) => {
     try {
         const { name, options } = req.body;
         const did = await keymaster.createId(name, options);
@@ -1311,7 +1346,7 @@ v1router.get('/ids/:id', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.delete('/ids/:id', requireAdminKey, async (req, res) => {
+v1router.delete('/ids/:id', async (req, res) => {
     try {
         const ok = await keymaster.removeId(req.params.id);
         res.json({ ok });
@@ -3257,7 +3292,7 @@ v1router.delete('/credentials/issued/:did', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/keys/rotate', requireAdminKey, async (req, res) => {
+v1router.post('/keys/rotate', async (req, res) => {
     try {
         const ok = await keymaster.rotateKeys();
         res.json({ ok });
@@ -3898,7 +3933,7 @@ v1router.put('/assets/:id', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/assets/:id/transfer', requireAdminKey, async (req, res) => {
+v1router.post('/assets/:id/transfer', async (req, res) => {
     try {
         const { controller } = req.body;
         const ok = await keymaster.transferAsset(req.params.id, controller);
