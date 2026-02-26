@@ -1,3 +1,4 @@
+import fs from 'fs';
 import express from 'express';
 import morgan from 'morgan';
 import path from 'path';
@@ -138,12 +139,26 @@ const serveClient = (process.env.ARCHON_KEYMASTER_SERVE_CLIENT ?? 'true').toLowe
 if (serveClient) {
     const clientBuildDir = path.join(__dirname, '../../client/build');
 
-    // Serve the React frontend
-    app.use(express.static(clientBuildDir));
+    // Serve the React frontend (index: false so our fallback handles it)
+    app.use(express.static(clientBuildDir, { index: false }));
+
+    // SPA fallback — inject server config into index.html
+    const indexPath = path.join(clientBuildDir, 'index.html');
+    let indexHtml = '';
+    try {
+        indexHtml = fs.readFileSync(indexPath, 'utf-8');
+    } catch {
+        // Client build not available
+    }
 
     app.use((req, res, next) => {
         if (!req.path.startsWith('/api')) {
-            res.sendFile(path.join(clientBuildDir, 'index.html'));
+            if (!indexHtml) {
+                res.status(404).send('Client build not found');
+                return;
+            }
+            const configScript = `<script>window.__ARCHON_CONFIG__=${JSON.stringify({ adminApiKey: config.adminApiKey || '' })};</script>`;
+            res.send(indexHtml.replace('</head>', `${configScript}</head>`));
         } else {
             next();
         }
