@@ -157,7 +157,7 @@ if (serveClient) {
                 res.status(404).send('Client build not found');
                 return;
             }
-            const configScript = `<script>window.__ARCHON_CONFIG__=${JSON.stringify({ adminApiKey: config.adminApiKey || '' })};</script>`;
+            const configScript = `<script>window.__ARCHON_CONFIG__=${JSON.stringify({ passphraseRequired: !!config.keymasterPassphrase })};</script>`;
             res.send(indexHtml.replace('</head>', `${configScript}</head>`));
         } else {
             next();
@@ -201,6 +201,23 @@ v1router.get('/ready', async (req, res) => {
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
     }
+});
+
+v1router.post('/login', async (req, res) => {
+    const { passphrase } = req.body;
+
+    if (!config.keymasterPassphrase) {
+        // No passphrase configured — return key directly (dev mode)
+        res.json({ adminApiKey: config.adminApiKey || '' });
+        return;
+    }
+
+    if (passphrase !== config.keymasterPassphrase) {
+        res.status(401).json({ error: 'Incorrect passphrase' });
+        return;
+    }
+
+    res.json({ adminApiKey: config.adminApiKey || '' });
 });
 
 // All routes below require admin API key (when configured)
