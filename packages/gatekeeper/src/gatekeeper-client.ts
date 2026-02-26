@@ -58,6 +58,10 @@ export default class GatekeeperClient implements GatekeeperInterface {
             this.API = `${options.url}${VERSION}`;
         }
 
+        if (options?.apiKey) {
+            this.addCustomHeader('Authorization', `Bearer ${options.apiKey}`);
+        }
+
         // Only used for unit testing
         // TBD replace console with a real logging package
         if (options?.console) {
