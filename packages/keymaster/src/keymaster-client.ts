@@ -21,6 +21,7 @@ import {
     IssueCredentialsOptions,
     KeymasterClientOptions,
     KeymasterInterface,
+    NostrKeys,
     NoticeMessage,
     PollConfig,
     StoredWallet,
@@ -425,6 +426,26 @@ export default class KeymasterClient implements KeymasterInterface {
     async removeAlias(alias: string): Promise<boolean> {
         try {
             const response = await this.axios.delete(`${this.API}/aliases/${alias}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addNostr(id?: string): Promise<NostrKeys> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr`, { id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeNostr(id?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/nostr`, { data: { id } });
             return response.data.ok;
         }
         catch (error) {

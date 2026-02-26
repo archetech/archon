@@ -1,4 +1,5 @@
-import { Cipher, EcdsaJwkPublic } from '@didcid/cipher/types';
+import { Cipher, EcdsaJwkPublic, NostrKeys } from '@didcid/cipher/types';
+export type { NostrKeys } from '@didcid/cipher/types';
 import {
     GatekeeperInterface,
     DidCidDocument,
@@ -326,6 +327,10 @@ export interface KeymasterInterface {
     addAlias(alias: string, did: string): Promise<boolean>;
     getAlias(alias: string): Promise<string | null>;
     removeAlias(alias: string): Promise<boolean>;
+
+    // Nostr
+    addNostr(id?: string): Promise<NostrKeys>;
+    removeNostr(id?: string): Promise<boolean>;
 
     // DIDs
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;

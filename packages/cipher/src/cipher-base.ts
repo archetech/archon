@@ -6,8 +6,9 @@ import { xchacha20poly1305 } from '@noble/ciphers/chacha';
 import { managedNonce } from '@noble/ciphers/webcrypto/utils'
 import { bytesToUtf8, utf8ToBytes } from '@noble/ciphers/utils';
 import { base64url } from 'multiformats/bases/base64';
-import { Cipher, HDKeyJSON, EcdsaJwkPublic, EcdsaJwkPrivate, EcdsaJwkPair } from './types.js';
+import { Cipher, HDKeyJSON, EcdsaJwkPublic, EcdsaJwkPrivate, EcdsaJwkPair, NostrKeys } from './types.js';
 import { buildJweCompact, parseJweCompact, isJweCompact } from './jwe.js';
+import { bech32 } from 'bech32';
 import canonicalizeModule from 'canonicalize';
 const canonicalize = canonicalizeModule as unknown as (input: unknown) => string;
 
@@ -54,6 +55,13 @@ export default abstract class CipherBase implements Cipher {
         const yBytes = base64url.baseDecode(jwk.y);
         const prefix = yBytes[yBytes.length - 1] % 2 === 0 ? 0x02 : 0x03;
         return new Uint8Array([prefix, ...xBytes]);
+    }
+
+    jwkToNostr(publicJwk: EcdsaJwkPublic): NostrKeys {
+        const pubkeyBytes = Buffer.from(base64url.baseDecode(publicJwk.x));
+        const pubkey = pubkeyBytes.toString('hex');
+        const npub = bech32.encode('npub', bech32.toWords(pubkeyBytes), 1000);
+        return { npub, pubkey };
     }
 
     hashMessage(msg: string | Uint8Array): string {

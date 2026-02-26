@@ -39,6 +39,7 @@ import {
     IssueCredentialsOptions,
     KeymasterInterface,
     KeymasterOptions,
+    NostrKeys,
     NoticeMessage,
     PollConfig,
     PollResults,
@@ -1698,6 +1699,22 @@ export default class Keymaster implements KeymasterInterface {
             delete wallet.aliases[alias];
         });
         return true;
+    }
+
+    async addNostr(name?: string): Promise<NostrKeys> {
+        const keypair = await this.fetchKeyPair(name);
+        if (!keypair) {
+            throw new InvalidParameterError('id');
+        }
+        const nostr = this.cipher.jwkToNostr(keypair.publicJwk);
+        const id = await this.fetchIdInfo(name);
+        await this.mergeData(id.did, { nostr });
+        return nostr;
+    }
+
+    async removeNostr(name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        return this.mergeData(id.did, { nostr: null });
     }
 
     async testAgent(id: string): Promise<boolean> {

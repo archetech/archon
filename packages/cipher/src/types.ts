@@ -26,6 +26,11 @@ export interface EcdsaJwkPair {
     privateJwk: EcdsaJwkPrivate,
 }
 
+export interface NostrKeys {
+    npub: string,
+    pubkey: string,
+}
+
 export interface ProofOfWork {
     difficulty: number,
     nonce: string,
@@ -40,6 +45,7 @@ export interface Cipher {
     generateJwk(privateKeyBytes: Uint8Array): EcdsaJwkPair,
     generateRandomJwk(): EcdsaJwkPair,
     convertJwkToCompressedBytes(jwk: EcdsaJwkPublic): Uint8Array,
+    jwkToNostr(publicJwk: EcdsaJwkPublic): NostrKeys,
 
     hashMessage(msg: string | Uint8Array): string,
     hashJSON(obj: unknown): string,

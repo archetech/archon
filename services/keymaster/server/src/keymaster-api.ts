@@ -1676,6 +1676,26 @@ v1router.delete('/aliases/:alias', async (req, res) => {
     }
 });
 
+v1router.post('/nostr', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const nostr = await keymaster.addNostr(id);
+        res.json(nostr);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+v1router.delete('/nostr', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const ok = await keymaster.removeNostr(id);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
 /**
  * @swagger
  * /challenge:
