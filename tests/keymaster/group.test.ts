@@ -42,8 +42,9 @@ describe('createGroup', () => {
         expect(doc.didDocument!.controller).toBe(ownerDid);
 
         const expectedGroup = {
+            name: groupName,
             group: {
-                name: groupName,
+                version: 2,
                 members: [],
             }
         };
@@ -59,8 +60,9 @@ describe('createGroup', () => {
         const doc = await keymaster.resolveDID(didAlias);
 
         const expectedGroup = {
+            name: groupName,
             group: {
-                name: groupName,
+                version: 2,
                 members: [],
             }
         };
@@ -650,17 +652,20 @@ describe('getGroup', () => {
         expect(group).toBeNull();
     });
 
-    it('should return old style group (TEMP during did:cid)', async () => {
+    it('should auto-upgrade V1 group to V2 format', async () => {
         await keymaster.createId('Bob');
-        const oldGroup = {
-            name: 'mock',
-            members: [],
-        };
-        const groupDid = await keymaster.createAsset(oldGroup);
+        const v1Data = { group: { name: 'legacy', members: [] } };
+        const groupDid = await keymaster.createAsset(v1Data);
 
         const group = await keymaster.getGroup(groupDid);
+        expect(group).toStrictEqual({ name: 'legacy', members: [] });
 
-        expect(group).toStrictEqual(oldGroup);
+        // Verify storage was upgraded to V2
+        const doc = await keymaster.resolveDID(groupDid);
+        expect(doc.didDocumentData).toStrictEqual({
+            name: 'legacy',
+            group: { version: 2, members: [] },
+        });
     });
 
     it('should return null if non-group DID specified', async () => {

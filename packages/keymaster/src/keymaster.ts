@@ -30,6 +30,7 @@ import {
     FileAsset,
     FixWalletResult,
     Group,
+    GroupData,
     Vault,
     VaultOptions,
     IDInfo,
@@ -2273,32 +2274,33 @@ export default class Keymaster implements KeymasterInterface {
         name: string,
         options: CreateAssetOptions = {}
     ): Promise<string> {
-        const group = {
-            name: name,
-            members: []
+        const group: GroupData = {
+            version: 2,
+            members: [],
         };
 
-        return this.createAsset({ group }, options);
+        return this.createAsset({ name, group }, options);
     }
 
     async getGroup(id: string): Promise<Group | null> {
-        const asset = await this.resolveAsset(id);
+        const asset = await this.resolveAsset(id) as any;
         if (!asset) {
             return null;
         }
 
-        // TEMP during did:cid, return old version groups
-        const castOldAsset = asset as Group;
-        if (castOldAsset.members) {
-            return castOldAsset;
+        // V2: { name, group: { version: 2, members } }
+        if (asset.group?.version === 2) {
+            return { name: asset.name, members: asset.group.members };
         }
 
-        const castAsset = asset as { group?: Group };
-        if (!castAsset.group) {
-            return null;
+        // V1: { group: { name, members } }
+        if (asset.group?.name && Array.isArray(asset.group?.members)) {
+            const group: Group = asset.group;
+            await this.mergeData(id, { name: group.name, group: { version: 2, members: group.members } });
+            return group;
         }
 
-        return castAsset.group;
+        return null;
     }
 
     async addGroupMember(
@@ -2341,9 +2343,9 @@ export default class Keymaster implements KeymasterInterface {
 
         const members = new Set(group.members);
         members.add(memberDID);
-        group.members = Array.from(members);
+        const updatedMembers = Array.from(members);
 
-        return this.mergeData(groupDID, { group });
+        return this.mergeData(groupDID, { group: { version: 2, members: updatedMembers } });
     }
 
     async removeGroupMember(
@@ -2373,9 +2375,9 @@ export default class Keymaster implements KeymasterInterface {
 
         const members = new Set(group.members);
         members.delete(memberDID);
-        group.members = Array.from(members);
+        const updatedMembers = Array.from(members);
 
-        return this.mergeData(groupDID, { group });
+        return this.mergeData(groupDID, { group: { version: 2, members: updatedMembers } });
     }
 
     async testGroup(

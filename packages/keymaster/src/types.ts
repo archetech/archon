@@ -76,6 +76,11 @@ export interface Group {
     members: string[];
 }
 
+export interface GroupData {
+    version: 2;
+    members: string[];
+}
+
 export interface CredentialSchema {
     id: string;
     type: "JsonSchema";
