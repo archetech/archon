@@ -16,6 +16,7 @@ services:
       - ARCHON_KEYMASTER_URL=http://keymaster:4226
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
       - ARCHON_SAT_CHAIN=BTC:signet
       - ARCHON_SAT_NETWORK=testnet

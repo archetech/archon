@@ -8,6 +8,7 @@ export type SatoshiDB = 'json' | 'sqlite' | 'mongodb' | 'redis';
 
 export interface AppConfig {
     nodeID?: string;
+    adminApiKey?: string;
     gatekeeperURL: string;
     keymasterURL?: string;
     chain: ChainName;
@@ -77,6 +78,7 @@ function toDB(name: string | undefined): SatoshiDB {
 
 const config: AppConfig = {
     nodeID: process.env.ARCHON_NODE_ID,
+    adminApiKey: process.env.ARCHON_ADMIN_API_KEY,
     gatekeeperURL: process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224',
     keymasterURL: process.env.ARCHON_KEYMASTER_URL,
     chain: toChain(process.env.ARCHON_SAT_CHAIN),

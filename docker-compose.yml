@@ -104,6 +104,7 @@ services:
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       - ARCHON_KEYMASTER_URL=http://keymaster:4226
       - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
       - ARCHON_NODE_NAME=${ARCHON_NODE_NAME}
       - ARCHON_PROTOCOL=${ARCHON_PROTOCOL}

@@ -845,6 +845,7 @@ async function main() {
 
     await gatekeeper.connect({
         url: config.gatekeeperURL,
+        apiKey: config.adminApiKey,
         waitUntilReady: true,
         intervalSeconds: 5,
         chatty: true,
