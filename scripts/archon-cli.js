@@ -1397,10 +1397,12 @@ program
 
 async function run() {
     const keymasterURL = process.env.ARCHON_KEYMASTER_URL || 'http://localhost:4226';
+    const adminApiKey = process.env.ARCHON_ADMIN_API_KEY;
 
     keymaster = new KeymasterClient();
     await keymaster.connect({
         url: keymasterURL,
+        apiKey: adminApiKey,
         waitUntilReady: true,
         intervalSeconds: 1,
         chatty: false,
