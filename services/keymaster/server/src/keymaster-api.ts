@@ -1696,6 +1696,26 @@ v1router.delete('/nostr', async (req, res) => {
     }
 });
 
+v1router.post('/nostr/nsec', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const nsec = await keymaster.exportNsec(id);
+        res.json({ nsec });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+v1router.post('/nostr/sign', async (req, res) => {
+    try {
+        const { event } = req.body;
+        const signed = await keymaster.signNostrEvent(event);
+        res.json(signed);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
 /**
  * @swagger
  * /challenge:

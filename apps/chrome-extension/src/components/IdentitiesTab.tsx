@@ -17,6 +17,7 @@ function IdentitiesTab() {
     const [recoverModalOpen, setRecoverModalOpen] = useState<boolean>(false);
     const [nostrKeys, setNostrKeys] = useState<NostrKeys | null>(null);
     const [removeNostrModal, setRemoveNostrModal] = useState<boolean>(false);
+    const [nsecValue, setNsecValue] = useState<string | null>(null);
     const {
         isBrowser,
         keymaster,
@@ -191,10 +192,27 @@ function IdentitiesTab() {
         try {
             await keymaster.removeNostr();
             setNostrKeys(null);
+            setNsecValue(null);
             setSuccess("Nostr keys removed");
         } catch (error: any) {
             setError(error);
         }
+    }
+
+    async function showNsec() {
+        if (!keymaster) {
+            return;
+        }
+        try {
+            const nsec = await keymaster.exportNsec();
+            setNsecValue(nsec);
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
+    function hideNsec() {
+        setNsecValue(null);
     }
 
     return (
@@ -334,6 +352,27 @@ function IdentitiesTab() {
                             Add Nostr
                         </Button>
                     )}
+                    {nostrKeys && (
+                        nsecValue ? (
+                            <Button
+                                variant="contained"
+                                color="warning"
+                                onClick={hideNsec}
+                                sx={{ whiteSpace: 'nowrap' }}
+                            >
+                                Hide nsec
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="contained"
+                                color="warning"
+                                onClick={showNsec}
+                                sx={{ whiteSpace: 'nowrap' }}
+                            >
+                                Show nsec
+                            </Button>
+                        )
+                    )}
                 </Box>
             )}
             {currentId && nostrKeys && (
@@ -345,6 +384,14 @@ function IdentitiesTab() {
                     <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
                         pubkey: {nostrKeys.pubkey}
                     </Typography>
+                    {nsecValue && (
+                        <>
+                            <br />
+                            <Typography variant="caption" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                nsec: {nsecValue}
+                            </Typography>
+                        </>
+                    )}
                 </Box>
             )}
         </Box>

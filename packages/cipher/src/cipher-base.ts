@@ -1,5 +1,6 @@
 import * as bip39 from 'bip39';
 import * as secp from '@noble/secp256k1';
+import { schnorr } from '@noble/curves/secp256k1';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha256';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
@@ -81,6 +82,18 @@ export default abstract class CipherBase implements Cipher {
         const privKey = base64url.baseDecode(privateJwk.d);
         const signature = secp.sign(msgHash, privKey);
         return signature.toCompactHex();
+    }
+
+    signSchnorr(msgHash: string, privateJwk: EcdsaJwkPrivate): string {
+        const privKey = base64url.baseDecode(privateJwk.d);
+        const msgHashBytes = Uint8Array.from(Buffer.from(msgHash, 'hex'));
+        const sig = schnorr.sign(msgHashBytes, privKey);
+        return Buffer.from(sig).toString('hex');
+    }
+
+    jwkToNsec(privateJwk: EcdsaJwkPrivate): string {
+        const privKeyBytes = base64url.baseDecode(privateJwk.d);
+        return bech32.encode('nsec', bech32.toWords(Buffer.from(privKeyBytes)), 1000);
     }
 
     verifySig(msgHash: string, sigHex: string, publicJwk: EcdsaJwkPublic): boolean {

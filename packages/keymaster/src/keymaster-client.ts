@@ -22,6 +22,7 @@ import {
     KeymasterClientOptions,
     KeymasterInterface,
     NostrKeys,
+    NostrEvent,
     NoticeMessage,
     PollConfig,
     StoredWallet,
@@ -447,6 +448,26 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.delete(`${this.API}/nostr`, { data: { id } });
             return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async exportNsec(id?: string): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr/nsec`, { id });
+            return response.data.nsec;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async signNostrEvent(event: NostrEvent): Promise<NostrEvent> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr/sign`, { event });
+            return response.data;
         }
         catch (error) {
             throwError(error);

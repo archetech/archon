@@ -31,6 +31,16 @@ export interface NostrKeys {
     pubkey: string,
 }
 
+export interface NostrEvent {
+    id?: string,
+    pubkey?: string,
+    created_at: number,
+    kind: number,
+    tags: string[][],
+    content: string,
+    sig?: string,
+}
+
 export interface ProofOfWork {
     difficulty: number,
     nonce: string,
@@ -51,7 +61,10 @@ export interface Cipher {
     hashJSON(obj: unknown): string,
 
     signHash(msgHash: string, privateJwk: EcdsaJwkPrivate): string,
+    signSchnorr(msgHash: string, privateJwk: EcdsaJwkPrivate): string,
     verifySig(msgHash: string, sigHex: string, publicJwk: EcdsaJwkPublic): boolean,
+
+    jwkToNsec(privateJwk: EcdsaJwkPrivate): string,
 
     encryptBytes(
         recipientPubKey: EcdsaJwkPublic,

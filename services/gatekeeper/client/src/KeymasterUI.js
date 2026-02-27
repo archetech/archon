@@ -234,6 +234,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [removePollOpen, setRemovePollOpen] = useState(false);
     const [removePollName, setRemovePollName] = useState("");
     const [nostrKeys, setNostrKeys] = useState(null);
+    const [nsecString, setNsecString] = useState('');
     const [pollList, setPollList] = useState([]);
     const [canVote, setCanVote] = useState(false);
     const [eligiblePolls, setEligiblePolls] = useState({});
@@ -330,6 +331,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 setSelectedId('');
                 setCurrentDID('');
                 setNostrKeys(null);
+                setNsecString('');
                 setTab('create');
             }
 
@@ -494,12 +496,26 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             if (window.confirm('Are you sure you want to remove Nostr keys?')) {
                 await keymaster.removeNostr();
                 setNostrKeys(null);
+                setNsecString('');
                 resolveId();
                 showSuccess('Nostr keys removed');
             }
         } catch (error) {
             showError(error);
         }
+    }
+
+    async function showNsec() {
+        try {
+            const nsec = await keymaster.exportNsec();
+            setNsecString(nsec);
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    function hideNsec() {
+        setNsecString('');
     }
 
     async function newChallenge() {
@@ -3220,6 +3236,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         </Button>
                                     }
                                 </Grid>
+                                {nostrKeys &&
+                                    <Grid item>
+                                        {nsecString ? (
+                                            <Button variant="contained" color="warning" onClick={hideNsec}>
+                                                Hide nsec
+                                            </Button>
+                                        ) : (
+                                            <Button variant="contained" color="warning" onClick={showNsec}>
+                                                Show nsec
+                                            </Button>
+                                        )}
+                                    </Grid>
+                                }
                             </Grid>
                             {nostrKeys &&
                                 <Box sx={{ mt: 2, mb: 1 }}>
@@ -3230,6 +3259,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                     <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
                                         <strong>pubkey:</strong> {nostrKeys.pubkey}
                                     </Typography>
+                                    {nsecString &&
+                                        <Typography variant="body2" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                            <strong>nsec:</strong> {nsecString}
+                                        </Typography>
+                                    }
                                 </Box>
                             }
                             <p />
