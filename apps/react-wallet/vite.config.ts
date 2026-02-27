@@ -10,6 +10,12 @@ export default defineConfig({
     server: {
         host: true,
         port,
+        allowedHosts: ['wallet.archon.technology', 'localhost'],
+    },
+    preview: {
+        host: true,
+        port,
+        allowedHosts: ['wallet.archon.technology', 'localhost'],
     },
     resolve: {
         alias: {
