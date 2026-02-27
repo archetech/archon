@@ -10,6 +10,7 @@ module.exports = {
         browser: path.resolve("./src/browser.tsx"),
         background: path.resolve("./src/background/background.ts"),
         contentScript: path.resolve("./src/contentScript/contentScript.ts"),
+        "nostr-provider": path.resolve("./src/contentScript/nostr-provider.ts"),
         offscreen: path.resolve("./src/offscreen/offscreen.ts"),
     },
     module: {

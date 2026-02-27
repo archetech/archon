@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { Box, Button, MenuItem, Select, TextField } from "@mui/material";
+import { Box, Button, MenuItem, Select, TextField, Typography } from "@mui/material";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
 import { useThemeContext } from "../contexts/ContextProviders";
 import { useVariablesContext } from "../contexts/VariablesProvider";
+import type { NostrKeys } from "@didcid/keymaster/types";
 
 function IdentitiesTab() {
     const [name, setName] = useState<string>("");
@@ -14,6 +15,9 @@ function IdentitiesTab() {
     const [removeCalled, setRemoveCalled] = useState<boolean>(false);
     const [renameModalOpen, setRenameModalOpen] = useState<boolean>(false);
     const [recoverModalOpen, setRecoverModalOpen] = useState<boolean>(false);
+    const [nostrKeys, setNostrKeys] = useState<NostrKeys | null>(null);
+    const [removeNostrModal, setRemoveNostrModal] = useState<boolean>(false);
+    const [nsecValue, setNsecValue] = useState<string | null>(null);
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
     const {
@@ -22,6 +26,7 @@ function IdentitiesTab() {
     } = useUIContext();
     const {
         currentId,
+        currentDID,
         registry,
         setRegistry,
         registries,
@@ -142,8 +147,78 @@ function IdentitiesTab() {
         }
     }
 
+    const refreshNostr = useCallback(async () => {
+        if (!keymaster || !currentDID) {
+            setNostrKeys(null);
+            return;
+        }
+        try {
+            const docs = await keymaster.resolveDID(currentDID);
+            const data = docs.didDocumentData as Record<string, unknown>;
+            setNostrKeys((data.nostr as NostrKeys) || null);
+        } catch {
+            setNostrKeys(null);
+        }
+    }, [keymaster, currentDID]);
+
+    useEffect(() => {
+        refreshNostr();
+    }, [refreshNostr]);
+
+    async function addNostr() {
+        if (!keymaster) {
+            return;
+        }
+        try {
+            const nostr = await keymaster.addNostr();
+            setNostrKeys(nostr);
+            setSuccess("Nostr keys added");
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
+    async function removeNostr() {
+        if (!keymaster) {
+            return;
+        }
+        setRemoveNostrModal(false);
+        try {
+            await keymaster.removeNostr();
+            setNostrKeys(null);
+            setNsecValue(null);
+            setSuccess("Nostr keys removed");
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
+    async function showNsec() {
+        if (!keymaster) {
+            return;
+        }
+        try {
+            const nsec = await keymaster.exportNsec();
+            setNsecValue(nsec);
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
+    function hideNsec() {
+        setNsecValue(null);
+    }
+
     return (
         <Box>
+            <WarningModal
+                title="Remove Nostr Keys"
+                warningText="Are you sure you want to remove Nostr keys from this identity?"
+                isOpen={removeNostrModal}
+                onClose={() => setRemoveNostrModal(false)}
+                onSubmit={removeNostr}
+            />
+
             <WarningModal
                 title="Remove Identity"
                 warningText={`Are you sure you want to remove ${currentId}?`}
@@ -212,7 +287,7 @@ function IdentitiesTab() {
                     </Button>
                 </Box>
                 {currentId && (
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'nowrap', flexDirection: 'row' }}>
+                    <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', width: '100%', flexWrap: 'wrap', flexDirection: 'row', gap: 1 }}>
                         <Button
                             variant="contained"
                             color="primary"
@@ -252,6 +327,66 @@ function IdentitiesTab() {
                         >
                             Rotate
                         </Button>
+
+                        {nostrKeys ? (
+                            <Button
+                                variant="contained"
+                                color="error"
+                                onClick={() => setRemoveNostrModal(true)}
+                                sx={{ whiteSpace: 'nowrap' }}
+                            >
+                                Remove Nostr
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={addNostr}
+                                sx={{ whiteSpace: 'nowrap' }}
+                            >
+                                Add Nostr
+                            </Button>
+                        )}
+                        {nostrKeys && (
+                            nsecValue ? (
+                                <Button
+                                    variant="contained"
+                                    color="warning"
+                                    onClick={hideNsec}
+                                    sx={{ whiteSpace: 'nowrap' }}
+                                >
+                                    Hide nsec
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="contained"
+                                    color="warning"
+                                    onClick={showNsec}
+                                    sx={{ whiteSpace: 'nowrap' }}
+                                >
+                                    Show nsec
+                                </Button>
+                            )
+                        )}
+                    </Box>
+                )}
+                {currentId && nostrKeys && (
+                    <Box sx={{ mt: 1 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                            npub: {nostrKeys.npub}
+                        </Typography>
+                        <br />
+                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                            pubkey: {nostrKeys.pubkey}
+                        </Typography>
+                        {nsecValue && (
+                            <>
+                                <br />
+                                <Typography variant="caption" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                    nsec: {nsecValue}
+                                </Typography>
+                            </>
+                        )}
                     </Box>
                 )}
             </Box>

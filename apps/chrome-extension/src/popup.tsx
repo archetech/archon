@@ -2,13 +2,21 @@ import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { ContextProviders } from "./contexts/ContextProviders";
 import PopupContent from "./components/PopupContent";
+import NostrApproval from "./components/NostrApproval";
 import "./static/extension.css";
+
+const params = new URLSearchParams(window.location.search);
+const nostrRequestId = params.get("nostrRequest");
+const nostrAutoApprove = params.get("autoApprove") === "true";
 
 const PopupUI = () => {
     const [pendingAuth, setPendingAuth] = useState<string>("");
     const [pendingCredential, setPendingCredential] = useState<string>("");
 
     useEffect(() => {
+        if (nostrRequestId) {
+            return;
+        }
         const handleMessage = (
             message: any,
             _: chrome.runtime.MessageSender,
@@ -28,6 +36,14 @@ const PopupUI = () => {
             chrome.runtime.onMessage.removeListener(handleMessage);
         };
     }, []);
+
+    if (nostrRequestId) {
+        return (
+            <ContextProviders isBrowser={false}>
+                <NostrApproval requestId={nostrRequestId} autoApprove={nostrAutoApprove} />
+            </ContextProviders>
+        );
+    }
 
     return (
         <ContextProviders pendingCredential={pendingCredential} pendingAuth={pendingAuth} isBrowser={false}>

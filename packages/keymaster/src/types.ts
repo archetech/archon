@@ -1,10 +1,12 @@
-import { Cipher, EcdsaJwkPublic } from '@didcid/cipher/types';
+import { Cipher, EcdsaJwkPublic, NostrKeys, NostrEvent } from '@didcid/cipher/types';
 import {
     GatekeeperInterface,
     DidCidDocument,
     ResolveDIDOptions,
     Proof,
 } from '@didcid/gatekeeper/types';
+
+export type { NostrKeys, NostrEvent } from '@didcid/cipher/types';
 
 export interface Seed {
     /** Passphrase-encrypted mnemonic */
@@ -326,6 +328,12 @@ export interface KeymasterInterface {
     addAlias(alias: string, did: string): Promise<boolean>;
     getAlias(alias: string): Promise<string | null>;
     removeAlias(alias: string): Promise<boolean>;
+
+    // Nostr
+    addNostr(id?: string): Promise<NostrKeys>;
+    removeNostr(id?: string): Promise<boolean>;
+    exportNsec(id?: string): Promise<string>;
+    signNostrEvent(event: NostrEvent): Promise<NostrEvent>;
 
     // DIDs
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;

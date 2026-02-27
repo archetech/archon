@@ -39,6 +39,8 @@ import {
     IssueCredentialsOptions,
     KeymasterInterface,
     KeymasterOptions,
+    NostrKeys,
+    NostrEvent,
     NoticeMessage,
     PollConfig,
     PollResults,
@@ -1698,6 +1700,54 @@ export default class Keymaster implements KeymasterInterface {
             delete wallet.aliases[alias];
         });
         return true;
+    }
+
+    async addNostr(name?: string): Promise<NostrKeys> {
+        const keypair = await this.fetchKeyPair(name);
+        if (!keypair) {
+            throw new InvalidParameterError('id');
+        }
+        const nostr = this.cipher.jwkToNostr(keypair.publicJwk);
+        const id = await this.fetchIdInfo(name);
+        await this.mergeData(id.did, { nostr });
+        return nostr;
+    }
+
+    async removeNostr(name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        return this.mergeData(id.did, { nostr: null });
+    }
+
+    async exportNsec(name?: string): Promise<string> {
+        const keypair = await this.fetchKeyPair(name);
+        if (!keypair) {
+            throw new InvalidParameterError('id');
+        }
+        return this.cipher.jwkToNsec(keypair.privateJwk);
+    }
+
+    async signNostrEvent(event: NostrEvent): Promise<NostrEvent> {
+        const keypair = await this.fetchKeyPair();
+        if (!keypair) {
+            throw new InvalidParameterError('id');
+        }
+        const nostr = this.cipher.jwkToNostr(keypair.publicJwk);
+        const serialized = JSON.stringify([
+            0,
+            nostr.pubkey,
+            event.created_at,
+            event.kind,
+            event.tags,
+            event.content,
+        ]);
+        const id = this.cipher.hashMessage(serialized);
+        const sig = this.cipher.signSchnorr(id, keypair.privateJwk);
+        return {
+            ...event,
+            id,
+            pubkey: nostr.pubkey,
+            sig,
+        };
     }
 
     async testAgent(id: string): Promise<boolean> {

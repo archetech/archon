@@ -26,6 +26,21 @@ export interface EcdsaJwkPair {
     privateJwk: EcdsaJwkPrivate,
 }
 
+export interface NostrKeys {
+    npub: string,
+    pubkey: string,
+}
+
+export interface NostrEvent {
+    id?: string,
+    pubkey?: string,
+    created_at: number,
+    kind: number,
+    tags: string[][],
+    content: string,
+    sig?: string,
+}
+
 export interface ProofOfWork {
     difficulty: number,
     nonce: string,
@@ -40,12 +55,16 @@ export interface Cipher {
     generateJwk(privateKeyBytes: Uint8Array): EcdsaJwkPair,
     generateRandomJwk(): EcdsaJwkPair,
     convertJwkToCompressedBytes(jwk: EcdsaJwkPublic): Uint8Array,
+    jwkToNostr(publicJwk: EcdsaJwkPublic): NostrKeys,
 
     hashMessage(msg: string | Uint8Array): string,
     hashJSON(obj: unknown): string,
 
     signHash(msgHash: string, privateJwk: EcdsaJwkPrivate): string,
+    signSchnorr(msgHash: string, privateJwk: EcdsaJwkPrivate): string,
     verifySig(msgHash: string, sigHex: string, publicJwk: EcdsaJwkPublic): boolean,
+
+    jwkToNsec(privateJwk: EcdsaJwkPrivate): string,
 
     encryptBytes(
         recipientPubKey: EcdsaJwkPublic,

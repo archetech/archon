@@ -2,6 +2,28 @@ import {openBrowserValues} from "../contexts/UIContext";
 
 const DEFAULT_GATEKEEPER_URL = "http://localhost:4224";
 
+interface PendingNostrRequest {
+    sendResponse: (response: any) => void;
+    method: string;
+    params?: any;
+    origin?: string;
+}
+
+const pendingNostrRequests = new Map<string, PendingNostrRequest>();
+
+async function getApprovedNostrOrigins(): Promise<string[]> {
+    const { approvedNostrOrigins = [] } = await chrome.storage.session.get("approvedNostrOrigins");
+    return approvedNostrOrigins as string[];
+}
+
+async function addApprovedNostrOrigin(origin: string): Promise<void> {
+    const origins = await getApprovedNostrOrigins();
+    if (!origins.includes(origin)) {
+        origins.push(origin);
+        await chrome.storage.session.set({ approvedNostrOrigins: origins });
+    }
+}
+
 async function ensureDefaultSettings() {
     try {
         const { gatekeeperUrl } = await chrome.storage.sync.get([
@@ -45,7 +67,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await createOffscreen();
 });
 
-chrome.runtime.onMessage.addListener((message, _, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "REQUEST_POPUP_CREDENTIAL") {
         chrome.action.openPopup(() => {
             chrome.runtime.sendMessage({
@@ -64,6 +86,51 @@ chrome.runtime.onMessage.addListener((message, _, sendResponse) => {
         sendResponse({ success: true });
     } else if (message.type === "OPEN_BROWSER_WINDOW") {
         openBrowserWindowService(message.options);
+    } else if (message.action === "NOSTR_REQUEST") {
+        const requestId = message.id as string;
+        const origin = sender?.tab?.url ? new URL(sender.tab.url).origin : "unknown";
+        pendingNostrRequests.set(requestId, {
+            sendResponse,
+            method: message.method,
+            params: message.params,
+            origin,
+        });
+        getApprovedNostrOrigins().then((origins) => {
+            const autoApprove = origins.includes(origin);
+            const popupUrl = chrome.runtime.getURL(
+                `popup.html?nostrRequest=${requestId}${autoApprove ? "&autoApprove=true" : ""}`
+            );
+            chrome.windows.create({
+                url: popupUrl,
+                type: "popup",
+                width: 500,
+                height: 340,
+                focused: !autoApprove,
+            });
+        });
+        // keep sendResponse alive by returning true below
+    } else if (message.action === "APPROVE_NOSTR_ORIGIN") {
+        addApprovedNostrOrigin(message.origin).then(() => {
+            sendResponse({ ok: true });
+        });
+    } else if (message.action === "NOSTR_RESPONSE") {
+        const pending = pendingNostrRequests.get(message.id);
+        if (pending) {
+            pendingNostrRequests.delete(message.id);
+            pending.sendResponse({ result: message.result, error: message.error });
+        }
+        sendResponse({ ok: true });
+    } else if (message.action === "GET_NOSTR_REQUEST") {
+        const pending = pendingNostrRequests.get(message.id);
+        if (pending) {
+            sendResponse({
+                method: pending.method,
+                params: pending.params,
+                origin: pending.origin,
+            });
+        } else {
+            sendResponse({ error: "Request not found" });
+        }
     }
 
     return true;

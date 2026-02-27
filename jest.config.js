@@ -38,6 +38,7 @@ const config = {
         '^\\.\\/encryption\\.js$': '<rootDir>/packages/keymaster/src/encryption.ts',
         '^\\.\\/search-index\\.js$': '<rootDir>/packages/gatekeeper/src/search-index.ts',
         '^@didcid/browser-hdkey$': '<rootDir>/packages/browser-hdkey/lib/hdkey.js',
+        '^@noble/curves/secp256k1$': '<rootDir>/node_modules/@noble/curves/secp256k1.js',
     },
     testPathIgnorePatterns: [
         "/node_modules/",

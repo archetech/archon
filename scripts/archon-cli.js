@@ -723,6 +723,32 @@ program
     });
 
 program
+    .command('add-nostr [id]')
+    .description('Derive and add nostr keys to an agent DID')
+    .action(async (id) => {
+        try {
+            const nostr = await keymaster.addNostr(id);
+            console.log(JSON.stringify(nostr, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
+    .command('remove-nostr [id]')
+    .description('Remove nostr keys from an agent DID')
+    .action(async (id) => {
+        try {
+            await keymaster.removeNostr(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
     .command('list-aliases')
     .description('List DID aliases')
     .action(async () => {
