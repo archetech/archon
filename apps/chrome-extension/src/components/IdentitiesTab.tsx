@@ -1,12 +1,13 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
-import { Box, Button, MenuItem, Select, TextField } from "@mui/material";
+import { Box, Button, MenuItem, Select, TextField, Typography } from "@mui/material";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { requestBrowserRefresh } from "../utils/utils";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
+import type { NostrKeys } from "@didcid/keymaster/types";
 
 function IdentitiesTab() {
     const [name, setName] = useState<string>("");
@@ -14,12 +15,15 @@ function IdentitiesTab() {
     const [removeCalled, setRemoveCalled] = useState<boolean>(false);
     const [renameModalOpen, setRenameModalOpen] = useState<boolean>(false);
     const [recoverModalOpen, setRecoverModalOpen] = useState<boolean>(false);
+    const [nostrKeys, setNostrKeys] = useState<NostrKeys | null>(null);
+    const [removeNostrModal, setRemoveNostrModal] = useState<boolean>(false);
     const {
         isBrowser,
         keymaster,
     } = useWalletContext();
     const {
         currentId,
+        currentDID,
         registry,
         setRegistry,
         registries,
@@ -148,8 +152,61 @@ function IdentitiesTab() {
         }
     }
 
+    const refreshNostr = useCallback(async () => {
+        if (!keymaster || !currentDID) {
+            setNostrKeys(null);
+            return;
+        }
+        try {
+            const docs = await keymaster.resolveDID(currentDID);
+            const data = docs.didDocumentData as Record<string, unknown>;
+            setNostrKeys((data.nostr as NostrKeys) || null);
+        } catch {
+            setNostrKeys(null);
+        }
+    }, [keymaster, currentDID]);
+
+    useEffect(() => {
+        refreshNostr();
+    }, [refreshNostr]);
+
+    async function addNostr() {
+        if (!keymaster) {
+            return;
+        }
+        try {
+            const nostr = await keymaster.addNostr();
+            setNostrKeys(nostr);
+            setSuccess("Nostr keys added");
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
+    async function removeNostr() {
+        if (!keymaster) {
+            return;
+        }
+        setRemoveNostrModal(false);
+        try {
+            await keymaster.removeNostr();
+            setNostrKeys(null);
+            setSuccess("Nostr keys removed");
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
     return (
         <Box>
+            <WarningModal
+                title="Remove Nostr Keys"
+                warningText="Are you sure you want to remove Nostr keys from this identity?"
+                isOpen={removeNostrModal}
+                onClose={() => setRemoveNostrModal(false)}
+                onSubmit={removeNostr}
+            />
+
             <WarningModal
                 title="Remove Identity"
                 warningText={`Are you sure you want to remove ${currentId}?`}
@@ -217,7 +274,7 @@ function IdentitiesTab() {
                 </Button>
             </Box>
             {currentId && (
-                <Box display="flex" flexDirection="row" sx={{ gap: 1, mt: 2 }}>
+                <Box display="flex" flexDirection="row" sx={{ gap: 1, mt: 2, flexWrap: 'wrap' }}>
                     <Button
                         variant="contained"
                         color="primary"
@@ -257,6 +314,37 @@ function IdentitiesTab() {
                     >
                         Rotate
                     </Button>
+
+                    {nostrKeys ? (
+                        <Button
+                            variant="contained"
+                            color="error"
+                            onClick={() => setRemoveNostrModal(true)}
+                            sx={{ whiteSpace: 'nowrap' }}
+                        >
+                            Remove Nostr
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={addNostr}
+                            sx={{ whiteSpace: 'nowrap' }}
+                        >
+                            Add Nostr
+                        </Button>
+                    )}
+                </Box>
+            )}
+            {currentId && nostrKeys && (
+                <Box sx={{ mt: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                        npub: {nostrKeys.npub}
+                    </Typography>
+                    <br />
+                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                        pubkey: {nostrKeys.pubkey}
+                    </Typography>
                 </Box>
             )}
         </Box>

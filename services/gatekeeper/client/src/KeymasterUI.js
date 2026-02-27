@@ -233,6 +233,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [renameOldPollName, setRenameOldPollName] = useState("");
     const [removePollOpen, setRemovePollOpen] = useState(false);
     const [removePollName, setRemovePollName] = useState("");
+    const [nostrKeys, setNostrKeys] = useState(null);
     const [pollList, setPollList] = useState([]);
     const [canVote, setCanVote] = useState(false);
     const [eligiblePolls, setEligiblePolls] = useState({});
@@ -307,6 +308,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 const docs = await keymaster.resolveDID(currentId);
                 setCurrentDID(docs.didDocument.id);
                 setManifest(docs.didDocumentData.manifest);
+                setNostrKeys(docs.didDocumentData.nostr || null);
                 setDocsString(JSON.stringify(docs, null, 4));
 
                 const versions = docs.didDocumentMetadata.version ?? 1;
@@ -327,6 +329,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 setCurrentId('');
                 setSelectedId('');
                 setCurrentDID('');
+                setNostrKeys(null);
                 setTab('create');
             }
 
@@ -398,6 +401,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         try {
             const docs = await keymaster.resolveDID(selectedId);
             setManifest(docs.didDocumentData.manifest);
+            setNostrKeys(docs.didDocumentData.nostr || null);
             setDocsString(JSON.stringify(docs, null, 4));
 
             const versions = docs.didDocumentMetadata.version ?? 1;
@@ -469,6 +473,30 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         try {
             await keymaster.rotateKeys();
             refreshAll();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function addNostr() {
+        try {
+            const nostr = await keymaster.addNostr();
+            setNostrKeys(nostr);
+            resolveId();
+            showSuccess('Nostr keys added');
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function removeNostr() {
+        try {
+            if (window.confirm('Are you sure you want to remove Nostr keys?')) {
+                await keymaster.removeNostr();
+                setNostrKeys(null);
+                resolveId();
+                showSuccess('Nostr keys removed');
+            }
         } catch (error) {
             showError(error);
         }
@@ -3181,7 +3209,29 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                         Rotate keys
                                     </Button>
                                 </Grid>
+                                <Grid item>
+                                    {nostrKeys ?
+                                        <Button variant="contained" color="error" onClick={removeNostr}>
+                                            Remove Nostr
+                                        </Button>
+                                        :
+                                        <Button variant="contained" color="primary" onClick={addNostr}>
+                                            Add Nostr
+                                        </Button>
+                                    }
+                                </Grid>
                             </Grid>
+                            {nostrKeys &&
+                                <Box sx={{ mt: 2, mb: 1 }}>
+                                    <Typography variant="subtitle2" gutterBottom>Nostr Keys</Typography>
+                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                        <strong>npub:</strong> {nostrKeys.npub}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                        <strong>pubkey:</strong> {nostrKeys.pubkey}
+                                    </Typography>
+                                </Box>
+                            }
                             <p />
                             {!widget &&
                                 <Box>
