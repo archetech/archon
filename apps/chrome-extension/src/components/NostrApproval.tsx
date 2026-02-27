@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { Box, Button, Typography, CircularProgress } from "@mui/material";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Box, Button, Checkbox, FormControlLabel, Typography, CircularProgress } from "@mui/material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 
 interface NostrApprovalProps {
     requestId: string;
+    autoApprove?: boolean;
 }
 
-export default function NostrApproval({ requestId }: NostrApprovalProps) {
+export default function NostrApproval({ requestId, autoApprove }: NostrApprovalProps) {
     const { keymaster } = useWalletContext();
     const { currentDID } = useVariablesContext();
     const [method, setMethod] = useState<string>("");
@@ -15,6 +16,13 @@ export default function NostrApproval({ requestId }: NostrApprovalProps) {
     const [origin, setOrigin] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(true);
     const [processing, setProcessing] = useState<boolean>(false);
+    const [alwaysApprove, setAlwaysApprove] = useState<boolean>(false);
+    const autoApproved = useRef(false);
+
+    useEffect(() => {
+        document.documentElement.style.overflow = "hidden";
+        document.body.style.overflow = "hidden";
+    }, []);
 
     useEffect(() => {
         chrome.runtime.sendMessage(
@@ -30,13 +38,16 @@ export default function NostrApproval({ requestId }: NostrApprovalProps) {
         );
     }, [requestId]);
 
-    async function handleApprove() {
+    const handleApprove = useCallback(async () => {
         if (!keymaster) {
             sendError("Wallet not initialized");
             return;
         }
         setProcessing(true);
         try {
+            if (alwaysApprove) {
+                chrome.runtime.sendMessage({ action: "APPROVE_NOSTR_ORIGIN", origin });
+            }
             let result: any;
             if (method === "getPublicKey") {
                 const doc = await keymaster.resolveDID(currentDID);
@@ -61,7 +72,15 @@ export default function NostrApproval({ requestId }: NostrApprovalProps) {
         } catch (error: any) {
             sendError(error?.message || String(error));
         }
-    }
+    }, [keymaster, method, params, currentDID, requestId, alwaysApprove, origin]);
+
+    // Auto-approve when ready (getPublicKey or remembered origin)
+    useEffect(() => {
+        if (autoApprove && !loading && method && keymaster && !autoApproved.current) {
+            autoApproved.current = true;
+            handleApprove();
+        }
+    }, [autoApprove, loading, method, keymaster, handleApprove]);
 
     function sendError(error: string) {
         setProcessing(false);
@@ -76,6 +95,15 @@ export default function NostrApproval({ requestId }: NostrApprovalProps) {
         sendError("User denied the request");
     }
 
+    // Don't render UI for auto-approved requests
+    if (autoApprove) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                <CircularProgress />
+            </Box>
+        );
+    }
+
     if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" height="100%">
@@ -85,7 +113,7 @@ export default function NostrApproval({ requestId }: NostrApprovalProps) {
     }
 
     return (
-        <Box sx={{ p: 2 }}>
+        <Box sx={{ p: 2.5 }}>
             <Typography variant="h6" gutterBottom>
                 Nostr Request
             </Typography>
@@ -96,18 +124,29 @@ export default function NostrApproval({ requestId }: NostrApprovalProps) {
                 <strong>{method === "getPublicKey" ? "Get Public Key" : "Sign Event"}</strong>
             </Typography>
             {method === "signEvent" && params && (
-                <Box sx={{ mt: 1, mb: 2, p: 1, bgcolor: "action.hover", borderRadius: 1, maxHeight: 200, overflow: "auto" }}>
+                <Box sx={{ mt: 1, mb: 2, p: 1.5, bgcolor: "action.hover", borderRadius: 1, maxHeight: 160, overflow: "auto" }}>
                     <Typography variant="caption" sx={{ fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
                         Kind: {params.kind}{"\n"}
                         Content: {params.content?.substring(0, 200)}{params.content?.length > 200 ? "..." : ""}
                     </Typography>
                 </Box>
             )}
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 {method === "getPublicKey"
                     ? "This site wants to know your Nostr public key."
                     : "This site wants to sign a Nostr event with your key."}
             </Typography>
+            <FormControlLabel
+                control={
+                    <Checkbox
+                        checked={alwaysApprove}
+                        onChange={(e) => setAlwaysApprove(e.target.checked)}
+                        size="small"
+                    />
+                }
+                label={<Typography variant="body2">Always approve for this site</Typography>}
+                sx={{ mt: 0.5, mb: 1 }}
+            />
             <Box display="flex" gap={1} justifyContent="flex-end">
                 <Button
                     variant="outlined"

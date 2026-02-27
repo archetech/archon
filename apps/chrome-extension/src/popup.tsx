@@ -7,6 +7,7 @@ import "./static/extension.css";
 
 const params = new URLSearchParams(window.location.search);
 const nostrRequestId = params.get("nostrRequest");
+const nostrAutoApprove = params.get("autoApprove") === "true";
 
 const PopupUI = () => {
     const [pendingAuth, setPendingAuth] = useState<string>("");
@@ -39,7 +40,7 @@ const PopupUI = () => {
     if (nostrRequestId) {
         return (
             <ContextProviders isBrowser={false}>
-                <NostrApproval requestId={nostrRequestId} />
+                <NostrApproval requestId={nostrRequestId} autoApprove={nostrAutoApprove} />
             </ContextProviders>
         );
     }
