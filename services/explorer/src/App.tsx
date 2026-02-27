@@ -23,7 +23,18 @@ interface SnackbarState {
     severity: AlertColor;
 }
 
+interface ArchonConfig {
+    apiKey?: string;
+}
+
+declare global {
+    interface Window {
+        __ARCHON_CONFIG__?: ArchonConfig;
+    }
+}
+
 const gatekeeperUrl = import.meta.env.VITE_GATEKEEPER_URL || 'http://localhost:4224';
+const apiKey = window.__ARCHON_CONFIG__?.apiKey || '';
 
 function App() {
     const [isReady, setIsReady] = useState<boolean>(false);
@@ -96,6 +107,7 @@ function App() {
                 waitUntilReady: true,
                 intervalSeconds: 5,
                 chatty: true,
+                apiKey: apiKey || undefined,
             });
 
             interval = setInterval(async () => {
