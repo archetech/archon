@@ -28,7 +28,7 @@ app.use(express.static(path.join(__dirname, 'dist'), {
     index: false // Don't serve index.html automatically
 }));
 
-app.get('*', (req, res) => {
+app.get('{*path}', (req, res) => {
     res.type('html').send(getIndexHtml());
 });
 
