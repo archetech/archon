@@ -1761,11 +1761,11 @@ export default class Keymaster implements KeymasterInterface {
     // Lightning helpers
 
     private requireDrawbridge(): DrawbridgeInterface {
-        const gk = this.gatekeeper as DrawbridgeInterface;
-        if (typeof gk.createLightningWallet !== 'function') {
+        const drawbridge = this.gatekeeper as DrawbridgeInterface;
+        if (typeof drawbridge.createLightningWallet !== 'function') {
             throw new LightningUnavailableError('Gateway does not support Lightning');
         }
-        return gk;
+        return drawbridge;
     }
 
     private getLightningConfig(idInfo: IDInfo): LightningConfig {
@@ -1779,7 +1779,7 @@ export default class Keymaster implements KeymasterInterface {
     // Lightning methods
 
     async addLightning(name?: string): Promise<LightningConfig> {
-        const gateway = this.requireDrawbridge();
+        const drawbridge = this.requireDrawbridge();
 
         let result!: LightningConfig;
 
@@ -1792,7 +1792,7 @@ export default class Keymaster implements KeymasterInterface {
             }
 
             const walletName = `archon-${idInfo.did.split(':').pop()?.substring(0, 12)}`;
-            const created = await gateway.createLightningWallet(walletName);
+            const created = await drawbridge.createLightningWallet(walletName);
 
             idInfo.lightning = {
                 walletId: created.walletId,
@@ -1815,11 +1815,11 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async getLightningBalance(name?: string): Promise<LightningBalance> {
-        const gateway = this.requireDrawbridge();
+        const drawbridge = this.requireDrawbridge();
         const wallet = await this.loadWallet();
         const idInfo = await this.fetchIdInfo(name, wallet);
         const config = this.getLightningConfig(idInfo);
-        return gateway.getLightningBalance(config.invoiceKey);
+        return drawbridge.getLightningBalance(config.invoiceKey);
     }
 
     async createLightningInvoice(amount: number, memo: string, name?: string): Promise<LightningInvoice> {
@@ -1829,33 +1829,33 @@ export default class Keymaster implements KeymasterInterface {
         if (!memo) {
             throw new InvalidParameterError('memo');
         }
-        const gateway = this.requireDrawbridge();
+        const drawbridge = this.requireDrawbridge();
         const wallet = await this.loadWallet();
         const idInfo = await this.fetchIdInfo(name, wallet);
         const config = this.getLightningConfig(idInfo);
-        return gateway.createLightningInvoice(config.invoiceKey, amount, memo);
+        return drawbridge.createLightningInvoice(config.invoiceKey, amount, memo);
     }
 
     async payLightningInvoice(bolt11: string, name?: string): Promise<LightningPayment> {
         if (!bolt11) {
             throw new InvalidParameterError('bolt11');
         }
-        const gateway = this.requireDrawbridge();
+        const drawbridge = this.requireDrawbridge();
         const wallet = await this.loadWallet();
         const idInfo = await this.fetchIdInfo(name, wallet);
         const config = this.getLightningConfig(idInfo);
-        return gateway.payLightningInvoice(config.adminKey, bolt11);
+        return drawbridge.payLightningInvoice(config.adminKey, bolt11);
     }
 
     async checkLightningPayment(paymentHash: string, name?: string): Promise<LightningPaymentStatus> {
         if (!paymentHash) {
             throw new InvalidParameterError('paymentHash');
         }
-        const gateway = this.requireDrawbridge();
+        const drawbridge = this.requireDrawbridge();
         const wallet = await this.loadWallet();
         const idInfo = await this.fetchIdInfo(name, wallet);
         const config = this.getLightningConfig(idInfo);
-        const data = await gateway.checkLightningPayment(config.invoiceKey, paymentHash);
+        const data = await drawbridge.checkLightningPayment(config.invoiceKey, paymentHash);
         return {
             paid: data.paid,
             preimage: data.preimage,
