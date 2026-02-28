@@ -1021,7 +1021,7 @@ v1router.post('/dids/remove', requireAdminKey, async (req, res) => {
  *             schema:
  *               type: string
  */
-v1router.post('/dids/export', requireAdminKey, async (req, res) => {
+v1router.post('/dids/export', async (req, res) => {
     try {
         const { dids } = req.body;
         const response = await gatekeeper.exportDIDs(dids);
