@@ -4,6 +4,11 @@ import {
     DidCidDocument,
     ResolveDIDOptions,
     Proof,
+    LightningConfig,
+    LightningBalance,
+    LightningInvoice,
+    LightningPayment,
+    LightningPaymentStatus,
 } from '@didcid/gatekeeper/types';
 
 export type { NostrKeys, NostrEvent } from '@didcid/cipher/types';
@@ -235,6 +240,14 @@ export interface WalletBase {
     updateWallet(mutator: (wallet: StoredWallet) => void | Promise<void>): Promise<void>;
 }
 
+export type {
+    LightningConfig,
+    LightningBalance,
+    LightningInvoice,
+    LightningPayment,
+    LightningPaymentStatus,
+} from '@didcid/gatekeeper/types';
+
 export interface KeymasterOptions {
     passphrase: string;
     gatekeeper: GatekeeperInterface;
@@ -334,6 +347,14 @@ export interface KeymasterInterface {
     removeNostr(id?: string): Promise<boolean>;
     exportNsec(id?: string): Promise<string>;
     signNostrEvent(event: NostrEvent): Promise<NostrEvent>;
+
+    // Lightning
+    addLightning(id?: string): Promise<LightningConfig>;
+    removeLightning(id?: string): Promise<boolean>;
+    getLightningBalance(id?: string): Promise<LightningBalance>;
+    createLightningInvoice(amount: number, memo: string, id?: string): Promise<LightningInvoice>;
+    payLightningInvoice(bolt11: string, id?: string): Promise<LightningPayment>;
+    checkLightningPayment(paymentHash: string, id?: string): Promise<LightningPaymentStatus>;
 
     // DIDs
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;

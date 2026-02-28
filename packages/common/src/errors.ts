@@ -50,6 +50,22 @@ export class UnknownIDError extends ArchonError {
     }
 }
 
+export class LightningNotConfiguredError extends ArchonError {
+    static type = 'Lightning not configured';
+
+    constructor(detail?: string) {
+        super(LightningNotConfiguredError.type, detail);
+    }
+}
+
+export class LightningUnavailableError extends ArchonError {
+    static type = 'Lightning service unavailable';
+
+    constructor(detail?: string) {
+        super(LightningUnavailableError.type, detail);
+    }
+}
+
 // For unit tests
 export class ExpectedExceptionError extends ArchonError {
     static type = 'Expected to throw an exception';

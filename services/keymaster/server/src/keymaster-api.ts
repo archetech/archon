@@ -4,7 +4,7 @@ import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
 import Keymaster from '@didcid/keymaster';
 import { WalletBase } from '@didcid/keymaster/types';
 import WalletJson from '@didcid/keymaster/wallet/json';
@@ -165,7 +165,7 @@ if (serveClient) {
     });
 }
 
-let gatekeeper: GatekeeperClient;
+let gatekeeper: DrawbridgeClient;
 let keymaster: Keymaster;
 let serverReady = false;
 
@@ -1881,6 +1881,213 @@ v1router.post('/nostr/sign', async (req, res) => {
         const { event } = req.body;
         const signed = await keymaster.signNostrEvent(event);
         res.json(signed);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+// Lightning routes
+
+/**
+ * @swagger
+ * /lightning:
+ *   post:
+ *     summary: Create a Lightning wallet for the current identity.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: Optional identity name or DID.
+ *     responses:
+ *       200:
+ *         description: Lightning wallet configuration.
+ *       400:
+ *         description: Error creating Lightning wallet.
+ */
+v1router.post('/lightning', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const config = await keymaster.addLightning(id);
+        res.json(config);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /lightning:
+ *   delete:
+ *     summary: Remove Lightning wallet from the current identity.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: Optional identity name or DID.
+ *     responses:
+ *       200:
+ *         description: Success.
+ *       400:
+ *         description: Error removing Lightning wallet.
+ */
+v1router.delete('/lightning', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const ok = await keymaster.removeLightning(id);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /lightning/balance:
+ *   post:
+ *     summary: Get Lightning wallet balance for the current identity.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: Optional identity name or DID.
+ *     responses:
+ *       200:
+ *         description: Balance in sats.
+ *       400:
+ *         description: Error getting balance.
+ */
+v1router.post('/lightning/balance', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const balance = await keymaster.getLightningBalance(id);
+        res.json(balance);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /lightning/invoice:
+ *   post:
+ *     summary: Create a Lightning invoice to receive sats.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *               - memo
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 description: Amount in sats.
+ *               memo:
+ *                 type: string
+ *                 description: Invoice description.
+ *               id:
+ *                 type: string
+ *                 description: Optional identity name or DID.
+ *     responses:
+ *       200:
+ *         description: Lightning invoice.
+ *       400:
+ *         description: Error creating invoice.
+ */
+v1router.post('/lightning/invoice', async (req, res) => {
+    try {
+        const { amount, memo, id } = req.body;
+        const invoice = await keymaster.createLightningInvoice(amount, memo, id);
+        res.json(invoice);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /lightning/pay:
+ *   post:
+ *     summary: Pay a Lightning invoice.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - bolt11
+ *             properties:
+ *               bolt11:
+ *                 type: string
+ *                 description: BOLT11 invoice string.
+ *               id:
+ *                 type: string
+ *                 description: Optional identity name or DID.
+ *     responses:
+ *       200:
+ *         description: Payment result.
+ *       400:
+ *         description: Error paying invoice.
+ */
+v1router.post('/lightning/pay', async (req, res) => {
+    try {
+        const { bolt11, id } = req.body;
+        const payment = await keymaster.payLightningInvoice(bolt11, id);
+        res.json(payment);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /lightning/payment:
+ *   post:
+ *     summary: Check status of a Lightning payment.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - paymentHash
+ *             properties:
+ *               paymentHash:
+ *                 type: string
+ *                 description: Payment hash to check.
+ *               id:
+ *                 type: string
+ *                 description: Optional identity name or DID.
+ *     responses:
+ *       200:
+ *         description: Payment status.
+ *       400:
+ *         description: Error checking payment.
+ */
+v1router.post('/lightning/payment', async (req, res) => {
+    try {
+        const { paymentHash, id } = req.body;
+        const status = await keymaster.checkLightningPayment(paymentHash, id);
+        res.json(status);
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });
     }
@@ -6849,7 +7056,7 @@ async function initWallet() {
 const port = config.keymasterPort;
 
 const server = app.listen(port, config.bindAddress, async () => {
-    gatekeeper = new GatekeeperClient();
+    gatekeeper = new DrawbridgeClient();
 
     await gatekeeper.connect({
         url: config.gatekeeperURL,

@@ -169,6 +169,41 @@ export interface GatekeeperInterface {
     search(query: { where: Record<string, unknown> }): Promise<string[]>;
 }
 
+// Lightning types used by DrawbridgeInterface
+
+export interface LightningConfig {
+    walletId: string;
+    adminKey: string;
+    invoiceKey: string;
+}
+
+export interface LightningBalance {
+    balance: number;
+}
+
+export interface LightningInvoice {
+    paymentRequest: string;
+    paymentHash: string;
+}
+
+export interface LightningPayment {
+    paymentHash: string;
+}
+
+export interface LightningPaymentStatus {
+    paid: boolean;
+    preimage?: string;
+    paymentHash: string;
+}
+
+export interface DrawbridgeInterface extends GatekeeperInterface {
+    createLightningWallet(name: string): Promise<LightningConfig>;
+    getLightningBalance(invoiceKey: string): Promise<LightningBalance>;
+    createLightningInvoice(invoiceKey: string, amount: number, memo: string): Promise<LightningInvoice>;
+    payLightningInvoice(adminKey: string, bolt11: string): Promise<LightningPayment>;
+    checkLightningPayment(invoiceKey: string, paymentHash: string): Promise<LightningPaymentStatus>;
+}
+
 export interface DidRegistration {
     height?: number;
     index?: number;
