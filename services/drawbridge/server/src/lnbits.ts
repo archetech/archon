@@ -31,8 +31,9 @@ export async function getBalance(
         const response = await axios.get(`${url}/api/v1/wallet`, {
             headers: { 'X-Api-Key': invoiceKey },
         });
-        // LNbits returns balance in millisats
-        return Math.floor(response.data.balance / 1000);
+        // LNbits returns balance in msats (field is "balance" or "balance_msat")
+        const msats = response.data.balance ?? response.data.balance_msat ?? 0;
+        return Math.floor(msats / 1000);
     } catch (error: any) {
         const detail = error.response?.data?.detail || error.code || error.message;
         throw new LightningUnavailableError(String(detail));
