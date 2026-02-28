@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
 import Keymaster from './keymaster.js';
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
 import CipherNode from '@didcid/cipher/node';
 import WalletJson from './db/json.js';
 import WalletSQLite from './db/sqlite.js';
@@ -1793,7 +1793,7 @@ async function run() {
 
     try {
         // Initialize gatekeeper client
-        const gatekeeper = new GatekeeperClient();
+        const gatekeeper = new DrawbridgeClient();
         await gatekeeper.connect({
             url: gatekeeperURL,
             waitUntilReady: true,
