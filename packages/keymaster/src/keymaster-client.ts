@@ -21,6 +21,11 @@ import {
     IssueCredentialsOptions,
     KeymasterClientOptions,
     KeymasterInterface,
+    LightningConfig,
+    LightningBalance,
+    LightningInvoice,
+    LightningPayment,
+    LightningPaymentStatus,
     NostrKeys,
     NostrEvent,
     NoticeMessage,
@@ -467,6 +472,68 @@ export default class KeymasterClient implements KeymasterInterface {
     async signNostrEvent(event: NostrEvent): Promise<NostrEvent> {
         try {
             const response = await this.axios.post(`${this.API}/nostr/sign`, { event });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    // Lightning
+
+    async addLightning(id?: string): Promise<LightningConfig> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning`, { id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeLightning(id?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/lightning`, { data: { id } });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getLightningBalance(id?: string): Promise<LightningBalance> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/balance`, { id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createLightningInvoice(amount: number, memo: string, id?: string): Promise<LightningInvoice> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/invoice`, { amount, memo, id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async payLightningInvoice(bolt11: string, id?: string): Promise<LightningPayment> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/pay`, { bolt11, id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async checkLightningPayment(paymentHash: string, id?: string): Promise<LightningPaymentStatus> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/payment`, { paymentHash, id });
             return response.data;
         }
         catch (error) {

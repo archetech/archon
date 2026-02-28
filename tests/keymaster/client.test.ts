@@ -116,6 +116,7 @@ describe('isReady', () => {
     it('should timeout if not ready', async () => {
         nock(KeymasterURL)
             .get(Endpoints.ready)
+            .times(3)
             .reply(200, { ready: false });
 
         const keymaster = await KeymasterClient.create({

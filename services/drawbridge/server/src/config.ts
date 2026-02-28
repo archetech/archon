@@ -19,6 +19,9 @@ const config = {
     rateLimitMax: process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX ? parseInt(process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX) : 100,
     rateLimitWindow: process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW ? parseInt(process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW) : 60,
 
+    // LNbits
+    lnbitsUrl: process.env.ARCHON_DRAWBRIDGE_LNBITS_URL || '',
+
     // Redis
     redisUrl: process.env.ARCHON_REDIS_URL || 'redis://localhost:6379',
 };

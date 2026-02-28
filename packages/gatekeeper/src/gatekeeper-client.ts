@@ -26,8 +26,8 @@ function throwError(error: AxiosError | any): never {
 }
 
 export default class GatekeeperClient implements GatekeeperInterface {
-    private API: string;
-    private axios: AxiosInstance;
+    protected API: string;
+    protected axios: AxiosInstance;
 
     // Factory method
     static async create(options: GatekeeperClientOptions): Promise<GatekeeperClient> {

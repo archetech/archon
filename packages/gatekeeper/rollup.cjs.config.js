@@ -15,6 +15,7 @@ const config = {
         'node': 'dist/esm/node.js',
         'gatekeeper': 'dist/esm/gatekeeper.js',
         'gatekeeper-client': 'dist/esm/gatekeeper-client.js',
+        'drawbridge-client': 'dist/esm/drawbridge-client.js',
         'db/json': 'dist/esm/db/json.js',
         'db/json-cache': 'dist/esm/db/json-cache.js',
         'db/json-memory': 'dist/esm/db/json-memory.js',
