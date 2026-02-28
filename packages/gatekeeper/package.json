@@ -34,6 +34,11 @@
       "require": "./dist/cjs/gatekeeper-client.cjs",
       "types": "./dist/types/gatekeeper-client.d.ts"
     },
+    "./drawbridge": {
+      "import": "./dist/esm/drawbridge-client.js",
+      "require": "./dist/cjs/drawbridge-client.cjs",
+      "types": "./dist/types/drawbridge-client.d.ts"
+    },
     "./db/json": {
       "import": "./dist/esm/db/json.js",
       "require": "./dist/cjs/db/json.cjs",
@@ -72,6 +77,9 @@
     "*": {
       "client": [
         "./dist/types/gatekeeper-client.d.ts"
+      ],
+      "drawbridge": [
+        "./dist/types/drawbridge-client.d.ts"
       ],
       "db/json": [
         "./dist/types/db/json.d.ts"

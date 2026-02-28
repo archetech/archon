@@ -797,6 +797,85 @@ program
         }
     });
 
+// Lightning commands
+program
+    .command('add-lightning [id]')
+    .description('Create a Lightning wallet for a DID')
+    .action(async (id) => {
+        try {
+            const config = await keymaster.addLightning(id);
+            console.log(JSON.stringify(config, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('remove-lightning [id]')
+    .description('Remove Lightning wallet from a DID')
+    .action(async (id) => {
+        try {
+            await keymaster.removeLightning(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('lightning-balance [id]')
+    .description('Check Lightning wallet balance')
+    .action(async (id) => {
+        try {
+            const balance = await keymaster.getLightningBalance(id);
+            console.log(`${balance.balance} sats`);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('lightning-invoice <amount> <memo> [id]')
+    .description('Create a Lightning invoice to receive sats')
+    .action(async (amount, memo, id) => {
+        try {
+            const invoice = await keymaster.createLightningInvoice(parseInt(amount), memo, id);
+            console.log(JSON.stringify(invoice, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('lightning-pay <bolt11> [id]')
+    .description('Pay a Lightning invoice')
+    .action(async (bolt11, id) => {
+        try {
+            const payment = await keymaster.payLightningInvoice(bolt11, id);
+            console.log(JSON.stringify(payment, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('lightning-check <paymentHash> [id]')
+    .description('Check status of a Lightning payment')
+    .action(async (paymentHash, id) => {
+        try {
+            const status = await keymaster.checkLightningPayment(paymentHash, id);
+            console.log(JSON.stringify(status, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
 // Group commands
 program
     .command('create-group <groupName>')

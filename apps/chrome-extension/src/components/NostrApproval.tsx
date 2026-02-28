@@ -38,6 +38,15 @@ export default function NostrApproval({ requestId, autoApprove }: NostrApprovalP
         );
     }, [requestId]);
 
+    const sendError = useCallback((error: string) => {
+        setProcessing(false);
+        chrome.runtime.sendMessage({
+            action: "NOSTR_RESPONSE",
+            id: requestId,
+            error,
+        }, () => window.close());
+    }, [requestId]);
+
     const handleApprove = useCallback(async () => {
         if (!keymaster) {
             sendError("Wallet not initialized");
@@ -72,7 +81,7 @@ export default function NostrApproval({ requestId, autoApprove }: NostrApprovalP
         } catch (error: any) {
             sendError(error?.message || String(error));
         }
-    }, [keymaster, method, params, currentDID, requestId, alwaysApprove, origin]);
+    }, [keymaster, method, params, currentDID, requestId, alwaysApprove, origin, sendError]);
 
     // Auto-approve when ready (getPublicKey or remembered origin)
     useEffect(() => {
@@ -81,15 +90,6 @@ export default function NostrApproval({ requestId, autoApprove }: NostrApprovalP
             handleApprove();
         }
     }, [autoApprove, loading, method, keymaster, handleApprove]);
-
-    function sendError(error: string) {
-        setProcessing(false);
-        chrome.runtime.sendMessage({
-            action: "NOSTR_RESPONSE",
-            id: requestId,
-            error,
-        }, () => window.close());
-    }
 
     function handleDeny() {
         sendError("User denied the request");

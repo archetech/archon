@@ -5,9 +5,12 @@ import {
     InvalidDIDError,
     InvalidParameterError,
     KeymasterError,
-    UnknownIDError
+    UnknownIDError,
+    LightningNotConfiguredError,
+    LightningUnavailableError,
 } from '@didcid/common/errors';
 import {
+    DrawbridgeInterface,
     GatekeeperInterface,
     DidCidDocument,
     DocumentMetadata,
@@ -39,6 +42,11 @@ import {
     IssueCredentialsOptions,
     KeymasterInterface,
     KeymasterOptions,
+    LightningConfig,
+    LightningBalance,
+    LightningInvoice,
+    LightningPayment,
+    LightningPaymentStatus,
     NostrKeys,
     NostrEvent,
     NoticeMessage,
@@ -1747,6 +1755,111 @@ export default class Keymaster implements KeymasterInterface {
             id,
             pubkey: nostr.pubkey,
             sig,
+        };
+    }
+
+    // Lightning helpers
+
+    private requireDrawbridge(): DrawbridgeInterface {
+        const gk = this.gatekeeper as DrawbridgeInterface;
+        if (typeof gk.createLightningWallet !== 'function') {
+            throw new LightningUnavailableError('Gateway does not support Lightning');
+        }
+        return gk;
+    }
+
+    private getLightningConfig(idInfo: IDInfo): LightningConfig {
+        const config = idInfo.lightning as LightningConfig | undefined;
+        if (!config) {
+            throw new LightningNotConfiguredError(`No Lightning wallet configured for ${idInfo.did}`);
+        }
+        return config;
+    }
+
+    // Lightning methods
+
+    async addLightning(name?: string): Promise<LightningConfig> {
+        const gateway = this.requireDrawbridge();
+
+        let result!: LightningConfig;
+
+        await this.mutateWallet(async (wallet) => {
+            const idInfo = await this.fetchIdInfo(name, wallet);
+
+            if (idInfo.lightning) {
+                result = idInfo.lightning as LightningConfig;
+                return;
+            }
+
+            const walletName = `archon-${idInfo.did.split(':').pop()?.substring(0, 12)}`;
+            const created = await gateway.createLightningWallet(walletName);
+
+            idInfo.lightning = {
+                walletId: created.walletId,
+                adminKey: created.adminKey,
+                invoiceKey: created.invoiceKey,
+            } as LightningConfig;
+
+            result = idInfo.lightning as LightningConfig;
+        });
+
+        return result;
+    }
+
+    async removeLightning(name?: string): Promise<boolean> {
+        await this.mutateWallet(async (wallet) => {
+            const idInfo = await this.fetchIdInfo(name, wallet);
+            delete idInfo.lightning;
+        });
+        return true;
+    }
+
+    async getLightningBalance(name?: string): Promise<LightningBalance> {
+        const gateway = this.requireDrawbridge();
+        const wallet = await this.loadWallet();
+        const idInfo = await this.fetchIdInfo(name, wallet);
+        const config = this.getLightningConfig(idInfo);
+        return gateway.getLightningBalance(config.invoiceKey);
+    }
+
+    async createLightningInvoice(amount: number, memo: string, name?: string): Promise<LightningInvoice> {
+        if (!amount || amount <= 0) {
+            throw new InvalidParameterError('amount');
+        }
+        if (!memo) {
+            throw new InvalidParameterError('memo');
+        }
+        const gateway = this.requireDrawbridge();
+        const wallet = await this.loadWallet();
+        const idInfo = await this.fetchIdInfo(name, wallet);
+        const config = this.getLightningConfig(idInfo);
+        return gateway.createLightningInvoice(config.invoiceKey, amount, memo);
+    }
+
+    async payLightningInvoice(bolt11: string, name?: string): Promise<LightningPayment> {
+        if (!bolt11) {
+            throw new InvalidParameterError('bolt11');
+        }
+        const gateway = this.requireDrawbridge();
+        const wallet = await this.loadWallet();
+        const idInfo = await this.fetchIdInfo(name, wallet);
+        const config = this.getLightningConfig(idInfo);
+        return gateway.payLightningInvoice(config.adminKey, bolt11);
+    }
+
+    async checkLightningPayment(paymentHash: string, name?: string): Promise<LightningPaymentStatus> {
+        if (!paymentHash) {
+            throw new InvalidParameterError('paymentHash');
+        }
+        const gateway = this.requireDrawbridge();
+        const wallet = await this.loadWallet();
+        const idInfo = await this.fetchIdInfo(name, wallet);
+        const config = this.getLightningConfig(idInfo);
+        const data = await gateway.checkLightningPayment(config.invoiceKey, paymentHash);
+        return {
+            paid: data.paid,
+            preimage: data.preimage,
+            paymentHash,
         };
     }
 
