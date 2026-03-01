@@ -74,8 +74,8 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(up{job=\"hyperswarm-mediator\"} * on(job) group_left(version, commit) service_version_info{job=\"hyperswarm-mediator\"}) or on(job) up{job=\"hyperswarm-mediator\"}",
-          "legendFormat": "v{{version}} ({{commit}})",
+          "expr": "up{job=\"hyperswarm-mediator\"}",
+          "legendFormat": "v${svc_version} (${svc_commit})",
           "refId": "A"
         }
       ],
@@ -819,7 +819,46 @@
     "hyperswarm"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "svc_version",
+        "label": "svc_version",
+        "type": "query",
+        "query": "label_values(service_version_info{job=\"hyperswarm-mediator\"}, version)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "refresh": 1,
+        "hide": 2,
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "sort": 0,
+        "multi": false,
+        "includeAll": false
+      },
+      {
+        "name": "svc_commit",
+        "label": "svc_commit",
+        "type": "query",
+        "query": "label_values(service_version_info{job=\"hyperswarm-mediator\"}, commit)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "refresh": 1,
+        "hide": 2,
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "sort": 0,
+        "multi": false,
+        "includeAll": false
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
