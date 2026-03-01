@@ -71,6 +71,8 @@ jobs:
           push: false
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
 
       - name: Run Anchore vulnerability scanner
         uses: anchore/scan-action@v3

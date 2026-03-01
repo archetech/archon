@@ -229,17 +229,23 @@ v1router.get('/ready', async (req, res) => {
  *     summary: Retrieve the API version
  *     responses:
  *       200:
- *         description: The API version string.
+ *         description: The API version and commit hash.
  *         content:
  *           application/json:
  *             schema:
- *               type: string
+ *               type: object
+ *               properties:
+ *                 version:
+ *                   type: string
+ *                 commit:
+ *                   type: string
  *       500:
  *         description: Internal Server Error.
  */
 v1router.get('/version', async (req, res) => {
     try {
-        res.json(pkg.version);
+        const commit = process.env.GIT_COMMIT || 'unknown';
+        res.json({ version: pkg.version, commit });
     } catch (error: any) {
         res.status(500).send(error.toString());
     }

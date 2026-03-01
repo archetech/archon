@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.satoshi
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/satoshi-mediator
     environment:
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224

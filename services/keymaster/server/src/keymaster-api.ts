@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { readFile } from 'fs/promises';
 import express from 'express';
 import morgan from 'morgan';
 import path from 'path';
@@ -200,6 +201,34 @@ v1router.get('/ready', async (req, res) => {
         res.json({ ready: serverReady });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /version:
+ *   get:
+ *     summary: Retrieve the API version
+ *     responses:
+ *       200:
+ *         description: The API version and commit hash.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 version:
+ *                   type: string
+ *                 commit:
+ *                   type: string
+ */
+v1router.get('/version', async (_req, res) => {
+    try {
+        const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
+        const commit = process.env.GIT_COMMIT || 'unknown';
+        res.json({ version: pkg.version, commit });
+    } catch {
+        res.json({ version: 'unknown', commit: 'unknown' });
     }
 });
 

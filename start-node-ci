@@ -2,6 +2,8 @@
 set -e
 source .env
 
+export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
 echo $ARCHON_GATEKEEPER_URL
 
 docker compose down

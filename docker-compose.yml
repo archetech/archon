@@ -1,9 +1,9 @@
 include:
   - docker-compose.btc-mainnet.yml
   - docker-compose.btc-signet.yml
+  - docker-compose.drawbridge.yml
 #  - docker-compose.cln-mainnet.yml
 #  - docker-compose.rtl.yml
-#  - docker-compose.drawbridge.yml
 #  - docker-compose.btc-testnet4.yml
 
 services:
@@ -37,6 +37,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.gatekeeper
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/gatekeeper
     environment:
       - ARCHON_GATEKEEPER_PORT=4224
@@ -68,6 +70,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.keymaster
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/keymaster
     environment:
       - ARCHON_KEYMASTER_PORT=4226
@@ -99,6 +103,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.hyperswarm
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/hyperswarm-mediator
     environment:
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
@@ -122,6 +128,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cli
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/cli
     environment:
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
@@ -140,6 +148,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.explorer
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/explorer
     environment:
       - VITE_EXPLORER_PORT=4000
@@ -155,6 +165,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.react-wallet
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/react-wallet
     environment:
       - VITE_PORT=${ARCHON_REACT_WALLET_PORT:-4228}

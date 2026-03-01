@@ -19,6 +19,9 @@ COPY services/mediators/hyperswarm ./hyperswarm/
 WORKDIR /app/hyperswarm
 RUN npm ci && npm run build
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
 EXPOSE 4232
 
 CMD ["node", "dist/hyperswarm-mediator.js"]

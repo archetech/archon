@@ -19,5 +19,8 @@ RUN cd keymaster/server && npm ci && npm run build
 
 WORKDIR /app/keymaster
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
 # Run...
 CMD ["node", "server/dist/keymaster-api.js"]

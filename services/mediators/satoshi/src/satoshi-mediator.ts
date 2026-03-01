@@ -11,6 +11,7 @@ import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
 import { DidRegistration } from '@didcid/gatekeeper/types';
 import express from 'express';
+import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 
 const REGISTRY = config.chain;
@@ -137,6 +138,16 @@ async function updateGauges(): Promise<void> {
 
 function startMetricsServer(): void {
     const app = express();
+
+    app.get('/version', async (_req, res) => {
+        try {
+            const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
+            const commit = process.env.GIT_COMMIT || 'unknown';
+            res.json({ version: pkg.version, commit });
+        } catch {
+            res.json({ version: 'unknown', commit: 'unknown' });
+        }
+    });
 
     app.get('/metrics', async (_req, res) => {
         try {

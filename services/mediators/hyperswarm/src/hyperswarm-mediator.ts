@@ -5,6 +5,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import asyncLib from 'async';
 import { EventEmitter } from 'events';
 import express from 'express';
+import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 
 import GatekeeperClient from '@didcid/gatekeeper/client';
@@ -168,6 +169,16 @@ function updateGauges(): void {
 
 function startMetricsServer(): void {
     const app = express();
+
+    app.get('/version', async (_req, res) => {
+        try {
+            const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
+            const commit = process.env.GIT_COMMIT || 'unknown';
+            res.json({ version: pkg.version, commit });
+        } catch {
+            res.json({ version: 'unknown', commit: 'unknown' });
+        }
+    });
 
     app.get('/metrics', async (_req, res) => {
         try {
