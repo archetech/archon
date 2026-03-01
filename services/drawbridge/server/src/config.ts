@@ -9,6 +9,7 @@ const config = {
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
 
     // Lightning / L402
+    l402Enabled: process.env.ARCHON_DRAWBRIDGE_L402_ENABLED !== 'false',
     clnRestUrl: process.env.ARCHON_DRAWBRIDGE_CLN_REST_URL || 'http://localhost:3001',
     clnRune: process.env.ARCHON_DRAWBRIDGE_CLN_RUNE || '',
     macaroonSecret: process.env.ARCHON_DRAWBRIDGE_MACAROON_SECRET || '',

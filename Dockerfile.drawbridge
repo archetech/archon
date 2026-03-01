@@ -18,5 +18,8 @@ RUN cd drawbridge/server && npm ci && npm run build
 
 WORKDIR /app/drawbridge
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
 # Run...
 CMD ["node", "server/dist/drawbridge-api.js"]
