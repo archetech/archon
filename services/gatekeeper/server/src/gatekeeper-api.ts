@@ -64,6 +64,12 @@ const didsByRegistryGauge = new promClient.Gauge({
     labelNames: ['registry'],
 });
 
+const serviceVersionInfo = new promClient.Gauge({
+    name: 'service_version_info',
+    help: 'Service version information',
+    labelNames: ['version', 'commit'],
+});
+
 // Initialize structured logger
 const logger = pino({
     level: process.env.LOG_LEVEL || 'info',
@@ -86,6 +92,7 @@ function normalizePath(path: string): string {
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
+serviceVersionInfo.set({ version: pkg.version, commit: process.env.GIT_COMMIT || 'unknown' }, 1);
 
 EventEmitter.defaultMaxListeners = 100;
 

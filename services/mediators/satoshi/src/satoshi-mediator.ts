@@ -122,6 +122,19 @@ const satoshiAnchorBatchDuration = new promClient.Histogram({
     buckets: [0.5, 1, 2, 5, 10, 30, 60, 120],
 });
 
+const serviceVersionInfo = new promClient.Gauge({
+    name: 'service_version_info',
+    help: 'Service version information',
+    labelNames: ['version', 'commit'],
+});
+
+readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
+    const pkg = JSON.parse(data);
+    serviceVersionInfo.set({ version: pkg.version, commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+}).catch(() => {
+    serviceVersionInfo.set({ version: 'unknown', commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+});
+
 async function updateGauges(): Promise<void> {
     const db = await loadDb();
     satoshiBlockHeight.set(db.height);

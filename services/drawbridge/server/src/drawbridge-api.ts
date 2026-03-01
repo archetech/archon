@@ -3,7 +3,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import pino from 'pino';
 import pinoHttp from 'pino-http';
-import { register, Counter, Histogram, collectDefaultMetrics } from 'prom-client';
+import { register, Counter, Gauge, Histogram, collectDefaultMetrics } from 'prom-client';
 import { readFile } from 'fs/promises';
 import { timingSafeEqual } from 'crypto';
 
@@ -45,6 +45,19 @@ const l402VerificationsTotal = new Counter({
     name: 'drawbridge_l402_verifications_total',
     help: 'Total L402 macaroon verifications',
     labelNames: ['result'],
+});
+
+const drawbridgeVersionInfo = new Gauge({
+    name: 'drawbridge_version_info',
+    help: 'Service version information',
+    labelNames: ['version', 'commit'],
+});
+
+readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
+    const pkg = JSON.parse(data);
+    drawbridgeVersionInfo.set({ version: pkg.version, commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+}).catch(() => {
+    drawbridgeVersionInfo.set({ version: 'unknown', commit: process.env.GIT_COMMIT || 'unknown' }, 1);
 });
 
 function normalizePath(path: string): string {
