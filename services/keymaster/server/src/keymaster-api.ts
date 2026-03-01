@@ -50,11 +50,15 @@ const serviceVersionInfo = new promClient.Gauge({
     labelNames: ['version', 'commit'],
 });
 
+let serviceVersion = 'unknown';
+const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
+
 readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
     const pkg = JSON.parse(data);
-    serviceVersionInfo.set({ version: pkg.version, commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+    serviceVersion = pkg.version;
+    serviceVersionInfo.set({ version: serviceVersion, commit: serviceCommit }, 1);
 }).catch(() => {
-    serviceVersionInfo.set({ version: 'unknown', commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+    serviceVersionInfo.set({ version: 'unknown', commit: serviceCommit }, 1);
 });
 
 // Initialize structured logger
@@ -219,7 +223,7 @@ v1router.get('/ready', async (req, res) => {
 
 /**
  * @swagger
- * /version:
+ * /api/v1/version:
  *   get:
  *     summary: Retrieve the API version
  *     responses:
@@ -235,14 +239,8 @@ v1router.get('/ready', async (req, res) => {
  *                 commit:
  *                   type: string
  */
-v1router.get('/version', async (_req, res) => {
-    try {
-        const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
-        const commit = process.env.GIT_COMMIT || 'unknown';
-        res.json({ version: pkg.version, commit });
-    } catch {
-        res.json({ version: 'unknown', commit: 'unknown' });
-    }
+v1router.get('/version', (_req, res) => {
+    res.json({ version: serviceVersion, commit: serviceCommit });
 });
 
 v1router.post('/login', async (req, res) => {
@@ -7111,9 +7109,7 @@ const server = app.listen(port, config.bindAddress, async () => {
     const cipher = new CipherNode();
     const defaultRegistry = config.defaultRegistry;
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase: config.keymasterPassphrase });
-    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
-    const commit = process.env.GIT_COMMIT || 'unknown';
-    console.log(`Keymaster server v${pkg.version} (${commit}) running on ${config.bindAddress}:${port}`);
+    console.log(`Keymaster server v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
     if (config.adminApiKey) {
         console.log('Admin API key protection is ENABLED');

@@ -53,11 +53,15 @@ const drawbridgeVersionInfo = new Gauge({
     labelNames: ['version', 'commit'],
 });
 
+let serviceVersion = 'unknown';
+const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
+
 readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
     const pkg = JSON.parse(data);
-    drawbridgeVersionInfo.set({ version: pkg.version, commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+    serviceVersion = pkg.version;
+    drawbridgeVersionInfo.set({ version: serviceVersion, commit: serviceCommit }, 1);
 }).catch(() => {
-    drawbridgeVersionInfo.set({ version: 'unknown', commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+    drawbridgeVersionInfo.set({ version: 'unknown', commit: serviceCommit }, 1);
 });
 
 function normalizePath(path: string): string {
@@ -192,14 +196,8 @@ async function main() {
         }
     });
 
-    v1router.get('/version', async (_req, res) => {
-        try {
-            const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
-            const commit = process.env.GIT_COMMIT || 'unknown';
-            res.json({ version: pkg.version, commit });
-        } catch {
-            res.json({ version: 'unknown', commit: 'unknown' });
-        }
+    v1router.get('/version', (_req, res) => {
+        res.json({ version: serviceVersion, commit: serviceCommit });
     });
 
     v1router.get('/status', async (_req, res) => {
@@ -619,11 +617,8 @@ async function main() {
     });
 
     // Start server
-    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
-    const commit = process.env.GIT_COMMIT || 'unknown';
-
     const server = app.listen(config.port, config.bindAddress, () => {
-        logger.info(`Drawbridge v${pkg.version} (${commit}) running on ${config.bindAddress}:${config.port}`);
+        logger.info(`Drawbridge v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${config.port}`);
         logger.info(`Proxying to Gatekeeper at ${config.gatekeeperURL}`);
     });
 

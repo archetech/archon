@@ -92,7 +92,8 @@ function normalizePath(path: string): string {
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-serviceVersionInfo.set({ version: pkg.version, commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+const commit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
+serviceVersionInfo.set({ version: pkg.version, commit }, 1);
 
 EventEmitter.defaultMaxListeners = 100;
 
@@ -231,7 +232,7 @@ v1router.get('/ready', async (req, res) => {
 
 /**
  * @swagger
- * /version:
+ * /api/v1/version:
  *   get:
  *     summary: Retrieve the API version
  *     responses:
@@ -249,13 +250,8 @@ v1router.get('/ready', async (req, res) => {
  *       500:
  *         description: Internal Server Error.
  */
-v1router.get('/version', async (req, res) => {
-    try {
-        const commit = process.env.GIT_COMMIT || 'unknown';
-        res.json({ version: pkg.version, commit });
-    } catch (error: any) {
-        res.status(500).send(error.toString());
-    }
+v1router.get('/version', (_req, res) => {
+    res.json({ version: pkg.version, commit });
 });
 
 /**
@@ -2369,7 +2365,6 @@ function formatBytes(bytes: number) {
 }
 
 async function main() {
-    const commit = process.env.GIT_COMMIT || 'unknown';
     console.log(`Starting Archon Gatekeeper v${pkg.version} (${commit}) with a db (${config.db}) check...`);
     await reportStatus();
 

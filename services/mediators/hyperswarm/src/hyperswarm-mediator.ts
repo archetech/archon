@@ -164,11 +164,15 @@ const serviceVersionInfo = new promClient.Gauge({
     labelNames: ['version', 'commit'],
 });
 
+let serviceVersion = 'unknown';
+const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
+
 readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
     const pkg = JSON.parse(data);
-    serviceVersionInfo.set({ version: pkg.version, commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+    serviceVersion = pkg.version;
+    serviceVersionInfo.set({ version: serviceVersion, commit: serviceCommit }, 1);
 }).catch(() => {
-    serviceVersionInfo.set({ version: 'unknown', commit: process.env.GIT_COMMIT || 'unknown' }, 1);
+    serviceVersionInfo.set({ version: 'unknown', commit: serviceCommit }, 1);
 });
 
 function updateGauges(): void {
@@ -183,14 +187,8 @@ function updateGauges(): void {
 function startMetricsServer(): void {
     const app = express();
 
-    app.get('/version', async (_req, res) => {
-        try {
-            const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
-            const commit = process.env.GIT_COMMIT || 'unknown';
-            res.json({ version: pkg.version, commit });
-        } catch {
-            res.json({ version: 'unknown', commit: 'unknown' });
-        }
+    app.get('/version', (_req, res) => {
+        res.json({ version: serviceVersion, commit: serviceCommit });
     });
 
     app.get('/metrics', async (_req, res) => {
@@ -744,9 +742,7 @@ const networkID = Buffer.from(hash).toString('hex');
 const topic = Buffer.from(b4a.from(networkID, 'hex'));
 
 async function main(): Promise<void> {
-    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
-    const commit = process.env.GIT_COMMIT || 'unknown';
-    console.log(`Starting Hyperswarm mediator v${pkg.version} (${commit})`);
+    console.log(`Starting Hyperswarm mediator v${serviceVersion} (${serviceCommit})`);
 
     await gatekeeper.connect({
         url: config.gatekeeperURL,
