@@ -69,13 +69,13 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "value_and_name"
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "up{job=\"btc-signet-mediator\"}",
-          "legendFormat": "Mediator",
+          "expr": "(up{job=\"btc-signet-mediator\"} * on(job) group_left(version, commit) service_version_info{job=\"btc-signet-mediator\"}) or up{job=\"btc-signet-mediator\"}",
+          "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }
       ],
@@ -319,7 +319,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 6
+        "y": 4
       },
       "id": 5,
       "options": {
@@ -412,7 +412,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 6
+        "y": 4
       },
       "id": 6,
       "options": {
@@ -500,7 +500,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 14
+        "y": 12
       },
       "id": 7,
       "options": {
@@ -593,7 +593,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 14
+        "y": 12
       },
       "id": 8,
       "options": {
@@ -687,7 +687,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 22
+        "y": 20
       },
       "id": 9,
       "options": {
@@ -780,7 +780,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 22
+        "y": 20
       },
       "id": 10,
       "options": {
@@ -813,64 +813,6 @@
       ],
       "title": "Batch Durations",
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 2,
-        "w": 24,
-        "x": 0,
-        "y": 4
-      },
-      "id": 20,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/^version$/",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "service_version_info{job=\"btc-signet-mediator\"}",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Version",
-      "type": "stat"
     }
   ],
   "refresh": "10s",

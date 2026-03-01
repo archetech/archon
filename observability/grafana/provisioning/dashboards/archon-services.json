@@ -55,13 +55,13 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "value_and_name"
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "up{job=\"gatekeeper\"}",
-          "legendFormat": "Gatekeeper",
+          "expr": "(up{job=\"gatekeeper\"} * on(job) group_left(version, commit) service_version_info{job=\"gatekeeper\"}) or up{job=\"gatekeeper\"}",
+          "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }
       ],
@@ -115,13 +115,13 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "value_and_name"
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "up{job=\"keymaster\"}",
-          "legendFormat": "Keymaster",
+          "expr": "(up{job=\"keymaster\"} * on(job) group_left(version, commit) service_version_info{job=\"keymaster\"}) or up{job=\"keymaster\"}",
+          "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }
       ],
@@ -300,7 +300,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 6
+        "y": 4
       },
       "id": 5,
       "options": {
@@ -389,7 +389,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 6
+        "y": 4
       },
       "id": 6,
       "options": {
@@ -478,7 +478,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 14
+        "y": 12
       },
       "id": 7,
       "options": {
@@ -567,7 +567,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 14
+        "y": 12
       },
       "id": 8,
       "options": {
@@ -656,7 +656,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 22
+        "y": 20
       },
       "id": 9,
       "options": {
@@ -749,7 +749,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 22
+        "y": 20
       },
       "id": 10,
       "options": {
@@ -842,7 +842,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 28
       },
       "id": 11,
       "options": {
@@ -900,7 +900,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 38
+        "y": 36
       },
       "id": 12,
       "options": {
@@ -989,7 +989,7 @@
         "h": 8,
         "w": 6,
         "x": 6,
-        "y": 38
+        "y": 36
       },
       "id": 13,
       "options": {
@@ -1078,7 +1078,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 38
+        "y": 36
       },
       "id": 16,
       "options": {
@@ -1166,7 +1166,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 38
+        "y": 36
       },
       "id": 17,
       "options": {
@@ -1222,7 +1222,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 46
+        "y": 44
       },
       "id": 14,
       "options": {
@@ -1322,7 +1322,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 46
+        "y": 44
       },
       "id": 15,
       "options": {
@@ -1349,122 +1349,6 @@
       ],
       "title": "Events Queue",
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 2,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
-      "id": 20,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/^version$/",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "service_version_info{job=\"gatekeeper\"}",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Gatekeeper Version",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 2,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
-      "id": 21,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/^version$/",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "service_version_info{job=\"keymaster\"}",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Keymaster Version",
-      "type": "stat"
     }
   ],
   "refresh": "10s",
