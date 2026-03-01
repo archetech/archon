@@ -160,7 +160,13 @@ async function main() {
     };
 
     // Auth middleware (subscription + L402)
-    const authMiddleware = createAuthMiddleware(l402Options);
+    const authMiddleware = config.l402Enabled
+        ? createAuthMiddleware(l402Options)
+        : [] as express.RequestHandler[];
+
+    if (!config.l402Enabled) {
+        logger.info('L402 paywall disabled (ARCHON_DRAWBRIDGE_L402_ENABLED=false)');
+    }
 
     // --- Unprotected routes ---
 
@@ -175,10 +181,11 @@ async function main() {
 
     v1router.get('/version', async (_req, res) => {
         try {
-            const pkg = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf-8'));
-            res.json(pkg.version);
+            const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
+            const commit = process.env.GIT_COMMIT || 'unknown';
+            res.json({ version: pkg.version, commit });
         } catch {
-            res.json('unknown');
+            res.json({ version: 'unknown', commit: 'unknown' });
         }
     });
 
