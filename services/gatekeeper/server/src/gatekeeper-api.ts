@@ -64,6 +64,12 @@ const didsByRegistryGauge = new promClient.Gauge({
     labelNames: ['registry'],
 });
 
+const serviceVersionInfo = new promClient.Gauge({
+    name: 'service_version_info',
+    help: 'Service version information',
+    labelNames: ['version', 'commit'],
+});
+
 // Initialize structured logger
 const logger = pino({
     level: process.env.LOG_LEVEL || 'info',
@@ -86,6 +92,8 @@ function normalizePath(path: string): string {
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
+const commit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
+serviceVersionInfo.set({ version: pkg.version, commit }, 1);
 
 EventEmitter.defaultMaxListeners = 100;
 
@@ -224,25 +232,26 @@ v1router.get('/ready', async (req, res) => {
 
 /**
  * @swagger
- * /version:
+ * /api/v1/version:
  *   get:
  *     summary: Retrieve the API version
  *     responses:
  *       200:
- *         description: The API version string.
+ *         description: The API version and commit hash.
  *         content:
  *           application/json:
  *             schema:
- *               type: string
+ *               type: object
+ *               properties:
+ *                 version:
+ *                   type: string
+ *                 commit:
+ *                   type: string
  *       500:
  *         description: Internal Server Error.
  */
-v1router.get('/version', async (req, res) => {
-    try {
-        res.json(pkg.version);
-    } catch (error: any) {
-        res.status(500).send(error.toString());
-    }
+v1router.get('/version', (_req, res) => {
+    res.json({ version: pkg.version, commit });
 });
 
 /**
@@ -2356,7 +2365,7 @@ function formatBytes(bytes: number) {
 }
 
 async function main() {
-    console.log(`Starting Archon Gatekeeper with a db (${config.db}) check...`);
+    console.log(`Starting Archon Gatekeeper v${pkg.version} (${commit}) with a db (${config.db}) check...`);
     await reportStatus();
 
     console.log('Initializing search index...');

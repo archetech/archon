@@ -16,6 +16,9 @@ COPY services/mediators/satoshi ./satoshi/
 WORKDIR /app/satoshi
 RUN npm ci && npm run build
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
 EXPOSE 4234
 
 # Run...

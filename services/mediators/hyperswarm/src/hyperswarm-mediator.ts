@@ -5,6 +5,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import asyncLib from 'async';
 import { EventEmitter } from 'events';
 import express from 'express';
+import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 
 import GatekeeperClient from '@didcid/gatekeeper/client';
@@ -157,6 +158,23 @@ const mediatorExportDbDuration = new promClient.Histogram({
     buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120],
 });
 
+const serviceVersionInfo = new promClient.Gauge({
+    name: 'service_version_info',
+    help: 'Service version information',
+    labelNames: ['version', 'commit'],
+});
+
+let serviceVersion = 'unknown';
+const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
+
+readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
+    const pkg = JSON.parse(data);
+    serviceVersion = pkg.version;
+    serviceVersionInfo.set({ version: serviceVersion, commit: serviceCommit }, 1);
+}).catch(() => {
+    serviceVersionInfo.set({ version: 'unknown', commit: serviceCommit }, 1);
+});
+
 function updateGauges(): void {
     mediatorActiveConnections.set(Object.keys(connectionInfo).length);
     mediatorImportQueueDepth.set(importQueue.length());
@@ -168,6 +186,10 @@ function updateGauges(): void {
 
 function startMetricsServer(): void {
     const app = express();
+
+    app.get('/version', (_req, res) => {
+        res.json({ version: serviceVersion, commit: serviceCommit });
+    });
 
     app.get('/metrics', async (_req, res) => {
         try {
@@ -720,6 +742,8 @@ const networkID = Buffer.from(hash).toString('hex');
 const topic = Buffer.from(b4a.from(networkID, 'hex'));
 
 async function main(): Promise<void> {
+    console.log(`Starting Hyperswarm mediator v${serviceVersion} (${serviceCommit})`);
+
     await gatekeeper.connect({
         url: config.gatekeeperURL,
         apiKey: config.adminApiKey,

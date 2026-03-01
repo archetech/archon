@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { readFile } from 'fs/promises';
 import express from 'express';
 import morgan from 'morgan';
 import path from 'path';
@@ -41,6 +42,23 @@ const walletOperationsTotal = new promClient.Counter({
     name: 'wallet_operations_total',
     help: 'Total number of wallet operations',
     labelNames: ['operation', 'status'],
+});
+
+const serviceVersionInfo = new promClient.Gauge({
+    name: 'service_version_info',
+    help: 'Service version information',
+    labelNames: ['version', 'commit'],
+});
+
+let serviceVersion = 'unknown';
+const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
+
+readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
+    const pkg = JSON.parse(data);
+    serviceVersion = pkg.version;
+    serviceVersionInfo.set({ version: serviceVersion, commit: serviceCommit }, 1);
+}).catch(() => {
+    serviceVersionInfo.set({ version: 'unknown', commit: serviceCommit }, 1);
 });
 
 // Initialize structured logger
@@ -201,6 +219,28 @@ v1router.get('/ready', async (req, res) => {
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
     }
+});
+
+/**
+ * @swagger
+ * /api/v1/version:
+ *   get:
+ *     summary: Retrieve the API version
+ *     responses:
+ *       200:
+ *         description: The API version and commit hash.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 version:
+ *                   type: string
+ *                 commit:
+ *                   type: string
+ */
+v1router.get('/version', (_req, res) => {
+    res.json({ version: serviceVersion, commit: serviceCommit });
 });
 
 v1router.post('/login', async (req, res) => {
@@ -7069,7 +7109,7 @@ const server = app.listen(port, config.bindAddress, async () => {
     const cipher = new CipherNode();
     const defaultRegistry = config.defaultRegistry;
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase: config.keymasterPassphrase });
-    console.log(`Keymaster server running on ${config.bindAddress}:${port}`);
+    console.log(`Keymaster server v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
     if (config.adminApiKey) {
         console.log('Admin API key protection is ENABLED');

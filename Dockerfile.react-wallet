@@ -19,6 +19,9 @@ WORKDIR /app/apps/react-wallet
 RUN npm ci
 RUN npm run build
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
 ENV VITE_PORT=4228
 EXPOSE 4228
 

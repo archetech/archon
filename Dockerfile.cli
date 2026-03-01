@@ -14,5 +14,8 @@ RUN npm run build
 
 COPY scripts ./scripts/
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
 # Run idle
 CMD ["tail", "-f", "/dev/null"]

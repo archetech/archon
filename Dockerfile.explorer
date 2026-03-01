@@ -19,6 +19,9 @@ WORKDIR /app/explorer
 RUN npm i
 RUN npm run build
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
 EXPOSE 4000
 
 # Run...
