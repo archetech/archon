@@ -74,7 +74,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(up{job=\"btc-mainnet-mediator\"} * on(job) group_left(version, commit) service_version_info{job=\"btc-mainnet-mediator\"}) or up{job=\"btc-mainnet-mediator\"}",
+          "expr": "(up{job=\"btc-mainnet-mediator\"} * on(job) group_left(version, commit) service_version_info{job=\"btc-mainnet-mediator\"}) or on(job) up{job=\"btc-mainnet-mediator\"}",
           "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }

@@ -74,7 +74,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(up{job=\"hyperswarm-mediator\"} * on(job) group_left(version, commit) service_version_info{job=\"hyperswarm-mediator\"}) or up{job=\"hyperswarm-mediator\"}",
+          "expr": "(up{job=\"hyperswarm-mediator\"} * on(job) group_left(version, commit) service_version_info{job=\"hyperswarm-mediator\"}) or on(job) up{job=\"hyperswarm-mediator\"}",
           "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }

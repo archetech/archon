@@ -18,17 +18,31 @@
           "color": {
             "mode": "palette-classic"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "DOWN"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "green",
+                "value": 1
               }
             ]
           },
@@ -60,7 +74,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(up{job=\"gatekeeper\"} * on(job) group_left(version, commit) service_version_info{job=\"gatekeeper\"}) or up{job=\"gatekeeper\"}",
+          "expr": "(up{job=\"gatekeeper\"} * on(job) group_left(version, commit) service_version_info{job=\"gatekeeper\"}) or on(job) up{job=\"gatekeeper\"}",
           "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }
@@ -78,17 +92,31 @@
           "color": {
             "mode": "palette-classic"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "DOWN"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "green",
+                "value": 1
               }
             ]
           },
@@ -120,7 +148,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(up{job=\"keymaster\"} * on(job) group_left(version, commit) service_version_info{job=\"keymaster\"}) or up{job=\"keymaster\"}",
+          "expr": "(up{job=\"keymaster\"} * on(job) group_left(version, commit) service_version_info{job=\"keymaster\"}) or on(job) up{job=\"keymaster\"}",
           "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }
@@ -978,6 +1006,10 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           },
@@ -1067,6 +1099,10 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           },
@@ -1155,6 +1191,10 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           },
@@ -1211,6 +1251,10 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           },
