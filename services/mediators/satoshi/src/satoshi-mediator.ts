@@ -818,6 +818,10 @@ async function syncBlocks(): Promise<void> {
 }
 
 async function main() {
+    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
+    const commit = process.env.GIT_COMMIT || 'unknown';
+    console.log(`Starting Satoshi mediator v${pkg.version} (${commit})`);
+
     if (!READ_ONLY && !config.nodeID) {
         console.log('satoshi-mediator must have a ARCHON_NODE_ID configured');
         return;

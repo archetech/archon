@@ -28,6 +28,9 @@ app.get('{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
+const pkg = JSON.parse(await readFile(path.join(__dirname, 'package.json'), 'utf-8'));
+const commit = process.env.GIT_COMMIT || 'unknown';
+
 app.listen(port, () => {
-    console.log(`Explorer running at http://localhost:${port}`);
+    console.log(`Explorer v${pkg.version} (${commit}) running at http://localhost:${port}`);
 });

@@ -744,6 +744,10 @@ const networkID = Buffer.from(hash).toString('hex');
 const topic = Buffer.from(b4a.from(networkID, 'hex'));
 
 async function main(): Promise<void> {
+    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
+    const commit = process.env.GIT_COMMIT || 'unknown';
+    console.log(`Starting Hyperswarm mediator v${pkg.version} (${commit})`);
+
     await gatekeeper.connect({
         url: config.gatekeeperURL,
         apiKey: config.adminApiKey,

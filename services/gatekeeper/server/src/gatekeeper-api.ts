@@ -2369,7 +2369,8 @@ function formatBytes(bytes: number) {
 }
 
 async function main() {
-    console.log(`Starting Archon Gatekeeper with a db (${config.db}) check...`);
+    const commit = process.env.GIT_COMMIT || 'unknown';
+    console.log(`Starting Archon Gatekeeper v${pkg.version} (${commit}) with a db (${config.db}) check...`);
     await reportStatus();
 
     console.log('Initializing search index...');

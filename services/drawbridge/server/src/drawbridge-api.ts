@@ -619,8 +619,11 @@ async function main() {
     });
 
     // Start server
+    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
+    const commit = process.env.GIT_COMMIT || 'unknown';
+
     const server = app.listen(config.port, config.bindAddress, () => {
-        logger.info(`Drawbridge running on ${config.bindAddress}:${config.port}`);
+        logger.info(`Drawbridge v${pkg.version} (${commit}) running on ${config.bindAddress}:${config.port}`);
         logger.info(`Proxying to Gatekeeper at ${config.gatekeeperURL}`);
     });
 

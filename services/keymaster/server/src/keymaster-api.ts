@@ -7111,7 +7111,9 @@ const server = app.listen(port, config.bindAddress, async () => {
     const cipher = new CipherNode();
     const defaultRegistry = config.defaultRegistry;
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase: config.keymasterPassphrase });
-    console.log(`Keymaster server running on ${config.bindAddress}:${port}`);
+    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf-8'));
+    const commit = process.env.GIT_COMMIT || 'unknown';
+    console.log(`Keymaster server v${pkg.version} (${commit}) running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
     if (config.adminApiKey) {
         console.log('Admin API key protection is ENABLED');
