@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import { QRCodeSVG } from "qrcode.react";
 import { LightningNotConfiguredError } from "@didcid/common/errors";
-import { DecodedLightningInvoice } from "@didcid/keymaster/types";
+import { DecodedLightningInvoice, LightningPaymentStatus } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 
@@ -36,6 +36,7 @@ const LightningTab: React.FC = () => {
     const [decoded, setDecoded] = useState<DecodedLightningInvoice | null>(null);
     const [loadingDecode, setLoadingDecode] = useState<boolean>(false);
     const [loadingPay, setLoadingPay] = useState<boolean>(false);
+    const [paymentResult, setPaymentResult] = useState<LightningPaymentStatus | null>(null);
 
     const fetchBalance = useCallback(async () => {
         if (!keymaster) return;
@@ -109,7 +110,9 @@ const LightningTab: React.FC = () => {
         if (!keymaster || !bolt11Input.trim()) return;
         setLoadingPay(true);
         try {
-            await keymaster.payLightningInvoice(bolt11Input.trim());
+            const payment = await keymaster.payLightningInvoice(bolt11Input.trim());
+            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            setPaymentResult(status);
             setSuccess("Payment sent successfully");
             setBolt11Input("");
             setDecoded(null);
@@ -223,6 +226,7 @@ const LightningTab: React.FC = () => {
                         onChange={(e) => {
                             setBolt11Input(e.target.value);
                             setDecoded(null);
+                            setPaymentResult(null);
                         }}
                         multiline
                         rows={3}
@@ -272,6 +276,19 @@ const LightningTab: React.FC = () => {
                             {decoded.expires && (
                                 <Typography variant="body2">
                                     <strong>Expires:</strong> {decoded.expires}
+                                </Typography>
+                            )}
+                        </Box>
+                    )}
+
+                    {paymentResult && (
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: 1 }}>
+                            <Typography variant="body2">
+                                <strong>Payment Hash:</strong> {paymentResult.paymentHash}
+                            </Typography>
+                            {paymentResult.preimage && (
+                                <Typography variant="body2">
+                                    <strong>Preimage (Proof):</strong> {paymentResult.preimage}
                                 </Typography>
                             )}
                         </Box>

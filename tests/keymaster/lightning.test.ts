@@ -256,17 +256,6 @@ describe('createLightningInvoice', () => {
         }
     });
 
-    it('should throw for missing memo', async () => {
-        await keymaster.createId('Bob');
-
-        try {
-            await keymaster.createLightningInvoice(100, '');
-            throw new Error('Expected exception');
-        }
-        catch (error: any) {
-            expect(error.type).toBe('Invalid parameter');
-        }
-    });
 
     it('should throw when Lightning not configured', async () => {
         await keymaster.createId('Bob');

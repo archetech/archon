@@ -253,6 +253,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [lightningInvoice, setLightningInvoice] = useState('');
     const [bolt11Input, setBolt11Input] = useState('');
     const [decodedInvoice, setDecodedInvoice] = useState(null);
+    const [lightningPaymentResult, setLightningPaymentResult] = useState(null);
 
     const pollExpired = pollDeadline ? Date.now() > pollDeadline.getTime() : false;
     const selectedPollDid = selectedPollName ? aliasList[selectedPollName] ?? "" : "";
@@ -350,7 +351,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     async function payLightningInvoice() {
         if (!bolt11Input.trim()) return;
         try {
-            await keymaster.payLightningInvoice(bolt11Input.trim());
+            const payment = await keymaster.payLightningInvoice(bolt11Input.trim());
+            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            setLightningPaymentResult(status);
             showSuccess('Payment sent successfully');
             setBolt11Input('');
             setDecodedInvoice(null);
@@ -5576,6 +5579,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         onChange={(e) => {
                                             setBolt11Input(e.target.value);
                                             setDecodedInvoice(null);
+                                            setLightningPaymentResult(null);
                                         }}
                                         multiline
                                         rows={3}
@@ -5607,6 +5611,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             }
                                             {decodedInvoice.expires &&
                                                 <Typography variant="body2"><strong>Expires:</strong> {decodedInvoice.expires}</Typography>
+                                            }
+                                        </Box>
+                                    }
+                                    {lightningPaymentResult &&
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+                                            <Typography variant="body2"><strong>Payment Hash:</strong> {lightningPaymentResult.paymentHash}</Typography>
+                                            {lightningPaymentResult.preimage &&
+                                                <Typography variant="body2"><strong>Preimage (Proof):</strong> {lightningPaymentResult.preimage}</Typography>
                                             }
                                         </Box>
                                     }
