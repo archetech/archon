@@ -61,8 +61,8 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
     async connect(options?: GatekeeperClientOptions) {
         if (options?.url) {
-            this.baseUrl = options.url;
-            this.API = `${options.url}${VERSION}`;
+            this.baseUrl = new URL(options.url).origin;
+            this.API = `${this.baseUrl}${VERSION}`;
         }
 
         if (options?.apiKey) {

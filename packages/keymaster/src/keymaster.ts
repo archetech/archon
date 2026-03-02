@@ -1834,21 +1834,26 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async removeLightning(name?: string): Promise<boolean> {
-        // Migrate old format if needed (ignore errors — may not be configured)
+        // Migrate old format if possible (ignore errors)
         try { await this.getLightningConfig(name); } catch { /* ok */ }
 
-        const drawbridge = this.requireDrawbridge();
-        const url = drawbridge.url;
+        // Try to get URL for targeted removal; fall back to removing all
+        const gk = this.gatekeeper as { url?: string };
+        const url = gk.url ? new URL(gk.url).origin : null;
 
         await this.mutateWallet(async (wallet) => {
             const idInfo = await this.fetchIdInfo(name, wallet);
 
             if (!idInfo.lightning) return;
 
-            const store = idInfo.lightning as Record<string, LightningConfig>;
-            delete store[url];
+            if (url) {
+                const store = idInfo.lightning as Record<string, LightningConfig>;
+                delete store[url];
 
-            if (Object.keys(store).length === 0) {
+                if (Object.keys(store).length === 0) {
+                    delete idInfo.lightning;
+                }
+            } else {
                 delete idInfo.lightning;
             }
         });

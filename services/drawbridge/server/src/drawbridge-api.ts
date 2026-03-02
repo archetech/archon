@@ -530,6 +530,10 @@ async function main() {
 
     // --- LNbits Lightning wallet routes ---
 
+    v1router.get('/lightning/supported', (_req, res) => {
+        res.json({ supported: true });
+    });
+
     v1router.post('/lightning/wallet', async (req, res) => {
         if (!config.lnbitsUrl) {
             res.status(503).json({ error: 'Lightning (LNbits) not configured' });

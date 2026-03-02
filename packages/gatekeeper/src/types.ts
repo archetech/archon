@@ -198,6 +198,7 @@ export interface LightningPaymentStatus {
 
 export interface DrawbridgeInterface extends GatekeeperInterface {
     readonly url: string;
+    isLightningSupported(): Promise<boolean>;
     createLightningWallet(name: string): Promise<LightningConfig>;
     getLightningBalance(invoiceKey: string): Promise<LightningBalance>;
     createLightningInvoice(invoiceKey: string, amount: number, memo: string): Promise<LightningInvoice>;

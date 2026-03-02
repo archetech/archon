@@ -27,6 +27,15 @@ export default class DrawbridgeClient extends GatekeeperClient implements Drawbr
         return client;
     }
 
+    async isLightningSupported(): Promise<boolean> {
+        try {
+            const response = await this.axios.get(`${this.API}/lightning/supported`);
+            return response.data?.supported === true;
+        } catch {
+            return false;
+        }
+    }
+
     async createLightningWallet(name: string): Promise<LightningConfig> {
         try {
             const response = await this.axios.post(`${this.API}/lightning/wallet`, { name });

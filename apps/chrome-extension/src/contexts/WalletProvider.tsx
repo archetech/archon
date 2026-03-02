@@ -103,20 +103,7 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
             "gatekeeperUrl",
         ]);
         await gatekeeper.connect({ url: gatekeeperUrl as string });
-        setHasLightning(await checkLightningSupport(gatekeeperUrl as string));
-    }
-
-    async function checkLightningSupport(url: string): Promise<boolean> {
-        try {
-            const res = await fetch(`${url}/api/v1/lightning/balance`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: '{}',
-            });
-            return res.status !== 404;
-        } catch {
-            return false;
-        }
+        setHasLightning(await gatekeeper.isLightningSupported());
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {

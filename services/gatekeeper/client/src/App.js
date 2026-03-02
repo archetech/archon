@@ -22,20 +22,7 @@ const gatekeeper = new DrawbridgeClient();
 await gatekeeper.connect({ url: gatekeeperUrl });
 const cipher = new CipherWeb();
 
-async function checkLightningSupport(url) {
-    try {
-        const res = await fetch(`${url}/api/v1/lightning/balance`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: '{}',
-        });
-        return res.status !== 404;
-    } catch {
-        return false;
-    }
-}
-
-const hasLightning = await checkLightningSupport(gatekeeperUrl);
+const hasLightning = await gatekeeper.isLightningSupported();
 
 function App() {
     const [isReady, setIsReady] = useState(false);

@@ -5494,7 +5494,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 indicatorColor="primary"
                                 textColor="primary"
                             >
-                                <Tab label="Wallet" value="wallet" onClick={fetchLightningBalance} />
+                                <Tab label="Wallet" value="wallet" />
                                 <Tab label="Receive" value="receive" />
                                 <Tab label="Send" value="send" />
                             </Tabs>
