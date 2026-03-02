@@ -17,8 +17,7 @@ import './App.css';
 
 global.Buffer = Buffer;
 
-const { protocol, hostname } = window.location;
-const gatekeeperUrl = `${protocol}//${hostname}:4224`;
+const gatekeeperUrl = window.location.origin;
 const gatekeeper = new DrawbridgeClient();
 await gatekeeper.connect({ url: gatekeeperUrl });
 const cipher = new CipherWeb();
