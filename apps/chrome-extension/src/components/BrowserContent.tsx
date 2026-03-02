@@ -4,6 +4,7 @@ import { TabContext, TabList, TabPanel } from "@mui/lab";
 import {
     AccountBalanceWallet,
     Badge,
+    Bolt,
     Email,
     List,
     ManageSearch,
@@ -26,13 +27,14 @@ import { createTheme, ThemeProvider } from "@mui/material/styles";
 import AliasedDIDs from "./AliasedDIDs";
 import AssetsTab from "./AssetsTab";
 import DmailTab from "./DmailTab";
+import LightningTab from "./LightningTab";
 import PollTab from "./PollTab";
 
 function BrowserContent() {
     const [menuOpen, setMenuOpen] = useState<boolean>(false);
     const [didRun, setDidRun] = useState<boolean>(false);
     const [refresh, setRefresh] = useState<number>(0);
-    const { isBrowser } = useWalletContext();
+    const { isBrowser, hasLightning } = useWalletContext();
     const { currentId, validId } = useVariablesContext();
     const { openBrowser, setOpenBrowser } = useUIContext();
     const { darkMode } = useThemeContext();
@@ -241,6 +243,17 @@ function BrowserContent() {
                                     />
                                 )}
 
+                                {displayComponent && hasLightning && (
+                                    <Tab
+                                        icon={<Bolt />}
+                                        label={menuOpen ? "Lightning" : ""}
+                                        value="lightning"
+                                        iconPosition="start"
+                                        className="sidebarTab"
+                                        sx={{ gap: 0.25 }}
+                                    />
+                                )}
+
                                 {displayComponent && (
                                     <Tab
                                         icon={<Token />}
@@ -307,6 +320,12 @@ function BrowserContent() {
                             {displayComponent && (
                                 <TabPanel value="polls" sx={{ p: 0 }}>
                                     <PollTab />
+                                </TabPanel>
+                            )}
+
+                            {displayComponent && hasLightning && (
+                                <TabPanel value="lightning" sx={{ p: 0 }}>
+                                    <LightningTab />
                                 </TabPanel>
                             )}
 

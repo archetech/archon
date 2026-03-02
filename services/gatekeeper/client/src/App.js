@@ -1,7 +1,7 @@
 import { Buffer } from 'buffer';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
 import CipherWeb from '@didcid/cipher/web';
 import Keymaster from '@didcid/keymaster';
 import WalletWeb from '@didcid/keymaster/wallet/web';
@@ -17,10 +17,12 @@ import './App.css';
 
 global.Buffer = Buffer;
 
-const { protocol, hostname } = window.location;
-const gatekeeper = new GatekeeperClient();
-await gatekeeper.connect({ url: `${protocol}//${hostname}:4224` });
+const gatekeeperUrl = window.location.origin;
+const gatekeeper = new DrawbridgeClient();
+await gatekeeper.connect({ url: gatekeeperUrl });
 const cipher = new CipherWeb();
+
+const hasLightning = await gatekeeper.isLightningSupported();
 
 function App() {
     const [isReady, setIsReady] = useState(false);
@@ -278,6 +280,7 @@ function App() {
                     title={'Keymaster Browser Wallet Demo'}
                     challengeDID={challengeDID}
                     onWalletUpload={handleWalletUploadFile}
+                    hasLightning={hasLightning}
                 />
             )}
         </>

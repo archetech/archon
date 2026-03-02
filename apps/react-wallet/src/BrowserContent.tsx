@@ -18,6 +18,7 @@ import { TabContext, TabPanel, TabList } from "@mui/lab";
 import {
     AccountBalanceWallet,
     Badge,
+    Bolt,
     Email,
     Key,
     List as ListIcon,
@@ -38,11 +39,13 @@ import JsonViewer from "./components/JsonViewer";
 import { useVariablesContext } from "./contexts/VariablesProvider";
 import { useUIContext } from "./contexts/UIContext";
 import { useThemeContext } from "./contexts/ContextProviders";
+import { useWalletContext } from "./contexts/WalletProvider";
 import { useSafeArea } from "./contexts/SafeAreaContext";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import AliasedDIDs from "./components/AliasedDIDs";
 import AssetsTab from "./components/AssetsTab";
 import DmailTab from "./components/DmailTab";
+import LightningTab from "./components/LightningTab";
 import PollTab from "./components/PollTab";
 import AuthTab from "./components/AuthTab";
 
@@ -54,6 +57,7 @@ function BrowserContent() {
     const [menuOpen, setMenuOpen] = useState<boolean>(false);
     const { isTabletUp } = useThemeContext();
 
+    const { hasLightning } = useWalletContext();
     const { currentId, validId } = useVariablesContext();
     const {
         selectedTab,
@@ -195,6 +199,12 @@ function BrowserContent() {
             {displayComponent && (
                 <TabPanel value="polls" sx={{ p: 0 }}>
                     <PollTab />
+                </TabPanel>
+            )}
+
+            {displayComponent && hasLightning && (
+                <TabPanel value="lightning" sx={{ p: 0 }}>
+                    <LightningTab />
                 </TabPanel>
             )}
 
@@ -353,6 +363,17 @@ function BrowserContent() {
                                                     menuOpen ? "Polls" : ""
                                                 }
                                                 value="polls"
+                                                iconPosition="start"
+                                            />
+                                        )}
+
+                                        {displayComponent && hasLightning && (
+                                            <Tab
+                                                icon={<Bolt />}
+                                                label={
+                                                    menuOpen ? "Lightning" : ""
+                                                }
+                                                value="lightning"
                                                 iconPosition="start"
                                             />
                                         )}
@@ -569,6 +590,17 @@ function BrowserContent() {
                                     </ListItemIcon>
                                     <ListItemText primary="Polls" />
                                 </ListItemButton>
+
+                                {hasLightning && (
+                                    <ListItemButton
+                                        onClick={() => selectFromMore("lightning")}
+                                    >
+                                        <ListItemIcon>
+                                            <Bolt />
+                                        </ListItemIcon>
+                                        <ListItemText primary="Lightning" />
+                                    </ListItemButton>
+                                )}
 
                                 <ListItemButton
                                     onClick={() => selectFromMore("assets")}

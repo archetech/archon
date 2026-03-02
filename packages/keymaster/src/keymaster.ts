@@ -1770,10 +1770,31 @@ export default class Keymaster implements KeymasterInterface {
         return drawbridge;
     }
 
-    private getLightningConfig(idInfo: IDInfo): LightningConfig {
-        const config = idInfo.lightning as LightningConfig | undefined;
-        if (!config) {
+    private async getLightningConfig(name?: string): Promise<LightningConfig> {
+        const drawbridge = this.requireDrawbridge();
+        const url = drawbridge.url;
+        let wallet = await this.loadWallet();
+        let idInfo = await this.fetchIdInfo(name, wallet);
+
+        if (!idInfo.lightning) {
             throw new LightningNotConfiguredError(`No Lightning wallet configured for ${idInfo.did}`);
+        }
+
+        // Migrate old flat format to per-URL dictionary
+        if ('walletId' in idInfo.lightning) {
+            await this.mutateWallet(async (wallet) => {
+                const idInfo = await this.fetchIdInfo(name, wallet);
+                if (idInfo.lightning && 'walletId' in idInfo.lightning) {
+                    idInfo.lightning = { [url]: idInfo.lightning as LightningConfig };
+                }
+            });
+            wallet = await this.loadWallet();
+            idInfo = await this.fetchIdInfo(name, wallet);
+        }
+
+        const config = (idInfo.lightning as Record<string, LightningConfig>)[url];
+        if (!config) {
+            throw new LightningNotConfiguredError(`No Lightning wallet configured for ${idInfo.did} on ${url}`);
         }
         return config;
     }
@@ -1781,60 +1802,76 @@ export default class Keymaster implements KeymasterInterface {
     // Lightning methods
 
     async addLightning(name?: string): Promise<LightningConfig> {
+        try {
+            return await this.getLightningConfig(name);
+        } catch (e: any) {
+            if (e.type !== LightningNotConfiguredError.type) throw e;
+        }
+
         const drawbridge = this.requireDrawbridge();
+        const url = drawbridge.url;
 
         let result!: LightningConfig;
 
         await this.mutateWallet(async (wallet) => {
             const idInfo = await this.fetchIdInfo(name, wallet);
 
-            if (idInfo.lightning) {
-                result = idInfo.lightning as LightningConfig;
-                return;
-            }
-
+            const store = (idInfo.lightning || {}) as Record<string, LightningConfig>;
             const walletName = `archon-${idInfo.did.split(':').pop()?.substring(0, 12)}`;
             const created = await drawbridge.createLightningWallet(walletName);
 
-            idInfo.lightning = {
+            store[url] = {
                 walletId: created.walletId,
                 adminKey: created.adminKey,
                 invoiceKey: created.invoiceKey,
-            } as LightningConfig;
+            };
 
-            result = idInfo.lightning as LightningConfig;
+            idInfo.lightning = store;
+            result = store[url];
         });
 
         return result;
     }
 
     async removeLightning(name?: string): Promise<boolean> {
+        // Migrate old format if possible (ignore errors)
+        try { await this.getLightningConfig(name); } catch { /* ok */ }
+
+        // Try to get URL for targeted removal; fall back to removing all
+        const gk = this.gatekeeper as { url?: string };
+        const url = gk.url ? new URL(gk.url).origin : null;
+
         await this.mutateWallet(async (wallet) => {
             const idInfo = await this.fetchIdInfo(name, wallet);
-            delete idInfo.lightning;
+
+            if (!idInfo.lightning) return;
+
+            if (url) {
+                const store = idInfo.lightning as Record<string, LightningConfig>;
+                delete store[url];
+
+                if (Object.keys(store).length === 0) {
+                    delete idInfo.lightning;
+                }
+            } else {
+                delete idInfo.lightning;
+            }
         });
         return true;
     }
 
     async getLightningBalance(name?: string): Promise<LightningBalance> {
         const drawbridge = this.requireDrawbridge();
-        const wallet = await this.loadWallet();
-        const idInfo = await this.fetchIdInfo(name, wallet);
-        const config = this.getLightningConfig(idInfo);
+        const config = await this.getLightningConfig(name);
         return drawbridge.getLightningBalance(config.invoiceKey);
     }
 
-    async createLightningInvoice(amount: number, memo: string, name?: string): Promise<LightningInvoice> {
+    async createLightningInvoice(amount: number, memo: string = '', name?: string): Promise<LightningInvoice> {
         if (!amount || amount <= 0) {
             throw new InvalidParameterError('amount');
         }
-        if (!memo) {
-            throw new InvalidParameterError('memo');
-        }
         const drawbridge = this.requireDrawbridge();
-        const wallet = await this.loadWallet();
-        const idInfo = await this.fetchIdInfo(name, wallet);
-        const config = this.getLightningConfig(idInfo);
+        const config = await this.getLightningConfig(name);
         return drawbridge.createLightningInvoice(config.invoiceKey, amount, memo);
     }
 
@@ -1843,9 +1880,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('bolt11');
         }
         const drawbridge = this.requireDrawbridge();
-        const wallet = await this.loadWallet();
-        const idInfo = await this.fetchIdInfo(name, wallet);
-        const config = this.getLightningConfig(idInfo);
+        const config = await this.getLightningConfig(name);
         return drawbridge.payLightningInvoice(config.adminKey, bolt11);
     }
 
@@ -1854,9 +1889,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('paymentHash');
         }
         const drawbridge = this.requireDrawbridge();
-        const wallet = await this.loadWallet();
-        const idInfo = await this.fetchIdInfo(name, wallet);
-        const config = this.getLightningConfig(idInfo);
+        const config = await this.getLightningConfig(name);
         const data = await drawbridge.checkLightningPayment(config.invoiceKey, paymentHash);
         return {
             paid: data.paid,

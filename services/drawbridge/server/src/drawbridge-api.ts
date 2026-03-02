@@ -6,6 +6,8 @@ import pinoHttp from 'pino-http';
 import { register, Counter, Gauge, Histogram, collectDefaultMetrics } from 'prom-client';
 import { readFile } from 'fs/promises';
 import { timingSafeEqual } from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import GatekeeperClient from '@didcid/gatekeeper/client';
 
@@ -528,6 +530,10 @@ async function main() {
 
     // --- LNbits Lightning wallet routes ---
 
+    v1router.get('/lightning/supported', (_req, res) => {
+        res.json({ supported: true });
+    });
+
     v1router.post('/lightning/wallet', async (req, res) => {
         if (!config.lnbitsUrl) {
             res.status(503).json({ error: 'Lightning (LNbits) not configured' });
@@ -605,6 +611,24 @@ async function main() {
 
     // Mount router
     app.use('/api/v1', v1router);
+
+    // Serve gatekeeper web client
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const serveClient = (process.env.ARCHON_GATEKEEPER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
+
+    if (serveClient) {
+        const clientBuildDir = path.join(__dirname, '../../../gatekeeper/client/build');
+
+        app.use(express.static(clientBuildDir));
+
+        app.use((req, res, next) => {
+            if (!req.path.startsWith('/api')) {
+                res.sendFile(path.join(clientBuildDir, 'index.html'));
+            } else {
+                next();
+            }
+        });
+    }
 
     // Prometheus metrics endpoint
     app.get('/metrics', async (_req, res) => {

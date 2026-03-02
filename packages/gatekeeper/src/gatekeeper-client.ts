@@ -27,6 +27,7 @@ function throwError(error: AxiosError | any): never {
 
 export default class GatekeeperClient implements GatekeeperInterface {
     protected API: string;
+    protected baseUrl: string;
     protected axios: AxiosInstance;
 
     // Factory method
@@ -42,6 +43,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
             (axiosModule as AxiosInstance);
 
         this.API = VERSION;
+        this.baseUrl = '';
         this.axios = axios.create();
     }
 
@@ -53,9 +55,14 @@ export default class GatekeeperClient implements GatekeeperInterface {
         delete this.axios.defaults.headers.common[header];
     }
 
+    get url(): string {
+        return this.baseUrl;
+    }
+
     async connect(options?: GatekeeperClientOptions) {
         if (options?.url) {
-            this.API = `${options.url}${VERSION}`;
+            this.baseUrl = new URL(options.url).origin;
+            this.API = `${this.baseUrl}${VERSION}`;
         }
 
         if (options?.apiKey) {
