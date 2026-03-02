@@ -362,8 +362,8 @@ const COFFEE_INVOICE = 'lnbc2500u1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3
 const DONATION_INVOICE = 'lnbc1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaq9qrsgq357wnc5r2ueh7ck6q93dj32dlqnls087fxdwk8qakdyafkq3yap9us6v52vjjsrvywa6rt52cm9r9zqt8r2t7mlcwspyetp5h2tztugp9lfyql';
 
 describe('decodeLightningInvoice', () => {
-    it('should decode a coffee invoice with amount and expiry', () => {
-        const info = keymaster.decodeLightningInvoice(COFFEE_INVOICE);
+    it('should decode a coffee invoice with amount and expiry', async () => {
+        const info = await keymaster.decodeLightningInvoice(COFFEE_INVOICE);
 
         expect(info.amount).toBe('250000 sats');
         expect(info.description).toBe('1 cup coffee');
@@ -374,8 +374,8 @@ describe('decodeLightningInvoice', () => {
         expect(info.expires).toBeDefined();
     });
 
-    it('should decode a donation invoice with no amount', () => {
-        const info = keymaster.decodeLightningInvoice(DONATION_INVOICE);
+    it('should decode a donation invoice with no amount', async () => {
+        const info = await keymaster.decodeLightningInvoice(DONATION_INVOICE);
 
         expect(info.amount).toBeUndefined();
         expect(info.description).toBe('Please consider supporting this project');
@@ -383,23 +383,23 @@ describe('decodeLightningInvoice', () => {
         expect(info.network).toBe('bc');
     });
 
-    it('should compute expires from timestamp + expiry', () => {
-        const info = keymaster.decodeLightningInvoice(COFFEE_INVOICE);
+    it('should compute expires from timestamp + expiry', async () => {
+        const info = await keymaster.decodeLightningInvoice(COFFEE_INVOICE);
 
         const expectedExpires = new Date((1496314658 + 60) * 1000).toISOString();
         expect(info.expires).toBe(expectedExpires);
     });
 
-    it('should not set expires when no expiry in invoice', () => {
-        const info = keymaster.decodeLightningInvoice(DONATION_INVOICE);
+    it('should not set expires when no expiry in invoice', async () => {
+        const info = await keymaster.decodeLightningInvoice(DONATION_INVOICE);
 
         expect(info.expiry).toBeUndefined();
         expect(info.expires).toBeUndefined();
     });
 
-    it('should throw for empty bolt11', () => {
+    it('should throw for empty bolt11', async () => {
         try {
-            keymaster.decodeLightningInvoice('');
+            await keymaster.decodeLightningInvoice('');
             throw new Error('Expected exception');
         }
         catch (error: any) {
@@ -407,10 +407,8 @@ describe('decodeLightningInvoice', () => {
         }
     });
 
-    it('should throw for invalid bolt11 string', () => {
-        expect(() => {
-            keymaster.decodeLightningInvoice('not-a-valid-invoice');
-        }).toThrow();
+    it('should throw for invalid bolt11 string', async () => {
+        await expect(keymaster.decodeLightningInvoice('not-a-valid-invoice')).rejects.toThrow();
     });
 });
 

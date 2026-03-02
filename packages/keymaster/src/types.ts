@@ -365,7 +365,7 @@ export interface KeymasterInterface {
     createLightningInvoice(amount: number, memo: string, id?: string): Promise<LightningInvoice>;
     payLightningInvoice(bolt11: string, id?: string): Promise<LightningPayment>;
     checkLightningPayment(paymentHash: string, id?: string): Promise<LightningPaymentStatus>;
-    decodeLightningInvoice(bolt11: string): Promise<DecodedLightningInvoice> | DecodedLightningInvoice;
+    decodeLightningInvoice(bolt11: string): Promise<DecodedLightningInvoice>;
 
     // DIDs
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;

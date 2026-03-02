@@ -1865,7 +1865,7 @@ export default class Keymaster implements KeymasterInterface {
         };
     }
 
-    decodeLightningInvoice(bolt11: string): DecodedLightningInvoice {
+    async decodeLightningInvoice(bolt11: string): Promise<DecodedLightningInvoice> {
         if (!bolt11) {
             throw new InvalidParameterError('bolt11');
         }

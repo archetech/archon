@@ -2296,7 +2296,7 @@
         }
       }
     },
-    "/api/v1/lightning/decode": {
+    "/lightning/decode": {
       "post": {
         "summary": "Decode a Lightning BOLT11 invoice.",
         "requestBody": {

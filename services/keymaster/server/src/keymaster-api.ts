@@ -2135,7 +2135,7 @@ v1router.post('/lightning/payment', async (req, res) => {
 
 /**
  * @swagger
- * /api/v1/lightning/decode:
+ * /lightning/decode:
  *   post:
  *     summary: Decode a Lightning BOLT11 invoice.
  *     requestBody:
@@ -2153,10 +2153,10 @@ v1router.post('/lightning/payment', async (req, res) => {
  *       400:
  *         description: Error decoding invoice.
  */
-v1router.post('/lightning/decode', (req, res) => {
+v1router.post('/lightning/decode', async (req, res) => {
     try {
         const { bolt11 } = req.body;
-        const info = keymaster.decodeLightningInvoice(bolt11);
+        const info = await keymaster.decodeLightningInvoice(bolt11);
         res.json(info);
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });
