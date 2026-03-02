@@ -39,6 +39,7 @@ beforeEach(() => {
 
     // Create a gatekeeper proxy that adds DrawbridgeInterface Lightning methods
     gatekeeper = Object.create(baseGatekeeper);
+    gatekeeper.url = 'http://test-drawbridge';
 
     gatekeeper.createLightningWallet = (name: string) => {
         trackCall('createLightningWallet', name);
@@ -83,7 +84,7 @@ describe('addLightning', () => {
         });
     });
 
-    it('should store credentials in wallet IDInfo', async () => {
+    it('should store credentials in wallet IDInfo keyed by URL', async () => {
         await keymaster.createId('Bob');
 
         await keymaster.addLightning();
@@ -91,9 +92,11 @@ describe('addLightning', () => {
         const walletData = await keymaster.loadWallet();
         const bobInfo = Object.values(walletData.ids).find(id => id.did);
         expect(bobInfo?.lightning).toStrictEqual({
-            walletId: 'w1',
-            adminKey: 'admin1',
-            invoiceKey: 'invoice1',
+            'http://test-drawbridge': {
+                walletId: 'w1',
+                adminKey: 'admin1',
+                invoiceKey: 'invoice1',
+            },
         });
     });
 
@@ -170,10 +173,77 @@ describe('addLightning', () => {
             expect(error).toBeDefined();
         }
     });
+
+    it('should migrate old flat format to per-URL dictionary', async () => {
+        await keymaster.createId('Bob');
+
+        // Manually inject old flat format
+        const walletData = await keymaster.loadWallet();
+        const bobInfo = Object.values(walletData.ids).find(id => id.did)!;
+        bobInfo.lightning = { walletId: 'w1', adminKey: 'admin1', invoiceKey: 'invoice1' };
+        await keymaster.saveWallet(walletData, true);
+
+        // addLightning should migrate and return existing config
+        const config = await keymaster.addLightning();
+
+        expect(config).toStrictEqual({
+            walletId: 'w1',
+            adminKey: 'admin1',
+            invoiceKey: 'invoice1',
+        });
+
+        // Verify migration persisted as per-URL dictionary
+        const updated = await keymaster.loadWallet();
+        const updatedBob = Object.values(updated.ids).find(id => id.did)!;
+        expect(updatedBob.lightning).toStrictEqual({
+            'http://test-drawbridge': {
+                walletId: 'w1',
+                adminKey: 'admin1',
+                invoiceKey: 'invoice1',
+            },
+        });
+
+        // Should not have called createLightningWallet
+        const walletCalls = calls.filter(c => c.method === 'createLightningWallet');
+        expect(walletCalls.length).toBe(0);
+    });
+
+    it('should create separate wallets per Drawbridge URL', async () => {
+        await keymaster.createId('Bob');
+
+        // Add lightning on first URL
+        await keymaster.addLightning();
+
+        // Switch to a different Drawbridge URL
+        gatekeeper.url = 'http://other-drawbridge';
+        gatekeeper.createLightningWallet = (name: string) => {
+            trackCall('createLightningWallet', name);
+            return Promise.resolve({ walletId: 'w2', adminKey: 'admin2', invoiceKey: 'invoice2' });
+        };
+
+        const config2 = await keymaster.addLightning();
+        expect(config2.walletId).toBe('w2');
+
+        // Verify both URLs stored
+        const walletData = await keymaster.loadWallet();
+        const bobInfo = Object.values(walletData.ids).find(id => id.did)!;
+        expect(bobInfo.lightning).toStrictEqual({
+            'http://test-drawbridge': {
+                walletId: 'w1',
+                adminKey: 'admin1',
+                invoiceKey: 'invoice1',
+            },
+            'http://other-drawbridge': {
+                walletId: 'w2',
+                adminKey: 'admin2',
+                invoiceKey: 'invoice2',
+            },
+        });
+    });
 });
 
 describe('removeLightning', () => {
-    it('should remove Lightning config from IDInfo', async () => {
+    it('should remove Lightning config for current URL', async () => {
         await keymaster.createId('Bob');
 
         await keymaster.addLightning();
@@ -184,6 +254,48 @@ describe('removeLightning', () => {
         const walletData = await keymaster.loadWallet();
         const bobInfo = Object.values(walletData.ids).find(id => id.did);
         expect(bobInfo?.lightning).toBeUndefined();
+    });
+
+    it('should only remove config for current URL, preserving others', async () => {
+        await keymaster.createId('Bob');
+
+        // Add lightning on two URLs
+        await keymaster.addLightning();
+
+        gatekeeper.url = 'http://other-drawbridge';
+        gatekeeper.createLightningWallet = () =>
+            Promise.resolve({ walletId: 'w2', adminKey: 'admin2', invoiceKey: 'invoice2' });
+        await keymaster.addLightning();
+
+        // Remove only the second URL
+        await keymaster.removeLightning();
+
+        const walletData = await keymaster.loadWallet();
+        const bobInfo = Object.values(walletData.ids).find(id => id.did)!;
+        expect(bobInfo.lightning).toStrictEqual({
+            'http://test-drawbridge': {
+                walletId: 'w1',
+                adminKey: 'admin1',
+                invoiceKey: 'invoice1',
+            },
+        });
+    });
+
+    it('should handle old flat format removal', async () => {
+        await keymaster.createId('Bob');
+
+        // Manually inject old flat format
+        const walletData = await keymaster.loadWallet();
+        const bobInfo = Object.values(walletData.ids).find(id => id.did)!;
+        bobInfo.lightning = { walletId: 'w1', adminKey: 'admin1', invoiceKey: 'invoice1' };
+        await keymaster.saveWallet(walletData, true);
+
+        const ok = await keymaster.removeLightning();
+        expect(ok).toBe(true);
+
+        const updated = await keymaster.loadWallet();
+        const updatedBob = Object.values(updated.ids).find(id => id.did)!;
+        expect(updatedBob.lightning).toBeUndefined();
     });
 
     it('should succeed even if Lightning was not configured', async () => {
@@ -220,8 +332,37 @@ describe('getLightningBalance', () => {
         expect(balanceCalls[0].args).toStrictEqual(['invoice1']);
     });
 
+    it('should return balance for old flat format wallet', async () => {
+        await keymaster.createId('Bob');
+
+        // Manually inject old flat format
+        const walletData = await keymaster.loadWallet();
+        const bobInfo = Object.values(walletData.ids).find(id => id.did)!;
+        bobInfo.lightning = { walletId: 'w1', adminKey: 'admin1', invoiceKey: 'invoice1' };
+        await keymaster.saveWallet(walletData, true);
+
+        const result = await keymaster.getLightningBalance();
+        expect(result.balance).toBe(1000);
+    });
+
     it('should throw when Lightning not configured', async () => {
         await keymaster.createId('Bob');
+
+        try {
+            await keymaster.getLightningBalance();
+            throw new Error('Expected exception');
+        }
+        catch (error: any) {
+            expect(error.type).toBe(LightningNotConfiguredError.type);
+        }
+    });
+
+    it('should throw when Lightning configured on different URL', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+
+        // Switch to a different Drawbridge URL
+        gatekeeper.url = 'http://other-drawbridge';
 
         try {
             await keymaster.getLightningBalance();
