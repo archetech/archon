@@ -1824,12 +1824,9 @@ export default class Keymaster implements KeymasterInterface {
         return drawbridge.getLightningBalance(config.invoiceKey);
     }
 
-    async createLightningInvoice(amount: number, memo: string, name?: string): Promise<LightningInvoice> {
+    async createLightningInvoice(amount: number, memo: string = '', name?: string): Promise<LightningInvoice> {
         if (!amount || amount <= 0) {
             throw new InvalidParameterError('amount');
-        }
-        if (!memo) {
-            throw new InvalidParameterError('memo');
         }
         const drawbridge = this.requireDrawbridge();
         const wallet = await this.loadWallet();
