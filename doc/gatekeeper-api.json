@@ -23,16 +23,24 @@
         }
       }
     },
-    "/version": {
+    "/api/v1/version": {
       "get": {
         "summary": "Retrieve the API version",
         "responses": {
           "200": {
-            "description": "The API version string.",
+            "description": "The API version and commit hash.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string"
+                    },
+                    "commit": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
