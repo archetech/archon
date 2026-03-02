@@ -9,7 +9,7 @@ import React, {
     useState,
 } from "react";
 
-import GatekeeperClient from "@didcid/gatekeeper/client";
+import DrawbridgeClient from "@didcid/gatekeeper/drawbridge";
 import Keymaster from "@didcid/keymaster";
 import CipherWeb from "@didcid/cipher/web";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
@@ -21,7 +21,7 @@ import MnemonicModal from "../modals/MnemonicModal";
 import { encryptWithPassphrase } from '@didcid/cipher/passphrase';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 
-const gatekeeper = new GatekeeperClient();
+const gatekeeper = new DrawbridgeClient();
 const cipher = new CipherWeb();
 
 interface WalletContextValue {
@@ -36,6 +36,7 @@ interface WalletContextValue {
     reloadBrowserWallet: () => Promise<void>;
     refreshFlag: number;
     keymaster: Keymaster | null;
+    hasLightning: boolean;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -56,6 +57,7 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
     const [recoveredMnemonic, setRecoveredMnemonic] = useState("");
     const [showRecoverSetup, setShowRecoverSetup] = useState(false);
     const [refreshFlag, setRefreshFlag] = useState<number>(0);
+    const [hasLightning, setHasLightning] = useState<boolean>(false);
 
     const keymasterRef = useRef<Keymaster | null>(null);
 
@@ -101,6 +103,20 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
             "gatekeeperUrl",
         ]);
         await gatekeeper.connect({ url: gatekeeperUrl as string });
+        setHasLightning(await checkLightningSupport(gatekeeperUrl as string));
+    }
+
+    async function checkLightningSupport(url: string): Promise<boolean> {
+        try {
+            const res = await fetch(`${url}/api/v1/lightning/balance`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}',
+            });
+            return res.status !== 404;
+        } catch {
+            return false;
+        }
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
@@ -305,6 +321,7 @@ export function WalletProvider({ children, isBrowser }: { children: ReactNode, i
         refreshFlag,
         isBrowser,
         keymaster: keymasterRef.current,
+        hasLightning,
     };
 
     return (

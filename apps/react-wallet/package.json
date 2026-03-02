@@ -24,6 +24,7 @@
     "@mui/material": "^7.3.5",
     "@uiw/react-json-view": "^2.0.0-alpha.39",
     "buffer": "^6.0.3",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

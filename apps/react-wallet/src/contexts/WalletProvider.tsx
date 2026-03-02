@@ -8,7 +8,7 @@ import {
     useRef,
     useState,
 } from "react";
-import GatekeeperClient from "@didcid/gatekeeper/client";
+import DrawbridgeClient from "@didcid/gatekeeper/drawbridge";
 import Keymaster from "@didcid/keymaster";
 import { WalletBase, StoredWallet } from '@didcid/keymaster/types';
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
@@ -31,7 +31,7 @@ import {
     clearSessionPassphrase,
 } from "../utils/sessionPassphrase";
 
-const gatekeeper = new GatekeeperClient();
+const gatekeeper = new DrawbridgeClient();
 const cipher = new CipherWeb();
 
 interface WalletContextValue {
@@ -44,6 +44,7 @@ interface WalletContextValue {
     handleWalletUploadFile: (uploaded: unknown) => Promise<void>;
     refreshFlag: number;
     keymaster: Keymaster | null;
+    hasLightning: boolean;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -64,6 +65,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const [recoveredMnemonic, setRecoveredMnemonic] = useState("");
     const [showRecoverSetup, setShowRecoverSetup] = useState(false);
     const [refreshFlag, setRefreshFlag] = useState<number>(0);
+    const [hasLightning, setHasLightning] = useState<boolean>(false);
 
     const keymasterRef = useRef<Keymaster | null>(null);
 
@@ -103,6 +105,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
         localStorage.setItem(GATEKEEPER_KEY, gatekeeperUrl);
         await gatekeeper.connect({ url: gatekeeperUrl });
+        setHasLightning(await checkLightningSupport(gatekeeperUrl));
+    }
+
+    async function checkLightningSupport(url: string): Promise<boolean> {
+        try {
+            const res = await fetch(`${url}/api/v1/lightning/balance`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}',
+            });
+            return res.status !== 404;
+        } catch {
+            return false;
+        }
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
@@ -340,6 +356,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         handleWalletUploadFile,
         refreshFlag,
         keymaster: keymasterRef.current,
+        hasLightning,
     };
 
     return (
