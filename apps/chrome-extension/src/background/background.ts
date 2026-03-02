@@ -1,6 +1,6 @@
 import {openBrowserValues} from "../contexts/UIContext";
 
-const DEFAULT_GATEKEEPER_URL = "http://localhost:4224";
+const DEFAULT_GATEKEEPER_URL = "https://archon.technology";
 
 async function ensureDefaultSettings() {
     try {
