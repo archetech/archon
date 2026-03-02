@@ -248,6 +248,16 @@ export type {
     LightningPaymentStatus,
 } from '@didcid/gatekeeper/types';
 
+export interface DecodedLightningInvoice {
+    amount?: string;
+    description?: string;
+    created?: string;
+    expiry?: string;
+    expires?: string;
+    payment_hash?: string;
+    network?: string;
+}
+
 export interface KeymasterOptions {
     passphrase: string;
     gatekeeper: GatekeeperInterface;
@@ -355,6 +365,7 @@ export interface KeymasterInterface {
     createLightningInvoice(amount: number, memo: string, id?: string): Promise<LightningInvoice>;
     payLightningInvoice(bolt11: string, id?: string): Promise<LightningPayment>;
     checkLightningPayment(paymentHash: string, id?: string): Promise<LightningPaymentStatus>;
+    decodeLightningInvoice(bolt11: string): Promise<DecodedLightningInvoice> | DecodedLightningInvoice;
 
     // DIDs
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;

@@ -838,6 +838,19 @@ program
     });
 
 program
+    .command('lightning-decode <bolt11>')
+    .description('Decode a Lightning BOLT11 invoice')
+    .action(async (bolt11) => {
+        try {
+            const info = await keymaster.decodeLightningInvoice(bolt11);
+            console.log(JSON.stringify(info, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('lightning-invoice <amount> <memo> [id]')
     .description('Create a Lightning invoice to receive sats')
     .action(async (amount, memo, id) => {

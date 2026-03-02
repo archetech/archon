@@ -1,5 +1,6 @@
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
+import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
 import {
     InvalidDIDError,
@@ -47,6 +48,7 @@ import {
     LightningInvoice,
     LightningPayment,
     LightningPaymentStatus,
+    DecodedLightningInvoice,
     NostrKeys,
     NostrEvent,
     NoticeMessage,
@@ -1861,6 +1863,47 @@ export default class Keymaster implements KeymasterInterface {
             preimage: data.preimage,
             paymentHash,
         };
+    }
+
+    decodeLightningInvoice(bolt11: string): DecodedLightningInvoice {
+        if (!bolt11) {
+            throw new InvalidParameterError('bolt11');
+        }
+
+        const decoded = decodeBolt11(bolt11);
+        const info: DecodedLightningInvoice = {};
+
+        let timestamp: number | undefined;
+
+        for (const section of decoded.sections) {
+            switch (section.name) {
+            case 'amount':
+                info.amount = `${parseInt(section.value) / 1000} sats`;
+                break;
+            case 'description':
+                info.description = section.value;
+                break;
+            case 'timestamp':
+                timestamp = section.value;
+                info.created = new Date(section.value * 1000).toISOString();
+                break;
+            case 'expiry':
+                info.expiry = `${section.value} seconds`;
+                break;
+            case 'payment_hash':
+                info.payment_hash = section.value;
+                break;
+            case 'coin_network':
+                info.network = section.value?.bech32;
+                break;
+            }
+        }
+
+        if (timestamp !== undefined && decoded.expiry !== undefined) {
+            info.expires = new Date((timestamp + decoded.expiry) * 1000).toISOString();
+        }
+
+        return info;
     }
 
     async testAgent(id: string): Promise<boolean> {

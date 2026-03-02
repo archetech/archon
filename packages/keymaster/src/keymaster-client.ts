@@ -26,6 +26,7 @@ import {
     LightningInvoice,
     LightningPayment,
     LightningPaymentStatus,
+    DecodedLightningInvoice,
     NostrKeys,
     NostrEvent,
     NoticeMessage,
@@ -534,6 +535,16 @@ export default class KeymasterClient implements KeymasterInterface {
     async checkLightningPayment(paymentHash: string, id?: string): Promise<LightningPaymentStatus> {
         try {
             const response = await this.axios.post(`${this.API}/lightning/payment`, { paymentHash, id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async decodeLightningInvoice(bolt11: string): Promise<DecodedLightningInvoice> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/decode`, { bolt11 });
             return response.data;
         }
         catch (error) {

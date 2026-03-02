@@ -45,6 +45,12 @@ const Endpoints = {
     dmail: '/api/v1/dmail',
     notices: '/api/v1/notices',
     export_wallet_encrypted: '/api/v1/export/wallet/encrypted',
+    lightning: '/api/v1/lightning',
+    lightning_balance: '/api/v1/lightning/balance',
+    lightning_invoice: '/api/v1/lightning/invoice',
+    lightning_pay: '/api/v1/lightning/pay',
+    lightning_payment: '/api/v1/lightning/payment',
+    lightning_decode: '/api/v1/lightning/decode',
 };
 
 const mockConsole = {
@@ -3590,6 +3596,222 @@ describe('exportEncryptedWallet', () => {
 
         try {
             await keymaster.exportEncryptedWallet();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('addLightning', () => {
+    const mockConfig = { walletId: 'w1', adminKey: 'admin1', invoiceKey: 'invoice1' };
+
+    it('should add Lightning wallet', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning)
+            .reply(200, mockConfig);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const config = await keymaster.addLightning();
+
+        expect(config).toStrictEqual(mockConfig);
+    });
+
+    it('should throw exception on addLightning server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.addLightning();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('removeLightning', () => {
+    it('should remove Lightning wallet', async () => {
+        nock(KeymasterURL)
+            .delete(Endpoints.lightning)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.removeLightning();
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on removeLightning server error', async () => {
+        nock(KeymasterURL)
+            .delete(Endpoints.lightning)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.removeLightning();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('getLightningBalance', () => {
+    it('should return balance', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_balance)
+            .reply(200, { balance: 1000 });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const result = await keymaster.getLightningBalance();
+
+        expect(result.balance).toBe(1000);
+    });
+
+    it('should throw exception on getLightningBalance server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_balance)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.getLightningBalance();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('createLightningInvoice', () => {
+    const mockInvoice = { paymentRequest: 'lnbc100...', paymentHash: 'hash123' };
+
+    it('should create an invoice', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_invoice)
+            .reply(200, mockInvoice);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const invoice = await keymaster.createLightningInvoice(100, 'test payment');
+
+        expect(invoice).toStrictEqual(mockInvoice);
+    });
+
+    it('should throw exception on createLightningInvoice server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_invoice)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.createLightningInvoice(100, 'test');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('payLightningInvoice', () => {
+    it('should pay an invoice', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_pay)
+            .reply(200, { paymentHash: 'out-hash' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const payment = await keymaster.payLightningInvoice('lnbc100...');
+
+        expect(payment.paymentHash).toBe('out-hash');
+    });
+
+    it('should throw exception on payLightningInvoice server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_pay)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.payLightningInvoice('lnbc100...');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('checkLightningPayment', () => {
+    const mockStatus = { paid: true, preimage: 'preimage123', paymentHash: 'hash123' };
+
+    it('should check payment status', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_payment)
+            .reply(200, mockStatus);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const status = await keymaster.checkLightningPayment('hash123');
+
+        expect(status).toStrictEqual(mockStatus);
+    });
+
+    it('should throw exception on checkLightningPayment server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_payment)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.checkLightningPayment('hash123');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('decodeLightningInvoice', () => {
+    const mockDecoded = {
+        amount: '250000 sats',
+        description: '1 cup coffee',
+        payment_hash: '0001020304050607080900010203040506070809000102030405060708090102',
+        network: 'bc',
+    };
+
+    it('should decode an invoice', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_decode)
+            .reply(200, mockDecoded);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const info = await keymaster.decodeLightningInvoice('lnbc2500u1...');
+
+        expect(info).toStrictEqual(mockDecoded);
+    });
+
+    it('should throw exception on decodeLightningInvoice server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_decode)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.decodeLightningInvoice('lnbc2500u1...');
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

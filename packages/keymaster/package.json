@@ -150,6 +150,7 @@
     "file-type": "^21.0.0",
     "image-size": "^2.0.1",
     "ioredis": "^5.4.1",
+    "light-bolt11-decoder": "^3.2.0",
     "mongodb": "^6.5.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"
