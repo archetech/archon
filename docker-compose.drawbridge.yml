@@ -8,7 +8,7 @@ services:
     image: ghcr.io/archetech/drawbridge
     entrypoint: ["/bin/sh", "/scripts/drawbridge-entrypoint.sh"]
     environment:
-      - ARCHON_DRAWBRIDGE_PORT=4230
+      - ARCHON_DRAWBRIDGE_PORT=4222
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
       - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
@@ -24,7 +24,7 @@ services:
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW:-60}
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
-      - ${ARCHON_DRAWBRIDGE_PORT:-4230}:4230
+      - ${ARCHON_DRAWBRIDGE_PORT:-4222}:4222
     volumes:
       - ./scripts/drawbridge-entrypoint.sh:/scripts/drawbridge-entrypoint.sh:ro
       - ./data/drawbridge:/data/drawbridge
