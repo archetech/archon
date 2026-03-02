@@ -12,8 +12,10 @@ COPY packages/ ./packages/
 RUN npm ci
 RUN npm run build
 
+COPY services/gatekeeper/client ./gatekeeper/client/
 COPY services/drawbridge ./drawbridge/
 
+RUN cd gatekeeper/client && npm ci && npm run build
 RUN cd drawbridge/server && npm ci && npm run build
 
 WORKDIR /app/drawbridge
