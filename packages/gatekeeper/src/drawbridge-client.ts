@@ -12,7 +12,7 @@ import GatekeeperClient from './gatekeeper-client.js';
 function throwError(error: any): never {
     if (error.response) {
         if (error.response.status === 404) {
-            throw { type: 'Lightning service unavailable', error: 'Server does not support Lightning' };
+            throw new Error('Lightning service unavailable: Server does not support Lightning');
         }
         throw error.response.data;
     }

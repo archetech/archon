@@ -911,3 +911,224 @@ def get_file(identifier):
 def test_file(identifier):
     response = proxy_request("POST", f"{_keymaster_api}/files/{identifier}/test")
     return response["test"]
+
+
+# Wallet extras
+
+def change_passphrase(passphrase):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/wallet/passphrase",
+        json={"passphrase": passphrase},
+    )
+    return response["ok"]
+
+
+def export_encrypted_wallet():
+    response = proxy_request("GET", f"{_keymaster_api}/export/wallet/encrypted")
+    return response["wallet"]
+
+
+# DID updates
+
+def update_did(identifier, doc):
+    response = proxy_request(
+        "PUT",
+        f"{_keymaster_api}/did/{identifier}",
+        json={"doc": doc},
+    )
+    return response["ok"]
+
+
+# Asset management
+
+def create_asset(data, options=None):
+    if options is None:
+        options = {}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/assets",
+        json={"data": data, "options": options},
+    )
+    return response["did"]
+
+
+def list_assets():
+    response = proxy_request("GET", f"{_keymaster_api}/assets")
+    return response["assets"]
+
+
+def clone_asset(identifier, options=None):
+    if options is None:
+        options = {}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/assets/{identifier}/clone",
+        json={"options": options},
+    )
+    return response["did"]
+
+
+def merge_data(identifier, data):
+    response = proxy_request(
+        "PUT",
+        f"{_keymaster_api}/assets/{identifier}",
+        json={"data": data},
+    )
+    return response["ok"]
+
+
+def transfer_asset(identifier, controller):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/assets/{identifier}/transfer",
+        json={"controller": controller},
+    )
+    return response["ok"]
+
+
+# Poll extras
+
+def send_poll(poll):
+    response = proxy_request("POST", f"{_keymaster_api}/polls/{poll}/send")
+    return response["did"]
+
+
+def send_ballot(ballot, poll):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/polls/ballot/send",
+        json={"ballot": ballot, "poll": poll},
+    )
+    return response["did"]
+
+
+def view_ballot(did):
+    response = proxy_request("GET", f"{_keymaster_api}/polls/ballot/{did}")
+    return response["ballot"]
+
+
+def add_poll_voter(poll, member_id):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/polls/{poll}/voters",
+        json={"memberId": member_id},
+    )
+    return response["ok"]
+
+
+def remove_poll_voter(poll, voter):
+    safe = requests.utils.quote(str(voter), safe="")
+    response = proxy_request(
+        "DELETE",
+        f"{_keymaster_api}/polls/{poll}/voters/{safe}",
+    )
+    return response["ok"]
+
+
+def list_poll_voters(poll):
+    response = proxy_request("GET", f"{_keymaster_api}/polls/{poll}/voters")
+    return response["voters"]
+
+
+# Nostr
+
+def add_nostr(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/nostr",
+        json={"id": id},
+    )
+    return response
+
+
+def remove_nostr(id=None):
+    response = proxy_request(
+        "DELETE",
+        f"{_keymaster_api}/nostr",
+        json={"id": id},
+    )
+    return response["ok"]
+
+
+def export_nsec(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/nostr/nsec",
+        json={"id": id},
+    )
+    return response["nsec"]
+
+
+def sign_nostr_event(event):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/nostr/sign",
+        json={"event": event},
+    )
+    return response
+
+
+# Lightning
+
+def add_lightning(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning",
+        json={"id": id},
+    )
+    return response
+
+
+def remove_lightning(id=None):
+    response = proxy_request(
+        "DELETE",
+        f"{_keymaster_api}/lightning",
+        json={"id": id},
+    )
+    return response["ok"]
+
+
+def get_lightning_balance(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning/balance",
+        json={"id": id},
+    )
+    return response
+
+
+def create_lightning_invoice(amount, memo, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning/invoice",
+        json={"amount": amount, "memo": memo, "id": id},
+    )
+    return response
+
+
+def pay_lightning_invoice(bolt11, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning/pay",
+        json={"bolt11": bolt11, "id": id},
+    )
+    return response
+
+
+def check_lightning_payment(payment_hash, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning/payment",
+        json={"paymentHash": payment_hash, "id": id},
+    )
+    return response
+
+
+def decode_lightning_invoice(bolt11):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning/decode",
+        json={"bolt11": bolt11},
+    )
+    return response

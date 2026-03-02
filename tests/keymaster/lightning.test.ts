@@ -3,7 +3,7 @@ import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import { UnknownIDError, LightningNotConfiguredError, LightningUnavailableError } from '@didcid/common/errors';
+import { UnknownIDError, InvalidParameterError, LightningNotConfiguredError, LightningUnavailableError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
 
 let ipfs: HeliaClient;
@@ -354,6 +354,61 @@ describe('checkLightningPayment', () => {
         catch (error: any) {
             expect(error.type).toBe(LightningNotConfiguredError.type);
         }
+    });
+});
+
+// BOLT11 test vectors from the spec (https://github.com/lightning/bolts/blob/master/11-payment-encoding.md)
+const COFFEE_INVOICE = 'lnbc2500u1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpu9qrsgquk0rl77nj30yxdy8j9vdx85fkpmdla2087ne0xh8nhedh8w27kyke0lp53ut353s06fv3qfegext0eh0ymjpf39tuven09sam30g4vgpfna3rh';
+const DONATION_INVOICE = 'lnbc1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaq9qrsgq357wnc5r2ueh7ck6q93dj32dlqnls087fxdwk8qakdyafkq3yap9us6v52vjjsrvywa6rt52cm9r9zqt8r2t7mlcwspyetp5h2tztugp9lfyql';
+
+describe('decodeLightningInvoice', () => {
+    it('should decode a coffee invoice with amount and expiry', async () => {
+        const info = await keymaster.decodeLightningInvoice(COFFEE_INVOICE);
+
+        expect(info.amount).toBe('250000 sats');
+        expect(info.description).toBe('1 cup coffee');
+        expect(info.payment_hash).toBe('0001020304050607080900010203040506070809000102030405060708090102');
+        expect(info.expiry).toBe('60 seconds');
+        expect(info.network).toBe('bc');
+        expect(info.created).toBeDefined();
+        expect(info.expires).toBeDefined();
+    });
+
+    it('should decode a donation invoice with no amount', async () => {
+        const info = await keymaster.decodeLightningInvoice(DONATION_INVOICE);
+
+        expect(info.amount).toBeUndefined();
+        expect(info.description).toBe('Please consider supporting this project');
+        expect(info.payment_hash).toBe('0001020304050607080900010203040506070809000102030405060708090102');
+        expect(info.network).toBe('bc');
+    });
+
+    it('should compute expires from timestamp + expiry', async () => {
+        const info = await keymaster.decodeLightningInvoice(COFFEE_INVOICE);
+
+        const expectedExpires = new Date((1496314658 + 60) * 1000).toISOString();
+        expect(info.expires).toBe(expectedExpires);
+    });
+
+    it('should not set expires when no expiry in invoice', async () => {
+        const info = await keymaster.decodeLightningInvoice(DONATION_INVOICE);
+
+        expect(info.expiry).toBeUndefined();
+        expect(info.expires).toBeUndefined();
+    });
+
+    it('should throw for empty bolt11', async () => {
+        try {
+            await keymaster.decodeLightningInvoice('');
+            throw new Error('Expected exception');
+        }
+        catch (error: any) {
+            expect(error.type).toBe(InvalidParameterError.type);
+        }
+    });
+
+    it('should throw for invalid bolt11 string', async () => {
+        await expect(keymaster.decodeLightningInvoice('not-a-valid-invoice')).rejects.toThrow();
     });
 });
 

@@ -44,6 +44,31 @@
         }
       }
     },
+    "/api/v1/version": {
+      "get": {
+        "summary": "Retrieve the API version",
+        "responses": {
+          "200": {
+            "description": "The API version and commit hash.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string"
+                    },
+                    "commit": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/registries": {
       "get": {
         "summary": "List the available registries.",
@@ -2069,6 +2094,232 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/lightning": {
+      "post": {
+        "summary": "Create a Lightning wallet for the current identity.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Optional identity name or DID."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lightning wallet configuration."
+          },
+          "400": {
+            "description": "Error creating Lightning wallet."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove Lightning wallet from the current identity.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Optional identity name or DID."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "400": {
+            "description": "Error removing Lightning wallet."
+          }
+        }
+      }
+    },
+    "/lightning/balance": {
+      "post": {
+        "summary": "Get Lightning wallet balance for the current identity.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Optional identity name or DID."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Balance in sats."
+          },
+          "400": {
+            "description": "Error getting balance."
+          }
+        }
+      }
+    },
+    "/lightning/invoice": {
+      "post": {
+        "summary": "Create a Lightning invoice to receive sats.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "memo"
+                ],
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "description": "Amount in sats."
+                  },
+                  "memo": {
+                    "type": "string",
+                    "description": "Invoice description."
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "Optional identity name or DID."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lightning invoice."
+          },
+          "400": {
+            "description": "Error creating invoice."
+          }
+        }
+      }
+    },
+    "/lightning/pay": {
+      "post": {
+        "summary": "Pay a Lightning invoice.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "bolt11"
+                ],
+                "properties": {
+                  "bolt11": {
+                    "type": "string",
+                    "description": "BOLT11 invoice string."
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "Optional identity name or DID."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment result."
+          },
+          "400": {
+            "description": "Error paying invoice."
+          }
+        }
+      }
+    },
+    "/lightning/payment": {
+      "post": {
+        "summary": "Check status of a Lightning payment.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "paymentHash"
+                ],
+                "properties": {
+                  "paymentHash": {
+                    "type": "string",
+                    "description": "Payment hash to check."
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "Optional identity name or DID."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment status."
+          },
+          "400": {
+            "description": "Error checking payment."
+          }
+        }
+      }
+    },
+    "/lightning/decode": {
+      "post": {
+        "summary": "Decode a Lightning BOLT11 invoice.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bolt11": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decoded invoice details."
+          },
+          "400": {
+            "description": "Error decoding invoice."
           }
         }
       }

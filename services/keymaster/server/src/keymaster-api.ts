@@ -2135,6 +2135,36 @@ v1router.post('/lightning/payment', async (req, res) => {
 
 /**
  * @swagger
+ * /lightning/decode:
+ *   post:
+ *     summary: Decode a Lightning BOLT11 invoice.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bolt11:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Decoded invoice details.
+ *       400:
+ *         description: Error decoding invoice.
+ */
+v1router.post('/lightning/decode', async (req, res) => {
+    try {
+        const { bolt11 } = req.body;
+        const info = await keymaster.decodeLightningInvoice(bolt11);
+        res.json(info);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /challenge:
  *   get:
  *     summary: Create a default challenge DID with no parameters.
