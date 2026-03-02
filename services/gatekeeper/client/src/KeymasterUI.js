@@ -43,6 +43,7 @@ import {
     Badge,
     BarChart,
     Block,
+    Bolt,
     Clear,
     Create,
     Groups,
@@ -80,6 +81,7 @@ import {
 } from "@mui/icons-material";
 import axios from 'axios';
 import { Buffer } from 'buffer';
+import { QRCodeSVG } from 'qrcode.react';
 import './App.css';
 import PollResultsModal from "./PollResultsModal";
 import TextInputModal from "./TextInputModal";
@@ -96,7 +98,7 @@ const DmailTags = {
     UNREAD: 'unread',
 };
 
-function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
+function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning }) {
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
     const [saveId, setSaveId] = useState('');
@@ -243,6 +245,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         message: "",
         severity: "warning",
     });
+    const [lightningTab, setLightningTab] = useState('wallet');
+    const [lightningBalance, setLightningBalance] = useState(null);
+    const [lightningIsConfigured, setLightningIsConfigured] = useState(null);
+    const [lightningReceiveAmount, setLightningReceiveAmount] = useState('');
+    const [lightningReceiveMemo, setLightningReceiveMemo] = useState('');
+    const [lightningInvoice, setLightningInvoice] = useState('');
+    const [bolt11Input, setBolt11Input] = useState('');
+    const [decodedInvoice, setDecodedInvoice] = useState(null);
 
     const pollExpired = pollDeadline ? Date.now() > pollDeadline.getTime() : false;
     const selectedPollDid = selectedPollName ? aliasList[selectedPollName] ?? "" : "";
@@ -256,6 +266,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         refreshAll();
         // eslint-disable-next-line
     }, []);
+
+    useEffect(() => {
+        if (tab === 'lightning' && lightningTab === 'wallet') {
+            fetchLightningBalance();
+        }
+        // eslint-disable-next-line
+    }, [tab]);
 
     function showAlert(warning) {
         setSnackbar({
@@ -280,6 +297,66 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             message: message,
             severity: "success",
         });
+    }
+
+    async function fetchLightningBalance() {
+        try {
+            const result = await keymaster.getLightningBalance();
+            setLightningBalance(result.balance);
+            setLightningIsConfigured(true);
+        } catch (error) {
+            if (error?.type === 'Lightning not configured' || error?.message?.includes('not configured')) {
+                setLightningIsConfigured(false);
+            } else {
+                showError(error);
+            }
+        }
+    }
+
+    async function setupLightning() {
+        try {
+            await keymaster.addLightning();
+            showSuccess('Lightning wallet set up successfully');
+            await fetchLightningBalance();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function createLightningInvoice() {
+        const amount = parseInt(lightningReceiveAmount, 10);
+        if (!amount || amount <= 0) {
+            showAlert('Enter a valid amount in satoshis');
+            return;
+        }
+        try {
+            const result = await keymaster.createLightningInvoice(amount, lightningReceiveMemo);
+            setLightningInvoice(result.paymentRequest);
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function decodeLightningInvoice() {
+        if (!bolt11Input.trim()) return;
+        try {
+            const result = await keymaster.decodeLightningInvoice(bolt11Input.trim());
+            setDecodedInvoice(result);
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function payLightningInvoice() {
+        if (!bolt11Input.trim()) return;
+        try {
+            await keymaster.payLightningInvoice(bolt11Input.trim());
+            showSuccess('Payment sent successfully');
+            setBolt11Input('');
+            setDecodedInvoice(null);
+        } catch (error) {
+            showError(error);
+        }
     }
 
     async function checkForChallenge() {
@@ -3162,6 +3239,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                         {currentId && !widget &&
                             <Tab key="polls" value="polls" label={'Polls'} icon={<Poll />} />
                         }
+                        {currentId && !widget && hasLightning &&
+                            <Tab key="lightning" value="lightning" label={'Lightning'} icon={<Bolt />} />
+                        }
                         {currentId &&
                             <Tab key="auth" value="auth" label={'Auth'} icon={<Key />} />
                         }
@@ -5397,6 +5477,141 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                 readOnly
                                 style={{ width: '800px', height: '600px', overflow: 'auto' }}
                             />
+                        </Box>
+                    }
+                    {tab === 'lightning' &&
+                        <Box>
+                            <p />
+                            <Tabs
+                                value={lightningTab}
+                                onChange={(_, v) => {
+                                    setLightningTab(v);
+                                    if (v === 'wallet') fetchLightningBalance();
+                                }}
+                                indicatorColor="primary"
+                                textColor="primary"
+                            >
+                                <Tab label="Wallet" value="wallet" onClick={fetchLightningBalance} />
+                                <Tab label="Receive" value="receive" />
+                                <Tab label="Send" value="send" />
+                            </Tabs>
+
+                            {lightningTab === 'wallet' &&
+                                <Box sx={{ mt: 2 }}>
+                                    {lightningIsConfigured === false &&
+                                        <Box>
+                                            <Typography>No Lightning wallet configured for this identity.</Typography>
+                                            <p />
+                                            <Button variant="contained" color="primary" onClick={setupLightning}>
+                                                Set Up Lightning
+                                            </Button>
+                                        </Box>
+                                    }
+                                    {lightningIsConfigured === true && lightningBalance !== null &&
+                                        <Box>
+                                            <Typography variant="h6">
+                                                Balance: {lightningBalance.toLocaleString()} sats
+                                            </Typography>
+                                            <p />
+                                            <Button variant="outlined" onClick={fetchLightningBalance}>
+                                                Refresh
+                                            </Button>
+                                        </Box>
+                                    }
+                                </Box>
+                            }
+
+                            {lightningTab === 'receive' &&
+                                <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 500 }}>
+                                    <TextField
+                                        label="Amount (sats)"
+                                        type="number"
+                                        value={lightningReceiveAmount}
+                                        onChange={(e) => setLightningReceiveAmount(e.target.value)}
+                                        size="small"
+                                    />
+                                    <TextField
+                                        label="Memo (optional)"
+                                        value={lightningReceiveMemo}
+                                        onChange={(e) => setLightningReceiveMemo(e.target.value)}
+                                        size="small"
+                                    />
+                                    <Box>
+                                        <Button variant="contained" color="primary" onClick={createLightningInvoice}>
+                                            Create Invoice
+                                        </Button>
+                                    </Box>
+                                    {lightningInvoice &&
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            <TextField
+                                                label="BOLT11 Invoice"
+                                                value={lightningInvoice}
+                                                multiline
+                                                rows={3}
+                                                InputProps={{ readOnly: true }}
+                                                size="small"
+                                                onClick={(e) => e.target.select()}
+                                            />
+                                            <Box>
+                                                <Button variant="outlined" size="small" onClick={() => {
+                                                    navigator.clipboard.writeText(lightningInvoice);
+                                                    showSuccess('Invoice copied to clipboard');
+                                                }}>
+                                                    Copy
+                                                </Button>
+                                            </Box>
+                                            <Box sx={{ mt: 1 }}>
+                                                <QRCodeSVG value={lightningInvoice} size={200} />
+                                            </Box>
+                                        </Box>
+                                    }
+                                </Box>
+                            }
+
+                            {lightningTab === 'send' &&
+                                <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 500 }}>
+                                    <TextField
+                                        label="BOLT11 Invoice"
+                                        value={bolt11Input}
+                                        onChange={(e) => {
+                                            setBolt11Input(e.target.value);
+                                            setDecodedInvoice(null);
+                                        }}
+                                        multiline
+                                        rows={3}
+                                        size="small"
+                                    />
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Button variant="outlined" onClick={decodeLightningInvoice} disabled={!bolt11Input.trim()}>
+                                            Decode
+                                        </Button>
+                                        {decodedInvoice &&
+                                            <Button variant="contained" color="primary" onClick={payLightningInvoice}>
+                                                Pay
+                                            </Button>
+                                        }
+                                    </Box>
+                                    {decodedInvoice &&
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                            {decodedInvoice.amount !== undefined &&
+                                                <Typography variant="body2"><strong>Amount:</strong> {decodedInvoice.amount}</Typography>
+                                            }
+                                            {decodedInvoice.description &&
+                                                <Typography variant="body2"><strong>Description:</strong> {decodedInvoice.description}</Typography>
+                                            }
+                                            {decodedInvoice.network &&
+                                                <Typography variant="body2"><strong>Network:</strong> {decodedInvoice.network}</Typography>
+                                            }
+                                            {decodedInvoice.created &&
+                                                <Typography variant="body2"><strong>Created:</strong> {decodedInvoice.created}</Typography>
+                                            }
+                                            {decodedInvoice.expires &&
+                                                <Typography variant="body2"><strong>Expires:</strong> {decodedInvoice.expires}</Typography>
+                                            }
+                                        </Box>
+                                    }
+                                </Box>
+                            }
                         </Box>
                     }
                     {tab === 'wallet' &&
