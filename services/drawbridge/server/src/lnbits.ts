@@ -1,5 +1,15 @@
 import axios from 'axios';
-import { LightningUnavailableError } from './errors.js';
+import { LightningPaymentError, LightningUnavailableError } from './errors.js';
+
+/** Throw LightningPaymentError for 4xx (business logic) or LightningUnavailableError for 5xx/connection errors. */
+function throwLnbitsError(error: any): never {
+    const detail = error.response?.data?.detail || error.code || error.message;
+    const status = error.response?.status;
+    if (status && status >= 400 && status < 500) {
+        throw new LightningPaymentError(String(detail));
+    }
+    throw new LightningUnavailableError(String(detail));
+}
 
 /** Create a new LNbits account with an initial wallet (one account per DID). */
 export async function createWallet(
@@ -17,8 +27,7 @@ export async function createWallet(
             invoiceKey: response.data.inkey,
         };
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }
 
@@ -35,8 +44,7 @@ export async function getBalance(
         const msats = response.data.balance ?? response.data.balance_msat ?? 0;
         return Math.floor(msats / 1000);
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }
 
@@ -58,8 +66,7 @@ export async function createInvoice(
             paymentHash: response.data.payment_hash,
         };
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }
 
@@ -79,8 +86,7 @@ export async function payInvoice(
             paymentHash: response.data.payment_hash,
         };
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }
 
@@ -110,7 +116,6 @@ export async function checkPayment(
         }
         return result;
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }

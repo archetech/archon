@@ -17,6 +17,7 @@ import { createAuthMiddleware } from './middleware/auth.js';
 import { handlePaymentCompletion, handleRevokeMacaroon, handleL402Status, handleGetPayments } from './middleware/l402-auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import * as lnbits from './lnbits.js';
+import { LightningPaymentError } from './errors.js';
 import type { L402Options, DrawbridgeStore } from './types.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -544,8 +545,9 @@ async function main() {
             const result = await lnbits.createWallet(config.lnbitsUrl, name || 'archon');
             res.json(result);
         } catch (error: any) {
+            const status = error instanceof LightningPaymentError ? 400 : 502;
             logger.error({ err: error }, 'LNbits error');
-            res.status(502).json({ error: error.message || 'LNbits error' });
+            res.status(status).json({ error: error.message || 'LNbits error' });
         }
     });
 
@@ -559,8 +561,9 @@ async function main() {
             const balance = await lnbits.getBalance(config.lnbitsUrl, invoiceKey);
             res.json({ balance });
         } catch (error: any) {
+            const status = error instanceof LightningPaymentError ? 400 : 502;
             logger.error({ err: error }, 'LNbits error');
-            res.status(502).json({ error: error.message || 'LNbits error' });
+            res.status(status).json({ error: error.message || 'LNbits error' });
         }
     });
 
@@ -574,8 +577,9 @@ async function main() {
             const result = await lnbits.createInvoice(config.lnbitsUrl, invoiceKey, amount, memo);
             res.json(result);
         } catch (error: any) {
+            const status = error instanceof LightningPaymentError ? 400 : 502;
             logger.error({ err: error }, 'LNbits error');
-            res.status(502).json({ error: error.message || 'LNbits error' });
+            res.status(status).json({ error: error.message || 'LNbits error' });
         }
     });
 
@@ -589,8 +593,9 @@ async function main() {
             const result = await lnbits.payInvoice(config.lnbitsUrl, adminKey, bolt11);
             res.json(result);
         } catch (error: any) {
+            const status = error instanceof LightningPaymentError ? 400 : 502;
             logger.error({ err: error }, 'LNbits error');
-            res.status(502).json({ error: error.message || 'LNbits error' });
+            res.status(status).json({ error: error.message || 'LNbits error' });
         }
     });
 
@@ -604,8 +609,9 @@ async function main() {
             const status = await lnbits.checkPayment(config.lnbitsUrl, invoiceKey, paymentHash);
             res.json({ ...status, paymentHash });
         } catch (error: any) {
+            const status = error instanceof LightningPaymentError ? 400 : 502;
             logger.error({ err: error }, 'LNbits error');
-            res.status(502).json({ error: error.message || 'LNbits error' });
+            res.status(status).json({ error: error.message || 'LNbits error' });
         }
     });
 
