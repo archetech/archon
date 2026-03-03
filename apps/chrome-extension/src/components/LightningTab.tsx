@@ -124,6 +124,7 @@ const LightningTab: React.FC = () => {
     async function handlePay() {
         if (!keymaster || !bolt11Input.trim()) return;
         setLoadingPay(true);
+        setPaymentResult(null);
         try {
             const payment = await keymaster.payLightningInvoice(bolt11Input.trim());
             const status = await keymaster.checkLightningPayment(payment.paymentHash);
@@ -132,6 +133,16 @@ const LightningTab: React.FC = () => {
             setBolt11Input("");
             setDecoded(null);
         } catch (err: any) {
+            if (decoded?.payment_hash) {
+                try {
+                    const status = await keymaster.checkLightningPayment(decoded.payment_hash);
+                    if (status.paid) {
+                        setPaymentResult(status);
+                        setSuccess("Invoice was already paid");
+                        return;
+                    }
+                } catch { /* fall through to original error */ }
+            }
             setError(err);
         } finally {
             setLoadingPay(false);

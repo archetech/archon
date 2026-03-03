@@ -90,15 +90,25 @@ export async function checkPayment(
     invoiceKey: string,
     paymentHash: string
 ): Promise<{ paid: boolean; preimage?: string }> {
-    try {
+    const doCheck = async () => {
         const response = await axios.get(
             `${url}/api/v1/payments/${paymentHash}`,
             { headers: { 'X-Api-Key': invoiceKey } }
         );
         return {
             paid: response.data.paid === true,
-            preimage: response.data.preimage,
+            preimage: response.data.preimage || undefined,
         };
+    };
+
+    try {
+        const result = await doCheck();
+        // Preimage may not be immediately available after payment settles
+        if (result.paid && !result.preimage) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return doCheck();
+        }
+        return result;
     } catch (error: any) {
         const detail = error.response?.data?.detail || error.code || error.message;
         throw new LightningUnavailableError(String(detail));

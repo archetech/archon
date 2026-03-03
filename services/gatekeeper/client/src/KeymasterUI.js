@@ -364,6 +364,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function payLightningInvoice() {
         if (!bolt11Input.trim()) return;
+        setLightningPaymentResult(null);
         try {
             const payment = await keymaster.payLightningInvoice(bolt11Input.trim());
             const status = await keymaster.checkLightningPayment(payment.paymentHash);
@@ -372,6 +373,16 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setBolt11Input('');
             setDecodedInvoice(null);
         } catch (error) {
+            if (decodedInvoice?.payment_hash) {
+                try {
+                    const status = await keymaster.checkLightningPayment(decodedInvoice.payment_hash);
+                    if (status.paid) {
+                        setLightningPaymentResult(status);
+                        showSuccess('Invoice was already paid');
+                        return;
+                    }
+                } catch { /* fall through to original error */ }
+            }
             showError(error);
         }
     }
