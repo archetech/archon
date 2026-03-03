@@ -57,7 +57,7 @@ urllib.request.urlopen('$CLNREST_URL', context=ctx, timeout=3)
 fi
 
 # --- Patch: fix internal payment balance zeroing (lnbits/lnbits#3817) ---
-TASKS_FILE="$(python3 -c "import lnbits.tasks; print(lnbits.tasks.__file__)")"
+TASKS_FILE="$(find / -path '*/lnbits/tasks.py' -not -path '*/test*' 2>/dev/null | head -1)"
 if [ -f "$TASKS_FILE" ] && grep -q "payment.fee = status.fee_msat" "$TASKS_FILE" && ! grep -q "if not is_internal:" "$TASKS_FILE"; then
     echo "[lnbits] Applying patch #3817 (internal payment fix)..."
     python3 -c "

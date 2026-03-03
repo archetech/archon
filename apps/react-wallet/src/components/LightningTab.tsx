@@ -52,7 +52,7 @@ const LightningTab: React.FC = () => {
                 setIsConfigured(false);
             } else {
                 setIsConfigured(true);
-                setWalletError(err.message || String(err));
+                setWalletError(err.message || err.error || JSON.stringify(err));
             }
         } finally {
             setLoadingBalance(false);
