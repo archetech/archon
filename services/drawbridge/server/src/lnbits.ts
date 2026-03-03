@@ -1,11 +1,13 @@
 import axios from 'axios';
 import { LightningPaymentError, LightningUnavailableError } from './errors.js';
 
-/** Throw LightningPaymentError for 4xx (business logic) or LightningUnavailableError for 5xx/connection errors. */
+/** Throw LightningPaymentError for business-logic errors or LightningUnavailableError for infra/auth errors. */
 function throwLnbitsError(error: any): never {
     const detail = error.response?.data?.detail || error.code || error.message;
     const status = error.response?.status;
-    if (status && status >= 400 && status < 500) {
+    // 400/402/409 = business logic (bad request, payment failed, already paid)
+    // 401/403/404 = misconfiguration (bad key, wrong URL) → treat as unavailable
+    if (status === 400 || status === 402 || status === 409) {
         throw new LightningPaymentError(String(detail));
     }
     throw new LightningUnavailableError(String(detail));

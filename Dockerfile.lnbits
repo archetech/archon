@@ -1,0 +1,5 @@
+FROM lnbits/lnbits:latest@sha256:12e54e3a3754b1df26225a5f8a3fd2cc2fe71b00c6bdb55171f9de8e3a459a68
+
+# Fix internal payment balance zeroing (lnbits/lnbits#3817)
+COPY patches/lnbits-3817-internal-payment.py /tmp/
+RUN python3 /tmp/lnbits-3817-internal-payment.py && rm /tmp/lnbits-3817-internal-payment.py

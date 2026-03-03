@@ -195,7 +195,10 @@ services:
     restart: "no"
 
   lnbits:
-    image: lnbits/lnbits:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.lnbits
+    image: ghcr.io/archetech/lnbits
     entrypoint: ["/bin/sh", "/scripts/lnbits-entrypoint.sh"]
     environment:
       - LNBITS_HOST=0.0.0.0
