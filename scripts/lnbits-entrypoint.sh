@@ -56,5 +56,42 @@ urllib.request.urlopen('$CLNREST_URL', context=ctx, timeout=3)
     fi
 fi
 
+# --- Patch: fix internal payment balance zeroing (lnbits/lnbits#3817) ---
+TASKS_FILE="$(python3 -c "import lnbits.tasks; print(lnbits.tasks.__file__)")"
+if [ -f "$TASKS_FILE" ] && grep -q "payment.fee = status.fee_msat" "$TASKS_FILE" && ! grep -q "if not is_internal:" "$TASKS_FILE"; then
+    echo "[lnbits] Applying patch #3817 (internal payment fix)..."
+    python3 -c "
+with open('$TASKS_FILE', 'r') as f:
+    content = f.read()
+old = '''    from lnbits.core.services.payments import check_payment_status
+
+    status = await check_payment_status(
+        payment, skip_internal_payment_notifications=True
+    )
+    payment.fee = status.fee_msat or payment.fee
+    # only overwrite preimage if status.preimage provides it
+    payment.preimage = status.preimage or payment.preimage
+    payment.status = PaymentState.SUCCESS'''
+new = '''    if not is_internal:
+        from lnbits.core.services.payments import check_payment_status
+
+        status = await check_payment_status(
+            payment, skip_internal_payment_notifications=True
+        )
+        payment.fee = status.fee_msat or payment.fee
+        # only overwrite preimage if status.preimage provides it
+        payment.preimage = status.preimage or payment.preimage
+    payment.status = PaymentState.SUCCESS'''
+if old in content:
+    with open('$TASKS_FILE', 'w') as f:
+        f.write(content.replace(old, new))
+    print('[lnbits] Patch #3817 applied successfully')
+else:
+    print('[lnbits] Patch #3817 already applied or code changed, skipping')
+"
+else
+    echo "[lnbits] Patch #3817 not needed, skipping"
+fi
+
 echo "[lnbits] Starting LNbits..."
 exec uv run lnbits --host "$LNBITS_HOST" --port "$LNBITS_PORT"

@@ -16,6 +16,7 @@ services:
       - HIVE_COMMS_ENABLED=true
       - HIVE_ARCHON_ENABLED=true
       - HIVE_ARCHON_VERSION=${ARCHON_CLN_ARCHON_VERSION:-v0.1.0}
+      - MIN_CAPACITY_SAT=${ARCHON_CLN_MIN_CAPACITY_SAT:-50000}
       - LOG_LEVEL=${ARCHON_CLN_LOG_LEVEL:-info}
     volumes:
       - ./data/cln-mainnet:/data/lightning

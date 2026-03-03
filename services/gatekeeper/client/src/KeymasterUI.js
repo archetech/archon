@@ -248,6 +248,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [lightningTab, setLightningTab] = useState('wallet');
     const [lightningBalance, setLightningBalance] = useState(null);
     const [lightningIsConfigured, setLightningIsConfigured] = useState(null);
+    const [lightningWalletError, setLightningWalletError] = useState(null);
     const [lightningReceiveAmount, setLightningReceiveAmount] = useState('');
     const [lightningReceiveMemo, setLightningReceiveMemo] = useState('');
     const [lightningInvoice, setLightningInvoice] = useState('');
@@ -301,6 +302,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function fetchLightningBalance() {
+        setLightningWalletError(null);
         try {
             const result = await keymaster.getLightningBalance();
             setLightningBalance(result.balance);
@@ -309,7 +311,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             if (error?.type === 'Lightning not configured' || error?.message?.includes('not configured')) {
                 setLightningIsConfigured(false);
             } else {
-                showError(error);
+                setLightningIsConfigured(true);
+                setLightningWalletError(error.error || error.message || String(error));
             }
         }
     }
@@ -319,6 +322,17 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             await keymaster.addLightning();
             showSuccess('Lightning wallet set up successfully');
             await fetchLightningBalance();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function disconnectLightning() {
+        try {
+            await keymaster.removeLightning();
+            setLightningBalance(null);
+            setLightningIsConfigured(false);
+            showSuccess('Lightning wallet disconnected');
         } catch (error) {
             showError(error);
         }
@@ -5510,15 +5524,24 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             </Button>
                                         </Box>
                                     }
-                                    {lightningIsConfigured === true && lightningBalance !== null &&
+                                    {lightningIsConfigured === true &&
                                         <Box>
-                                            <Typography variant="h6">
-                                                Balance: {lightningBalance.toLocaleString()} sats
-                                            </Typography>
+                                            {lightningWalletError ?
+                                                <Typography color="error">{lightningWalletError}</Typography>
+                                            :
+                                                <Typography variant="h6">
+                                                    Balance: {(lightningBalance ?? 0).toLocaleString()} sats
+                                                </Typography>
+                                            }
                                             <p />
-                                            <Button variant="outlined" onClick={fetchLightningBalance}>
-                                                Refresh
-                                            </Button>
+                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                                <Button variant="outlined" onClick={fetchLightningBalance}>
+                                                    Refresh
+                                                </Button>
+                                                <Button variant="outlined" color="error" onClick={disconnectLightning}>
+                                                    Disconnect Wallet
+                                                </Button>
+                                            </Box>
                                         </Box>
                                     }
                                 </Box>
