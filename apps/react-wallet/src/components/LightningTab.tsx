@@ -24,6 +24,7 @@ const LightningTab: React.FC = () => {
     const [balance, setBalance] = useState<number | null>(null);
     const [loadingBalance, setLoadingBalance] = useState<boolean>(false);
     const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
+    const [walletError, setWalletError] = useState<string | null>(null);
 
     // Receive sub-tab
     const [receiveAmount, setReceiveAmount] = useState<string>("");
@@ -41,6 +42,7 @@ const LightningTab: React.FC = () => {
     const fetchBalance = useCallback(async () => {
         if (!keymaster) return;
         setLoadingBalance(true);
+        setWalletError(null);
         try {
             const result = await keymaster.getLightningBalance();
             setBalance(result.balance);
@@ -49,12 +51,13 @@ const LightningTab: React.FC = () => {
             if (err instanceof LightningNotConfiguredError) {
                 setIsConfigured(false);
             } else {
-                setError(err);
+                setIsConfigured(true);
+                setWalletError(err.message || err.error || JSON.stringify(err));
             }
         } finally {
             setLoadingBalance(false);
         }
-    }, [keymaster, setError]);
+    }, [keymaster]);
 
     useEffect(() => {
         if (activeTab === "wallet") {
@@ -68,6 +71,18 @@ const LightningTab: React.FC = () => {
             await keymaster.addLightning();
             setSuccess("Lightning wallet set up successfully");
             await fetchBalance();
+        } catch (err: any) {
+            setError(err);
+        }
+    }
+
+    async function handleDisconnectLightning() {
+        if (!keymaster) return;
+        try {
+            await keymaster.removeLightning();
+            setBalance(null);
+            setIsConfigured(false);
+            setSuccess("Lightning wallet disconnected");
         } catch (err: any) {
             setError(err);
         }
@@ -109,6 +124,7 @@ const LightningTab: React.FC = () => {
     async function handlePay() {
         if (!keymaster || !bolt11Input.trim()) return;
         setLoadingPay(true);
+        setPaymentResult(null);
         try {
             const payment = await keymaster.payLightningInvoice(bolt11Input.trim());
             const status = await keymaster.checkLightningPayment(payment.paymentHash);
@@ -117,6 +133,16 @@ const LightningTab: React.FC = () => {
             setBolt11Input("");
             setDecoded(null);
         } catch (err: any) {
+            if (decoded?.payment_hash) {
+                try {
+                    const status = await keymaster.checkLightningPayment(decoded.payment_hash);
+                    if (status.paid) {
+                        setPaymentResult(status);
+                        setSuccess("Invoice was already paid");
+                        return;
+                    }
+                } catch { /* fall through to original error */ }
+            }
             setError(err);
         } finally {
             setLoadingPay(false);
@@ -150,14 +176,29 @@ const LightningTab: React.FC = () => {
                         </Box>
                     )}
 
-                    {!loadingBalance && isConfigured === true && balance !== null && (
+                    {!loadingBalance && isConfigured === true && (
                         <Box>
-                            <Typography variant="h6" sx={{ mb: 1 }}>
-                                Balance: {balance.toLocaleString()} sats
-                            </Typography>
-                            <Button variant="outlined" onClick={fetchBalance}>
-                                Refresh
-                            </Button>
+                            {walletError ? (
+                                <Typography color="error" sx={{ mb: 1 }}>
+                                    {walletError}
+                                </Typography>
+                            ) : (
+                                <Typography variant="h6" sx={{ mb: 1 }}>
+                                    Balance: {(balance ?? 0).toLocaleString()} sats
+                                </Typography>
+                            )}
+                            <Box sx={{ display: "flex", gap: 1 }}>
+                                <Button variant="outlined" onClick={fetchBalance}>
+                                    Refresh
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    onClick={handleDisconnectLightning}
+                                >
+                                    Disconnect Wallet
+                                </Button>
+                            </Box>
                         </Box>
                     )}
                 </Box>

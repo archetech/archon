@@ -1,0 +1,223 @@
+services:
+  cln-mainnet-node:
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    environment:
+      - NETWORK=bitcoin
+      - ALIAS=${ARCHON_CLN_ALIAS:-archon}
+      - RGB=${ARCHON_CLN_RGB:-e33502}
+      - BITCOIN_RPCHOST=${ARCHON_BTC_HOST}
+      - BITCOIN_RPCPORT=${ARCHON_BTC_PORT:-8332}
+      - BITCOIN_RPCUSER=${ARCHON_BTC_USER}
+      - BITCOIN_RPCPASSWORD=${ARCHON_BTC_PASS}
+      - LIGHTNING_PORT=${ARCHON_CLN_PORT:-9736}
+      - NETWORK_MODE=${ARCHON_CLN_NETWORK_MODE:-tor}
+      - ANNOUNCE_ADDR=${ARCHON_CLN_ANNOUNCE_ADDR:-}
+      - HIVE_GOVERNANCE_MODE=${ARCHON_CLN_GOVERNANCE_MODE:-advisor}
+      - HIVE_COMMS_ENABLED=true
+      - HIVE_ARCHON_ENABLED=true
+      - HIVE_ARCHON_VERSION=${ARCHON_CLN_ARCHON_VERSION:-v0.1.0}
+      - MIN_CAPACITY_SAT=${ARCHON_CLN_MIN_CAPACITY_SAT:-50000}
+      - LOG_LEVEL=${ARCHON_CLN_LOG_LEVEL:-info}
+    volumes:
+      - ./data/cln-mainnet:/data/lightning
+    networks:
+      default:
+        aliases:
+          - cln
+    ports:
+      - "${ARCHON_CLN_PORT:-9736}:${ARCHON_CLN_PORT:-9736}"
+      - "127.0.0.1:3001:3001"
+
+  drawbridge-init:
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        RUNE_FILE=/data/lightning/drawbridge/rune.txt
+        RPC_SOCKET=/data/lightning/bitcoin/bitcoin/lightning-rpc
+
+        if [ -f "$$RUNE_FILE" ]; then
+            echo "[drawbridge-init] Rune already exists, skipping"
+            exit 0
+        fi
+
+        echo "[drawbridge-init] Waiting for lightningd..."
+        timeout=600; elapsed=0
+        while ! lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" getinfo >/dev/null 2>&1; do
+            sleep 2; elapsed=$$((elapsed + 2))
+            if [ $$elapsed -ge $$timeout ]; then
+                echo "[drawbridge-init] ERROR: lightningd not ready after $${timeout}s"
+                exit 1
+            fi
+        done
+
+        echo "[drawbridge-init] Creating rune..."
+        set -e
+        mkdir -p /data/lightning/drawbridge
+        RUNE=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
+            restrictions='[["method^invoice","method^listinvoices"]]' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+
+        if [ -z "$$RUNE" ]; then
+            echo "[drawbridge-init] ERROR: Failed to create rune"
+            exit 1
+        fi
+
+        echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE"
+        echo "[drawbridge-init] Rune created successfully (restricted to invoice methods)"
+    volumes:
+      - ./data/cln-mainnet:/data/lightning
+    depends_on:
+      - cln-mainnet-node
+    restart: "no"
+
+  rtl-init:
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        RUNE_FILE=/data/lightning/rtl/rune.txt
+        RPC_SOCKET=/data/lightning/bitcoin/bitcoin/lightning-rpc
+
+        if [ -f "$$RUNE_FILE" ]; then
+            echo "[rtl-init] Rune already exists, skipping"
+            exit 0
+        fi
+
+        echo "[rtl-init] Waiting for lightningd..."
+        timeout=600; elapsed=0
+        while ! lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" getinfo >/dev/null 2>&1; do
+            sleep 2; elapsed=$$((elapsed + 2))
+            if [ $$elapsed -ge $$timeout ]; then
+                echo "[rtl-init] ERROR: lightningd not ready after $${timeout}s"
+                exit 1
+            fi
+        done
+
+        echo "[rtl-init] Creating rune..."
+        set -e
+        mkdir -p /data/lightning/rtl
+        RUNE=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+
+        if [ -z "$$RUNE" ]; then
+            echo "[rtl-init] ERROR: Failed to create rune"
+            exit 1
+        fi
+
+        echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE"
+        echo "[rtl-init] Rune created successfully"
+    volumes:
+      - ./data/cln-mainnet:/data/lightning
+    depends_on:
+      - cln-mainnet-node
+    restart: "no"
+
+  rtl:
+    image: shahanafarooqui/rtl:0.15.1
+    entrypoint: ["/bin/sh", "/scripts/rtl-entrypoint.sh"]
+    environment:
+      - RTL_CONFIG_PATH=/data
+      - CLN_REST_HOST=cln
+      - CLN_REST_PORT=3001
+      - RTL_NODE_NAME=${ARCHON_CLN_ALIAS:-archon}
+      - RTL_PASSWORD=${ARCHON_RTL_PASSWORD:-changeme}
+    volumes:
+      - ./scripts/rtl-entrypoint.sh:/scripts/rtl-entrypoint.sh:ro
+      - ./data/cln-mainnet/rtl:/data
+    ports:
+      - "127.0.0.1:${ARCHON_RTL_PORT:-3002}:3000"
+    depends_on:
+      rtl-init:
+        condition: service_completed_successfully
+      cln-mainnet-node:
+        condition: service_started
+
+  lnbits-init:
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        RUNE_DIR=/data/lightning/lnbits
+        RUNE_FILE=$$RUNE_DIR/runes.env
+        RPC_SOCKET=/data/lightning/bitcoin/bitcoin/lightning-rpc
+        CERT_DIR=/data/lightning/bitcoin/bitcoin
+
+        if [ -f "$$RUNE_FILE" ]; then
+            echo "[lnbits-init] Runes already exist, skipping"
+            exit 0
+        fi
+
+        echo "[lnbits-init] Waiting for lightningd..."
+        timeout=600; elapsed=0
+        while ! lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" getinfo >/dev/null 2>&1; do
+            sleep 2; elapsed=$$((elapsed + 2))
+            if [ $$elapsed -ge $$timeout ]; then
+                echo "[lnbits-init] ERROR: lightningd not ready after $${timeout}s"
+                exit 1
+            fi
+        done
+
+        echo "[lnbits-init] Creating runes..."
+        set -e
+        mkdir -p "$$RUNE_DIR"
+
+        READONLY=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
+            restrictions='[["method=listfunds","method=listpays","method=listinvoices","method=getinfo","method=summary","method=waitanyinvoice"]]' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+
+        INVOICE=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
+            restrictions='[["method=invoice"],["rate=120"]]' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+
+        PAY=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
+            restrictions='[["method=pay"],["rate=30"]]' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+
+        echo "CLNREST_READONLY_RUNE=\"$$READONLY\"" > "$$RUNE_FILE"
+        echo "CLNREST_INVOICE_RUNE=\"$$INVOICE\"" >> "$$RUNE_FILE"
+        echo "CLNREST_PAY_RUNE=\"$$PAY\"" >> "$$RUNE_FILE"
+
+        # Copy TLS certs so LNbits can read them
+        if [ -f "$$CERT_DIR/ca.pem" ]; then
+            cp "$$CERT_DIR/ca.pem" "$$RUNE_DIR/ca.pem"
+            cp "$$CERT_DIR/server.pem" "$$RUNE_DIR/server.pem"
+            echo "[lnbits-init] TLS certs copied"
+        else
+            echo "[lnbits-init] WARNING: TLS certs not found at $$CERT_DIR"
+        fi
+
+        echo "[lnbits-init] Runes created successfully"
+    volumes:
+      - ./data/cln-mainnet:/data/lightning
+    depends_on:
+      - cln-mainnet-node
+    restart: "no"
+
+  lnbits:
+    build:
+      context: .
+      dockerfile: Dockerfile.lnbits
+    image: ghcr.io/archetech/lnbits
+    entrypoint: ["/bin/sh", "/scripts/lnbits-entrypoint.sh"]
+    environment:
+      - LNBITS_HOST=0.0.0.0
+      - LNBITS_PORT=5000
+      - LNBITS_ADMIN_UI=true
+      - LNBITS_BACKEND_WALLET_CLASS=CLNRestWallet
+      - CLNREST_URL=https://cln:3001
+      - CLNREST_CA=/data/lightning/lnbits/ca.pem
+      - LNBITS_DATA_FOLDER=/data/lnbits
+      - FORWARDED_ALLOW_IPS=*
+      - AUTH_SECRET_KEY=${ARCHON_LNBITS_AUTH_SECRET:-}
+    volumes:
+      - ./scripts/lnbits-entrypoint.sh:/scripts/lnbits-entrypoint.sh:ro
+      - ./data/cln-mainnet:/data/lightning:ro
+      - ./data/lnbits:/data/lnbits
+    ports:
+      - "127.0.0.1:${ARCHON_LNBITS_PORT:-5000}:5000"
+    depends_on:
+      lnbits-init:
+        condition: service_completed_successfully
+      cln-mainnet-node:
+        condition: service_started

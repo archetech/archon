@@ -1,5 +1,17 @@
 import axios from 'axios';
-import { LightningUnavailableError } from './errors.js';
+import { LightningPaymentError, LightningUnavailableError } from './errors.js';
+
+/** Throw LightningPaymentError for business-logic errors or LightningUnavailableError for infra/auth errors. */
+function throwLnbitsError(error: any): never {
+    const detail = error.response?.data?.detail || error.code || error.message;
+    const status = error.response?.status;
+    // 400/402/409 = business logic (bad request, payment failed, already paid)
+    // 401/403/404 = misconfiguration (bad key, wrong URL) → treat as unavailable
+    if (status === 400 || status === 402 || status === 409) {
+        throw new LightningPaymentError(String(detail));
+    }
+    throw new LightningUnavailableError(String(detail));
+}
 
 /** Create a new LNbits account with an initial wallet (one account per DID). */
 export async function createWallet(
@@ -17,8 +29,7 @@ export async function createWallet(
             invoiceKey: response.data.inkey,
         };
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }
 
@@ -35,8 +46,7 @@ export async function getBalance(
         const msats = response.data.balance ?? response.data.balance_msat ?? 0;
         return Math.floor(msats / 1000);
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }
 
@@ -58,8 +68,7 @@ export async function createInvoice(
             paymentHash: response.data.payment_hash,
         };
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }
 
@@ -79,8 +88,7 @@ export async function payInvoice(
             paymentHash: response.data.payment_hash,
         };
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }
 
@@ -90,17 +98,26 @@ export async function checkPayment(
     invoiceKey: string,
     paymentHash: string
 ): Promise<{ paid: boolean; preimage?: string }> {
-    try {
+    const doCheck = async () => {
         const response = await axios.get(
             `${url}/api/v1/payments/${paymentHash}`,
             { headers: { 'X-Api-Key': invoiceKey } }
         );
         return {
             paid: response.data.paid === true,
-            preimage: response.data.preimage,
+            preimage: response.data.preimage || undefined,
         };
+    };
+
+    try {
+        const result = await doCheck();
+        // Preimage may not be immediately available after payment settles
+        if (result.paid && !result.preimage) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return doCheck();
+        }
+        return result;
     } catch (error: any) {
-        const detail = error.response?.data?.detail || error.code || error.message;
-        throw new LightningUnavailableError(String(detail));
+        throwLnbitsError(error);
     }
 }
