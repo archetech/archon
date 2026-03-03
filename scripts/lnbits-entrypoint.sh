@@ -34,5 +34,27 @@ else
     echo "[lnbits] Auth secret generated and saved to $SECRET_FILE"
 fi
 
+# --- Wait for CLN REST ---
+if [ -n "$CLNREST_URL" ]; then
+    echo "[lnbits] Waiting for CLN REST at $CLNREST_URL..."
+    timeout=120; elapsed=0
+    while ! python3 -c "
+import urllib.request, ssl
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+urllib.request.urlopen('$CLNREST_URL', context=ctx, timeout=3)
+" >/dev/null 2>&1; do
+        sleep 2; elapsed=$((elapsed + 2))
+        if [ $elapsed -ge $timeout ]; then
+            echo "[lnbits] WARNING: CLN REST not ready after ${timeout}s, starting anyway"
+            break
+        fi
+    done
+    if [ $elapsed -lt $timeout ]; then
+        echo "[lnbits] CLN REST is ready"
+    fi
+fi
+
 echo "[lnbits] Starting LNbits..."
 exec uv run lnbits --host "$LNBITS_HOST" --port "$LNBITS_PORT"
