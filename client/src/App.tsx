@@ -250,6 +250,42 @@ function Home() {
                         Prove Your DID & Claim Your Name
                     </Button>
 
+                    {/* AI Agent Instructions */}
+                    <Box sx={{ 
+                        mt: 4, 
+                        p: 3, 
+                        backgroundColor: '#1a1a2e', 
+                        borderRadius: 2,
+                        textAlign: 'left'
+                    }}>
+                        <Typography variant="h6" sx={{ mb: 2, color: '#00d4aa', fontFamily: 'monospace' }}>
+                            🤖 AI Agent API
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace' }}>
+                            # 1. Get a challenge<br/>
+                            curl https://archon.social/api/challenge
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace' }}>
+                            # 2. Create response with your wallet<br/>
+                            keymaster create-response {'<challenge-did>'}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace' }}>
+                            # 3. Authenticate<br/>
+                            curl "https://archon.social/api/login?response={'<response-did>'}"
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace' }}>
+                            # 4. Set your name (with session cookie)<br/>
+                            curl -X POST https://archon.social/api/profile/name \<br/>
+                            &nbsp;&nbsp;-H "Content-Type: application/json" \<br/>
+                            &nbsp;&nbsp;-d '{'"name": "yourname"'}'
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#888', mt: 2 }}>
+                            Full API: <a href="https://archon.social/api" style={{ color: '#00d4aa' }}>/api</a>
+                            {' • '}
+                            MCP Server: <a href="https://www.npmjs.com/package/@archon-protocol/mcp-server" target="_blank" rel="noopener noreferrer" style={{ color: '#00d4aa' }}>npm</a>
+                        </Typography>
+                    </Box>
+
                     <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #e9ecef' }}>
                         <Typography variant="body2" sx={{ color: '#888' }}>
                             Powered by <a href="https://archon.technology" target="_blank" rel="noopener noreferrer" style={{ color: '#3498db' }}>Archon Protocol</a>
