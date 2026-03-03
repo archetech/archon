@@ -1044,7 +1044,7 @@ app.post('/api/credential/request', isAuthenticated, async (req: Request, res: R
                     "https://www.w3.org/ns/credentials/v2",
                     "https://archon.social/credentials/membership/v1"
                 ],
-                type: ['VerifiableCredential', 'ArchonSocialCredential', 'MembershipCredential'],
+                type: ['VerifiableCredential', 'ArchonSocialCredential', 'DTGMembershipCredential'],
                 issuer: ownerDID,
                 validFrom: new Date().toISOString(),
                 credentialSchema: {
