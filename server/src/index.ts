@@ -88,6 +88,7 @@ async function verifyRoles(): Promise<void> {
     } catch (error) {
         console.log(`Creating group ${roles.admin}`);
         roleDIDs.admin = await keymaster.createGroup(roles.admin);
+        await keymaster.addAlias(roles.admin, roleDIDs.admin);
         console.log(`Created ${roles.admin}: ${roleDIDs.admin}`);
     }
 
@@ -99,6 +100,7 @@ async function verifyRoles(): Promise<void> {
     } catch (error) {
         console.log(`Creating group ${roles.moderator}`);
         roleDIDs.moderator = await keymaster.createGroup(roles.moderator);
+        await keymaster.addAlias(roles.moderator, roleDIDs.moderator);
         console.log(`Created ${roles.moderator}: ${roleDIDs.moderator}`);
     }
 
@@ -110,6 +112,7 @@ async function verifyRoles(): Promise<void> {
     } catch (error) {
         console.log(`Creating group ${roles.member}`);
         roleDIDs.member = await keymaster.createGroup(roles.member);
+        await keymaster.addAlias(roles.member, roleDIDs.member);
         console.log(`Created ${roles.member}: ${roleDIDs.member}`);
     }
 
