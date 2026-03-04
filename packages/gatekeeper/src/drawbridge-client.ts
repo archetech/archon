@@ -11,9 +11,6 @@ import GatekeeperClient from './gatekeeper-client.js';
 
 function throwError(error: any): never {
     if (error.response) {
-        if (error.response.status === 404) {
-            throw new Error('Lightning service unavailable: Server does not support Lightning');
-        }
         throw error.response.data;
     }
     throw error.message;
