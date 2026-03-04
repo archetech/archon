@@ -916,11 +916,11 @@ program
     });
 
 program
-    .command('lightning-zap <did> <amount>')
+    .command('lightning-zap <did> <amount> [memo]')
     .description('Send sats to a DID via Lightning')
-    .action(async (did, amount) => {
+    .action(async (did, amount, memo) => {
         try {
-            const result = await keymaster.zapLightning(did, parseInt(amount));
+            const result = await keymaster.zapLightning(did, parseInt(amount), memo);
             console.log(JSON.stringify(result, null, 4));
         }
         catch (error: any) {

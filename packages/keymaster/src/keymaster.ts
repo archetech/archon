@@ -1996,7 +1996,7 @@ export default class Keymaster implements KeymasterInterface {
         return true;
     }
 
-    async zapLightning(id: string, amount: number, name?: string): Promise<LightningPayment> {
+    async zapLightning(id: string, amount: number, memo?: string, name?: string): Promise<LightningPayment> {
         const did = await this.lookupDID(id);
         if (!did) {
             throw new InvalidParameterError('did');
@@ -2007,7 +2007,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const drawbridge = this.requireDrawbridge();
         const config = await this.getLightningConfig(name);
-        return drawbridge.zapLightning(config.adminKey, did, amount);
+        return drawbridge.zapLightning(config.adminKey, did, amount, memo);
     }
 
     async testAgent(id: string): Promise<boolean> {

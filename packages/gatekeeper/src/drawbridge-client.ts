@@ -99,9 +99,9 @@ export default class DrawbridgeClient extends GatekeeperClient implements Drawbr
         }
     }
 
-    async zapLightning(adminKey: string, did: string, amount: number): Promise<LightningPayment> {
+    async zapLightning(adminKey: string, did: string, amount: number, memo?: string): Promise<LightningPayment> {
         try {
-            const response = await this.axios.post(`${this.API}/lightning/zap`, { adminKey, did, amount });
+            const response = await this.axios.post(`${this.API}/lightning/zap`, { adminKey, did, amount, memo });
             return response.data;
         } catch (error) {
             throwError(error);

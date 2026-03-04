@@ -2185,7 +2185,7 @@ v1router.post('/lightning/decode', async (req, res) => {
  */
 v1router.post('/lightning/publish', async (req, res) => {
     try {
-        const { id } = req.body;
+        const id = req.body?.id;
         const ok = await keymaster.publishLightning(id);
         res.json({ ok });
     } catch (error: any) {
@@ -2215,7 +2215,7 @@ v1router.post('/lightning/publish', async (req, res) => {
  */
 v1router.post('/lightning/unpublish', async (req, res) => {
     try {
-        const { id } = req.body;
+        const id = req.body?.id;
         const ok = await keymaster.unpublishLightning(id);
         res.json({ ok });
     } catch (error: any) {
@@ -2239,6 +2239,10 @@ v1router.post('/lightning/unpublish', async (req, res) => {
  *                 type: string
  *               amount:
  *                 type: integer
+ *               memo:
+ *                 type: string
+ *               id:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Payment result with preimage.
@@ -2247,8 +2251,8 @@ v1router.post('/lightning/unpublish', async (req, res) => {
  */
 v1router.post('/lightning/zap', async (req, res) => {
     try {
-        const { did, amount } = req.body;
-        const result = await keymaster.zapLightning(did, amount);
+        const { did, amount, memo, id } = req.body;
+        const result = await keymaster.zapLightning(did, amount, memo, id);
         res.json(result);
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });

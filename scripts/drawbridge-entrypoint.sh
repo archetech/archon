@@ -45,7 +45,7 @@ else
     TOR_HOSTNAME_FILE="/data/tor/hostname"
     if [ -f "$TOR_HOSTNAME_FILE" ]; then
         ONION_HOST="$(cat "$TOR_HOSTNAME_FILE" | tr -d '[:space:]')"
-        export ARCHON_DRAWBRIDGE_PUBLIC_HOST="http://${ONION_HOST}:4222"
+        export ARCHON_DRAWBRIDGE_PUBLIC_HOST="http://${ONION_HOST}:${ARCHON_DRAWBRIDGE_PORT:-4222}"
         echo "[drawbridge] Using Tor address as public host: $ARCHON_DRAWBRIDGE_PUBLIC_HOST"
     else
         echo "[drawbridge] No public host configured (no ARCHON_DRAWBRIDGE_PUBLIC_HOST or Tor hostname)"

@@ -76,8 +76,8 @@ beforeEach(() => {
         return Promise.resolve(true);
     };
 
-    gatekeeper.zapLightning = (adminKey: string, serviceEndpoint: string, amount: number) => {
-        trackCall('zapLightning', adminKey, serviceEndpoint, amount);
+    gatekeeper.zapLightning = (adminKey: string, did: string, amount: number, memo?: string) => {
+        trackCall('zapLightning', adminKey, did, amount, memo);
         return Promise.resolve({ paymentHash: 'zap-hash' });
     };
 
@@ -685,6 +685,20 @@ describe('zapLightning', () => {
         expect(zapCalls[0].args[0]).toBe('admin1'); // adminKey
         expect(zapCalls[0].args[1]).toBe(aliceDid); // resolved DID from alias
         expect(zapCalls[0].args[2]).toBe(100); // amount
+        expect(zapCalls[0].args[3]).toBeUndefined(); // no memo
+    });
+
+    it('should pass memo to drawbridge zapLightning', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.createId('Alice');
+
+        await keymaster.setCurrentId('Bob');
+        await keymaster.zapLightning('Alice', 50, 'thanks for the coffee');
+
+        const zapCalls = calls.filter(c => c.method === 'zapLightning');
+        expect(zapCalls[0].args[2]).toBe(50);
+        expect(zapCalls[0].args[3]).toBe('thanks for the coffee');
     });
 });
 

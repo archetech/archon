@@ -681,9 +681,13 @@ async function main() {
             return;
         }
         try {
-            const { adminKey, did, amount } = req.body;
-            if (!adminKey || !did || !amount) {
-                res.status(400).json({ error: 'adminKey, did, and amount are required' });
+            const { adminKey, did, amount, memo } = req.body;
+            if (!adminKey || !did) {
+                res.status(400).json({ error: 'adminKey and did are required' });
+                return;
+            }
+            if (!Number.isInteger(amount) || amount <= 0) {
+                res.status(400).json({ error: 'amount must be a positive integer' });
                 return;
             }
 
@@ -697,12 +701,31 @@ async function main() {
                 return;
             }
 
+            // Validate service endpoint URL to prevent SSRF
+            const url = new URL(lightningService.serviceEndpoint);
+            const isOnion = url.hostname.endsWith('.onion');
+
+            if (isOnion && url.protocol !== 'http:') {
+                res.status(400).json({ error: 'Invalid service endpoint: .onion must use http' });
+                return;
+            }
+            if (!isOnion && url.protocol !== 'https:') {
+                res.status(400).json({ error: 'Invalid service endpoint: must use https' });
+                return;
+            }
+            if (!isOnion && /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(url.hostname)) {
+                res.status(400).json({ error: 'Invalid service endpoint: private addresses not allowed' });
+                return;
+            }
+
             // Fetch invoice from recipient's service endpoint (Tor-aware)
-            const invoiceUrl = `${lightningService.serviceEndpoint}?amount=${amount}`;
+            let invoiceUrl = `${lightningService.serviceEndpoint}?amount=${amount}`;
+            if (memo) {
+                invoiceUrl += `&memo=${encodeURIComponent(memo)}`;
+            }
             const fetchOptions: any = {};
 
-            const url = new URL(invoiceUrl);
-            if (url.hostname.endsWith('.onion') && config.torProxy) {
+            if (isOnion && config.torProxy) {
                 const [host, port] = config.torProxy.split(':');
                 fetchOptions.dispatcher = socksDispatcher({
                     type: 5,
