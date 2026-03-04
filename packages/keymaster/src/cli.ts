@@ -889,6 +889,45 @@ program
         }
     });
 
+program
+    .command('publish-lightning [id]')
+    .description('Publish Lightning service endpoint for a DID')
+    .action(async (id) => {
+        try {
+            await keymaster.publishLightning(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('unpublish-lightning [id]')
+    .description('Remove Lightning service endpoint from a DID')
+    .action(async (id) => {
+        try {
+            await keymaster.unpublishLightning(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('lightning-zap <did> <amount>')
+    .description('Send sats to a DID via Lightning')
+    .action(async (did, amount) => {
+        try {
+            const result = await keymaster.lightningZap(did, parseInt(amount));
+            console.log(JSON.stringify(result, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
 // Group commands
 program
     .command('create-group <groupName>')

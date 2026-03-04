@@ -2165,6 +2165,98 @@ v1router.post('/lightning/decode', async (req, res) => {
 
 /**
  * @swagger
+ * /lightning/publish:
+ *   post:
+ *     summary: Publish Lightning service endpoint for a DID.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Lightning published successfully.
+ *       400:
+ *         description: Error publishing Lightning.
+ */
+v1router.post('/lightning/publish', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const ok = await keymaster.publishLightning(id);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /lightning/unpublish:
+ *   post:
+ *     summary: Unpublish Lightning service endpoint for a DID.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Lightning unpublished successfully.
+ *       400:
+ *         description: Error unpublishing Lightning.
+ */
+v1router.post('/lightning/unpublish', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const ok = await keymaster.unpublishLightning(id);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /lightning/zap:
+ *   post:
+ *     summary: Send sats to a DID via Lightning.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               did:
+ *                 type: string
+ *               amount:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Payment result with preimage.
+ *       400:
+ *         description: Error sending payment.
+ */
+v1router.post('/lightning/zap', async (req, res) => {
+    try {
+        const { did, amount } = req.body;
+        const result = await keymaster.lightningZap(did, amount);
+        res.json(result);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /challenge:
  *   get:
  *     summary: Create a default challenge DID with no parameters.

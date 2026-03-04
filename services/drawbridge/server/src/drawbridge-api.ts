@@ -615,6 +615,71 @@ async function main() {
         }
     });
 
+    // --- Published Lightning (public invoice generation) ---
+
+    v1router.post('/lightning/publish', async (req, res) => {
+        if (!config.lnbitsUrl) {
+            res.status(503).json({ error: 'Lightning (LNbits) not configured' });
+            return;
+        }
+        try {
+            const { did, invoiceKey } = req.body;
+            if (!did || !invoiceKey) {
+                res.status(400).json({ error: 'did and invoiceKey are required' });
+                return;
+            }
+            await store.savePublishedLightning(did, invoiceKey);
+            logger.info({ did }, 'Published Lightning for DID');
+            res.json({ ok: true });
+        } catch (error: any) {
+            logger.error({ err: error }, 'Failed to publish Lightning');
+            res.status(500).json({ error: error.message || 'Failed to publish Lightning' });
+        }
+    });
+
+    v1router.delete('/lightning/publish/:did', async (req, res) => {
+        try {
+            const did = req.params.did as string;
+            await store.deletePublishedLightning(did);
+            logger.info({ did }, 'Unpublished Lightning for DID');
+            res.json({ ok: true });
+        } catch (error: any) {
+            logger.error({ err: error }, 'Failed to unpublish Lightning');
+            res.status(500).json({ error: error.message || 'Failed to unpublish Lightning' });
+        }
+    });
+
+    // Public invoice endpoint — no auth required
+    app.get('/invoice/:did', async (req, res) => {
+        if (!config.lnbitsUrl) {
+            res.status(503).json({ error: 'Lightning not configured' });
+            return;
+        }
+        try {
+            const { did } = req.params;
+            const amount = parseInt(req.query.amount as string, 10);
+            const memo = (req.query.memo as string) || '';
+
+            if (!amount || amount <= 0) {
+                res.status(400).json({ error: 'amount is required and must be positive (sats)' });
+                return;
+            }
+
+            const invoiceKey = await store.getPublishedLightning(did);
+            if (!invoiceKey) {
+                res.status(404).json({ error: 'DID has not published Lightning' });
+                return;
+            }
+
+            const result = await lnbits.createInvoice(config.lnbitsUrl, invoiceKey, amount, memo);
+            res.json(result);
+        } catch (error: any) {
+            const status = error instanceof LightningPaymentError ? 400 : 502;
+            logger.error({ err: error }, 'Public invoice error');
+            res.status(status).json({ error: error.message || 'Invoice creation failed' });
+        }
+    });
+
     // Mount router
     app.use('/api/v1', v1router);
 

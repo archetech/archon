@@ -80,4 +80,22 @@ export default class DrawbridgeClient extends GatekeeperClient implements Drawbr
             throwError(error);
         }
     }
+
+    async publishLightning(did: string, invoiceKey: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/publish`, { did, invoiceKey });
+            return response.data.ok;
+        } catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpublishLightning(did: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/lightning/publish/${encodeURIComponent(did)}`);
+            return response.data.ok;
+        } catch (error) {
+            throwError(error);
+        }
+    }
 }

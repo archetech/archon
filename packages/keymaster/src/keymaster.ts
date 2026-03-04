@@ -1939,6 +1939,99 @@ export default class Keymaster implements KeymasterInterface {
         return info;
     }
 
+    async publishLightning(name?: string): Promise<boolean> {
+        const drawbridge = this.requireDrawbridge();
+        const config = await this.getLightningConfig(name);
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+
+        // Register invoiceKey on Drawbridge using DID suffix as key
+        const didSuffix = did.split(':').pop()!;
+        await drawbridge.publishLightning(didSuffix, config.invoiceKey);
+
+        // Add service endpoint to DID document
+        const doc = await this.resolveDID(did);
+        const services = doc.didDocument?.service || [];
+        const serviceId = `${did}#lightning`;
+
+        // Remove existing lightning service if present
+        const filtered = services.filter(s => s.id !== serviceId);
+
+        const publicHost = drawbridge.url;
+        filtered.push({
+            id: serviceId,
+            type: 'Lightning',
+            serviceEndpoint: `${publicHost}/invoice/${didSuffix}`,
+        });
+
+        doc.didDocument!.service = filtered;
+        await this.updateDID(did, doc);
+
+        return true;
+    }
+
+    async unpublishLightning(name?: string): Promise<boolean> {
+        const drawbridge = this.requireDrawbridge();
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+
+        // Unregister from Drawbridge using DID suffix as key
+        const didSuffix = did.split(':').pop()!;
+        await drawbridge.unpublishLightning(didSuffix);
+
+        // Remove service endpoint from DID document
+        const doc = await this.resolveDID(did);
+        const services = doc.didDocument?.service || [];
+        const serviceId = `${did}#lightning`;
+        const filtered = services.filter(s => s.id !== serviceId);
+
+        if (filtered.length > 0) {
+            doc.didDocument!.service = filtered;
+        } else {
+            delete doc.didDocument!.service;
+        }
+
+        await this.updateDID(did, doc);
+
+        return true;
+    }
+
+    async lightningZap(did: string, amount: number): Promise<LightningPayment> {
+        if (!did) {
+            throw new InvalidParameterError('did');
+        }
+        if (!amount || amount <= 0) {
+            throw new InvalidParameterError('amount');
+        }
+
+        // Resolve recipient's DID to find Lightning service endpoint
+        const doc = await this.resolveDID(did);
+        const services = doc.didDocument?.service || [];
+        const lightningService = services.find(s => s.type === 'Lightning');
+
+        if (!lightningService) {
+            throw new LightningUnavailableError('Recipient DID has no Lightning service endpoint');
+        }
+
+        // Request invoice from recipient's Drawbridge
+        const invoiceUrl = `${lightningService.serviceEndpoint}?amount=${amount}`;
+        const response = await fetch(invoiceUrl);
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: response.statusText }));
+            throw new LightningUnavailableError(`Invoice request failed: ${error.error || response.statusText}`);
+        }
+
+        const { paymentRequest } = await response.json();
+
+        if (!paymentRequest) {
+            throw new LightningUnavailableError('No payment request returned');
+        }
+
+        // Pay the invoice
+        return this.payLightningInvoice(paymentRequest);
+    }
+
     async testAgent(id: string): Promise<boolean> {
         const doc = await this.resolveDID(id);
         return doc.didDocumentRegistration?.type === 'agent';

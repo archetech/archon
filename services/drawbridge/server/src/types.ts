@@ -75,6 +75,11 @@ export interface DrawbridgeStore {
     savePendingInvoice(data: PendingInvoiceData): Promise<void>;
     getPendingInvoice(paymentHash: string): Promise<PendingInvoiceData | null>;
     deletePendingInvoice(paymentHash: string): Promise<void>;
+
+    // Published Lightning (public invoice generation)
+    savePublishedLightning(did: string, invoiceKey: string): Promise<void>;
+    getPublishedLightning(did: string): Promise<string | null>;
+    deletePublishedLightning(did: string): Promise<void>;
 }
 
 // Persisted macaroon record
