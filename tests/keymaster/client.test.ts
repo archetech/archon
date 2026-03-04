@@ -51,6 +51,9 @@ const Endpoints = {
     lightning_pay: '/api/v1/lightning/pay',
     lightning_payment: '/api/v1/lightning/payment',
     lightning_decode: '/api/v1/lightning/decode',
+    lightning_publish: '/api/v1/lightning/publish',
+    lightning_unpublish: '/api/v1/lightning/unpublish',
+    lightning_zap: '/api/v1/lightning/zap',
 };
 
 const mockConsole = {
@@ -3812,6 +3815,95 @@ describe('decodeLightningInvoice', () => {
 
         try {
             await keymaster.decodeLightningInvoice('lnbc2500u1...');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('publishLightning', () => {
+    it('should publish Lightning', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_publish)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.publishLightning();
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on publishLightning server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_publish)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.publishLightning();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('unpublishLightning', () => {
+    it('should unpublish Lightning', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_unpublish)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.unpublishLightning();
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on unpublishLightning server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_unpublish)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.unpublishLightning();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('lightningZap', () => {
+    const mockPayment = { paymentHash: 'zap-hash-123' };
+
+    it('should zap a DID', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_zap)
+            .reply(200, mockPayment);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const result = await keymaster.lightningZap('did:cid:test', 100);
+
+        expect(result).toStrictEqual(mockPayment);
+    });
+
+    it('should throw exception on lightningZap server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_zap)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.lightningZap('did:cid:test', 100);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
