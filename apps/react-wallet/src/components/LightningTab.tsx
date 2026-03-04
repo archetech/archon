@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
+    Autocomplete,
     Box,
     Button,
     CircularProgress,
@@ -12,13 +13,15 @@ import { QRCodeSVG } from "qrcode.react";
 import { LightningNotConfiguredError } from "@didcid/common/errors";
 import { DecodedLightningInvoice, LightningPaymentStatus } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 
 const LightningTab: React.FC = () => {
     const { keymaster } = useWalletContext();
+    const { currentDID, agentList } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
 
-    const [activeTab, setActiveTab] = useState<"wallet" | "receive" | "send">("wallet");
+    const [activeTab, setActiveTab] = useState<"wallet" | "receive" | "send" | "zap">("wallet");
 
     // Wallet sub-tab
     const [balance, setBalance] = useState<number | null>(null);
@@ -39,6 +42,17 @@ const LightningTab: React.FC = () => {
     const [loadingPay, setLoadingPay] = useState<boolean>(false);
     const [paymentResult, setPaymentResult] = useState<LightningPaymentStatus | null>(null);
 
+    // Zap sub-tab
+    const [zapDid, setZapDid] = useState<string>("");
+    const [zapAmount, setZapAmount] = useState<string>("");
+    const [zapMemo, setZapMemo] = useState<string>("");
+    const [loadingZap, setLoadingZap] = useState<boolean>(false);
+    const [zapResult, setZapResult] = useState<LightningPaymentStatus | null>(null);
+
+    // Publish state
+    const [isPublished, setIsPublished] = useState<boolean>(false);
+    const [loadingPublishToggle, setLoadingPublishToggle] = useState<boolean>(false);
+
     const fetchBalance = useCallback(async () => {
         if (!keymaster) return;
         setLoadingBalance(true);
@@ -47,6 +61,14 @@ const LightningTab: React.FC = () => {
             const result = await keymaster.getLightningBalance();
             setBalance(result.balance);
             setIsConfigured(true);
+            // Check publish state
+            if (currentDID) {
+                try {
+                    const doc = await keymaster.resolveDID(currentDID);
+                    const services = doc?.didDocument?.service || [];
+                    setIsPublished(services.some((s: any) => s.id?.endsWith('#lightning')));
+                } catch { /* ignore resolve errors */ }
+            }
         } catch (err: any) {
             if (err instanceof LightningNotConfiguredError) {
                 setIsConfigured(false);
@@ -57,7 +79,7 @@ const LightningTab: React.FC = () => {
         } finally {
             setLoadingBalance(false);
         }
-    }, [keymaster]);
+    }, [keymaster, currentDID]);
 
     useEffect(() => {
         if (activeTab === "wallet") {
@@ -149,6 +171,58 @@ const LightningTab: React.FC = () => {
         }
     }
 
+    async function handleTogglePublish() {
+        if (!keymaster) return;
+        setLoadingPublishToggle(true);
+        try {
+            if (isPublished) {
+                await keymaster.unpublishLightning();
+                setIsPublished(false);
+                setSuccess("Lightning unpublished — your DID is no longer zappable");
+            } else {
+                await keymaster.publishLightning();
+                setIsPublished(true);
+                setSuccess("Lightning published — your DID is now zappable");
+            }
+        } catch (err: any) {
+            setError(err);
+        } finally {
+            setLoadingPublishToggle(false);
+        }
+    }
+
+    async function handleZap() {
+        if (!keymaster) return;
+        if (!zapDid.trim()) {
+            setError("Enter a recipient DID");
+            return;
+        }
+        const amount = parseInt(zapAmount, 10);
+        if (!amount || amount <= 0) {
+            setError("Enter a valid amount in satoshis");
+            return;
+        }
+        setLoadingZap(true);
+        setZapResult(null);
+        try {
+            const payment = await keymaster.zapLightning(
+                zapDid.trim(),
+                amount,
+                zapMemo.trim() || undefined
+            );
+            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            setZapResult(status);
+            setSuccess("Zap sent successfully");
+            setZapDid("");
+            setZapAmount("");
+            setZapMemo("");
+        } catch (err: any) {
+            setError(err);
+        } finally {
+            setLoadingZap(false);
+        }
+    }
+
     return (
         <Box>
             <Tabs
@@ -159,6 +233,7 @@ const LightningTab: React.FC = () => {
                 <Tab label="Wallet" value="wallet" />
                 <Tab label="Receive" value="receive" />
                 <Tab label="Send" value="send" />
+                <Tab label="Zap" value="zap" />
             </Tabs>
 
             {activeTab === "wallet" && (
@@ -187,9 +262,19 @@ const LightningTab: React.FC = () => {
                                     Balance: {(balance ?? 0).toLocaleString()} sats
                                 </Typography>
                             )}
-                            <Box sx={{ display: "flex", gap: 1 }}>
+                            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                                 <Button variant="outlined" onClick={fetchBalance}>
                                     Refresh
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    color={isPublished ? "warning" : "success"}
+                                    onClick={handleTogglePublish}
+                                    disabled={loadingPublishToggle}
+                                >
+                                    {loadingPublishToggle
+                                        ? <CircularProgress size={20} />
+                                        : isPublished ? "Unpublish Lightning" : "Publish Lightning"}
                                 </Button>
                                 <Button
                                     variant="outlined"
@@ -330,6 +415,68 @@ const LightningTab: React.FC = () => {
                             {paymentResult.preimage && (
                                 <Typography variant="body2">
                                     <strong>Preimage (Proof):</strong> {paymentResult.preimage}
+                                </Typography>
+                            )}
+                        </Box>
+                    )}
+                </Box>
+            )}
+
+            {activeTab === "zap" && (
+                <Box sx={{ p: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                    <Autocomplete
+                        freeSolo
+                        options={agentList || []}
+                        value={zapDid}
+                        onChange={(_, newValue) => {
+                            setZapDid(newValue || "");
+                            setZapResult(null);
+                        }}
+                        onInputChange={(_, newInputValue) => {
+                            setZapDid(newInputValue);
+                            setZapResult(null);
+                        }}
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                label="Recipient DID"
+                                size="small"
+                                placeholder="did:mdip:... or alias"
+                            />
+                        )}
+                    />
+                    <TextField
+                        label="Amount (sats)"
+                        type="number"
+                        value={zapAmount}
+                        onChange={(e) => setZapAmount(e.target.value)}
+                        slotProps={{ htmlInput: { min: 1 } }}
+                        size="small"
+                    />
+                    <TextField
+                        label="Memo (optional)"
+                        value={zapMemo}
+                        onChange={(e) => setZapMemo(e.target.value)}
+                        size="small"
+                    />
+                    <Box>
+                        <Button
+                            variant="contained"
+                            onClick={handleZap}
+                            disabled={loadingZap || !zapDid.trim() || !zapAmount.trim()}
+                        >
+                            {loadingZap ? <CircularProgress size={20} /> : "Zap"}
+                        </Button>
+                    </Box>
+
+                    {zapResult && (
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: 1 }}>
+                            <Typography variant="body2">
+                                <strong>Payment Hash:</strong> {zapResult.paymentHash}
+                            </Typography>
+                            {zapResult.preimage && (
+                                <Typography variant="body2">
+                                    <strong>Preimage (Proof):</strong> {zapResult.preimage}
                                 </Typography>
                             )}
                         </Box>

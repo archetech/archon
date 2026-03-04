@@ -255,6 +255,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [bolt11Input, setBolt11Input] = useState('');
     const [decodedInvoice, setDecodedInvoice] = useState(null);
     const [lightningPaymentResult, setLightningPaymentResult] = useState(null);
+    const [zapDid, setZapDid] = useState('');
+    const [zapAmount, setZapAmount] = useState('');
+    const [zapMemo, setZapMemo] = useState('');
+    const [loadingZap, setLoadingZap] = useState(false);
+    const [zapResult, setZapResult] = useState(null);
+    const [isPublished, setIsPublished] = useState(false);
+    const [loadingPublishToggle, setLoadingPublishToggle] = useState(false);
 
     const pollExpired = pollDeadline ? Date.now() > pollDeadline.getTime() : false;
     const selectedPollDid = selectedPollName ? aliasList[selectedPollName] ?? "" : "";
@@ -307,6 +314,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             const result = await keymaster.getLightningBalance();
             setLightningBalance(result.balance);
             setLightningIsConfigured(true);
+            // Check publish state
+            if (currentDID) {
+                try {
+                    const doc = await keymaster.resolveDID(currentDID);
+                    const services = doc?.didDocument?.service || [];
+                    setIsPublished(services.some(s => s.id?.endsWith('#lightning')));
+                } catch { /* ignore resolve errors */ }
+            }
         } catch (error) {
             if (error?.type === 'Lightning not configured' || error?.message?.includes('not configured')) {
                 setLightningIsConfigured(false);
@@ -384,6 +399,56 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 } catch { /* fall through to original error */ }
             }
             showError(error);
+        }
+    }
+
+    async function togglePublishLightning() {
+        setLoadingPublishToggle(true);
+        try {
+            if (isPublished) {
+                await keymaster.unpublishLightning();
+                setIsPublished(false);
+                showSuccess('Lightning unpublished — your DID is no longer zappable');
+            } else {
+                await keymaster.publishLightning();
+                setIsPublished(true);
+                showSuccess('Lightning published — your DID is now zappable');
+            }
+        } catch (error) {
+            showError(error);
+        } finally {
+            setLoadingPublishToggle(false);
+        }
+    }
+
+    async function handleZap() {
+        if (!zapDid.trim()) {
+            showAlert('Enter a recipient DID');
+            return;
+        }
+        const amount = parseInt(zapAmount, 10);
+        if (!amount || amount <= 0) {
+            showAlert('Enter a valid amount in satoshis');
+            return;
+        }
+        setLoadingZap(true);
+        setZapResult(null);
+        try {
+            const payment = await keymaster.zapLightning(
+                zapDid.trim(),
+                amount,
+                zapMemo.trim() || undefined
+            );
+            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            setZapResult(status);
+            showSuccess('Zap sent successfully');
+            setZapDid('');
+            setZapAmount('');
+            setZapMemo('');
+        } catch (error) {
+            showError(error);
+        } finally {
+            setLoadingZap(false);
         }
     }
 
@@ -5522,6 +5587,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 <Tab label="Wallet" value="wallet" />
                                 <Tab label="Receive" value="receive" />
                                 <Tab label="Send" value="send" />
+                                <Tab label="Zap" value="zap" />
                             </Tabs>
 
                             {lightningTab === 'wallet' &&
@@ -5545,9 +5611,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 </Typography>
                                             }
                                             <p />
-                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                                 <Button variant="outlined" onClick={fetchLightningBalance}>
                                                     Refresh
+                                                </Button>
+                                                <Button
+                                                    variant="outlined"
+                                                    color={isPublished ? 'warning' : 'success'}
+                                                    onClick={togglePublishLightning}
+                                                    disabled={loadingPublishToggle}
+                                                >
+                                                    {loadingPublishToggle
+                                                        ? 'Publishing...'
+                                                        : isPublished ? 'Unpublish Lightning' : 'Publish Lightning'}
                                                 </Button>
                                                 <Button variant="outlined" color="error" onClick={disconnectLightning}>
                                                     Disconnect Wallet
@@ -5653,6 +5729,63 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             <Typography variant="body2"><strong>Payment Hash:</strong> {lightningPaymentResult.paymentHash}</Typography>
                                             {lightningPaymentResult.preimage &&
                                                 <Typography variant="body2"><strong>Preimage (Proof):</strong> {lightningPaymentResult.preimage}</Typography>
+                                            }
+                                        </Box>
+                                    }
+                                </Box>
+                            }
+
+                            {lightningTab === 'zap' &&
+                                <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 500 }}>
+                                    <Autocomplete
+                                        freeSolo
+                                        options={agentList || []}
+                                        value={zapDid}
+                                        onChange={(event, newValue) => {
+                                            setZapDid(newValue || '');
+                                            setZapResult(null);
+                                        }}
+                                        onInputChange={(event, newInputValue) => {
+                                            setZapDid(newInputValue);
+                                            setZapResult(null);
+                                        }}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Recipient DID"
+                                                size="small"
+                                                placeholder="did:mdip:... or alias"
+                                            />
+                                        )}
+                                    />
+                                    <TextField
+                                        label="Amount (sats)"
+                                        type="number"
+                                        value={zapAmount}
+                                        onChange={(e) => setZapAmount(e.target.value)}
+                                        size="small"
+                                    />
+                                    <TextField
+                                        label="Memo (optional)"
+                                        value={zapMemo}
+                                        onChange={(e) => setZapMemo(e.target.value)}
+                                        size="small"
+                                    />
+                                    <Box>
+                                        <Button
+                                            variant="contained"
+                                            color="primary"
+                                            onClick={handleZap}
+                                            disabled={loadingZap || !zapDid.trim() || !zapAmount.trim()}
+                                        >
+                                            {loadingZap ? 'Zapping...' : 'Zap'}
+                                        </Button>
+                                    </Box>
+                                    {zapResult &&
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+                                            <Typography variant="body2"><strong>Payment Hash:</strong> {zapResult.paymentHash}</Typography>
+                                            {zapResult.preimage &&
+                                                <Typography variant="body2"><strong>Preimage (Proof):</strong> {zapResult.preimage}</Typography>
                                             }
                                         </Box>
                                     }
