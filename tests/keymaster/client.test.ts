@@ -2485,6 +2485,102 @@ describe('unpublishPoll', () => {
     });
 });
 
+describe('addPollVoter', () => {
+    const mockPollId = 'poll1';
+    const mockMemberId = 'did:mock:voter';
+
+    it('should add poll voter', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.polls}/${mockPollId}/voters`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.addPollVoter(mockPollId, mockMemberId);
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on addPollVoter server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.polls}/${mockPollId}/voters`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.addPollVoter(mockPollId, mockMemberId);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('removePollVoter', () => {
+    const mockPollId = 'poll1';
+    const mockMemberId = 'did:mock:voter';
+
+    it('should remove poll voter', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.polls}/${mockPollId}/voters/${mockMemberId}`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.removePollVoter(mockPollId, mockMemberId);
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on removePollVoter server error', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.polls}/${mockPollId}/voters/${mockMemberId}`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.removePollVoter(mockPollId, mockMemberId);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('listPollVoters', () => {
+    const mockPollId = 'poll1';
+    const mockVoters = { voter1: 'did:mock:v1', voter2: 'did:mock:v2' };
+
+    it('should list poll voters', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.polls}/${mockPollId}/voters`)
+            .reply(200, { voters: mockVoters });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const voters = await keymaster.listPollVoters(mockPollId);
+
+        expect(voters).toStrictEqual(mockVoters);
+    });
+
+    it('should throw exception on listPollVoters server error', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.polls}/${mockPollId}/voters`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.listPollVoters(mockPollId);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('createImage', () => {
     const mockImage = Buffer.from('image data');
     const mockDID = 'did:example:123456789abcd';
@@ -2788,6 +2884,17 @@ describe('getVault', () => {
         expect(vault).toStrictEqual(mockVault);
     });
 
+    it('should get vault with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.vaults}/${mockVaultId}?confirm=true`)
+            .reply(200, { vault: mockVault });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const vault = await keymaster.getVault(mockVaultId, { confirm: true });
+
+        expect(vault).toStrictEqual(mockVault);
+    });
+
     it('should throw exception on getVault server error', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.vaults}/${mockVaultId}`)
@@ -3013,6 +3120,17 @@ describe('listVaultItems', () => {
         expect(items).toStrictEqual(mockItems);
     });
 
+    it('should list vault items with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.vaults}/${mockVaultId}/items?confirm=true`)
+            .reply(200, { items: mockItems });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const items = await keymaster.listVaultItems(mockVaultId, { confirm: true });
+
+        expect(items).toStrictEqual(mockItems);
+    });
+
     it('should throw exception on listVaultItems server error', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.vaults}/${mockVaultId}/items`)
@@ -3066,6 +3184,17 @@ describe('getVaultItem', () => {
         const data = await keymaster.getVaultItem(mockVaultId, mockName);
 
         expect(data).toStrictEqual(null);
+    });
+
+    it('should get vault item with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.vaults}/${mockVaultId}/items/${mockName}?confirm=true`)
+            .reply(200, mockData);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const data = await keymaster.getVaultItem(mockVaultId, mockName, { confirm: true });
+
+        expect(data).toStrictEqual(mockData);
     });
 
     it('should throw exception on getVaultItem server error', async () => {
@@ -3315,6 +3444,17 @@ describe('listDmailAttachments', () => {
         expect(items).toStrictEqual(mockAttachments);
     });
 
+    it('should list attachments with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.dmail}/${mockDmailId}/attachments?confirm=true`)
+            .reply(200, { attachments: mockAttachments });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const items = await keymaster.listDmailAttachments(mockDmailId, { confirm: true });
+
+        expect(items).toStrictEqual(mockAttachments);
+    });
+
     it('should throw exception on listDmailAttachments server error', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.dmail}/${mockDmailId}/attachments`)
@@ -3424,6 +3564,17 @@ describe('getDmailMessage', () => {
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
         const message = await keymaster.getDmailMessage(mockDmailId);
+
+        expect(message).toStrictEqual(mockDmail);
+    });
+
+    it('should get message with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.dmail}/${mockDmailId}?confirm=true`)
+            .reply(200, { message: mockDmail });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const message = await keymaster.getDmailMessage(mockDmailId, { confirm: true });
 
         expect(message).toStrictEqual(mockDmail);
     });
