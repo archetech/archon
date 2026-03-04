@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 
 import GatekeeperClient from '@didcid/gatekeeper/client';
 
+import { socksDispatcher } from 'fetch-socks';
 import config from './config.js';
 import { RedisStore } from './store.js';
 import { createAuthMiddleware } from './middleware/auth.js';
@@ -21,6 +22,30 @@ import { LightningPaymentError } from './errors.js';
 import type { L402Options, DrawbridgeStore } from './types.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+
+const TOR_HOSTNAME_FILE = '/data/tor/hostname';
+let cachedPublicHost: string | undefined;
+
+async function getPublicHost(): Promise<string | undefined> {
+    if (cachedPublicHost) {
+        return cachedPublicHost;
+    }
+    if (config.publicHost) {
+        cachedPublicHost = config.publicHost;
+        return cachedPublicHost;
+    }
+    try {
+        const onion = (await readFile(TOR_HOSTNAME_FILE, 'utf-8')).trim();
+        if (onion) {
+            cachedPublicHost = `http://${onion}:${config.port}`;
+            logger.info({ publicHost: cachedPublicHost }, 'Resolved public host from Tor hostname');
+            return cachedPublicHost;
+        }
+    } catch {
+        // File not available yet
+    }
+    return undefined;
+}
 
 // Prometheus metrics
 collectDefaultMetrics();
@@ -612,6 +637,154 @@ async function main() {
             const status = error instanceof LightningPaymentError ? 400 : 502;
             logger.error({ err: error }, 'LNbits error');
             res.status(status).json({ error: error.message || 'LNbits error' });
+        }
+    });
+
+    // --- Published Lightning (public invoice generation) ---
+
+    v1router.post('/lightning/publish', async (req, res) => {
+        if (!config.lnbitsUrl) {
+            res.status(503).json({ error: 'Lightning (LNbits) not configured' });
+            return;
+        }
+        try {
+            const { did, invoiceKey } = req.body;
+            if (!did || !invoiceKey) {
+                res.status(400).json({ error: 'did and invoiceKey are required' });
+                return;
+            }
+            await store.savePublishedLightning(did, invoiceKey);
+            logger.info({ did }, 'Published Lightning for DID');
+            const publicHost = await getPublicHost();
+            res.json({ ok: true, publicHost });
+        } catch (error: any) {
+            logger.error({ err: error }, 'Failed to publish Lightning');
+            res.status(500).json({ error: error.message || 'Failed to publish Lightning' });
+        }
+    });
+
+    v1router.delete('/lightning/publish/:did', async (req, res) => {
+        try {
+            const did = req.params.did as string;
+            await store.deletePublishedLightning(did);
+            logger.info({ did }, 'Unpublished Lightning for DID');
+            res.json({ ok: true });
+        } catch (error: any) {
+            logger.error({ err: error }, 'Failed to unpublish Lightning');
+            res.status(500).json({ error: error.message || 'Failed to unpublish Lightning' });
+        }
+    });
+
+    v1router.post('/lightning/zap', async (req, res) => {
+        if (!config.lnbitsUrl) {
+            res.status(503).json({ error: 'Lightning (LNbits) not configured' });
+            return;
+        }
+        try {
+            const { adminKey, did, amount, memo } = req.body;
+            if (!adminKey || !did) {
+                res.status(400).json({ error: 'adminKey and did are required' });
+                return;
+            }
+            if (!Number.isInteger(amount) || amount <= 0) {
+                res.status(400).json({ error: 'amount must be a positive integer' });
+                return;
+            }
+
+            // Resolve recipient's DID to find Lightning service endpoint
+            const doc = await gatekeeper.resolveDID(did);
+            const services = doc.didDocument?.service || [];
+            const lightningService = services.find((s: any) => s.type === 'Lightning');
+
+            if (!lightningService) {
+                res.status(404).json({ error: 'Recipient DID has no Lightning service endpoint' });
+                return;
+            }
+
+            // Validate service endpoint URL to prevent SSRF
+            const url = new URL(lightningService.serviceEndpoint);
+            const isOnion = url.hostname.endsWith('.onion');
+
+            if (isOnion && url.protocol !== 'http:') {
+                res.status(400).json({ error: 'Invalid service endpoint: .onion must use http' });
+                return;
+            }
+            if (!isOnion && url.protocol !== 'https:') {
+                res.status(400).json({ error: 'Invalid service endpoint: must use https' });
+                return;
+            }
+            if (!isOnion && /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(url.hostname)) {
+                res.status(400).json({ error: 'Invalid service endpoint: private addresses not allowed' });
+                return;
+            }
+
+            // Fetch invoice from recipient's service endpoint (Tor-aware)
+            let invoiceUrl = `${lightningService.serviceEndpoint}?amount=${amount}`;
+            if (memo) {
+                invoiceUrl += `&memo=${encodeURIComponent(memo)}`;
+            }
+            const fetchOptions: any = {};
+
+            if (isOnion && config.torProxy) {
+                const [host, port] = config.torProxy.split(':');
+                fetchOptions.dispatcher = socksDispatcher({
+                    type: 5,
+                    host: host || 'localhost',
+                    port: parseInt(port || '9050'),
+                });
+            }
+
+            const invoiceResponse = await fetch(invoiceUrl, fetchOptions);
+            if (!invoiceResponse.ok) {
+                const error = await invoiceResponse.json().catch(() => ({ error: invoiceResponse.statusText }));
+                res.status(502).json({ error: `Invoice request failed: ${error.error || invoiceResponse.statusText}` });
+                return;
+            }
+
+            const { paymentRequest } = await invoiceResponse.json() as any;
+            if (!paymentRequest) {
+                res.status(502).json({ error: 'No payment request returned from recipient' });
+                return;
+            }
+
+            // Pay the invoice
+            const result = await lnbits.payInvoice(config.lnbitsUrl, adminKey, paymentRequest);
+            res.json(result);
+        } catch (error: any) {
+            const status = error instanceof LightningPaymentError ? 400 : 502;
+            logger.error({ err: error }, 'Lightning zap error');
+            res.status(status).json({ error: error.message || 'Lightning zap failed' });
+        }
+    });
+
+    // Public invoice endpoint — no auth required
+    app.get('/invoice/:did', async (req, res) => {
+        if (!config.lnbitsUrl) {
+            res.status(503).json({ error: 'Lightning not configured' });
+            return;
+        }
+        try {
+            const { did } = req.params;
+            const amount = parseInt(req.query.amount as string, 10);
+            const memo = (req.query.memo as string) || '';
+
+            if (!amount || amount <= 0) {
+                res.status(400).json({ error: 'amount is required and must be positive (sats)' });
+                return;
+            }
+
+            const invoiceKey = await store.getPublishedLightning(did);
+            if (!invoiceKey) {
+                res.status(404).json({ error: 'DID has not published Lightning' });
+                return;
+            }
+
+            const result = await lnbits.createInvoice(config.lnbitsUrl, invoiceKey, amount, memo);
+            res.json(result);
+        } catch (error: any) {
+            const status = error instanceof LightningPaymentError ? 400 : 502;
+            logger.error({ err: error }, 'Public invoice error');
+            res.status(status).json({ error: error.message || 'Invoice creation failed' });
         }
     });
 

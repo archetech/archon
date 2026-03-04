@@ -204,6 +204,9 @@ export interface DrawbridgeInterface extends GatekeeperInterface {
     createLightningInvoice(invoiceKey: string, amount: number, memo: string): Promise<LightningInvoice>;
     payLightningInvoice(adminKey: string, bolt11: string): Promise<LightningPayment>;
     checkLightningPayment(invoiceKey: string, paymentHash: string): Promise<LightningPaymentStatus>;
+    publishLightning(did: string, invoiceKey: string): Promise<{ ok: boolean; publicHost?: string }>;
+    unpublishLightning(did: string): Promise<boolean>;
+    zapLightning(adminKey: string, did: string, amount: number, memo?: string): Promise<LightningPayment>;
 }
 
 export interface DidRegistration {
@@ -251,6 +254,11 @@ export interface DidCidDocument {
         }>,
         authentication?: string[],
         assertionMethod?: string[],
+        service?: Array<{
+            id: string;
+            type: string;
+            serviceEndpoint: string;
+        }>,
     },
     didDocumentMetadata?: DocumentMetadata,
     didResolutionMetadata?: {

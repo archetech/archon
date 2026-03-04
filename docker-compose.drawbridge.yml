@@ -22,6 +22,8 @@ services:
       - ARCHON_DRAWBRIDGE_INVOICE_EXPIRY=${ARCHON_DRAWBRIDGE_INVOICE_EXPIRY:-3600}
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX=${ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX:-100}
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW:-60}
+      - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
+      - ARCHON_TOR_PROXY=tor:9050
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_DRAWBRIDGE_PORT:-4222}:4222
@@ -29,8 +31,35 @@ services:
       - ./scripts/drawbridge-entrypoint.sh:/scripts/drawbridge-entrypoint.sh:ro
       - ./data/drawbridge:/data/drawbridge
       - ./data/cln-mainnet:/data/lightning:ro
+      - tor-hostname:/data/tor:ro
     depends_on:
       gatekeeper:
         condition: service_started
       redis:
         condition: service_started
+
+  tor:
+    image: goldy/tor-hidden-service:latest
+    environment:
+      DRAWBRIDGE_TOR_SERVICE_HOSTS: '4222:drawbridge:4222'
+      DRAWBRIDGE_TOR_SERVICE_VERSION: '3'
+      TOR_SOCKS_PORT: '0.0.0.0:9050'
+    volumes:
+      - ./data/tor-drawbridge:/var/lib/tor/hidden_service
+      - tor-hostname:/tor-hostname
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        pyentrypoint tor &
+        while [ ! -f /var/lib/tor/hidden_service/drawbridge/hostname ]; do sleep 1; done
+        cp /var/lib/tor/hidden_service/drawbridge/hostname /tor-hostname/hostname
+        chmod 644 /tor-hostname/hostname
+        echo '[tor] Published onion hostname'
+        wait
+    depends_on:
+      drawbridge:
+        condition: service_started
+
+volumes:
+  tor-hostname:

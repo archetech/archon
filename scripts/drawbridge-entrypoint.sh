@@ -38,5 +38,19 @@ else
     echo "[drawbridge] WARNING: No rune found — Lightning invoices will not work"
 fi
 
+# --- Public host (Tor fallback) ---
+if [ -n "$ARCHON_DRAWBRIDGE_PUBLIC_HOST" ]; then
+    echo "[drawbridge] Using public host from environment: $ARCHON_DRAWBRIDGE_PUBLIC_HOST"
+else
+    TOR_HOSTNAME_FILE="/data/tor/hostname"
+    if [ -f "$TOR_HOSTNAME_FILE" ]; then
+        ONION_HOST="$(cat "$TOR_HOSTNAME_FILE" | tr -d '[:space:]')"
+        export ARCHON_DRAWBRIDGE_PUBLIC_HOST="http://${ONION_HOST}:${ARCHON_DRAWBRIDGE_PORT:-4222}"
+        echo "[drawbridge] Using Tor address as public host: $ARCHON_DRAWBRIDGE_PUBLIC_HOST"
+    else
+        echo "[drawbridge] No public host configured (no ARCHON_DRAWBRIDGE_PUBLIC_HOST or Tor hostname)"
+    fi
+fi
+
 echo "[drawbridge] Starting Drawbridge..."
 exec node server/dist/drawbridge-api.js

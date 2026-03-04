@@ -66,6 +66,21 @@ beforeEach(() => {
         return Promise.resolve({ paid: true, preimage: 'preimage123', paymentHash });
     };
 
+    gatekeeper.publishLightning = (did: string, invoiceKey: string) => {
+        trackCall('publishLightning', did, invoiceKey);
+        return Promise.resolve({ ok: true });
+    };
+
+    gatekeeper.unpublishLightning = (did: string) => {
+        trackCall('unpublishLightning', did);
+        return Promise.resolve(true);
+    };
+
+    gatekeeper.zapLightning = (adminKey: string, did: string, amount: number, memo?: string) => {
+        trackCall('zapLightning', adminKey, did, amount, memo);
+        return Promise.resolve({ paymentHash: 'zap-hash' });
+    };
+
     keymaster = new Keymaster({
         gatekeeper, wallet, cipher, passphrase: 'passphrase',
     });
@@ -539,6 +554,151 @@ describe('decodeLightningInvoice', () => {
 
     it('should throw for invalid bolt11 string', async () => {
         await expect(keymaster.decodeLightningInvoice('not-a-valid-invoice')).rejects.toThrow();
+    });
+});
+
+describe('publishLightning', () => {
+    it('should register invoiceKey and add service endpoint to DID doc', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+
+        const ok = await keymaster.publishLightning();
+        expect(ok).toBe(true);
+
+        // Check that publishLightning was called on drawbridge with DID suffix and invoiceKey
+        const publishCalls = calls.filter(c => c.method === 'publishLightning');
+        expect(publishCalls.length).toBe(1);
+        expect(publishCalls[0].args[1]).toBe('invoice1');
+
+        // Check that DID document has service endpoint
+        const doc = await keymaster.resolveDID('Bob');
+        expect(doc.didDocument!.service).toBeDefined();
+        expect(doc.didDocument!.service!.length).toBe(1);
+        expect(doc.didDocument!.service![0].type).toBe('Lightning');
+        expect(doc.didDocument!.service![0].serviceEndpoint).toContain('/invoice/');
+    });
+
+    it('should throw when Lightning wallet not configured', async () => {
+        await keymaster.createId('Bob');
+
+        try {
+            await keymaster.publishLightning();
+            throw new Error('Expected exception');
+        }
+        catch (error: any) {
+            expect(error.type).toBe(LightningNotConfiguredError.type);
+        }
+    });
+
+    it('should use publicHost from Drawbridge when available', async () => {
+        gatekeeper.publishLightning = (did: string, invoiceKey: string) => {
+            trackCall('publishLightning', did, invoiceKey);
+            return Promise.resolve({ ok: true, publicHost: 'http://abc123.onion:4222' });
+        };
+
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+
+        const doc = await keymaster.resolveDID('Bob');
+        expect(doc.didDocument!.service![0].serviceEndpoint).toMatch(/^http:\/\/abc123\.onion:4222\/invoice\//);
+    });
+
+    it('should replace existing lightning service on re-publish', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+
+        await keymaster.publishLightning();
+        await keymaster.publishLightning();
+
+        const doc = await keymaster.resolveDID('Bob');
+        expect(doc.didDocument!.service!.length).toBe(1);
+    });
+});
+
+describe('unpublishLightning', () => {
+    it('should remove service endpoint from DID doc', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+
+        const ok = await keymaster.unpublishLightning();
+        expect(ok).toBe(true);
+
+        // Check that unpublishLightning was called on drawbridge
+        const unpublishCalls = calls.filter(c => c.method === 'unpublishLightning');
+        expect(unpublishCalls.length).toBe(1);
+
+        // Check that DID document no longer has service endpoint
+        const doc = await keymaster.resolveDID('Bob');
+        expect(doc.didDocument!.service).toBeUndefined();
+    });
+
+    it('should succeed even if not published', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+
+        const ok = await keymaster.unpublishLightning();
+        expect(ok).toBe(true);
+    });
+});
+
+describe('zapLightning', () => {
+    it('should throw for missing did', async () => {
+        await keymaster.createId('Bob');
+
+        try {
+            await keymaster.zapLightning('', 100);
+            throw new Error('Expected exception');
+        }
+        catch (error: any) {
+            expect(error.type).toBe(UnknownIDError.type);
+        }
+    });
+
+    it('should throw for invalid amount', async () => {
+        await keymaster.createId('Bob');
+
+        try {
+            await keymaster.zapLightning('did:cid:test', 0);
+            throw new Error('Expected exception');
+        }
+        catch (error: any) {
+            expect(error.type).toBe(InvalidParameterError.type);
+        }
+    });
+
+    it('should delegate to drawbridge zapLightning', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.createId('Alice');
+        const aliceDoc = await keymaster.resolveDID('Alice');
+        const aliceDid = aliceDoc.didDocument!.id!;
+
+        await keymaster.setCurrentId('Bob');
+        const result = await keymaster.zapLightning('Alice', 100);
+        expect(result.paymentHash).toBe('zap-hash');
+
+        // Verify zapLightning was called on drawbridge with resolved DID
+        const zapCalls = calls.filter(c => c.method === 'zapLightning');
+        expect(zapCalls.length).toBe(1);
+        expect(zapCalls[0].args[0]).toBe('admin1'); // adminKey
+        expect(zapCalls[0].args[1]).toBe(aliceDid); // resolved DID from alias
+        expect(zapCalls[0].args[2]).toBe(100); // amount
+        expect(zapCalls[0].args[3]).toBeUndefined(); // no memo
+    });
+
+    it('should pass memo to drawbridge zapLightning', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.createId('Alice');
+
+        await keymaster.setCurrentId('Bob');
+        await keymaster.zapLightning('Alice', 50, 'thanks for the coffee');
+
+        const zapCalls = calls.filter(c => c.method === 'zapLightning');
+        expect(zapCalls[0].args[2]).toBe(50);
+        expect(zapCalls[0].args[3]).toBe('thanks for the coffee');
     });
 });
 

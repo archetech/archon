@@ -51,6 +51,9 @@ const Endpoints = {
     lightning_pay: '/api/v1/lightning/pay',
     lightning_payment: '/api/v1/lightning/payment',
     lightning_decode: '/api/v1/lightning/decode',
+    lightning_publish: '/api/v1/lightning/publish',
+    lightning_unpublish: '/api/v1/lightning/unpublish',
+    lightning_zap: '/api/v1/lightning/zap',
 };
 
 const mockConsole = {
@@ -2482,6 +2485,102 @@ describe('unpublishPoll', () => {
     });
 });
 
+describe('addPollVoter', () => {
+    const mockPollId = 'poll1';
+    const mockMemberId = 'did:mock:voter';
+
+    it('should add poll voter', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.polls}/${mockPollId}/voters`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.addPollVoter(mockPollId, mockMemberId);
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on addPollVoter server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.polls}/${mockPollId}/voters`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.addPollVoter(mockPollId, mockMemberId);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('removePollVoter', () => {
+    const mockPollId = 'poll1';
+    const mockMemberId = 'did:mock:voter';
+
+    it('should remove poll voter', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.polls}/${mockPollId}/voters/${mockMemberId}`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.removePollVoter(mockPollId, mockMemberId);
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on removePollVoter server error', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.polls}/${mockPollId}/voters/${mockMemberId}`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.removePollVoter(mockPollId, mockMemberId);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('listPollVoters', () => {
+    const mockPollId = 'poll1';
+    const mockVoters = { voter1: 'did:mock:v1', voter2: 'did:mock:v2' };
+
+    it('should list poll voters', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.polls}/${mockPollId}/voters`)
+            .reply(200, { voters: mockVoters });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const voters = await keymaster.listPollVoters(mockPollId);
+
+        expect(voters).toStrictEqual(mockVoters);
+    });
+
+    it('should throw exception on listPollVoters server error', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.polls}/${mockPollId}/voters`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.listPollVoters(mockPollId);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('createImage', () => {
     const mockImage = Buffer.from('image data');
     const mockDID = 'did:example:123456789abcd';
@@ -2785,6 +2884,17 @@ describe('getVault', () => {
         expect(vault).toStrictEqual(mockVault);
     });
 
+    it('should get vault with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.vaults}/${mockVaultId}?confirm=true`)
+            .reply(200, { vault: mockVault });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const vault = await keymaster.getVault(mockVaultId, { confirm: true });
+
+        expect(vault).toStrictEqual(mockVault);
+    });
+
     it('should throw exception on getVault server error', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.vaults}/${mockVaultId}`)
@@ -3010,6 +3120,17 @@ describe('listVaultItems', () => {
         expect(items).toStrictEqual(mockItems);
     });
 
+    it('should list vault items with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.vaults}/${mockVaultId}/items?confirm=true`)
+            .reply(200, { items: mockItems });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const items = await keymaster.listVaultItems(mockVaultId, { confirm: true });
+
+        expect(items).toStrictEqual(mockItems);
+    });
+
     it('should throw exception on listVaultItems server error', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.vaults}/${mockVaultId}/items`)
@@ -3063,6 +3184,17 @@ describe('getVaultItem', () => {
         const data = await keymaster.getVaultItem(mockVaultId, mockName);
 
         expect(data).toStrictEqual(null);
+    });
+
+    it('should get vault item with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.vaults}/${mockVaultId}/items/${mockName}?confirm=true`)
+            .reply(200, mockData);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const data = await keymaster.getVaultItem(mockVaultId, mockName, { confirm: true });
+
+        expect(data).toStrictEqual(mockData);
     });
 
     it('should throw exception on getVaultItem server error', async () => {
@@ -3312,6 +3444,17 @@ describe('listDmailAttachments', () => {
         expect(items).toStrictEqual(mockAttachments);
     });
 
+    it('should list attachments with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.dmail}/${mockDmailId}/attachments?confirm=true`)
+            .reply(200, { attachments: mockAttachments });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const items = await keymaster.listDmailAttachments(mockDmailId, { confirm: true });
+
+        expect(items).toStrictEqual(mockAttachments);
+    });
+
     it('should throw exception on listDmailAttachments server error', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.dmail}/${mockDmailId}/attachments`)
@@ -3421,6 +3564,17 @@ describe('getDmailMessage', () => {
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
         const message = await keymaster.getDmailMessage(mockDmailId);
+
+        expect(message).toStrictEqual(mockDmail);
+    });
+
+    it('should get message with options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.dmail}/${mockDmailId}?confirm=true`)
+            .reply(200, { message: mockDmail });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const message = await keymaster.getDmailMessage(mockDmailId, { confirm: true });
 
         expect(message).toStrictEqual(mockDmail);
     });
@@ -3812,6 +3966,95 @@ describe('decodeLightningInvoice', () => {
 
         try {
             await keymaster.decodeLightningInvoice('lnbc2500u1...');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('publishLightning', () => {
+    it('should publish Lightning', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_publish)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.publishLightning();
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on publishLightning server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_publish)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.publishLightning();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('unpublishLightning', () => {
+    it('should unpublish Lightning', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_unpublish)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.unpublishLightning();
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on unpublishLightning server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_unpublish)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.unpublishLightning();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('zapLightning', () => {
+    const mockPayment = { paymentHash: 'zap-hash-123' };
+
+    it('should zap a DID', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_zap)
+            .reply(200, mockPayment);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const result = await keymaster.zapLightning('did:cid:test', 100);
+
+        expect(result).toStrictEqual(mockPayment);
+    });
+
+    it('should throw exception on zapLightning server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_zap)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.zapLightning('did:cid:test', 100);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

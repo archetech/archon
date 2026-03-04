@@ -552,6 +552,36 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async publishLightning(name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/publish`, { id: name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpublishLightning(name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/unpublish`, { id: name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async zapLightning(did: string, amount: number, memo?: string, name?: string): Promise<LightningPayment> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/zap`, { did, amount, memo, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async resolveDID(
         id: string,
         options?: ResolveDIDOptions
