@@ -5622,7 +5622,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     disabled={loadingPublishToggle}
                                                 >
                                                     {loadingPublishToggle
-                                                        ? 'Publishing...'
+                                                        ? (isPublished ? 'Unpublishing...' : 'Publishing...')
                                                         : isPublished ? 'Unpublish Lightning' : 'Publish Lightning'}
                                                 </Button>
                                                 <Button variant="outlined" color="error" onClick={disconnectLightning}>
