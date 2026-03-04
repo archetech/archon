@@ -68,12 +68,17 @@ beforeEach(() => {
 
     gatekeeper.publishLightning = (did: string, invoiceKey: string) => {
         trackCall('publishLightning', did, invoiceKey);
-        return Promise.resolve(true);
+        return Promise.resolve({ ok: true });
     };
 
     gatekeeper.unpublishLightning = (did: string) => {
         trackCall('unpublishLightning', did);
         return Promise.resolve(true);
+    };
+
+    gatekeeper.zapLightning = (adminKey: string, serviceEndpoint: string, amount: number) => {
+        trackCall('zapLightning', adminKey, serviceEndpoint, amount);
+        return Promise.resolve({ paymentHash: 'zap-hash' });
     };
 
     keymaster = new Keymaster({
@@ -585,6 +590,20 @@ describe('publishLightning', () => {
         }
     });
 
+    it('should use publicHost from Drawbridge when available', async () => {
+        gatekeeper.publishLightning = (did: string, invoiceKey: string) => {
+            trackCall('publishLightning', did, invoiceKey);
+            return Promise.resolve({ ok: true, publicHost: 'http://abc123.onion:4222' });
+        };
+
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+
+        const doc = await keymaster.resolveDID('Bob');
+        expect(doc.didDocument!.service![0].serviceEndpoint).toMatch(/^http:\/\/abc123\.onion:4222\/invoice\//);
+    });
+
     it('should replace existing lightning service on re-publish', async () => {
         await keymaster.createId('Bob');
         await keymaster.addLightning();
@@ -624,16 +643,16 @@ describe('unpublishLightning', () => {
     });
 });
 
-describe('lightningZap', () => {
+describe('zapLightning', () => {
     it('should throw for missing did', async () => {
         await keymaster.createId('Bob');
 
         try {
-            await keymaster.lightningZap('', 100);
+            await keymaster.zapLightning('', 100);
             throw new Error('Expected exception');
         }
         catch (error: any) {
-            expect(error.type).toBe(InvalidParameterError.type);
+            expect(error.type).toBe(UnknownIDError.type);
         }
     });
 
@@ -641,7 +660,7 @@ describe('lightningZap', () => {
         await keymaster.createId('Bob');
 
         try {
-            await keymaster.lightningZap('did:cid:test', 0);
+            await keymaster.zapLightning('did:cid:test', 0);
             throw new Error('Expected exception');
         }
         catch (error: any) {
@@ -649,56 +668,23 @@ describe('lightningZap', () => {
         }
     });
 
-    it('should throw when recipient has no Lightning service', async () => {
+    it('should delegate to drawbridge zapLightning', async () => {
         await keymaster.createId('Bob');
         await keymaster.addLightning();
         await keymaster.createId('Alice');
+        const aliceDoc = await keymaster.resolveDID('Alice');
+        const aliceDid = aliceDoc.didDocument!.id!;
 
-        try {
-            await keymaster.lightningZap('Bob', 100);
-            throw new Error('Expected exception');
-        }
-        catch (error: any) {
-            expect(error.type).toBe(LightningUnavailableError.type);
-        }
-    });
+        await keymaster.setCurrentId('Bob');
+        const result = await keymaster.zapLightning('Alice', 100);
+        expect(result.paymentHash).toBe('zap-hash');
 
-    it('should fetch invoice from service endpoint and pay it', async () => {
-        await keymaster.createId('Bob');
-        await keymaster.addLightning();
-        await keymaster.publishLightning();
-
-        // Get Bob's DID for the zap
-        const bobDoc = await keymaster.resolveDID('Bob');
-        const bobDid = bobDoc.didDocument!.id!;
-
-        // Mock fetch for the invoice request
-        const originalFetch = global.fetch;
-        let fetchCalledWith = '';
-        global.fetch = (async (url: string) => {
-            fetchCalledWith = url;
-            return {
-                ok: true,
-                json: () => Promise.resolve({ paymentRequest: 'lnbc100mock...', paymentHash: 'zap-hash' }),
-            };
-        }) as any;
-
-        try {
-            const result = await keymaster.lightningZap(bobDid, 100);
-            expect(result.paymentHash).toBe('out-hash');
-
-            // Verify fetch was called with correct URL
-            expect(fetchCalledWith).toContain('/invoice/');
-            expect(fetchCalledWith).toContain('amount=100');
-
-            // Verify payLightningInvoice was called with the mocked bolt11
-            const payCalls = calls.filter(c => c.method === 'payLightningInvoice');
-            expect(payCalls.length).toBe(1);
-            expect(payCalls[0].args[1]).toBe('lnbc100mock...');
-        }
-        finally {
-            global.fetch = originalFetch;
-        }
+        // Verify zapLightning was called on drawbridge with resolved DID
+        const zapCalls = calls.filter(c => c.method === 'zapLightning');
+        expect(zapCalls.length).toBe(1);
+        expect(zapCalls[0].args[0]).toBe('admin1'); // adminKey
+        expect(zapCalls[0].args[1]).toBe(aliceDid); // resolved DID from alias
+        expect(zapCalls[0].args[2]).toBe(100); // amount
     });
 });
 

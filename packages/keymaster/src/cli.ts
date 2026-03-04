@@ -920,7 +920,7 @@ program
     .description('Send sats to a DID via Lightning')
     .action(async (did, amount) => {
         try {
-            const result = await keymaster.lightningZap(did, parseInt(amount));
+            const result = await keymaster.zapLightning(did, parseInt(amount));
             console.log(JSON.stringify(result, null, 4));
         }
         catch (error: any) {

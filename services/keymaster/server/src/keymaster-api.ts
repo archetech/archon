@@ -2248,7 +2248,7 @@ v1router.post('/lightning/unpublish', async (req, res) => {
 v1router.post('/lightning/zap', async (req, res) => {
     try {
         const { did, amount } = req.body;
-        const result = await keymaster.lightningZap(did, amount);
+        const result = await keymaster.zapLightning(did, amount);
         res.json(result);
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });

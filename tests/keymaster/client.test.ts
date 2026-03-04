@@ -4032,7 +4032,7 @@ describe('unpublishLightning', () => {
     });
 });
 
-describe('lightningZap', () => {
+describe('zapLightning', () => {
     const mockPayment = { paymentHash: 'zap-hash-123' };
 
     it('should zap a DID', async () => {
@@ -4041,12 +4041,12 @@ describe('lightningZap', () => {
             .reply(200, mockPayment);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const result = await keymaster.lightningZap('did:cid:test', 100);
+        const result = await keymaster.zapLightning('did:cid:test', 100);
 
         expect(result).toStrictEqual(mockPayment);
     });
 
-    it('should throw exception on lightningZap server error', async () => {
+    it('should throw exception on zapLightning server error', async () => {
         nock(KeymasterURL)
             .post(Endpoints.lightning_zap)
             .reply(500, ServerError);
@@ -4054,7 +4054,7 @@ describe('lightningZap', () => {
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
         try {
-            await keymaster.lightningZap('did:cid:test', 100);
+            await keymaster.zapLightning('did:cid:test', 100);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

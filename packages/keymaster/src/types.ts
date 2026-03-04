@@ -368,7 +368,7 @@ export interface KeymasterInterface {
     decodeLightningInvoice(bolt11: string): Promise<DecodedLightningInvoice>;
     publishLightning(name?: string): Promise<boolean>;
     unpublishLightning(name?: string): Promise<boolean>;
-    lightningZap(did: string, amount: number): Promise<LightningPayment>;
+    zapLightning(id: string, amount: number, name?: string): Promise<LightningPayment>;
 
     // DIDs
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;

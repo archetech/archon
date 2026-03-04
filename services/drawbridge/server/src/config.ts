@@ -26,6 +26,9 @@ const config = {
     // Public Lightning invoices
     publicHost: process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || '',
 
+    // Tor SOCKS proxy for .onion requests (host:port)
+    torProxy: process.env.ARCHON_TOR_PROXY || '',
+
     // Redis
     redisUrl: process.env.ARCHON_REDIS_URL || 'redis://localhost:6379',
 };

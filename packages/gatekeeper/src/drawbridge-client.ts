@@ -81,10 +81,10 @@ export default class DrawbridgeClient extends GatekeeperClient implements Drawbr
         }
     }
 
-    async publishLightning(did: string, invoiceKey: string): Promise<boolean> {
+    async publishLightning(did: string, invoiceKey: string): Promise<{ ok: boolean; publicHost?: string }> {
         try {
             const response = await this.axios.post(`${this.API}/lightning/publish`, { did, invoiceKey });
-            return response.data.ok;
+            return response.data;
         } catch (error) {
             throwError(error);
         }
@@ -94,6 +94,15 @@ export default class DrawbridgeClient extends GatekeeperClient implements Drawbr
         try {
             const response = await this.axios.delete(`${this.API}/lightning/publish/${encodeURIComponent(did)}`);
             return response.data.ok;
+        } catch (error) {
+            throwError(error);
+        }
+    }
+
+    async zapLightning(adminKey: string, did: string, amount: number): Promise<LightningPayment> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/zap`, { adminKey, did, amount });
+            return response.data;
         } catch (error) {
             throwError(error);
         }

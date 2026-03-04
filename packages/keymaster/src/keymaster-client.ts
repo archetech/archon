@@ -572,7 +572,7 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async lightningZap(did: string, amount: number): Promise<LightningPayment> {
+    async zapLightning(did: string, amount: number): Promise<LightningPayment> {
         try {
             const response = await this.axios.post(`${this.API}/lightning/zap`, { did, amount });
             return response.data;

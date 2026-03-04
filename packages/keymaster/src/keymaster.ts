@@ -1947,7 +1947,7 @@ export default class Keymaster implements KeymasterInterface {
 
         // Register invoiceKey on Drawbridge using DID suffix as key
         const didSuffix = did.split(':').pop()!;
-        await drawbridge.publishLightning(didSuffix, config.invoiceKey);
+        const result = await drawbridge.publishLightning(didSuffix, config.invoiceKey);
 
         // Add service endpoint to DID document
         const doc = await this.resolveDID(did);
@@ -1957,7 +1957,7 @@ export default class Keymaster implements KeymasterInterface {
         // Remove existing lightning service if present
         const filtered = services.filter(s => s.id !== serviceId);
 
-        const publicHost = drawbridge.url;
+        const publicHost = result.publicHost || drawbridge.url;
         filtered.push({
             id: serviceId,
             type: 'Lightning',
@@ -1996,7 +1996,8 @@ export default class Keymaster implements KeymasterInterface {
         return true;
     }
 
-    async lightningZap(did: string, amount: number): Promise<LightningPayment> {
+    async zapLightning(id: string, amount: number, name?: string): Promise<LightningPayment> {
+        const did = await this.lookupDID(id);
         if (!did) {
             throw new InvalidParameterError('did');
         }
@@ -2004,32 +2005,9 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('amount');
         }
 
-        // Resolve recipient's DID to find Lightning service endpoint
-        const doc = await this.resolveDID(did);
-        const services = doc.didDocument?.service || [];
-        const lightningService = services.find(s => s.type === 'Lightning');
-
-        if (!lightningService) {
-            throw new LightningUnavailableError('Recipient DID has no Lightning service endpoint');
-        }
-
-        // Request invoice from recipient's Drawbridge
-        const invoiceUrl = `${lightningService.serviceEndpoint}?amount=${amount}`;
-        const response = await fetch(invoiceUrl);
-
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: response.statusText }));
-            throw new LightningUnavailableError(`Invoice request failed: ${error.error || response.statusText}`);
-        }
-
-        const { paymentRequest } = await response.json();
-
-        if (!paymentRequest) {
-            throw new LightningUnavailableError('No payment request returned');
-        }
-
-        // Pay the invoice
-        return this.payLightningInvoice(paymentRequest);
+        const drawbridge = this.requireDrawbridge();
+        const config = await this.getLightningConfig(name);
+        return drawbridge.zapLightning(config.adminKey, did, amount);
     }
 
     async testAgent(id: string): Promise<boolean> {
