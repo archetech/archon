@@ -712,20 +712,29 @@ async function main() {
 
             if (isLud16) {
                 // LUD-16 Lightning Address flow
-                const [name, domain] = did.split('@');
-                if (!name || !domain) {
+                const parts = did.split('@');
+                if (parts.length !== 2 || !parts[0] || !parts[1]) {
                     res.status(400).json({ error: 'Invalid Lightning Address format' });
                     return;
                 }
+                const [name, domain] = parts;
 
-                // SSRF validation on domain
-                if (/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(domain)) {
+                // Build and validate LNURL URL to prevent SSRF
+                let lnurlUrl: URL;
+                try {
+                    lnurlUrl = new URL(`https://${domain}/.well-known/lnurlp/${encodeURIComponent(name)}`);
+                } catch {
+                    res.status(400).json({ error: 'Invalid Lightning Address domain' });
+                    return;
+                }
+
+                if (/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(lnurlUrl.hostname)) {
                     res.status(400).json({ error: 'Invalid Lightning Address: private addresses not allowed' });
                     return;
                 }
 
                 // Fetch LNURL-pay metadata
-                const lnurlResponse = await fetch(`https://${domain}/.well-known/lnurlp/${name}`);
+                const lnurlResponse = await fetch(lnurlUrl.toString());
                 if (!lnurlResponse.ok) {
                     res.status(502).json({ error: `Lightning Address lookup failed: ${lnurlResponse.statusText}` });
                     return;
@@ -744,7 +753,13 @@ async function main() {
                 }
 
                 // SSRF validation on callback URL
-                const callbackUrl = new URL(callback);
+                let callbackUrl: URL;
+                try {
+                    callbackUrl = new URL(callback);
+                } catch {
+                    res.status(400).json({ error: 'Invalid callback URL' });
+                    return;
+                }
                 if (callbackUrl.protocol !== 'https:') {
                     res.status(400).json({ error: 'Invalid callback URL: must use https' });
                     return;
