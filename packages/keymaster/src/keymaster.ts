@@ -1998,17 +1998,26 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async zapLightning(id: string, amount: number, memo?: string, name?: string): Promise<LightningPayment> {
-        const did = await this.lookupDID(id);
-        if (!did) {
-            throw new InvalidParameterError('did');
+        const isLud16 = id.includes('@') && !id.startsWith('did:');
+        let recipient: string;
+
+        if (isLud16) {
+            recipient = id;
+        } else {
+            const did = await this.lookupDID(id);
+            if (!did) {
+                throw new InvalidParameterError('did');
+            }
+            recipient = did;
         }
+
         if (!amount || amount <= 0) {
             throw new InvalidParameterError('amount');
         }
 
         const drawbridge = this.requireDrawbridge();
         const config = await this.getLightningConfig(name);
-        return drawbridge.zapLightning(config.adminKey, did, amount, memo);
+        return drawbridge.zapLightning(config.adminKey, recipient, amount, memo);
     }
 
     async getLightningPayments(name?: string): Promise<LightningPaymentRecord[]> {
