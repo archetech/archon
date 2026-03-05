@@ -5,6 +5,7 @@ import {
     LightningConfig,
     LightningInvoice,
     LightningPayment,
+    LightningPaymentRecord,
     LightningPaymentStatus,
 } from './types.js';
 import GatekeeperClient from './gatekeeper-client.js';
@@ -91,6 +92,15 @@ export default class DrawbridgeClient extends GatekeeperClient implements Drawbr
         try {
             const response = await this.axios.delete(`${this.API}/lightning/publish/${encodeURIComponent(did)}`);
             return response.data.ok;
+        } catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getLightningPayments(adminKey: string): Promise<LightningPaymentRecord[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/payments`, { adminKey });
+            return response.data.payments;
         } catch (error) {
             throwError(error);
         }

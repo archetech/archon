@@ -640,6 +640,22 @@ async function main() {
         }
     });
 
+    v1router.post('/lightning/payments', async (req, res) => {
+        if (!config.lnbitsUrl) {
+            res.status(503).json({ error: 'Lightning (LNbits) not configured' });
+            return;
+        }
+        try {
+            const { adminKey } = req.body;
+            const payments = await lnbits.getPayments(config.lnbitsUrl, adminKey);
+            res.json({ payments });
+        } catch (error: any) {
+            const status = error instanceof LightningPaymentError ? 400 : 502;
+            logger.error({ err: error }, 'LNbits error');
+            res.status(status).json({ error: error.message || 'LNbits error' });
+        }
+    });
+
     // --- Published Lightning (public invoice generation) ---
 
     v1router.post('/lightning/publish', async (req, res) => {

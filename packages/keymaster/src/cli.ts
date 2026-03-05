@@ -928,6 +928,30 @@ program
         }
     });
 
+program
+    .command('lightning-payments [id]')
+    .description('Show Lightning payment history')
+    .action(async (id) => {
+        try {
+            const payments = await keymaster.getLightningPayments(id);
+            if (payments.length === 0) {
+                console.log('No payments found.');
+                return;
+            }
+            for (const p of payments) {
+                const d = p.time ? new Date(p.time) : null;
+                const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` : '—';
+                const fee = p.fee > 0 ? ` (fee: ${p.fee})` : '';
+                const memo = p.memo ? ` "${p.memo}"` : '';
+                const status = p.pending ? ' [pending]' : '';
+                console.log(`${date}  ${p.amount} sats${fee}${memo}${status}`);
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
 // Group commands
 program
     .command('create-group <groupName>')

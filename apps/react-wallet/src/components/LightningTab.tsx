@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import { QRCodeSVG } from "qrcode.react";
 import { LightningNotConfiguredError } from "@didcid/common/errors";
-import { DecodedLightningInvoice, LightningPaymentStatus } from "@didcid/keymaster/types";
+import { DecodedLightningInvoice, LightningPaymentRecord, LightningPaymentStatus } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
@@ -21,7 +21,7 @@ const LightningTab: React.FC = () => {
     const { currentDID, agentList } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
 
-    const [activeTab, setActiveTab] = useState<"wallet" | "receive" | "send" | "zap">("wallet");
+    const [activeTab, setActiveTab] = useState<"wallet" | "payments" | "receive" | "send" | "zap">("wallet");
 
     // Wallet sub-tab
     const [balance, setBalance] = useState<number | null>(null);
@@ -48,6 +48,10 @@ const LightningTab: React.FC = () => {
     const [zapMemo, setZapMemo] = useState<string>("");
     const [loadingZap, setLoadingZap] = useState<boolean>(false);
     const [zapResult, setZapResult] = useState<LightningPaymentStatus | null>(null);
+
+    // Payments sub-tab
+    const [payments, setPayments] = useState<LightningPaymentRecord[]>([]);
+    const [loadingPayments, setLoadingPayments] = useState<boolean>(false);
 
     // Publish state
     const [isPublished, setIsPublished] = useState<boolean>(false);
@@ -81,11 +85,26 @@ const LightningTab: React.FC = () => {
         }
     }, [keymaster, currentDID]);
 
+    const fetchPayments = useCallback(async () => {
+        if (!keymaster) return;
+        setLoadingPayments(true);
+        try {
+            const result = await keymaster.getLightningPayments();
+            setPayments(result);
+        } catch (err: any) {
+            setError(err);
+        } finally {
+            setLoadingPayments(false);
+        }
+    }, [keymaster, setError]);
+
     useEffect(() => {
         if (activeTab === "wallet") {
             fetchBalance();
+        } else if (activeTab === "payments") {
+            fetchPayments();
         }
-    }, [activeTab, fetchBalance]);
+    }, [activeTab, fetchBalance, fetchPayments]);
 
     async function handleSetupLightning() {
         if (!keymaster) return;
@@ -231,6 +250,7 @@ const LightningTab: React.FC = () => {
                 sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
             >
                 <Tab label="Wallet" value="wallet" />
+                <Tab label="Payments" value="payments" />
                 <Tab label="Receive" value="receive" />
                 <Tab label="Send" value="send" />
                 <Tab label="Zap" value="zap" />
@@ -284,6 +304,44 @@ const LightningTab: React.FC = () => {
                                     Disconnect Wallet
                                 </Button>
                             </Box>
+                        </Box>
+                    )}
+                </Box>
+            )}
+
+            {activeTab === "payments" && (
+                <Box sx={{ p: 1 }}>
+                    <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                        <Button variant="outlined" onClick={fetchPayments} disabled={loadingPayments}>
+                            Refresh
+                        </Button>
+                    </Box>
+                    {loadingPayments && <CircularProgress size={24} />}
+                    {!loadingPayments && payments.length === 0 && (
+                        <Typography>No payments found.</Typography>
+                    )}
+                    {!loadingPayments && payments.length > 0 && (
+                        <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", "& th, & td": { p: 0.75, textAlign: "left", borderBottom: "1px solid", borderColor: "divider" }, "& th": { fontWeight: "bold" } }}>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Memo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {payments.map((p, i) => {
+                                    const d = p.time ? new Date(p.time) : null;
+                                    const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}` : "—";
+                                    return (
+                                        <tr key={i}>
+                                            <td>{date}</td>
+                                            <td>{p.amount} sats{p.fee > 0 ? ` (fee: ${p.fee})` : ""}</td>
+                                            <td>{p.memo || "—"}{p.pending ? " [pending]" : ""}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
                         </Box>
                     )}
                 </Box>

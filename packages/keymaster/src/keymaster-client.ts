@@ -25,6 +25,7 @@ import {
     LightningBalance,
     LightningInvoice,
     LightningPayment,
+    LightningPaymentRecord,
     LightningPaymentStatus,
     DecodedLightningInvoice,
     NostrKeys,
@@ -576,6 +577,16 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.post(`${this.API}/lightning/zap`, { did, amount, memo, id: name });
             return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getLightningPayments(name?: string): Promise<LightningPaymentRecord[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/payments`, { id: name });
+            return response.data.payments;
         }
         catch (error) {
             throwError(error);

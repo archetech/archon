@@ -81,6 +81,13 @@ beforeEach(() => {
         return Promise.resolve({ paymentHash: 'zap-hash' });
     };
 
+    gatekeeper.getLightningPayments = (adminKey: string) => {
+        trackCall('getLightningPayments', adminKey);
+        return Promise.resolve([
+            { paymentHash: 'hash1', amount: 100, fee: 0, memo: 'received', time: '2023-11-14T22:13:20+00:00', pending: false },
+        ]);
+    };
+
     keymaster = new Keymaster({
         gatekeeper, wallet, cipher, passphrase: 'passphrase',
     });
@@ -699,6 +706,29 @@ describe('zapLightning', () => {
         const zapCalls = calls.filter(c => c.method === 'zapLightning');
         expect(zapCalls[0].args[2]).toBe(50);
         expect(zapCalls[0].args[3]).toBe('thanks for the coffee');
+    });
+});
+
+describe('getLightningPayments', () => {
+    it('should return payments from drawbridge', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+
+        const result = await keymaster.getLightningPayments();
+        expect(result).toStrictEqual([
+            { paymentHash: 'hash1', amount: 100, fee: 0, memo: 'received', time: '2023-11-14T22:13:20+00:00', pending: false },
+        ]);
+    });
+
+    it('should throw when Lightning not configured', async () => {
+        await keymaster.createId('Bob');
+
+        try {
+            await keymaster.getLightningPayments();
+            throw new Error('Expected exception');
+        } catch (error: any) {
+            expect(error.type).toBe(LightningNotConfiguredError.type);
+        }
     });
 });
 

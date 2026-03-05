@@ -54,6 +54,7 @@ const Endpoints = {
     lightning_publish: '/api/v1/lightning/publish',
     lightning_unpublish: '/api/v1/lightning/unpublish',
     lightning_zap: '/api/v1/lightning/zap',
+    lightning_payments: '/api/v1/lightning/payments',
 };
 
 const mockConsole = {
@@ -4055,6 +4056,40 @@ describe('zapLightning', () => {
 
         try {
             await keymaster.zapLightning('did:cid:test', 100);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('getLightningPayments', () => {
+    const mockPayments = [
+        { paymentHash: 'hash1', amount: 100, fee: 0, memo: 'test', time: '2023-11-14T22:13:20+00:00', pending: false },
+        { paymentHash: 'hash2', amount: -50, fee: 1, memo: 'sent', time: '2023-11-14T22:14:40+00:00', pending: false },
+    ];
+
+    it('should return payments', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_payments)
+            .reply(200, { payments: mockPayments });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const result = await keymaster.getLightningPayments();
+
+        expect(result).toStrictEqual(mockPayments);
+    });
+
+    it('should throw exception on getLightningPayments server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.lightning_payments)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.getLightningPayments();
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

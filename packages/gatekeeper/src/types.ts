@@ -196,6 +196,15 @@ export interface LightningPaymentStatus {
     paymentHash: string;
 }
 
+export interface LightningPaymentRecord {
+    paymentHash: string;
+    amount: number;
+    fee: number;
+    memo: string;
+    time: string;
+    pending: boolean;
+}
+
 export interface DrawbridgeInterface extends GatekeeperInterface {
     readonly url: string;
     isLightningSupported(): Promise<boolean>;
@@ -207,6 +216,7 @@ export interface DrawbridgeInterface extends GatekeeperInterface {
     publishLightning(did: string, invoiceKey: string): Promise<{ ok: boolean; publicHost?: string }>;
     unpublishLightning(did: string): Promise<boolean>;
     zapLightning(adminKey: string, did: string, amount: number, memo?: string): Promise<LightningPayment>;
+    getLightningPayments(adminKey: string): Promise<LightningPaymentRecord[]>;
 }
 
 export interface DidRegistration {
