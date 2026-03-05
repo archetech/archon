@@ -707,60 +707,145 @@ async function main() {
                 return;
             }
 
-            // Resolve recipient's DID to find Lightning service endpoint
-            const doc = await gatekeeper.resolveDID(did);
-            const services = doc.didDocument?.service || [];
-            const lightningService = services.find((s: any) => s.type === 'Lightning');
+            const isLud16 = did.includes('@') && !did.startsWith('did:');
+            let paymentRequest: string;
 
-            if (!lightningService) {
-                res.status(404).json({ error: 'Recipient DID has no Lightning service endpoint' });
-                return;
-            }
+            if (isLud16) {
+                // LUD-16 Lightning Address flow
+                const [name, domain] = did.split('@');
+                if (!name || !domain) {
+                    res.status(400).json({ error: 'Invalid Lightning Address format' });
+                    return;
+                }
 
-            // Validate service endpoint URL to prevent SSRF
-            const url = new URL(lightningService.serviceEndpoint);
-            const isOnion = url.hostname.endsWith('.onion');
+                // SSRF validation on domain
+                if (/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(domain)) {
+                    res.status(400).json({ error: 'Invalid Lightning Address: private addresses not allowed' });
+                    return;
+                }
 
-            if (isOnion && url.protocol !== 'http:') {
-                res.status(400).json({ error: 'Invalid service endpoint: .onion must use http' });
-                return;
-            }
-            if (!isOnion && url.protocol !== 'https:') {
-                res.status(400).json({ error: 'Invalid service endpoint: must use https' });
-                return;
-            }
-            if (!isOnion && /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(url.hostname)) {
-                res.status(400).json({ error: 'Invalid service endpoint: private addresses not allowed' });
-                return;
-            }
+                // Fetch LNURL-pay metadata
+                const lnurlResponse = await fetch(`https://${domain}/.well-known/lnurlp/${name}`);
+                if (!lnurlResponse.ok) {
+                    res.status(502).json({ error: `Lightning Address lookup failed: ${lnurlResponse.statusText}` });
+                    return;
+                }
 
-            // Fetch invoice from recipient's service endpoint (Tor-aware)
-            let invoiceUrl = `${lightningService.serviceEndpoint}?amount=${amount}`;
-            if (memo) {
-                invoiceUrl += `&memo=${encodeURIComponent(memo)}`;
-            }
-            const fetchOptions: any = {};
+                const lnurlData = await lnurlResponse.json() as any;
+                if (lnurlData.status === 'ERROR') {
+                    res.status(502).json({ error: `Lightning Address error: ${lnurlData.reason || 'unknown'}` });
+                    return;
+                }
 
-            if (isOnion && config.torProxy) {
-                const [host, port] = config.torProxy.split(':');
-                fetchOptions.dispatcher = socksDispatcher({
-                    type: 5,
-                    host: host || 'localhost',
-                    port: parseInt(port || '9050'),
-                });
-            }
+                const { callback, minSendable, maxSendable } = lnurlData;
+                if (!callback) {
+                    res.status(502).json({ error: 'No callback URL in Lightning Address response' });
+                    return;
+                }
 
-            const invoiceResponse = await fetch(invoiceUrl, fetchOptions);
-            if (!invoiceResponse.ok) {
-                const error = await invoiceResponse.json().catch(() => ({ error: invoiceResponse.statusText }));
-                res.status(502).json({ error: `Invoice request failed: ${error.error || invoiceResponse.statusText}` });
-                return;
-            }
+                // SSRF validation on callback URL
+                const callbackUrl = new URL(callback);
+                if (callbackUrl.protocol !== 'https:') {
+                    res.status(400).json({ error: 'Invalid callback URL: must use https' });
+                    return;
+                }
+                if (/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(callbackUrl.hostname)) {
+                    res.status(400).json({ error: 'Invalid callback URL: private addresses not allowed' });
+                    return;
+                }
 
-            const { paymentRequest } = await invoiceResponse.json() as any;
-            if (!paymentRequest) {
-                res.status(502).json({ error: 'No payment request returned from recipient' });
-                return;
+                // LUD-16 uses millisats
+                const amountMsats = amount * 1000;
+                if (minSendable && amountMsats < minSendable) {
+                    res.status(400).json({ error: `Amount too low: minimum ${Math.ceil(minSendable / 1000)} sats` });
+                    return;
+                }
+                if (maxSendable && amountMsats > maxSendable) {
+                    res.status(400).json({ error: `Amount too high: maximum ${Math.floor(maxSendable / 1000)} sats` });
+                    return;
+                }
+
+                // Fetch invoice from callback
+                let invoiceUrl = `${callback}${callback.includes('?') ? '&' : '?'}amount=${amountMsats}`;
+                if (memo) {
+                    invoiceUrl += `&comment=${encodeURIComponent(memo)}`;
+                }
+
+                const invoiceResponse = await fetch(invoiceUrl);
+                if (!invoiceResponse.ok) {
+                    const error = await invoiceResponse.json().catch(() => ({ error: invoiceResponse.statusText }));
+                    res.status(502).json({ error: `Invoice request failed: ${error.error || invoiceResponse.statusText}` });
+                    return;
+                }
+
+                const invoiceData = await invoiceResponse.json() as any;
+                if (invoiceData.status === 'ERROR') {
+                    res.status(502).json({ error: `Invoice error: ${invoiceData.reason || 'unknown'}` });
+                    return;
+                }
+
+                paymentRequest = invoiceData.pr;
+                if (!paymentRequest) {
+                    res.status(502).json({ error: 'No payment request returned from Lightning Address' });
+                    return;
+                }
+            } else {
+                // DID-based zap flow (existing)
+                const doc = await gatekeeper.resolveDID(did);
+                const services = doc.didDocument?.service || [];
+                const lightningService = services.find((s: any) => s.type === 'Lightning');
+
+                if (!lightningService) {
+                    res.status(404).json({ error: 'Recipient DID has no Lightning service endpoint' });
+                    return;
+                }
+
+                // Validate service endpoint URL to prevent SSRF
+                const url = new URL(lightningService.serviceEndpoint);
+                const isOnion = url.hostname.endsWith('.onion');
+
+                if (isOnion && url.protocol !== 'http:') {
+                    res.status(400).json({ error: 'Invalid service endpoint: .onion must use http' });
+                    return;
+                }
+                if (!isOnion && url.protocol !== 'https:') {
+                    res.status(400).json({ error: 'Invalid service endpoint: must use https' });
+                    return;
+                }
+                if (!isOnion && /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(url.hostname)) {
+                    res.status(400).json({ error: 'Invalid service endpoint: private addresses not allowed' });
+                    return;
+                }
+
+                // Fetch invoice from recipient's service endpoint (Tor-aware)
+                let invoiceUrl = `${lightningService.serviceEndpoint}?amount=${amount}`;
+                if (memo) {
+                    invoiceUrl += `&memo=${encodeURIComponent(memo)}`;
+                }
+                const fetchOptions: any = {};
+
+                if (isOnion && config.torProxy) {
+                    const [host, port] = config.torProxy.split(':');
+                    fetchOptions.dispatcher = socksDispatcher({
+                        type: 5,
+                        host: host || 'localhost',
+                        port: parseInt(port || '9050'),
+                    });
+                }
+
+                const invoiceResponse = await fetch(invoiceUrl, fetchOptions);
+                if (!invoiceResponse.ok) {
+                    const error = await invoiceResponse.json().catch(() => ({ error: invoiceResponse.statusText }));
+                    res.status(502).json({ error: `Invoice request failed: ${error.error || invoiceResponse.statusText}` });
+                    return;
+                }
+
+                const invoiceJson = await invoiceResponse.json() as any;
+                paymentRequest = invoiceJson.paymentRequest;
+                if (!paymentRequest) {
+                    res.status(502).json({ error: 'No payment request returned from recipient' });
+                    return;
+                }
             }
 
             // Pay the invoice
