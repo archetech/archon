@@ -334,11 +334,11 @@ const LightningTab: React.FC = () => {
                                     const d = p.time ? new Date(p.time) : null;
                                     const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}` : "—";
                                     return (
-                                    <tr key={i}>
-                                        <td>{date}</td>
-                                        <td>{p.amount} sats{p.fee > 0 ? ` (fee: ${p.fee})` : ""}</td>
-                                        <td>{p.memo || "—"}{p.pending ? " [pending]" : ""}</td>
-                                    </tr>
+                                        <tr key={i}>
+                                            <td>{date}</td>
+                                            <td>{p.amount} sats{p.fee > 0 ? ` (fee: ${p.fee})` : ""}</td>
+                                            <td>{p.memo || "—"}{p.pending ? " [pending]" : ""}</td>
+                                        </tr>
                                     );
                                 })}
                             </tbody>
