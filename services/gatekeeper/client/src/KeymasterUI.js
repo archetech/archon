@@ -437,7 +437,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function handleZap() {
         if (!zapDid.trim()) {
-            showAlert('Enter a recipient DID');
+            showAlert('Enter a recipient');
             return;
         }
         const amount = parseInt(zapAmount, 10);
@@ -5807,9 +5807,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         renderInput={(params) => (
                                             <TextField
                                                 {...params}
-                                                label="Recipient DID"
+                                                label="Recipient"
                                                 size="small"
-                                                placeholder="did:mdip:... or alias"
+                                                placeholder="DID, alias, or Lightning Address"
                                             />
                                         )}
                                     />
