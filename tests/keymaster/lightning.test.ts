@@ -707,20 +707,6 @@ describe('zapLightning', () => {
         expect(zapCalls[0].args[2]).toBe(50);
         expect(zapCalls[0].args[3]).toBe('thanks for the coffee');
     });
-
-    it('should pass LUD-16 address directly without lookupDID', async () => {
-        await keymaster.createId('Bob');
-        await keymaster.addLightning();
-
-        const result = await keymaster.zapLightning('alice@example.com', 21, 'hi');
-        expect(result.paymentHash).toBe('zap-hash');
-
-        const zapCalls = calls.filter(c => c.method === 'zapLightning');
-        expect(zapCalls.length).toBe(1);
-        expect(zapCalls[0].args[1]).toBe('alice@example.com'); // passed through as-is
-        expect(zapCalls[0].args[2]).toBe(21);
-        expect(zapCalls[0].args[3]).toBe('hi');
-    });
 });
 
 describe('getLightningPayments', () => {

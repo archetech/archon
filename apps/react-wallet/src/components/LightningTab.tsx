@@ -213,7 +213,7 @@ const LightningTab: React.FC = () => {
     async function handleZap() {
         if (!keymaster) return;
         if (!zapDid.trim()) {
-            setError("Enter a recipient");
+            setError("Enter a recipient DID");
             return;
         }
         const amount = parseInt(zapAmount, 10);
@@ -497,9 +497,9 @@ const LightningTab: React.FC = () => {
                         renderInput={(params) => (
                             <TextField
                                 {...params}
-                                label="Recipient"
+                                label="Recipient DID"
                                 size="small"
-                                placeholder="DID, alias, or Lightning Address"
+                                placeholder="did:mdip:... or alias"
                             />
                         )}
                     />
