@@ -260,6 +260,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [zapMemo, setZapMemo] = useState('');
     const [loadingZap, setLoadingZap] = useState(false);
     const [zapResult, setZapResult] = useState(null);
+    const [lightningPayments, setLightningPayments] = useState([]);
+    const [loadingPayments, setLoadingPayments] = useState(false);
     const [isPublished, setIsPublished] = useState(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState(false);
 
@@ -329,6 +331,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 setLightningIsConfigured(true);
                 setLightningWalletError(error.error || error.message || String(error));
             }
+        }
+    }
+
+    async function fetchLightningPayments() {
+        setLoadingPayments(true);
+        try {
+            const result = await keymaster.getLightningPayments();
+            setLightningPayments(result);
+        } catch (error) {
+            showError(error);
+        } finally {
+            setLoadingPayments(false);
         }
     }
 
@@ -5580,11 +5594,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 onChange={(_, v) => {
                                     setLightningTab(v);
                                     if (v === 'wallet') fetchLightningBalance();
+                                    if (v === 'payments') fetchLightningPayments();
                                 }}
                                 indicatorColor="primary"
                                 textColor="primary"
                             >
                                 <Tab label="Wallet" value="wallet" />
+                                <Tab label="Payments" value="payments" />
                                 <Tab label="Receive" value="receive" />
                                 <Tab label="Send" value="send" />
                                 <Tab label="Zap" value="zap" />
@@ -5630,6 +5646,45 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 </Button>
                                             </Box>
                                         </Box>
+                                    }
+                                </Box>
+                            }
+
+                            {lightningTab === 'payments' &&
+                                <Box sx={{ mt: 2 }}>
+                                    <Button variant="outlined" onClick={fetchLightningPayments} disabled={loadingPayments}>
+                                        Refresh
+                                    </Button>
+                                    <p />
+                                    {loadingPayments && <Typography>Loading...</Typography>}
+                                    {!loadingPayments && lightningPayments.length === 0 &&
+                                        <Typography>No payments found.</Typography>
+                                    }
+                                    {!loadingPayments && lightningPayments.length > 0 &&
+                                        <TableContainer component={Paper}>
+                                            <Table size="small">
+                                                <TableHead>
+                                                    <TableRow>
+                                                        <TableCell>Date</TableCell>
+                                                        <TableCell>Amount</TableCell>
+                                                        <TableCell>Memo</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {lightningPayments.map((p, i) => {
+                                                        const d = p.time ? new Date(p.time) : null;
+                                                        const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` : '—';
+                                                        return (
+                                                        <TableRow key={i}>
+                                                            <TableCell>{date}</TableCell>
+                                                            <TableCell>{p.amount} sats{p.fee > 0 ? ` (fee: ${p.fee})` : ''}</TableCell>
+                                                            <TableCell>{p.memo || '—'}{p.pending ? ' [pending]' : ''}</TableCell>
+                                                        </TableRow>
+                                                        );
+                                                    })}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
                                     }
                                 </Box>
                             }

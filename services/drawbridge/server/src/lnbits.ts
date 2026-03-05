@@ -92,6 +92,28 @@ export async function payInvoice(
     }
 }
 
+/** Get payment history. Uses adminKey to see both incoming and outgoing. */
+export async function getPayments(
+    url: string,
+    adminKey: string
+): Promise<Array<{ paymentHash: string; amount: number; fee: number; memo: string; time: string; pending: boolean }>> {
+    try {
+        const response = await axios.get(`${url}/api/v1/payments`, {
+            headers: { 'X-Api-Key': adminKey },
+        });
+        return (response.data || []).map((p: any) => ({
+            paymentHash: p.payment_hash || p.checking_id || '',
+            amount: Math.floor((p.amount || 0) / 1000),
+            fee: Math.floor(Math.abs(p.fee || 0) / 1000),
+            memo: p.memo || '',
+            time: p.time || '',
+            pending: p.pending === true,
+        }));
+    } catch (error: any) {
+        throwLnbitsError(error);
+    }
+}
+
 /** Check payment status by payment hash. Uses invoiceKey. */
 export async function checkPayment(
     url: string,

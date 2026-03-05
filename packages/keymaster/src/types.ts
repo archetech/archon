@@ -8,6 +8,7 @@ import {
     LightningBalance,
     LightningInvoice,
     LightningPayment,
+    LightningPaymentRecord,
     LightningPaymentStatus,
 } from '@didcid/gatekeeper/types';
 
@@ -245,6 +246,7 @@ export type {
     LightningBalance,
     LightningInvoice,
     LightningPayment,
+    LightningPaymentRecord,
     LightningPaymentStatus,
 } from '@didcid/gatekeeper/types';
 
@@ -369,6 +371,7 @@ export interface KeymasterInterface {
     publishLightning(name?: string): Promise<boolean>;
     unpublishLightning(name?: string): Promise<boolean>;
     zapLightning(id: string, amount: number, memo?: string, name?: string): Promise<LightningPayment>;
+    getLightningPayments(name?: string): Promise<LightningPaymentRecord[]>;
 
     // DIDs
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;

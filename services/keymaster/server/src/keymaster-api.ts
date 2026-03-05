@@ -2261,6 +2261,36 @@ v1router.post('/lightning/zap', async (req, res) => {
 
 /**
  * @swagger
+ * /lightning/payments:
+ *   post:
+ *     summary: Get Lightning payment history.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: List of payments.
+ *       400:
+ *         description: Error fetching payments.
+ */
+v1router.post('/lightning/payments', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const payments = await keymaster.getLightningPayments(id);
+        res.json({ payments });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /challenge:
  *   get:
  *     summary: Create a default challenge DID with no parameters.

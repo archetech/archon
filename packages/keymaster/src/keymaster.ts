@@ -47,6 +47,7 @@ import {
     LightningBalance,
     LightningInvoice,
     LightningPayment,
+    LightningPaymentRecord,
     LightningPaymentStatus,
     DecodedLightningInvoice,
     NostrKeys,
@@ -2008,6 +2009,12 @@ export default class Keymaster implements KeymasterInterface {
         const drawbridge = this.requireDrawbridge();
         const config = await this.getLightningConfig(name);
         return drawbridge.zapLightning(config.adminKey, did, amount, memo);
+    }
+
+    async getLightningPayments(name?: string): Promise<LightningPaymentRecord[]> {
+        const drawbridge = this.requireDrawbridge();
+        const config = await this.getLightningConfig(name);
+        return drawbridge.getLightningPayments(config.adminKey);
     }
 
     async testAgent(id: string): Promise<boolean> {
