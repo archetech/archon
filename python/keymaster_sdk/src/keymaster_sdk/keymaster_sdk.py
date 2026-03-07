@@ -1132,3 +1132,39 @@ def decode_lightning_invoice(bolt11):
         json={"bolt11": bolt11},
     )
     return response
+
+
+def publish_lightning(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning/publish",
+        json={"id": id},
+    )
+    return response["ok"]
+
+
+def unpublish_lightning(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning/unpublish",
+        json={"id": id},
+    )
+    return response["ok"]
+
+
+def zap_lightning(did, amount, memo=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning/zap",
+        json={"did": did, "amount": amount, "memo": memo, "id": id},
+    )
+    return response
+
+
+def get_lightning_payments(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/lightning/payments",
+        json={"id": id},
+    )
+    return response["payments"]
