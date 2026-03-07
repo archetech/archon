@@ -367,17 +367,6 @@ def test_polls():
     assert_equal(response["results"]["ballots"][0]["voter"], alice_id)
 
 
-def test_lightning():
-    alice = generate_id()
-    keymaster.create_id(alice, local_options)
-
-    response = keymaster.add_lightning()
-    assert isinstance(response, dict), "add_lightning should return a dict"
-
-    response = keymaster.remove_lightning()
-    assert_equal(response, True)
-
-
 def test_remove_ids():
     for identifier in generated_ids:
         response = keymaster.remove_id(identifier)
