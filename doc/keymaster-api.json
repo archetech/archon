@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Keymaster API",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Documentation for Keymaster API"
   },
   "paths": {
@@ -2320,6 +2320,127 @@
           },
           "400": {
             "description": "Error decoding invoice."
+          }
+        }
+      }
+    },
+    "/lightning/publish": {
+      "post": {
+        "summary": "Publish Lightning service endpoint for a DID.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lightning published successfully."
+          },
+          "400": {
+            "description": "Error publishing Lightning."
+          }
+        }
+      }
+    },
+    "/lightning/unpublish": {
+      "post": {
+        "summary": "Unpublish Lightning service endpoint for a DID.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lightning unpublished successfully."
+          },
+          "400": {
+            "description": "Error unpublishing Lightning."
+          }
+        }
+      }
+    },
+    "/lightning/zap": {
+      "post": {
+        "summary": "Send sats to a DID via Lightning.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "did": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "integer"
+                  },
+                  "memo": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment result with preimage."
+          },
+          "400": {
+            "description": "Error sending payment."
+          }
+        }
+      }
+    },
+    "/lightning/payments": {
+      "post": {
+        "summary": "Get Lightning payment history.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "List of payments."
+          },
+          "400": {
+            "description": "Error fetching payments."
           }
         }
       }
