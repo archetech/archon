@@ -140,6 +140,7 @@ keymaster list-ids
 | `restore-wallet-file <file>` | Restore wallet from file |
 | `backup-wallet-did` | Backup wallet to encrypted DID |
 | `recover-wallet-did [did]` | Recover wallet from DID |
+| `change-passphrase <new>` | Re-encrypt wallet with a new passphrase |
 
 ##### Identity Management
 
@@ -269,6 +270,22 @@ keymaster list-ids
 | `add-vault-item <id> <file>` | Add file to vault |
 | `remove-vault-item <id> <item>` | Remove item |
 | `get-vault-item <id> <item> <file>` | Download item |
+
+##### Lightning
+
+| Command | Description |
+|---------|-------------|
+| `add-lightning [id]` | Create a Lightning wallet for a DID |
+| `remove-lightning [id]` | Remove Lightning wallet from a DID |
+| `lightning-balance [id]` | Check Lightning wallet balance |
+| `lightning-invoice <amount> <memo> [id]` | Create invoice to receive sats |
+| `lightning-pay <bolt11> [id]` | Pay a Lightning invoice |
+| `lightning-check <hash> [id]` | Check status of a payment |
+| `lightning-decode <bolt11>` | Decode a BOLT11 invoice |
+| `lightning-zap <recipient> <amount> [memo]` | Send sats to a DID, alias, or Lightning Address |
+| `lightning-payments [id]` | Show payment history |
+| `publish-lightning [id]` | Publish Lightning service endpoint for a DID |
+| `unpublish-lightning [id]` | Remove Lightning service endpoint from a DID |
 
 #### Command Options
 
