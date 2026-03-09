@@ -31,6 +31,9 @@ function toNetwork(name: string | undefined): WalletNetwork {
     }
 }
 
+const network = toNetwork(process.env.ARCHON_WALLET_NETWORK);
+const nodeId = (process.env.ARCHON_NODE_ID || 'default').toLowerCase();
+
 const config: AppConfig = {
     port: process.env.ARCHON_WALLET_PORT ? parseInt(process.env.ARCHON_WALLET_PORT) : 4240,
     metricsPort: process.env.ARCHON_WALLET_METRICS_PORT ? parseInt(process.env.ARCHON_WALLET_METRICS_PORT) : 4241,
@@ -40,8 +43,8 @@ const config: AppConfig = {
     btcPort: process.env.ARCHON_WALLET_BTC_PORT ? parseInt(process.env.ARCHON_WALLET_BTC_PORT) : 38332,
     btcUser: process.env.ARCHON_WALLET_BTC_USER,
     btcPass: process.env.ARCHON_WALLET_BTC_PASS,
-    walletName: process.env.ARCHON_WALLET_NAME || 'archon-watch',
-    network: toNetwork(process.env.ARCHON_WALLET_NETWORK),
+    walletName: process.env.ARCHON_WALLET_NAME || `archon-watch-${nodeId}`,
+    network,
     gapLimit: process.env.ARCHON_WALLET_GAP_LIMIT ? parseInt(process.env.ARCHON_WALLET_GAP_LIMIT) : 20,
     feeTarget: process.env.ARCHON_WALLET_FEE_TARGET ? parseInt(process.env.ARCHON_WALLET_FEE_TARGET) : 6,
 };
