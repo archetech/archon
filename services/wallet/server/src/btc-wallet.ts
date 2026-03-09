@@ -224,6 +224,118 @@ export async function getWalletStatus(btcClient: BtcClient): Promise<{
     }
 }
 
+export async function anchorData(
+    btcClient: BtcClient,
+    mnemonic: string,
+    network: WalletNetwork,
+    data: string,
+    feeRate?: number,
+): Promise<{ txid: string; fee: number }> {
+    const btcNetwork = getBtcNetwork(network);
+    const opReturnHex = Buffer.from(data, 'utf8').toString('hex');
+
+    // Create funded PSBT with OP_RETURN output
+    const psbtResult: WalletCreateFundedPsbtResult = await btcClient.walletCreateFundedPsbt(
+        [],
+        [{ data: opReturnHex }],
+        0,
+        {
+            includeWatching: true,
+            fee_rate: feeRate || undefined,
+            conf_target: feeRate ? undefined : config.feeTarget,
+            replaceable: true,
+            add_inputs: true,
+        },
+        true, // include BIP-32 derivation info
+    );
+
+    // Sign and broadcast
+    return signAndBroadcast(btcClient, mnemonic, network, psbtResult);
+}
+
+export async function bumpTransactionFee(
+    btcClient: BtcClient,
+    mnemonic: string,
+    network: WalletNetwork,
+    txid: string,
+    feeRate?: number,
+): Promise<{ txid: string; fee: number }> {
+    // psbtbumpfee returns a PSBT for watch-only wallets
+    const bumpResult = await btcClient.command('psbtbumpfee', txid, {
+        ...(feeRate ? { fee_rate: feeRate } : {}),
+    });
+
+    const btcNetwork = getBtcNetwork(network);
+    const psbt = bitcoin.Psbt.fromBase64(bumpResult.psbt, { network: btcNetwork });
+
+    // Sign all inputs
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    const root = HDKey.fromMasterSeed(seed);
+
+    for (let i = 0; i < psbt.inputCount; i++) {
+        const input = psbt.data.inputs[i];
+        const bip32Derivation = input.bip32Derivation;
+        if (!bip32Derivation || bip32Derivation.length === 0) {
+            throw new Error(`Input ${i}: missing BIP-32 derivation info`);
+        }
+
+        const { path } = bip32Derivation[0];
+        const child = root.derive(path);
+
+        if (!child.privateKey) {
+            throw new Error(`Input ${i}: could not derive private key at ${path}`);
+        }
+
+        const keyPair = ECPair.fromPrivateKey(child.privateKey, { network: btcNetwork });
+        psbt.signInput(i, keyPair);
+    }
+
+    psbt.finalizeAllInputs();
+    const tx = psbt.extractTransaction();
+    const newTxid = await btcClient.sendRawTransaction(tx.toHex());
+
+    return { txid: newTxid, fee: bumpResult.fee };
+}
+
+async function signAndBroadcast(
+    btcClient: BtcClient,
+    mnemonic: string,
+    network: WalletNetwork,
+    psbtResult: WalletCreateFundedPsbtResult,
+): Promise<{ txid: string; fee: number }> {
+    const btcNetwork = getBtcNetwork(network);
+    const psbt = bitcoin.Psbt.fromBase64(psbtResult.psbt, { network: btcNetwork });
+
+    // Derive keys and sign each input
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    const root = HDKey.fromMasterSeed(seed);
+
+    for (let i = 0; i < psbt.inputCount; i++) {
+        const input = psbt.data.inputs[i];
+        const bip32Derivation = input.bip32Derivation;
+        if (!bip32Derivation || bip32Derivation.length === 0) {
+            throw new Error(`Input ${i}: missing BIP-32 derivation info`);
+        }
+
+        const { path } = bip32Derivation[0];
+        const child = root.derive(path);
+
+        if (!child.privateKey) {
+            throw new Error(`Input ${i}: could not derive private key at ${path}`);
+        }
+
+        const keyPair = ECPair.fromPrivateKey(child.privateKey, { network: btcNetwork });
+        psbt.signInput(i, keyPair);
+    }
+
+    // Finalize and extract
+    psbt.finalizeAllInputs();
+    const tx = psbt.extractTransaction();
+    const txid = await btcClient.sendRawTransaction(tx.toHex());
+
+    return { txid, fee: psbtResult.fee };
+}
+
 export async function sendBtc(
     btcClient: BtcClient,
     mnemonic: string,
@@ -258,40 +370,6 @@ export async function sendBtc(
         true, // include BIP-32 derivation info
     );
 
-    // Parse PSBT
-    const psbt = bitcoin.Psbt.fromBase64(psbtResult.psbt, { network: btcNetwork });
-
-    // Derive keys and sign each input
-    const seed = bip39.mnemonicToSeedSync(mnemonic);
-    const root = HDKey.fromMasterSeed(seed);
-
-    for (let i = 0; i < psbt.inputCount; i++) {
-        const input = psbt.data.inputs[i];
-
-        // Get the BIP-32 derivation path from the PSBT input
-        const bip32Derivation = input.bip32Derivation;
-        if (!bip32Derivation || bip32Derivation.length === 0) {
-            throw new Error(`Input ${i}: missing BIP-32 derivation info`);
-        }
-
-        const { path } = bip32Derivation[0];
-        const child = root.derive(path);
-
-        if (!child.privateKey) {
-            throw new Error(`Input ${i}: could not derive private key at ${path}`);
-        }
-
-        const keyPair = ECPair.fromPrivateKey(child.privateKey, { network: btcNetwork });
-        psbt.signInput(i, keyPair);
-    }
-
-    // Finalize and extract
-    psbt.finalizeAllInputs();
-    const tx = psbt.extractTransaction();
-    const txHex = tx.toHex();
-
-    // Broadcast
-    const txid = await btcClient.sendRawTransaction(txHex);
-
-    return { txid, fee: psbtResult.fee };
+    // Sign and broadcast
+    return signAndBroadcast(btcClient, mnemonic, network, psbtResult);
 }

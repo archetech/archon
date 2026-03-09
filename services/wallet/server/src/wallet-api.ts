@@ -18,6 +18,8 @@ import {
     estimateFee,
     getWalletStatus,
     sendBtc,
+    anchorData,
+    bumpTransactionFee,
 } from './btc-wallet.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -223,6 +225,49 @@ async function main() {
             res.json({ ...result, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to send BTC');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Anchor OP_RETURN data
+    v1router.post('/wallet/anchor', requireAdminKey, async (req, res) => {
+        try {
+            const { data, feeRate } = req.body;
+
+            if (!data || typeof data !== 'string') {
+                res.status(400).json({ error: 'Missing or invalid "data" string' });
+                return;
+            }
+
+            if (Buffer.from(data, 'utf8').length > 80) {
+                res.status(400).json({ error: 'OP_RETURN data exceeds 80 byte limit' });
+                return;
+            }
+
+            const mnemonic = await fetchMnemonic();
+            const result = await anchorData(btcClient, mnemonic, config.network, data, feeRate);
+            res.json({ ...result, network: config.network });
+        } catch (error: any) {
+            logger.error({ err: error }, 'Failed to anchor data');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // RBF fee bump
+    v1router.post('/wallet/bump-fee', requireAdminKey, async (req, res) => {
+        try {
+            const { txid, feeRate } = req.body;
+
+            if (!txid || typeof txid !== 'string') {
+                res.status(400).json({ error: 'Missing or invalid "txid"' });
+                return;
+            }
+
+            const mnemonic = await fetchMnemonic();
+            const result = await bumpTransactionFee(btcClient, mnemonic, config.network, txid, feeRate);
+            res.json({ ...result, network: config.network });
+        } catch (error: any) {
+            logger.error({ err: error }, 'Failed to bump fee');
             res.status(500).json({ error: error.message });
         }
     });
