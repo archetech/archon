@@ -43,6 +43,16 @@ function deriveAccountKey(mnemonic: string, network: WalletNetwork): HDKey {
     return root.derive(`m/84'/${coinType}'/0'`);
 }
 
+function getMasterFingerprint(mnemonic: string, network: WalletNetwork): string {
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    const versions = getHDKeyVersions(network);
+    const root = HDKey.fromMasterSeed(seed, versions);
+    // Fingerprint is first 4 bytes of HASH160(pubkey), hdkey stores it as a uint32
+    const buf = Buffer.alloc(4);
+    buf.writeUInt32BE(root.fingerprint);
+    return buf.toString('hex');
+}
+
 export function getXpub(mnemonic: string, network: WalletNetwork): string {
     const account = deriveAccountKey(mnemonic, network);
     return account.publicExtendedKey;
@@ -105,9 +115,13 @@ export async function setupWatchOnlyWallet(
         };
     }
 
-    // Get checksummed descriptors from bitcoind
-    const extDesc = `wpkh(${xpub}/0/*)`;
-    const intDesc = `wpkh(${xpub}/1/*)`;
+    // Build descriptors with key origin info so PSBTs include full derivation paths
+    const fingerprint = getMasterFingerprint(mnemonic, network);
+    const coinType = getCoinType(network);
+    const origin = `${fingerprint}/84h/${coinType}h/0h`;
+
+    const extDesc = `wpkh([${origin}]${xpub}/0/*)`;
+    const intDesc = `wpkh([${origin}]${xpub}/1/*)`;
 
     const extInfo: DescriptorInfoResult = await btcClient.getDescriptorInfo(extDesc);
     const intInfo: DescriptorInfoResult = await btcClient.getDescriptorInfo(intDesc);
