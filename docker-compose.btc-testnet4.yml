@@ -4,6 +4,34 @@ services:
     volumes:
       - ./data/btc-testnet4:/root/.bitcoin
 
+  btc-testnet4-wallet:
+    build:
+      context: .
+      dockerfile: Dockerfile.wallet
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/wallet
+    environment:
+      - ARCHON_WALLET_PORT=4244
+      - ARCHON_WALLET_METRICS_PORT=4245
+      - ARCHON_WALLET_NETWORK=testnet4
+      - ARCHON_WALLET_BTC_HOST=btc-testnet4-node
+      - ARCHON_WALLET_BTC_PORT=48332
+      - ARCHON_WALLET_BTC_USER=${ARCHON_BTC_T4_USER}
+      - ARCHON_WALLET_BTC_PASS=${ARCHON_BTC_T4_PASS}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "127.0.0.1:4244:4244"
+      - "127.0.0.1:4245:4245"
+    depends_on:
+      btc-testnet4-node:
+        condition: service_started
+      keymaster:
+        condition: service_started
+
   btc-testnet4-mediator:
     build:
       context: .
@@ -25,7 +53,7 @@ services:
       - ARCHON_SAT_START_BLOCK=${ARCHON_BTC_T4_START_BLOCK}
       - ARCHON_SAT_USER=${ARCHON_BTC_T4_USER}
       - ARCHON_SAT_PASS=${ARCHON_BTC_T4_PASS}
-      - ARCHON_SAT_WALLET=${ARCHON_BTC_T4_WALLET}
+      - ARCHON_WALLET_URL=http://btc-testnet4-wallet:4244
       - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_BTC_T4_IMPORT_INTERVAL}
       - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_BTC_T4_EXPORT_INTERVAL}
       - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_BTC_T4_FEE_BLOCK_TARGET}
@@ -41,3 +69,4 @@ services:
       - btc-testnet4-node
       - gatekeeper
       - keymaster
+      - btc-testnet4-wallet

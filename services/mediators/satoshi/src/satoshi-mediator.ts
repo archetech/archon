@@ -754,13 +754,18 @@ async function waitForChain() {
         return false;
     }
 
-    try {
-        const { balance } = await walletGetBalance();
-        const address = await walletGetAddress();
-        console.log(`Wallet balance: ${balance}, funding address: ${address}`);
-    } catch (error) {
-        console.error('Wallet service not accessible:', error);
-        return false;
+    let walletReady = false;
+    console.log(`Connecting to wallet service at ${config.walletURL}`);
+    while (!walletReady) {
+        try {
+            const { balance } = await walletGetBalance();
+            const address = await walletGetAddress();
+            console.log(`Wallet balance: ${balance}, funding address: ${address}`);
+            walletReady = true;
+        } catch (error) {
+            console.log(`Waiting for wallet service...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
     }
 
     return true;

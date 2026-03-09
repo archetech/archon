@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export type WalletNetwork = 'mainnet' | 'signet';
+export type WalletNetwork = 'mainnet' | 'signet' | 'testnet4';
 
 export interface AppConfig {
     port: number;
@@ -26,6 +26,8 @@ function toNetwork(name: string | undefined): WalletNetwork {
     case 'signet':
     case undefined:
         return 'signet';
+    case 'testnet4':
+        return 'testnet4';
     default:
         throw new Error(`Unsupported network "${name}"`);
     }

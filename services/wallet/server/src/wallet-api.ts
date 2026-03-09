@@ -118,6 +118,35 @@ async function main() {
 
     const btcClient = createBtcClient();
 
+    // Auto-setup: create watch-only wallet on startup
+    const maxRetries = 12;
+    let walletReady = false;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const mnemonic = await fetchMnemonic();
+            const result = await setupWatchOnlyWallet(btcClient, mnemonic, config.network);
+            logger.info({ ...result }, 'Watch-only wallet ready');
+            walletReady = true;
+            break;
+        } catch (error: any) {
+            // Fatal: bitcoind lacks sqlite support — descriptor wallets won't work
+            if (error.message?.includes('sqlite')) {
+                logger.error(`Bitcoin node does not support descriptor wallets: ${error.message}`);
+                logger.error('Upgrade Bitcoin Core to a build with sqlite support');
+                break;
+            }
+            if (attempt === maxRetries) {
+                logger.error({ err: error }, `Wallet setup failed after ${maxRetries} attempts, starting without wallet`);
+                break;
+            }
+            logger.warn(`Wallet setup attempt ${attempt}/${maxRetries} failed: ${error.message}. Retrying in 10s...`);
+            await new Promise(resolve => setTimeout(resolve, 10000));
+        }
+    }
+    if (!walletReady) {
+        logger.warn('Wallet service starting without an active watch-only wallet');
+    }
+
     // Health / version
     v1router.get('/wallet/version', (_req, res) => {
         res.json({ version: serviceVersion, commit: serviceCommit });

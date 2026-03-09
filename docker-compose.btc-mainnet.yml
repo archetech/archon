@@ -1,4 +1,30 @@
 services:
+  btc-mainnet-wallet:
+    build:
+      context: .
+      dockerfile: Dockerfile.wallet
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/wallet
+    environment:
+      - ARCHON_WALLET_PORT=4242
+      - ARCHON_WALLET_METRICS_PORT=4243
+      - ARCHON_WALLET_NETWORK=mainnet
+      - ARCHON_WALLET_BTC_HOST=${ARCHON_BTC_HOST}
+      - ARCHON_WALLET_BTC_PORT=8332
+      - ARCHON_WALLET_BTC_USER=${ARCHON_BTC_USER}
+      - ARCHON_WALLET_BTC_PASS=${ARCHON_BTC_PASS}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "127.0.0.1:4242:4242"
+      - "127.0.0.1:4243:4243"
+    depends_on:
+      keymaster:
+        condition: service_started
+
   btc-mainnet-mediator:
     build:
       context: .
@@ -20,7 +46,7 @@ services:
       - ARCHON_SAT_START_BLOCK=${ARCHON_BTC_START_BLOCK}
       - ARCHON_SAT_USER=${ARCHON_BTC_USER}
       - ARCHON_SAT_PASS=${ARCHON_BTC_PASS}
-      - ARCHON_SAT_WALLET=${ARCHON_BTC_WALLET}
+      - ARCHON_WALLET_URL=http://btc-mainnet-wallet:4242
       - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_BTC_IMPORT_INTERVAL}
       - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_BTC_EXPORT_INTERVAL}
       - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_BTC_FEE_BLOCK_TARGET}
@@ -38,3 +64,4 @@ services:
     depends_on:
       - gatekeeper
       - keymaster
+      - btc-mainnet-wallet

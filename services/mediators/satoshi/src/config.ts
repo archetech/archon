@@ -16,7 +16,6 @@ export interface AppConfig {
     network: NetworkName;
     host: string;
     port: number;
-    wallet?: string;
     user?: string;
     pass?: string;
     importInterval: number;
@@ -87,7 +86,6 @@ const config: AppConfig = {
     network: toNetwork(process.env.ARCHON_SAT_NETWORK),
     host: process.env.ARCHON_SAT_HOST || 'localhost',
     port: process.env.ARCHON_SAT_PORT ? parseInt(process.env.ARCHON_SAT_PORT) : 8332,
-    wallet: process.env.ARCHON_SAT_WALLET,
     user: process.env.ARCHON_SAT_USER,
     pass: process.env.ARCHON_SAT_PASS,
     importInterval: process.env.ARCHON_SAT_IMPORT_INTERVAL ? parseInt(process.env.ARCHON_SAT_IMPORT_INTERVAL) : 0,
