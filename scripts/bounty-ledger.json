@@ -1,0 +1,19 @@
+{
+  "payouts": [
+    {
+      "round": 1,
+      "number": 1,
+      "name": "scully",
+      "did": "did:cid:bagaaiera74pyqt2sftbsaco4yy73z4y4zxrnnrk24aadkr77xsdg3btgsfvq",
+      "amount": 100,
+      "date": "2026-03-09T15:06:00.657Z",
+      "paymentHash": "01c8bd10191e7bf2123e9c65148dad2634d3097f7262256c09ac04b5524f47c1",
+      "checkResult": {
+        "paid": true,
+        "preimage": "1fbcab4b36880ef689df9786b018dd9b9e9f1dd73cf5b3e0aa07dbcf65a34acc",
+        "paymentHash": "01c8bd10191e7bf2123e9c65148dad2634d3097f7262256c09ac04b5524f47c1"
+      }
+    }
+  ],
+  "totalPaid": 100
+}
