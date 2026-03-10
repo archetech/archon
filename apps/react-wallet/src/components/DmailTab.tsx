@@ -598,7 +598,7 @@ const DmailTab: React.FC = () => {
             }
 
             // Create a Blob from the buffer
-            const blob = new Blob([buffer]);
+            const blob = new Blob([new Uint8Array(buffer)]);
             // Create a temporary link to trigger the download
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
