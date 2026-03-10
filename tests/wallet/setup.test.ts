@@ -30,8 +30,6 @@ async function setupWatchOnlyWallet(
     walletName: string,
     gapLimit: number,
 ): Promise<{ walletName: string; descriptors: string[] }> {
-    const xpub = getXpub(mnemonic, network);
-
     try {
         await btcClient.command('createwallet', walletName, true, true, '', false, true);
     } catch (err: any) {
