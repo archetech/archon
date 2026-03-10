@@ -1,4 +1,4 @@
-import BtcClient, {Block, BlockVerbose, BlockHeader, FundRawTransactionOptions, MempoolEntry} from 'bitcoin-core';
+import BtcClient, {Block, BlockVerbose, BlockHeader, MempoolEntry} from 'bitcoin-core';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import KeymasterClient from '@didcid/keymaster/client';
@@ -13,9 +13,9 @@ import { DidRegistration } from '@didcid/gatekeeper/types';
 import express from 'express';
 import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
+import axios from 'axios';
 
 const REGISTRY = config.chain;
-const SMART_FEE_MODE = "CONSERVATIVE";
 
 const READ_ONLY = config.exportInterval === 0;
 
@@ -26,8 +26,45 @@ const btcClient = new BtcClient({
     username: config.user,
     password: config.pass,
     host: `http://${config.host}:${config.port}`,
-    ...(READ_ONLY ? {} : { wallet: config.wallet }),
 });
+
+// Wallet service API helpers
+function walletHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (config.adminApiKey) {
+        headers['Authorization'] = `Bearer ${config.adminApiKey}`;
+    }
+    return headers;
+}
+
+async function walletGetBalance(): Promise<{ balance: number; unconfirmed_balance: number }> {
+    const { data } = await axios.get(`${config.walletURL}/api/v1/wallet/balance`, { headers: walletHeaders() });
+    return data;
+}
+
+async function walletGetAddress(): Promise<string> {
+    const { data } = await axios.get(`${config.walletURL}/api/v1/wallet/address`, { headers: walletHeaders() });
+    return data.address;
+}
+
+async function walletAnchor(opReturnData: string): Promise<string> {
+    const { data } = await axios.post(`${config.walletURL}/api/v1/wallet/anchor`, { data: opReturnData }, { headers: walletHeaders() });
+    return data.txid;
+}
+
+async function walletBumpFee(txid: string, feeRate?: number): Promise<string> {
+    const { data } = await axios.post(`${config.walletURL}/api/v1/wallet/bump-fee`, { txid, feeRate }, { headers: walletHeaders() });
+    return data.txid;
+}
+
+async function walletGetTransaction(txid: string): Promise<{ confirmations: number; blockhash?: string } | undefined> {
+    try {
+        const { data } = await axios.get(`${config.walletURL}/api/v1/wallet/transaction/${txid}`, { headers: walletHeaders() });
+        return data;
+    } catch {
+        return undefined;
+    }
+}
 
 let jsonPersister: MediatorDbInterface;
 let importRunning = false;
@@ -475,49 +512,15 @@ async function retryFailedImports(): Promise<void> {
 }
 
 export async function createOpReturnTxn(opReturnData: string): Promise<string | undefined> {
-    const opReturnHex = Buffer.from(opReturnData, 'utf8').toString('hex');
-
-    const raw = await btcClient.createRawTransaction([], { data: opReturnHex });
-
-    const { version } = await btcClient.getNetworkInfo();
-
-    const feeResp = await btcClient.estimateSmartFee(config.feeConf, SMART_FEE_MODE);
-    const estSatPerVByte = feeResp.feerate ? Math.ceil(feeResp.feerate * 1e5) : config.feeFallback;
-
-    const fundOpts: FundRawTransactionOptions = {
-        changeAddress: await btcClient.getNewAddress('change'),
-        changePosition: 1,
-        replaceable: true,
-    };
-
-    if (version >= 210000) {
-        fundOpts.fee_rate = estSatPerVByte;
-    } else {
-        fundOpts.feeRate = estSatPerVByte * 1e-5;
-    }
-
-    const funded = await btcClient.fundRawTransaction(raw, fundOpts);
-
-    let signedTxn;
-    try {
-        signedTxn = await btcClient.signRawTransactionWithWallet(funded.hex);
-    } catch {
-        signedTxn = await btcClient.signRawTransaction(funded.hex);
-    }
-
-    console.log(JSON.stringify(signedTxn, null, 4));
-
-    // Broadcast the transaction
-    const txid = await btcClient.sendRawTransaction(signedTxn.hex);
-
+    const txid = await walletAnchor(opReturnData);
     console.log(`Transaction broadcast with txid: ${txid}`);
     return txid;
 }
 
 async function checkPendingTransactions(txids: string[]): Promise<boolean> {
     const isMined = async (txid: string) => {
-        const tx = await btcClient.getTransaction(txid).catch(() => undefined);
-        return !!(tx && tx.blockhash);
+        const tx = await walletGetTransaction(txid);
+        return !!(tx && tx.confirmations > 0);
     };
 
     const checkPendingTxs = async (txids: string[]): Promise<number> => {
@@ -561,9 +564,6 @@ async function getEntryFromMempool(txids: string[]): Promise<{ entry: MempoolEnt
     throw new Error('RBF: Cannot find pending reveal transaction in mempool');
 }
 
-function toEightDpCeil(x: number): number {
-    return Math.ceil(x * 1e8) / 1e8;
-}
 
 async function replaceByFee(): Promise<boolean> {
     const db = await loadDb();
@@ -582,24 +582,33 @@ async function replaceByFee(): Promise<boolean> {
     }
 
     const { entry, txid } = await getEntryFromMempool(db.pending.txids);
-    const { version } = await btcClient.getNetworkInfo();
 
-    const feeResp = await btcClient.estimateSmartFee(config.feeConf, SMART_FEE_MODE);
-    const estSatPerVByte = feeResp.feerate ? Math.ceil(feeResp.feerate * 1e5) : config.feeFallback;
-    const currFeeSat = Math.round(entry.fees.modified * 1e8);
-    const curSatPerVb = Math.floor(currFeeSat / entry.vsize);
-    const targetSatPerVb = Math.max(estSatPerVByte, curSatPerVb + 1);
-    const fee_rate = version < 210000 ? toEightDpCeil(targetSatPerVb * 1e-5) : targetSatPerVb;
+    // Check if already at max fee
+    if (entry.fees.modified >= config.feeMax) {
+        console.log('RBF: Pending transaction already at max fee');
+        return true;
+    }
 
-    const result = await btcClient.bumpFee(txid, { fee_rate });
+    // Get recommended fee rate and compare with current tx fee rate
+    const currentSatPerVb = (entry.fees.base * 1e8) / entry.vsize;
+    const estimate = await btcClient.estimateSmartFee(config.feeConf, 'ECONOMICAL');
+    const estimatedBtcPerKb = estimate.feerate ?? (config.feeFallback / 1e8 * 1000);
+    const targetSatPerVb = (estimatedBtcPerKb / 1000) * 1e8;
 
-    if (result.txid) {
+    if (currentSatPerVb >= targetSatPerVb) {
+        console.log(`RBF: Current fee ${currentSatPerVb.toFixed(1)} sat/vB >= estimate ${targetSatPerVb.toFixed(1)} sat/vB, skipping bump`);
+        return true;
+    }
+
+    console.log(`RBF: Bumping fee from ${currentSatPerVb.toFixed(1)} sat/vB (estimate: ${targetSatPerVb.toFixed(1)} sat/vB)`);
+    const newTxid = await walletBumpFee(txid);
+
+    if (newTxid) {
         satoshiRbfBumps.inc();
-        const txid = result.txid;
-        console.log(`RBF: Transaction broadcast with txid: ${txid}`);
+        console.log(`RBF: Transaction broadcast with txid: ${newTxid}`);
         await jsonPersister.updateDb((db) => {
             if (db.pending?.txids) {
-                db.pending.txids.push(txid);
+                db.pending.txids.push(newTxid);
             }
         });
     }
@@ -640,16 +649,16 @@ async function anchorBatch(): Promise<void> {
 
     try {
         try {
-            const walletInfo = await btcClient.getWalletInfo();
+            const { balance } = await walletGetBalance();
 
-            if (walletInfo.balance < config.feeMax) {
-                const address = await btcClient.getNewAddress('funds', 'bech32');
-                console.log(`Wallet has insufficient funds (${walletInfo.balance}). Send ${config.chain} to ${address}`);
+            if (balance < config.feeMax) {
+                const address = await walletGetAddress();
+                console.log(`Wallet has insufficient funds (${balance}). Send ${config.chain} to ${address}`);
                 return;
             }
         }
         catch {
-            console.log(`${config.chain} node not accessible`);
+            console.log(`${config.chain} wallet service not accessible`);
             return;
         }
 
@@ -740,7 +749,7 @@ async function exportLoop(): Promise<void> {
 async function waitForChain() {
     let isReady = false;
 
-    console.log(`Connecting to ${config.chain} node on ${config.host}:${config.port} using wallet '${config.wallet}'`);
+    console.log(`Connecting to ${config.chain} node on ${config.host}:${config.port}`);
 
     while (!isReady) {
         try {
@@ -760,34 +769,25 @@ async function waitForChain() {
         return true;
     }
 
-    try {
-        await btcClient.createWallet(config.wallet!);
-        console.log(`Wallet '${config.wallet}' created successfully.`);
-    } catch (error: any) {
-        // If wallet already exists, log a message
-        if (error.message.includes("already exists")) {
-            console.log(`Wallet '${config.wallet}' already exists.`);
-        } else {
-            console.error("Error creating wallet:", error);
-            return false;
+    // Verify wallet service is accessible
+    if (!config.walletURL) {
+        console.error('ARCHON_WALLET_URL is required for export mode');
+        return false;
+    }
+
+    console.log(`Connecting to wallet service at ${config.walletURL}`);
+    while (true) {
+        try {
+            await walletGetBalance();
+            break;
+        } catch (error) {
+            console.log(`Waiting for wallet service...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
     }
-
-    try {
-        const walletInfo = await btcClient.getWalletInfo();
-        console.log("Wallet Info:", JSON.stringify(walletInfo, null, 4));
-    } catch (error) {
-        console.error("Error fetching wallet info:", error);
-        return false;
-    }
-
-    try {
-        const address = await btcClient.getNewAddress('funds', 'bech32');
-        console.log(`Send ${config.chain} to address: ${address}`);
-    } catch (error) {
-        console.error("Error generating new address:", error);
-        return false;
-    }
+    const { balance } = await walletGetBalance();
+    const address = await walletGetAddress();
+    console.log(`Wallet balance: ${balance}, funding address: ${address}`);
 
     return true;
 }
@@ -894,7 +894,7 @@ async function main() {
 
     if (!READ_ONLY) {
         console.log(`Exporting operations every ${config.exportInterval} minute(s)`);
-        console.log(`Txn fees (${config.chain}): conf target: ${config.feeConf}, maximum: ${config.feeMax}, fallback Sat/Byte: ${config.feeFallback}`);
+        console.log(`Wallet service: ${config.walletURL}`);
         setTimeout(exportLoop, config.exportInterval * 60 * 1000);
     }
 }

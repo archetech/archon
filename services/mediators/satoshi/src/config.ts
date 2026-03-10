@@ -11,11 +11,11 @@ export interface AppConfig {
     adminApiKey?: string;
     gatekeeperURL: string;
     keymasterURL?: string;
+    walletURL?: string;
     chain: ChainName;
     network: NetworkName;
     host: string;
     port: number;
-    wallet?: string;
     user?: string;
     pass?: string;
     importInterval: number;
@@ -81,11 +81,11 @@ const config: AppConfig = {
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY,
     gatekeeperURL: process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224',
     keymasterURL: process.env.ARCHON_KEYMASTER_URL,
+    walletURL: process.env.ARCHON_WALLET_URL,
     chain: toChain(process.env.ARCHON_SAT_CHAIN),
     network: toNetwork(process.env.ARCHON_SAT_NETWORK),
     host: process.env.ARCHON_SAT_HOST || 'localhost',
     port: process.env.ARCHON_SAT_PORT ? parseInt(process.env.ARCHON_SAT_PORT) : 8332,
-    wallet: process.env.ARCHON_SAT_WALLET,
     user: process.env.ARCHON_SAT_USER,
     pass: process.env.ARCHON_SAT_PASS,
     importInterval: process.env.ARCHON_SAT_IMPORT_INTERVAL ? parseInt(process.env.ARCHON_SAT_IMPORT_INTERVAL) : 0,
