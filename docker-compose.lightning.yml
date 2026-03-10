@@ -20,6 +20,7 @@ services:
       - LOG_LEVEL=${ARCHON_CLN_LOG_LEVEL:-info}
     volumes:
       - ./data/cln-mainnet:/data/lightning
+      - ./data/cln-mainnet/tor:/var/lib/tor
     networks:
       default:
         aliases:
@@ -221,3 +222,4 @@ services:
         condition: service_completed_successfully
       cln-mainnet-node:
         condition: service_started
+
