@@ -589,7 +589,19 @@ async function replaceByFee(): Promise<boolean> {
         return true;
     }
 
-    const newTxid = await walletBumpFee(txid);
+    // Get recommended fee rate and compare with current tx fee rate
+    const currentSatPerVb = (entry.fees.base * 1e8) / entry.vsize;
+    const estimate = await btcClient.estimateSmartFee(config.feeConf, 'ECONOMICAL');
+    const estimatedBtcPerKb = estimate.feerate ?? (config.feeFallback / 1e8 * 1000);
+    const targetSatPerVb = (estimatedBtcPerKb / 1000) * 1e8;
+
+    if (currentSatPerVb >= targetSatPerVb) {
+        console.log(`RBF: Current fee ${currentSatPerVb.toFixed(1)} sat/vB >= estimate ${targetSatPerVb.toFixed(1)} sat/vB, skipping bump`);
+        return true;
+    }
+
+    console.log(`RBF: Bumping fee from ${currentSatPerVb.toFixed(1)} to ${targetSatPerVb.toFixed(1)} sat/vB`);
+    const newTxid = await walletBumpFee(txid, targetSatPerVb);
 
     if (newTxid) {
         satoshiRbfBumps.inc();
