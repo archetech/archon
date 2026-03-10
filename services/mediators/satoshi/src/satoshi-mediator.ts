@@ -600,8 +600,8 @@ async function replaceByFee(): Promise<boolean> {
         return true;
     }
 
-    console.log(`RBF: Bumping fee from ${currentSatPerVb.toFixed(1)} to ${targetSatPerVb.toFixed(1)} sat/vB`);
-    const newTxid = await walletBumpFee(txid, targetSatPerVb);
+    console.log(`RBF: Bumping fee from ${currentSatPerVb.toFixed(1)} sat/vB (estimate: ${targetSatPerVb.toFixed(1)} sat/vB)`);
+    const newTxid = await walletBumpFee(txid);
 
     if (newTxid) {
         satoshiRbfBumps.inc();
