@@ -1,10 +1,10 @@
 {
-    "height": 940417,
-    "time": "2026-03-12T16:58:44.000Z",
-    "blockCount": 940417,
-    "blocksScanned": 6418,
+    "height": 940147,
+    "time": "2026-03-10T17:57:41.000Z",
+    "blockCount": 940147,
+    "blocksScanned": 6148,
     "blocksPending": 0,
-    "txnsScanned": 19779434,
+    "txnsScanned": 18930218,
     "registered": [
         {
             "did": "did:cid:bagaaierax7pa5nqcur6y7w5sciggm7xadjzdieapcma6vft6xocoorzmtxra",
@@ -45,34 +45,6 @@
         {
             "did": "did:cid:bagaaiera7crwdv2tzkwrlz7cttxydj3sm7hpcmewyrkh7lxdeb2tcf3k7qba",
             "txid": "ccc84b27f33b5439d1beac5029602fa0272b149f3b78c02b8a7bb94cf893d7be"
-        },
-        {
-            "did": "did:cid:bagaaieraptvi3z4xj4s2y5mpucfh5t6is7jmdaq5ffayotolopwsdlaffjfa",
-            "txid": "8af252152543a6171d8caec3f9e42f6eb2887724713609d90a49979c4715dd19"
-        },
-        {
-            "did": "did:cid:bagaaieraciwxi7fxjsrdak4rmjfjm5kixvkvblgwk5dnu4afs6mnm5jmw6uq",
-            "txid": "fb71fda2f1077f95489db163156f556812923e735aa3d58e018dd13a81bb99ff"
-        },
-        {
-            "did": "did:cid:bagaaierayovsofj2h5m3ssotubh4vhmhvaom4wo4fxp6bjg2klqffgsfxkza",
-            "txid": "0466b6e461b2055c201dc79d9a03c871f0756f6534cec642e795eacf975d948b"
-        },
-        {
-            "did": "did:cid:bagaaierav5ysbdeisfgaxtoy26u5a4aoi5wnlqvy4ozziuiqjtx6m7b2ebba",
-            "txid": "8680dda182169f3c2000fc53f5344f9b742e5ae157b128d9a3dcc4c09a04112a"
-        },
-        {
-            "did": "did:cid:bagaaierarabmlh76d2wvfwombittqxaoaydovhgbwnmakviei3ltepdybvya",
-            "txid": "063651c515f721d40ac38118d944d61627c1c3bd50f40518e1514993efb48513"
-        },
-        {
-            "did": "did:cid:bagaaieran7s4sw3crskzdj5k74zfgsujobhncirgsns6axkxly5lozrw7ahq",
-            "txid": "4d9dd759cf86fa11d38bf0ab8c0d63cd415e5c93d900a0ffdba0e3b4997ae419"
-        },
-        {
-            "did": "did:cid:bagaaieracssm3rj7dm7vb3ht3oatz24zqx3ndqb4secr6wn5kpx2xr6ef7oq",
-            "txid": "96e555227edb2d902ed052a36680fa324f8291d73dc92c0ef049dfe61fdc14cc"
         }
     ],
     "discovered": [
@@ -507,111 +479,13 @@
                 "total": 2
             },
             "processed": {
-                "added": 0,
-                "merged": 2,
+                "added": 2,
+                "merged": 0,
                 "rejected": 0,
                 "pending": 0
             }
-        },
-        {
-            "height": 940154,
-            "index": 50,
-            "time": "2026-03-10T19:19:05.000Z",
-            "txid": "ee625180dd78255ddd0e0e94357a0da454b7662d34c9ffe030693fed39bf1bd2",
-            "did": "did:cid:bagaaieraptvi3z4xj4s2y5mpucfh5t6is7jmdaq5ffayotolopwsdlaffjfa",
-            "imported": {
-                "queued": 2,
-                "processed": 0,
-                "rejected": 0,
-                "total": 2
-            },
-            "processed": {
-                "added": 0,
-                "merged": 2,
-                "rejected": 0,
-                "pending": 0
-            }
-        },
-        {
-            "height": 940294,
-            "index": 3022,
-            "time": "2026-03-11T18:08:43.000Z",
-            "txid": "0466b6e461b2055c201dc79d9a03c871f0756f6534cec642e795eacf975d948b",
-            "did": "did:cid:bagaaierayovsofj2h5m3ssotubh4vhmhvaom4wo4fxp6bjg2klqffgsfxkza",
-            "imported": {
-                "queued": 2,
-                "processed": 0,
-                "rejected": 0,
-                "total": 2
-            },
-            "processed": {
-                "added": 0,
-                "merged": 2,
-                "rejected": 0,
-                "pending": 0
-            }
-        },
-        {
-            "height": 940299,
-            "index": 2492,
-            "time": "2026-03-11T18:56:31.000Z",
-            "txid": "8680dda182169f3c2000fc53f5344f9b742e5ae157b128d9a3dcc4c09a04112a",
-            "did": "did:cid:bagaaierav5ysbdeisfgaxtoy26u5a4aoi5wnlqvy4ozziuiqjtx6m7b2ebba",
-            "imported": {
-                "queued": 2,
-                "processed": 0,
-                "rejected": 0,
-                "total": 2
-            },
-            "processed": {
-                "added": 0,
-                "merged": 1,
-                "rejected": 0,
-                "pending": 1
-            },
-            "error": "No progress: 1 pending event(s) unresolved"
-        },
-        {
-            "height": 940310,
-            "index": 106,
-            "time": "2026-03-11T21:29:08.000Z",
-            "txid": "987d4569e0990917b7079d11225e83edace83e789dd7e95da06dd737c9be4e49",
-            "did": "did:cid:bagaaieran7s4sw3crskzdj5k74zfgsujobhncirgsns6axkxly5lozrw7ahq",
-            "imported": {
-                "queued": 1,
-                "processed": 0,
-                "rejected": 0,
-                "total": 2
-            },
-            "processed": {
-                "added": 0,
-                "merged": 1,
-                "rejected": 0,
-                "pending": 1
-            },
-            "error": "No progress: 1 pending event(s) unresolved"
-        },
-        {
-            "height": 940337,
-            "index": 783,
-            "time": "2026-03-12T02:36:31.000Z",
-            "txid": "96e555227edb2d902ed052a36680fa324f8291d73dc92c0ef049dfe61fdc14cc",
-            "did": "did:cid:bagaaieracssm3rj7dm7vb3ht3oatz24zqx3ndqb4secr6wn5kpx2xr6ef7oq",
-            "imported": {
-                "queued": 1,
-                "processed": 0,
-                "rejected": 0,
-                "total": 2
-            },
-            "processed": {
-                "added": 0,
-                "merged": 1,
-                "rejected": 0,
-                "pending": 1
-            },
-            "error": "No progress: 1 pending event(s) unresolved"
         }
     ],
-    "lastExport": "2026-03-12T02:35:46.564Z",
-    "hash": "00000000000000000000ef31222c6fa96d96e5980daae9283f43c8b7010ccaa9"
+    "lastExport": "2026-03-10T16:18:52.960Z",
+    "hash": "00000000000000000000c4875570bee26bdffd6744fcafab09320c9229229c16"
 }
