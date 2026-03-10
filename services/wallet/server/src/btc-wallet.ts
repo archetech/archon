@@ -174,8 +174,18 @@ export async function getBalance(btcClient: BtcClient): Promise<{
     };
 }
 
+let cachedReceiveAddress: string | null = null;
+
 export async function getReceiveAddress(btcClient: BtcClient): Promise<string> {
-    return btcClient.getNewAddress('receive', 'bech32');
+    if (cachedReceiveAddress) {
+        const received = await btcClient.command('getreceivedbyaddress', cachedReceiveAddress, 0);
+        if (received === 0) {
+            return cachedReceiveAddress;
+        }
+    }
+
+    cachedReceiveAddress = await btcClient.getNewAddress('receive', 'bech32');
+    return cachedReceiveAddress;
 }
 
 export async function getTransactions(
