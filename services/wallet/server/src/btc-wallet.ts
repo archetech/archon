@@ -16,46 +16,15 @@ import BtcClient, {
 } from 'bitcoin-core';
 import config from './config.js';
 import type { WalletNetwork } from './config.js';
+import { getXpub, buildDescriptors } from './derivation.js';
+
+export { getXpub } from './derivation.js';
 
 const ECPair = ECPairFactory(ecc);
 bitcoin.initEccLib(ecc);
 
 function getBtcNetwork(network: WalletNetwork): bitcoin.Network {
     return network === 'mainnet' ? bitcoin.networks.bitcoin : bitcoin.networks.testnet;
-}
-
-function getCoinType(network: WalletNetwork): number {
-    return network === 'mainnet' ? 0 : 1;
-}
-
-const MAINNET_VERSIONS = { private: 0x0488ADE4, public: 0x0488B21E }; // xprv / xpub
-const TESTNET_VERSIONS = { private: 0x04358394, public: 0x043587CF }; // tprv / tpub
-
-function getHDKeyVersions(network: WalletNetwork) {
-    return network === 'mainnet' ? MAINNET_VERSIONS : TESTNET_VERSIONS;
-}
-
-function deriveAccountKey(mnemonic: string, network: WalletNetwork): HDKey {
-    const seed = bip39.mnemonicToSeedSync(mnemonic);
-    const versions = getHDKeyVersions(network);
-    const root = HDKey.fromMasterSeed(seed, versions);
-    const coinType = getCoinType(network);
-    return root.derive(`m/84'/${coinType}'/0'`);
-}
-
-function getMasterFingerprint(mnemonic: string, network: WalletNetwork): string {
-    const seed = bip39.mnemonicToSeedSync(mnemonic);
-    const versions = getHDKeyVersions(network);
-    const root = HDKey.fromMasterSeed(seed, versions);
-    // Fingerprint is first 4 bytes of HASH160(pubkey), hdkey stores it as a uint32
-    const buf = Buffer.alloc(4);
-    buf.writeUInt32BE(root.fingerprint);
-    return buf.toString('hex');
-}
-
-export function getXpub(mnemonic: string, network: WalletNetwork): string {
-    const account = deriveAccountKey(mnemonic, network);
-    return account.publicExtendedKey;
 }
 
 export function createBtcClient(): BtcClient {
@@ -116,15 +85,10 @@ export async function setupWatchOnlyWallet(
     }
 
     // Build descriptors with key origin info so PSBTs include full derivation paths
-    const fingerprint = getMasterFingerprint(mnemonic, network);
-    const coinType = getCoinType(network);
-    const origin = `${fingerprint}/84h/${coinType}h/0h`;
+    const descs = buildDescriptors(mnemonic, network);
 
-    const extDesc = `wpkh([${origin}]${xpub}/0/*)`;
-    const intDesc = `wpkh([${origin}]${xpub}/1/*)`;
-
-    const extInfo: DescriptorInfoResult = await btcClient.getDescriptorInfo(extDesc);
-    const intInfo: DescriptorInfoResult = await btcClient.getDescriptorInfo(intDesc);
+    const extInfo: DescriptorInfoResult = await btcClient.getDescriptorInfo(descs.external);
+    const intInfo: DescriptorInfoResult = await btcClient.getDescriptorInfo(descs.internal);
 
     // Only import missing descriptors
     const requests: ImportDescriptorRequest[] = [];
