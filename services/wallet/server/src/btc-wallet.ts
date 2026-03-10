@@ -16,7 +16,7 @@ import BtcClient, {
 } from 'bitcoin-core';
 import config from './config.js';
 import type { WalletNetwork } from './config.js';
-import { getXpub, buildDescriptors } from './derivation.js';
+import { buildDescriptors } from './derivation.js';
 
 export { getXpub } from './derivation.js';
 
@@ -41,8 +41,6 @@ export async function setupWatchOnlyWallet(
     mnemonic: string,
     network: WalletNetwork,
 ): Promise<{ walletName: string; descriptors: string[] }> {
-    const xpub = getXpub(mnemonic, network);
-
     // Create a blank watch-only descriptor wallet
     // createwallet args: name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
     try {
@@ -205,7 +203,6 @@ export async function anchorData(
     data: string,
     feeRate?: number,
 ): Promise<{ txid: string; fee: number }> {
-    const btcNetwork = getBtcNetwork(network);
     const opReturnHex = Buffer.from(data, 'utf8').toString('hex');
 
     // Create funded PSBT with OP_RETURN output
