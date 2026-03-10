@@ -191,6 +191,16 @@ async function main() {
         try {
             const count = req.query.count ? parseInt(req.query.count as string) : 10;
             const skip = req.query.skip ? parseInt(req.query.skip as string) : 0;
+
+            if (!Number.isFinite(count) || count < 1) {
+                res.status(400).json({ error: 'Invalid "count" parameter' });
+                return;
+            }
+            if (!Number.isFinite(skip) || skip < 0) {
+                res.status(400).json({ error: 'Invalid "skip" parameter' });
+                return;
+            }
+
             const transactions = await getTransactions(btcClient, count, skip);
             res.json({ transactions, network: config.network });
         } catch (error: any) {
@@ -203,6 +213,12 @@ async function main() {
     v1router.get('/wallet/utxos', requireAdminKey, async (req, res) => {
         try {
             const minconf = req.query.minconf ? parseInt(req.query.minconf as string) : 1;
+
+            if (!Number.isFinite(minconf) || minconf < 0) {
+                res.status(400).json({ error: 'Invalid "minconf" parameter' });
+                return;
+            }
+
             const utxos = await getUtxos(btcClient, minconf);
             res.json({ utxos, network: config.network });
         } catch (error: any) {
@@ -215,6 +231,12 @@ async function main() {
     v1router.get('/wallet/fee-estimate', requireAdminKey, async (req, res) => {
         try {
             const blocks = req.query.blocks ? parseInt(req.query.blocks as string) : undefined;
+
+            if (blocks !== undefined && (!Number.isFinite(blocks) || blocks < 1)) {
+                res.status(400).json({ error: 'Invalid "blocks" parameter' });
+                return;
+            }
+
             const estimate = await estimateFee(btcClient, blocks);
             res.json({ ...estimate, network: config.network });
         } catch (error: any) {
@@ -244,7 +266,7 @@ async function main() {
                 return;
             }
 
-            if (!amount || typeof amount !== 'number' || amount <= 0) {
+            if (!Number.isFinite(amount) || amount <= 0) {
                 res.status(400).json({ error: 'Missing or invalid "amount" (BTC)' });
                 return;
             }
@@ -278,6 +300,27 @@ async function main() {
             res.json({ ...result, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to anchor data');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Transaction status (uses wallet's gettransaction which works without txindex)
+    v1router.get('/wallet/transaction/:txid', requireAdminKey, async (req, res) => {
+        try {
+            const tx = await btcClient.command('gettransaction', req.params.txid, true) as any;
+            res.json({
+                txid: tx.txid,
+                confirmations: tx.confirmations,
+                blockhash: tx.blockhash,
+                fee: tx.fee,
+                network: config.network,
+            });
+        } catch (error: any) {
+            if (error.message?.includes('Invalid or non-wallet transaction')) {
+                res.status(404).json({ error: 'Transaction not found in wallet' });
+                return;
+            }
+            logger.error({ err: error }, 'Failed to get transaction');
             res.status(500).json({ error: error.message });
         }
     });

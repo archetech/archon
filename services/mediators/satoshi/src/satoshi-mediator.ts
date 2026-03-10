@@ -57,6 +57,15 @@ async function walletBumpFee(txid: string, feeRate?: number): Promise<string> {
     return data.txid;
 }
 
+async function walletGetTransaction(txid: string): Promise<{ confirmations: number; blockhash?: string } | undefined> {
+    try {
+        const { data } = await axios.get(`${config.walletURL}/api/v1/wallet/transaction/${txid}`, { headers: walletHeaders() });
+        return data;
+    } catch {
+        return undefined;
+    }
+}
+
 let jsonPersister: MediatorDbInterface;
 let importRunning = false;
 let exportRunning = false;
@@ -510,8 +519,8 @@ export async function createOpReturnTxn(opReturnData: string): Promise<string | 
 
 async function checkPendingTransactions(txids: string[]): Promise<boolean> {
     const isMined = async (txid: string) => {
-        const tx = await btcClient.getRawTransaction(txid, 1).catch(() => undefined) as any;
-        return !!(tx && tx.blockhash);
+        const tx = await walletGetTransaction(txid);
+        return !!(tx && tx.confirmations > 0);
     };
 
     const checkPendingTxs = async (txids: string[]): Promise<number> => {
@@ -754,19 +763,19 @@ async function waitForChain() {
         return false;
     }
 
-    let walletReady = false;
     console.log(`Connecting to wallet service at ${config.walletURL}`);
-    while (!walletReady) {
+    while (true) {
         try {
-            const { balance } = await walletGetBalance();
-            const address = await walletGetAddress();
-            console.log(`Wallet balance: ${balance}, funding address: ${address}`);
-            walletReady = true;
+            await walletGetBalance();
+            break;
         } catch (error) {
             console.log(`Waiting for wallet service...`);
             await new Promise(resolve => setTimeout(resolve, 5000));
         }
     }
+    const { balance } = await walletGetBalance();
+    const address = await walletGetAddress();
+    console.log(`Wallet balance: ${balance}, funding address: ${address}`);
 
     return true;
 }
