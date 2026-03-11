@@ -392,13 +392,13 @@ async function scanBlocks(): Promise<void> {
 }
 
 async function importBatch(item: DiscoveredItem, retry: boolean = false) {
-    // Skip already processed items (unless retrying)
-    if (item.imported && item.processed) {
+    // Skip items with errors unless this is a retry
+    if (item.error && !retry) {
         return;
     }
 
-    // Skip items with errors unless this is a retry
-    if (item.error && !retry) {
+    // Skip already processed items (unless retrying)
+    if (item.imported && item.processed) {
         return;
     }
 
