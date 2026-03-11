@@ -27,7 +27,21 @@
         "preimage": "21d665979df66c36529cd4d5f51bf2af8b0888772a251cafffa98a4d85c938e5",
         "paymentHash": "23a6e848f0383c0083ab377f888a79c8656a303f96d90f048838e9f6cd91dfa4"
       }
+    },
+    {
+      "round": 1,
+      "number": 3,
+      "name": "Hex",
+      "did": "did:cid:bagaaierajrr7k6izcrdfwqxpgtrobflsv5oibymfnthjazkkokaugszyh4ka",
+      "amount": 100,
+      "date": "2026-03-11T17:37:31.836Z",
+      "paymentHash": "6d3fab549846e9f7b81cc125aa9f2a3e0cf1a273d005d14531e3002fb5ff230e",
+      "checkResult": {
+        "paid": true,
+        "preimage": "7fb649f686a25bdfe1ebb12b145e8adb43495a5dfa9ee93af04b309db4381b3b",
+        "paymentHash": "6d3fab549846e9f7b81cc125aa9f2a3e0cf1a273d005d14531e3002fb5ff230e"
+      }
     }
   ],
-  "totalPaid": 200
+  "totalPaid": 300
 }
