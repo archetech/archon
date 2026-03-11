@@ -13,7 +13,21 @@
         "preimage": "1fbcab4b36880ef689df9786b018dd9b9e9f1dd73cf5b3e0aa07dbcf65a34acc",
         "paymentHash": "01c8bd10191e7bf2123e9c65148dad2634d3097f7262256c09ac04b5524f47c1"
       }
+    },
+    {
+      "round": 1,
+      "number": 2,
+      "name": "GenitriX",
+      "did": "did:cid:bagaaieraxdxq4fm2kjh6yqjxjor3t2idczkmxd4v7in4u353fa6m6sms2pnq",
+      "amount": 100,
+      "date": "2026-03-11T02:06:50.966Z",
+      "paymentHash": "23a6e848f0383c0083ab377f888a79c8656a303f96d90f048838e9f6cd91dfa4",
+      "checkResult": {
+        "paid": true,
+        "preimage": "21d665979df66c36529cd4d5f51bf2af8b0888772a251cafffa98a4d85c938e5",
+        "paymentHash": "23a6e848f0383c0083ab377f888a79c8656a303f96d90f048838e9f6cd91dfa4"
+      }
     }
   ],
-  "totalPaid": 100
+  "totalPaid": 200
 }
