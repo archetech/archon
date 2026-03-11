@@ -241,6 +241,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [pollList, setPollList] = useState([]);
     const [canVote, setCanVote] = useState(false);
     const [eligiblePolls, setEligiblePolls] = useState({});
+    const [migrateTarget, setMigrateTarget] = useState('');
+    const [showMigrateDialog, setShowMigrateDialog] = useState(false);
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: "",
@@ -714,6 +716,30 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
+    function openMigrate(id) {
+        setMigrateTarget(id);
+        setRegistry('');
+        setShowMigrateDialog(true);
+    }
+
+    function closeMigrate() {
+        setShowMigrateDialog(false);
+        setMigrateTarget('');
+        setRegistry('');
+    }
+
+    async function migrateId() {
+        try {
+            const ok = await keymaster.changeRegistry(migrateTarget, registry);
+            if (ok) {
+                showSuccess(`${migrateTarget} migrated to ${registry}`);
+                closeMigrate();
+            }
+        } catch (error) {
+            showError(error);
+        }
+    }
+
     async function renameId() {
         try {
             const input = window.prompt("Please enter new name:");
@@ -904,7 +930,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function refreshNames() {
-        const aliasList = await keymaster.listAliases();
+        const aliasList = await keymaster.listAliases({ includeIDs: false });
         const names = Object.keys(aliasList);
 
         setAliasList(aliasList);
@@ -3413,6 +3439,21 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 </Alert>
             </Snackbar>
 
+            <Dialog open={showMigrateDialog} onClose={closeMigrate}>
+                <DialogTitle>Migrate {migrateTarget}</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 1 }}>
+                        <RegistrySelect />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeMigrate}>Cancel</Button>
+                    <Button variant="contained" onClick={migrateId} disabled={!registry}>
+                        Migrate
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <header className="App-header">
 
                 <h1>{title}</h1>
@@ -3532,6 +3573,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                     </Button>
                                 </Grid>
                                 <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => openMigrate(selectedId)}>
+                                        Migrate...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
                                     {nostrKeys ?
                                         <Button variant="contained" color="error" onClick={removeNostr}>
                                             Remove Nostr
@@ -3637,7 +3683,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 <RegistrySelect />
                                             </TableCell>
                                         </TableRow>
-                                        {Object.entries(aliasList).map(([alias, did], index) => (
+                                        {Object.entries(aliasList).filter(([alias]) => !idList.includes(alias)).map(([alias, did], index) => (
                                             <TableRow key={index}>
                                                 <TableCell>
                                                     {getAliasIcon(alias)}
@@ -3671,6 +3717,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 <TableCell>
                                                     <Button variant="contained" color="primary" onClick={() => transferAlias(alias)}>
                                                         Transfer
+                                                    </Button>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button variant="contained" color="primary" onClick={() => openMigrate(alias)}>
+                                                        Migrate
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>
