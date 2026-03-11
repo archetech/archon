@@ -70,10 +70,18 @@ function PropertiesTab() {
 
     // Load properties when selection changes
     useEffect(() => {
+        setEditingKey(null);
+        setEditValue("");
+        setDeleteOpen(false);
+        setDeleteKey("");
+        setNewKey("");
+        setNewValue("");
+
         if (selectedName) {
             loadProperties();
         } else {
             setProperties({});
+            setIsOwned(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedName]);

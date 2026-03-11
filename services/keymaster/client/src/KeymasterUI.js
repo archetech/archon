@@ -411,6 +411,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     }, [currentId, propsNameEntries, propsSelectedName]);
 
     useEffect(() => {
+        setPropsEditingKey(null);
+        setPropsEditValue('');
+        setPropsDeleteOpen(false);
+        setPropsDeleteKey('');
+        setPropsNewKey('');
+        setPropsNewValue('');
+
         if (propsSelectedName) {
             loadProps();
         } else {

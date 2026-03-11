@@ -596,6 +596,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }, [currentId, propsNameEntries, propsSelectedName]);
 
     useEffect(() => {
+        setPropsEditingKey(null);
+        setPropsEditValue('');
+        setPropsDeleteOpen(false);
+        setPropsDeleteKey('');
+        setPropsNewKey('');
+        setPropsNewValue('');
+
         if (propsSelectedName) {
             loadProps();
         } else {
