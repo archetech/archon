@@ -46,6 +46,43 @@ const walletVersionInfo = new Gauge({
     labelNames: ['version', 'commit'],
 });
 
+// Domain metrics
+const walletBalanceConfirmed = new Gauge({
+    name: 'wallet_balance_confirmed_btc',
+    help: 'Confirmed wallet balance in BTC',
+});
+
+const walletBalanceUnconfirmed = new Gauge({
+    name: 'wallet_balance_unconfirmed_btc',
+    help: 'Unconfirmed wallet balance in BTC',
+});
+
+const walletUtxoCount = new Gauge({
+    name: 'wallet_utxo_count',
+    help: 'Number of unspent transaction outputs',
+});
+
+const walletFeeEstimate = new Gauge({
+    name: 'wallet_fee_estimate_sat_per_vb',
+    help: 'Current fee estimate in sat/vB',
+});
+
+const walletSendsTotal = new Counter({
+    name: 'wallet_sends_total',
+    help: 'Total send operations',
+    labelNames: ['status'],
+});
+
+const walletSetupStatus = new Gauge({
+    name: 'wallet_setup_status',
+    help: 'Watch-only wallet initialization status (1=ready, 0=not ready)',
+});
+
+const walletBlockHeight = new Gauge({
+    name: 'wallet_bitcoind_block_height',
+    help: 'Current block height from bitcoind',
+});
+
 let serviceVersion = 'unknown';
 const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
 
@@ -147,6 +184,36 @@ async function main() {
         logger.warn('Wallet service starting without an active watch-only wallet');
     }
 
+    walletSetupStatus.set(walletReady ? 1 : 0);
+
+    // Periodic metrics collection (every 60s)
+    async function updateMetrics() {
+        try {
+            const balance = await getBalance(btcClient);
+            walletBalanceConfirmed.set(balance.balance);
+            walletBalanceUnconfirmed.set(balance.unconfirmed_balance);
+
+            const utxos = await getUtxos(btcClient, 0);
+            walletUtxoCount.set(utxos.length);
+
+            const fee = await estimateFee(btcClient);
+            if (fee.feerate) {
+                // feerate is BTC/kB, convert to sat/vB
+                walletFeeEstimate.set((fee.feerate / 1000) * 1e8);
+            }
+
+            const blockchainInfo = await btcClient.command('getblockcount') as number;
+            walletBlockHeight.set(blockchainInfo);
+        } catch (error: any) {
+            logger.debug({ err: error }, 'Metrics update failed');
+        }
+    }
+
+    if (walletReady) {
+        updateMetrics();
+        setInterval(updateMetrics, 60_000);
+    }
+
     // Health / version
     v1router.get('/wallet/version', (_req, res) => {
         res.json({ version: serviceVersion, commit: serviceCommit });
@@ -157,6 +224,7 @@ async function main() {
         try {
             const mnemonic = await fetchMnemonic();
             const result = await setupWatchOnlyWallet(btcClient, mnemonic, config.network);
+            walletSetupStatus.set(1);
             res.json({ ok: true, network: config.network, ...result });
         } catch (error: any) {
             logger.error({ err: error }, 'Wallet setup failed');
@@ -273,8 +341,10 @@ async function main() {
 
             const mnemonic = await fetchMnemonic();
             const result = await sendBtc(btcClient, mnemonic, config.network, to, amount, feeRate, subtractFee);
+            walletSendsTotal.inc({ status: 'success' });
             res.json({ ...result, network: config.network });
         } catch (error: any) {
+            walletSendsTotal.inc({ status: 'failed' });
             logger.error({ err: error }, 'Failed to send BTC');
             res.status(500).json({ error: error.message });
         }
@@ -297,8 +367,10 @@ async function main() {
 
             const mnemonic = await fetchMnemonic();
             const result = await anchorData(btcClient, mnemonic, config.network, data, feeRate);
+            walletSendsTotal.inc({ status: 'success' });
             res.json({ ...result, network: config.network });
         } catch (error: any) {
+            walletSendsTotal.inc({ status: 'failed' });
             logger.error({ err: error }, 'Failed to anchor data');
             res.status(500).json({ error: error.message });
         }
