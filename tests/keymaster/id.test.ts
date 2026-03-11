@@ -373,6 +373,53 @@ describe('renameId', () => {
     });
 });
 
+describe('changeRegistry', () => {
+    it('should change the registry for an existing ID', async () => {
+        const name = 'Bob';
+        const did = await keymaster.createId(name, { registry: 'local' });
+
+        const ok = await keymaster.changeRegistry(name, 'hyperswarm');
+        const doc = await keymaster.resolveDID(did);
+
+        expect(ok).toBe(true);
+        expect(doc.didDocumentRegistration!.registry).toBe('hyperswarm');
+    });
+
+    it('should return true without updating when registry is unchanged', async () => {
+        const name = 'Bob';
+        const did = await keymaster.createId(name, { registry: 'local' });
+        const docBefore = await keymaster.resolveDID(did);
+
+        const ok = await keymaster.changeRegistry(name, 'local');
+        const docAfter = await keymaster.resolveDID(did);
+
+        expect(ok).toBe(true);
+        expect(docAfter.didDocumentMetadata!.versionSequence).toBe(docBefore.didDocumentMetadata!.versionSequence);
+    });
+
+    it('should work with a raw DID instead of a name', async () => {
+        const did = await keymaster.createId('Bob', { registry: 'local' });
+
+        const ok = await keymaster.changeRegistry(did, 'hyperswarm');
+        const doc = await keymaster.resolveDID(did);
+
+        expect(ok).toBe(true);
+        expect(doc.didDocumentRegistration!.registry).toBe('hyperswarm');
+    });
+
+    it('should throw for an unsupported registry', async () => {
+        await keymaster.createId('Bob', { registry: 'local' });
+
+        try {
+            await keymaster.changeRegistry('Bob', 'BTC:mainnet');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toContain('not supported');
+        }
+    });
+});
+
 describe('setCurrentId', () => {
     it('should switch to another ID', async () => {
         const name1 = 'Bob';
