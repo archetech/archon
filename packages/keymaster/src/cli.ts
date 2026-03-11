@@ -269,19 +269,6 @@ program
     });
 
 program
-    .command('change-registry <id> <registry>')
-    .description('Changes the registry for an existing DID')
-    .action(async (id, registry) => {
-        try {
-            const ok = await keymaster.changeRegistry(id, registry);
-            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
-        }
-        catch (error: any) {
-            console.error(error.error || error.message || error);
-        }
-    });
-
-program
     .command('rename-id <oldName> <newName>')
     .description('Renames the ID')
     .action(async (oldName, newName) => {
@@ -379,6 +366,19 @@ program
         }
         catch (error: any) {
             console.error(`cannot revoke ${did}`);
+        }
+    });
+
+program
+    .command('change-registry <id> <registry>')
+    .description('Changes the registry for an existing DID')
+    .action(async (id, registry) => {
+        try {
+            const ok = await keymaster.changeRegistry(id, registry);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
         }
     });
 

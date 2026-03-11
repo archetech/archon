@@ -346,6 +346,19 @@ program
     });
 
 program
+    .command('change-registry <did> <registry>')
+    .description('Changes the registry for an existing DID')
+    .action(async (did, registry) => {
+        try {
+            const ok = await keymaster.changeRegistry(did, registry);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
     .command('revoke-did <did>')
     .description('Permanently revoke a DID')
     .action(async (did, confirm) => {
