@@ -1223,6 +1223,10 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async changeRegistry(id: string, registry: string): Promise<boolean> {
+        if (!registry) {
+            throw new InvalidParameterError('registry');
+        }
+
         const did = await this.lookupDID(id);
         const current = await this.resolveDID(did);
         const currentRegistry = current.didDocumentRegistration?.registry;
