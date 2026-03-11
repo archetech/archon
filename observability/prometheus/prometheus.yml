@@ -37,6 +37,11 @@ scrape_configs:
       - targets: ['btc-mainnet-mediator:4234']
     metrics_path: '/metrics'
 
+  - job_name: 'btc-signet-wallet'
+    static_configs:
+      - targets: ['btc-signet-wallet:4241']
+    metrics_path: '/metrics'
+
   - job_name: 'btc-signet-mediator'
     static_configs:
       - targets: ['btc-signet-mediator:4236']
