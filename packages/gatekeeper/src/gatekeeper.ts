@@ -875,10 +875,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const newRegistry = operation.doc?.didDocumentRegistration?.registry;
-        const targetRegistry = (newRegistry && newRegistry !== registry) ? newRegistry : registry;
 
-        if (targetRegistry !== registry && !this.supportedRegistries.includes(targetRegistry)) {
-            throw new InvalidOperationError(`registry ${targetRegistry} not supported`);
+        if (newRegistry && newRegistry !== registry && !this.supportedRegistries.includes(newRegistry)) {
+            throw new InvalidOperationError(`registry ${newRegistry} not supported`);
         }
 
         return this.withDidLock(operation.did, async () => {
@@ -892,7 +891,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 did: operation.did
             });
 
-            await this.queueOperation(targetRegistry, operation);
+            await this.queueOperation(registry, operation);
             await this.updateSearchIndex(operation.did!);
 
             return true;
