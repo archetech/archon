@@ -2,6 +2,16 @@
 
 A lightning zap sends sats from the user's Lightning wallet to a recipient identified by either a **DID** (Decentralized Identifier), an **alias**, or a **LUD-16 Lightning Address** (e.g. `user@domain.com`).
 
+## Recipient Addressing: DID vs LUD-16
+
+Archon supports two ways to address a Lightning recipient, which reflect different trust models.
+
+**LUD-16 Lightning Address** (`user@domain`) is a widely-adopted convention from the [LNURL specification](https://github.com/lnurl/luds/blob/luds/16.md). It is convenient — the format resembles an email address — but it inherits the trust assumptions of DNS and HTTPS. The recipient's Lightning endpoint is discoverable only because a third party (the domain operator) publishes it at a well-known URL. If the domain is compromised, redirected, or simply shut down, the address stops working.
+
+**DID-based zap** is the native Archon approach and more closely aligned with [W3C DID Core](https://www.w3.org/TR/did-core/). The recipient publishes their Lightning endpoint as a `service` entry in their DID Document — a standard W3C construct — which they control directly. Discovery goes through Gatekeeper using the DID resolution protocol, with no dependency on DNS or any centralised naming authority. The recipient can also publish a Tor onion address as their endpoint, enabling fully private, censorship-resistant payments.
+
+In short: LUD-16 is compatible and practical for interoperability with the broader Lightning ecosystem; the DID-based approach is self-sovereign and censorship-resistant.
+
 ## Overview
 
 The flow has three distinct phases:
