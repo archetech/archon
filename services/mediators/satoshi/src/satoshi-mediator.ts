@@ -397,8 +397,9 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
         return;
     }
 
-    // Skip already processed items (unless retrying)
-    if (item.imported && item.processed) {
+    // Skip fully processed items (unless retrying)
+    const isFullyProcessed = item.processed && !item.processed.busy && (item.processed.pending ?? 0) === 0;
+    if (item.imported && isFullyProcessed && !retry) {
         return;
     }
 
