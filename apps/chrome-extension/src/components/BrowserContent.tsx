@@ -12,6 +12,7 @@ import {
     Poll,
     Settings,
     Token,
+    Tune,
 } from "@mui/icons-material";
 import CredentialsTab from "./CredentialsTab";
 import WalletTab from "./WalletTab";
@@ -29,6 +30,7 @@ import AssetsTab from "./AssetsTab";
 import DmailTab from "./DmailTab";
 import LightningTab from "./LightningTab";
 import PollTab from "./PollTab";
+import PropertiesTab from "./PropertiesTab";
 
 function BrowserContent() {
     const [menuOpen, setMenuOpen] = useState<boolean>(false);
@@ -243,6 +245,17 @@ function BrowserContent() {
                                     />
                                 )}
 
+                                {displayComponent && (
+                                    <Tab
+                                        icon={<Tune />}
+                                        label={menuOpen ? "Properties" : ""}
+                                        value="properties"
+                                        iconPosition="start"
+                                        className="sidebarTab"
+                                        sx={{ gap: 0.25 }}
+                                    />
+                                )}
+
                                 {displayComponent && hasLightning && (
                                     <Tab
                                         icon={<Bolt />}
@@ -320,6 +333,12 @@ function BrowserContent() {
                             {displayComponent && (
                                 <TabPanel value="polls" sx={{ p: 0 }}>
                                     <PollTab />
+                                </TabPanel>
+                            )}
+
+                            {displayComponent && (
+                                <TabPanel value="properties" sx={{ p: 0 }}>
+                                    <PropertiesTab />
                                 </TabPanel>
                             )}
 

@@ -29,6 +29,7 @@ import {
     Person,
     MoreHoriz,
     Close,
+    Tune,
 } from "@mui/icons-material";
 import CredentialsTab from "./components/CredentialsTab";
 import WalletTab from "./components/WalletTab";
@@ -48,6 +49,7 @@ import DmailTab from "./components/DmailTab";
 import LightningTab from "./components/LightningTab";
 import PollTab from "./components/PollTab";
 import AuthTab from "./components/AuthTab";
+import PropertiesTab from "./components/PropertiesTab";
 
 function BrowserContent() {
     const [moreOpen, setMoreOpen] = useState<boolean>(false);
@@ -193,6 +195,12 @@ function BrowserContent() {
             {displayComponent && (
                 <TabPanel value="aliases" sx={{ p: 0 }}>
                     <AliasedDIDs />
+                </TabPanel>
+            )}
+
+            {displayComponent && (
+                <TabPanel value="properties" sx={{ p: 0 }}>
+                    <PropertiesTab />
                 </TabPanel>
             )}
 
@@ -352,6 +360,19 @@ function BrowserContent() {
                                                         : ""
                                                 }
                                                 value="aliases"
+                                                iconPosition="start"
+                                            />
+                                        )}
+
+                                        {displayComponent && (
+                                            <Tab
+                                                icon={<Tune />}
+                                                label={
+                                                    menuOpen
+                                                        ? "Properties"
+                                                        : ""
+                                                }
+                                                value="properties"
                                                 iconPosition="start"
                                             />
                                         )}
@@ -580,6 +601,15 @@ function BrowserContent() {
                                         <ListIcon />
                                     </ListItemIcon>
                                     <ListItemText primary="Aliased DIDs" />
+                                </ListItemButton>
+
+                                <ListItemButton
+                                    onClick={() => selectFromMore("properties")}
+                                >
+                                    <ListItemIcon>
+                                        <Tune />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Properties" />
                                 </ListItemButton>
 
                                 <ListItemButton

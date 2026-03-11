@@ -77,6 +77,7 @@ import {
     Schema,
     Search,
     Token,
+    Tune,
     Unarchive,
 } from "@mui/icons-material";
 import axios from 'axios';
@@ -245,6 +246,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         message: "",
         severity: "warning",
     });
+    // Properties tab
+    const [propsSelectedName, setPropsSelectedName] = useState('');
+    const [propsData, setPropsData] = useState({});
+    const [propsIsOwned, setPropsIsOwned] = useState(false);
+    const [propsLoading, setPropsLoading] = useState(false);
+    const [propsNewKey, setPropsNewKey] = useState('');
+    const [propsNewValue, setPropsNewValue] = useState('');
+    const [propsEditingKey, setPropsEditingKey] = useState(null);
+    const [propsEditValue, setPropsEditValue] = useState('');
+    const [propsDeleteOpen, setPropsDeleteOpen] = useState(false);
+    const [propsDeleteKey, setPropsDeleteKey] = useState('');
+
     const [lightningTab, setLightningTab] = useState('wallet');
     const [lightningBalance, setLightningBalance] = useState(null);
     const [lightningIsConfigured, setLightningIsConfigured] = useState(null);
@@ -561,6 +574,109 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         } catch (error) {
             showError(error);
         }
+    }
+
+    // Properties helpers
+    const propsNameEntries = useMemo(() => {
+        const seen = new Set();
+        const entries = [];
+        for (const name of agentList || []) {
+            if (!seen.has(name)) { seen.add(name); entries.push(name); }
+        }
+        for (const name of Object.keys(aliasList || {})) {
+            if (!seen.has(name)) { seen.add(name); entries.push(name); }
+        }
+        return entries.sort((a, b) => a.localeCompare(b));
+    }, [agentList, aliasList]);
+
+    useEffect(() => {
+        if (!propsSelectedName && currentId && propsNameEntries.includes(currentId)) {
+            setPropsSelectedName(currentId);
+        }
+    }, [currentId, propsNameEntries, propsSelectedName]);
+
+    useEffect(() => {
+        setPropsEditingKey(null);
+        setPropsEditValue('');
+        setPropsDeleteOpen(false);
+        setPropsDeleteKey('');
+        setPropsNewKey('');
+        setPropsNewValue('');
+
+        if (propsSelectedName) {
+            loadProps();
+        } else {
+            setPropsData({});
+            setPropsIsOwned(false);
+        }
+        // eslint-disable-next-line
+    }, [propsSelectedName]);
+
+    async function loadProps() {
+        if (!propsSelectedName) return;
+        setPropsLoading(true);
+        try {
+            const doc = await keymaster.resolveDID(propsSelectedName);
+            setPropsData(doc.didDocumentData || {});
+            setPropsIsOwned(!!doc.didDocumentMetadata?.isOwned);
+        } catch (error) {
+            showError(error);
+            setPropsData({});
+            setPropsIsOwned(false);
+        } finally {
+            setPropsLoading(false);
+        }
+    }
+
+    async function propsAdd() {
+        if (!propsNewKey.trim()) return;
+        try {
+            let parsed;
+            try { parsed = JSON.parse(propsNewValue); } catch { parsed = propsNewValue; }
+            await keymaster.mergeData(propsSelectedName, { [propsNewKey.trim()]: parsed });
+            setPropsNewKey('');
+            setPropsNewValue('');
+            showSuccess('Property added');
+            await loadProps();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function propsSaveEdit(key) {
+        try {
+            let parsed;
+            try { parsed = JSON.parse(propsEditValue); } catch { parsed = propsEditValue; }
+            await keymaster.mergeData(propsSelectedName, { [key]: parsed });
+            setPropsEditingKey(null);
+            showSuccess('Property updated');
+            await loadProps();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function propsConfirmDelete() {
+        if (!propsDeleteKey) return;
+        try {
+            await keymaster.mergeData(propsSelectedName, { [propsDeleteKey]: null });
+            showSuccess('Property removed');
+            await loadProps();
+        } catch (error) {
+            showError(error);
+        }
+        setPropsDeleteOpen(false);
+        setPropsDeleteKey('');
+    }
+
+    function propsStartEdit(key, value) {
+        setPropsEditingKey(key);
+        setPropsEditValue(typeof value === 'string' ? value : JSON.stringify(value, null, 2));
+    }
+
+    function propsFormatValue(value) {
+        if (typeof value === 'string') return value;
+        return JSON.stringify(value);
     }
 
     async function showCreate() {
@@ -3346,6 +3462,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                         {currentId && !widget &&
                             <Tab key="polls" value="polls" label={'Polls'} icon={<Poll />} />
                         }
+                        {currentId && !widget &&
+                            <Tab key="properties" value="properties" label={'Properties'} icon={<Tune />} />
+                        }
                         {currentId && !widget && hasLightning &&
                             <Tab key="lightning" value="lightning" label={'Lightning'} icon={<Bolt />} />
                         }
@@ -4655,6 +4774,127 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         </Box>
                                     )}
                                 </Box>
+                            )}
+                        </Box>
+                    }
+                    {tab === 'properties' &&
+                        <Box sx={{ maxWidth: 700 }}>
+                            <WarningModal
+                                title="Remove Property"
+                                warningText={`Are you sure you want to remove '${propsDeleteKey}'?`}
+                                isOpen={propsDeleteOpen}
+                                onClose={() => setPropsDeleteOpen(false)}
+                                onSubmit={propsConfirmDelete}
+                            />
+                            <Box sx={{ mt: 1, mb: 2 }}>
+                                <Select
+                                    value={propsSelectedName}
+                                    onChange={(e) => setPropsSelectedName(e.target.value)}
+                                    displayEmpty
+                                    size="small"
+                                    fullWidth
+                                >
+                                    <MenuItem value="" disabled>Select a DID...</MenuItem>
+                                    {propsNameEntries.map((name) => (
+                                        <MenuItem key={name} value={name}>{name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </Box>
+                            {propsSelectedName && (
+                                <>
+                                    {propsIsOwned && (
+                                        <Box display="flex" sx={{ mb: 2, gap: 1 }}>
+                                            <TextField
+                                                label="Key"
+                                                variant="outlined"
+                                                value={propsNewKey}
+                                                onChange={(e) => setPropsNewKey(e.target.value)}
+                                                size="small"
+                                                sx={{ flex: '0 0 150px' }}
+                                            />
+                                            <TextField
+                                                label="Value"
+                                                variant="outlined"
+                                                value={propsNewValue}
+                                                onChange={(e) => setPropsNewValue(e.target.value)}
+                                                size="small"
+                                                sx={{ flex: 1 }}
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                onClick={propsAdd}
+                                                disabled={!propsNewKey.trim()}
+                                            >
+                                                Add
+                                            </Button>
+                                        </Box>
+                                    )}
+                                    {propsLoading ? (
+                                        <Typography color="text.secondary" sx={{ mt: 2 }}>Loading...</Typography>
+                                    ) : Object.keys(propsData).length === 0 ? (
+                                        <Typography color="text.secondary" sx={{ mt: 2 }}>No properties set</Typography>
+                                    ) : (
+                                        Object.entries(propsData).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => (
+                                            <Box key={key} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1, gap: 1 }}>
+                                                <Typography sx={{ flex: '0 0 150px', fontWeight: 'bold', pt: propsEditingKey === key ? 1 : 0.5, wordBreak: 'break-all' }}>
+                                                    {key}
+                                                </Typography>
+                                                {propsEditingKey === key ? (
+                                                    <Box sx={{ flex: 1, display: 'flex', gap: 0.5, alignItems: 'flex-start' }}>
+                                                        <TextField
+                                                            value={propsEditValue}
+                                                            onChange={(e) => setPropsEditValue(e.target.value)}
+                                                            size="small"
+                                                            fullWidth
+                                                            multiline
+                                                            maxRows={6}
+                                                        />
+                                                        <Tooltip title="Save">
+                                                            <IconButton size="small" onClick={() => propsSaveEdit(key)} color="primary">
+                                                                <LibraryAddCheck />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Cancel">
+                                                            <IconButton size="small" onClick={() => setPropsEditingKey(null)}>
+                                                                <Clear />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Box>
+                                                ) : (
+                                                    <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                                                        <Typography sx={{
+                                                            flex: 1,
+                                                            wordBreak: 'break-word',
+                                                            fontFamily: typeof value !== 'string' ? 'monospace' : 'inherit',
+                                                            fontSize: typeof value !== 'string' ? '0.85rem' : 'inherit',
+                                                        }}>
+                                                            {propsFormatValue(value)}
+                                                        </Typography>
+                                                        {propsIsOwned && (
+                                                            <>
+                                                                <Tooltip title="Edit">
+                                                                    <IconButton size="small" onClick={() => propsStartEdit(key, value)}>
+                                                                        <Edit />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                                <Tooltip title="Delete">
+                                                                    <IconButton size="small" onClick={() => { setPropsDeleteKey(key); setPropsDeleteOpen(true); }}>
+                                                                        <Delete />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            </>
+                                                        )}
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        ))
+                                    )}
+                                    <Box sx={{ mt: 2 }}>
+                                        <Button variant="outlined" onClick={loadProps} size="small">
+                                            Refresh
+                                        </Button>
+                                    </Box>
+                                </>
                             )}
                         </Box>
                     }
