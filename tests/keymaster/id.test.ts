@@ -418,6 +418,31 @@ describe('changeRegistry', () => {
             expect(error.message).toContain('not supported');
         }
     });
+
+    it('should throw for an empty registry', async () => {
+        await keymaster.createId('Bob', { registry: 'local' });
+
+        try {
+            await keymaster.changeRegistry('Bob', '');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.type).toBe(InvalidParameterError.type);
+        }
+    });
+
+    it('should throw for an undefined registry', async () => {
+        await keymaster.createId('Bob', { registry: 'local' });
+
+        try {
+            // @ts-expect-error Testing invalid usage, incorrect argument
+            await keymaster.changeRegistry('Bob', undefined);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.type).toBe(InvalidParameterError.type);
+        }
+    });
 });
 
 describe('setCurrentId', () => {
