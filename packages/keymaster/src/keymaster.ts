@@ -1550,6 +1550,23 @@ export default class Keymaster implements KeymasterInterface {
         return true;
     }
 
+    async changeRegistry(id: string, registry: string): Promise<boolean> {
+        const did = await this.lookupDID(id);
+        const current = await this.resolveDID(did);
+        const currentRegistry = current.didDocumentRegistration?.registry;
+
+        if (registry === currentRegistry) {
+            return true;
+        }
+
+        return this.updateDID(did, {
+            didDocumentRegistration: {
+                ...current.didDocumentRegistration!,
+                registry,
+            },
+        });
+    }
+
     async backupId(id?: string): Promise<boolean> {
         // Backs up current ID if id is not provided
         const wallet = await this.loadWallet();

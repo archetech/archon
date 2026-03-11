@@ -378,6 +378,16 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async changeRegistry(id: string, registry: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/ids/${id}/change-registry`, { registry });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async backupId(id?: string): Promise<boolean> {
         try {
             if (!id) {

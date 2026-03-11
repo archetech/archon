@@ -345,6 +345,7 @@ export interface KeymasterInterface {
     createId(name: string, options?: { registry?: string }): Promise<string>;
     removeId(id: string): Promise<boolean>;
     renameId(id: string, newName: string): Promise<boolean>;
+    changeRegistry(id: string, registry: string): Promise<boolean>;
     backupId(id?: string): Promise<boolean>;
     recoverId(did: string): Promise<string>;
 

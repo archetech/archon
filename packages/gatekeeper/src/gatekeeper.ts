@@ -874,6 +874,13 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError(`registry ${registry} not supported`);
         }
 
+        const newRegistry = operation.doc?.didDocumentRegistration?.registry;
+        const targetRegistry = (newRegistry && newRegistry !== registry) ? newRegistry : registry;
+
+        if (targetRegistry !== registry && !this.supportedRegistries.includes(targetRegistry)) {
+            throw new InvalidOperationError(`registry ${targetRegistry} not supported`);
+        }
+
         return this.withDidLock(operation.did, async () => {
             const opid = await this.generateCID(operation, true);
             await this.db.addEvent(operation.did!, {
@@ -885,7 +892,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 did: operation.did
             });
 
-            await this.queueOperation(registry, operation);
+            await this.queueOperation(targetRegistry, operation);
             await this.updateSearchIndex(operation.did!);
 
             return true;
