@@ -120,6 +120,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [alias, setAlias] = useState('');
     const [aliasDID, setAliasDID] = useState('');
     const [selectedName, setSelectedName] = useState('');
+    const [aliasIsOwned, setAliasIsOwned] = useState(false);
     const [aliasDocs, setAliasDocs] = useState('');
     const [aliasDocsVersion, setAliasDocsVersion] = useState(1);
     const [aliasDocsVersionMax, setAliasDocsVersionMax] = useState(1);
@@ -1116,6 +1117,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             const trimmedName = name.trim();
             const docs = await keymaster.resolveDID(trimmedName);
             setSelectedName(trimmedName);
+            setAliasIsOwned(!!docs.didDocumentMetadata?.isOwned);
             setAliasDocs(JSON.stringify(docs, null, 4));
             const versions = docs.didDocumentMetadata.version ?? 1;
             setAliasDocsVersion(versions);
@@ -3689,7 +3691,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             </TableCell>
                                         </TableRow>
                                         {Object.entries(aliasList).filter(([alias]) => !idList.includes(alias)).map(([alias, did], index) => (
-                                            <TableRow key={index}>
+                                            <TableRow key={index} selected={alias === selectedName}>
                                                 <TableCell>
                                                     {getAliasIcon(alias)}
                                                     {alias}
@@ -3704,37 +3706,39 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                         Resolve
                                                     </Button>
                                                 </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => changeAlias(alias, did)}>
-                                                        Rename
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => removeAlias(alias)}>
-                                                        Remove
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => revokeAlias(alias)}>
-                                                        Revoke
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => transferAlias(alias)}>
-                                                        Transfer
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => openMigrate(alias)}>
-                                                        Migrate
-                                                    </Button>
-                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
                             <p>{selectedName}</p>
+                            <Grid container spacing={1} style={{ marginBottom: '8px' }}>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => changeAlias(selectedName, aliasList[selectedName])} disabled={!selectedName}>
+                                        Rename
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => removeAlias(selectedName)} disabled={!selectedName}>
+                                        Remove
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => revokeAlias(selectedName)} disabled={!selectedName || !aliasIsOwned}>
+                                        Revoke
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => transferAlias(selectedName)} disabled={!selectedName || !aliasIsOwned}>
+                                        Transfer
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => openMigrate(selectedName)} disabled={!selectedName || !aliasIsOwned}>
+                                        Migrate
+                                    </Button>
+                                </Grid>
+                            </Grid>
                             <VersionsNavigator
                                 version={aliasDocsVersion}
                                 maxVersion={aliasDocsVersionMax}
