@@ -3606,6 +3606,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             <Tab key="names" value="names" label={'DIDs'} icon={<List />} />
                         }
                         {currentId && !widget &&
+                            <Tab key="properties" value="properties" label={'Properties'} icon={<Tune />} />
+                        }
+                        {currentId && !widget &&
                             <Tab key="assets" value="assets" label={'Assets'} icon={<Token />} />
                         }
                         {currentId && !widget &&
@@ -3616,9 +3619,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                         }
                         {currentId && !widget &&
                             <Tab key="polls" value="polls" label={'Polls'} icon={<Poll />} />
-                        }
-                        {currentId && !widget &&
-                            <Tab key="properties" value="properties" label={'Properties'} icon={<Tune />} />
                         }
                         {currentId && !widget && hasLightning &&
                             <Tab key="lightning" value="lightning" label={'Lightning'} icon={<Bolt />} />
