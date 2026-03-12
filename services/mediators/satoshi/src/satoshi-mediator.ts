@@ -427,7 +427,7 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
         } as DidRegistration,
     };
 
-    const previousPending = item.processed?.pending ?? 0;
+    const previousPending = item.processed?.pending;
     let update: DiscoveredItem = { ...item };
     const end = satoshiImportBatchDuration.startTimer();
 
@@ -437,7 +437,7 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
 
         // If pending count didn't decrease, no progress was made — stop retrying
         const newPending = update.processed?.pending ?? 0;
-        if (!retry && newPending > 0 && newPending >= previousPending) {
+        if (!retry && newPending > 0 && previousPending !== undefined && newPending >= previousPending) {
             update.error = `No progress: ${newPending} pending event(s) unresolved`;
         }
     } catch (error) {
