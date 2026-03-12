@@ -427,12 +427,19 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
         } as DidRegistration,
     };
 
+    const previousPending = item.processed?.pending ?? 0;
     let update: DiscoveredItem = { ...item };
     const end = satoshiImportBatchDuration.startTimer();
 
     try {
         update.imported = await gatekeeper.importBatchByCids(cids, metadata);
         update.processed = await gatekeeper.processEvents();
+
+        // If pending count didn't decrease, no progress was made — stop retrying
+        const newPending = update.processed?.pending ?? 0;
+        if (!retry && newPending > 0 && newPending >= previousPending) {
+            update.error = `No progress: ${newPending} pending event(s) unresolved`;
+        }
     } catch (error) {
         satoshiImportErrors.inc();
         update.error = JSON.stringify(error);

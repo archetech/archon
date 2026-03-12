@@ -734,6 +734,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             if (ok) {
                 showSuccess(`${migrateTarget} migrated to ${registry}`);
                 closeMigrate();
+                if (migrateTarget === selectedId) {
+                    resolveId();
+                } else {
+                    resolveAlias(migrateTarget);
+                }
             }
         } catch (error) {
             showError(error);
