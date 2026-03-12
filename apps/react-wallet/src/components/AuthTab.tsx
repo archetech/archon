@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import {Box, Button, TextField, IconButton, InputAdornment, Tooltip} from "@mui/material";
+import {
+    Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
+    MenuItem, Select, TextField, IconButton, InputAdornment, Tooltip, Typography
+} from "@mui/material";
 import { CameraAlt } from "@mui/icons-material";
 import axios from "axios";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { useUIContext } from "../contexts/UIContext";
+import { useVariablesContext } from "../contexts/VariablesProvider";
 import { scanQrCode } from "../utils/utils";
 
 function AuthTab() {
@@ -13,6 +17,9 @@ function AuthTab() {
     const [challenge, setChallenge] = useState<string>("");
     const [response, setResponse] = useState<string>("");
     const [disableSendResponse, setDisableSendResponse] = useState<boolean>(true);
+    const [showChallengeDialog, setShowChallengeDialog] = useState<boolean>(false);
+    const [challengeSchemas, setChallengeSchemas] = useState<string[]>([]);
+    const [challengeSchemaSelection, setChallengeSchemaSelection] = useState<string>("");
     const { keymaster } = useWalletContext();
     const {
         setOpenBrowser,
@@ -23,6 +30,7 @@ function AuthTab() {
         setError,
         setWarning,
     } = useSnackbar();
+    const { schemaList } = useVariablesContext();
 
     useEffect(() => {
         if (pendingChallenge && pendingChallenge !== challenge) {
@@ -32,14 +40,45 @@ function AuthTab() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingChallenge]);
 
+    function openChallengeDialog() {
+        setChallengeSchemas([]);
+        setChallengeSchemaSelection("");
+        setShowChallengeDialog(true);
+    }
+
+    function closeChallengeDialog() {
+        setShowChallengeDialog(false);
+    }
+
+    function addChallengeSchema() {
+        if (challengeSchemaSelection && !challengeSchemas.includes(challengeSchemaSelection)) {
+            setChallengeSchemas([...challengeSchemas, challengeSchemaSelection]);
+            setChallengeSchemaSelection("");
+        }
+    }
+
+    function removeChallengeSchema(schema: string) {
+        setChallengeSchemas(challengeSchemas.filter(s => s !== schema));
+    }
+
     async function newChallenge() {
         if (!keymaster) {
             return;
         }
         try {
-            const challenge = await keymaster.createChallenge();
-            await setChallenge(challenge);
-            await resolveChallenge(challenge);
+            closeChallengeDialog();
+            const spec: { credentials?: { schema: string }[] } = {};
+            if (challengeSchemas.length > 0) {
+                const credentials: { schema: string }[] = [];
+                for (const name of challengeSchemas) {
+                    const did = await keymaster.lookupDID(name);
+                    credentials.push({ schema: did });
+                }
+                spec.credentials = credentials;
+            }
+            const did = await keymaster.createChallenge(spec);
+            await setChallenge(did);
+            await resolveChallenge(did);
         } catch (error: any) {
             setError(error);
         }
@@ -186,10 +225,10 @@ function AuthTab() {
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={newChallenge}
+                    onClick={openChallengeDialog}
                     className="button large bottom"
                 >
-                    New
+                    New...
                 </Button>
 
                 <Button
@@ -275,6 +314,48 @@ function AuthTab() {
                     Clear
                 </Button>
             </Box>
+
+            <Dialog open={showChallengeDialog} onClose={closeChallengeDialog}>
+                <DialogTitle>New Challenge</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Add schemas to request specific credentials. Leave empty for an open challenge.
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
+                        <Select
+                            value={challengeSchemaSelection}
+                            onChange={(e) => setChallengeSchemaSelection(e.target.value)}
+                            displayEmpty
+                            size="small"
+                            sx={{ minWidth: 200 }}
+                        >
+                            <MenuItem value="" disabled>Select schema</MenuItem>
+                            {schemaList
+                                .filter((s: string) => !challengeSchemas.includes(s))
+                                .map((s: string) => (
+                                    <MenuItem key={s} value={s}>{s}</MenuItem>
+                                ))
+                            }
+                        </Select>
+                        <Button variant="contained" size="small" onClick={addChallengeSchema} disabled={!challengeSchemaSelection}>
+                            Add
+                        </Button>
+                    </Box>
+                    {challengeSchemas.length > 0 &&
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {challengeSchemas.map((s) => (
+                                <Chip key={s} label={s} onDelete={() => removeChallengeSchema(s)} />
+                            ))}
+                        </Box>
+                    }
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeChallengeDialog}>Cancel</Button>
+                    <Button variant="contained" onClick={newChallenge}>
+                        Create
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }
