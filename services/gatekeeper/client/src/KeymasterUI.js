@@ -941,7 +941,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function newChallenge() {
         try {
-            closeChallengeDialog();
             const spec = {};
             if (challengeCredentials.length > 0) {
                 const credentials = [];
@@ -957,6 +956,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 spec.credentials = credentials;
             }
             const challenge = await keymaster.createChallenge(spec);
+            closeChallengeDialog();
             setChallenge(challenge);
             resolveChallenge(challenge);
         } catch (error) {

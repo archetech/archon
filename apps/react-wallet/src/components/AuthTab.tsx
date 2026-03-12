@@ -29,7 +29,7 @@ function AuthTab() {
     } = useUIContext();
     const {
         setError,
-        setWarning,
+        setSuccess,
     } = useSnackbar();
     const { schemaList, agentList } = useVariablesContext();
 
@@ -72,7 +72,6 @@ function AuthTab() {
             return;
         }
         try {
-            closeChallengeDialog();
             const spec: { credentials?: { schema: string; issuers?: string[] }[] } = {};
             if (challengeCredentials.length > 0) {
                 const credentials: { schema: string; issuers?: string[] }[] = [];
@@ -88,6 +87,7 @@ function AuthTab() {
                 spec.credentials = credentials;
             }
             const did = await keymaster.createChallenge(spec);
+            closeChallengeDialog();
             await setChallenge(did);
             await resolveChallenge(did);
         } catch (error: any) {
@@ -165,9 +165,9 @@ function AuthTab() {
             const verify = await keymaster.verifyResponse(response);
 
             if (verify.match) {
-                setWarning("Response is VALID");
+                setSuccess("Response is VALID");
             } else {
-                setWarning("Response is NOT VALID");
+                setError("Response is NOT VALID");
             }
         } catch (error: any) {
             setError(error);
