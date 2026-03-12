@@ -26,13 +26,15 @@ import {
     Poll,
     QuestionMark,
     Schema,
-    SwapHoriz,
+    TransferWithinAStation,
+    MoveUp,
 } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import TextInputModal from "../modals/TextInputModal";
+import SelectInputModal from "../modals/SelectInputModal";
 import CopyResolveDID from "./CopyResolveDID";
 
 function AliasedDIDs() {
@@ -45,6 +47,8 @@ function AliasedDIDs() {
     const [revokeName, setRevokeName] = useState<string>("");
     const [transferOpen, setTransferOpen] = useState<boolean>(false);
     const [transferName, setTransferName] = useState<string>("");
+    const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
+    const [migrateName, setMigrateName] = useState<string>("");
     const [bulkOpen, setBulkOpen] = useState<boolean>(false);
     const [bulkMenuAnchor, setBulkMenuAnchor] = useState<null | HTMLElement>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -73,6 +77,7 @@ function AliasedDIDs() {
         aliasList,
         aliasRegistry,
         pollList,
+        registries,
         schemaList,
         setAliasDID,
         setAlias,
@@ -236,6 +241,19 @@ function AliasedDIDs() {
         }
     };
 
+    const handleMigrateSubmit = async (registry: string) => {
+        setMigrateOpen(false);
+        if (!registry || !keymaster) {
+            return;
+        }
+        try {
+            await keymaster.changeRegistry(migrateName, registry);
+            await refreshAliases();
+        } catch (error: any) {
+            setError(error);
+        }
+    };
+
     function getNameIcon(name: string) {
         const iconStyle = { verticalAlign: "middle", marginRight: 4 };
         if (agentList?.includes(name)) {
@@ -366,6 +384,17 @@ function AliasedDIDs() {
                 defaultValue=""
                 onSubmit={handleTransferSubmit}
                 onClose={() => setTransferOpen(false)}
+            />
+
+            <SelectInputModal
+                isOpen={migrateOpen}
+                title="Migrate DID"
+                description={`Select registry for '${migrateName}'`}
+                label="Registry"
+                confirmText="Migrate"
+                options={registries}
+                onSubmit={handleMigrateSubmit}
+                onClose={() => setMigrateOpen(false)}
             />
 
             <Box className="flex-box mt-2">
@@ -553,7 +582,18 @@ function AliasedDIDs() {
                                     }}
                                     size="small"
                                 >
-                                    <SwapHoriz />
+                                    <TransferWithinAStation />
+                                </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Migrate">
+                                <IconButton
+                                    onClick={() => {
+                                        setMigrateName(name);
+                                        setMigrateOpen(true);
+                                    }}
+                                    size="small"
+                                >
+                                    <MoveUp />
                                 </IconButton>
                             </Tooltip>
                             <Tooltip title="Revoke">
