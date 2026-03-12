@@ -411,3 +411,16 @@ describe('mergeData', () => {
         expect(asset).toStrictEqual({ key1: 'val1' });
     });
 });
+
+describe('changeRegistry', () => {
+    it('should change the registry for an asset DID', async () => {
+        await keymaster.createId('Bob');
+        const assetDid = await keymaster.createAsset({ data: 'test' }, { registry: 'local' });
+
+        const ok = await keymaster.changeRegistry(assetDid, 'hyperswarm');
+        const doc = await keymaster.resolveDID(assetDid);
+
+        expect(ok).toBe(true);
+        expect(doc.didDocumentRegistration!.registry).toBe('hyperswarm');
+    });
+});

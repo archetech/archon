@@ -216,6 +216,7 @@ export async function anchorData(
             conf_target: feeRate ? undefined : config.feeTarget,
             replaceable: true,
             add_inputs: true,
+            changePosition: 1,
         },
         true, // include BIP-32 derivation info
     );

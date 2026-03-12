@@ -874,6 +874,12 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError(`registry ${registry} not supported`);
         }
 
+        const newRegistry = operation.doc?.didDocumentRegistration?.registry;
+
+        if (newRegistry && newRegistry !== registry && !this.supportedRegistries.includes(newRegistry)) {
+            throw new InvalidOperationError(`registry ${newRegistry} not supported`);
+        }
+
         return this.withDidLock(operation.did, async () => {
             const opid = await this.generateCID(operation, true);
             await this.db.addEvent(operation.did!, {

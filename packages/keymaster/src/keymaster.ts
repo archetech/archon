@@ -1222,6 +1222,27 @@ export default class Keymaster implements KeymasterInterface {
         return ok;
     }
 
+    async changeRegistry(id: string, registry: string): Promise<boolean> {
+        if (!registry) {
+            throw new InvalidParameterError('registry');
+        }
+
+        const did = await this.lookupDID(id);
+        const current = await this.resolveDID(did);
+        const currentRegistry = current.didDocumentRegistration?.registry;
+
+        if (registry === currentRegistry) {
+            return true;
+        }
+
+        return this.updateDID(did, {
+            didDocumentRegistration: {
+                ...current.didDocumentRegistration!,
+                registry,
+            },
+        });
+    }
+
     async addToOwned(
         did: string,
         owner?: string

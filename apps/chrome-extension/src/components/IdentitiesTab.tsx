@@ -7,6 +7,7 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { requestBrowserRefresh } from "../utils/utils";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
+import SelectInputModal from "../modals/SelectInputModal";
 import type { NostrKeys } from "@didcid/keymaster/types";
 
 function IdentitiesTab() {
@@ -17,6 +18,7 @@ function IdentitiesTab() {
     const [recoverModalOpen, setRecoverModalOpen] = useState<boolean>(false);
     const [nostrKeys, setNostrKeys] = useState<NostrKeys | null>(null);
     const [removeNostrModal, setRemoveNostrModal] = useState<boolean>(false);
+    const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
     const [nsecValue, setNsecValue] = useState<string | null>(null);
     const {
         isBrowser,
@@ -153,6 +155,20 @@ function IdentitiesTab() {
         }
     }
 
+    async function migrateId(registry: string) {
+        if (!keymaster) {
+            return;
+        }
+        setMigrateOpen(false);
+        try {
+            await keymaster.changeRegistry(currentId, registry);
+            await refreshAll();
+            setSuccess(`${currentId} migrated to ${registry}`);
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
     const refreshNostr = useCallback(async () => {
         if (!keymaster || !currentDID) {
             setNostrKeys(null);
@@ -253,6 +269,17 @@ function IdentitiesTab() {
                 onClose={() => setRecoverModalOpen(false)}
             />
 
+            <SelectInputModal
+                isOpen={migrateOpen}
+                title="Migrate Identity"
+                description={`Select registry for ${currentId}`}
+                label="Registry"
+                confirmText="Migrate"
+                options={registries}
+                onSubmit={migrateId}
+                onClose={() => setMigrateOpen(false)}
+            />
+
             <Box className="flex-box mt-2">
                 <TextField
                     label="Create ID"
@@ -331,6 +358,14 @@ function IdentitiesTab() {
                         onClick={rotateKeys}
                     >
                         Rotate
+                    </Button>
+
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => setMigrateOpen(true)}
+                    >
+                        Migrate...
                     </Button>
 
                     {nostrKeys ? (

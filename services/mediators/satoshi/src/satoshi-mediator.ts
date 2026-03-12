@@ -339,25 +339,27 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
 
             console.log(height, String(i).padStart(4), txid);
 
-            const asm = tx.vout?.[0]?.scriptPubKey?.asm;
-            if (!asm) {
-                continue;
-            }
-
-            const parts = asm.split(' ');
-            if (parts[0] !== 'OP_RETURN' || !parts[1]) {
-                continue;
-            }
-
-            try {
-                const textString = Buffer.from(parts[1], 'hex').toString('utf8');
-                if (textString.startsWith('did:cid:') && isValidDID(textString)) {
-                    await jsonPersister.updateDb((db) => {
-                        db.discovered.push({ height, index: i, time: timestamp, txid, did: textString });
-                    });
+            for (const vout of tx.vout ?? []) {
+                const asm = vout.scriptPubKey?.asm;
+                if (!asm) {
+                    continue;
                 }
-            } catch (error: any) {
-                console.error('Error decoding OP_RETURN or updating DB:', error);
+
+                const parts = asm.split(' ');
+                if (parts[0] !== 'OP_RETURN' || !parts[1]) {
+                    continue;
+                }
+
+                try {
+                    const textString = Buffer.from(parts[1], 'hex').toString('utf8');
+                    if (textString.startsWith('did:cid:') && isValidDID(textString)) {
+                        await jsonPersister.updateDb((db) => {
+                            db.discovered.push({ height, index: i, time: timestamp, txid, did: textString });
+                        });
+                    }
+                } catch (error: any) {
+                    console.error('Error decoding OP_RETURN or updating DB:', error);
+                }
             }
         }
 
@@ -425,12 +427,19 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
         } as DidRegistration,
     };
 
+    const previousPending = item.processed?.pending;
     let update: DiscoveredItem = { ...item };
     const end = satoshiImportBatchDuration.startTimer();
 
     try {
         update.imported = await gatekeeper.importBatchByCids(cids, metadata);
         update.processed = await gatekeeper.processEvents();
+
+        // If pending count didn't decrease, no progress was made — stop retrying
+        const newPending = update.processed?.pending ?? 0;
+        if (!retry && newPending > 0 && previousPending !== undefined && newPending >= previousPending) {
+            update.error = `No progress: ${newPending} pending event(s) unresolved`;
+        }
     } catch (error) {
         satoshiImportErrors.inc();
         update.error = JSON.stringify(error);

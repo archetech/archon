@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
     Alert,
     Autocomplete,
@@ -43,6 +43,7 @@ import {
     Badge,
     BarChart,
     Block,
+    Bolt,
     Clear,
     Create,
     Groups,
@@ -81,6 +82,7 @@ import {
 } from "@mui/icons-material";
 import axios from 'axios';
 import { Buffer } from 'buffer';
+import { QRCodeSVG } from 'qrcode.react';
 import './App.css';
 import PollResultsModal from "./PollResultsModal";
 import TextInputModal from "./TextInputModal";
@@ -97,7 +99,7 @@ const DmailTags = {
     UNREAD: 'unread',
 };
 
-function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
+function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning }) {
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
     const [saveId, setSaveId] = useState('');
@@ -118,6 +120,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [alias, setAlias] = useState('');
     const [aliasDID, setAliasDID] = useState('');
     const [selectedName, setSelectedName] = useState('');
+    const [aliasIsOwned, setAliasIsOwned] = useState(false);
     const [aliasDocs, setAliasDocs] = useState('');
     const [aliasDocsVersion, setAliasDocsVersion] = useState(1);
     const [aliasDocsVersionMax, setAliasDocsVersionMax] = useState(1);
@@ -239,6 +242,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [pollList, setPollList] = useState([]);
     const [canVote, setCanVote] = useState(false);
     const [eligiblePolls, setEligiblePolls] = useState({});
+    const [migrateTarget, setMigrateTarget] = useState('');
+    const [showMigrateDialog, setShowMigrateDialog] = useState(false);
+    const [showCloneDialog, setShowCloneDialog] = useState(false);
+    const [cloneName, setCloneName] = useState('');
+    const confirmResolve = useRef(null);
+    const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '' });
+    const promptResolve = useRef(null);
+    const [promptDialog, setPromptDialog] = useState({ open: false, message: '', value: '' });
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: "",
@@ -256,6 +267,26 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     const [propsDeleteOpen, setPropsDeleteOpen] = useState(false);
     const [propsDeleteKey, setPropsDeleteKey] = useState('');
 
+    const [lightningTab, setLightningTab] = useState('wallet');
+    const [lightningBalance, setLightningBalance] = useState(null);
+    const [lightningIsConfigured, setLightningIsConfigured] = useState(null);
+    const [lightningWalletError, setLightningWalletError] = useState(null);
+    const [lightningReceiveAmount, setLightningReceiveAmount] = useState('');
+    const [lightningReceiveMemo, setLightningReceiveMemo] = useState('');
+    const [lightningInvoice, setLightningInvoice] = useState('');
+    const [bolt11Input, setBolt11Input] = useState('');
+    const [decodedInvoice, setDecodedInvoice] = useState(null);
+    const [lightningPaymentResult, setLightningPaymentResult] = useState(null);
+    const [zapDid, setZapDid] = useState('');
+    const [zapAmount, setZapAmount] = useState('');
+    const [zapMemo, setZapMemo] = useState('');
+    const [loadingZap, setLoadingZap] = useState(false);
+    const [zapResult, setZapResult] = useState(null);
+    const [lightningPayments, setLightningPayments] = useState([]);
+    const [loadingPayments, setLoadingPayments] = useState(false);
+    const [isPublished, setIsPublished] = useState(false);
+    const [loadingPublishToggle, setLoadingPublishToggle] = useState(false);
+
     const pollExpired = pollDeadline ? Date.now() > pollDeadline.getTime() : false;
     const selectedPollDid = selectedPollName ? aliasList[selectedPollName] ?? "" : "";
 
@@ -268,6 +299,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         refreshAll();
         // eslint-disable-next-line
     }, []);
+
+    useEffect(() => {
+        if (tab === 'lightning' && lightningTab === 'wallet') {
+            fetchLightningBalance();
+        }
+        // eslint-disable-next-line
+    }, [tab]);
 
     function showAlert(warning) {
         setSnackbar({
@@ -292,6 +330,162 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             message: message,
             severity: "success",
         });
+    }
+
+    async function fetchLightningBalance() {
+        setLightningWalletError(null);
+        try {
+            const result = await keymaster.getLightningBalance();
+            setLightningBalance(result.balance);
+            setLightningIsConfigured(true);
+            // Check publish state
+            if (currentDID) {
+                try {
+                    const doc = await keymaster.resolveDID(currentDID);
+                    const services = doc?.didDocument?.service || [];
+                    setIsPublished(services.some(s => s.id?.endsWith('#lightning')));
+                } catch { /* ignore resolve errors */ }
+            }
+        } catch (error) {
+            if (error?.type === 'Lightning not configured' || error?.message?.includes('not configured')) {
+                setLightningIsConfigured(false);
+            } else {
+                setLightningIsConfigured(true);
+                setLightningWalletError(error.error || error.message || String(error));
+            }
+        }
+    }
+
+    async function fetchLightningPayments() {
+        setLoadingPayments(true);
+        try {
+            const result = await keymaster.getLightningPayments();
+            setLightningPayments(result);
+        } catch (error) {
+            showError(error);
+        } finally {
+            setLoadingPayments(false);
+        }
+    }
+
+    async function setupLightning() {
+        try {
+            await keymaster.addLightning();
+            showSuccess('Lightning wallet set up successfully');
+            await fetchLightningBalance();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function disconnectLightning() {
+        try {
+            await keymaster.removeLightning();
+            setLightningBalance(null);
+            setLightningIsConfigured(false);
+            showSuccess('Lightning wallet disconnected');
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function createLightningInvoice() {
+        const amount = parseInt(lightningReceiveAmount, 10);
+        if (!amount || amount <= 0) {
+            showAlert('Enter a valid amount in satoshis');
+            return;
+        }
+        try {
+            const result = await keymaster.createLightningInvoice(amount, lightningReceiveMemo);
+            setLightningInvoice(result.paymentRequest);
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function decodeLightningInvoice() {
+        if (!bolt11Input.trim()) return;
+        try {
+            const result = await keymaster.decodeLightningInvoice(bolt11Input.trim());
+            setDecodedInvoice(result);
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function payLightningInvoice() {
+        if (!bolt11Input.trim()) return;
+        setLightningPaymentResult(null);
+        try {
+            const payment = await keymaster.payLightningInvoice(bolt11Input.trim());
+            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            setLightningPaymentResult(status);
+            showSuccess('Payment sent successfully');
+            setBolt11Input('');
+            setDecodedInvoice(null);
+        } catch (error) {
+            if (decodedInvoice?.payment_hash) {
+                try {
+                    const status = await keymaster.checkLightningPayment(decodedInvoice.payment_hash);
+                    if (status.paid) {
+                        setLightningPaymentResult(status);
+                        showSuccess('Invoice was already paid');
+                        return;
+                    }
+                } catch { /* fall through to original error */ }
+            }
+            showError(error);
+        }
+    }
+
+    async function togglePublishLightning() {
+        setLoadingPublishToggle(true);
+        try {
+            if (isPublished) {
+                await keymaster.unpublishLightning();
+                setIsPublished(false);
+                showSuccess('Lightning unpublished — your DID is no longer zappable');
+            } else {
+                await keymaster.publishLightning();
+                setIsPublished(true);
+                showSuccess('Lightning published — your DID is now zappable');
+            }
+        } catch (error) {
+            showError(error);
+        } finally {
+            setLoadingPublishToggle(false);
+        }
+    }
+
+    async function handleZap() {
+        if (!zapDid.trim()) {
+            showAlert('Enter a recipient');
+            return;
+        }
+        const amount = parseInt(zapAmount, 10);
+        if (!amount || amount <= 0) {
+            showAlert('Enter a valid amount in satoshis');
+            return;
+        }
+        setLoadingZap(true);
+        setZapResult(null);
+        try {
+            const payment = await keymaster.zapLightning(
+                zapDid.trim(),
+                amount,
+                zapMemo.trim() || undefined
+            );
+            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            setZapResult(status);
+            showSuccess('Zap sent successfully');
+            setZapDid('');
+            setZapAmount('');
+            setZapMemo('');
+        } catch (error) {
+            showError(error);
+        } finally {
+            setLoadingZap(false);
+        }
     }
 
     async function checkForChallenge() {
@@ -529,9 +723,86 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
         }
     }
 
+    function openMigrate(id) {
+        setMigrateTarget(id);
+        setRegistry('');
+        setShowMigrateDialog(true);
+    }
+
+    function closeMigrate() {
+        setShowMigrateDialog(false);
+        setMigrateTarget('');
+        setRegistry('');
+    }
+
+    function openClone() {
+        setCloneName('');
+        setRegistry('');
+        setShowCloneDialog(true);
+    }
+
+    function closeClone() {
+        setShowCloneDialog(false);
+        setCloneName('');
+        setRegistry('');
+    }
+
+    async function migrateId() {
+        try {
+            const ok = await keymaster.changeRegistry(migrateTarget, registry);
+            if (ok) {
+                showSuccess(`${migrateTarget} migrated to ${registry}`);
+                closeMigrate();
+                if (migrateTarget === selectedId) {
+                    resolveId();
+                } else {
+                    resolveAlias(migrateTarget);
+                }
+            }
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    function showConfirm(message) {
+        return new Promise((resolve) => {
+            confirmResolve.current = resolve;
+            setConfirmDialog({ open: true, message });
+        });
+    }
+
+    function handleConfirmOk() {
+        setConfirmDialog(d => ({ ...d, open: false }));
+        confirmResolve.current?.(true);
+    }
+
+    function handleConfirmCancel() {
+        setConfirmDialog(d => ({ ...d, open: false }));
+        confirmResolve.current?.(false);
+    }
+
+    function showPrompt(message, defaultValue = '') {
+        return new Promise((resolve) => {
+            promptResolve.current = resolve;
+            setPromptDialog({ open: true, message, value: defaultValue });
+        });
+    }
+
+    function handlePromptOk() {
+        setPromptDialog(d => {
+            promptResolve.current?.(d.value || null);
+            return { ...d, open: false };
+        });
+    }
+
+    function handlePromptCancel() {
+        setPromptDialog(d => ({ ...d, open: false }));
+        promptResolve.current?.(null);
+    }
+
     async function renameId() {
         try {
-            const input = window.prompt("Please enter new name:");
+            const input = await showPrompt("Please enter new name:");
 
             if (input) {
                 const name = input.trim();
@@ -548,7 +819,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function removeId() {
         try {
-            if (window.confirm(`Are you sure you want to remove ${selectedId}?`)) {
+            if (await showConfirm(`Are you sure you want to remove ${selectedId}?`)) {
                 await keymaster.removeId(selectedId);
                 refreshAll();
             }
@@ -575,7 +846,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function recoverId() {
         try {
-            const did = window.prompt("Please enter the DID:");
+            const did = await showPrompt("Please enter the DID:");
             if (did) {
                 const response = await keymaster.recoverId(did);
                 refreshAll();
@@ -608,7 +879,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function removeNostr() {
         try {
-            if (window.confirm('Are you sure you want to remove Nostr keys?')) {
+            if (await showConfirm('Are you sure you want to remove Nostr keys?')) {
                 await keymaster.removeNostr();
                 setNostrKeys(null);
                 setNsecString('');
@@ -719,7 +990,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
     }
 
     async function refreshNames() {
-        const aliasList = await keymaster.listAliases();
+        const aliasList = await keymaster.listAliases({ includeIDs: false });
         const names = Object.keys(aliasList);
 
         setAliasList(aliasList);
@@ -881,7 +1152,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function cloneAsset() {
         try {
-            await keymaster.cloneAsset(aliasDID, { alias: alias, registry });
+            await keymaster.cloneAsset(aliasList[selectedName], { alias: cloneName, registry });
+            showSuccess(`${selectedName} cloned as ${cloneName}`);
+            closeClone();
             refreshNames();
         } catch (error) {
             const errorMessage = error.error || error.toString();
@@ -900,6 +1173,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             const trimmedName = name.trim();
             const docs = await keymaster.resolveDID(trimmedName);
             setSelectedName(trimmedName);
+            setAliasIsOwned(!!docs.didDocumentMetadata?.isOwned);
             setAliasDocs(JSON.stringify(docs, null, 4));
             const versions = docs.didDocumentMetadata.version ?? 1;
             setAliasDocsVersion(versions);
@@ -911,8 +1185,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function removeAlias(alias) {
         try {
-            if (window.confirm(`Are you sure you want to remove ${alias}?`)) {
+            if (await showConfirm(`Are you sure you want to remove ${alias}?`)) {
                 await keymaster.removeAlias(alias);
+                setSelectedName('');
                 refreshNames();
             }
         } catch (error) {
@@ -922,7 +1197,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function changeAlias(oldName, did) {
         try {
-            const newName = window.prompt("Rename DID:");
+            const newName = await showPrompt("Rename DID:");
 
             if (newName && newName !== oldName) {
                 await keymaster.addAlias(newName, did);
@@ -936,7 +1211,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function revokeAlias(alias) {
         try {
-            if (window.confirm(`Are you sure you want to revoke ${alias}? This operation cannot be undone.`)) {
+            if (await showConfirm(`Are you sure you want to revoke ${alias}? This operation cannot be undone.`)) {
                 await keymaster.revokeDID(alias);
                 resolveAlias(alias);
                 showAlert(`Revoked ${alias} can no longer be updated.`);
@@ -960,7 +1235,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 return;
             }
 
-            const newController = window.prompt("Transfer asset to name or DID:");
+            const newController = await showPrompt("Transfer asset to name or DID:");
 
             if (newController) {
                 await keymaster.transferAsset(alias, newController);
@@ -1036,7 +1311,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function removeGroupMember(did) {
         try {
-            if (window.confirm(`Remove member from ${selectedGroupName}?`)) {
+            if (await showConfirm(`Remove member from ${selectedGroupName}?`)) {
                 await keymaster.removeGroupMember(selectedGroupName, did);
                 refreshGroup(selectedGroupName);
             }
@@ -1274,7 +1549,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function removeCredential(did) {
         try {
-            if (window.confirm(`Are you sure you want to remove ${did}?`)) {
+            if (await showConfirm(`Are you sure you want to remove ${did}?`)) {
                 await keymaster.removeCredential(did);
                 refreshHeld();
             }
@@ -1388,7 +1663,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function revokeIssued(did) {
         try {
-            if (window.confirm(`Revoke credential?`)) {
+            if (await showConfirm(`Revoke credential?`)) {
                 await keymaster.revokeCredential(did);
 
                 // Remove did from issuedList
@@ -1430,7 +1705,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function importDmail() {
         try {
-            const did = window.prompt("Dmail DID:");
+            const did = await showPrompt("Dmail DID:");
 
             if (!did) {
                 return;
@@ -1728,7 +2003,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function revokeDmail() {
         try {
-            if (window.confirm(`Revoke Dmail?`)) {
+            if (await showConfirm(`Revoke Dmail?`)) {
                 await keymaster.removeDmail(dmailDID);
                 await keymaster.revokeDID(dmailDID);
                 refreshDmail();
@@ -1897,7 +2172,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function newWallet() {
         try {
-            if (window.confirm(`Overwrite wallet with new one?`)) {
+            if (await showConfirm(`Overwrite wallet with new one?`)) {
                 await keymaster.newWallet(null, true);
                 refreshAll();
             }
@@ -1908,7 +2183,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function importWallet() {
         try {
-            const mnenomic = window.prompt("Overwrite wallet with mnemonic:");
+            const mnenomic = await showPrompt("Overwrite wallet with mnemonic:");
 
             if (mnenomic) {
                 await keymaster.newWallet(mnenomic, true);
@@ -1932,7 +2207,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function recoverWallet() {
         try {
-            if (window.confirm(`Overwrite wallet from backup?`)) {
+            if (await showConfirm(`Overwrite wallet from backup?`)) {
                 await keymaster.recoverWallet();
                 refreshAll();
             }
@@ -1949,7 +2224,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
             if (invalid === 0 && deleted === 0) {
                 showError(`${checked} DIDs checked, no problems found`);
             }
-            else if (window.confirm(`${checked} DIDs checked\n${invalid} invalid DIDs found\n${deleted} deleted DIDs found\n\nFix wallet?`)) {
+            else if (await showConfirm(`${checked} DIDs checked\n${invalid} invalid DIDs found\n${deleted} deleted DIDs found\n\nFix wallet?`)) {
                 const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
                 showError(`${idsRemoved} IDs removed\n${ownedRemoved} owned DIDs removed\n${heldRemoved} held DIDs removed\n${aliasesRemoved} aliases removed`);
                 refreshAll();
@@ -1994,7 +2269,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                     showError("Invalid JSON file.");
                 }
 
-                if (!window.confirm('Overwrite wallet with upload?')) {
+                if (!await showConfirm('Overwrite wallet with upload?')) {
                     return;
                 }
 
@@ -2046,11 +2321,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function changePassphrase() {
         try {
-            const newPass = window.prompt("Enter new passphrase:");
+            const newPass = await showPrompt("Enter new passphrase:");
             if (!newPass) {
                 return;
             }
-            const confirmPassphrase = window.prompt("Confirm new passphrase:");
+            const confirmPassphrase = await showPrompt("Confirm new passphrase:");
             if (newPass !== confirmPassphrase) {
                 showError("Passphrases do not match");
                 return;
@@ -2361,7 +2636,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function removeVaultMember(did) {
         try {
-            if (window.confirm(`Remove member from ${selectedVaultName}?`)) {
+            if (await showConfirm(`Remove member from ${selectedVaultName}?`)) {
                 await keymaster.removeVaultMember(selectedVaultName, did);
                 refreshVault(selectedVaultName);
             }
@@ -2511,7 +2786,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
 
     async function removeVaultItem(name) {
         try {
-            if (window.confirm(`Remove item from ${selectedVaultName}?`)) {
+            if (await showConfirm(`Remove item from ${selectedVaultName}?`)) {
                 await keymaster.removeVaultItem(selectedVaultName, name);
                 refreshVault(selectedVaultName);
             }
@@ -3228,6 +3503,71 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                 </Alert>
             </Snackbar>
 
+            <Dialog open={showMigrateDialog} onClose={closeMigrate}>
+                <DialogTitle>Migrate {migrateTarget}</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 1 }}>
+                        <RegistrySelect />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeMigrate}>Cancel</Button>
+                    <Button variant="contained" onClick={migrateId} disabled={!registry}>
+                        Migrate
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={showCloneDialog} onClose={closeClone}>
+                <DialogTitle>Clone {selectedName}</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <TextField
+                            label="Clone name"
+                            value={cloneName}
+                            onChange={(e) => setCloneName(e.target.value)}
+                            fullWidth
+                            autoFocus
+                        />
+                        <RegistrySelect />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeClone}>Cancel</Button>
+                    <Button variant="contained" onClick={cloneAsset} disabled={!cloneName || !registry}>
+                        Clone
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={confirmDialog.open} onClose={handleConfirmCancel}>
+                <DialogContent>
+                    <Box sx={{ whiteSpace: 'pre-line' }}>{confirmDialog.message}</Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleConfirmCancel}>Cancel</Button>
+                    <Button variant="contained" onClick={handleConfirmOk} autoFocus>OK</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={promptDialog.open} onClose={handlePromptCancel}>
+                <DialogContent>
+                    <Box sx={{ mb: 1 }}>{promptDialog.message}</Box>
+                    <TextField
+                        value={promptDialog.value}
+                        onChange={(e) => setPromptDialog(d => ({ ...d, value: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handlePromptOk(); }}
+                        fullWidth
+                        autoFocus
+                        margin="dense"
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handlePromptCancel}>Cancel</Button>
+                    <Button variant="contained" onClick={handlePromptOk}>OK</Button>
+                </DialogActions>
+            </Dialog>
+
             <header className="App-header">
 
                 <h1>{title}</h1>
@@ -3266,6 +3606,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                             <Tab key="names" value="names" label={'DIDs'} icon={<List />} />
                         }
                         {currentId && !widget &&
+                            <Tab key="properties" value="properties" label={'Properties'} icon={<Tune />} />
+                        }
+                        {currentId && !widget &&
                             <Tab key="assets" value="assets" label={'Assets'} icon={<Token />} />
                         }
                         {currentId && !widget &&
@@ -3277,8 +3620,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                         {currentId && !widget &&
                             <Tab key="polls" value="polls" label={'Polls'} icon={<Poll />} />
                         }
-                        {currentId && !widget &&
-                            <Tab key="properties" value="properties" label={'Properties'} icon={<Tune />} />
+                        {currentId && !widget && hasLightning &&
+                            <Tab key="lightning" value="lightning" label={'Lightning'} icon={<Bolt />} />
                         }
                         {currentId &&
                             <Tab key="auth" value="auth" label={'Auth'} icon={<Key />} />
@@ -3341,6 +3684,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                 <Grid item>
                                     <Button variant="contained" color="primary" onClick={rotateKeys}>
                                         Rotate keys
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => openMigrate(selectedId)}>
+                                        Migrate...
                                     </Button>
                                 </Grid>
                                 <Grid item>
@@ -3440,17 +3788,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                     Add
                                                 </Button>
                                             </TableCell>
-                                            <TableCell>
-                                                <Button variant="contained" color="primary" onClick={cloneAsset} disabled={!alias || !aliasDID || !registry}>
-                                                    Clone
-                                                </Button>
-                                            </TableCell>
-                                            <TableCell colspan={2}>
-                                                <RegistrySelect />
-                                            </TableCell>
                                         </TableRow>
-                                        {Object.entries(aliasList).map(([alias, did], index) => (
-                                            <TableRow key={index}>
+                                        {Object.entries(aliasList).filter(([alias]) => !idList.includes(alias)).map(([alias, did], index) => (
+                                            <TableRow key={index} selected={alias === selectedName}>
                                                 <TableCell>
                                                     {getAliasIcon(alias)}
                                                     {alias}
@@ -3465,32 +3805,44 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                                         Resolve
                                                     </Button>
                                                 </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => changeAlias(alias, did)}>
-                                                        Rename
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => removeAlias(alias)}>
-                                                        Remove
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => revokeAlias(alias)}>
-                                                        Revoke
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => transferAlias(alias)}>
-                                                        Transfer
-                                                    </Button>
-                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
                             <p>{selectedName}</p>
+                            <Grid container spacing={1} style={{ marginBottom: '8px' }}>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => changeAlias(selectedName, aliasList[selectedName])} disabled={!selectedName}>
+                                        Rename...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => removeAlias(selectedName)} disabled={!selectedName}>
+                                        Remove...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => revokeAlias(selectedName)} disabled={!selectedName || !aliasIsOwned}>
+                                        Revoke...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => transferAlias(selectedName)} disabled={!selectedName || !aliasIsOwned}>
+                                        Transfer...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => openMigrate(selectedName)} disabled={!selectedName || !aliasIsOwned}>
+                                        Migrate...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={openClone} disabled={!selectedName || !aliasIsOwned}>
+                                        Clone...
+                                    </Button>
+                                </Grid>
+                            </Grid>
                             <VersionsNavigator
                                 version={aliasDocsVersion}
                                 maxVersion={aliasDocsVersionMax}
@@ -5636,6 +5988,268 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload }) {
                                 readOnly
                                 style={{ width: '800px', height: '600px', overflow: 'auto' }}
                             />
+                        </Box>
+                    }
+                    {tab === 'lightning' &&
+                        <Box>
+                            <p />
+                            <Tabs
+                                value={lightningTab}
+                                onChange={(_, v) => {
+                                    setLightningTab(v);
+                                    if (v === 'wallet') fetchLightningBalance();
+                                    if (v === 'payments') fetchLightningPayments();
+                                }}
+                                indicatorColor="primary"
+                                textColor="primary"
+                            >
+                                <Tab label="Wallet" value="wallet" />
+                                <Tab label="Payments" value="payments" />
+                                <Tab label="Receive" value="receive" />
+                                <Tab label="Send" value="send" />
+                                <Tab label="Zap" value="zap" />
+                            </Tabs>
+
+                            {lightningTab === 'wallet' &&
+                                <Box sx={{ mt: 2 }}>
+                                    {lightningIsConfigured === false &&
+                                        <Box>
+                                            <Typography>No Lightning wallet configured for this identity.</Typography>
+                                            <p />
+                                            <Button variant="contained" color="primary" onClick={setupLightning}>
+                                                Set Up Lightning
+                                            </Button>
+                                        </Box>
+                                    }
+                                    {lightningIsConfigured === true &&
+                                        <Box>
+                                            {lightningWalletError ?
+                                                <Typography color="error">{lightningWalletError}</Typography>
+                                            :
+                                                <Typography variant="h6">
+                                                    Balance: {(lightningBalance ?? 0).toLocaleString()} sats
+                                                </Typography>
+                                            }
+                                            <p />
+                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                <Button variant="outlined" onClick={fetchLightningBalance}>
+                                                    Refresh
+                                                </Button>
+                                                <Button
+                                                    variant="outlined"
+                                                    color={isPublished ? 'warning' : 'success'}
+                                                    onClick={togglePublishLightning}
+                                                    disabled={loadingPublishToggle}
+                                                >
+                                                    {loadingPublishToggle
+                                                        ? (isPublished ? 'Unpublishing...' : 'Publishing...')
+                                                        : isPublished ? 'Unpublish Lightning' : 'Publish Lightning'}
+                                                </Button>
+                                                <Button variant="outlined" color="error" onClick={disconnectLightning}>
+                                                    Disconnect Wallet
+                                                </Button>
+                                            </Box>
+                                        </Box>
+                                    }
+                                </Box>
+                            }
+
+                            {lightningTab === 'payments' &&
+                                <Box sx={{ mt: 2 }}>
+                                    <Button variant="outlined" onClick={fetchLightningPayments} disabled={loadingPayments}>
+                                        Refresh
+                                    </Button>
+                                    <p />
+                                    {loadingPayments && <Typography>Loading...</Typography>}
+                                    {!loadingPayments && lightningPayments.length === 0 &&
+                                        <Typography>No payments found.</Typography>
+                                    }
+                                    {!loadingPayments && lightningPayments.length > 0 &&
+                                        <TableContainer component={Paper}>
+                                            <Table size="small">
+                                                <TableHead>
+                                                    <TableRow>
+                                                        <TableCell>Date</TableCell>
+                                                        <TableCell>Amount</TableCell>
+                                                        <TableCell>Memo</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {lightningPayments.map((p, i) => {
+                                                        const d = p.time ? new Date(p.time) : null;
+                                                        const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` : '—';
+                                                        return (
+                                                        <TableRow key={i}>
+                                                            <TableCell>{date}</TableCell>
+                                                            <TableCell>{p.amount} sats{p.fee > 0 ? ` (fee: ${p.fee})` : ''}</TableCell>
+                                                            <TableCell>{p.memo || '—'}{p.pending ? ' [pending]' : ''}</TableCell>
+                                                        </TableRow>
+                                                        );
+                                                    })}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
+                                    }
+                                </Box>
+                            }
+
+                            {lightningTab === 'receive' &&
+                                <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 500 }}>
+                                    <TextField
+                                        label="Amount (sats)"
+                                        type="number"
+                                        value={lightningReceiveAmount}
+                                        onChange={(e) => setLightningReceiveAmount(e.target.value)}
+                                        size="small"
+                                    />
+                                    <TextField
+                                        label="Memo (optional)"
+                                        value={lightningReceiveMemo}
+                                        onChange={(e) => setLightningReceiveMemo(e.target.value)}
+                                        size="small"
+                                    />
+                                    <Box>
+                                        <Button variant="contained" color="primary" onClick={createLightningInvoice}>
+                                            Create Invoice
+                                        </Button>
+                                    </Box>
+                                    {lightningInvoice &&
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            <TextField
+                                                label="BOLT11 Invoice"
+                                                value={lightningInvoice}
+                                                multiline
+                                                rows={3}
+                                                InputProps={{ readOnly: true }}
+                                                size="small"
+                                                onClick={(e) => e.target.select()}
+                                            />
+                                            <Box>
+                                                <Button variant="outlined" size="small" onClick={() => {
+                                                    navigator.clipboard.writeText(lightningInvoice);
+                                                    showSuccess('Invoice copied to clipboard');
+                                                }}>
+                                                    Copy
+                                                </Button>
+                                            </Box>
+                                            <Box sx={{ mt: 1 }}>
+                                                <QRCodeSVG value={lightningInvoice} size={200} />
+                                            </Box>
+                                        </Box>
+                                    }
+                                </Box>
+                            }
+
+                            {lightningTab === 'send' &&
+                                <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 500 }}>
+                                    <TextField
+                                        label="BOLT11 Invoice"
+                                        value={bolt11Input}
+                                        onChange={(e) => {
+                                            setBolt11Input(e.target.value);
+                                            setDecodedInvoice(null);
+                                            setLightningPaymentResult(null);
+                                        }}
+                                        multiline
+                                        rows={3}
+                                        size="small"
+                                    />
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Button variant="outlined" onClick={decodeLightningInvoice} disabled={!bolt11Input.trim()}>
+                                            Decode
+                                        </Button>
+                                        {decodedInvoice &&
+                                            <Button variant="contained" color="primary" onClick={payLightningInvoice}>
+                                                Pay
+                                            </Button>
+                                        }
+                                    </Box>
+                                    {decodedInvoice &&
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                            {decodedInvoice.amount !== undefined &&
+                                                <Typography variant="body2"><strong>Amount:</strong> {decodedInvoice.amount}</Typography>
+                                            }
+                                            {decodedInvoice.description &&
+                                                <Typography variant="body2"><strong>Description:</strong> {decodedInvoice.description}</Typography>
+                                            }
+                                            {decodedInvoice.network &&
+                                                <Typography variant="body2"><strong>Network:</strong> {decodedInvoice.network}</Typography>
+                                            }
+                                            {decodedInvoice.created &&
+                                                <Typography variant="body2"><strong>Created:</strong> {decodedInvoice.created}</Typography>
+                                            }
+                                            {decodedInvoice.expires &&
+                                                <Typography variant="body2"><strong>Expires:</strong> {decodedInvoice.expires}</Typography>
+                                            }
+                                        </Box>
+                                    }
+                                    {lightningPaymentResult &&
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+                                            <Typography variant="body2"><strong>Payment Hash:</strong> {lightningPaymentResult.paymentHash}</Typography>
+                                            {lightningPaymentResult.preimage &&
+                                                <Typography variant="body2"><strong>Preimage (Proof):</strong> {lightningPaymentResult.preimage}</Typography>
+                                            }
+                                        </Box>
+                                    }
+                                </Box>
+                            }
+
+                            {lightningTab === 'zap' &&
+                                <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 500 }}>
+                                    <Autocomplete
+                                        freeSolo
+                                        options={agentList || []}
+                                        value={zapDid}
+                                        onChange={(event, newValue) => {
+                                            setZapDid(newValue || '');
+                                            setZapResult(null);
+                                        }}
+                                        onInputChange={(event, newInputValue) => {
+                                            setZapDid(newInputValue);
+                                            setZapResult(null);
+                                        }}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Recipient"
+                                                size="small"
+                                                placeholder="DID, alias, or Lightning Address"
+                                            />
+                                        )}
+                                    />
+                                    <TextField
+                                        label="Amount (sats)"
+                                        type="number"
+                                        value={zapAmount}
+                                        onChange={(e) => setZapAmount(e.target.value)}
+                                        size="small"
+                                    />
+                                    <TextField
+                                        label="Memo (optional)"
+                                        value={zapMemo}
+                                        onChange={(e) => setZapMemo(e.target.value)}
+                                        size="small"
+                                    />
+                                    <Box>
+                                        <Button
+                                            variant="contained"
+                                            color="primary"
+                                            onClick={handleZap}
+                                            disabled={loadingZap || !zapDid.trim() || !zapAmount.trim()}
+                                        >
+                                            {loadingZap ? 'Zapping...' : 'Zap'}
+                                        </Button>
+                                    </Box>
+                                    {zapResult &&
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+                                            <Typography variant="body2"><strong>Payment Hash:</strong> {zapResult.paymentHash}</Typography>
+                                            {zapResult.preimage &&
+                                                <Typography variant="body2"><strong>Preimage (Proof):</strong> {zapResult.preimage}</Typography>
+                                            }
+                                        </Box>
+                                    }
+                                </Box>
+                            }
                         </Box>
                     }
                     {tab === 'wallet' &&

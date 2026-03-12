@@ -795,6 +795,38 @@ describe('renameId', () => {
     });
 });
 
+describe('changeRegistry', () => {
+    const mockName = 'mockName';
+    const mockRegistry = 'hyperswarm';
+
+    it('should change registry', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.ids}/${mockName}/change-registry`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.changeRegistry(mockName, mockRegistry);
+
+        expect(ok).toStrictEqual(true);
+    });
+
+    it('should throw exception on changeRegistry server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.ids}/${mockName}/change-registry`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.changeRegistry(mockName, mockRegistry);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('backupId', () => {
     const mockName = 'mockName';
 

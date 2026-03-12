@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
     Alert,
     Autocomplete,
@@ -120,6 +120,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [alias, setAlias] = useState('');
     const [aliasDID, setAliasDID] = useState('');
     const [selectedName, setSelectedName] = useState('');
+    const [aliasIsOwned, setAliasIsOwned] = useState(false);
     const [aliasDocs, setAliasDocs] = useState('');
     const [aliasDocsVersion, setAliasDocsVersion] = useState(1);
     const [aliasDocsVersionMax, setAliasDocsVersionMax] = useState(1);
@@ -241,6 +242,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [pollList, setPollList] = useState([]);
     const [canVote, setCanVote] = useState(false);
     const [eligiblePolls, setEligiblePolls] = useState({});
+    const [migrateTarget, setMigrateTarget] = useState('');
+    const [showMigrateDialog, setShowMigrateDialog] = useState(false);
+    const [showCloneDialog, setShowCloneDialog] = useState(false);
+    const [cloneName, setCloneName] = useState('');
+    const confirmResolve = useRef(null);
+    const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '' });
+    const promptResolve = useRef(null);
+    const [promptDialog, setPromptDialog] = useState({ open: false, message: '', value: '' });
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: "",
@@ -714,9 +723,86 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
+    function openMigrate(id) {
+        setMigrateTarget(id);
+        setRegistry('');
+        setShowMigrateDialog(true);
+    }
+
+    function closeMigrate() {
+        setShowMigrateDialog(false);
+        setMigrateTarget('');
+        setRegistry('');
+    }
+
+    function openClone() {
+        setCloneName('');
+        setRegistry('');
+        setShowCloneDialog(true);
+    }
+
+    function closeClone() {
+        setShowCloneDialog(false);
+        setCloneName('');
+        setRegistry('');
+    }
+
+    async function migrateId() {
+        try {
+            const ok = await keymaster.changeRegistry(migrateTarget, registry);
+            if (ok) {
+                showSuccess(`${migrateTarget} migrated to ${registry}`);
+                closeMigrate();
+                if (migrateTarget === selectedId) {
+                    resolveId();
+                } else {
+                    resolveAlias(migrateTarget);
+                }
+            }
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    function showConfirm(message) {
+        return new Promise((resolve) => {
+            confirmResolve.current = resolve;
+            setConfirmDialog({ open: true, message });
+        });
+    }
+
+    function handleConfirmOk() {
+        setConfirmDialog(d => ({ ...d, open: false }));
+        confirmResolve.current?.(true);
+    }
+
+    function handleConfirmCancel() {
+        setConfirmDialog(d => ({ ...d, open: false }));
+        confirmResolve.current?.(false);
+    }
+
+    function showPrompt(message, defaultValue = '') {
+        return new Promise((resolve) => {
+            promptResolve.current = resolve;
+            setPromptDialog({ open: true, message, value: defaultValue });
+        });
+    }
+
+    function handlePromptOk() {
+        setPromptDialog(d => {
+            promptResolve.current?.(d.value || null);
+            return { ...d, open: false };
+        });
+    }
+
+    function handlePromptCancel() {
+        setPromptDialog(d => ({ ...d, open: false }));
+        promptResolve.current?.(null);
+    }
+
     async function renameId() {
         try {
-            const input = window.prompt("Please enter new name:");
+            const input = await showPrompt("Please enter new name:");
 
             if (input) {
                 const name = input.trim();
@@ -733,7 +819,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function removeId() {
         try {
-            if (window.confirm(`Are you sure you want to remove ${selectedId}?`)) {
+            if (await showConfirm(`Are you sure you want to remove ${selectedId}?`)) {
                 await keymaster.removeId(selectedId);
                 refreshAll();
             }
@@ -760,7 +846,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function recoverId() {
         try {
-            const did = window.prompt("Please enter the DID:");
+            const did = await showPrompt("Please enter the DID:");
             if (did) {
                 const response = await keymaster.recoverId(did);
                 refreshAll();
@@ -793,7 +879,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function removeNostr() {
         try {
-            if (window.confirm('Are you sure you want to remove Nostr keys?')) {
+            if (await showConfirm('Are you sure you want to remove Nostr keys?')) {
                 await keymaster.removeNostr();
                 setNostrKeys(null);
                 setNsecString('');
@@ -904,7 +990,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function refreshNames() {
-        const aliasList = await keymaster.listAliases();
+        const aliasList = await keymaster.listAliases({ includeIDs: false });
         const names = Object.keys(aliasList);
 
         setAliasList(aliasList);
@@ -1066,7 +1152,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function cloneAsset() {
         try {
-            await keymaster.cloneAsset(aliasDID, { alias: alias, registry });
+            await keymaster.cloneAsset(aliasList[selectedName], { alias: cloneName, registry });
+            showSuccess(`${selectedName} cloned as ${cloneName}`);
+            closeClone();
             refreshNames();
         } catch (error) {
             const errorMessage = error.error || error.toString();
@@ -1085,6 +1173,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             const trimmedName = name.trim();
             const docs = await keymaster.resolveDID(trimmedName);
             setSelectedName(trimmedName);
+            setAliasIsOwned(!!docs.didDocumentMetadata?.isOwned);
             setAliasDocs(JSON.stringify(docs, null, 4));
             const versions = docs.didDocumentMetadata.version ?? 1;
             setAliasDocsVersion(versions);
@@ -1096,8 +1185,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function removeAlias(alias) {
         try {
-            if (window.confirm(`Are you sure you want to remove ${alias}?`)) {
+            if (await showConfirm(`Are you sure you want to remove ${alias}?`)) {
                 await keymaster.removeAlias(alias);
+                setSelectedName('');
                 refreshNames();
             }
         } catch (error) {
@@ -1107,7 +1197,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function changeAlias(oldName, did) {
         try {
-            const newName = window.prompt("Rename DID:");
+            const newName = await showPrompt("Rename DID:");
 
             if (newName && newName !== oldName) {
                 await keymaster.addAlias(newName, did);
@@ -1121,7 +1211,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function revokeAlias(alias) {
         try {
-            if (window.confirm(`Are you sure you want to revoke ${alias}? This operation cannot be undone.`)) {
+            if (await showConfirm(`Are you sure you want to revoke ${alias}? This operation cannot be undone.`)) {
                 await keymaster.revokeDID(alias);
                 resolveAlias(alias);
                 showAlert(`Revoked ${alias} can no longer be updated.`);
@@ -1145,7 +1235,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 return;
             }
 
-            const newController = window.prompt("Transfer asset to name or DID:");
+            const newController = await showPrompt("Transfer asset to name or DID:");
 
             if (newController) {
                 await keymaster.transferAsset(alias, newController);
@@ -1221,7 +1311,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function removeGroupMember(did) {
         try {
-            if (window.confirm(`Remove member from ${selectedGroupName}?`)) {
+            if (await showConfirm(`Remove member from ${selectedGroupName}?`)) {
                 await keymaster.removeGroupMember(selectedGroupName, did);
                 refreshGroup(selectedGroupName);
             }
@@ -1459,7 +1549,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function removeCredential(did) {
         try {
-            if (window.confirm(`Are you sure you want to remove ${did}?`)) {
+            if (await showConfirm(`Are you sure you want to remove ${did}?`)) {
                 await keymaster.removeCredential(did);
                 refreshHeld();
             }
@@ -1573,7 +1663,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function revokeIssued(did) {
         try {
-            if (window.confirm(`Revoke credential?`)) {
+            if (await showConfirm(`Revoke credential?`)) {
                 await keymaster.revokeCredential(did);
 
                 // Remove did from issuedList
@@ -1615,7 +1705,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function importDmail() {
         try {
-            const did = window.prompt("Dmail DID:");
+            const did = await showPrompt("Dmail DID:");
 
             if (!did) {
                 return;
@@ -1913,7 +2003,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function revokeDmail() {
         try {
-            if (window.confirm(`Revoke Dmail?`)) {
+            if (await showConfirm(`Revoke Dmail?`)) {
                 await keymaster.removeDmail(dmailDID);
                 await keymaster.revokeDID(dmailDID);
                 refreshDmail();
@@ -2082,7 +2172,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function newWallet() {
         try {
-            if (window.confirm(`Overwrite wallet with new one?`)) {
+            if (await showConfirm(`Overwrite wallet with new one?`)) {
                 await keymaster.newWallet(null, true);
                 refreshAll();
             }
@@ -2093,7 +2183,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function importWallet() {
         try {
-            const mnenomic = window.prompt("Overwrite wallet with mnemonic:");
+            const mnenomic = await showPrompt("Overwrite wallet with mnemonic:");
 
             if (mnenomic) {
                 await keymaster.newWallet(mnenomic, true);
@@ -2117,7 +2207,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function recoverWallet() {
         try {
-            if (window.confirm(`Overwrite wallet from backup?`)) {
+            if (await showConfirm(`Overwrite wallet from backup?`)) {
                 await keymaster.recoverWallet();
                 refreshAll();
             }
@@ -2134,7 +2224,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             if (invalid === 0 && deleted === 0) {
                 showError(`${checked} DIDs checked, no problems found`);
             }
-            else if (window.confirm(`${checked} DIDs checked\n${invalid} invalid DIDs found\n${deleted} deleted DIDs found\n\nFix wallet?`)) {
+            else if (await showConfirm(`${checked} DIDs checked\n${invalid} invalid DIDs found\n${deleted} deleted DIDs found\n\nFix wallet?`)) {
                 const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
                 showError(`${idsRemoved} IDs removed\n${ownedRemoved} owned DIDs removed\n${heldRemoved} held DIDs removed\n${aliasesRemoved} aliases removed`);
                 refreshAll();
@@ -2179,7 +2269,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     showError("Invalid JSON file.");
                 }
 
-                if (!window.confirm('Overwrite wallet with upload?')) {
+                if (!await showConfirm('Overwrite wallet with upload?')) {
                     return;
                 }
 
@@ -2231,11 +2321,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function changePassphrase() {
         try {
-            const newPass = window.prompt("Enter new passphrase:");
+            const newPass = await showPrompt("Enter new passphrase:");
             if (!newPass) {
                 return;
             }
-            const confirmPassphrase = window.prompt("Confirm new passphrase:");
+            const confirmPassphrase = await showPrompt("Confirm new passphrase:");
             if (newPass !== confirmPassphrase) {
                 showError("Passphrases do not match");
                 return;
@@ -2546,7 +2636,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function removeVaultMember(did) {
         try {
-            if (window.confirm(`Remove member from ${selectedVaultName}?`)) {
+            if (await showConfirm(`Remove member from ${selectedVaultName}?`)) {
                 await keymaster.removeVaultMember(selectedVaultName, did);
                 refreshVault(selectedVaultName);
             }
@@ -2696,7 +2786,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function removeVaultItem(name) {
         try {
-            if (window.confirm(`Remove item from ${selectedVaultName}?`)) {
+            if (await showConfirm(`Remove item from ${selectedVaultName}?`)) {
                 await keymaster.removeVaultItem(selectedVaultName, name);
                 refreshVault(selectedVaultName);
             }
@@ -3413,6 +3503,71 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 </Alert>
             </Snackbar>
 
+            <Dialog open={showMigrateDialog} onClose={closeMigrate}>
+                <DialogTitle>Migrate {migrateTarget}</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 1 }}>
+                        <RegistrySelect />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeMigrate}>Cancel</Button>
+                    <Button variant="contained" onClick={migrateId} disabled={!registry}>
+                        Migrate
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={showCloneDialog} onClose={closeClone}>
+                <DialogTitle>Clone {selectedName}</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <TextField
+                            label="Clone name"
+                            value={cloneName}
+                            onChange={(e) => setCloneName(e.target.value)}
+                            fullWidth
+                            autoFocus
+                        />
+                        <RegistrySelect />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeClone}>Cancel</Button>
+                    <Button variant="contained" onClick={cloneAsset} disabled={!cloneName || !registry}>
+                        Clone
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={confirmDialog.open} onClose={handleConfirmCancel}>
+                <DialogContent>
+                    <Box sx={{ whiteSpace: 'pre-line' }}>{confirmDialog.message}</Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleConfirmCancel}>Cancel</Button>
+                    <Button variant="contained" onClick={handleConfirmOk} autoFocus>OK</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={promptDialog.open} onClose={handlePromptCancel}>
+                <DialogContent>
+                    <Box sx={{ mb: 1 }}>{promptDialog.message}</Box>
+                    <TextField
+                        value={promptDialog.value}
+                        onChange={(e) => setPromptDialog(d => ({ ...d, value: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handlePromptOk(); }}
+                        fullWidth
+                        autoFocus
+                        margin="dense"
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handlePromptCancel}>Cancel</Button>
+                    <Button variant="contained" onClick={handlePromptOk}>OK</Button>
+                </DialogActions>
+            </Dialog>
+
             <header className="App-header">
 
                 <h1>{title}</h1>
@@ -3451,6 +3606,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             <Tab key="names" value="names" label={'DIDs'} icon={<List />} />
                         }
                         {currentId && !widget &&
+                            <Tab key="properties" value="properties" label={'Properties'} icon={<Tune />} />
+                        }
+                        {currentId && !widget &&
                             <Tab key="assets" value="assets" label={'Assets'} icon={<Token />} />
                         }
                         {currentId && !widget &&
@@ -3461,9 +3619,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                         }
                         {currentId && !widget &&
                             <Tab key="polls" value="polls" label={'Polls'} icon={<Poll />} />
-                        }
-                        {currentId && !widget &&
-                            <Tab key="properties" value="properties" label={'Properties'} icon={<Tune />} />
                         }
                         {currentId && !widget && hasLightning &&
                             <Tab key="lightning" value="lightning" label={'Lightning'} icon={<Bolt />} />
@@ -3529,6 +3684,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 <Grid item>
                                     <Button variant="contained" color="primary" onClick={rotateKeys}>
                                         Rotate keys
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => openMigrate(selectedId)}>
+                                        Migrate...
                                     </Button>
                                 </Grid>
                                 <Grid item>
@@ -3628,17 +3788,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     Add
                                                 </Button>
                                             </TableCell>
-                                            <TableCell>
-                                                <Button variant="contained" color="primary" onClick={cloneAsset} disabled={!alias || !aliasDID || !registry}>
-                                                    Clone
-                                                </Button>
-                                            </TableCell>
-                                            <TableCell colspan={2}>
-                                                <RegistrySelect />
-                                            </TableCell>
                                         </TableRow>
-                                        {Object.entries(aliasList).map(([alias, did], index) => (
-                                            <TableRow key={index}>
+                                        {Object.entries(aliasList).filter(([alias]) => !idList.includes(alias)).map(([alias, did], index) => (
+                                            <TableRow key={index} selected={alias === selectedName}>
                                                 <TableCell>
                                                     {getAliasIcon(alias)}
                                                     {alias}
@@ -3653,32 +3805,44 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                         Resolve
                                                     </Button>
                                                 </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => changeAlias(alias, did)}>
-                                                        Rename
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => removeAlias(alias)}>
-                                                        Remove
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => revokeAlias(alias)}>
-                                                        Revoke
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="contained" color="primary" onClick={() => transferAlias(alias)}>
-                                                        Transfer
-                                                    </Button>
-                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
                             <p>{selectedName}</p>
+                            <Grid container spacing={1} style={{ marginBottom: '8px' }}>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => changeAlias(selectedName, aliasList[selectedName])} disabled={!selectedName}>
+                                        Rename...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => removeAlias(selectedName)} disabled={!selectedName}>
+                                        Remove...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => revokeAlias(selectedName)} disabled={!selectedName || !aliasIsOwned}>
+                                        Revoke...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => transferAlias(selectedName)} disabled={!selectedName || !aliasIsOwned}>
+                                        Transfer...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={() => openMigrate(selectedName)} disabled={!selectedName || !aliasIsOwned}>
+                                        Migrate...
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={openClone} disabled={!selectedName || !aliasIsOwned}>
+                                        Clone...
+                                    </Button>
+                                </Grid>
+                            </Grid>
                             <VersionsNavigator
                                 version={aliasDocsVersion}
                                 maxVersion={aliasDocsVersionMax}

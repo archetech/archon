@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { buildDescriptors, getXpub } from '../../services/wallet/server/src/derivation';
+import { buildDescriptors } from '../../services/wallet/server/src/derivation';
 
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 

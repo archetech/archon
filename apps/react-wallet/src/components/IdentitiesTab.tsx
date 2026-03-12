@@ -5,6 +5,7 @@ import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
+import SelectInputModal from "../modals/SelectInputModal";
 import { useThemeContext } from "../contexts/ContextProviders";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import type { NostrKeys } from "@didcid/keymaster/types";
@@ -17,6 +18,7 @@ function IdentitiesTab() {
     const [recoverModalOpen, setRecoverModalOpen] = useState<boolean>(false);
     const [nostrKeys, setNostrKeys] = useState<NostrKeys | null>(null);
     const [removeNostrModal, setRemoveNostrModal] = useState<boolean>(false);
+    const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
     const [nsecValue, setNsecValue] = useState<string | null>(null);
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
@@ -147,6 +149,20 @@ function IdentitiesTab() {
         }
     }
 
+    async function migrateId(registry: string) {
+        if (!keymaster) {
+            return;
+        }
+        setMigrateOpen(false);
+        try {
+            await keymaster.changeRegistry(currentId, registry);
+            await refreshAll();
+            setSuccess(`${currentId} migrated to ${registry}`);
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
     const refreshNostr = useCallback(async () => {
         if (!keymaster || !currentDID) {
             setNostrKeys(null);
@@ -247,6 +263,17 @@ function IdentitiesTab() {
                 onClose={() => setRecoverModalOpen(false)}
             />
 
+            <SelectInputModal
+                isOpen={migrateOpen}
+                title="Migrate Identity"
+                description={`Select registry for ${currentId}`}
+                label="Registry"
+                confirmText="Migrate"
+                options={registries}
+                onSubmit={migrateId}
+                onClose={() => setMigrateOpen(false)}
+            />
+
             <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0, width: isTabletUp ? '80%' : '100%' }}>
                 <Box sx={{ display: 'flex', gap: 0, width: '100%', flexWrap: 'nowrap', flexDirection: 'row' }}>
                     <TextField
@@ -326,6 +353,14 @@ function IdentitiesTab() {
                             onClick={rotateKeys}
                         >
                             Rotate
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => setMigrateOpen(true)}
+                        >
+                            Migrate...
                         </Button>
 
                         {nostrKeys ? (

@@ -369,6 +369,19 @@ program
         }
     });
 
+program
+    .command('change-registry <id> <registry>')
+    .description('Changes the registry for an existing DID')
+    .action(async (id, registry) => {
+        try {
+            const ok = await keymaster.changeRegistry(id, registry);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
 // Encryption commands
 program
     .command('encrypt-message <message> <did>')
