@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { Box, Button, MenuItem, Select, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, MenuItem, Select, TextField, Typography } from "@mui/material";
+import { ExpandMore } from "@mui/icons-material";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
@@ -363,66 +364,77 @@ function IdentitiesTab() {
                             Migrate...
                         </Button>
 
-                        {nostrKeys ? (
-                            <Button
-                                variant="contained"
-                                color="error"
-                                onClick={() => setRemoveNostrModal(true)}
-                                sx={{ whiteSpace: 'nowrap' }}
-                            >
-                                Remove Nostr
-                            </Button>
-                        ) : (
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={addNostr}
-                                sx={{ whiteSpace: 'nowrap' }}
-                            >
-                                Add Nostr
-                            </Button>
-                        )}
-                        {nostrKeys && (
-                            nsecValue ? (
-                                <Button
-                                    variant="contained"
-                                    color="warning"
-                                    onClick={hideNsec}
-                                    sx={{ whiteSpace: 'nowrap' }}
-                                >
-                                    Hide nsec
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="contained"
-                                    color="warning"
-                                    onClick={showNsec}
-                                    sx={{ whiteSpace: 'nowrap' }}
-                                >
-                                    Show nsec
-                                </Button>
-                            )
-                        )}
                     </Box>
                 )}
-                {currentId && nostrKeys && (
-                    <Box sx={{ mt: 1 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                            npub: {nostrKeys.npub}
-                        </Typography>
-                        <br />
-                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                            pubkey: {nostrKeys.pubkey}
-                        </Typography>
-                        {nsecValue && (
-                            <>
-                                <br />
-                                <Typography variant="caption" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                    nsec: {nsecValue}
-                                </Typography>
-                            </>
-                        )}
-                    </Box>
+                {currentId && (
+                    <Accordion sx={{ mt: 1 }}>
+                        <AccordionSummary expandIcon={<ExpandMore />} sx={{ flexDirection: 'row-reverse', gap: 1 }}>
+                            <Typography>Nostr</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                                {nostrKeys ? (
+                                    <Button
+                                        variant="contained"
+                                        color="error"
+                                        onClick={() => setRemoveNostrModal(true)}
+                                        sx={{ whiteSpace: 'nowrap' }}
+                                    >
+                                        Remove Nostr
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={addNostr}
+                                        sx={{ whiteSpace: 'nowrap' }}
+                                    >
+                                        Add Nostr
+                                    </Button>
+                                )}
+                                {nostrKeys && (
+                                    nsecValue ? (
+                                        <Button
+                                            variant="contained"
+                                            color="warning"
+                                            onClick={hideNsec}
+                                            sx={{ whiteSpace: 'nowrap' }}
+                                        >
+                                            Hide nsec
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            variant="contained"
+                                            color="warning"
+                                            onClick={showNsec}
+                                            sx={{ whiteSpace: 'nowrap' }}
+                                        >
+                                            Show nsec
+                                        </Button>
+                                    )
+                                )}
+                            </Box>
+                            {nostrKeys && (
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                        npub: {nostrKeys.npub}
+                                    </Typography>
+                                    <br />
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                        pubkey: {nostrKeys.pubkey}
+                                    </Typography>
+                                    {nsecValue && (
+                                        <>
+                                            <br />
+                                            <Typography variant="caption" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                                nsec: {nsecValue}
+                                            </Typography>
+                                        </>
+                                    )}
+                                </Box>
+                            )}
+                        </AccordionDetails>
+                    </Accordion>
                 )}
             </Box>
         </Box>
