@@ -244,6 +244,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [eligiblePolls, setEligiblePolls] = useState({});
     const [migrateTarget, setMigrateTarget] = useState('');
     const [showMigrateDialog, setShowMigrateDialog] = useState(false);
+    const [showCloneDialog, setShowCloneDialog] = useState(false);
+    const [cloneName, setCloneName] = useState('');
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: "",
@@ -729,6 +731,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         setRegistry('');
     }
 
+    function openClone() {
+        setCloneName('');
+        setRegistry('');
+        setShowCloneDialog(true);
+    }
+
+    function closeClone() {
+        setShowCloneDialog(false);
+        setCloneName('');
+        setRegistry('');
+    }
+
     async function migrateId() {
         try {
             const ok = await keymaster.changeRegistry(migrateTarget, registry);
@@ -1098,7 +1112,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function cloneAsset() {
         try {
-            await keymaster.cloneAsset(aliasDID, { alias: alias, registry });
+            await keymaster.cloneAsset(aliasList[selectedName], { alias: cloneName, registry });
+            showSuccess(`${selectedName} cloned as ${cloneName}`);
+            closeClone();
             refreshNames();
         } catch (error) {
             const errorMessage = error.error || error.toString();
@@ -3461,6 +3477,28 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 </DialogActions>
             </Dialog>
 
+            <Dialog open={showCloneDialog} onClose={closeClone}>
+                <DialogTitle>Clone {selectedName}</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <TextField
+                            label="Clone name"
+                            value={cloneName}
+                            onChange={(e) => setCloneName(e.target.value)}
+                            fullWidth
+                            autoFocus
+                        />
+                        <RegistrySelect />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeClone}>Cancel</Button>
+                    <Button variant="contained" onClick={cloneAsset} disabled={!cloneName || !registry}>
+                        Clone
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <header className="App-header">
 
                 <h1>{title}</h1>
@@ -3681,14 +3719,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     Add
                                                 </Button>
                                             </TableCell>
-                                            <TableCell>
-                                                <Button variant="contained" color="primary" onClick={cloneAsset} disabled={!alias || !aliasDID || !registry}>
-                                                    Clone
-                                                </Button>
-                                            </TableCell>
-                                            <TableCell colspan={2}>
-                                                <RegistrySelect />
-                                            </TableCell>
                                         </TableRow>
                                         {Object.entries(aliasList).filter(([alias]) => !idList.includes(alias)).map(([alias, did], index) => (
                                             <TableRow key={index} selected={alias === selectedName}>
@@ -3736,6 +3766,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 <Grid item>
                                     <Button variant="contained" color="primary" onClick={() => openMigrate(selectedName)} disabled={!selectedName || !aliasIsOwned}>
                                         Migrate
+                                    </Button>
+                                </Grid>
+                                <Grid item>
+                                    <Button variant="contained" color="primary" onClick={openClone} disabled={!selectedName || !aliasIsOwned}>
+                                        Clone
                                     </Button>
                                 </Grid>
                             </Grid>
