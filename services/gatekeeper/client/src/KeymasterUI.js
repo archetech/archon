@@ -1147,6 +1147,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         try {
             if (window.confirm(`Are you sure you want to remove ${alias}?`)) {
                 await keymaster.removeAlias(alias);
+                setSelectedName('');
                 refreshNames();
             }
         } catch (error) {
