@@ -18,8 +18,9 @@ function AuthTab() {
     const [response, setResponse] = useState<string>("");
     const [disableSendResponse, setDisableSendResponse] = useState<boolean>(true);
     const [showChallengeDialog, setShowChallengeDialog] = useState<boolean>(false);
-    const [challengeSchemas, setChallengeSchemas] = useState<string[]>([]);
+    const [challengeCredentials, setChallengeCredentials] = useState<{ schema: string; issuer: string }[]>([]);
     const [challengeSchemaSelection, setChallengeSchemaSelection] = useState<string>("");
+    const [challengeIssuerSelection, setChallengeIssuerSelection] = useState<string>("");
     const { keymaster } = useWalletContext();
     const {
         setOpenBrowser,
@@ -30,7 +31,7 @@ function AuthTab() {
         setError,
         setWarning,
     } = useSnackbar();
-    const { schemaList } = useVariablesContext();
+    const { schemaList, agentList } = useVariablesContext();
 
     useEffect(() => {
         if (pendingChallenge && pendingChallenge !== challenge) {
@@ -41,8 +42,9 @@ function AuthTab() {
     }, [pendingChallenge]);
 
     function openChallengeDialog() {
-        setChallengeSchemas([]);
+        setChallengeCredentials([]);
         setChallengeSchemaSelection("");
+        setChallengeIssuerSelection("");
         setShowChallengeDialog(true);
     }
 
@@ -50,15 +52,19 @@ function AuthTab() {
         setShowChallengeDialog(false);
     }
 
-    function addChallengeSchema() {
-        if (challengeSchemaSelection && !challengeSchemas.includes(challengeSchemaSelection)) {
-            setChallengeSchemas([...challengeSchemas, challengeSchemaSelection]);
+    function addChallengeCredential() {
+        if (challengeSchemaSelection) {
+            setChallengeCredentials([...challengeCredentials, {
+                schema: challengeSchemaSelection,
+                issuer: challengeIssuerSelection || "",
+            }]);
             setChallengeSchemaSelection("");
+            setChallengeIssuerSelection("");
         }
     }
 
-    function removeChallengeSchema(schema: string) {
-        setChallengeSchemas(challengeSchemas.filter(s => s !== schema));
+    function removeChallengeCredential(index: number) {
+        setChallengeCredentials(challengeCredentials.filter((_, i) => i !== index));
     }
 
     async function newChallenge() {
@@ -67,12 +73,17 @@ function AuthTab() {
         }
         try {
             closeChallengeDialog();
-            const spec: { credentials?: { schema: string }[] } = {};
-            if (challengeSchemas.length > 0) {
-                const credentials: { schema: string }[] = [];
-                for (const name of challengeSchemas) {
-                    const did = await keymaster.lookupDID(name);
-                    credentials.push({ schema: did });
+            const spec: { credentials?: { schema: string; issuers?: string[] }[] } = {};
+            if (challengeCredentials.length > 0) {
+                const credentials: { schema: string; issuers?: string[] }[] = [];
+                for (const cred of challengeCredentials) {
+                    const schemaDid = await keymaster.lookupDID(cred.schema);
+                    const entry: { schema: string; issuers?: string[] } = { schema: schemaDid };
+                    if (cred.issuer) {
+                        const issuerDid = await keymaster.lookupDID(cred.issuer);
+                        entry.issuers = [issuerDid];
+                    }
+                    credentials.push(entry);
                 }
                 spec.credentials = credentials;
             }
@@ -319,7 +330,7 @@ function AuthTab() {
                 <DialogTitle>New Challenge</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" sx={{ mb: 2 }}>
-                        Add schemas to request specific credentials. Leave empty for an open challenge.
+                        Add credential requirements. Leave empty for an open challenge.
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
                         <Select
@@ -327,24 +338,37 @@ function AuthTab() {
                             onChange={(e) => setChallengeSchemaSelection(e.target.value)}
                             displayEmpty
                             size="small"
-                            sx={{ minWidth: 200 }}
+                            sx={{ minWidth: 180 }}
                         >
-                            <MenuItem value="" disabled>Select schema</MenuItem>
-                            {schemaList
-                                .filter((s: string) => !challengeSchemas.includes(s))
-                                .map((s: string) => (
-                                    <MenuItem key={s} value={s}>{s}</MenuItem>
-                                ))
-                            }
+                            <MenuItem value="" disabled>Schema</MenuItem>
+                            {schemaList.map((s: string) => (
+                                <MenuItem key={s} value={s}>{s}</MenuItem>
+                            ))}
                         </Select>
-                        <Button variant="contained" size="small" onClick={addChallengeSchema} disabled={!challengeSchemaSelection}>
+                        <Select
+                            value={challengeIssuerSelection}
+                            onChange={(e) => setChallengeIssuerSelection(e.target.value)}
+                            displayEmpty
+                            size="small"
+                            sx={{ minWidth: 180 }}
+                        >
+                            <MenuItem value="">Any issuer</MenuItem>
+                            {agentList.map((s: string) => (
+                                <MenuItem key={s} value={s}>{s}</MenuItem>
+                            ))}
+                        </Select>
+                        <Button variant="contained" size="small" onClick={addChallengeCredential} disabled={!challengeSchemaSelection}>
                             Add
                         </Button>
                     </Box>
-                    {challengeSchemas.length > 0 &&
+                    {challengeCredentials.length > 0 &&
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {challengeSchemas.map((s) => (
-                                <Chip key={s} label={s} onDelete={() => removeChallengeSchema(s)} />
+                            {challengeCredentials.map((cred, i) => (
+                                <Chip
+                                    key={i}
+                                    label={cred.issuer ? `${cred.schema} (${cred.issuer})` : cred.schema}
+                                    onDelete={() => removeChallengeCredential(i)}
+                                />
                             ))}
                         </Box>
                     }

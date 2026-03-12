@@ -252,8 +252,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [showCloneDialog, setShowCloneDialog] = useState(false);
     const [cloneName, setCloneName] = useState('');
     const [showChallengeDialog, setShowChallengeDialog] = useState(false);
-    const [challengeSchemas, setChallengeSchemas] = useState([]);
+    const [challengeCredentials, setChallengeCredentials] = useState([]);
     const [challengeSchemaSelection, setChallengeSchemaSelection] = useState('');
+    const [challengeIssuerSelection, setChallengeIssuerSelection] = useState('');
     const confirmResolve = useRef(null);
     const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '' });
     const promptResolve = useRef(null);
@@ -913,8 +914,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     function openChallengeDialog() {
-        setChallengeSchemas([]);
+        setChallengeCredentials([]);
         setChallengeSchemaSelection('');
+        setChallengeIssuerSelection('');
         setShowChallengeDialog(true);
     }
 
@@ -922,26 +924,35 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         setShowChallengeDialog(false);
     }
 
-    function addChallengeSchema() {
-        if (challengeSchemaSelection && !challengeSchemas.includes(challengeSchemaSelection)) {
-            setChallengeSchemas([...challengeSchemas, challengeSchemaSelection]);
+    function addChallengeCredential() {
+        if (challengeSchemaSelection) {
+            setChallengeCredentials([...challengeCredentials, {
+                schema: challengeSchemaSelection,
+                issuer: challengeIssuerSelection || '',
+            }]);
             setChallengeSchemaSelection('');
+            setChallengeIssuerSelection('');
         }
     }
 
-    function removeChallengeSchema(schema) {
-        setChallengeSchemas(challengeSchemas.filter(s => s !== schema));
+    function removeChallengeCredential(index) {
+        setChallengeCredentials(challengeCredentials.filter((_, i) => i !== index));
     }
 
     async function newChallenge() {
         try {
             closeChallengeDialog();
             const spec = {};
-            if (challengeSchemas.length > 0) {
+            if (challengeCredentials.length > 0) {
                 const credentials = [];
-                for (const name of challengeSchemas) {
-                    const did = await keymaster.lookupDID(name);
-                    credentials.push({ schema: did });
+                for (const cred of challengeCredentials) {
+                    const schemaDid = await keymaster.lookupDID(cred.schema);
+                    const entry = { schema: schemaDid };
+                    if (cred.issuer) {
+                        const issuerDid = await keymaster.lookupDID(cred.issuer);
+                        entry.issuers = [issuerDid];
+                    }
+                    credentials.push(entry);
                 }
                 spec.credentials = credentials;
             }
@@ -3583,7 +3594,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 <DialogTitle>New Challenge</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" sx={{ mb: 2 }}>
-                        Add schemas to request specific credentials. Leave empty for an open challenge.
+                        Add credential requirements. Leave empty for an open challenge.
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
                         <Select
@@ -3591,24 +3602,37 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             onChange={(e) => setChallengeSchemaSelection(e.target.value)}
                             displayEmpty
                             size="small"
-                            sx={{ minWidth: 200 }}
+                            sx={{ minWidth: 180 }}
                         >
-                            <MenuItem value="" disabled>Select schema</MenuItem>
-                            {schemaList && schemaList
-                                .filter(s => !challengeSchemas.includes(s))
-                                .map((s) => (
-                                    <MenuItem key={s} value={s}>{s}</MenuItem>
-                                ))
-                            }
+                            <MenuItem value="" disabled>Schema</MenuItem>
+                            {schemaList && schemaList.map((s) => (
+                                <MenuItem key={s} value={s}>{s}</MenuItem>
+                            ))}
                         </Select>
-                        <Button variant="contained" size="small" onClick={addChallengeSchema} disabled={!challengeSchemaSelection}>
+                        <Select
+                            value={challengeIssuerSelection}
+                            onChange={(e) => setChallengeIssuerSelection(e.target.value)}
+                            displayEmpty
+                            size="small"
+                            sx={{ minWidth: 180 }}
+                        >
+                            <MenuItem value="">Any issuer</MenuItem>
+                            {agentList && agentList.map((s) => (
+                                <MenuItem key={s} value={s}>{s}</MenuItem>
+                            ))}
+                        </Select>
+                        <Button variant="contained" size="small" onClick={addChallengeCredential} disabled={!challengeSchemaSelection}>
                             Add
                         </Button>
                     </Box>
-                    {challengeSchemas.length > 0 &&
+                    {challengeCredentials.length > 0 &&
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {challengeSchemas.map((s) => (
-                                <Chip key={s} label={s} onDelete={() => removeChallengeSchema(s)} />
+                            {challengeCredentials.map((cred, i) => (
+                                <Chip
+                                    key={i}
+                                    label={cred.issuer ? `${cred.schema} (${cred.issuer})` : cred.schema}
+                                    onDelete={() => removeChallengeCredential(i)}
+                                />
                             ))}
                         </Box>
                     }
