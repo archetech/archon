@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
     Alert,
     Autocomplete,
     Box,
@@ -52,6 +55,7 @@ import {
     Drafts,
     Edit,
     Email,
+    ExpandMore,
     Forward,
     HowToVote,
     Image,
@@ -3691,48 +3695,55 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         Migrate...
                                     </Button>
                                 </Grid>
-                                <Grid item>
-                                    {nostrKeys ?
-                                        <Button variant="contained" color="error" onClick={removeNostr}>
-                                            Remove Nostr
-                                        </Button>
-                                        :
-                                        <Button variant="contained" color="primary" onClick={addNostr}>
-                                            Add Nostr
-                                        </Button>
-                                    }
-                                </Grid>
-                                {nostrKeys &&
-                                    <Grid item>
-                                        {nsecString ? (
-                                            <Button variant="contained" color="warning" onClick={hideNsec}>
-                                                Hide nsec
-                                            </Button>
-                                        ) : (
-                                            <Button variant="contained" color="warning" onClick={showNsec}>
-                                                Show nsec
-                                            </Button>
-                                        )}
-                                    </Grid>
-                                }
                             </Grid>
-                            {nostrKeys &&
-                                <Box sx={{ mt: 2, mb: 1 }}>
-                                    <Typography variant="subtitle2" gutterBottom>Nostr Keys</Typography>
-                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                        <strong>npub:</strong> {nostrKeys.npub}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                        <strong>pubkey:</strong> {nostrKeys.pubkey}
-                                    </Typography>
-                                    {nsecString &&
-                                        <Typography variant="body2" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                            <strong>nsec:</strong> {nsecString}
-                                        </Typography>
+                            <Accordion sx={{ mt: 1 }}>
+                                <AccordionSummary expandIcon={<ExpandMore />} sx={{ flexDirection: 'row-reverse', gap: 1 }}>
+                                    <Typography>Nostr</Typography>
+                                </AccordionSummary>
+                                <AccordionDetails>
+                                    <Grid container spacing={1} sx={{ mb: 1 }}>
+                                        <Grid item>
+                                            {nostrKeys ?
+                                                <Button variant="contained" color="error" onClick={removeNostr}>
+                                                    Remove Nostr
+                                                </Button>
+                                                :
+                                                <Button variant="contained" color="primary" onClick={addNostr}>
+                                                    Add Nostr
+                                                </Button>
+                                            }
+                                        </Grid>
+                                        {nostrKeys &&
+                                            <Grid item>
+                                                {nsecString ? (
+                                                    <Button variant="contained" color="warning" onClick={hideNsec}>
+                                                        Hide nsec
+                                                    </Button>
+                                                ) : (
+                                                    <Button variant="contained" color="warning" onClick={showNsec}>
+                                                        Show nsec
+                                                    </Button>
+                                                )}
+                                            </Grid>
+                                        }
+                                    </Grid>
+                                    {nostrKeys &&
+                                        <Box>
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                                <strong>npub:</strong> {nostrKeys.npub}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                                <strong>pubkey:</strong> {nostrKeys.pubkey}
+                                            </Typography>
+                                            {nsecString &&
+                                                <Typography variant="body2" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                                    <strong>nsec:</strong> {nsecString}
+                                                </Typography>
+                                            }
+                                        </Box>
                                     }
-                                </Box>
-                            }
-                            <p />
+                                </AccordionDetails>
+                            </Accordion>
                             {!widget &&
                                 <Box>
                                     <VersionsNavigator
