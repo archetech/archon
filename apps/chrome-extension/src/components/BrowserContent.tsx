@@ -6,6 +6,7 @@ import {
     Badge,
     Bolt,
     Email,
+    Key,
     List,
     ManageSearch,
     PermIdentity,
@@ -30,6 +31,7 @@ import AssetsTab from "./AssetsTab";
 import DmailTab from "./DmailTab";
 import LightningTab from "./LightningTab";
 import PollTab from "./PollTab";
+import AuthTab from "./AuthTab";
 import PropertiesTab from "./PropertiesTab";
 
 function BrowserContent() {
@@ -203,6 +205,17 @@ function BrowserContent() {
 
                                 {displayComponent && (
                                     <Tab
+                                        icon={<Key />}
+                                        label={menuOpen ? "Auth" : ""}
+                                        value="auth"
+                                        iconPosition="start"
+                                        className="sidebarTab"
+                                        sx={{ gap: 0.25 }}
+                                    />
+                                )}
+
+                                {displayComponent && (
+                                    <Tab
                                         icon={<Email />}
                                         label={menuOpen ? "DMail" : ""}
                                         value="dmail"
@@ -311,6 +324,12 @@ function BrowserContent() {
                             <TabPanel value="identities" sx={{ p: 0 }}>
                                 <IdentitiesTab />
                             </TabPanel>
+
+                            {displayComponent && (
+                                <TabPanel value="auth" sx={{ p: 0 }}>
+                                    <AuthTab />
+                                </TabPanel>
+                            )}
 
                             {displayComponent && (
                                 <TabPanel value="dmail" sx={{ p: 0 }}>
