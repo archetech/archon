@@ -8,21 +8,26 @@ import WalletWeb from '@didcid/keymaster/wallet/web';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
-import KeymasterUI from './KeymasterUI.js';
+import KeymasterUI from './KeymasterUI.jsx';
 import PassphraseModal from './PassphraseModal';
 import WarningModal from './WarningModal';
 import MnemonicModal from './MnemonicModal';
 import { encryptWithPassphrase } from '@didcid/cipher/passphrase';
 import './App.css';
 
-global.Buffer = Buffer;
+globalThis.Buffer = Buffer;
 
-const gatekeeperUrl = window.location.origin;
+const gatekeeperUrl = import.meta.env.VITE_GATEKEEPER_URL || 'http://localhost:4224';
 const gatekeeper = new DrawbridgeClient();
 await gatekeeper.connect({ url: gatekeeperUrl });
 const cipher = new CipherWeb();
 
-const hasLightning = await gatekeeper.isLightningSupported();
+let hasLightning = false;
+try {
+    hasLightning = await gatekeeper.isLightningSupported();
+} catch {
+    // Drawbridge not available — Lightning features disabled
+}
 
 function App() {
     const [isReady, setIsReady] = useState(false);

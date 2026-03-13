@@ -12,14 +12,18 @@ COPY packages/ ./packages/
 RUN npm ci
 RUN npm run build
 
-COPY services/drawbridge ./drawbridge/
+COPY apps/gatekeeper-client ./apps/gatekeeper-client/
 
-RUN cd drawbridge/server && npm ci && npm run build
+WORKDIR /app/apps/gatekeeper-client
 
-WORKDIR /app/drawbridge
+RUN npm ci
+RUN npm run build
 
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
 
+ENV VITE_PORT=4225
+EXPOSE 4225
+
 # Run...
-CMD ["node", "server/dist/drawbridge-api.js"]
+CMD ["sh", "-c", "npm run preview -- --host 0.0.0.0 --port ${VITE_PORT}"]

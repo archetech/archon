@@ -1,30 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import KeymasterClient from '@didcid/keymaster/client';
-import KeymasterUI from './KeymasterUI.js';
-import LoginModal from './LoginModal.js';
+import KeymasterUI from './KeymasterUI.jsx';
+import LoginModal from './LoginModal.jsx';
 import './App.css';
+
+const keymasterUrl = import.meta.env.VITE_KEYMASTER_URL || 'http://localhost:4226';
 
 function App() {
     const [keymaster, setKeymaster] = useState(null);
-    const [showLogin, setShowLogin] = useState(false);
+    const [showLogin, setShowLogin] = useState(true);
     const [loginError, setLoginError] = useState('');
-
-    useEffect(() => {
-        const passphraseRequired = window.__ARCHON_CONFIG__?.passphraseRequired;
-
-        if (passphraseRequired) {
-            setShowLogin(true);
-        } else {
-            // Dev mode — get key (if any) without passphrase
-            login();
-        }
-    }, []);
 
     async function login(passphrase) {
         setLoginError('');
 
         try {
-            const res = await fetch('/api/v1/login', {
+            const res = await fetch(`${keymasterUrl}/api/v1/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ passphrase }),
@@ -38,6 +29,7 @@ function App() {
 
             const { adminApiKey } = await res.json();
             const km = new KeymasterClient();
+            await km.connect({ url: keymasterUrl });
             if (adminApiKey) {
                 km.addCustomHeader('Authorization', `Bearer ${adminApiKey}`);
             }

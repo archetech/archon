@@ -1,9 +1,7 @@
-import fs from 'fs';
 import { readFile } from 'fs/promises';
 import express from 'express';
+import cors from 'cors';
 import morgan from 'morgan';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
 import Keymaster from '@didcid/keymaster';
@@ -123,6 +121,8 @@ if (process.env.NODE_ENV === 'production') {
 } else {
     app.use(morgan('dev'));
 }
+app.use(cors());
+app.options('*', cors());
 app.use(express.json());
 
 // Metrics middleware - track HTTP requests
@@ -147,41 +147,7 @@ app.get('/metrics', async (req, res) => {
     }
 });
 
-// Define __dirname in ES module scope
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 const DIDNotFound = { error: 'DID not found' };
-
-const serveClient = (process.env.ARCHON_KEYMASTER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
-
-if (serveClient) {
-    const clientBuildDir = path.join(__dirname, '../../client/build');
-
-    // Serve the React frontend (index: false so our fallback handles it)
-    app.use(express.static(clientBuildDir, { index: false }));
-
-    // SPA fallback — inject server config into index.html
-    const indexPath = path.join(clientBuildDir, 'index.html');
-    let indexHtml = '';
-    try {
-        indexHtml = fs.readFileSync(indexPath, 'utf-8');
-    } catch {
-        // Client build not available
-    }
-
-    app.use((req, res, next) => {
-        if (!req.path.startsWith('/api')) {
-            if (!indexHtml) {
-                res.status(404).send('Client build not found');
-                return;
-            }
-            const configScript = `<script>window.__ARCHON_CONFIG__=${JSON.stringify({ passphraseRequired: !!config.keymasterPassphrase })};</script>`;
-            res.send(indexHtml.replace('</head>', `${configScript}</head>`));
-        } else {
-            next();
-        }
-    });
-}
 
 let gatekeeper: DrawbridgeClient;
 let keymaster: Keymaster;

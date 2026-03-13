@@ -49,7 +49,6 @@ services:
       - ARCHON_GATEKEEPER_GC_INTERVAL=${ARCHON_GATEKEEPER_GC_INTERVAL}
       - ARCHON_GATEKEEPER_STATUS_INTERVAL=${ARCHON_GATEKEEPER_STATUS_INTERVAL}
       - ARCHON_GATEKEEPER_UPLOAD_LIMIT=${ARCHON_GATEKEEPER_UPLOAD_LIMIT}
-      - ARCHON_GATEKEEPER_SERVE_CLIENT=${ARCHON_GATEKEEPER_SERVE_CLIENT}
       - ARCHON_GATEKEEPER_FALLBACK_URL=${ARCHON_GATEKEEPER_FALLBACK_URL}
       - ARCHON_GATEKEEPER_FALLBACK_TIMEOUT=${ARCHON_GATEKEEPER_FALLBACK_TIMEOUT}
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
@@ -83,7 +82,6 @@ services:
       - ARCHON_ENCRYPTED_PASSPHRASE=${ARCHON_ENCRYPTED_PASSPHRASE}
       - ARCHON_WALLET_CACHE=${ARCHON_WALLET_CACHE}
       - ARCHON_DEFAULT_REGISTRY=${ARCHON_DEFAULT_REGISTRY}
-      - ARCHON_KEYMASTER_SERVE_CLIENT=${ARCHON_KEYMASTER_SERVE_CLIENT}
       - ARCHON_KEYMASTER_UPLOAD_LIMIT=${ARCHON_KEYMASTER_UPLOAD_LIMIT}
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
@@ -159,6 +157,38 @@ services:
     depends_on:
       - gatekeeper
 
+  gatekeeper-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.gatekeeper-client
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/gatekeeper-client
+    environment:
+      - VITE_PORT=4225
+      - VITE_GATEKEEPER_URL=http://gatekeeper:4224
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "${ARCHON_GATEKEEPER_CLIENT_PORT:-4225}:4225"
+    depends_on:
+      - gatekeeper
+
+  keymaster-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.keymaster-client
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/keymaster-client
+    environment:
+      - VITE_PORT=4227
+      - VITE_KEYMASTER_URL=http://keymaster:4226
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "${ARCHON_KEYMASTER_CLIENT_PORT:-4227}:4227"
+    depends_on:
+      - keymaster
+
   react-wallet:
     build:
       context: .
@@ -206,6 +236,6 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_USERS_DEFAULT_THEME=dark
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${ARCHON_GRAFANA_PORT:-3000}:3000"
     depends_on:
       - prometheus

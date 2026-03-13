@@ -3900,70 +3900,89 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     }
                     {tab === 'names' &&
                         <Box>
-                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
-                                <TextField
-                                    label="Name"
-                                    style={{ width: '200px' }}
-                                    value={alias}
-                                    onChange={(e) => setAlias(e.target.value)}
-                                    margin="normal"
-                                    inputProps={{ maxLength: 20 }}
-                                />
-                                <TextField
-                                    label="DID"
-                                    style={{ width: '500px' }}
-                                    value={aliasDID}
-                                    onChange={(e) => setAliasDID(e.target.value.trim())}
-                                    margin="normal"
-                                    inputProps={{ maxLength: 80 }}
-                                />
-                                <Button variant="contained" color="primary" onClick={() => resolveAlias(aliasDID)} disabled={!aliasDID}>
-                                    Resolve
-                                </Button>
-                                <Button variant="contained" color="primary" onClick={addAlias} disabled={!alias || !aliasDID}>
-                                    Add
-                                </Button>
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
-                                <TextField
-                                    label="Search"
-                                    size="small"
-                                    value={nameSearch}
-                                    onChange={(e) => setNameSearch(e.target.value)}
-                                    style={{ width: '200px' }}
-                                    slotProps={{
-                                        input: {
-                                            endAdornment: nameSearch && (
-                                                <IconButton size="small" onClick={() => setNameSearch('')}>
-                                                    <Clear fontSize="small" />
-                                                </IconButton>
-                                            ),
-                                        },
-                                    }}
-                                />
-                                <Select
-                                    size="small"
-                                    value={nameTypeFilter}
-                                    onChange={(e) => setNameTypeFilter(e.target.value)}
-                                    style={{ width: '160px' }}
-                                >
-                                    <MenuItem value="all">Type: All</MenuItem>
-                                    <MenuItem value="agent">Agents</MenuItem>
-                                    <MenuItem value="file">Documents</MenuItem>
-                                    <MenuItem value="group">Groups</MenuItem>
-                                    <MenuItem value="image">Images</MenuItem>
-                                    <MenuItem value="poll">Polls</MenuItem>
-                                    <MenuItem value="schema">Schemas</MenuItem>
-                                    <MenuItem value="vault">Vaults</MenuItem>
-                                    <MenuItem value="unknown">Unknown</MenuItem>
-                                </Select>
-                            </Box>
-                            <TableContainer component={Paper} style={{ maxHeight: '300px', overflow: 'auto' }}>
-                                <Table style={{ width: '800px' }}>
+                            <TableContainer component={Paper} style={{ maxHeight: '400px', overflow: 'auto' }}>
+                                <Table stickyHeader style={{ width: '1000px', tableLayout: 'fixed' }}>
+                                    <colgroup>
+                                        <col style={{ width: '200px' }} />
+                                        <col />
+                                        <col style={{ width: '160px' }} />
+                                    </colgroup>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell style={{ borderBottom: 'none' }}>
+                                                <TextField
+                                                    label="Name"
+                                                    size="small"
+                                                    fullWidth
+                                                    value={alias}
+                                                    onChange={(e) => setAlias(e.target.value)}
+                                                    inputProps={{ maxLength: 20 }}
+                                                />
+                                            </TableCell>
+                                            <TableCell style={{ borderBottom: 'none' }}>
+                                                <TextField
+                                                    label="DID"
+                                                    size="small"
+                                                    fullWidth
+                                                    value={aliasDID}
+                                                    onChange={(e) => setAliasDID(e.target.value.trim())}
+                                                    inputProps={{ maxLength: 80 }}
+                                                />
+                                            </TableCell>
+                                            <TableCell style={{ borderBottom: 'none', whiteSpace: 'nowrap' }}>
+                                                <Button variant="contained" color="primary" onClick={() => resolveAlias(aliasDID)} disabled={!aliasDID}>
+                                                    Resolve
+                                                </Button>
+                                                {' '}
+                                                <Button variant="contained" color="primary" onClick={addAlias} disabled={!alias || !aliasDID}>
+                                                    Add
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell style={{ borderBottom: 'none' }}>
+                                                <TextField
+                                                    label="Search"
+                                                    size="small"
+                                                    fullWidth
+                                                    value={nameSearch}
+                                                    onChange={(e) => setNameSearch(e.target.value)}
+                                                    slotProps={{
+                                                        input: {
+                                                            endAdornment: nameSearch && (
+                                                                <IconButton size="small" onClick={() => setNameSearch('')}>
+                                                                    <Clear fontSize="small" />
+                                                                </IconButton>
+                                                            ),
+                                                        },
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            <TableCell style={{ borderBottom: 'none' }}>
+                                                <Select
+                                                    size="small"
+                                                    value={nameTypeFilter}
+                                                    onChange={(e) => setNameTypeFilter(e.target.value)}
+                                                    style={{ width: '160px' }}
+                                                >
+                                                    <MenuItem value="all">Type: All</MenuItem>
+                                                    <MenuItem value="agent">Agents</MenuItem>
+                                                    <MenuItem value="file">Documents</MenuItem>
+                                                    <MenuItem value="group">Groups</MenuItem>
+                                                    <MenuItem value="image">Images</MenuItem>
+                                                    <MenuItem value="poll">Polls</MenuItem>
+                                                    <MenuItem value="schema">Schemas</MenuItem>
+                                                    <MenuItem value="vault">Vaults</MenuItem>
+                                                    <MenuItem value="unknown">Unknown</MenuItem>
+                                                </Select>
+                                            </TableCell>
+                                            <TableCell style={{ borderBottom: 'none' }} />
+                                        </TableRow>
+                                    </TableHead>
                                     <TableBody>
                                         {filteredAliases.map(([alias, did], index) => (
                                             <TableRow key={index} selected={alias === selectedName}>
-                                                <TableCell style={{ width: '200px' }}>
+                                                <TableCell>
                                                     {getAliasIcon(alias)}
                                                     {alias}
                                                 </TableCell>

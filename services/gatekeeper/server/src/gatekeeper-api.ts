@@ -1,8 +1,6 @@
 import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { EventEmitter } from 'events';
 import Gatekeeper from '@didcid/gatekeeper';
@@ -186,26 +184,6 @@ app.get('/metrics', async (req, res) => {
         res.status(500).end(error.toString());
     }
 });
-
-// Define __dirname in ES module scope
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const serveClient = (process.env.ARCHON_GATEKEEPER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
-
-if (serveClient) {
-    const clientBuildDir = path.join(__dirname, '../../client/build');
-
-    // Serve the React frontend
-    app.use(express.static(clientBuildDir));
-
-    app.use((req, res, next) => {
-        if (!req.path.startsWith('/api')) {
-            res.sendFile(path.join(clientBuildDir, 'index.html'));
-        } else {
-            next();
-        }
-    });
-}
 
 let serverReady = false;
 
