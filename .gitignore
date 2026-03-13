@@ -14,3 +14,4 @@ dids.db-journal
 
 
 **/.npmrc
+data/liquid/
