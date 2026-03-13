@@ -8,9 +8,11 @@ import {
     DEFAULT_GATEKEEPER_URL,
     GATEKEEPER_KEY,
 } from "../constants";
+import packageJson from "../../package.json";
 
 const SettingsTab = () => {
     const [gatekeeperUrl, setGatekeeperUrl] = useState<string>(DEFAULT_GATEKEEPER_URL);
+    const [serverVersion, setServerVersion] = useState<string>("");
     const {
         darkMode,
         handleDarkModeToggle,
@@ -33,6 +35,14 @@ const SettingsTab = () => {
             }
         };
         init();
+    }, []);
+
+    useEffect(() => {
+        const url = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
+        fetch(`${url}/api/v1/version`)
+            .then(r => r.json())
+            .then(data => setServerVersion(`${data.version} (${data.commit})`))
+            .catch(() => {});
     }, []);
 
     const handleSave = async () => {
@@ -81,6 +91,18 @@ const SettingsTab = () => {
             >
                 Save
             </Button>
+
+            <Box sx={{ mt: 3, opacity: 0.6 }}>
+                <Typography variant="caption" display="block">
+                    Client v{packageJson.version}
+                </Typography>
+                <Typography variant="caption" display="block">
+                    Server v{serverVersion || "..."}
+                </Typography>
+                <Typography variant="caption" display="block">
+                    {gatekeeperUrl}
+                </Typography>
+            </Box>
         </Box>
     );
 };
