@@ -37,12 +37,16 @@ const SettingsTab = () => {
         init();
     }, []);
 
-    useEffect(() => {
-        const url = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
+    const fetchServerVersion = (url: string) => {
         fetch(`${url}/api/v1/version`)
             .then(r => r.json())
             .then(data => setServerVersion(`${data.version} (${data.commit})`))
             .catch(() => {});
+    };
+
+    useEffect(() => {
+        const url = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
+        fetchServerVersion(url);
     }, []);
 
     const handleSave = async () => {
@@ -50,6 +54,7 @@ const SettingsTab = () => {
             localStorage.setItem(GATEKEEPER_KEY, gatekeeperUrl);
             await initialiseServices();
             await initialiseWallet();
+            fetchServerVersion(gatekeeperUrl);
             setSuccess("Services updated");
         } catch (error: any) {
             console.error("Error saving URLs:", error);

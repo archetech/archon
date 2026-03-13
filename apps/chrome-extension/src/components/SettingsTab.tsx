@@ -14,6 +14,13 @@ const SettingsTab = () => {
     } = useWalletContext();
     const { setSuccess } = useSnackbar();
 
+    const fetchServerVersion = (url: string) => {
+        fetch(`${url}/api/v1/version`)
+            .then(r => r.json())
+            .then(data => setServerVersion(`${data.version} (${data.commit})`))
+            .catch(() => {});
+    };
+
     useEffect(() => {
         const init = async () => {
             try {
@@ -22,10 +29,7 @@ const SettingsTab = () => {
                 setGatekeeperUrl(url);
 
                 if (url) {
-                    fetch(`${url}/api/v1/version`)
-                        .then(r => r.json())
-                        .then(data => setServerVersion(`${data.version} (${data.commit})`))
-                        .catch(() => {});
+                    fetchServerVersion(url);
                 }
             } catch (error: any) {
                 console.error("Error retrieving gatekeeperUrl:", error);
@@ -39,6 +43,7 @@ const SettingsTab = () => {
             await chrome.storage.sync.set({ gatekeeperUrl });
             await initialiseServices();
             await initialiseWallet();
+            fetchServerVersion(gatekeeperUrl);
             setSuccess("Services updated");
         } catch (error: any) {
             console.error("Error saving URLs:", error);
