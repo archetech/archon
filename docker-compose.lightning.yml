@@ -127,7 +127,7 @@ services:
       - ./scripts/rtl-entrypoint.sh:/scripts/rtl-entrypoint.sh:ro
       - ./data/cln-mainnet/rtl:/data
     ports:
-      - "127.0.0.1:${ARCHON_RTL_PORT:-3002}:3000"
+      - "${ARCHON_RTL_PORT:-3002}:3000"
     depends_on:
       rtl-init:
         condition: service_completed_successfully
@@ -216,7 +216,7 @@ services:
       - ./data/cln-mainnet:/data/lightning:ro
       - ./data/lnbits:/data/lnbits
     ports:
-      - "127.0.0.1:${ARCHON_LNBITS_PORT:-5000}:5000"
+      - "${ARCHON_LNBITS_PORT:-5000}:5000"
     depends_on:
       lnbits-init:
         condition: service_completed_successfully

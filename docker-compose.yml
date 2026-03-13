@@ -169,7 +169,7 @@ services:
       - VITE_GATEKEEPER_URL=http://gatekeeper:4224
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
-      - "127.0.0.1:4225:4225"
+      - "${ARCHON_GATEKEEPER_CLIENT_PORT:-4225}:4225"
     depends_on:
       - gatekeeper
 
@@ -185,7 +185,7 @@ services:
       - VITE_KEYMASTER_URL=http://keymaster:4226
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
-      - "127.0.0.1:4227:4227"
+      - "${ARCHON_KEYMASTER_CLIENT_PORT:-4227}:4227"
     depends_on:
       - keymaster
 
@@ -236,6 +236,6 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_USERS_DEFAULT_THEME=dark
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${ARCHON_GRAFANA_PORT:-3000}:3000"
     depends_on:
       - prometheus
