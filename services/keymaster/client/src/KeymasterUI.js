@@ -3956,7 +3956,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                     <TableBody>
                                         {filteredAliases.map(([alias, did], index) => (
                                             <TableRow key={index} selected={alias === selectedName}>
-                                                <TableCell>
+                                                <TableCell style={{ width: '200px' }}>
                                                     {getAliasIcon(alias)}
                                                     {alias}
                                                 </TableCell>
