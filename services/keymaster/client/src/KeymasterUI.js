@@ -8,6 +8,7 @@ import {
     Box,
     Button,
     Checkbox,
+    Chip,
     Dialog,
     DialogActions,
     DialogContent,
@@ -250,6 +251,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [showMigrateDialog, setShowMigrateDialog] = useState(false);
     const [showCloneDialog, setShowCloneDialog] = useState(false);
     const [cloneName, setCloneName] = useState('');
+    const [showChallengeDialog, setShowChallengeDialog] = useState(false);
+    const [challengeCredentials, setChallengeCredentials] = useState([]);
+    const [challengeSchemaSelection, setChallengeSchemaSelection] = useState('');
+    const [challengeIssuerSelection, setChallengeIssuerSelection] = useState('');
     const confirmResolve = useRef(null);
     const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '' });
     const promptResolve = useRef(null);
@@ -908,9 +913,50 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         setNsecString('');
     }
 
+    function openChallengeDialog() {
+        setChallengeCredentials([]);
+        setChallengeSchemaSelection('');
+        setChallengeIssuerSelection('');
+        setShowChallengeDialog(true);
+    }
+
+    function closeChallengeDialog() {
+        setShowChallengeDialog(false);
+    }
+
+    function addChallengeCredential() {
+        if (challengeSchemaSelection) {
+            setChallengeCredentials([...challengeCredentials, {
+                schema: challengeSchemaSelection,
+                issuer: challengeIssuerSelection || '',
+            }]);
+            setChallengeSchemaSelection('');
+            setChallengeIssuerSelection('');
+        }
+    }
+
+    function removeChallengeCredential(index) {
+        setChallengeCredentials(challengeCredentials.filter((_, i) => i !== index));
+    }
+
     async function newChallenge() {
         try {
-            const challenge = await keymaster.createChallenge();
+            const spec = {};
+            if (challengeCredentials.length > 0) {
+                const credentials = [];
+                for (const cred of challengeCredentials) {
+                    const schemaDid = await keymaster.lookupDID(cred.schema);
+                    const entry = { schema: schemaDid };
+                    if (cred.issuer) {
+                        const issuerDid = await keymaster.lookupDID(cred.issuer);
+                        entry.issuers = [issuerDid];
+                    }
+                    credentials.push(entry);
+                }
+                spec.credentials = credentials;
+            }
+            const challenge = await keymaster.createChallenge(spec);
+            closeChallengeDialog();
             setChallenge(challenge);
             resolveChallenge(challenge);
         } catch (error) {
@@ -967,7 +1013,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             const verify = await keymaster.verifyResponse(response);
 
             if (verify.match) {
-                showError("Response is VALID");
+                showSuccess("Response is VALID");
                 setAccessGranted(true);
             }
             else {
@@ -3544,6 +3590,61 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 </DialogActions>
             </Dialog>
 
+            <Dialog open={showChallengeDialog} onClose={closeChallengeDialog}>
+                <DialogTitle>New Challenge</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Add credential requirements. Leave empty for an open challenge.
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
+                        <Select
+                            value={challengeSchemaSelection}
+                            onChange={(e) => setChallengeSchemaSelection(e.target.value)}
+                            displayEmpty
+                            size="small"
+                            sx={{ minWidth: 180 }}
+                        >
+                            <MenuItem value="" disabled>Schema</MenuItem>
+                            {schemaList && schemaList.map((s) => (
+                                <MenuItem key={s} value={s}>{s}</MenuItem>
+                            ))}
+                        </Select>
+                        <Select
+                            value={challengeIssuerSelection}
+                            onChange={(e) => setChallengeIssuerSelection(e.target.value)}
+                            displayEmpty
+                            size="small"
+                            sx={{ minWidth: 180 }}
+                        >
+                            <MenuItem value="">Any issuer</MenuItem>
+                            {agentList && agentList.map((s) => (
+                                <MenuItem key={s} value={s}>{s}</MenuItem>
+                            ))}
+                        </Select>
+                        <Button variant="contained" size="small" onClick={addChallengeCredential} disabled={!challengeSchemaSelection}>
+                            Add
+                        </Button>
+                    </Box>
+                    {challengeCredentials.length > 0 &&
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {challengeCredentials.map((cred, i) => (
+                                <Chip
+                                    key={i}
+                                    label={cred.issuer ? `${cred.schema} (${cred.issuer})` : cred.schema}
+                                    onDelete={() => removeChallengeCredential(i)}
+                                />
+                            ))}
+                        </Box>
+                    }
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeChallengeDialog}>Cancel</Button>
+                    <Button variant="contained" onClick={newChallenge}>
+                        Create
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <Dialog open={confirmDialog.open} onClose={handleConfirmCancel}>
                 <DialogContent>
                     <Box sx={{ whiteSpace: 'pre-line' }}>{confirmDialog.message}</Box>
@@ -5933,8 +6034,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             <br />
                                             <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={newChallenge}>
-                                                        New
+                                                    <Button variant="contained" color="primary" onClick={openChallengeDialog}>
+                                                        New...
                                                     </Button>
                                                 </Grid>
                                                 <Grid item>
