@@ -249,6 +249,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [eligiblePolls, setEligiblePolls] = useState({});
     const [migrateTarget, setMigrateTarget] = useState('');
     const [showMigrateDialog, setShowMigrateDialog] = useState(false);
+    const [nameSearch, setNameSearch] = useState('');
+    const [nameTypeFilter, setNameTypeFilter] = useState('all');
     const [showCloneDialog, setShowCloneDialog] = useState(false);
     const [cloneName, setCloneName] = useState('');
     const [showChallengeDialog, setShowChallengeDialog] = useState(false);
@@ -1187,9 +1189,36 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             return <Article style={iconStyle} />;
         }
 
-        // Add more types as needed, e.g. images, pdf, etc.
+        if (pollList && pollList.includes(alias)) {
+            return <Poll style={iconStyle} />;
+        }
+
         return <Token style={iconStyle} />;
     }
+
+    function getAliasKind(alias) {
+        if (agentList && agentList.includes(alias)) return 'agent';
+        if (vaultList && vaultList.includes(alias)) return 'vault';
+        if (groupList && groupList.includes(alias)) return 'group';
+        if (schemaList && schemaList.includes(alias)) return 'schema';
+        if (imageList && imageList.includes(alias)) return 'image';
+        if (fileList && fileList.includes(alias)) return 'file';
+        if (pollList && pollList.includes(alias)) return 'poll';
+        return 'unknown';
+    }
+
+    const filteredAliases = useMemo(() => {
+        if (!aliasList) return [];
+        return Object.entries(aliasList)
+            .filter(([alias]) => !idList.includes(alias))
+            .filter(([alias]) => {
+                const passesSearch = !nameSearch || alias.toLowerCase().includes(nameSearch.toLowerCase());
+                const passesType = nameTypeFilter === 'all' || getAliasKind(alias) === nameTypeFilter;
+                return passesSearch && passesType;
+            })
+            .sort(([a], [b]) => a.localeCompare(b));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [aliasList, idList, nameSearch, nameTypeFilter, agentList, vaultList, groupList, schemaList, imageList, fileList, pollList]);
 
     async function addAlias() {
         try {
@@ -3864,44 +3893,68 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     }
                     {tab === 'names' &&
                         <Box>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                                <TextField
+                                    label="Name"
+                                    style={{ width: '200px' }}
+                                    value={alias}
+                                    onChange={(e) => setAlias(e.target.value)}
+                                    margin="normal"
+                                    inputProps={{ maxLength: 20 }}
+                                />
+                                <TextField
+                                    label="DID"
+                                    style={{ width: '500px' }}
+                                    value={aliasDID}
+                                    onChange={(e) => setAliasDID(e.target.value.trim())}
+                                    margin="normal"
+                                    inputProps={{ maxLength: 80 }}
+                                />
+                                <Button variant="contained" color="primary" onClick={() => resolveAlias(aliasDID)} disabled={!aliasDID}>
+                                    Resolve
+                                </Button>
+                                <Button variant="contained" color="primary" onClick={addAlias} disabled={!alias || !aliasDID}>
+                                    Add
+                                </Button>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                                <TextField
+                                    label="Search"
+                                    size="small"
+                                    value={nameSearch}
+                                    onChange={(e) => setNameSearch(e.target.value)}
+                                    style={{ width: '200px' }}
+                                    slotProps={{
+                                        input: {
+                                            endAdornment: nameSearch && (
+                                                <IconButton size="small" onClick={() => setNameSearch('')}>
+                                                    <Clear fontSize="small" />
+                                                </IconButton>
+                                            ),
+                                        },
+                                    }}
+                                />
+                                <Select
+                                    size="small"
+                                    value={nameTypeFilter}
+                                    onChange={(e) => setNameTypeFilter(e.target.value)}
+                                    style={{ width: '160px' }}
+                                >
+                                    <MenuItem value="all">Type: All</MenuItem>
+                                    <MenuItem value="agent">Agents</MenuItem>
+                                    <MenuItem value="file">Documents</MenuItem>
+                                    <MenuItem value="group">Groups</MenuItem>
+                                    <MenuItem value="image">Images</MenuItem>
+                                    <MenuItem value="poll">Polls</MenuItem>
+                                    <MenuItem value="schema">Schemas</MenuItem>
+                                    <MenuItem value="vault">Vaults</MenuItem>
+                                    <MenuItem value="unknown">Unknown</MenuItem>
+                                </Select>
+                            </Box>
                             <TableContainer component={Paper} style={{ maxHeight: '300px', overflow: 'auto' }}>
                                 <Table style={{ width: '800px' }}>
                                     <TableBody>
-                                        <TableRow>
-                                            <TableCell style={{ width: '100%' }}>
-                                                <TextField
-                                                    label="Name"
-                                                    style={{ width: '200px' }}
-                                                    value={alias}
-                                                    onChange={(e) => setAlias(e.target.value)}
-                                                    fullWidth
-                                                    margin="normal"
-                                                    inputProps={{ maxLength: 20 }}
-                                                />
-                                            </TableCell>
-                                            <TableCell style={{ width: '100%' }}>
-                                                <TextField
-                                                    label="DID"
-                                                    style={{ width: '500px' }}
-                                                    value={aliasDID}
-                                                    onChange={(e) => setAliasDID(e.target.value.trim())}
-                                                    fullWidth
-                                                    margin="normal"
-                                                    inputProps={{ maxLength: 80 }}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button variant="contained" color="primary" onClick={() => resolveAlias(aliasDID)} disabled={!aliasDID}>
-                                                    Resolve
-                                                </Button>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button variant="contained" color="primary" onClick={addAlias} disabled={!alias || !aliasDID}>
-                                                    Add
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                        {Object.entries(aliasList).filter(([alias]) => !idList.includes(alias)).map(([alias, did], index) => (
+                                        {filteredAliases.map(([alias, did], index) => (
                                             <TableRow key={index} selected={alias === selectedName}>
                                                 <TableCell>
                                                     {getAliasIcon(alias)}
