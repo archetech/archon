@@ -17,6 +17,7 @@ import {
     ArrowDropDown,
     Article,
     Block,
+    Clear,
     Delete,
     Edit,
     Groups,
@@ -54,6 +55,7 @@ function AliasedDIDs() {
     const [bulkMenuAnchor, setBulkMenuAnchor] = useState<null | HTMLElement>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [lastIndex, setLastIndex] = useState<number | null>(null);
+    const [nameSearch, setNameSearch] = useState<string>("");
     type NameKind =
           | "all"
           | "agent"
@@ -119,6 +121,7 @@ function AliasedDIDs() {
         return Object.entries({ ...aliasList, ...unresolvedList })
             .sort(([a], [b]) => a.localeCompare(b))
             .filter(([alias]) => {
+                const passesSearch = !nameSearch || alias.toLowerCase().includes(nameSearch.toLowerCase());
                 const { kind } = getAliasIcon(alias);
                 const passesKind = (filter === "all" || kind === filter);
 
@@ -126,10 +129,10 @@ function AliasedDIDs() {
                 const regTag: RegistryFilter = reg ?? "unresolved";
                 const passesRegistry = (registryFilter === "all" || regTag === registryFilter);
 
-                return passesKind && passesRegistry;
+                return passesSearch && passesKind && passesRegistry;
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [aliasList, aliasRegistry, unresolvedList, filter, registryFilter]);
+    }, [aliasList, aliasRegistry, unresolvedList, nameSearch, filter, registryFilter]);
 
     useEffect(() => {
         if (!openBrowser) {
@@ -499,6 +502,23 @@ function AliasedDIDs() {
                         </MenuItem>
                     </Menu>
                 </Box>
+
+                <TextField
+                    label="Search"
+                    size="small"
+                    value={nameSearch}
+                    onChange={(e) => setNameSearch(e.target.value)}
+                    sx={{ width: 150 }}
+                    slotProps={{
+                        input: {
+                            endAdornment: nameSearch ? (
+                                <IconButton size="small" onClick={() => setNameSearch("")}>
+                                    <Clear fontSize="small" />
+                                </IconButton>
+                            ) : undefined,
+                        },
+                    }}
+                />
 
                 <Select
                     size="small"
