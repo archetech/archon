@@ -1,22 +1,36 @@
 import React, { useState, useEffect } from "react";
-import { Box, Button, TextField } from "@mui/material";
+import { Box, Button, TextField, Typography } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
+import packageJson from "../../package.json";
 
 const SettingsTab = () => {
     const [gatekeeperUrl, setGatekeeperUrl] = useState<string>("");
+    const [serverVersion, setServerVersion] = useState<string>("");
     const {
         initialiseServices,
         initialiseWallet
     } = useWalletContext();
     const { setSuccess } = useSnackbar();
 
+    const fetchServerVersion = (url: string) => {
+        fetch(`${url}/api/v1/version`)
+            .then(r => r.json())
+            .then(data => setServerVersion(`${data.version} (${data.commit})`))
+            .catch(() => {});
+    };
+
     useEffect(() => {
         const init = async () => {
             try {
                 const result = await chrome.storage.sync.get(["gatekeeperUrl"]);
-                setGatekeeperUrl(result.gatekeeperUrl as string);
+                const url = result.gatekeeperUrl as string;
+                setGatekeeperUrl(url);
+
+                if (url) {
+                    fetchServerVersion(url);
+                }
             } catch (error: any) {
                 console.error("Error retrieving gatekeeperUrl:", error);
             }
@@ -29,6 +43,7 @@ const SettingsTab = () => {
             await chrome.storage.sync.set({ gatekeeperUrl });
             await initialiseServices();
             await initialiseWallet();
+            fetchServerVersion(gatekeeperUrl);
             setSuccess("Services updated");
         } catch (error: any) {
             console.error("Error saving URLs:", error);
@@ -57,6 +72,12 @@ const SettingsTab = () => {
             >
                 Save
             </Button>
+
+            <Box sx={{ mt: 3, opacity: 0.6 }}>
+                <Typography variant="caption" display="block">
+                    Client v{packageJson.version} | Server v{serverVersion || "..."}
+                </Typography>
+            </Box>
         </Box>
     );
 };

@@ -92,6 +92,7 @@ import './App.css';
 import PollResultsModal from "./PollResultsModal";
 import TextInputModal from "./TextInputModal";
 import WarningModal from "./WarningModal";
+import packageJson from "../package.json";
 
 // TBD figure out how to import an enum from keymaster package
 const DmailTags = {
@@ -251,6 +252,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [showMigrateDialog, setShowMigrateDialog] = useState(false);
     const [nameSearch, setNameSearch] = useState('');
     const [nameTypeFilter, setNameTypeFilter] = useState('all');
+    const [serverVersion, setServerVersion] = useState('');
     const [showCloneDialog, setShowCloneDialog] = useState(false);
     const [cloneName, setCloneName] = useState('');
     const [showChallengeDialog, setShowChallengeDialog] = useState(false);
@@ -308,6 +310,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     useEffect(() => {
         checkForChallenge();
         refreshAll();
+
+        fetch('/api/v1/version')
+            .then(r => r.json())
+            .then(data => setServerVersion(`${data.version} (${data.commit})`))
+            .catch(() => {});
         // eslint-disable-next-line
     }, []);
 
@@ -6526,6 +6533,20 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     />
                 </Box>
             </header>
+            <Box
+                component="footer"
+                sx={{
+                    mt: 2,
+                    py: 1,
+                    px: 2,
+                    opacity: 0.6,
+                    fontSize: '0.75rem',
+                }}
+            >
+                <Typography variant="caption">
+                    Client v{packageJson.version} | Server v{serverVersion || '...'}
+                </Typography>
+            </Box>
         </div >
     );
 }

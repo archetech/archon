@@ -8,9 +8,11 @@ import {
     DEFAULT_GATEKEEPER_URL,
     GATEKEEPER_KEY,
 } from "../constants";
+import packageJson from "../../package.json";
 
 const SettingsTab = () => {
     const [gatekeeperUrl, setGatekeeperUrl] = useState<string>(DEFAULT_GATEKEEPER_URL);
+    const [serverVersion, setServerVersion] = useState<string>("");
     const {
         darkMode,
         handleDarkModeToggle,
@@ -35,11 +37,24 @@ const SettingsTab = () => {
         init();
     }, []);
 
+    const fetchServerVersion = (url: string) => {
+        fetch(`${url}/api/v1/version`)
+            .then(r => r.json())
+            .then(data => setServerVersion(`${data.version} (${data.commit})`))
+            .catch(() => {});
+    };
+
+    useEffect(() => {
+        const url = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
+        fetchServerVersion(url);
+    }, []);
+
     const handleSave = async () => {
         try {
             localStorage.setItem(GATEKEEPER_KEY, gatekeeperUrl);
             await initialiseServices();
             await initialiseWallet();
+            fetchServerVersion(gatekeeperUrl);
             setSuccess("Services updated");
         } catch (error: any) {
             console.error("Error saving URLs:", error);
@@ -81,6 +96,12 @@ const SettingsTab = () => {
             >
                 Save
             </Button>
+
+            <Box sx={{ mt: 3, opacity: 0.6 }}>
+                <Typography variant="caption" display="block">
+                    Client v{packageJson.version} | Server v{serverVersion || "..."}
+                </Typography>
+            </Box>
         </Box>
     );
 };
