@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { readFile } from 'fs/promises';
 import express from 'express';
+import cors from 'cors';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -123,6 +124,8 @@ if (process.env.NODE_ENV === 'production') {
 } else {
     app.use(morgan('dev'));
 }
+app.use(cors());
+app.options('*', cors());
 app.use(express.json());
 
 // Metrics middleware - track HTTP requests
@@ -152,7 +155,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DIDNotFound = { error: 'DID not found' };
 
-const serveClient = (process.env.ARCHON_KEYMASTER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
+const serveClient = (process.env.ARCHON_KEYMASTER_SERVE_CLIENT ?? 'false').toLowerCase() === 'true';
 
 if (serveClient) {
     const clientBuildDir = path.join(__dirname, '../../client/build');

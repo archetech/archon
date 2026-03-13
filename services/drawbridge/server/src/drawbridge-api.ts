@@ -909,7 +909,7 @@ async function main() {
 
     // Serve gatekeeper web client
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const serveClient = (process.env.ARCHON_GATEKEEPER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
+    const serveClient = (process.env.ARCHON_GATEKEEPER_SERVE_CLIENT ?? 'false').toLowerCase() === 'true';
 
     if (serveClient) {
         const clientBuildDir = path.join(__dirname, '../../../gatekeeper/client/build');

@@ -12,9 +12,8 @@ COPY packages/ ./packages/
 RUN npm ci
 RUN npm run build
 
-COPY services/gatekeeper ./gatekeeper/
+COPY services/gatekeeper/server ./gatekeeper/server/
 
-RUN cd gatekeeper/client && npm ci && npm run build
 RUN cd gatekeeper/server && npm ci && npm run build
 
 WORKDIR /app/gatekeeper
