@@ -94,13 +94,7 @@ const SettingsTab = () => {
 
             <Box sx={{ mt: 3, opacity: 0.6 }}>
                 <Typography variant="caption" display="block">
-                    Client v{packageJson.version}
-                </Typography>
-                <Typography variant="caption" display="block">
-                    Server v{serverVersion || "..."}
-                </Typography>
-                <Typography variant="caption" display="block">
-                    {gatekeeperUrl}
+                    Client v{packageJson.version} | Server v{serverVersion || "..."}
                 </Typography>
             </Box>
         </Box>

@@ -6539,13 +6539,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     mt: 2,
                     py: 1,
                     px: 2,
-                    textAlign: 'center',
                     opacity: 0.6,
                     fontSize: '0.75rem',
                 }}
             >
                 <Typography variant="caption">
-                    Client v{packageJson.version} | Server v{serverVersion || '...'} | {window.location.origin}
+                    Client v{packageJson.version} | Server v{serverVersion || '...'}
                 </Typography>
             </Box>
         </div >
