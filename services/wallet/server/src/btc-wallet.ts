@@ -16,7 +16,7 @@ import BtcClient, {
 } from 'bitcoin-core';
 import config from './config.js';
 import type { WalletNetwork } from './config.js';
-import { buildDescriptors } from './derivation.js';
+import { buildDescriptors, getCoinType, getHDKeyVersions } from './derivation.js';
 
 export { getXpub } from './derivation.js';
 
@@ -24,7 +24,12 @@ const ECPair = ECPairFactory(ecc);
 bitcoin.initEccLib(ecc);
 
 function getBtcNetwork(network: WalletNetwork): bitcoin.Network {
-    return network === 'mainnet' ? bitcoin.networks.bitcoin : bitcoin.networks.testnet;
+    if (network === 'mainnet' || network === 'liquid') return bitcoin.networks.bitcoin;
+    return bitcoin.networks.testnet;
+}
+
+export function isLiquid(network: WalletNetwork): boolean {
+    return network === 'liquid';
 }
 
 export function createBtcClient(): BtcClient {
@@ -237,6 +242,21 @@ export async function bumpTransactionFee(
         ...(feeRate ? { fee_rate: feeRate } : {}),
     });
 
+    if (isLiquid(network)) {
+        const decoded: any = await btcClient.command('decodepsbt', bumpResult.psbt);
+        const rawHex = decoded.tx?.hex;
+        if (!rawHex) {
+            throw new Error('Failed to extract raw transaction from PSET');
+        }
+        const privKeysWIF = deriveAllPrivateKeys(mnemonic, network);
+        const signed: any = await btcClient.command('signrawtransactionwithkey', rawHex, privKeysWIF);
+        if (!signed.complete) {
+            throw new Error(`Liquid signing incomplete: ${signed.errors?.map((e: any) => e.error).join(', ')}`);
+        }
+        const newTxid = await btcClient.sendRawTransaction(signed.hex);
+        return { txid: newTxid, fee: bumpResult.fee };
+    }
+
     const btcNetwork = getBtcNetwork(network);
     const psbt = bitcoin.Psbt.fromBase64(bumpResult.psbt, { network: btcNetwork });
 
@@ -275,6 +295,10 @@ async function signAndBroadcast(
     network: WalletNetwork,
     psbtResult: WalletCreateFundedPsbtResult,
 ): Promise<{ txid: string; fee: number }> {
+    if (isLiquid(network)) {
+        return signAndBroadcastLiquid(btcClient, mnemonic, network, psbtResult);
+    }
+
     const btcNetwork = getBtcNetwork(network);
     const psbt = bitcoin.Psbt.fromBase64(psbtResult.psbt, { network: btcNetwork });
 
@@ -308,6 +332,70 @@ async function signAndBroadcast(
     return { txid, fee: psbtResult.fee };
 }
 
+/**
+ * Liquid signing path: Elements returns PSET (not standard PSBT), so we use
+ * fundrawtransaction + signrawtransactionwithkey RPC calls instead of
+ * client-side PSBT parsing. Private keys are derived from the mnemonic and
+ * passed ephemerally per-call — they are never stored on the node.
+ */
+async function signAndBroadcastLiquid(
+    btcClient: BtcClient,
+    mnemonic: string,
+    network: WalletNetwork,
+    psbtResult: WalletCreateFundedPsbtResult,
+): Promise<{ txid: string; fee: number }> {
+    // Extract the raw unsigned tx from the PSET via converttopsbt's inverse:
+    // decodepsbt gives us the tx hex, but we need the unsigned raw tx.
+    // Elements supports extracting via the 'hex' field of decodepsbt.
+    const decoded: any = await btcClient.command('decodepsbt', psbtResult.psbt);
+    const rawHex = decoded.tx?.hex;
+
+    if (!rawHex) {
+        throw new Error('Failed to extract raw transaction from PSET');
+    }
+
+    // Derive all private keys for our gap limit (both external and internal chains)
+    const privKeysWIF = deriveAllPrivateKeys(mnemonic, network);
+
+    // Sign with derived keys — Elements matches inputs to keys automatically
+    const signed: any = await btcClient.command(
+        'signrawtransactionwithkey',
+        rawHex,
+        privKeysWIF,
+    );
+
+    if (!signed.complete) {
+        const errors = signed.errors?.map((e: any) => e.error).join(', ');
+        throw new Error(`Liquid signing incomplete: ${errors || 'unknown error'}`);
+    }
+
+    const txid = await btcClient.sendRawTransaction(signed.hex);
+    return { txid, fee: psbtResult.fee };
+}
+
+function deriveAllPrivateKeys(mnemonic: string, network: WalletNetwork): string[] {
+    const btcNetwork = getBtcNetwork(network);
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    const versions = getHDKeyVersions(network);
+    const root = HDKey.fromMasterSeed(seed, versions);
+    const coinType = getCoinType(network);
+    const account = root.derive(`m/84'/${coinType}'/0'`);
+    const keys: string[] = [];
+
+    // Derive keys for both external (0) and internal (1) chains
+    for (const chain of [0, 1]) {
+        for (let i = 0; i <= config.gapLimit; i++) {
+            const child = account.derive(`m/${chain}/${i}`);
+            if (child.privateKey) {
+                const keyPair = ECPair.fromPrivateKey(child.privateKey, { network: btcNetwork });
+                keys.push(keyPair.toWIF());
+            }
+        }
+    }
+
+    return keys;
+}
+
 export async function sendBtc(
     btcClient: BtcClient,
     mnemonic: string,
@@ -319,11 +407,13 @@ export async function sendBtc(
 ): Promise<{ txid: string; fee: number }> {
     const btcNetwork = getBtcNetwork(network);
 
-    // Validate address
-    try {
-        bitcoin.address.toOutputScript(to, btcNetwork);
-    } catch {
-        throw new Error(`Invalid address for ${network}: ${to}`);
+    // Validate address (skip for Liquid — Elements validates internally)
+    if (!isLiquid(network)) {
+        try {
+            bitcoin.address.toOutputScript(to, btcNetwork);
+        } catch {
+            throw new Error(`Invalid address for ${network}: ${to}`);
+        }
     }
 
     // Create funded PSBT via bitcoind (handles UTXO selection, change)

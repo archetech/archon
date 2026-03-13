@@ -2,8 +2,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export type NetworkName = 'bitcoin' | 'testnet' | 'regtest';
-export type ChainName = 'BTC:mainnet' | 'BTC:testnet4' | 'BTC:signet';
+export type NetworkName = 'bitcoin' | 'testnet' | 'regtest' | 'liquid';
+export type ChainName = 'BTC:mainnet' | 'BTC:testnet4' | 'BTC:signet' | 'L-BTC:mainnet';
 export type SatoshiDB = 'json' | 'sqlite' | 'mongodb' | 'redis';
 
 export interface AppConfig {
@@ -40,6 +40,8 @@ function toChain(name: string | undefined): ChainName {
         return 'BTC:testnet4';
     case 'BTC:signet':
         return 'BTC:signet';
+    case 'L-BTC:mainnet':
+        return 'L-BTC:mainnet';
     default:
         throw new Error(`Unsupported chain "${name}"`);
     }
@@ -55,6 +57,8 @@ function toNetwork(name: string | undefined): NetworkName {
         return 'testnet';
     case 'regtest':
         return 'regtest';
+    case 'liquid':
+        return 'liquid';
     default:
         throw new Error(`Unsupported network "${name}"`);
     }

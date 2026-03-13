@@ -6,11 +6,15 @@ const MAINNET_VERSIONS = { private: 0x0488ADE4, public: 0x0488B21E }; // xprv / 
 const TESTNET_VERSIONS = { private: 0x04358394, public: 0x043587CF }; // tprv / tpub
 
 export function getCoinType(network: WalletNetwork): number {
-    return network === 'mainnet' ? 0 : 1;
+    if (network === 'mainnet') return 0;
+    if (network === 'liquid') return 1776;
+    return 1;
 }
 
 export function getHDKeyVersions(network: WalletNetwork) {
-    return network === 'mainnet' ? MAINNET_VERSIONS : TESTNET_VERSIONS;
+    return (network === 'mainnet' || network === 'liquid')
+        ? MAINNET_VERSIONS
+        : TESTNET_VERSIONS;
 }
 
 export function deriveAccountKey(mnemonic: string, network: WalletNetwork): HDKey {

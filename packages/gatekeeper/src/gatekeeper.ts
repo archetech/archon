@@ -43,6 +43,7 @@ const ValidRegistries = [
     'BTC:mainnet',
     'BTC:testnet4',
     'BTC:signet',
+    'L-BTC:mainnet',
 ];
 
 enum ImportStatus {

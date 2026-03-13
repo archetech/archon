@@ -1,6 +1,7 @@
 include:
   - docker-compose.btc-mainnet.yml
   - docker-compose.btc-signet.yml
+  - docker-compose.liquid.yml
   - docker-compose.lightning.yml
   - docker-compose.drawbridge.yml
 #  - docker-compose.btc-testnet4.yml
