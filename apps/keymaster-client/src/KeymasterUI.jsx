@@ -644,17 +644,26 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         // eslint-disable-next-line
     }, [propsSelectedName]);
 
-    async function refreshCurrentDoc() {
-        if (!currentId) return;
+    async function refreshResolvedDocs() {
         try {
-            const docs = await keymaster.resolveDID(currentId);
-            setCurrentDID(docs.didDocument.id);
-            setDocsString(JSON.stringify(docs, null, 4));
-            const versions = docs.didDocumentMetadata.version ?? 1;
-            setDocsVersion(versions);
-            setDocsVersionMax(versions);
+            if (currentId && propsSelectedName === currentId) {
+                const docs = await keymaster.resolveDID(currentId);
+                setCurrentDID(docs.didDocument.id);
+                setDocsString(JSON.stringify(docs, null, 4));
+                const versions = docs.didDocumentMetadata.version ?? 1;
+                setDocsVersion(versions);
+                setDocsVersionMax(versions);
+            }
+
+            if (selectedName && propsSelectedName === selectedName) {
+                const docs = await keymaster.resolveDID(selectedName);
+                setAliasDocs(JSON.stringify(docs, null, 4));
+                const versions = docs.didDocumentMetadata.version ?? 1;
+                setAliasDocsVersion(versions);
+                setAliasDocsVersionMax(versions);
+            }
         } catch (error) {
-            // ignore — identity tab will refresh on next visit
+            // ignore — tabs will refresh on next visit
         }
     }
 
@@ -684,7 +693,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setPropsNewValue('');
             showSuccess('Property added');
             await loadProps();
-            await refreshCurrentDoc();
+            await refreshResolvedDocs();
         } catch (error) {
             showError(error);
         }
@@ -698,7 +707,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setPropsEditingKey(null);
             showSuccess('Property updated');
             await loadProps();
-            await refreshCurrentDoc();
+            await refreshResolvedDocs();
         } catch (error) {
             showError(error);
         }
@@ -710,7 +719,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             await keymaster.mergeData(propsSelectedName, { [propsDeleteKey]: null });
             showSuccess('Property removed');
             await loadProps();
-            await refreshCurrentDoc();
+            await refreshResolvedDocs();
         } catch (error) {
             showError(error);
         }
