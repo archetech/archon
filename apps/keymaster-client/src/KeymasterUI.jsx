@@ -83,6 +83,8 @@ import {
     Search,
     Token,
     Tune,
+    Save,
+    Settings,
     Unarchive,
 } from "@mui/icons-material";
 import axios from 'axios';
@@ -105,7 +107,7 @@ const DmailTags = {
     UNREAD: 'unread',
 };
 
-function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning }) {
+function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, serverUrl, onServerUrlChange }) {
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
     const [saveId, setSaveId] = useState('');
@@ -253,6 +255,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [nameSearch, setNameSearch] = useState('');
     const [nameTypeFilter, setNameTypeFilter] = useState('all');
     const [serverVersion, setServerVersion] = useState('');
+    const [settingsUrl, setSettingsUrl] = useState(serverUrl || '');
     const [showCloneDialog, setShowCloneDialog] = useState(false);
     const [cloneName, setCloneName] = useState('');
     const [showChallengeDialog, setShowChallengeDialog] = useState(false);
@@ -311,10 +314,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         checkForChallenge();
         refreshAll();
 
-        fetch('/api/v1/version')
-            .then(r => r.json())
-            .then(data => setServerVersion(`${data.version} (${data.commit})`))
-            .catch(() => {});
+        if (serverUrl) {
+            fetch(`${serverUrl}/api/v1/version`)
+                .then(r => r.json())
+                .then(data => setServerVersion(`${data.version} (${data.commit})`))
+                .catch(() => {});
+        }
         // eslint-disable-next-line
     }, []);
 
@@ -3774,6 +3779,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             <Tab key="create" value="create" label={'Create ID'} icon={<PermIdentity />} />
                         }
                         <Tab key="wallet" value="wallet" label={'Wallet'} icon={<AccountBalanceWallet />} />
+                        <Tab key="settings" value="settings" label={'Settings'} icon={<Settings />} />
                     </Tabs>
                 </Box>
                 <Box style={{ width: '90vw' }}>
@@ -6531,6 +6537,26 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     {tab === 'access' &&
                         <Box>
                             Special Access
+                        </Box>
+                    }
+                    {tab === 'settings' &&
+                        <Box sx={{ display: 'flex', flexDirection: 'column', maxWidth: '400px', mt: 1 }}>
+                            <TextField
+                                label="Server URL"
+                                variant="outlined"
+                                value={settingsUrl}
+                                onChange={(e) => setSettingsUrl(e.target.value)}
+                                sx={{ mb: 2 }}
+                            />
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={() => onServerUrlChange && onServerUrlChange(settingsUrl)}
+                                startIcon={<Save />}
+                                sx={{ alignSelf: 'start' }}
+                            >
+                                Save
+                            </Button>
                         </Box>
                     }
                     <LoginDialog

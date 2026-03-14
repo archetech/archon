@@ -163,7 +163,7 @@ services:
       dockerfile: Dockerfile.gatekeeper-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-        VITE_GATEKEEPER_URL: http://localhost:${ARCHON_GATEKEEPER_PORT:-4224}
+        VITE_SERVER_PORT: ${ARCHON_GATEKEEPER_PORT:-4224}
     image: ghcr.io/archetech/gatekeeper-client
     environment:
       - VITE_PORT=4225
@@ -179,7 +179,7 @@ services:
       dockerfile: Dockerfile.keymaster-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-        VITE_KEYMASTER_URL: http://localhost:${ARCHON_KEYMASTER_PORT:-4226}
+        VITE_SERVER_PORT: ${ARCHON_KEYMASTER_PORT:-4226}
     image: ghcr.io/archetech/keymaster-client
     environment:
       - VITE_PORT=4227

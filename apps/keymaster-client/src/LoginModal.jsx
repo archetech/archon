@@ -11,9 +11,10 @@ import {
     CircularProgress,
 } from "@mui/material";
 
-const LoginModal = ({ isOpen, errorText, onSubmit }) => {
+const LoginModal = ({ isOpen, errorText, onSubmit, serverUrl, onServerUrlChange }) => {
     const [passphrase, setPassphrase] = useState("");
     const [submitting, setSubmitting] = useState(false);
+    const [url, setUrl] = useState(serverUrl || "");
 
     if (!isOpen) {
         return null;
@@ -22,6 +23,11 @@ const LoginModal = ({ isOpen, errorText, onSubmit }) => {
     async function handleSubmit(e) {
         e.preventDefault();
         if (submitting) {
+            return;
+        }
+
+        if (url !== serverUrl && onServerUrlChange) {
+            onServerUrlChange(url);
             return;
         }
 
@@ -44,11 +50,19 @@ const LoginModal = ({ isOpen, errorText, onSubmit }) => {
                 )}
                 <form onSubmit={handleSubmit} id="login-form">
                     <TextField
+                        label="Server URL"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        fullWidth
+                        variant="outlined"
+                        margin="dense"
+                        disabled={submitting}
+                    />
+                    <TextField
                         label="Passphrase"
                         type="password"
                         value={passphrase}
                         onChange={(e) => setPassphrase(e.target.value)}
-                        required
                         autoFocus
                         fullWidth
                         variant="outlined"
@@ -63,7 +77,7 @@ const LoginModal = ({ isOpen, errorText, onSubmit }) => {
                     form="login-form"
                     variant="contained"
                     color="primary"
-                    disabled={submitting || !passphrase}
+                    disabled={submitting || (!passphrase && url === serverUrl)}
                     startIcon={submitting ? <CircularProgress size={18} /> : null}
                 >
                     {submitting ? "Working" : "Submit"}
