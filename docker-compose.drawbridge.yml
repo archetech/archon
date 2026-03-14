@@ -44,10 +44,10 @@ services:
       dockerfile: Dockerfile.gatekeeper-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/gatekeeper-client
+        VITE_GATEKEEPER_URL: http://localhost:${ARCHON_DRAWBRIDGE_PORT:-4222}
+    image: ghcr.io/archetech/drawbridge-client
     environment:
       - VITE_PORT=4223
-      - VITE_GATEKEEPER_URL=http://drawbridge:4222
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_DRAWBRIDGE_CLIENT_PORT:-4223}:4223"

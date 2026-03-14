@@ -17,10 +17,14 @@ COPY apps/gatekeeper-client ./apps/gatekeeper-client/
 WORKDIR /app/apps/gatekeeper-client
 
 RUN npm ci
-RUN npm run build
 
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
+
+ARG VITE_GATEKEEPER_URL=http://localhost:4224
+ENV VITE_GATEKEEPER_URL=$VITE_GATEKEEPER_URL
+
+RUN npm run build
 
 ENV VITE_PORT=4225
 EXPOSE 4225

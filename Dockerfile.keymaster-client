@@ -17,10 +17,14 @@ COPY apps/keymaster-client ./apps/keymaster-client/
 WORKDIR /app/apps/keymaster-client
 
 RUN npm ci
-RUN npm run build
 
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
+
+ARG VITE_KEYMASTER_URL=http://localhost:4226
+ENV VITE_KEYMASTER_URL=$VITE_KEYMASTER_URL
+
+RUN npm run build
 
 ENV VITE_PORT=4227
 EXPOSE 4227
