@@ -63,7 +63,6 @@ const LoginModal = ({ isOpen, errorText, onSubmit, serverUrl, onServerUrlChange 
                         type="password"
                         value={passphrase}
                         onChange={(e) => setPassphrase(e.target.value)}
-                        required
                         autoFocus
                         fullWidth
                         variant="outlined"
@@ -78,7 +77,7 @@ const LoginModal = ({ isOpen, errorText, onSubmit, serverUrl, onServerUrlChange 
                     form="login-form"
                     variant="contained"
                     color="primary"
-                    disabled={submitting || !passphrase}
+                    disabled={submitting || (!passphrase && url === serverUrl)}
                     startIcon={submitting ? <CircularProgress size={18} /> : null}
                 >
                     {submitting ? "Working" : "Submit"}
