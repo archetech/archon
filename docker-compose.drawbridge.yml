@@ -44,7 +44,7 @@ services:
       dockerfile: Dockerfile.gatekeeper-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-        VITE_GATEKEEPER_URL: http://localhost:${ARCHON_DRAWBRIDGE_PORT:-4222}
+        VITE_SERVER_PORT: ${ARCHON_DRAWBRIDGE_PORT:-4222}
     image: ghcr.io/archetech/drawbridge-client
     environment:
       - VITE_PORT=4223

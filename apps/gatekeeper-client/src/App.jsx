@@ -17,7 +17,10 @@ import './App.css';
 
 globalThis.Buffer = Buffer;
 
-const gatekeeperUrl = import.meta.env.VITE_GATEKEEPER_URL || 'http://localhost:4224';
+const STORAGE_KEY = 'GATEKEEPER_URL';
+const defaultPort = import.meta.env.VITE_SERVER_PORT || '4224';
+const defaultUrl = `${window.location.protocol}//${window.location.hostname}:${defaultPort}`;
+const gatekeeperUrl = localStorage.getItem(STORAGE_KEY) || defaultUrl;
 const gatekeeper = new DrawbridgeClient();
 await gatekeeper.connect({ url: gatekeeperUrl });
 const cipher = new CipherWeb();
@@ -166,6 +169,11 @@ function App() {
         setPassphraseErrorText("");
     }
 
+    function handleServerUrlChange(newUrl) {
+        localStorage.setItem(STORAGE_KEY, newUrl);
+        window.location.reload();
+    }
+
     async function handleRecoverMnemonicSubmit(mnemonic) {
         setMnemonicErrorText("");
         try {
@@ -286,6 +294,8 @@ function App() {
                     challengeDID={challengeDID}
                     onWalletUpload={handleWalletUploadFile}
                     hasLightning={hasLightning}
+                    serverUrl={gatekeeperUrl}
+                    onServerUrlChange={handleServerUrlChange}
                 />
             )}
         </>

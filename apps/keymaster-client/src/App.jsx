@@ -4,7 +4,10 @@ import KeymasterUI from './KeymasterUI.jsx';
 import LoginModal from './LoginModal.jsx';
 import './App.css';
 
-const keymasterUrl = import.meta.env.VITE_KEYMASTER_URL || 'http://localhost:4226';
+const STORAGE_KEY = 'KEYMASTER_URL';
+const defaultPort = import.meta.env.VITE_SERVER_PORT || '4226';
+const defaultUrl = `${window.location.protocol}//${window.location.hostname}:${defaultPort}`;
+const keymasterUrl = localStorage.getItem(STORAGE_KEY) || defaultUrl;
 
 function App() {
     const [keymaster, setKeymaster] = useState(null);
@@ -40,15 +43,27 @@ function App() {
         }
     }
 
+    function handleServerUrlChange(newUrl) {
+        localStorage.setItem(STORAGE_KEY, newUrl);
+        window.location.reload();
+    }
+
     return (
         <>
             <LoginModal
                 isOpen={showLogin}
                 errorText={loginError}
                 onSubmit={login}
+                serverUrl={keymasterUrl}
+                onServerUrlChange={handleServerUrlChange}
             />
             {keymaster && (
-                <KeymasterUI keymaster={keymaster} title={'Keymaster Server Wallet Demo'} />
+                <KeymasterUI
+                    keymaster={keymaster}
+                    title={'Keymaster Server Wallet Demo'}
+                    serverUrl={keymasterUrl}
+                    onServerUrlChange={handleServerUrlChange}
+                />
             )}
         </>
     );
