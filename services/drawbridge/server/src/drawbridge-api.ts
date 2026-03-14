@@ -326,86 +326,6 @@ async function main() {
         }
     });
 
-    v1router.post('/dids/import', ...authMiddleware, async (req, res) => {
-        try {
-            const result = await gatekeeper.importDIDs(req.body);
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
-    v1router.post('/dids/remove', requireAdminKey, async (req, res) => {
-        try {
-            const result = await gatekeeper.removeDIDs(req.body);
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
-    v1router.post('/batch/export', ...authMiddleware, async (req, res) => {
-        try {
-            const result = await gatekeeper.exportBatch(req.body?.dids);
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
-    v1router.post('/batch/import', ...authMiddleware, async (req, res) => {
-        try {
-            const result = await gatekeeper.importBatch(req.body);
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
-    v1router.post('/batch/import/cids', ...authMiddleware, async (req, res) => {
-        try {
-            const result = await gatekeeper.importBatchByCids(req.body.cids, req.body.metadata);
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
-    v1router.get('/queue/:registry', ...authMiddleware, async (req, res) => {
-        try {
-            const result = await gatekeeper.getQueue(req.params.registry as string);
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
-    v1router.post('/queue/:registry/clear', ...authMiddleware, async (req, res) => {
-        try {
-            const result = await gatekeeper.clearQueue(req.params.registry as string, req.body);
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
-    v1router.post('/events/process', ...authMiddleware, async (req, res) => {
-        try {
-            const result = await gatekeeper.processEvents();
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
     // IPFS routes
 
     v1router.post('/ipfs/json', ...authMiddleware, async (req, res) => {
@@ -496,16 +416,6 @@ async function main() {
         }
     });
 
-    v1router.post('/block/:registry', ...authMiddleware, async (req, res) => {
-        try {
-            const result = await gatekeeper.addBlock(req.params.registry as string, req.body);
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
     // Search routes
 
     v1router.get('/search', ...authMiddleware, async (req, res) => {
@@ -529,27 +439,6 @@ async function main() {
         }
     });
 
-    // Admin DB routes
-
-    v1router.get('/db/reset', requireAdminKey, async (_req, res) => {
-        try {
-            const result = await gatekeeper.resetDb();
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
-
-    v1router.get('/db/verify', requireAdminKey, async (_req, res) => {
-        try {
-            const result = await gatekeeper.verifyDb();
-            res.json(result);
-        } catch (error: any) {
-            logger.error({ err: error }, 'Gatekeeper proxy error');
-            res.status(502).json({ error: 'Upstream gatekeeper error' });
-        }
-    });
 
     // --- LNbits Lightning wallet routes ---
 
