@@ -11,6 +11,9 @@ interface PendingNostrRequest {
 
 const pendingNostrRequests = new Map<string, PendingNostrRequest>();
 
+let passphrase: string | null = null;
+const extensionState: Record<string, any> = {};
+
 async function getApprovedNostrOrigins(): Promise<string[]> {
     const { approvedNostrOrigins = [] } = await chrome.storage.session.get("approvedNostrOrigins");
     return approvedNostrOrigins as string[];
@@ -48,27 +51,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
         await ensureDefaultSettings();
     }
-    await createOffscreen();
 });
-
-async function createOffscreen() {
-    if (await chrome.offscreen.hasDocument()) {
-        return;
-    }
-    await chrome.offscreen.createDocument({
-        url: "offscreen.html",
-        reasons: [chrome.offscreen.Reason.WORKERS],
-        justification: "Communicate with the extension",
-    });
-}
 
 chrome.runtime.onStartup.addListener(async () => {
     await ensureDefaultSettings();
-    await createOffscreen();
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "REQUEST_POPUP_CREDENTIAL") {
+    if (message.action === "REQUEST_POPUP_CREDENTIAL" || message.action === "OPEN_CREDENTIAL_TAB") {
         chrome.action.openPopup(() => {
             chrome.runtime.sendMessage({
                 action: "SHOW_POPUP_CREDENTIAL",
@@ -76,7 +66,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
         });
         sendResponse({ success: true });
-    } else if (message.action === "REQUEST_POPUP_AUTH") {
+    } else if (message.action === "REQUEST_POPUP_AUTH" || message.action === "OPEN_AUTH_TAB") {
         chrome.action.openPopup(() => {
             chrome.runtime.sendMessage({
                 action: "SHOW_POPUP_AUTH",
@@ -131,6 +121,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         } else {
             sendResponse({ error: "Request not found" });
         }
+    } else if (message.action === "STORE_PASSPHRASE") {
+        passphrase = message.passphrase;
+        sendResponse({ success: true });
+    } else if (message.action === "GET_PASSPHRASE") {
+        sendResponse({ passphrase });
+    } else if (message.action === "CLEAR_PASSPHRASE") {
+        passphrase = null;
+        sendResponse({ success: true });
+    } else if (message.action === "STORE_STATE") {
+        extensionState[message.key] = message.value;
+        sendResponse({ success: true });
+    } else if (message.action === "GET_ALL_STATE") {
+        sendResponse({ extensionState });
+    } else if (message.action === "CLEAR_ALL_STATE") {
+        for (const key in extensionState) {
+            delete extensionState[key];
+        }
+        sendResponse({ success: true });
+    } else if (message.action === "CLEAR_STATE") {
+        delete extensionState[message.key];
+        sendResponse({ success: true });
     }
 
     return true;

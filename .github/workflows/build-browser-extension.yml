@@ -1,10 +1,10 @@
-name: Build Chrome Extension
+name: Build Browser Extension
 
 on:
   push:
 
 jobs:
-  build-chrome-extension:
+  build-browser-extension:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,11 +24,16 @@ jobs:
 
       - name: Install extension dependencies
         run: |
-          cd ./apps/chrome-extension
+          cd ./apps/browser-extension
           npm install
 
-      - name: Build extension
+      - name: Build Chrome extension
         run: |
-          cd ./apps/chrome-extension
-          npm start
+          cd ./apps/browser-extension
+          npm run build:chrome
+
+      - name: Build Firefox extension
+        run: |
+          cd ./apps/browser-extension
+          npm run build:firefox
 
