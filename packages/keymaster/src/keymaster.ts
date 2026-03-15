@@ -1,8 +1,6 @@
-import { createRequire } from 'module';
 import { imageSize } from 'image-size';
 
-const require = createRequire(import.meta.url);
-const pkg = require('../package.json');
+const KEYMASTER_VERSION = '0.4.3';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
@@ -195,7 +193,7 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async getVersion(): Promise<{ version: string; commit: string }> {
-        return { version: pkg.version, commit: '' };
+        return { version: KEYMASTER_VERSION, commit: '' };
     }
 
     async loadWallet(): Promise<WalletFile> {
