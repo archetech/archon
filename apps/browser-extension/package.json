@@ -1,7 +1,7 @@
 {
-  "name": "archon-chrome-extension",
+  "name": "archon-browser-extension",
   "version": "0.5.0",
-  "description": "Archon Chrome Extension",
+  "description": "Archon Browser Extension",
   "main": "index.js",
   "scripts": {
     "start": "webpack --progress --config webpack.dev.js",
