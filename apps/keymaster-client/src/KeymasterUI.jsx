@@ -6587,6 +6587,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             >
                                 Save
                             </Button>
+                            <Typography variant="caption" sx={{ mt: 3, opacity: 0.6 }}>
+                                Client v{packageJson.version} | Server v{serverVersion || '...'}
+                            </Typography>
                         </Box>
                     }
                     <LoginDialog
