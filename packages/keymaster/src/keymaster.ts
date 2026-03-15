@@ -190,6 +190,13 @@ export default class Keymaster implements KeymasterInterface {
         });
     }
 
+    async getVersion(): Promise<{ version: string; commit: string }> {
+        if ('getVersion' in this.gatekeeper && typeof (this.gatekeeper as any).getVersion === 'function') {
+            return (this.gatekeeper as any).getVersion();
+        }
+        throw new Error('getVersion is not supported by this gatekeeper');
+    }
+
     async loadWallet(): Promise<WalletFile> {
         if (this._walletCache) {
             return this._walletCache;
