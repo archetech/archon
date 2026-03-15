@@ -326,9 +326,6 @@ export interface NoticeMessage {
 }
 
 export interface KeymasterInterface {
-    // Version
-    getVersion(): Promise<{ version: string; commit: string }>;
-
     // Wallet
     loadWallet(): Promise<WalletFile>;
     saveWallet(wallet: StoredWallet, overwrite?: boolean): Promise<boolean>;
