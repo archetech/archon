@@ -1,4 +1,8 @@
+import { createRequire } from 'module';
 import { imageSize } from 'image-size';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
@@ -191,10 +195,7 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async getVersion(): Promise<{ version: string; commit: string }> {
-        if ('getVersion' in this.gatekeeper && typeof (this.gatekeeper as any).getVersion === 'function') {
-            return (this.gatekeeper as any).getVersion();
-        }
-        throw new Error('getVersion is not supported by this gatekeeper');
+        return { version: pkg.version, commit: '' };
     }
 
     async loadWallet(): Promise<WalletFile> {
