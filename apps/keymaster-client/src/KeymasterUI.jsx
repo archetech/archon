@@ -314,7 +314,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         checkForChallenge();
         refreshAll();
 
-        if (serverUrl) {
+        if (keymaster.getVersion) {
+            keymaster.getVersion()
+                .then(data => setServerVersion(`${data.version} (${data.commit})`))
+                .catch(() => {});
+        } else if (serverUrl) {
             fetch(`${serverUrl}/api/v1/version`)
                 .then(r => r.json())
                 .then(data => setServerVersion(`${data.version} (${data.commit})`))
@@ -6583,6 +6587,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             >
                                 Save
                             </Button>
+                            <Typography variant="caption" sx={{ mt: 3, opacity: 0.6 }}>
+                                Client v{packageJson.version} | Server v{serverVersion || '...'}
+                            </Typography>
                         </Box>
                     }
                     <LoginDialog

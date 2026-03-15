@@ -41,6 +41,7 @@ from .keymaster_sdk import (
     file_dmail,
     fix_wallet,
     get_credential,
+    get_version,
     get_current_id,
     get_dmail_attachment,
     get_dmail_message,

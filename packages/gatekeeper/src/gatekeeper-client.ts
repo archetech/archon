@@ -158,7 +158,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
-    async getVersion(): Promise<number> {
+    async getVersion(): Promise<{ version: string; commit: string }> {
         try {
             const response = await this.axios.get(`${this.API}/version`);
             return response.data;

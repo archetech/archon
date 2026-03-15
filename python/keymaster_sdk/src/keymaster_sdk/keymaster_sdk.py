@@ -53,6 +53,11 @@ def set_url(new_url: str):
     _keymaster_api = _base_url + "/api/v1"
 
 
+def get_version():
+    response = proxy_request("GET", f"{_keymaster_api}/version")
+    return response
+
+
 def is_ready():
     response = proxy_request("GET", f"{_keymaster_api}/ready")
     return response["ready"]
