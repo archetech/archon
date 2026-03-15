@@ -27,8 +27,13 @@ jobs:
           cd ./apps/browser-extension
           npm install
 
-      - name: Build extension
+      - name: Build Chrome extension
         run: |
           cd ./apps/browser-extension
-          npm start
+          npm run build:chrome
+
+      - name: Build Firefox extension
+        run: |
+          cd ./apps/browser-extension
+          npm run build:firefox
 
