@@ -1,6 +1,4 @@
 import { imageSize } from 'image-size';
-
-const KEYMASTER_VERSION = '0.4.3';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
@@ -190,10 +188,6 @@ export default class Keymaster implements KeymasterInterface {
 
             this._walletCache = decrypted;
         });
-    }
-
-    async getVersion(): Promise<{ version: string; commit: string }> {
-        return { version: KEYMASTER_VERSION, commit: '' };
     }
 
     async loadWallet(): Promise<WalletFile> {

@@ -314,9 +314,16 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         checkForChallenge();
         refreshAll();
 
-        keymaster.getVersion()
-            .then(data => setServerVersion(`${data.version} (${data.commit})`))
-            .catch(() => {});
+        if (keymaster.getVersion) {
+            keymaster.getVersion()
+                .then(data => setServerVersion(`${data.version} (${data.commit})`))
+                .catch(() => {});
+        } else if (serverUrl) {
+            fetch(`${serverUrl}/api/v1/version`)
+                .then(r => r.json())
+                .then(data => setServerVersion(`${data.version} (${data.commit})`))
+                .catch(() => {});
+        }
         // eslint-disable-next-line
     }, []);
 
