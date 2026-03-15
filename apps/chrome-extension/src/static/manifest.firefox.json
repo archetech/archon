@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "Archon Chrome Extension",
-    "description": "Archon Chrome Extension",
+    "name": "Archon Firefox Extension",
+    "description": "Archon Firefox Extension",
     "version": "0.5.0",
     "icons": {
         "16": "icon.png",
@@ -10,11 +10,11 @@
     },
     "action": {
         "default_popup": "popup.html",
-        "default_title": "Archon Chrome Extension",
+        "default_title": "Archon Firefox Extension",
         "default_icon": "icon.png"
     },
     "background": {
-        "service_worker": "background.js"
+        "scripts": ["background.js"]
     },
     "content_scripts": [
         {
@@ -33,5 +33,10 @@
             "resources": ["nostr-provider.js"],
             "matches": ["<all_urls>"]
         }
-    ]
+    ],
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "archon@archetech.dev"
+        }
+    }
 }

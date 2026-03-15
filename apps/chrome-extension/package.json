@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "webpack --progress --config webpack.dev.js",
-    "build": "webpack --progress --config webpack.prod.js"
+    "build": "webpack --progress --config webpack.prod.js",
+    "build:chrome": "webpack --progress --config webpack.prod.js",
+    "build:firefox": "webpack --progress --config webpack.firefox.js"
   },
   "author": "Peter Bushnell",
   "license": "MIT",
