@@ -139,6 +139,16 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async getVersion(): Promise<{ version: string; commit: string }> {
+        try {
+            const response = await this.axios.get(`${this.API}/version`);
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async isReady(): Promise<boolean> {
         try {
             const response = await this.axios.get(`${this.API}/ready`);
