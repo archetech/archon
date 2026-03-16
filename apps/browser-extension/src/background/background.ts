@@ -11,8 +11,27 @@ interface PendingNostrRequest {
 
 const pendingNostrRequests = new Map<string, PendingNostrRequest>();
 
-let passphrase: string | null = null;
-const extensionState: Record<string, any> = {};
+async function getPassphrase(): Promise<string | null> {
+    const result = await chrome.storage.session.get("passphrase");
+    return (result.passphrase as string) ?? null;
+}
+
+async function setPassphrase(value: string | null): Promise<void> {
+    if (value === null) {
+        await chrome.storage.session.remove("passphrase");
+    } else {
+        await chrome.storage.session.set({ passphrase: value });
+    }
+}
+
+async function getExtensionState(): Promise<Record<string, any>> {
+    const result = await chrome.storage.session.get("extensionState");
+    return (result.extensionState as Record<string, any>) ?? {};
+}
+
+async function setExtensionState(state: Record<string, any>): Promise<void> {
+    await chrome.storage.session.set({ extensionState: state });
+}
 
 async function getApprovedNostrOrigins(): Promise<string[]> {
     const { approvedNostrOrigins = [] } = await chrome.storage.session.get("approvedNostrOrigins");
@@ -122,26 +141,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ error: "Request not found" });
         }
     } else if (message.action === "STORE_PASSPHRASE") {
-        passphrase = message.passphrase;
-        sendResponse({ success: true });
+        setPassphrase(message.passphrase).then(() => sendResponse({ success: true }));
     } else if (message.action === "GET_PASSPHRASE") {
-        sendResponse({ passphrase });
+        getPassphrase().then((passphrase) => sendResponse({ passphrase }));
     } else if (message.action === "CLEAR_PASSPHRASE") {
-        passphrase = null;
-        sendResponse({ success: true });
+        setPassphrase(null).then(() => sendResponse({ success: true }));
     } else if (message.action === "STORE_STATE") {
-        extensionState[message.key] = message.value;
-        sendResponse({ success: true });
+        getExtensionState().then((state) => {
+            state[message.key] = message.value;
+            setExtensionState(state).then(() => sendResponse({ success: true }));
+        });
     } else if (message.action === "GET_ALL_STATE") {
-        sendResponse({ extensionState });
+        getExtensionState().then((extensionState) => sendResponse({ extensionState }));
     } else if (message.action === "CLEAR_ALL_STATE") {
-        for (const key in extensionState) {
-            delete extensionState[key];
-        }
-        sendResponse({ success: true });
+        setExtensionState({}).then(() => sendResponse({ success: true }));
     } else if (message.action === "CLEAR_STATE") {
-        delete extensionState[message.key];
-        sendResponse({ success: true });
+        getExtensionState().then((state) => {
+            delete state[message.key];
+            setExtensionState(state).then(() => sendResponse({ success: true }));
+        });
     }
 
     return true;
