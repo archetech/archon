@@ -1039,17 +1039,14 @@ function ViewMember() {
             <Header title={`${name}@${serviceDomain}`} />
             
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
-                <Box sx={{ 
-                    backgroundColor: '#f8f9fa', 
-                    borderRadius: 2, 
-                    p: 3, 
+                <Box sx={{
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: 2,
+                    p: 3,
                     mb: 3,
                     border: '1px solid #e9ecef',
                     textAlign: 'center'
                 }}>
-                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#2c3e50', mb: 1 }}>
-                        {name}@{serviceDomain}
-                    </Typography>
                     <Typography variant="body1" sx={{ fontFamily: 'monospace', color: '#666', wordBreak: 'break-all' }}>
                         {memberData?.id}
                     </Typography>
