@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name archon.social;
+    server_name ${DOMAIN};
 
     # Redirect HTTP to HTTPS
     location / {
@@ -15,11 +15,11 @@ server {
 
 server {
     listen 443 ssl http2;
-    server_name archon.social;
+    server_name ${DOMAIN};
 
     # SSL certificates (Let's Encrypt)
-    ssl_certificate /etc/letsencrypt/live/archon.social/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/archon.social/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
 
     # SSL settings
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -34,7 +34,7 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
 
     # Root for static files
-    root /var/www/archon.social;
+    root /var/www/${DOMAIN};
 
     # API routes → Express backend
     location /api {
@@ -68,13 +68,13 @@ server {
 
     # React app at /app
     location /app {
-        alias /var/www/archon.social/app;
+        alias /var/www/${DOMAIN}/app;
         try_files $uri $uri/ /app/index.html;
     }
 
     # Member profile pages (served by React app)
     location /member {
-        alias /var/www/archon.social/app;
+        alias /var/www/${DOMAIN}/app;
         try_files $uri $uri/ /app/index.html;
     }
 

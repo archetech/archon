@@ -1,5 +1,7 @@
 # OAuth Integration Guide
 
+> Replace `https://your-domain.example` below with your actual deployment URL.
+
 ## Add to index.ts
 
 ### 1. Import the OAuth module
@@ -11,8 +13,6 @@ import { createOAuthRoutes } from './oauth/index.js';
 ```
 
 ### 2. Create helper function to get member by DID
-
-After the `verifyDb()` function, add:
 
 ```typescript
 async function getMemberByDID(did: string): Promise<any> {
@@ -39,7 +39,7 @@ app.use('/oauth', oauthRouter);
 
 // OIDC discovery (must be at root)
 app.get('/.well-known/openid-configuration', (req, res) => {
-    const issuer = process.env.AD_HOST_URL || 'https://archon.social';
+    const issuer = process.env.AD_PUBLIC_URL || process.env.AD_HOST_URL || 'http://localhost:3300';
     res.json({
         issuer,
         authorization_endpoint: `${issuer}/oauth/authorize`,
@@ -59,7 +59,7 @@ app.get('/.well-known/openid-configuration', (req, res) => {
 ### 1. Get authorization challenge
 
 ```bash
-curl "https://archon.social/oauth/authorize?client_id=demo-client&redirect_uri=http://localhost:4000/callback&response_type=code&scope=openid%20profile&state=xyz123"
+curl "https://your-domain.example/oauth/authorize?client_id=demo-client&redirect_uri=http://localhost:4000/callback&response_type=code&scope=openid%20profile&state=xyz123"
 ```
 
 ### 2. User responds with wallet
@@ -71,7 +71,7 @@ keymaster create-response <challenge-did>
 ### 3. Wallet posts response
 
 ```bash
-curl -X POST https://archon.social/oauth/callback \
+curl -X POST https://your-domain.example/oauth/callback \
   -H "Content-Type: application/json" \
   -d '{"response": "did:cid:..."}'
 ```
@@ -79,7 +79,7 @@ curl -X POST https://archon.social/oauth/callback \
 ### 4. Exchange code for token
 
 ```bash
-curl -X POST https://archon.social/oauth/token \
+curl -X POST https://your-domain.example/oauth/token \
   -H "Content-Type: application/json" \
   -d '{
     "grant_type": "authorization_code",
@@ -93,7 +93,7 @@ curl -X POST https://archon.social/oauth/token \
 ### 5. Get user info
 
 ```bash
-curl https://archon.social/oauth/userinfo \
+curl https://your-domain.example/oauth/userinfo \
   -H "Authorization: Bearer <access-token>"
 ```
 

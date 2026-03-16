@@ -1,22 +1,22 @@
 #!/bin/bash
-# Archon Social Registry Publisher
+# Name Service Registry Publisher
 # Extracts names from the server and publishes to IPNS
 
 set -e
 
 # Configuration
-ARCHON_API="http://localhost:3000"
-IPNS_KEY="archon-social"  # Change if using different key name
-OUTPUT_FILE="/tmp/archon-registry.json"
+API_URL="${AD_PUBLIC_URL:-http://localhost:3300}"
+IPNS_KEY="${AD_IPNS_KEY_NAME:-${AD_SERVICE_NAME:-name-service}}"
+OUTPUT_FILE="/tmp/registry.json"
 
 echo "[$(date)] Starting registry publish..."
 
 # Get registry from the API (already formatted correctly)
 echo "Fetching registry from API..."
-curl -s "${ARCHON_API}/api/registry" > "$OUTPUT_FILE"
+curl -s "${API_URL}/api/registry" > "$OUTPUT_FILE"
 
 if [ ! -s "$OUTPUT_FILE" ]; then
-    echo "ERROR: Could not fetch registry from API. Is archon-social running?"
+    echo "ERROR: Could not fetch registry from API. Is the server running?"
     exit 1
 fi
 
@@ -36,4 +36,3 @@ echo "$RESULT"
 
 echo ""
 echo "[$(date)] Registry published successfully!"
-echo "View at: https://ipfs.io/ipns/archon.social"

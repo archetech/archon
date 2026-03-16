@@ -3,9 +3,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: archon-social
+    image: ${AD_SERVICE_NAME:-name-service}
     environment:
-      - AD_HOST_PORT=${AD_HOST_PORT:-3000}
+      - AD_SERVICE_NAME=${AD_SERVICE_NAME:-name-service}
+      - AD_PUBLIC_URL=${AD_PUBLIC_URL}
+      - AD_SESSION_SECRET=${AD_SESSION_SECRET}
+      - AD_HOST_PORT=${AD_HOST_PORT:-3300}
       - AD_HOST_URL=${AD_HOST_URL}
       - AD_GATEKEEPER_URL=${AD_GATEKEEPER_URL:-http://archon-gatekeeper-1:4224}
       - AD_KEYMASTER_URL=${AD_KEYMASTER_URL}
@@ -13,11 +16,11 @@ services:
       - AD_DATABASE=${AD_DATABASE}
       - AD_WALLET_PASSPHRASE=${AD_WALLET_PASSPHRASE}
       - AD_IPFS_API_URL=${AD_IPFS_API_URL:-http://archon-ipfs-1:5001/api/v0}
-      - AD_IPNS_KEY_NAME=${AD_IPNS_KEY_NAME:-archon-social}
+      - AD_IPNS_KEY_NAME=${AD_IPNS_KEY_NAME:-${AD_SERVICE_NAME:-name-service}}
     volumes:
       - ./server/data:/app/server/data
     ports:
-      - "${AD_HOST_PORT:-3000}:${AD_HOST_PORT:-3000}"
+      - "${AD_HOST_PORT:-3300}:${AD_HOST_PORT:-3300}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

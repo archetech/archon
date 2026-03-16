@@ -25,13 +25,16 @@ let db: DatabaseInterface;
 
 dotenv.config();
 
-const HOST_PORT = Number(process.env.AD_HOST_PORT) || 3000;
-const HOST_URL = process.env.AD_HOST_URL || 'http://localhost:3000';
+const HOST_PORT = Number(process.env.AD_HOST_PORT) || 3300;
+const HOST_URL = process.env.AD_HOST_URL || 'http://localhost:3300';
 const GATEKEEPER_URL = process.env.AD_GATEKEEPER_URL || 'http://localhost:4224';
 const WALLET_URL = process.env.AD_WALLET_URL || 'http://localhost:4224';
 const AD_DATABASE_TYPE = process.env.AD_DATABASE || 'json';
 const IPFS_API_URL = process.env.AD_IPFS_API_URL || 'http://ipfs:5001/api/v0';
-const IPNS_KEY_NAME = process.env.AD_IPNS_KEY_NAME || 'self';
+const SERVICE_NAME = process.env.AD_SERVICE_NAME || 'name-service';
+const PUBLIC_URL = process.env.AD_PUBLIC_URL || HOST_URL;
+const SESSION_SECRET = process.env.AD_SESSION_SECRET || SERVICE_NAME;
+const IPNS_KEY_NAME = process.env.AD_IPNS_KEY_NAME || SERVICE_NAME;
 
 const app = express();
 const logins: Record<string, {
@@ -41,243 +44,39 @@ const logins: Record<string, {
     verify: any;
 }> = {};
 
-const roles = {
-    owner: 'archon-social',
-    admin: 'archon-social-admin',
-    moderator: 'archon-social-moderator',
-    member: 'archon-social-member',
-};
-
 app.use(morgan('dev'));
 app.use(express.json());
 
 // Session setup
 app.use(session({
-    secret: 'archon-social',
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: true,
     cookie: { secure: false } // Set to true if using HTTPS
 }));
 
 let ownerDID = '';
-const roleDIDs: Record<string, string> = {};
 
-async function verifyRoles(): Promise<void> {
+async function initOwnerIdentity(): Promise<void> {
     const currentId = await keymaster.getCurrentId();
 
     try {
-        const docs = await keymaster.resolveDID(roles.owner);
+        const docs = await keymaster.resolveDID(SERVICE_NAME);
         if (!docs.didDocument?.id) {
             throw new Error('No DID found');
         }
         ownerDID = docs.didDocument.id;
-        console.log(`${roles.owner}: ${ownerDID}`);
+        console.log(`${SERVICE_NAME}: ${ownerDID}`);
     }
     catch (error) {
-        console.log(`Creating ID ${roles.owner}`);
-        ownerDID = await keymaster.createId(roles.owner);
+        console.log(`Creating ID ${SERVICE_NAME}`);
+        ownerDID = await keymaster.createId(SERVICE_NAME);
     }
 
-    await keymaster.setCurrentId(roles.owner);
-
-    // Resolve or create Admin group
-    try {
-        const doc = await keymaster.resolveDID(roles.admin);
-        roleDIDs.admin = doc.didDocument?.id!;
-        console.log(`${roles.admin}: ${roleDIDs.admin}`);
-    } catch (error) {
-        console.log(`Creating group ${roles.admin}`);
-        roleDIDs.admin = await keymaster.createGroup(roles.admin);
-        await keymaster.addAlias(roles.admin, roleDIDs.admin);
-        console.log(`Created ${roles.admin}: ${roleDIDs.admin}`);
-    }
-
-    // Resolve or create Moderator group
-    try {
-        const doc = await keymaster.resolveDID(roles.moderator);
-        roleDIDs.moderator = doc.didDocument?.id!;
-        console.log(`${roles.moderator}: ${roleDIDs.moderator}`);
-    } catch (error) {
-        console.log(`Creating group ${roles.moderator}`);
-        roleDIDs.moderator = await keymaster.createGroup(roles.moderator);
-        await keymaster.addAlias(roles.moderator, roleDIDs.moderator);
-        console.log(`Created ${roles.moderator}: ${roleDIDs.moderator}`);
-    }
-
-    // Resolve or create Member group
-    try {
-        const doc = await keymaster.resolveDID(roles.member);
-        roleDIDs.member = doc.didDocument?.id!;
-        console.log(`${roles.member}: ${roleDIDs.member}`);
-    } catch (error) {
-        console.log(`Creating group ${roles.member}`);
-        roleDIDs.member = await keymaster.createGroup(roles.member);
-        await keymaster.addAlias(roles.member, roleDIDs.member);
-        console.log(`Created ${roles.member}: ${roleDIDs.member}`);
-    }
-
-    // Ensure hierarchy is set up (idempotent - won't duplicate if already exists)
-    // Admin group contains Owner
-    // Moderator group contains Admin group (Admins are implicitly Moderators)
-    // Member group contains Moderator group (Moderators are implicitly Members)
-    console.log('Verifying group hierarchy...');
-    
-    const ownerInAdmin = await keymaster.testGroup(roleDIDs.admin, ownerDID);
-    if (!ownerInAdmin) {
-        console.log(`Adding owner to admin group...`);
-        await keymaster.addGroupMember(roleDIDs.admin, ownerDID);
-    }
-
-    const adminInModerator = await keymaster.testGroup(roleDIDs.moderator, roleDIDs.admin);
-    if (!adminInModerator) {
-        console.log(`Adding admin group to moderator group...`);
-        await keymaster.addGroupMember(roleDIDs.moderator, roleDIDs.admin);
-    }
-
-    const moderatorInMember = await keymaster.testGroup(roleDIDs.member, roleDIDs.moderator);
-    if (!moderatorInMember) {
-        console.log(`Adding moderator group to member group...`);
-        await keymaster.addGroupMember(roleDIDs.member, roleDIDs.moderator);
-    }
-
-    console.log('Group hierarchy verified.');
+    await keymaster.setCurrentId(SERVICE_NAME);
 
     if (currentId) {
         await keymaster.setCurrentId(currentId);
-    }
-}
-
-async function getRole(user: string): Promise<string | null> {
-    try {
-        if (user === ownerDID) {
-            return 'Owner';
-        }
-
-        const isAdmin = await keymaster.testGroup(roleDIDs.admin, user);
-
-        if (isAdmin) {
-            return 'Admin';
-        }
-
-        const isModerator = await keymaster.testGroup(roleDIDs.moderator, user);
-
-        if (isModerator) {
-            return 'Moderator';
-        }
-
-        const isMember = await keymaster.testGroup(roleDIDs.member, user);
-
-        if (isMember) {
-            return 'Member';
-        }
-
-        return null;
-    }
-    catch (error) {
-        console.log(error);
-        return null;
-    }
-}
-
-async function setRole(user: string, role: string): Promise<string | null> {
-    const currentRole = await getRole(user);
-
-    if (currentRole === 'Owner' || role === currentRole) {
-        return currentRole;
-    }
-
-    // Must be owner to modify groups
-    await keymaster.setCurrentId(roles.owner);
-    console.log(`Changing role for ${user} from ${currentRole} to ${role}`);
-
-    // Remove from current group
-    if (currentRole === 'Admin') {
-        console.log(`Removing from admin group...`);
-        await keymaster.removeGroupMember(roleDIDs.admin, user);
-    }
-
-    if (currentRole === 'Moderator') {
-        console.log(`Removing from moderator group...`);
-        await keymaster.removeGroupMember(roleDIDs.moderator, user);
-    }
-
-    if (currentRole === 'Member') {
-        console.log(`Removing from member group...`);
-        await keymaster.removeGroupMember(roleDIDs.member, user);
-    }
-
-    // Add to new group
-    if (role === 'Admin') {
-        console.log(`Adding to admin group (${roleDIDs.admin})...`);
-        const result = await keymaster.addGroupMember(roleDIDs.admin, user);
-        console.log(`addGroupMember result: ${result}`);
-        const verify = await keymaster.testGroup(roleDIDs.admin, user);
-        console.log(`Verify in admin group: ${verify}`);
-    }
-
-    if (role === 'Moderator') {
-        console.log(`Adding to moderator group (${roleDIDs.moderator})...`);
-        const result = await keymaster.addGroupMember(roleDIDs.moderator, user);
-        console.log(`addGroupMember result: ${result}`);
-        const verify = await keymaster.testGroup(roleDIDs.moderator, user);
-        console.log(`Verify in moderator group: ${verify}`);
-    }
-
-    if (role === 'Member') {
-        console.log(`Adding to member group (${roleDIDs.member})...`);
-        const result = await keymaster.addGroupMember(roleDIDs.member, user);
-        console.log(`addGroupMember result: ${result}`);
-        const verify = await keymaster.testGroup(roleDIDs.member, user);
-        console.log(`Verify in member group: ${verify}`);
-    }
-
-    const newRole = await getRole(user);
-    console.log(`Role change complete. New role: ${newRole}`);
-    return newRole;
-}
-
-async function addMember(userDID: string): Promise<string | null> {
-    await keymaster.setCurrentId(roles.owner);
-    await keymaster.addGroupMember(roleDIDs.member, userDID);
-    return await getRole(userDID);
-}
-
-async function userInRole(user: string, role: string): Promise<boolean> {
-    try {
-        return await keymaster.testGroup(role, user);
-    }
-    catch {
-        return false;
-    }
-}
-
-async function verifyDb(): Promise<void> {
-    console.log('verifying db...');
-
-    const currentDb = db.loadDb();
-
-    if (currentDb.users) {
-        for (const userDID of Object.keys(currentDb.users)) {
-            let role = await getRole(userDID);
-
-            if (role) {
-                console.log(`User ${userDID} verified in role ${role}`);
-            }
-            else {
-                console.log(`Adding user ${userDID} to ${roles.member}...`);
-                role = await addMember(userDID);
-            }
-
-            if (role) {
-                currentDb.users[userDID].role = role;
-            }
-
-            if (role === 'Owner') {
-                currentDb.users[userDID].name = roles.owner;
-            }
-        }
-
-        db.writeDb(currentDb);
     }
 }
 
@@ -288,19 +87,13 @@ function isAuthenticated(req: Request, res: Response, next: NextFunction): void 
     res.status(401).send('You need to log in first');
 }
 
-function isAdmin(req: Request, res: Response, next: NextFunction): void {
-    isAuthenticated(req, res, async () => {
+function isOwner(req: Request, res: Response, next: NextFunction): void {
+    isAuthenticated(req, res, () => {
         const userDid = req.session.user?.did;
-        if (!userDid) {
-            res.status(403).send('Admin access required');
-            return;
-        }
-
-        const inAdminRole = await userInRole(userDid, roleDIDs.admin);
-        if (inAdminRole) {
+        if (userDid === ownerDID) {
             return next();
         }
-        res.status(403).send('Admin access required');
+        res.status(403).send('Owner access required');
     });
 }
 
@@ -323,13 +116,10 @@ async function loginUser(response: string): Promise<any> {
             currentDb.users[did].logins = (currentDb.users[did].logins || 0) + 1;
         }
         else {
-            const role = await getRole(did) || await addMember(did);
-
             currentDb.users[did] = {
                 firstLogin: now,
                 lastLogin: now,
                 logins: 1,
-                role: role!,
             }
         }
 
@@ -382,6 +172,13 @@ app.get('/api/version', async (_: Request, res: Response) => {
         console.log(error);
         res.status(500).send(String(error));
     }
+});
+
+app.get('/api/config', (_: Request, res: Response) => {
+    res.json({
+        serviceName: SERVICE_NAME,
+        publicUrl: PUBLIC_URL,
+    });
 });
 
 app.get('/api/challenge', async (req: Request, res: Response) => {
@@ -470,30 +267,16 @@ app.get('/api/check-auth', async (req: Request, res: Response) => {
         const userDID = isAuthenticated ? req.session.user?.did : null;
         const currentDb = db.loadDb();
 
-        let isOwner = false;
-        let isAdmin = false;
-        let isModerator = false;
-        let isMember = false;
-
         let profile: any = null;
 
         if (isAuthenticated && userDID && currentDb.users) {
             profile = currentDb.users[userDID] || null;
-            if (userDID === ownerDID) {
-                isOwner = true;
-            }
-            isAdmin = await userInRole(userDID, roleDIDs.admin);
-            isModerator = await userInRole(userDID, roleDIDs.moderator);
-            isMember = await userInRole(userDID, roleDIDs.member);
         }
 
         const auth = {
             isAuthenticated,
             userDID,
-            isOwner,
-            isAdmin,
-            isModerator,
-            isMember,
+            isOwner: isAuthenticated && userDID === ownerDID,
             profile,
         };
 
@@ -517,7 +300,7 @@ app.get('/api/users', isAuthenticated, async (_: Request, res: Response) => {
     }
 });
 
-app.get('/api/admin', isAdmin, async (_: Request, res: Response) => {
+app.get('/api/admin', isOwner, async (_: Request, res: Response) => {
     try {
         res.json(db.loadDb());
     }
@@ -528,7 +311,7 @@ app.get('/api/admin', isAdmin, async (_: Request, res: Response) => {
 });
 
 // Publish registry to IPFS and update IPNS
-app.post('/api/admin/publish', isAdmin, async (_: Request, res: Response) => {
+app.post('/api/admin/publish', isOwner, async (_: Request, res: Response) => {
     try {
         // Build registry from DB
         const currentDb = db.loadDb();
@@ -608,7 +391,6 @@ app.get('/api/profile/:did', isAuthenticated, async (req: Request, res: Response
         const profile: User = { ...currentDb.users[did] };
 
         profile.did = did;
-        profile.role = (await getRole(did))!;
         profile.isUser = (req.session?.user?.did === did);
 
         res.json(profile);
@@ -871,66 +653,9 @@ app.get('/member/:name', async (req: Request, res: Response) => {
     }
 });
 
-const validRoles = ['Admin', 'Moderator', 'Member'];
-
-app.get('/api/roles', async (_: Request, res: Response) => {
-    try {
-        res.json(validRoles);
-    }
-    catch (error) {
-        console.log(error);
-        res.status(500).send(String(error));
-    }
-});
-
-app.get('/api/profile/:did/role', isAuthenticated, async (req: Request, res: Response) => {
-    try {
-        const did = req.params.did as string;
-        const currentDb = db.loadDb();
-
-        if (!currentDb.users || !currentDb.users[did]) {
-            res.status(404).send('Not found');
-            return;
-        }
-
-        const profile = currentDb.users[did];
-        res.json({ role: profile.role });
-    }
-    catch (error) {
-        console.log(error);
-        res.status(500).send(String(error));
-    }
-});
-
-app.put('/api/profile/:did/role', isAdmin, async (req: Request, res: Response) => {
-    try {
-        const did = req.params.did as string;
-        const { role } = req.body;
-
-        if (!validRoles.includes(role)) {
-            res.status(400).send(`valid roles include ${validRoles}`);
-            return;
-        }
-
-        const currentDb = db.loadDb();
-        if (!currentDb.users || !currentDb.users[did]) {
-            res.status(404).send('Not found');
-            return;
-        }
-
-        currentDb.users[did].role = (await setRole(did, role))!;
-        db.writeDb(currentDb);
-
-        res.json({ ok: true, message: `role set to ${role}` });
-    }
-    catch (error) {
-        console.log(error);
-        res.status(500).send(String(error));
-    }
-});
 
 // Admin: Delete a user
-app.delete('/api/admin/user/:did', isAdmin, async (req: Request, res: Response) => {
+app.delete('/api/admin/user/:did', isOwner, async (req: Request, res: Response) => {
     try {
         const did = decodeURIComponent(req.params.did as string);
         const currentDb = db.loadDb();
@@ -1028,8 +753,8 @@ app.post('/api/credential/request', isAuthenticated, async (req: Request, res: R
         }
 
         // Switch to owner identity to issue credential
-        await keymaster.setCurrentId(roles.owner);
-        console.log(`Issuing credential as ${roles.owner} (${ownerDID})`);
+        await keymaster.setCurrentId(SERVICE_NAME);
+        console.log(`Issuing credential as ${SERVICE_NAME} (${ownerDID})`);
         console.log(`User has existing credential: ${!!user.credentialDid}`);
 
         let credentialDid: string;
@@ -1042,9 +767,9 @@ app.post('/api/credential/request', isAuthenticated, async (req: Request, res: R
             const vc: any = {
                 "@context": [
                     "https://www.w3.org/ns/credentials/v2",
-                    "https://archon.social/credentials/membership/v1"
+                    `${PUBLIC_URL}/credentials/membership/v1`
                 ],
-                type: ['VerifiableCredential', 'ArchonSocialCredential', 'DTGMembershipCredential'],
+                type: ['VerifiableCredential', 'DTGMembershipCredential'],
                 issuer: ownerDID,
                 validFrom: new Date().toISOString(),
                 credentialSchema: {
@@ -1108,7 +833,7 @@ app.post('/api/credential/request', isAuthenticated, async (req: Request, res: R
 if (process.env.AD_SERVE_CLIENT !== 'false') {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const clientBuildPath = path.join(__dirname, '../../client/build');
-    app.use(express.static(clientBuildPath));
+    app.use('/app', express.static(clientBuildPath));
 
     app.use((req, res) => {
         if (!req.path.startsWith('/api')) {
@@ -1152,7 +877,7 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             intervalSeconds: 5,
             chatty: true,
         });
-        console.log(`auth-demo using keymaster at ${process.env.AD_KEYMASTER_URL}`);
+        console.log(`${SERVICE_NAME} using keymaster at ${process.env.AD_KEYMASTER_URL}`);
     }
     else {
         const passphrase = process.env.AD_WALLET_PASSPHRASE;
@@ -1180,11 +905,10 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
         
         // Load existing wallet (decrypt and restore IDs/aliases)
         await keymaster.loadWallet();
-        console.log(`auth-demo using gatekeeper at ${GATEKEEPER_URL}`);
+        console.log(`${SERVICE_NAME} using gatekeeper at ${GATEKEEPER_URL}`);
     }
 
-    await verifyRoles();
-    await verifyDb();
-    console.log(`roles-auth-demo using wallet at ${WALLET_URL}`);
-    console.log(`roles-auth-demo listening at ${HOST_URL}`);
+    await initOwnerIdentity();
+    console.log(`${SERVICE_NAME} using wallet at ${WALLET_URL}`);
+    console.log(`${SERVICE_NAME} listening at ${HOST_URL}`);
 });

@@ -1,7 +1,7 @@
-# Archon.Social – Server (Express)
+# Name Service – Server (Express)
 
 ### Overview
-This folder contains the Express server for Archon.Social, providing DID-based authentication using Keymaster and Gatekeeper. It exposes `/api` routes for login, profile management, name registration, and credential issuance.
+This folder contains the Express server for the name service, providing DID-based authentication using Keymaster and Gatekeeper. It exposes `/api` routes for login, profile management, name registration, and credential issuance.
 
 ### Setup
 
@@ -9,14 +9,14 @@ This folder contains the Express server for Archon.Social, providing DID-based a
     - `npm install`
 
 2. **.env configuration**
-    - `AD_HOST_PORT=3000`
+    - `AD_HOST_PORT=3300`
     - `AD_SERVE_CLIENT=true` (Whether to serve the client build or not)
     - `AD_CORS_SITE_ORIGIN=http://localhost:3001` (URL of remote client)
     - Additional variables like `AD_KEYMASTER_URL`, `AD_GATEKEEPER_URL`, `AD_WALLET_URL` for Keymaster/Gatekeeper integration.
 
 3. **Run**:
     - `npm start`
-      Starts the server at `http://localhost:3000`.
+      Starts the server at `http://localhost:3300`.
 
 ### Serving the Client
 If `AD_SERVE_CLIENT=true` and you have built the React app (`npm run build` in client), this server will serve that `build/` folder for all non-API requests.
@@ -47,6 +47,6 @@ If `AD_SERVE_CLIENT=true` and you have built the React app (`npm run build` in c
 - `/member/:name` – Get member's DID document by name.
 - `/directory.json` – Public registry JSON.
 
-**Admin**
-- `/api/admin` – Get full database (admin only).
-- `/api/admin/publish` – Publish registry to IPNS (admin only).
+**Admin (owner only)**
+- `/api/admin` – Get full database.
+- `/api/admin/publish` – Publish registry to IPNS.

@@ -2,7 +2,6 @@ export interface User {
     firstLogin?: string;
     lastLogin?: string;
     logins?: number;
-    role?: string;
     name?: string;
     credentialDid?: string;
     credentialName?: string;  // The name at time of credential issuance

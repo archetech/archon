@@ -2,7 +2,7 @@
   "name": "auth-demo",
   "version": "1.2.0",
   "type": "module",
-  "description": "Archon Social - Decentralized naming service",
+  "description": "Decentralized naming service",
   "main": "dist/index.js",
   "scripts": {
     "start": "tsc && node dist/index.js"

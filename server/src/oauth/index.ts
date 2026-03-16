@@ -104,8 +104,8 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 });
             }
 
-            // Create Archon challenge with OAuth context
-            const hostUrl = process.env.AD_HOST_URL || 'http://localhost:3000';
+            // Create DID challenge with OAuth context
+            const hostUrl = process.env.AD_HOST_URL || 'http://localhost:3300';
             const challenge = await keymaster().createChallenge({
                 callback: `${hostUrl}/oauth/callback`,
                 oauth: {
@@ -146,7 +146,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Sign in with Archon Social</title>
+                    <title>Sign in with ${process.env.AD_SERVICE_NAME || 'Name Service'}</title>
                     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
                     <style>
                         body { 
@@ -195,7 +195,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                     </style>
                 </head>
                 <body>
-                    <h1>🔐 Sign in with Archon Social</h1>
+                    <h1>Sign in with ${process.env.AD_SERVICE_NAME || 'Name Service'}</h1>
                     <p class="subtitle"><strong>${client.name}</strong> wants to access your profile</p>
                     
                     <a href="${challengeURL}" target="_blank" class="qr-container" title="Click to open in wallet">
@@ -379,7 +379,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 token_type: 'Bearer',
                 expires_in: 3600,
                 scope: authCode.scope,
-                // Include DID directly (Archon-native approach)
+                // Include DID directly
                 did: authCode.did
             });
         } catch (error: any) {
@@ -411,7 +411,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 return res.status(401).json({ error: 'token_expired' });
             }
 
-            // Get member info from archon.social
+            // Get member info
             const member = await getMemberByDID(tokenData.did);
 
             res.json({
@@ -432,7 +432,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
      * OIDC Discovery document
      */
     router.get('/.well-known/openid-configuration', (_req: Request, res: Response) => {
-        const issuer = process.env.AD_HOST_URL || 'https://archon.social';
+        const issuer = process.env.AD_PUBLIC_URL || process.env.AD_HOST_URL || 'http://localhost:3300';
         
         res.json({
             issuer,

@@ -7,7 +7,7 @@ import {
     Routes,
     Route,
 } from "react-router-dom";
-import { Alert, Box, Button, Select, MenuItem, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, TextField, Typography } from '@mui/material';
 import { Table, TableBody, TableRow, TableCell } from '@mui/material';
 import axios from 'axios';
 import { format, differenceInDays } from 'date-fns';
@@ -24,9 +24,6 @@ interface AuthState {
     isAuthenticated: boolean;
     userDID: string;
     isOwner: boolean;
-    isAdmin: boolean;
-    isModerator: boolean;
-    isMember: boolean;
     profile?: {
         logins?: number;
         name?: string;
@@ -52,8 +49,6 @@ function App() {
                 <Route path="/login" element={<ViewLogin />} />
                 <Route path="/logout" element={<ViewLogout />} />
                 <Route path="/members" element={<ViewMembers />} />
-                <Route path="/moderators" element={<ViewModerators />} />
-                <Route path="/admins" element={<ViewAdmins />} />
                 <Route path="/owner" element={<ViewOwner />} />
                 <Route path="/profile/:did" element={<ViewProfile />} />
                 <Route path="/member/:name" element={<ViewMember />} />
@@ -77,7 +72,7 @@ function Header({ title, showTagline = false } : { title: string, showTagline?: 
         >
             <Link to="/" style={{ textDecoration: 'none' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <img src="/archon-logo.png" alt="Archon Social" style={{ width: 64, height: 64 }} />
+                    <img src="/archon-logo.png" alt="Logo" style={{ width: 64, height: 64 }} />
                     <Typography variant="h3" component="h1" sx={{ fontWeight: 700, color: '#1a1a1a' }}>
                         {title}
                     </Typography>
@@ -98,12 +93,18 @@ function Home() {
     const [userDID, setUserDID] = useState<string>('');
     const [userName, setUserName] = useState<string>('');
     const [logins, setLogins] = useState<number>(0);
+    const [publicUrl, setPublicUrl] = useState<string>('');
+    const [serviceName, setServiceName] = useState<string>('Name Service');
 
     const navigate = useNavigate();
 
     useEffect(() => {
         const init = async () => {
             try {
+                const configResponse = await api.get(`/config`);
+                setPublicUrl(configResponse.data.publicUrl);
+                setServiceName(configResponse.data.serviceName);
+
                 const response = await api.get(`/check-auth`);
                 const auth: AuthState = response.data;
                 setAuth(auth);
@@ -137,7 +138,7 @@ function Home() {
     if (!auth) {
         return (
             <div className="App">
-                <Header title="Archon.Social" showTagline />
+                <Header title={serviceName} showTagline />
                 <p>Loading...</p>
             </div>
         )
@@ -145,7 +146,7 @@ function Home() {
 
     return (
         <div className="App">
-            <Header title="Archon.Social" showTagline />
+            <Header title={serviceName} showTagline />
 
             {isAuthenticated ? (
                 <Box sx={{ maxWidth: 600, mx: 'auto', textAlign: 'center' }}>
@@ -182,21 +183,9 @@ function Home() {
                         <Button component={Link} to='/credential' variant="outlined" size="small" color="success">
                             My Credential
                         </Button>
-                        {auth.isMember &&
-                            <Button component={Link} to='/members' variant="outlined" size="small">
-                                Members
-                            </Button>
-                        }
-                        {auth.isModerator &&
-                            <Button component={Link} to='/moderators' variant="outlined" size="small">
-                                Moderators
-                            </Button>
-                        }
-                        {auth.isAdmin &&
-                            <Button component={Link} to='/admins' variant="outlined" size="small">
-                                Admin
-                            </Button>
-                        }
+                        <Button component={Link} to='/members' variant="outlined" size="small">
+                            Members
+                        </Button>
                         {auth.isOwner &&
                             <Button component={Link} to='/owner' variant="outlined" size="small">
                                 Owner
@@ -221,7 +210,7 @@ function Home() {
                             Have you named your DID?
                         </Typography>
                         <Typography variant="h6" sx={{ mb: 3, color: '#555', lineHeight: 1.6 }}>
-                            Register your free name on the <strong>Archon.Social</strong> identity network.
+                            Register your free name on the <strong>{serviceName}</strong> identity network.
                         </Typography>
                         <Typography variant="body1" sx={{ mb: 3, color: '#666' }}>
                             🤖 AIs and humans welcome! 🧑‍💻
@@ -278,20 +267,20 @@ npx @didcid/keymaster create-id myagent`}
                         </Typography>
                         <Typography variant="body2" component="pre" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
 {`# 1. Get challenge
-CHALLENGE=$(curl -s https://archon.social/api/challenge | jq -r .challenge)
+CHALLENGE=$(curl -s ${publicUrl}/api/challenge | jq -r .challenge)
 
 # 2. Create response
 RESPONSE=$(npx @didcid/keymaster create-response $CHALLENGE)
 
 # 3. Authenticate (save session cookie)
-curl -c cookies.txt "https://archon.social/api/login?response=$RESPONSE"
+curl -c cookies.txt "${publicUrl}/api/login?response=$RESPONSE"
 
 # 4. Claim your name
-curl -b cookies.txt -X POST https://archon.social/api/profile/name \\
+curl -b cookies.txt -X POST ${publicUrl}/api/profile/name \\
   -H "Content-Type: application/json" -d '{"name": "myagent"}'
 
 # 5. Get your verifiable credential
-curl -b cookies.txt -X POST https://archon.social/api/credential/request`}
+curl -b cookies.txt -X POST ${publicUrl}/api/credential/request`}
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mt: 2 }}>
                             MCP Server: <a href="https://www.npmjs.com/package/@archon-protocol/mcp-server" target="_blank" rel="noopener noreferrer" style={{ color: '#00d4aa' }}>@archon-protocol/mcp-server</a>
@@ -306,7 +295,7 @@ curl -b cookies.txt -X POST https://archon.social/api/credential/request`}
                             {' • '}
                             <a href="/directory.json" target="_blank" rel="noopener noreferrer" style={{ color: '#3498db' }}>View Directory</a>
                             {' • '}
-                            <a href="https://ipfs.io/ipns/archon.social" target="_blank" rel="noopener noreferrer" style={{ color: '#3498db' }}>IPNS Registry</a>
+                            {publicUrl && <a href={`https://ipfs.io/ipns/${new URL(publicUrl).host}`} target="_blank" rel="noopener noreferrer" style={{ color: '#3498db' }}>IPNS Registry</a>}
                         </Typography>
                     </Box>
                 </Box>
@@ -486,7 +475,7 @@ function ViewMembers() {
                 const authResponse = await api.get(`/check-auth`);
                 const auth = authResponse.data;
 
-                if (!auth.isMember) {
+                if (!auth.isAuthenticated) {
                     navigate('/');
                     return;
                 }
@@ -586,57 +575,18 @@ function ViewMembers() {
     )
 }
 
-function ViewModerators() {
-    const [users, setUsers] = useState<string[]>([]);
-    const navigate = useNavigate();
-
-    useEffect(() => {
-        const init = async () => {
-            try {
-                const response = await api.get(`/users`);
-                setUsers(response.data);
-            }
-            catch (error: any) {
-                navigate('/');
-            }
-        };
-
-        init();
-    }, [navigate]);
-
-    return (
-        <div className="App">
-            <Header title="Moderators Area" />
-            <h2>Users</h2>
-            <Table style={{ width: '800px' }}>
-                <TableBody>
-                    {users.map((did, index) => (
-                        <TableRow key={index}>
-                            <TableCell>{index + 1}</TableCell>
-                            <TableCell><Link to={`/profile/${did}`}>{did}</Link></TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
-    )
-}
-
-function ViewAdmins() {
-    const navigate = useNavigate();
+function ViewOwner() {
+    const [adminInfo, setAdminInfo] = useState<any>(null);
     const [publishing, setPublishing] = useState(false);
     const [publishResult, setPublishResult] = useState<any>(null);
     const [error, setError] = useState('');
+    const navigate = useNavigate();
 
     useEffect(() => {
         const init = async () => {
             try {
-                const response = await api.get(`/check-auth`);
-                const auth = response.data;
-
-                if (!auth.isAdmin) {
-                    navigate('/');
-                }
+                const response = await api.get(`/admin`);
+                setAdminInfo(response.data);
             }
             catch (error: any) {
                 navigate('/');
@@ -662,15 +612,15 @@ function ViewAdmins() {
 
     return (
         <div className="App">
-            <Header title="Admin Area" />
+            <Header title="Owner Area" />
             <Box sx={{ maxWidth: 600, mx: 'auto', p: 3 }}>
                 <Typography variant="h6" gutterBottom>Registry Management</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     Publish the name registry to IPNS for decentralized resolution.
                 </Typography>
-                
-                <Button 
-                    variant="contained" 
+
+                <Button
+                    variant="contained"
                     onClick={publishToIPNS}
                     disabled={publishing}
                     sx={{ mb: 2 }}
@@ -691,38 +641,12 @@ function ViewAdmins() {
                         </Typography>
                     </Alert>
                 )}
-
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-                    Admins can also set roles for other users via the profile pages.
-                </Typography>
             </Box>
-        </div>
-    )
-}
 
-function ViewOwner() {
-    const [adminInfo, setAdminInfo] = useState<any>(null);
-    const navigate = useNavigate();
-
-    useEffect(() => {
-        const init = async () => {
-            try {
-                const response = await api.get(`/admin`);
-                setAdminInfo(response.data);
-            }
-            catch (error: any) {
-                navigate('/');
-            }
-        };
-
-        init();
-    }, [navigate]);
-
-    return (
-        <div className="App">
-            <Header title="Owner Area" />
-            <h2>database</h2>
-            <pre>{JSON.stringify(adminInfo, null, 4)}</pre>
+            <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
+                <Typography variant="h6" gutterBottom>Database</Typography>
+                <pre style={{ textAlign: 'left', overflow: 'auto' }}>{JSON.stringify(adminInfo, null, 4)}</pre>
+            </Box>
         </div>
     )
 }
@@ -734,9 +658,6 @@ function ViewProfile() {
     const [profile, setProfile] = useState<any>(null);
     const [currentName, setCurrentName] = useState<string>("");
     const [newName, setNewName] = useState<string>("");
-    const [roleList, setRoleList] = useState<string[]>([]);
-    const [currentRole, setCurrentRole] = useState<string>("");
-    const [newRole, setNewRole] = useState<string>("");
 
     useEffect(() => {
         const init = async () => {
@@ -756,12 +677,6 @@ function ViewProfile() {
                     setNewName(profile.name);
                 }
 
-                if (profile.role) {
-                    setCurrentRole(profile.role);
-                    setNewRole(profile.role);
-                }
-
-                setRoleList(['Admin', 'Moderator', 'Member']);
             }
             catch (error: any) {
                 navigate('/');
@@ -778,19 +693,6 @@ function ViewProfile() {
             setNewName(name);
             setCurrentName(name);
             profile.name = name;
-        }
-        catch (error: any) {
-            window.alert(error);
-        }
-    }
-
-    async function saveRole() {
-        try {
-            const role = newRole;
-            await api.put(`/profile/${profile.did}/role`, { role });
-            setNewRole(role);
-            setCurrentRole(role);
-            profile.role = role;
         }
         catch (error: any) {
             window.alert(error);
@@ -842,7 +744,7 @@ function ViewProfile() {
                     <TableRow>
                         <TableCell>Name:</TableCell>
                         <TableCell>
-                            {profile.isUser && currentRole !== 'Owner' ? (
+                            {profile.isUser ? (
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                                     <TextField
                                         label=""
@@ -868,42 +770,6 @@ function ViewProfile() {
                                 </Box>
                             ) : (
                                 currentName
-                            )}
-                        </TableCell>
-                    </TableRow>
-                    <TableRow>
-                        <TableCell>Role:</TableCell>
-                        <TableCell>
-                            {auth?.isAdmin && currentRole !== 'Owner' ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                    <Select
-                                        value={newRole}
-                                        displayEmpty
-                                        onChange={(event) => setNewRole(event.target.value)}
-                                        sx={{ width: 300 }}
-                                        fullWidth
-                                    >
-                                        <MenuItem value="" disabled>
-                                            Select role
-                                        </MenuItem>
-                                        {roleList.map((role, index) => (
-                                            <MenuItem value={role} key={index}>
-                                                {role}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        onClick={saveRole}
-                                        disabled={newRole === currentRole}
-                                    >
-                                        Save
-                                    </Button>
-                                </Box>
-                            ) : (
-                                currentRole
                             )}
                         </TableCell>
                     </TableRow>
@@ -1002,9 +868,9 @@ function ViewCredential() {
                             Get Your Verified Name Credential
                         </Typography>
                         <Typography variant="body1" sx={{ mb: 3, color: '#666' }}>
-                            Request a verifiable credential from Archon.Social that proves you own your @name.
+                            Request a verifiable credential that proves you own your @name.
                             <br />
-                            This credential is signed by Archon.Social and can be verified by anyone.
+                            This credential is cryptographically signed and can be verified by anyone.
                         </Typography>
                         
                         {credentialData?.name ? (
