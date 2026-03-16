@@ -89,6 +89,88 @@ async function initServiceIdentity(): Promise<void> {
     }
 }
 
+function validateName(name: any): { ok: boolean; trimmedName?: string; message?: string } {
+    if (!name || typeof name !== 'string') {
+        return { ok: false, message: 'Name is required' };
+    }
+    const trimmedName = name.trim().toLowerCase();
+    if (trimmedName.length < 3 || trimmedName.length > 32) {
+        return { ok: false, message: 'Name must be 3-32 characters' };
+    }
+    if (!/^[a-z0-9_-]+$/.test(trimmedName)) {
+        return { ok: false, message: 'Name can only contain letters, numbers, hyphens, and underscores' };
+    }
+    return { ok: true, trimmedName };
+}
+
+function checkNameAvailability(currentDb: any, trimmedName: string, excludeDid?: string): boolean {
+    if (!currentDb.users) return true;
+    for (const [existingDid, user] of Object.entries(currentDb.users) as [string, any][]) {
+        if (existingDid !== excludeDid && user.name?.toLowerCase() === trimmedName) {
+            return false;
+        }
+    }
+    return true;
+}
+
+async function issueOrUpdateCredential(did: string, user: any, trimmedName: string): Promise<void> {
+    await keymaster.setCurrentId(SERVICE_NAME);
+
+    if (user.credentialDid) {
+        const vc: any = await keymaster.getCredential(user.credentialDid);
+        if (!vc) throw new Error('Failed to fetch existing credential');
+        vc.credentialSubject.name = `${trimmedName}@${SERVICE_DOMAIN}`;
+        vc.validFrom = new Date().toISOString();
+        const updated = await keymaster.updateCredential(user.credentialDid, vc);
+        if (!updated) throw new Error('Failed to update credential');
+        user.credentialIssuedAt = new Date().toISOString();
+        console.log(`Updated credential ${user.credentialDid} for ${trimmedName}`);
+    } else {
+        const boundCredential = await keymaster.bindCredential(did, {
+            schema: MEMBERSHIP_SCHEMA_DID,
+            validFrom: new Date().toISOString(),
+            claims: { name: `${trimmedName}@${SERVICE_DOMAIN}` }
+        });
+        const credentialDid = await keymaster.issueCredential(boundCredential);
+        user.credentialDid = credentialDid;
+        user.credentialIssuedAt = new Date().toISOString();
+        console.log(`Issued new credential ${credentialDid} for ${trimmedName}`);
+    }
+}
+
+async function revokeCredential(user: any, name: string): Promise<void> {
+    if (user.credentialDid) {
+        try {
+            await keymaster.setCurrentId(SERVICE_NAME);
+            await keymaster.revokeCredential(user.credentialDid);
+            console.log(`Revoked credential ${user.credentialDid} for ${name}`);
+        } catch (err) {
+            console.log(`Failed to revoke credential: ${err}`);
+        }
+        delete user.credentialDid;
+        delete user.credentialIssuedAt;
+    }
+}
+
+async function verifyBearerToken(req: Request): Promise<string | null> {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return null;
+    const response = authHeader.slice(7);
+    if (!response) return null;
+    const verify = await keymaster.verifyResponse(response, { retries: 10 });
+    if (!verify.match || !verify.responder) return null;
+    return verify.responder;
+}
+
+function ensureUser(currentDb: any, did: string): any {
+    if (!currentDb.users) currentDb.users = {};
+    const now = new Date().toISOString();
+    if (!currentDb.users[did]) {
+        currentDb.users[did] = { firstLogin: now, lastLogin: now, logins: 1 };
+    }
+    return currentDb.users[did];
+}
+
 function isAuthenticated(req: Request, res: Response, next: NextFunction): void {
     if (req.session.user) {
         return next();
@@ -147,7 +229,7 @@ async function loginUser(response: string): Promise<any> {
 
 const corsOptions = {
     origin: process.env.NS_CORS_SITE_ORIGIN || 'http://localhost:3001', // Origin needs to be specified with credentials true
-    methods: ['GET', 'POST'],  // Specify which methods are allowed (e.g., GET, POST)
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,         // Enable if you need to send cookies or authorization headers
     optionsSuccessStatus: 200  // Some legacy browsers choke on 204
 };
@@ -433,32 +515,18 @@ app.get('/api/profile/:did/name', isAuthenticated, async (req: Request, res: Res
 app.put('/api/profile/:did/name', isAuthenticated, async (req: Request, res: Response) => {
     try {
         const did = req.params.did as string;
-        const { name } = req.body;
 
         if (!req.session.user || req.session.user.did !== did) {
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
 
-        // Validate name format
-        if (!name || typeof name !== 'string') {
-            res.status(400).json({ ok: false, message: 'Name is required' });
+        const validation = validateName(req.body.name);
+        if (!validation.ok) {
+            res.status(400).json({ ok: false, message: validation.message });
             return;
         }
-
-        const trimmedName = name.trim().toLowerCase();
-
-        // Check length (3-32 characters)
-        if (trimmedName.length < 3 || trimmedName.length > 32) {
-            res.status(400).json({ ok: false, message: 'Name must be 3-32 characters' });
-            return;
-        }
-
-        // Check format (alphanumeric, hyphens, underscores only)
-        if (!/^[a-z0-9_-]+$/.test(trimmedName)) {
-            res.status(400).json({ ok: false, message: 'Name can only contain letters, numbers, hyphens, and underscores' });
-            return;
-        }
+        const trimmedName = validation.trimmedName!;
 
         const currentDb = db.loadDb();
         if (!currentDb.users || !currentDb.users[did]) {
@@ -466,51 +534,14 @@ app.put('/api/profile/:did/name', isAuthenticated, async (req: Request, res: Res
             return;
         }
 
-        // Check for duplicate names (case-insensitive)
-        for (const [existingDid, user] of Object.entries(currentDb.users)) {
-            if (existingDid !== did && user.name?.toLowerCase() === trimmedName) {
-                res.status(409).json({ ok: false, message: 'Name already taken' });
-                return;
-            }
+        if (!checkNameAvailability(currentDb, trimmedName, did)) {
+            res.status(409).json({ ok: false, message: 'Name already taken' });
+            return;
         }
 
         const user = currentDb.users[did];
         user.name = trimmedName;
-
-        // Auto-create or update credential
-        await keymaster.setCurrentId(SERVICE_NAME);
-
-        if (user.credentialDid) {
-            // Fetch existing credential and update the name claim
-            const vc: any = await keymaster.getCredential(user.credentialDid);
-            if (!vc) {
-                throw new Error('Failed to fetch existing credential');
-            }
-            vc.credentialSubject.name = `${trimmedName}@${SERVICE_DOMAIN}`;
-            vc.validFrom = new Date().toISOString();
-            const updated = await keymaster.updateCredential(user.credentialDid, vc);
-            if (!updated) {
-                throw new Error('Failed to update credential');
-            }
-
-            user.credentialIssuedAt = new Date().toISOString();
-            console.log(`Updated credential ${user.credentialDid} for ${trimmedName}`);
-        } else {
-            // Issue new credential
-            const boundCredential = await keymaster.bindCredential(did, {
-                schema: MEMBERSHIP_SCHEMA_DID,
-                validFrom: new Date().toISOString(),
-                claims: {
-                    name: `${trimmedName}@${SERVICE_DOMAIN}`
-                }
-            });
-            const credentialDid = await keymaster.issueCredential(boundCredential);
-            user.credentialDid = credentialDid;
-
-            user.credentialIssuedAt = new Date().toISOString();
-            console.log(`Issued new credential ${credentialDid} for ${trimmedName}`);
-        }
-
+        await issueOrUpdateCredential(did, user, trimmedName);
         db.writeDb(currentDb);
 
         res.json({ ok: true, message: `name set to ${trimmedName}` });
@@ -521,7 +552,7 @@ app.put('/api/profile/:did/name', isAuthenticated, async (req: Request, res: Res
     }
 });
 
-// Delete name and revoke credential
+// Delete name and revoke credential (session-based)
 app.delete('/api/profile/:did/name', isAuthenticated, async (req: Request, res: Response) => {
     try {
         const did = req.params.did as string;
@@ -540,19 +571,92 @@ app.delete('/api/profile/:did/name', isAuthenticated, async (req: Request, res: 
         const user = currentDb.users[did];
         const deletedName = user.name;
 
-        // Revoke credential if one exists
-        if (user.credentialDid) {
-            try {
-                await keymaster.setCurrentId(SERVICE_NAME);
-                await keymaster.revokeCredential(user.credentialDid);
-                console.log(`Revoked credential ${user.credentialDid} for ${deletedName}`);
-            } catch (err) {
-                console.log(`Failed to revoke credential: ${err}`);
-            }
-            delete user.credentialDid;
-            delete user.credentialIssuedAt;
+        await revokeCredential(user, deletedName || '');
+        delete user.name;
+        db.writeDb(currentDb);
+
+        res.json({ ok: true, message: `name '${deletedName}' deleted and credential revoked` });
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send(String(error));
+    }
+});
+
+// Stateless name claim (Bearer token auth)
+app.put('/api/name', async (req: Request, res: Response) => {
+    try {
+        const did = await verifyBearerToken(req);
+        if (!did) {
+            res.status(401).json({ ok: false, message: 'Valid Bearer token (response DID) required' });
+            return;
         }
 
+        const validation = validateName(req.body.name);
+        if (!validation.ok) {
+            res.status(400).json({ ok: false, message: validation.message });
+            return;
+        }
+        const trimmedName = validation.trimmedName!;
+
+        const currentDb = db.loadDb();
+        const user = ensureUser(currentDb, did);
+
+        if (!checkNameAvailability(currentDb, trimmedName, did)) {
+            res.status(409).json({ ok: false, message: 'Name already taken' });
+            return;
+        }
+
+        user.name = trimmedName;
+        await issueOrUpdateCredential(did, user, trimmedName);
+        db.writeDb(currentDb);
+
+        let credential = null;
+        if (user.credentialDid) {
+            credential = await keymaster.getCredential(user.credentialDid);
+        }
+
+        res.json({
+            ok: true,
+            name: trimmedName,
+            did,
+            credential: {
+                credentialDid: user.credentialDid,
+                credentialIssuedAt: user.credentialIssuedAt,
+                credential,
+            }
+        });
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send(String(error));
+    }
+});
+
+// Stateless name delete (Bearer token auth)
+app.delete('/api/name', async (req: Request, res: Response) => {
+    try {
+        const did = await verifyBearerToken(req);
+        if (!did) {
+            res.status(401).json({ ok: false, message: 'Valid Bearer token (response DID) required' });
+            return;
+        }
+
+        const currentDb = db.loadDb();
+        if (!currentDb.users?.[did]) {
+            res.status(404).json({ ok: false, message: 'User not found' });
+            return;
+        }
+
+        const user = currentDb.users[did];
+        const deletedName = user.name;
+
+        if (!deletedName) {
+            res.status(404).json({ ok: false, message: 'No name to delete' });
+            return;
+        }
+
+        await revokeCredential(user, deletedName);
         delete user.name;
         db.writeDb(currentDb);
 

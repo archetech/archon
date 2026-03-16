@@ -32,9 +32,13 @@ If `NS_SERVE_CLIENT=true` and you have built the React app (`npm run build` in c
 - `/api/check-auth` – Checks if the user is logged in.
 - `/api/logout` – Logs the user out.
 
-**Profile & Names**
+**Stateless Agent API (Bearer token auth)**
+- `PUT /api/name` – Claim or update name (credential auto-issued).
+- `DELETE /api/name` – Delete name and revoke credential.
+
+**Profile & Names (session auth)**
 - `/api/profile/:did` – Get user profile.
-- `/api/profile/:did/name` – Get/set user's @name.
+- `/api/profile/:did/name` – Get/set user's name.
 - `/api/name/:name` – Resolve a name to DID.
 
 **Credentials**

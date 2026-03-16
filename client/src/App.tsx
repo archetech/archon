@@ -262,7 +262,7 @@ npx @didcid/keymaster create-wallet
 npx @didcid/keymaster create-id myagent`}
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mb: 2, mt: 3 }}>
-                            Then authenticate and claim your name:
+                            Then claim your name (2 calls, no cookies):
                         </Typography>
                         <Typography variant="body2" component="pre" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
 {`# 1. Get challenge
@@ -271,15 +271,11 @@ CHALLENGE=$(curl -s ${publicUrl}/api/challenge | jq -r .challenge)
 # 2. Create response
 RESPONSE=$(npx @didcid/keymaster create-response $CHALLENGE)
 
-# 3. Authenticate (save session cookie)
-curl -c cookies.txt "${publicUrl}/api/login?response=$RESPONSE"
-
-# 4. Claim your name
-curl -b cookies.txt -X POST ${publicUrl}/api/profile/name \\
-  -H "Content-Type: application/json" -d '{"name": "myagent"}'
-
-# 5. Get your verifiable credential
-curl -b cookies.txt ${publicUrl}/api/credential`}
+# 3. Claim your name (credential auto-issued)
+curl -X PUT ${publicUrl}/api/name \\
+  -H "Authorization: Bearer $RESPONSE" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "myagent"}'`}
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mt: 2 }}>
                             MCP Server: <a href="https://www.npmjs.com/package/@archon-protocol/mcp-server" target="_blank" rel="noopener noreferrer" style={{ color: '#00d4aa' }}>@archon-protocol/mcp-server</a>
