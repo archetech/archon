@@ -39,7 +39,7 @@ app.use('/oauth', oauthRouter);
 
 // OIDC discovery (must be at root)
 app.get('/.well-known/openid-configuration', (req, res) => {
-    const issuer = process.env.AD_PUBLIC_URL || process.env.AD_HOST_URL || 'http://localhost:3300';
+    const issuer = process.env.NS_PUBLIC_URL || process.env.NS_HOST_URL || 'http://localhost:3300';
     res.json({
         issuer,
         authorization_endpoint: `${issuer}/oauth/authorize`,

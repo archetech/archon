@@ -105,7 +105,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             }
 
             // Create DID challenge with OAuth context
-            const hostUrl = process.env.AD_HOST_URL || 'http://localhost:3300';
+            const hostUrl = process.env.NS_HOST_URL || 'http://localhost:3300';
             const challenge = await keymaster().createChallenge({
                 callback: `${hostUrl}/oauth/callback`,
                 oauth: {
@@ -126,7 +126,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             });
 
             // Return challenge for client to display
-            const walletUrl = process.env.AD_WALLET_URL || 'https://wallet.archon.technology';
+            const walletUrl = process.env.NS_WALLET_URL || 'https://wallet.archon.technology';
             const challengeURL = `${walletUrl}?challenge=${challenge}`;
 
             // If explicitly requesting JSON (API call), return JSON
@@ -146,7 +146,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Sign in with ${process.env.AD_SERVICE_NAME || 'Name Service'}</title>
+                    <title>Sign in with ${process.env.NS_SERVICE_NAME || 'Name Service'}</title>
                     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
                     <style>
                         body { 
@@ -195,7 +195,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                     </style>
                 </head>
                 <body>
-                    <h1>Sign in with ${process.env.AD_SERVICE_NAME || 'Name Service'}</h1>
+                    <h1>Sign in with ${process.env.NS_SERVICE_NAME || 'Name Service'}</h1>
                     <p class="subtitle"><strong>${client.name}</strong> wants to access your profile</p>
                     
                     <a href="${challengeURL}" target="_blank" class="qr-container" title="Click to open in wallet">
@@ -432,7 +432,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
      * OIDC Discovery document
      */
     router.get('/.well-known/openid-configuration', (_req: Request, res: Response) => {
-        const issuer = process.env.AD_PUBLIC_URL || process.env.AD_HOST_URL || 'http://localhost:3300';
+        const issuer = process.env.NS_PUBLIC_URL || process.env.NS_HOST_URL || 'http://localhost:3300';
         
         res.json({
             issuer,

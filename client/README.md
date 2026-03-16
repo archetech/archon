@@ -23,7 +23,7 @@ This folder contains the React front-end for the name service. It provides login
 2. Serve those files from your hosting solution.
 
 ### Running with the Server
-If you set the environment variable `AD_SERVE_CLIENT=true` in the server's .env, and then build this client (`npm run build`), the server can serve these static files. Access the app at the server's URL (e.g. `http://localhost:3300`).
+If you set the environment variable `NS_SERVE_CLIENT=true` in the server's .env, and then build this client (`npm run build`), the server can serve these static files. Access the app at the server's URL (e.g. `http://localhost:3300`).
 
 ### Features
 - **QR Code Login** – Scan with your wallet to authenticate

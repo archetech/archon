@@ -25,16 +25,16 @@ let db: DatabaseInterface;
 
 dotenv.config();
 
-const HOST_PORT = Number(process.env.AD_HOST_PORT) || 3300;
-const HOST_URL = process.env.AD_HOST_URL || 'http://localhost:3300';
-const GATEKEEPER_URL = process.env.AD_GATEKEEPER_URL || 'http://localhost:4224';
-const WALLET_URL = process.env.AD_WALLET_URL || 'http://localhost:4224';
-const AD_DATABASE_TYPE = process.env.AD_DATABASE || 'json';
-const IPFS_API_URL = process.env.AD_IPFS_API_URL || 'http://ipfs:5001/api/v0';
-const SERVICE_NAME = process.env.AD_SERVICE_NAME || 'name-service';
-const PUBLIC_URL = process.env.AD_PUBLIC_URL || HOST_URL;
-const SESSION_SECRET = process.env.AD_SESSION_SECRET || SERVICE_NAME;
-const IPNS_KEY_NAME = process.env.AD_IPNS_KEY_NAME || SERVICE_NAME;
+const HOST_PORT = Number(process.env.NS_HOST_PORT) || 3300;
+const HOST_URL = process.env.NS_HOST_URL || 'http://localhost:3300';
+const GATEKEEPER_URL = process.env.NS_GATEKEEPER_URL || 'http://localhost:4224';
+const WALLET_URL = process.env.NS_WALLET_URL || 'http://localhost:4224';
+const NS_DATABASE_TYPE = process.env.NS_DATABASE || 'json';
+const IPFS_API_URL = process.env.NS_IPFS_API_URL || 'http://localhost:5001/api/v0';
+const SERVICE_NAME = process.env.NS_SERVICE_NAME || 'name-service';
+const PUBLIC_URL = process.env.NS_PUBLIC_URL || HOST_URL;
+const SESSION_SECRET = process.env.NS_SESSION_SECRET || SERVICE_NAME;
+const IPNS_KEY_NAME = process.env.NS_IPNS_KEY_NAME || SERVICE_NAME;
 
 const app = express();
 const logins: Record<string, {
@@ -137,7 +137,7 @@ async function loginUser(response: string): Promise<any> {
 }
 
 const corsOptions = {
-    origin: process.env.AD_CORS_SITE_ORIGIN || 'http://localhost:3001', // Origin needs to be specified with credentials true
+    origin: process.env.NS_CORS_SITE_ORIGIN || 'http://localhost:3001', // Origin needs to be specified with credentials true
     methods: ['GET', 'POST'],  // Specify which methods are allowed (e.g., GET, POST)
     credentials: true,         // Enable if you need to send cookies or authorization headers
     optionsSuccessStatus: 200  // Some legacy browsers choke on 204
@@ -760,7 +760,7 @@ app.post('/api/credential/request', isAuthenticated, async (req: Request, res: R
         let credentialDid: string;
 
         // Schema DID for membership credentials
-        const MEMBERSHIP_SCHEMA_DID = process.env.AD_MEMBERSHIP_SCHEMA_DID || 'did:cid:bagaaieraj6e2ygpm7laaapxuz5efo2bxi436vi6ubw42b75elsscelte6kza';
+        const MEMBERSHIP_SCHEMA_DID = process.env.NS_MEMBERSHIP_SCHEMA_DID || 'did:cid:bagaaieraj6e2ygpm7laaapxuz5efo2bxi436vi6ubw42b75elsscelte6kza';
         
         if (user.credentialDid) {
             // Update existing credential with schema-based format
@@ -830,7 +830,7 @@ app.post('/api/credential/request', isAuthenticated, async (req: Request, res: R
     }
 });
 
-if (process.env.AD_SERVE_CLIENT !== 'false') {
+if (process.env.NS_SERVE_CLIENT !== 'false') {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const clientBuildPath = path.join(__dirname, '../../client/build');
     app.use('/app', express.static(clientBuildPath));
@@ -854,7 +854,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 app.listen(HOST_PORT, '0.0.0.0', async () => {
-    if (AD_DATABASE_TYPE === 'sqlite') {
+    if (NS_DATABASE_TYPE === 'sqlite') {
         db = new DbSqlite();
     } else {
         db = new DbJson();
@@ -869,21 +869,21 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
         }
     }
 
-    if (process.env.AD_KEYMASTER_URL) {
+    if (process.env.NS_KEYMASTER_URL) {
         keymaster = new KeymasterClient();
         await keymaster.connect({
-            url: process.env.AD_KEYMASTER_URL,
+            url: process.env.NS_KEYMASTER_URL,
             waitUntilReady: true,
             intervalSeconds: 5,
             chatty: true,
         });
-        console.log(`${SERVICE_NAME} using keymaster at ${process.env.AD_KEYMASTER_URL}`);
+        console.log(`${SERVICE_NAME} using keymaster at ${process.env.NS_KEYMASTER_URL}`);
     }
     else {
-        const passphrase = process.env.AD_WALLET_PASSPHRASE;
+        const passphrase = process.env.NS_WALLET_PASSPHRASE;
 
         if (!passphrase) {
-            console.error('Error: AD_WALLET_PASSPHRASE environment variable not set');
+            console.error('Error: NS_WALLET_PASSPHRASE environment variable not set');
             process.exit(1);
         }
 

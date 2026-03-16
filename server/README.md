@@ -9,17 +9,17 @@ This folder contains the Express server for the name service, providing DID-base
     - `npm install`
 
 2. **.env configuration**
-    - `AD_HOST_PORT=3300`
-    - `AD_SERVE_CLIENT=true` (Whether to serve the client build or not)
-    - `AD_CORS_SITE_ORIGIN=http://localhost:3001` (URL of remote client)
-    - Additional variables like `AD_KEYMASTER_URL`, `AD_GATEKEEPER_URL`, `AD_WALLET_URL` for Keymaster/Gatekeeper integration.
+    - `NS_HOST_PORT=3300`
+    - `NS_SERVE_CLIENT=true` (Whether to serve the client build or not)
+    - `NS_CORS_SITE_ORIGIN=http://localhost:3001` (URL of remote client)
+    - Additional variables like `NS_KEYMASTER_URL`, `NS_GATEKEEPER_URL`, `NS_WALLET_URL` for Keymaster/Gatekeeper integration.
 
 3. **Run**:
     - `npm start`
       Starts the server at `http://localhost:3300`.
 
 ### Serving the Client
-If `AD_SERVE_CLIENT=true` and you have built the React app (`npm run build` in client), this server will serve that `build/` folder for all non-API requests.
+If `NS_SERVE_CLIENT=true` and you have built the React app (`npm run build` in client), this server will serve that `build/` folder for all non-API requests.
 
 ### CORS and Sessions
 - This server uses `express-session` for session-based logins. Make sure to keep `credentials: true` if you want cross-origin cookies from your React dev server.
