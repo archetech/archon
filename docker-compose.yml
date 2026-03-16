@@ -6,6 +6,7 @@ services:
     image: ${NS_SERVICE_NAME:-name-service}
     environment:
       - NS_SERVICE_NAME=${NS_SERVICE_NAME}
+      - NS_SERVICE_DOMAIN=${NS_SERVICE_DOMAIN}
       - NS_PUBLIC_URL=${NS_PUBLIC_URL}
       - NS_SESSION_SECRET=${NS_SESSION_SECRET}
       - NS_HOST_PORT=${NS_HOST_PORT:-3300}

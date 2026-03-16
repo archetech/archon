@@ -33,6 +33,7 @@ const NS_DATABASE_TYPE = process.env.NS_DATABASE || 'json';
 const IPFS_API_URL = process.env.NS_IPFS_API_URL || 'http://localhost:5001/api/v0';
 const SERVICE_NAME = process.env.NS_SERVICE_NAME || 'name-service';
 const PUBLIC_URL = process.env.NS_PUBLIC_URL || HOST_URL;
+const SERVICE_DOMAIN = process.env.NS_SERVICE_DOMAIN || '';
 const SESSION_SECRET = process.env.NS_SESSION_SECRET || SERVICE_NAME;
 const IPNS_KEY_NAME = process.env.NS_IPNS_KEY_NAME || SERVICE_NAME;
 
@@ -184,6 +185,7 @@ app.get('/api/version', async (_: Request, res: Response) => {
 app.get('/api/config', (_: Request, res: Response) => {
     res.json({
         serviceName: SERVICE_NAME,
+        serviceDomain: SERVICE_DOMAIN,
         publicUrl: PUBLIC_URL,
     });
 });
@@ -785,7 +787,7 @@ app.post('/api/credential/request', isAuthenticated, async (req: Request, res: R
                 },
                 credentialSubject: {
                     id: userDid,
-                    memberName: `@${user.name}`
+                    memberName: `${user.name}@${SERVICE_DOMAIN}`
                 }
             };
             console.log(`Updating credential ${user.credentialDid}...`);
@@ -802,7 +804,7 @@ app.post('/api/credential/request', isAuthenticated, async (req: Request, res: R
                 schema: MEMBERSHIP_SCHEMA_DID,
                 validFrom: new Date().toISOString(),
                 claims: {
-                    memberName: `@${user.name}`
+                    memberName: `${user.name}@${SERVICE_DOMAIN}`
                 }
             });
             console.log(`Bound credential, now issuing...`);

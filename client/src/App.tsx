@@ -94,6 +94,7 @@ function Home() {
     const [userName, setUserName] = useState<string>('');
     const [logins, setLogins] = useState<number>(0);
     const [publicUrl, setPublicUrl] = useState<string>('');
+    const [serviceDomain, setServiceDomain] = useState<string>('');
     const [serviceName, setServiceName] = useState<string>('Name Service');
 
     const navigate = useNavigate();
@@ -103,6 +104,7 @@ function Home() {
             try {
                 const configResponse = await api.get(`/config`);
                 setPublicUrl(configResponse.data.publicUrl);
+                setServiceDomain(configResponse.data.serviceDomain);
                 setServiceName(configResponse.data.serviceName);
 
                 const response = await api.get(`/check-auth`);
@@ -163,7 +165,7 @@ function Home() {
                         
                         {userName ? (
                             <Typography variant="h6" sx={{ color: '#27ae60', fontWeight: 600 }}>
-                                🎉 Your handle: <strong>@{userName}</strong>
+                                🎉 Your handle: <strong>{userName}@{serviceDomain}</strong>
                             </Typography>
                         ) : (
                             <Typography variant="body1" sx={{ color: '#e74c3c' }}>
@@ -467,11 +469,15 @@ function ViewMembers() {
     const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [lastUpdated, setLastUpdated] = useState<string>('');
+    const [serviceDomain, setServiceDomain] = useState<string>('');
     const navigate = useNavigate();
 
     useEffect(() => {
         const init = async () => {
             try {
+                const configResponse = await api.get(`/config`);
+                setServiceDomain(configResponse.data.serviceDomain);
+
                 const authResponse = await api.get(`/check-auth`);
                 const auth = authResponse.data;
 
@@ -544,7 +550,7 @@ function ViewMembers() {
                                 onClick={() => navigate(`/profile/${entry.did}`)}
                             >
                                 <TableCell sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#2c3e50' }}>
-                                    @{entry.name}
+                                    {entry.name}@{serviceDomain}
                                 </TableCell>
                                 <TableCell sx={{ color: '#666', fontFamily: 'monospace', fontSize: '0.85rem' }}>
                                     {entry.did.substring(0, 20)}...{entry.did.substring(entry.did.length - 8)}
@@ -789,10 +795,14 @@ function ViewCredential() {
     const [loading, setLoading] = useState<boolean>(true);
     const [requesting, setRequesting] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
+    const [serviceDomain, setServiceDomain] = useState<string>('');
     const navigate = useNavigate();
 
     const fetchCredential = async () => {
         try {
+            const configResponse = await api.get('/config');
+            setServiceDomain(configResponse.data.serviceDomain);
+
             const response = await api.get('/credential');
             setCredentialData(response.data);
         }
@@ -868,7 +878,7 @@ function ViewCredential() {
                             Get Your Verified Name Credential
                         </Typography>
                         <Typography variant="body1" sx={{ mb: 3, color: '#666' }}>
-                            Request a verifiable credential that proves you own your @name.
+                            Request a verifiable credential that proves you own your name.
                             <br />
                             This credential is cryptographically signed and can be verified by anyone.
                         </Typography>
@@ -881,7 +891,7 @@ function ViewCredential() {
                                 disabled={requesting}
                                 size="large"
                             >
-                                {requesting ? 'Requesting...' : `Request Credential for @${credentialData.name}`}
+                                {requesting ? 'Requesting...' : `Request Credential for ${credentialData.name}@${serviceDomain}`}
                             </Button>
                         ) : (
                             <Box>
@@ -908,7 +918,7 @@ function ViewCredential() {
                                 ✓ Verified Name Credential
                             </Typography>
                             <Typography variant="h4" sx={{ fontWeight: 600, color: '#1b5e20' }}>
-                                @{credentialData.credentialName}
+                                {credentialData.credentialName}@{serviceDomain}
                             </Typography>
                             <Typography variant="body2" sx={{ color: '#666', mt: 1 }}>
                                 Issued: {credentialData.credentialIssuedAt ? 
@@ -926,7 +936,7 @@ function ViewCredential() {
                                 border: '1px solid #ffe0b2'
                             }}>
                                 <Typography variant="body1" sx={{ color: '#e65100' }}>
-                                    ⚠️ Your name has changed to @{credentialData.currentName}. 
+                                    ⚠️ Your name has changed to {credentialData.currentName}@{serviceDomain}.
                                     Update your credential to reflect your new name.
                                 </Typography>
                                 <Button 
@@ -991,10 +1001,14 @@ function ViewMember() {
     const [memberData, setMemberData] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
+    const [serviceDomain, setServiceDomain] = useState<string>('');
 
     useEffect(() => {
         const fetchMember = async () => {
             try {
+                const configResponse = await api.get('/config');
+                setServiceDomain(configResponse.data.serviceDomain);
+
                 const response = await api.get(`/member/${name}`);
                 setMemberData(response.data);
             }
@@ -1014,7 +1028,7 @@ function ViewMember() {
     if (loading) {
         return (
             <div className="App">
-                <Header title={`@${name}`} />
+                <Header title={`${name}@${serviceDomain}`} />
                 <p>Loading...</p>
             </div>
         );
@@ -1038,7 +1052,7 @@ function ViewMember() {
 
     return (
         <div className="App">
-            <Header title={`@${name}`} />
+            <Header title={`${name}@${serviceDomain}`} />
             
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
                 <Box sx={{ 
@@ -1050,7 +1064,7 @@ function ViewMember() {
                     textAlign: 'center'
                 }}>
                     <Typography variant="h4" sx={{ fontWeight: 600, color: '#2c3e50', mb: 1 }}>
-                        @{memberData?.name}
+                        {memberData?.name}@{serviceDomain}
                     </Typography>
                     <Typography variant="body1" sx={{ fontFamily: 'monospace', color: '#666', wordBreak: 'break-all' }}>
                         {memberData?.did}
