@@ -66,19 +66,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # React app at /app
-    location /app {
-        alias /var/www/${DOMAIN}/app;
-        try_files $uri $uri/ /app/index.html;
-    }
-
-    # Member profile pages (served by React app)
-    location /member {
-        alias /var/www/${DOMAIN}/app;
-        try_files $uri $uri/ /app/index.html;
-    }
-
-    # Landing page (default fallback)
+    # React app (SPA fallback)
     location / {
         try_files $uri $uri/ /index.html;
     }

@@ -32,18 +32,9 @@ interface AuthState {
     [key: string]: any;
 }
 
-// Dynamic basename: /member/* routes work at root, everything else under /app
-const getBasename = () => {
-    const path = window.location.pathname;
-    if (path.startsWith('/member/') || path === '/member') {
-        return '';
-    }
-    return '/app';
-};
-
 function App() {
     return (
-        <Router basename={getBasename()}>
+        <Router>
             <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<ViewLogin />} />

@@ -897,7 +897,7 @@ app.get('/api/credential', isAuthenticated, async (req: Request, res: Response) 
 if (process.env.NS_SERVE_CLIENT !== 'false') {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const clientBuildPath = path.join(__dirname, '../../client/build');
-    app.use('/app', express.static(clientBuildPath));
+    app.use(express.static(clientBuildPath));
 
     app.use((req, res) => {
         if (!req.path.startsWith('/api')) {
