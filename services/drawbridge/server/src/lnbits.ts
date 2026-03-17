@@ -102,7 +102,7 @@ export async function getPayments(
             headers: { 'X-Api-Key': adminKey },
         });
         return (response.data || [])
-            .filter((p: any) => p.pending !== true)
+            .filter((p: any) => p.status === 'success')
             .map((p: any) => ({
                 paymentHash: p.payment_hash || p.checking_id || '',
                 amount: Math.floor((p.amount || 0) / 1000),
