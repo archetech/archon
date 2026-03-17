@@ -8,13 +8,17 @@ import "./static/extension.css";
 const params = new URLSearchParams(window.location.search);
 const nostrRequestId = params.get("nostrRequest");
 const nostrAutoApprove = params.get("autoApprove") === "true";
+const urlChallenge = params.get("challenge") || "";
+const urlCredential = params.get("credential");
 
 const PopupUI = () => {
-    const [pendingAuth, setPendingAuth] = useState<string>("");
-    const [pendingCredential, setPendingCredential] = useState<string>("");
+    const [pendingAuth, setPendingAuth] = useState<string>(urlChallenge);
+    const [pendingCredential, setPendingCredential] = useState<string>(
+        urlCredential ? JSON.parse(decodeURIComponent(urlCredential)) : ""
+    );
 
     useEffect(() => {
-        if (nostrRequestId) {
+        if (nostrRequestId || urlChallenge || urlCredential) {
             return;
         }
         const handleMessage = (
