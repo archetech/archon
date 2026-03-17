@@ -22,6 +22,7 @@ import { useAuthContext } from "./AuthContext";
 import { useVariablesContext } from "./VariablesProvider";
 import { useThemeContext } from "./ContextProviders";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
+import { requestBrowserRefresh } from "../utils/utils";
 
 export enum RefreshMode {
     NONE = 'NONE',
@@ -321,7 +322,8 @@ export function UIProvider(
             (async () => {
                 try {
                     await keymaster!.addAlias(pendingAlias.alias, pendingAlias.did);
-                    await refreshAll();
+                    await refreshAliases();
+                    requestBrowserRefresh(isBrowser);
                     setSuccess(`Added alias "${pendingAlias.alias}"`);
                 } catch (error: any) {
                     setError(error);

@@ -4,6 +4,7 @@ import {
     Button,
     Checkbox,
     IconButton,
+    InputAdornment,
     ListItemIcon,
     Menu,
     MenuItem,
@@ -17,6 +18,7 @@ import {
     ArrowDropDown,
     Article,
     Block,
+    CameraAlt,
     Clear,
     Delete,
     Edit,
@@ -37,6 +39,7 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 import TextInputModal from "../modals/TextInputModal";
 import SelectInputModal from "../modals/SelectInputModal";
 import CopyResolveDID from "./CopyResolveDID";
+import { scanAliasQrCode } from "../utils/utils";
 
 function AliasedDIDs() {
     const [removeOpen, setRemoveOpen] = useState<boolean>(false);
@@ -91,6 +94,16 @@ function AliasedDIDs() {
         setOpenBrowser,
         refreshAliases,
     } = useUIContext();
+
+    async function scanAliasQR() {
+        const result = await scanAliasQrCode();
+        if (!result) {
+            setError("No alias link found in QR code");
+            return;
+        }
+        setAlias(result.alias);
+        setAliasDID(result.did);
+    }
 
     const registryOptions = useMemo(() => {
         const regs = new Set<string>();
@@ -425,6 +438,19 @@ function AliasedDIDs() {
                     slotProps={{
                         htmlInput: {
                             maxLength: 80,
+                        },
+                        input: {
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Tooltip title="Scan QR" placement="top">
+                                        <span>
+                                            <IconButton edge="end" onClick={scanAliasQR}>
+                                                <CameraAlt />
+                                            </IconButton>
+                                        </span>
+                                    </Tooltip>
+                                </InputAdornment>
+                            ),
                         },
                     }}
                 />
