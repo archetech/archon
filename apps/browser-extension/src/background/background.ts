@@ -78,18 +78,34 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "REQUEST_POPUP_CREDENTIAL" || message.action === "OPEN_CREDENTIAL_TAB") {
-        chrome.action.openPopup(() => {
+        chrome.action.openPopup().then(() => {
             chrome.runtime.sendMessage({
                 action: "SHOW_POPUP_CREDENTIAL",
                 credential: message.credential,
             });
+        }).catch(() => {
+            const credentialEncoded = encodeURIComponent(JSON.stringify(message.credential));
+            chrome.windows.create({
+                url: chrome.runtime.getURL(`popup.html?credential=${credentialEncoded}`),
+                type: "popup",
+                width: 500,
+                height: 600,
+            });
         });
         sendResponse({ success: true });
     } else if (message.action === "REQUEST_POPUP_AUTH" || message.action === "OPEN_AUTH_TAB") {
-        chrome.action.openPopup(() => {
+        chrome.action.openPopup().then(() => {
             chrome.runtime.sendMessage({
                 action: "SHOW_POPUP_AUTH",
                 challenge: message.challenge,
+            });
+        }).catch(() => {
+            const challengeEncoded = encodeURIComponent(message.challenge);
+            chrome.windows.create({
+                url: chrome.runtime.getURL(`popup.html?challenge=${challengeEncoded}`),
+                type: "popup",
+                width: 500,
+                height: 600,
             });
         });
         sendResponse({ success: true });
