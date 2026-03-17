@@ -1,18 +1,37 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { SignJWT, generateKeyPair } from 'jose';
+import { SignJWT, generateKeyPair, exportJWK } from 'jose';
 
 // Generate ES256 signing key at startup (or load from env)
 let jwtSigningKey: CryptoKey | null = null;
+let jwtPublicJWK: any = null;
+const JWT_KEY_ID = 'archon-social-signing-key-1';
 
-async function getJWTSigningKey(): Promise<CryptoKey> {
+async function initJWTKeys(): Promise<void> {
     if (!jwtSigningKey) {
         // Generate ephemeral key pair (in production, persist this)
-        const { privateKey } = await generateKeyPair('ES256');
+        const { privateKey, publicKey } = await generateKeyPair('ES256');
         jwtSigningKey = privateKey as CryptoKey;
-        console.log('Generated ES256 JWT signing key');
+        
+        // Export public key as JWK for JWKS endpoint
+        jwtPublicJWK = await exportJWK(publicKey);
+        jwtPublicJWK.kid = JWT_KEY_ID;
+        jwtPublicJWK.use = 'sig';
+        jwtPublicJWK.alg = 'ES256';
+        
+        console.log('Generated ES256 JWT signing key, kid:', JWT_KEY_ID);
     }
-    return jwtSigningKey;
+}
+
+async function getJWTSigningKey(): Promise<CryptoKey> {
+    await initJWTKeys();
+    return jwtSigningKey!;
+}
+
+function getJWKS(): any {
+    return {
+        keys: jwtPublicJWK ? [jwtPublicJWK] : []
+    };
 }
 
 const router = Router();
@@ -457,7 +476,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 picture: member?.avatar,
                 did: authCode.did  // Include DID as custom claim
             })
-                .setProtectedHeader({ alg: 'ES256', typ: 'JWT' })
+                .setProtectedHeader({ alg: 'ES256', typ: 'JWT', kid: JWT_KEY_ID })
                 .setSubject(authCode.did)
                 .setIssuer(issuer)
                 .setAudience(client_id)
@@ -518,6 +537,16 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
     });
 
     /**
+     * GET /.well-known/jwks.json
+     * JSON Web Key Set for verifying id_tokens
+     */
+    router.get('/.well-known/jwks.json', async (_req: Request, res: Response) => {
+        // Ensure keys are initialized
+        await initJWTKeys();
+        res.json(getJWKS());
+    });
+
+    /**
      * GET /.well-known/openid-configuration
      * OIDC Discovery document
      */
@@ -529,6 +558,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             authorization_endpoint: `${issuer}/oauth/authorize`,
             token_endpoint: `${issuer}/oauth/token`,
             userinfo_endpoint: `${issuer}/oauth/userinfo`,
+            jwks_uri: `${issuer}/oauth/.well-known/jwks.json`,
             response_types_supported: ['code'],
             subject_types_supported: ['public'],
             id_token_signing_alg_values_supported: ['ES256'],
