@@ -13,6 +13,7 @@ import { clearSessionPassphrase, setSessionPassphrase } from "../utils/sessionPa
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
+import { Capacitor } from "@capacitor/core";
 
 const WalletTab = () => {
     const [open, setOpen] = useState<boolean>(false);
@@ -145,8 +146,7 @@ const WalletTab = () => {
 
     async function handleUploadClick() {
         try {
-            const canShare = await Share.canShare();
-            if (canShare.value) {
+            if (Capacitor.isNativePlatform()) {
                 // Native file picker on Android
                 const result = await FilePicker.pickFiles({
                     types: ["application/json"],
@@ -192,8 +192,7 @@ const WalletTab = () => {
             const wallet = await keymaster.exportEncryptedWallet();
             const walletJSON = JSON.stringify(wallet, null, 4);
 
-            const canShare = await Share.canShare();
-            if (canShare.value) {
+            if (Capacitor.isNativePlatform()) {
                 const result = await Filesystem.writeFile({
                     path: 'archon-wallet.json',
                     data: walletJSON,
