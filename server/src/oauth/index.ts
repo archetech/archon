@@ -48,6 +48,17 @@ clients.set('demo-client', {
     ]
 });
 
+// Grafana dashboard - requires membership VC
+clients.set('grafana-dashboard', {
+    client_id: 'grafana-dashboard',
+    client_secret: process.env.GRAFANA_OAUTH_SECRET || 'grafana-secret-change-me',
+    name: 'Archon Grafana Dashboard',
+    redirect_uris: [
+        'https://grafana.archon.technology/oauth2/callback',
+        'http://localhost:4180/oauth2/callback'
+    ]
+});
+
 // Helper functions
 function generateCode(): string {
     return crypto.randomBytes(32).toString('hex');
@@ -260,6 +271,17 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             const pending = pendingAuths.get(challengeDID);
             if (!pending) {
                 return res.status(400).json({ error: 'unknown_challenge' });
+            }
+
+            // Check if client requires membership (grafana-dashboard)
+            if (pending.client_id === 'grafana-dashboard') {
+                const member = await getMemberByDID(userDID);
+                if (!member || !member.credentialDid) {
+                    return res.status(403).json({ 
+                        error: 'access_denied',
+                        error_description: 'You must be a registered member of archon.social to access this resource'
+                    });
+                }
             }
 
             // Generate authorization code
