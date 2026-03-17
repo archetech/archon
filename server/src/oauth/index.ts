@@ -1,6 +1,19 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { SignJWT, importJWK } from 'jose';
+import { SignJWT, generateKeyPair } from 'jose';
+
+// Generate ES256 signing key at startup (or load from env)
+let jwtSigningKey: CryptoKey | null = null;
+
+async function getJWTSigningKey(): Promise<CryptoKey> {
+    if (!jwtSigningKey) {
+        // Generate ephemeral key pair (in production, persist this)
+        const { privateKey } = await generateKeyPair('ES256');
+        jwtSigningKey = privateKey as CryptoKey;
+        console.log('Generated ES256 JWT signing key');
+    }
+    return jwtSigningKey;
+}
 
 const router = Router();
 
@@ -429,21 +442,13 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             // Delete used auth code
             authCodes.delete(code);
 
-            // Generate JWT id_token signed by archon.social's key
-            const keyPair = await keymaster().fetchKeyPair();
-            if (!keyPair) {
-                return res.status(500).json({ 
-                    error: 'server_error', 
-                    error_description: 'No signing key available' 
-                });
-            }
-
+            // Generate JWT id_token
             const member = await getMemberByDID(authCode.did);
             const issuer = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
             const now = Math.floor(Date.now() / 1000);
 
-            // Import private key for jose
-            const privateKey = await importJWK(keyPair.privateJwk, 'ES256K');
+            // Get ES256 signing key
+            const signingKey = await getJWTSigningKey();
 
             // Create and sign id_token
             const id_token = await new SignJWT({
@@ -452,13 +457,13 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 picture: member?.avatar,
                 did: authCode.did  // Include DID as custom claim
             })
-                .setProtectedHeader({ alg: 'ES256K', typ: 'JWT' })
+                .setProtectedHeader({ alg: 'ES256', typ: 'JWT' })
                 .setSubject(authCode.did)
                 .setIssuer(issuer)
                 .setAudience(client_id)
                 .setIssuedAt(now)
                 .setExpirationTime(now + 3600)
-                .sign(privateKey);
+                .sign(signingKey);
 
             res.json({
                 access_token,
@@ -526,7 +531,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             userinfo_endpoint: `${issuer}/oauth/userinfo`,
             response_types_supported: ['code'],
             subject_types_supported: ['public'],
-            id_token_signing_alg_values_supported: ['ES256K'],
+            id_token_signing_alg_values_supported: ['ES256'],
             scopes_supported: ['openid', 'profile'],
             claims_supported: ['sub', 'name', 'preferred_username', 'picture']
         });
