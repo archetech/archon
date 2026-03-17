@@ -10,15 +10,20 @@ const nostrRequestId = params.get("nostrRequest");
 const nostrAutoApprove = params.get("autoApprove") === "true";
 const urlChallenge = params.get("challenge") || "";
 const urlCredential = params.get("credential");
+const urlAlias = params.get("alias") || "";
+const urlAliasDid = params.get("did") || "";
 
 const PopupUI = () => {
     const [pendingAuth, setPendingAuth] = useState<string>(urlChallenge);
     const [pendingCredential, setPendingCredential] = useState<string>(
         urlCredential ? JSON.parse(decodeURIComponent(urlCredential)) : ""
     );
+    const [pendingAlias, setPendingAlias] = useState<{ alias: string; did: string } | undefined>(
+        urlAlias && urlAliasDid ? { alias: urlAlias, did: urlAliasDid } : undefined
+    );
 
     useEffect(() => {
-        if (nostrRequestId || urlChallenge || urlCredential) {
+        if (nostrRequestId || urlChallenge || urlCredential || urlAlias) {
             return;
         }
         const handleMessage = (
@@ -31,6 +36,9 @@ const PopupUI = () => {
                 sendResponse({ success: true });
             } else if (message.action === "SHOW_POPUP_CREDENTIAL") {
                 setPendingCredential(message.credential);
+                sendResponse({ success: true });
+            } else if (message.action === "SHOW_POPUP_ALIAS") {
+                setPendingAlias({ alias: message.alias, did: message.did });
                 sendResponse({ success: true });
             }
         };
@@ -50,7 +58,7 @@ const PopupUI = () => {
     }
 
     return (
-        <ContextProviders pendingCredential={pendingCredential} pendingAuth={pendingAuth} isBrowser={false}>
+        <ContextProviders pendingCredential={pendingCredential} pendingAuth={pendingAuth} pendingAlias={pendingAlias} isBrowser={false}>
             <PopupContent />
         </ContextProviders>
     );

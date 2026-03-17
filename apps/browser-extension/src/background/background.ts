@@ -109,6 +109,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
         });
         sendResponse({ success: true });
+    } else if (message.action === "OPEN_ALIAS_TAB") {
+        const aliasEncoded = encodeURIComponent(message.alias);
+        const didEncoded = encodeURIComponent(message.did);
+        chrome.action.openPopup().then(() => {
+            chrome.runtime.sendMessage({
+                action: "SHOW_POPUP_ALIAS",
+                alias: message.alias,
+                did: message.did,
+            });
+        }).catch(() => {
+            chrome.windows.create({
+                url: chrome.runtime.getURL(`popup.html?alias=${aliasEncoded}&did=${didEncoded}`),
+                type: "popup",
+                width: 500,
+                height: 600,
+            });
+        });
+        sendResponse({ success: true });
     } else if (message.type === "OPEN_BROWSER_WINDOW") {
         openBrowserWindowService(message.options);
     } else if (message.action === "NOSTR_REQUEST") {

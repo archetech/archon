@@ -63,6 +63,7 @@ export function UIProvider(
         children,
         pendingAuth,
         pendingCredential,
+        pendingAlias,
         openBrowser,
         setOpenBrowser,
         browserRefresh,
@@ -71,6 +72,7 @@ export function UIProvider(
         children: ReactNode,
         pendingAuth?: string,
         pendingCredential?: string,
+        pendingAlias?: { alias: string; did: string },
         openBrowser?: openBrowserValues,
         setOpenBrowser?: Dispatch<SetStateAction<openBrowserValues | undefined>>,
         browserRefresh?: RefreshMode,
@@ -88,7 +90,7 @@ export function UIProvider(
         refreshFlag,
         reloadBrowserWallet,
     } = useWalletContext();
-    const { setError } = useSnackbar();
+    const { setError, setSuccess } = useSnackbar();
     const {
         setResponse,
         setCallback,
@@ -315,6 +317,17 @@ export function UIProvider(
 
             // Prevent credential repopulating after clear on ID change
             setPendingUsed(true);
+        } else if (pendingAlias && !pendingUsed) {
+            (async () => {
+                try {
+                    await keymaster!.addAlias(pendingAlias.alias, pendingAlias.did);
+                    await refreshAll();
+                    setSuccess(`Added alias "${pendingAlias.alias}"`);
+                } catch (error: any) {
+                    setError(error);
+                }
+            })();
+            setPendingUsed(true);
         } else if (pendingTab) {
             (async () => {
                 await setSelectedTab(pendingTab);
@@ -328,7 +341,7 @@ export function UIProvider(
             })();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentId, pendingAuth, pendingCredential, pendingTab, pendingMessageTab]);
+    }, [currentId, pendingAuth, pendingCredential, pendingAlias, pendingTab, pendingMessageTab]);
 
     function openBrowserWindow(options: openBrowserValues) {
         const tab = options.tab ?? "viewer";
