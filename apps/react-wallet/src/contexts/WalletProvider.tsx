@@ -104,8 +104,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     async function initialiseServices() {
         const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
         localStorage.setItem(GATEKEEPER_KEY, gatekeeperUrl);
-        await gatekeeper.connect({ url: gatekeeperUrl });
-        setHasLightning(await gatekeeper.isLightningSupported());
+        try {
+            await gatekeeper.connect({ url: gatekeeperUrl });
+            setHasLightning(await gatekeeper.isLightningSupported());
+        } catch (error) {
+            console.error('Failed to connect to gatekeeper:', error);
+        }
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
