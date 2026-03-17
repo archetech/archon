@@ -947,7 +947,9 @@ function ViewCredential() {
                                 mb: 3
                             }}
                         >
-                            {credentialData.credentialDid}
+                            <a href={`archon://accept?credential=${credentialData.credentialDid}`} style={{ color: 'inherit' }}>
+                                {credentialData.credentialDid}
+                            </a>
                         </Typography>
 
                         <Typography variant="h6" sx={{ mb: 2 }}>Verifiable Credential</Typography>
