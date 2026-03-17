@@ -194,17 +194,13 @@ const WalletTab = () => {
 
             const canShare = await Share.canShare();
             if (canShare.value) {
-                const result = await Filesystem.writeFile({
+                await Filesystem.writeFile({
                     path: 'archon-wallet.json',
                     data: walletJSON,
-                    directory: Directory.Cache,
+                    directory: Directory.Documents,
                     encoding: 'utf8' as any,
                 });
-                await Share.share({
-                    title: 'Archon Wallet Backup',
-                    url: result.uri,
-                    dialogTitle: 'Save wallet backup',
-                });
+                setSuccess('Wallet saved to Documents/archon-wallet.json');
             } else {
                 // Fallback for desktop browsers
                 const blob = new Blob([walletJSON], { type: 'application/json' });
