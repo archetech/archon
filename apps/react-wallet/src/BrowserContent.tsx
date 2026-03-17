@@ -356,7 +356,7 @@ function BrowserContent() {
                                                 icon={<ListIcon />}
                                                 label={
                                                     menuOpen
-                                                        ? "Aliased DIDs"
+                                                        ? "Aliases"
                                                         : ""
                                                 }
                                                 value="aliases"
@@ -600,7 +600,7 @@ function BrowserContent() {
                                     <ListItemIcon>
                                         <ListIcon />
                                     </ListItemIcon>
-                                    <ListItemText primary="Aliased DIDs" />
+                                    <ListItemText primary="Aliases" />
                                 </ListItemButton>
 
                                 <ListItemButton
