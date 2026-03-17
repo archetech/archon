@@ -255,10 +255,10 @@ async function loginUser(response: string): Promise<any> {
 }
 
 const corsOptions = {
-    origin: process.env.NS_CORS_SITE_ORIGIN || 'http://localhost:3001', // Origin needs to be specified with credentials true
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true,         // Enable if you need to send cookies or authorization headers
-    optionsSuccessStatus: 200  // Some legacy browsers choke on 204
+    credentials: true,
+    optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));

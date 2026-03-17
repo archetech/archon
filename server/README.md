@@ -11,7 +11,6 @@ This folder contains the Express server for the name service, providing DID-base
 2. **.env configuration**
     - `NS_HOST_PORT=3300`
     - `NS_SERVE_CLIENT=true` (Whether to serve the client build or not)
-    - `NS_CORS_SITE_ORIGIN=http://localhost:3001` (URL of remote client)
     - Additional variables like `NS_KEYMASTER_URL`, `NS_GATEKEEPER_URL`, `NS_WALLET_URL` for Keymaster/Gatekeeper integration.
 
 3. **Run**:
