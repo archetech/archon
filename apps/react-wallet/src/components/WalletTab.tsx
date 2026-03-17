@@ -10,6 +10,8 @@ import MnemonicModal from "../modals/MnemonicModal";
 import PassphraseModal from "../modals/PassphraseModal";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import { clearSessionPassphrase, setSessionPassphrase } from "../utils/sessionPassphrase";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 
 const WalletTab = () => {
     const [open, setOpen] = useState<boolean>(false);
@@ -172,15 +174,30 @@ const WalletTab = () => {
         try {
             const wallet = await keymaster.exportEncryptedWallet();
             const walletJSON = JSON.stringify(wallet, null, 4);
-            const blob = new Blob([walletJSON], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
 
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'archon-wallet.json';
-            link.click();
-
-            URL.revokeObjectURL(url);
+            const canShare = await Share.canShare();
+            if (canShare.value) {
+                const result = await Filesystem.writeFile({
+                    path: 'archon-wallet.json',
+                    data: walletJSON,
+                    directory: Directory.Cache,
+                    encoding: 'utf8' as any,
+                });
+                await Share.share({
+                    title: 'Archon Wallet Backup',
+                    url: result.uri,
+                    dialogTitle: 'Save wallet backup',
+                });
+            } else {
+                // Fallback for desktop browsers
+                const blob = new Blob([walletJSON], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'archon-wallet.json';
+                link.click();
+                URL.revokeObjectURL(url);
+            }
         } catch (error: any) {
             setError(error);
         }
