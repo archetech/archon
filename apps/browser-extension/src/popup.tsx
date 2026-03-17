@@ -23,7 +23,7 @@ const PopupUI = () => {
     );
 
     useEffect(() => {
-        if (nostrRequestId || urlChallenge || urlCredential || urlAlias) {
+        if (nostrRequestId || urlChallenge || urlCredential || (urlAlias && urlAliasDid)) {
             return;
         }
         const handleMessage = (

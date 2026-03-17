@@ -33,8 +33,10 @@ window.addEventListener("message", (event) => {
 
 // Handle archon:// protocol links
 document.addEventListener("click", (event) => {
-    const target = event.target as HTMLElement;
-    const anchor = target.closest("a");
+    if (!(event.target instanceof Element)) {
+        return;
+    }
+    const anchor = event.target.closest("a");
     if (!anchor) {
         return;
     }
