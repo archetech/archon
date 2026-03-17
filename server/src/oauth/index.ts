@@ -349,10 +349,24 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
     /**
      * POST /oauth/token
      * Token endpoint - exchanges code for tokens
+     * Supports both client_secret_basic (header) and client_secret_post (body)
      */
     router.post('/token', async (req: Request, res: Response) => {
         try {
-            const { grant_type, code, redirect_uri, client_id, client_secret } = req.body;
+            const { grant_type, code, redirect_uri } = req.body;
+            
+            // Extract client credentials from Basic auth header OR body
+            let client_id = req.body.client_id;
+            let client_secret = req.body.client_secret;
+            
+            const authHeader = req.headers.authorization;
+            if (authHeader && authHeader.startsWith('Basic ')) {
+                const base64Credentials = authHeader.substring(6);
+                const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
+                const [basicId, basicSecret] = credentials.split(':');
+                client_id = basicId;
+                client_secret = basicSecret;
+            }
 
             if (grant_type !== 'authorization_code') {
                 return res.status(400).json({
@@ -363,6 +377,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             // Validate client credentials
             const client = clients.get(client_id);
             if (!client || client.client_secret !== client_secret) {
+                console.log('Client auth failed:', { client_id, hasClient: !!client, secretMatch: client?.client_secret === client_secret });
                 return res.status(401).json({
                     error: 'invalid_client'
                 });
