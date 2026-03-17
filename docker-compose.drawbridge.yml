@@ -56,6 +56,8 @@ services:
 
   tor:
     image: goldy/tor-hidden-service:latest
+    ports:
+      - "${ARCHON_TOR_SOCKS_PORT:-9050}:9050"
     environment:
       DRAWBRIDGE_TOR_SERVICE_HOSTS: '4222:drawbridge:4222'
       DRAWBRIDGE_TOR_SERVICE_VERSION: '3'
