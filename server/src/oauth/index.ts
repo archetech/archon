@@ -220,21 +220,31 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                     <p class="status"><span class="spinner">⏳</span> Waiting for response...</p>
                     
                     <script>
-                        // Generate QR code
-                        QRCode.toCanvas(document.getElementById('qr'), '${challengeURL}', {
-                            width: 240,
-                            margin: 2,
-                            color: { dark: '#1f2937', light: '#ffffff' }
-                        });
-                        
-                        // Poll for completion
+                        // Poll for completion (separate from QR to ensure it runs)
                         setInterval(async () => {
-                            const res = await fetch('/oauth/poll?challenge=${challenge}');
-                            const data = await res.json();
-                            if (data.redirect) {
-                                window.location.href = data.redirect;
+                            try {
+                                const res = await fetch('/oauth/poll?challenge=${challenge}');
+                                const data = await res.json();
+                                if (data.redirect) {
+                                    window.location.href = data.redirect;
+                                }
+                            } catch (e) {
+                                console.error('Poll error:', e);
                             }
                         }, 2000);
+                    </script>
+                    <script>
+                        // Generate QR code (optional, may fail)
+                        try {
+                            QRCode.toCanvas(document.getElementById('qr'), '${challengeURL}', {
+                                width: 240,
+                                margin: 2,
+                                color: { dark: '#1f2937', light: '#ffffff' }
+                            });
+                        } catch (e) {
+                            console.warn('QR code generation failed:', e);
+                            document.getElementById('qr').outerHTML = '<p style="color:#666;font-size:12px;">QR code unavailable</p>';
+                        }
                     </script>
                 </body>
                 </html>
