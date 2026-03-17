@@ -62,6 +62,26 @@ export function extractDid(input: string): string | null {
     return null;
 }
 
+export function extractAlias(input: string): { alias: string; did: string } | null {
+    if (!input) {
+        return null;
+    }
+
+    try {
+        const url = new URL(input);
+
+        if (url.protocol === 'archon:' && (url.host || '').toLowerCase() === 'accept') {
+            const alias = url.searchParams.get('alias');
+            const did = url.searchParams.get('did');
+            if (alias && did?.startsWith('did:')) {
+                return { alias, did };
+            }
+        }
+    } catch {}
+
+    return null;
+}
+
 async function ensureGoogleModuleReady(timeoutMs = 8000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -101,6 +121,30 @@ export async function scanQrCode() {
         }
 
         return did;
+    } catch {}
+    return null;
+}
+
+export async function scanAliasQrCode(): Promise<{ alias: string; did: string } | null> {
+    try {
+        const perm = await BarcodeScanner.requestPermissions();
+        if (perm.camera !== 'granted') {
+            return null;
+        }
+
+        const ready = await ensureGoogleModuleReady();
+        if (!ready) {
+            return null;
+        }
+
+        const { barcodes } = await BarcodeScanner.scan();
+
+        for (const b of barcodes) {
+            const result = extractAlias(b.rawValue);
+            if (result) {
+                return result;
+            }
+        }
     } catch {}
     return null;
 }

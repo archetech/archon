@@ -26,6 +26,7 @@ import {
     Lock,
     MoreVert,
     OpenInBrowser,
+    List,
     PermIdentity,
     Poll,
     Schema,
@@ -114,6 +115,12 @@ const PopupContent = () => {
                                     <Email fontSize="small" />
                                 </ListItemIcon>
                                 <ListItemText primary="DMail" />
+                            </MenuItem>
+                            <MenuItem onClick={() => handleMenuClick("aliases")} sx={denseItemSx}>
+                                <ListItemIcon>
+                                    <List fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText primary="Aliases" />
                             </MenuItem>
                             <MenuItem onClick={() => handleMenuClick("credentials")} sx={denseItemSx}>
                                 <ListItemIcon>

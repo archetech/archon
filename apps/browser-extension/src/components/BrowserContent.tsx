@@ -239,7 +239,7 @@ function BrowserContent() {
                                 {displayComponent && (
                                     <Tab
                                         icon={<List />}
-                                        label={menuOpen ? "Aliased DIDs" : ""}
+                                        label={menuOpen ? "Aliases" : ""}
                                         value="aliases"
                                         iconPosition="start"
                                         className="sidebarTab"

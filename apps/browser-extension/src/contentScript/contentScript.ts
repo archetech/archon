@@ -33,12 +33,15 @@ window.addEventListener("message", (event) => {
 
 // Handle archon:// protocol links
 document.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLAnchorElement)) {
+    if (!(event.target instanceof Element)) {
+        return;
+    }
+    const anchor = event.target.closest("a");
+    if (!anchor) {
         return;
     }
 
-    const href = target.getAttribute("href") || "";
+    const href = anchor.getAttribute("href") || "";
 
     if (href.startsWith("archon://")) {
         event.preventDefault();
@@ -55,13 +58,21 @@ document.addEventListener("click", (event) => {
             });
         } else if (tab === "accept") {
             const credential = parsedURL.searchParams.get("credential");
-            if (!credential) {
-                return;
+            const alias = parsedURL.searchParams.get("alias");
+            const did = parsedURL.searchParams.get("did");
+
+            if (alias && did) {
+                chrome.runtime.sendMessage({
+                    action: "OPEN_ALIAS_TAB",
+                    alias,
+                    did,
+                });
+            } else if (credential) {
+                chrome.runtime.sendMessage({
+                    action: "OPEN_CREDENTIAL_TAB",
+                    credential,
+                });
             }
-            chrome.runtime.sendMessage({
-                action: "OPEN_CREDENTIAL_TAB",
-                credential,
-            });
         }
     }
 });

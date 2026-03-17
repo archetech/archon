@@ -22,6 +22,7 @@ export function ContextProviders(
         isBrowser,
         pendingAuth,
         pendingCredential,
+        pendingAlias,
         openBrowser,
         setOpenBrowser,
         browserRefresh,
@@ -31,6 +32,7 @@ export function ContextProviders(
         isBrowser: boolean,
         pendingAuth?: string,
         pendingCredential?: string,
+        pendingAlias?: { alias: string; did: string },
         openBrowser?: openBrowserValues,
         setOpenBrowser?: Dispatch<SetStateAction<openBrowserValues | undefined>>,
         browserRefresh?: RefreshMode,
@@ -89,6 +91,7 @@ export function ContextProviders(
                                     <UIProvider
                                         pendingAuth={pendingAuth}
                                         pendingCredential={pendingCredential}
+                                        pendingAlias={pendingAlias}
                                         openBrowser={openBrowser}
                                         browserRefresh={browserRefresh}
                                         setBrowserRefresh={setBrowserRefresh}
