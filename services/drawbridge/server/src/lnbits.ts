@@ -101,14 +101,16 @@ export async function getPayments(
         const response = await axios.get(`${url}/api/v1/payments`, {
             headers: { 'X-Api-Key': adminKey },
         });
-        return (response.data || []).map((p: any) => ({
-            paymentHash: p.payment_hash || p.checking_id || '',
-            amount: Math.floor((p.amount || 0) / 1000),
-            fee: Math.floor(Math.abs(p.fee || 0) / 1000),
-            memo: p.memo || '',
-            time: p.time || '',
-            pending: p.pending === true,
-        }));
+        return (response.data || [])
+            .filter((p: any) => p.status === 'success')
+            .map((p: any) => ({
+                paymentHash: p.payment_hash || p.checking_id || '',
+                amount: Math.floor((p.amount || 0) / 1000),
+                fee: Math.floor(Math.abs(p.fee || 0) / 1000),
+                memo: p.memo || '',
+                time: p.time || '',
+                pending: false,
+            }));
     } catch (error: any) {
         throwLnbitsError(error);
     }
