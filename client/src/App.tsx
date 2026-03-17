@@ -948,6 +948,8 @@ function ViewCredential() {
                             }}
                         >
                             <a href={`archon://accept?credential=${credentialData.credentialDid}`} style={{ color: 'inherit' }}>
+                                <QRCodeSVG value={`archon://accept?credential=${credentialData.credentialDid}`} />
+                                <br />
                                 {credentialData.credentialDid}
                             </a>
                         </Typography>
