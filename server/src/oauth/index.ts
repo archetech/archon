@@ -463,7 +463,8 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
 
             // Generate JWT id_token
             const member = await getMemberByDID(authCode.did);
-            const issuer = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
+            const baseUrl = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
+            const issuer = `${baseUrl}/oauth`;  // Must match OIDC discovery issuer
             const now = Math.floor(Date.now() / 1000);
 
             // Get ES256 signing key
@@ -551,14 +552,15 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
      * OIDC Discovery document
      */
     router.get('/.well-known/openid-configuration', (_req: Request, res: Response) => {
-        const issuer = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
+        const baseUrl = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
+        const issuer = `${baseUrl}/oauth`;  // Issuer matches where discovery is served
         
         res.json({
             issuer,
-            authorization_endpoint: `${issuer}/oauth/authorize`,
-            token_endpoint: `${issuer}/oauth/token`,
-            userinfo_endpoint: `${issuer}/oauth/userinfo`,
-            jwks_uri: `${issuer}/oauth/.well-known/jwks.json`,
+            authorization_endpoint: `${baseUrl}/oauth/authorize`,
+            token_endpoint: `${baseUrl}/oauth/token`,
+            userinfo_endpoint: `${baseUrl}/oauth/userinfo`,
+            jwks_uri: `${baseUrl}/oauth/.well-known/jwks.json`,
             response_types_supported: ['code'],
             subject_types_supported: ['public'],
             id_token_signing_alg_values_supported: ['ES256'],
