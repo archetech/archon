@@ -12,6 +12,7 @@ import WalletWeb from "@didcid/keymaster/wallet/web";
 import { clearSessionPassphrase, setSessionPassphrase } from "../utils/sessionPassphrase";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
+import { FilePicker } from "@capawesome/capacitor-file-picker";
 
 const WalletTab = () => {
     const [open, setOpen] = useState<boolean>(false);
@@ -143,28 +144,44 @@ const WalletTab = () => {
     }
 
     async function handleUploadClick() {
-        const fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.accept = ".json,application/json";
-
-        fileInput.onchange = async (event: any) => {
-            const file = event.target.files?.[0];
-            if (!file) {
-                return;
-            }
-
-            const text = await file.text();
-
-            try {
+        try {
+            const canShare = await Share.canShare();
+            if (canShare.value) {
+                // Native file picker on Android
+                const result = await FilePicker.pickFiles({
+                    types: ["application/json"],
+                    readData: true,
+                });
+                const file = result.files[0];
+                if (!file?.data) {
+                    return;
+                }
+                const text = atob(file.data);
                 const wallet = JSON.parse(text);
                 setPendingWallet(wallet);
                 setOpen(true);
-            } catch (err) {
-                setError("Invalid JSON file.");
+            } else {
+                // Fallback for desktop browsers
+                const fileInput = document.createElement("input");
+                fileInput.type = "file";
+                fileInput.accept = ".json,application/json";
+                fileInput.onchange = async (event: any) => {
+                    const f = event.target.files?.[0];
+                    if (!f) return;
+                    const text = await f.text();
+                    try {
+                        const wallet = JSON.parse(text);
+                        setPendingWallet(wallet);
+                        setOpen(true);
+                    } catch {
+                        setError("Invalid JSON file.");
+                    }
+                };
+                fileInput.click();
             }
-        };
-
-        fileInput.click();
+        } catch (error: any) {
+            setError(error);
+        }
     }
 
     async function downloadWallet() {
