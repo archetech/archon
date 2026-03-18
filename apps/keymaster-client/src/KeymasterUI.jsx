@@ -300,6 +300,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [zapResult, setZapResult] = useState(null);
     const [lightningPayments, setLightningPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(false);
+    const [lightningStatusFilter, setLightningStatusFilter] = useState({ settled: true, pending: true, failed: true, expired: true });
     const [isPublished, setIsPublished] = useState(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState(false);
 
@@ -6283,21 +6284,36 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
                             {lightningTab === 'payments' &&
                                 <Box sx={{ mt: 2 }}>
-                                    <Button variant="outlined" onClick={fetchLightningPayments} disabled={loadingPayments}>
-                                        Refresh
-                                    </Button>
-                                    <p />
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
+                                        <Button variant="outlined" onClick={fetchLightningPayments} disabled={loadingPayments}>
+                                            Refresh
+                                        </Button>
+                                        {['settled', 'pending', 'failed', 'expired'].map(s => (
+                                            <FormControlLabel key={s} label={s} sx={{ mr: 0 }}
+                                                control={<Checkbox size="small" checked={lightningStatusFilter[s]}
+                                                    onChange={e => setLightningStatusFilter(f => ({ ...f, [s]: e.target.checked }))} />} />
+                                        ))}
+                                    </Box>
                                     {loadingPayments && <Typography>Loading...</Typography>}
                                     {!loadingPayments && lightningPayments.length === 0 &&
                                         <Typography>No payments found.</Typography>
                                     }
                                     {!loadingPayments && lightningPayments.length > 0 &&
                                         <TableContainer component={Paper}>
-                                            <Table size="small">
+                                            <Table size="small" sx={{ tableLayout: "fixed" }}>
+                                                <colgroup>
+                                                    <col style={{ width: "190px" }} />
+                                                    <col style={{ width: "120px" }} />
+                                                    <col style={{ width: "60px" }} />
+                                                    <col style={{ width: "80px" }} />
+                                                    <col />
+                                                </colgroup>
                                                 <TableHead>
                                                     <TableRow>
                                                         <TableCell>Date</TableCell>
-                                                        <TableCell>Amount</TableCell>
+                                                        <TableCell align="right">Amount (sats)</TableCell>
+                                                        <TableCell align="right">Fee</TableCell>
+                                                        <TableCell>Status</TableCell>
                                                         <TableCell>Memo</TableCell>
                                                     </TableRow>
                                                 </TableHead>
@@ -6305,11 +6321,21 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     {lightningPayments.map((p, i) => {
                                                         const d = p.time ? new Date(p.time) : null;
                                                         const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` : '—';
+                                                        const displayStatus = p.status === 'success' ? 'settled'
+                                                            : p.status === 'failed' ? 'failed'
+                                                            : (p.expiry && new Date(p.expiry) < new Date()) ? 'expired'
+                                                            : 'pending';
+                                                        if (!lightningStatusFilter[displayStatus]) return null;
+                                                        const statusColor = displayStatus === 'settled' ? 'inherit'
+                                                            : displayStatus === 'failed' ? 'error.main'
+                                                            : 'text.secondary';
                                                         return (
                                                         <TableRow key={i}>
                                                             <TableCell>{date}</TableCell>
-                                                            <TableCell>{p.amount} sats{p.fee > 0 ? ` (fee: ${p.fee})` : ''}</TableCell>
-                                                            <TableCell>{p.memo || '—'}{p.pending ? ' [pending]' : ''}</TableCell>
+                                                            <TableCell align="right">{p.amount}</TableCell>
+                                                            <TableCell align="right">{p.fee > 0 ? p.fee : ''}</TableCell>
+                                                            <TableCell><Box component="span" sx={{ color: statusColor }}>{displayStatus}</Box></TableCell>
+                                                            <TableCell>{p.memo || '—'}</TableCell>
                                                         </TableRow>
                                                         );
                                                     })}
