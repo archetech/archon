@@ -300,6 +300,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [zapResult, setZapResult] = useState(null);
     const [lightningPayments, setLightningPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(false);
+    const [lightningStatusFilter, setLightningStatusFilter] = useState({ settled: true, pending: true, failed: true, expired: true });
     const [isPublished, setIsPublished] = useState(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState(false);
 
@@ -6283,10 +6284,16 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
                             {lightningTab === 'payments' &&
                                 <Box sx={{ mt: 2 }}>
-                                    <Button variant="outlined" onClick={fetchLightningPayments} disabled={loadingPayments}>
-                                        Refresh
-                                    </Button>
-                                    <p />
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
+                                        <Button variant="outlined" onClick={fetchLightningPayments} disabled={loadingPayments}>
+                                            Refresh
+                                        </Button>
+                                        {['settled', 'pending', 'failed', 'expired'].map(s => (
+                                            <FormControlLabel key={s} label={s} sx={{ mr: 0 }}
+                                                control={<Checkbox size="small" checked={lightningStatusFilter[s]}
+                                                    onChange={e => setLightningStatusFilter(f => ({ ...f, [s]: e.target.checked }))} />} />
+                                        ))}
+                                    </Box>
                                     {loadingPayments && <Typography>Loading...</Typography>}
                                     {!loadingPayments && lightningPayments.length === 0 &&
                                         <Typography>No payments found.</Typography>
@@ -6318,6 +6325,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                             : p.status === 'failed' ? 'failed'
                                                             : (p.expiry && new Date(p.expiry) < new Date()) ? 'expired'
                                                             : 'pending';
+                                                        if (!lightningStatusFilter[displayStatus]) return null;
                                                         const statusColor = displayStatus === 'settled' ? 'inherit'
                                                             : displayStatus === 'failed' ? 'error.main'
                                                             : 'text.secondary';

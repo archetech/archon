@@ -3,7 +3,9 @@ import {
     Autocomplete,
     Box,
     Button,
+    Checkbox,
     CircularProgress,
+    FormControlLabel,
     Tab,
     Tabs,
     TextField,
@@ -52,6 +54,7 @@ const LightningTab: React.FC = () => {
     // Payments sub-tab
     const [payments, setPayments] = useState<LightningPaymentRecord[]>([]);
     const [loadingPayments, setLoadingPayments] = useState<boolean>(false);
+    const [statusFilter, setStatusFilter] = useState({ settled: true, pending: true, failed: true, expired: true });
 
     // Publish state
     const [isPublished, setIsPublished] = useState<boolean>(false);
@@ -311,10 +314,15 @@ const LightningTab: React.FC = () => {
 
             {activeTab === "payments" && (
                 <Box sx={{ p: 1 }}>
-                    <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
                         <Button variant="outlined" onClick={fetchPayments} disabled={loadingPayments}>
                             Refresh
                         </Button>
+                        {(['settled', 'pending', 'failed', 'expired'] as const).map(s => (
+                            <FormControlLabel key={s} label={s} sx={{ mr: 0 }}
+                                control={<Checkbox size="small" checked={statusFilter[s]}
+                                    onChange={e => setStatusFilter(f => ({ ...f, [s]: e.target.checked }))} />} />
+                        ))}
                     </Box>
                     {loadingPayments && <CircularProgress size={24} />}
                     {!loadingPayments && payments.length === 0 && (
@@ -342,10 +350,11 @@ const LightningTab: React.FC = () => {
                                 {payments.map((p, i) => {
                                     const d = p.time ? new Date(p.time) : null;
                                     const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}` : "—";
-                                    const displayStatus = p.status === 'success' ? 'settled'
+                                    const displayStatus: 'settled' | 'pending' | 'failed' | 'expired' = p.status === 'success' ? 'settled'
                                         : p.status === 'failed' ? 'failed'
                                         : (p.expiry && new Date(p.expiry) < new Date()) ? 'expired'
                                         : 'pending';
+                                    if (!statusFilter[displayStatus]) return null;
                                     const statusColor = displayStatus === 'settled' ? 'inherit'
                                         : displayStatus === 'failed' ? 'error.main'
                                         : 'text.secondary';
