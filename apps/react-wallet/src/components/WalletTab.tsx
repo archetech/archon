@@ -10,6 +10,10 @@ import MnemonicModal from "../modals/MnemonicModal";
 import PassphraseModal from "../modals/PassphraseModal";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import { clearSessionPassphrase, setSessionPassphrase } from "../utils/sessionPassphrase";
+import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
+import { FilePicker } from "@capawesome/capacitor-file-picker";
+import { Capacitor } from "@capacitor/core";
 
 const WalletTab = () => {
     const [open, setOpen] = useState<boolean>(false);
@@ -141,28 +145,47 @@ const WalletTab = () => {
     }
 
     async function handleUploadClick() {
-        const fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.accept = ".json,application/json";
-
-        fileInput.onchange = async (event: any) => {
-            const file = event.target.files?.[0];
-            if (!file) {
-                return;
+        try {
+            if (Capacitor.isNativePlatform()) {
+                // Native file picker on Android
+                const result = await FilePicker.pickFiles({
+                    types: ["application/json"],
+                    readData: true,
+                });
+                const file = result.files[0];
+                if (!file?.data) {
+                    return;
+                }
+                const text = atob(file.data);
+                try {
+                    const wallet = JSON.parse(text);
+                    setPendingWallet(wallet);
+                    setOpen(true);
+                } catch {
+                    setError("Invalid JSON file.");
+                }
+            } else {
+                // Fallback for desktop browsers
+                const fileInput = document.createElement("input");
+                fileInput.type = "file";
+                fileInput.accept = ".json,application/json";
+                fileInput.onchange = async (event: any) => {
+                    try {
+                        const f = event.target.files?.[0];
+                        if (!f) return;
+                        const text = await f.text();
+                        const wallet = JSON.parse(text);
+                        setPendingWallet(wallet);
+                        setOpen(true);
+                    } catch {
+                        setError("Invalid JSON file.");
+                    }
+                };
+                fileInput.click();
             }
-
-            const text = await file.text();
-
-            try {
-                const wallet = JSON.parse(text);
-                setPendingWallet(wallet);
-                setOpen(true);
-            } catch (err) {
-                setError("Invalid JSON file.");
-            }
-        };
-
-        fileInput.click();
+        } catch (error: any) {
+            setError(error);
+        }
     }
 
     async function downloadWallet() {
@@ -172,15 +195,29 @@ const WalletTab = () => {
         try {
             const wallet = await keymaster.exportEncryptedWallet();
             const walletJSON = JSON.stringify(wallet, null, 4);
-            const blob = new Blob([walletJSON], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
 
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'archon-wallet.json';
-            link.click();
-
-            URL.revokeObjectURL(url);
+            if (Capacitor.isNativePlatform()) {
+                const result = await Filesystem.writeFile({
+                    path: 'archon-wallet.json',
+                    data: walletJSON,
+                    directory: Directory.Cache,
+                    encoding: Encoding.UTF8,
+                });
+                await Share.share({
+                    title: 'Archon Wallet Backup',
+                    url: result.uri,
+                    dialogTitle: 'Save wallet backup',
+                });
+            } else {
+                // Fallback for desktop browsers
+                const blob = new Blob([walletJSON], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'archon-wallet.json';
+                link.click();
+                URL.revokeObjectURL(url);
+            }
         } catch (error: any) {
             setError(error);
         }
