@@ -6293,11 +6293,20 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                     }
                                     {!loadingPayments && lightningPayments.length > 0 &&
                                         <TableContainer component={Paper}>
-                                            <Table size="small">
+                                            <Table size="small" sx={{ tableLayout: "fixed" }}>
+                                                <colgroup>
+                                                    <col style={{ width: "190px" }} />
+                                                    <col style={{ width: "120px" }} />
+                                                    <col style={{ width: "60px" }} />
+                                                    <col style={{ width: "80px" }} />
+                                                    <col />
+                                                </colgroup>
                                                 <TableHead>
                                                     <TableRow>
                                                         <TableCell>Date</TableCell>
-                                                        <TableCell>Amount</TableCell>
+                                                        <TableCell align="right">Amount (sats)</TableCell>
+                                                        <TableCell align="right">Fee</TableCell>
+                                                        <TableCell>Status</TableCell>
                                                         <TableCell>Memo</TableCell>
                                                     </TableRow>
                                                 </TableHead>
@@ -6305,11 +6314,20 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     {lightningPayments.map((p, i) => {
                                                         const d = p.time ? new Date(p.time) : null;
                                                         const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` : '—';
+                                                        const displayStatus = p.status === 'success' ? 'settled'
+                                                            : p.status === 'failed' ? 'failed'
+                                                            : (p.expiry && new Date(p.expiry) < new Date()) ? 'expired'
+                                                            : 'pending';
+                                                        const statusColor = displayStatus === 'settled' ? 'inherit'
+                                                            : displayStatus === 'failed' ? 'error.main'
+                                                            : 'text.secondary';
                                                         return (
                                                         <TableRow key={i}>
                                                             <TableCell>{date}</TableCell>
-                                                            <TableCell>{p.amount} sats{p.fee > 0 ? ` (fee: ${p.fee})` : ''}</TableCell>
-                                                            <TableCell>{p.memo || '—'}{p.pending ? ' [pending]' : ''}</TableCell>
+                                                            <TableCell align="right">{p.amount}</TableCell>
+                                                            <TableCell align="right">{p.fee > 0 ? p.fee : ''}</TableCell>
+                                                            <TableCell><Box component="span" sx={{ color: statusColor }}>{displayStatus}</Box></TableCell>
+                                                            <TableCell>{p.memo || '—'}</TableCell>
                                                         </TableRow>
                                                         );
                                                     })}

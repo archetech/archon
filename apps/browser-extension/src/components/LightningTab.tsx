@@ -321,11 +321,20 @@ const LightningTab: React.FC = () => {
                         <Typography>No payments found.</Typography>
                     )}
                     {!loadingPayments && payments.length > 0 && (
-                        <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", "& th, & td": { p: 0.75, textAlign: "left", borderBottom: "1px solid", borderColor: "divider" }, "& th": { fontWeight: "bold" } }}>
+                        <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", "& th, & td": { p: 0.75, borderBottom: "1px solid", borderColor: "divider", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, "& th": { fontWeight: "bold", textAlign: "left" }, "& td.num": { textAlign: "right" } }}>
+                            <colgroup>
+                                <col style={{ width: "190px" }} />
+                                <col style={{ width: "120px" }} />
+                                <col style={{ width: "60px" }} />
+                                <col style={{ width: "80px" }} />
+                                <col />
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th>Date</th>
-                                    <th>Amount</th>
+                                    <th style={{ textAlign: "right" }}>Amount (sats)</th>
+                                    <th style={{ textAlign: "right" }}>Fee</th>
+                                    <th>Status</th>
                                     <th>Memo</th>
                                 </tr>
                             </thead>
@@ -333,11 +342,20 @@ const LightningTab: React.FC = () => {
                                 {payments.map((p, i) => {
                                     const d = p.time ? new Date(p.time) : null;
                                     const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}` : "—";
+                                    const displayStatus = p.status === 'success' ? 'settled'
+                                        : p.status === 'failed' ? 'failed'
+                                        : (p.expiry && new Date(p.expiry) < new Date()) ? 'expired'
+                                        : 'pending';
+                                    const statusColor = displayStatus === 'settled' ? 'inherit'
+                                        : displayStatus === 'failed' ? 'error.main'
+                                        : 'text.secondary';
                                     return (
                                         <tr key={i}>
                                             <td>{date}</td>
-                                            <td>{p.amount} sats{p.fee > 0 ? ` (fee: ${p.fee})` : ""}</td>
-                                            <td>{p.memo || "—"}{p.pending ? " [pending]" : ""}</td>
+                                            <td className="num">{p.amount}</td>
+                                            <td className="num">{p.fee > 0 ? p.fee : ""}</td>
+                                            <td><Box component="span" sx={{ color: statusColor }}>{displayStatus}</Box></td>
+                                            <td>{p.memo || "—"}</td>
                                         </tr>
                                     );
                                 })}

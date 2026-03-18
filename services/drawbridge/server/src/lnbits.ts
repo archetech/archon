@@ -96,21 +96,27 @@ export async function payInvoice(
 export async function getPayments(
     url: string,
     adminKey: string
-): Promise<Array<{ paymentHash: string; amount: number; fee: number; memo: string; time: string; pending: boolean }>> {
+): Promise<Array<{ paymentHash: string; amount: number; fee: number; memo: string; time: string; pending: boolean; status: 'success' | 'pending' | 'failed'; expiry?: number }>> {
     try {
         const response = await axios.get(`${url}/api/v1/payments`, {
             headers: { 'X-Api-Key': adminKey },
         });
         return (response.data || [])
-            .filter((p: any) => p.status === 'success')
-            .map((p: any) => ({
-                paymentHash: p.payment_hash || p.checking_id || '',
-                amount: Math.floor((p.amount || 0) / 1000),
-                fee: Math.floor(Math.abs(p.fee || 0) / 1000),
-                memo: p.memo || '',
-                time: p.time || '',
-                pending: false,
-            }));
+            .map((p: any) => {
+                const status = p.status === 'success' ? 'success'
+                    : p.status === 'failed' ? 'failed'
+                    : 'pending';
+                return {
+                    paymentHash: p.payment_hash || p.checking_id || '',
+                    amount: Math.floor((p.amount || 0) / 1000),
+                    fee: Math.floor(Math.abs(p.fee || 0) / 1000),
+                    memo: p.memo || '',
+                    time: p.time || '',
+                    pending: status !== 'success',
+                    status,
+                    expiry: p.expiry ?? undefined,
+                };
+            });
     } catch (error: any) {
         throwLnbitsError(error);
     }

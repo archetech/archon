@@ -198,11 +198,13 @@ export interface LightningPaymentStatus {
 
 export interface LightningPaymentRecord {
     paymentHash: string;
-    amount: number;
+    amount: number;  // positive = incoming, negative = outgoing
     fee: number;
     memo: string;
     time: string;
     pending: boolean;
+    status: 'success' | 'pending' | 'failed';
+    expiry?: string;  // ISO timestamp, invoices only
 }
 
 export interface DrawbridgeInterface extends GatekeeperInterface {
