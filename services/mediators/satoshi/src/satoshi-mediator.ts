@@ -621,7 +621,7 @@ async function replaceByFee(): Promise<boolean> {
     }
 
     const blockCount = await btcClient.getBlockCount();
-    if (db.pending.blockCount + config.feeConf >= blockCount) {
+    if (db.pending.blockCount + config.feeConf > blockCount) {
         return true;
     }
 
