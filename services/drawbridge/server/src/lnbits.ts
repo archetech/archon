@@ -112,7 +112,7 @@ export async function getPayments(
                     fee: Math.floor(Math.abs(p.fee || 0) / 1000),
                     memo: p.memo || '',
                     time: p.time || '',
-                    pending: status !== 'success',
+                    pending: status === 'pending',
                     status,
                     expiry: p.expiry ?? undefined,
                 };
