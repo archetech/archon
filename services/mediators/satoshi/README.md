@@ -26,6 +26,7 @@ The mediator has two responsibilities:
 | `ARCHON_SAT_FEE_BLOCK_TARGET`      | 1                    | Number of blocks to pass before Replace-By-Fee is used if enabled |
 | `ARCHON_SAT_FEE_FALLBACK_SAT_BYTE` | 10                   | Fallback Sat/Byte if estimatesmartfee does not have enough data   |
 | `ARCHON_SAT_FEE_MAX`               | 0.00002              | Maximum transaction fee           |
+| `ARCHON_SAT_FEE_ORACLE_URL`        | mempool.space URL    | External fee oracle for hybrid estimation (set empty to disable; recommended empty for testnet/signet) |
 | `ARCHON_SAT_RBF_ENABLED`           | false                | Whether Replace-By-Fee is enabled |
 | `ARCHON_SAT_START_BLOCK`           | 0                    | Blockchain scan starting block index |
 | `ARCHON_SAT_REIMPORT`              | true                 | Whether to reimport all discovered batches on startup |
