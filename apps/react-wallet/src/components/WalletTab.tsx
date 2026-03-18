@@ -10,7 +10,7 @@ import MnemonicModal from "../modals/MnemonicModal";
 import PassphraseModal from "../modals/PassphraseModal";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import { clearSessionPassphrase, setSessionPassphrase } from "../utils/sessionPassphrase";
-import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
 import { Capacitor } from "@capacitor/core";
@@ -157,19 +157,23 @@ const WalletTab = () => {
                     return;
                 }
                 const text = atob(file.data);
-                const wallet = JSON.parse(text);
-                setPendingWallet(wallet);
-                setOpen(true);
+                try {
+                    const wallet = JSON.parse(text);
+                    setPendingWallet(wallet);
+                    setOpen(true);
+                } catch {
+                    setError("Invalid JSON file.");
+                }
             } else {
                 // Fallback for desktop browsers
                 const fileInput = document.createElement("input");
                 fileInput.type = "file";
                 fileInput.accept = ".json,application/json";
                 fileInput.onchange = async (event: any) => {
-                    const f = event.target.files?.[0];
-                    if (!f) return;
-                    const text = await f.text();
                     try {
+                        const f = event.target.files?.[0];
+                        if (!f) return;
+                        const text = await f.text();
                         const wallet = JSON.parse(text);
                         setPendingWallet(wallet);
                         setOpen(true);
@@ -197,7 +201,7 @@ const WalletTab = () => {
                     path: 'archon-wallet.json',
                     data: walletJSON,
                     directory: Directory.Cache,
-                    encoding: 'utf8' as any,
+                    encoding: Encoding.UTF8,
                 });
                 await Share.share({
                     title: 'Archon Wallet Backup',
