@@ -105,7 +105,7 @@ export async function getPayments(
             .map((p: any) => {
                 const status = p.status === 'success' ? 'success'
                     : p.status === 'failed' ? 'failed'
-                    : 'pending';
+                        : 'pending';
                 return {
                     paymentHash: p.payment_hash || p.checking_id || '',
                     amount: Math.floor((p.amount || 0) / 1000),

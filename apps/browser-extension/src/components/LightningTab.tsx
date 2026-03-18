@@ -352,12 +352,12 @@ const LightningTab: React.FC = () => {
                                     const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}` : "—";
                                     const displayStatus: 'settled' | 'pending' | 'failed' | 'expired' = p.status === 'success' ? 'settled'
                                         : p.status === 'failed' ? 'failed'
-                                        : (p.expiry && new Date(p.expiry) < new Date()) ? 'expired'
-                                        : 'pending';
+                                            : (p.expiry && new Date(p.expiry) < new Date()) ? 'expired'
+                                                : 'pending';
                                     if (!statusFilter[displayStatus]) return null;
                                     const statusColor = displayStatus === 'settled' ? 'inherit'
                                         : displayStatus === 'failed' ? 'error.main'
-                                        : 'text.secondary';
+                                            : 'text.secondary';
                                     return (
                                         <tr key={i}>
                                             <td>{date}</td>
