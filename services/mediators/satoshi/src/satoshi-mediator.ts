@@ -47,8 +47,8 @@ async function walletGetAddress(): Promise<string> {
     return data.address;
 }
 
-async function walletAnchor(opReturnData: string): Promise<string> {
-    const { data } = await axios.post(`${config.walletURL}/api/v1/wallet/anchor`, { data: opReturnData }, { headers: walletHeaders() });
+async function walletAnchor(opReturnData: string, feeRate?: number): Promise<string> {
+    const { data } = await axios.post(`${config.walletURL}/api/v1/wallet/anchor`, { data: opReturnData, feeRate }, { headers: walletHeaders() });
     return data.txid;
 }
 
@@ -522,7 +522,9 @@ async function retryFailedImports(): Promise<void> {
 }
 
 export async function createOpReturnTxn(opReturnData: string): Promise<string | undefined> {
-    const txid = await walletAnchor(opReturnData);
+    const feeRate = await getHybridFeeRateSatPerVb();
+    console.log(`Anchoring with fee rate: ${feeRate.toFixed(1)} sat/vB`);
+    const txid = await walletAnchor(opReturnData, feeRate);
     console.log(`Transaction broadcast with txid: ${txid}`);
     return txid;
 }
