@@ -96,7 +96,9 @@ const config: AppConfig = {
     feeMax: process.env.ARCHON_SAT_FEE_MAX ? parseFloat(process.env.ARCHON_SAT_FEE_MAX) : 0.00002,
     feeOracleUrl: process.env.ARCHON_SAT_FEE_ORACLE_URL !== undefined
         ? process.env.ARCHON_SAT_FEE_ORACLE_URL
-        : 'https://mempool.space/api/v1/fees/recommended',
+        : (process.env.ARCHON_SAT_CHAIN ?? 'BTC:mainnet') === 'BTC:mainnet'
+            ? 'https://mempool.space/api/v1/fees/recommended'
+            : '',
     rbfEnabled: process.env.ARCHON_SAT_RBF_ENABLED === 'true',
     startBlock: process.env.ARCHON_SAT_START_BLOCK ? parseInt(process.env.ARCHON_SAT_START_BLOCK) : 0,
     reimport: process.env.ARCHON_SAT_REIMPORT ? (process.env.ARCHON_SAT_REIMPORT === 'true') : true,

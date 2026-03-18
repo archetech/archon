@@ -558,10 +558,15 @@ async function checkPendingTransactions(txids: string[]): Promise<boolean> {
 }
 
 async function getHybridFeeRateSatPerVb(): Promise<number> {
-    const estimate = await btcClient.estimateSmartFee(config.feeConf, 'ECONOMICAL');
-    const localSatPerVb = estimate.feerate
-        ? (estimate.feerate / 1000) * 1e8
-        : config.feeFallback;
+    let localSatPerVb = config.feeFallback;
+    try {
+        const estimate = await btcClient.estimateSmartFee(config.feeConf, 'ECONOMICAL');
+        if (estimate.feerate) {
+            localSatPerVb = (estimate.feerate / 1000) * 1e8;
+        }
+    } catch (err: any) {
+        console.warn(`estimateSmartFee failed, using fallback: ${err.message}`);
+    }
 
     let oracleSatPerVb: number | undefined;
     if (config.feeOracleUrl) {
