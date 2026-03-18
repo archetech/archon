@@ -555,6 +555,38 @@ async function checkPendingTransactions(txids: string[]): Promise<boolean> {
     return true;
 }
 
+async function getHybridFeeRateSatPerVb(): Promise<number> {
+    const estimate = await btcClient.estimateSmartFee(config.feeConf, 'ECONOMICAL');
+    const localSatPerVb = estimate.feerate
+        ? (estimate.feerate / 1000) * 1e8
+        : config.feeFallback;
+
+    let oracleSatPerVb: number | undefined;
+    if (config.feeOracleUrl) {
+        try {
+            const response = await axios.get<{ fastestFee: number; halfHourFee: number; hourFee: number }>(
+                config.feeOracleUrl,
+                { timeout: 5000 }
+            );
+            const { fastestFee, halfHourFee, hourFee } = response.data;
+            if (config.feeConf <= 1) {
+                oracleSatPerVb = fastestFee;
+            } else if (config.feeConf <= 3) {
+                oracleSatPerVb = halfHourFee;
+            } else {
+                oracleSatPerVb = hourFee;
+            }
+            if (oracleSatPerVb !== localSatPerVb) {
+                console.log(`Fee oracle: ${oracleSatPerVb} sat/vB (local estimate: ${localSatPerVb.toFixed(1)} sat/vB)`);
+            }
+        } catch (err: any) {
+            console.warn(`Fee oracle unavailable: ${err.message}`);
+        }
+    }
+
+    return Math.max(localSatPerVb, oracleSatPerVb ?? 0);
+}
+
 async function getEntryFromMempool(txids: string[]): Promise<{ entry: MempoolEntry, txid: string }>  {
     if (!txids.length) {
         throw new Error('RBF: empty array');
@@ -601,9 +633,7 @@ async function replaceByFee(): Promise<boolean> {
 
     // Get recommended fee rate and compare with current tx fee rate
     const currentSatPerVb = (entry.fees.base * 1e8) / entry.vsize;
-    const estimate = await btcClient.estimateSmartFee(config.feeConf, 'ECONOMICAL');
-    const estimatedBtcPerKb = estimate.feerate ?? (config.feeFallback / 1e8 * 1000);
-    const targetSatPerVb = (estimatedBtcPerKb / 1000) * 1e8;
+    const targetSatPerVb = await getHybridFeeRateSatPerVb();
 
     if (currentSatPerVb >= targetSatPerVb) {
         console.log(`RBF: Current fee ${currentSatPerVb.toFixed(1)} sat/vB >= estimate ${targetSatPerVb.toFixed(1)} sat/vB, skipping bump`);
@@ -611,7 +641,7 @@ async function replaceByFee(): Promise<boolean> {
     }
 
     console.log(`RBF: Bumping fee from ${currentSatPerVb.toFixed(1)} sat/vB (estimate: ${targetSatPerVb.toFixed(1)} sat/vB)`);
-    const newTxid = await walletBumpFee(txid);
+    const newTxid = await walletBumpFee(txid, targetSatPerVb);
 
     if (newTxid) {
         satoshiRbfBumps.inc();
