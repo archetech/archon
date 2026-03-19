@@ -1303,8 +1303,28 @@ export default class KeymasterClient implements KeymasterInterface {
             const response = await this.axios.post(`${this.API}/files`, data, {
                 headers: {
                     'Content-Type': 'application/octet-stream',
-                    'X-Options': JSON.stringify(options), // Pass options as a custom header
+                    'X-Options': JSON.stringify(options),
                 }
+            });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createFileStream(
+        stream: AsyncIterable<Uint8Array>,
+        options: FileAssetOptions = {}
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/files`, stream, {
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify(options),
+                },
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity,
             });
             return response.data.did;
         }
@@ -1322,8 +1342,29 @@ export default class KeymasterClient implements KeymasterInterface {
             const response = await this.axios.put(`${this.API}/files/${id}`, data, {
                 headers: {
                     'Content-Type': 'application/octet-stream',
-                    'X-Options': JSON.stringify(options), // Pass options as a custom header
+                    'X-Options': JSON.stringify(options),
                 }
+            });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updateFileStream(
+        id: string,
+        stream: AsyncIterable<Uint8Array>,
+        options: FileAssetOptions = {}
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/files/${id}`, stream, {
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify(options),
+                },
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity,
             });
             return response.data.ok;
         }

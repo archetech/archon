@@ -462,7 +462,9 @@ export interface KeymasterInterface {
 
     // Files
     createFile(data: Buffer, options?: FileAssetOptions): Promise<string>;
+    createFileStream(stream: AsyncIterable<Uint8Array>, options?: FileAssetOptions): Promise<string>;
     updateFile(did: string, data: Buffer, options?: FileAssetOptions): Promise<boolean>;
+    updateFileStream(did: string, stream: AsyncIterable<Uint8Array>, options?: FileAssetOptions): Promise<boolean>;
     getFile(id: string): Promise<FileAsset | null>;
     testFile(id: string): Promise<boolean>;
 

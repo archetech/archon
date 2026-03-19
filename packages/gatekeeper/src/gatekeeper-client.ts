@@ -406,6 +406,8 @@ export default class GatekeeperClient implements GatekeeperInterface {
             const response = await this.axios.post(`${this.API}/ipfs/stream`, stream, {
                 headers: { 'Content-Type': 'application/octet-stream' },
                 responseType: 'text',
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity,
             });
             return response.data;
         } catch (error) {
