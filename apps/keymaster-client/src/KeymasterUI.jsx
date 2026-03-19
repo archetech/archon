@@ -2557,7 +2557,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setSelectedImageDocs(docs);
             setSelectedImage({ file: data.file, image: data.image });
             setSelectedImageOwned(docs.didDocumentMetadata.isOwned);
-            setSelectedImageURL(`/api/v1/ipfs/data/${data.file.cid}`);
+            setSelectedImageURL(`${serverUrl}/api/v1/ipfs/data/${data.file.cid}`);
             setImageVersion(versions);
             setImageVersionMax(versions);
         } catch (error) {
@@ -2574,7 +2574,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
             setSelectedImageDocs(docs);
             setSelectedImage({ file: data.file, image: data.image });
-            setSelectedImageURL(`/api/v1/ipfs/data/${data.file.cid}`);
+            setSelectedImageURL(`${serverUrl}/api/v1/ipfs/data/${data.file.cid}`);
             setImageVersion(version);
         } catch (error) {
             showError(error);
@@ -2583,44 +2583,37 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function uploadFile(event) {
         try {
-            const fileInput = event.target; // Reference to the input element
+            const fileInput = event.target;
             const file = fileInput.files[0];
 
             if (!file) return;
 
-            // Reset the input value to allow selecting the same file again
             fileInput.value = "";
 
-            // Read the file as a binary buffer
-            const reader = new FileReader();
+            const response = await fetch(`${serverUrl}/api/v1/ipfs/stream`, {
+                method: 'POST',
+                body: file,
+                headers: { 'Content-Type': 'application/octet-stream' },
+            });
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${await response.text()}`);
+            }
+            const cid = await response.text();
+            const fileAsset = { cid, filename: file.name, type: file.type || 'application/octet-stream', bytes: file.size };
 
-            reader.onload = async (e) => {
-                try {
-                    const arrayBuffer = e.target.result;
-                    const buffer = Buffer.from(arrayBuffer);
-                    // Names have a 32-character limit. Truncating to 26 characters and appending a number if needed.
-                    const aliasList = await keymaster.listAliases();
-                    let alias = file.name.slice(0, 26);
-                    let count = 1;
+            // Names have a 32-character limit. Truncating to 26 characters and appending a number if needed.
+            const names = await keymaster.listAliases();
+            let alias = file.name.slice(0, 26);
+            let count = 1;
 
-                    while (alias in aliasList) {
-                        alias = `${file.name.slice(0, 26)} (${count++})`;
-                    }
+            while (alias in names) {
+                alias = `${file.name.slice(0, 26)} (${count++})`;
+            }
 
-                    await keymaster.createFile(buffer, { registry, alias, filename: file.name });
-                    showSuccess(`File uploaded successfully: ${alias}`);
-                    refreshNames();
-                } catch (error) {
-                    // Catch errors from the Keymaster API or other logic
-                    showError(`Error processing file: ${error}`);
-                }
-            };
-
-            reader.onerror = (error) => {
-                showError(`Error reading file: ${error}`);
-            };
-
-            reader.readAsArrayBuffer(file);
+            const did = await keymaster.createAsset({ file: fileAsset }, { registry });
+            await keymaster.addAlias(alias, did);
+            showSuccess(`File uploaded successfully: ${alias}`);
+            refreshNames();
         } catch (error) {
             showError(`Error uploading file: ${error}`);
         }
@@ -2628,38 +2621,30 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function updateFile(event) {
         try {
-            const fileInput = event.target; // Reference to the input element
+            const fileInput = event.target;
             const file = fileInput.files[0];
 
             if (!file) return;
 
-            // Reset the input value to allow selecting the same file again
             fileInput.value = "";
 
-            // Read the file as a binary buffer
-            const reader = new FileReader();
+            const response = await fetch(`${serverUrl}/api/v1/ipfs/stream`, {
+                method: 'POST',
+                body: file,
+                headers: { 'Content-Type': 'application/octet-stream' },
+            });
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${await response.text()}`);
+            }
+            const cid = await response.text();
+            const fileAsset = { cid, filename: file.name, type: file.type || 'application/octet-stream', bytes: file.size };
 
-            reader.onload = async (e) => {
-                try {
-                    const arrayBuffer = e.target.result;
-                    const buffer = Buffer.from(arrayBuffer);
-
-                    await keymaster.updateFile(selectedFileName, buffer, { filename: file.name });
-                    showSuccess(`File updated successfully`);
-                    selectFile(selectedFileName);
-                } catch (error) {
-                    // Catch errors from the Keymaster API or other logic
-                    showError(`Error processing file: ${error}`);
-                }
-            };
-
-            reader.onerror = (error) => {
-                showError(`Error reading file: ${error}`);
-            };
-
-            reader.readAsArrayBuffer(file);
+            const did = aliasList[selectedFileName];
+            await keymaster.mergeData(did, { file: fileAsset });
+            showSuccess(`File updated successfully`);
+            selectFile(selectedFileName);
         } catch (error) {
-            showError(`Error uploading file: ${error}`);
+            showError(`Error updating file: ${error}`);
         }
     }
 
@@ -2673,7 +2658,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setSelectedFileDocs(docs);
             setSelectedFile(file);
             setSelectedFileOwned(docs.didDocumentMetadata.isOwned);
-            setSelectedFileURL(`/api/v1/ipfs/data/${file.cid}`)
+            setSelectedFileURL(`${serverUrl}/api/v1/ipfs/stream/${file.cid}?filename=${encodeURIComponent(file.filename || 'download.bin')}&type=${encodeURIComponent(file.type || 'application/octet-stream')}`)
             setFileVersion(versions);
             setFileVersionMax(versions);
         } catch (error) {
@@ -2688,7 +2673,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
             setSelectedFileDocs(docs);
             setSelectedFile(file);
-            setSelectedFileURL(`/api/v1/ipfs/data/${file.cid}`)
+            setSelectedFileURL(`${serverUrl}/api/v1/ipfs/stream/${file.cid}?filename=${encodeURIComponent(file.filename || 'download.bin')}&type=${encodeURIComponent(file.type || 'application/octet-stream')}`)
             setFileVersion(version);
         } catch (error) {
             showError(error);
@@ -2701,7 +2686,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         link.download = selectedFile.filename;
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link); // Clean up the DOM
+        document.body.removeChild(link);
     }
 
     async function createVault() {
@@ -4461,7 +4446,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             <input
                                                 type="file"
                                                 id="fileUpload"
-                                                accept=".pdf,.doc,.docx,.txt"
+                                                accept=".pdf,.doc,.docx,.txt,video/*"
                                                 style={{ display: 'none' }}
                                                 onChange={uploadFile}
                                             />
@@ -4507,7 +4492,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                             <input
                                                                 type="file"
                                                                 id="fileUpdate"
-                                                                accept=".pdf,.doc,.docx,.txt"
+                                                                accept=".pdf,.doc,.docx,.txt,video/*"
                                                                 style={{ display: 'none' }}
                                                                 onChange={updateFile}
                                                             />
