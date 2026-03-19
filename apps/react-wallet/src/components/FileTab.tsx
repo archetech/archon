@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useState } from "react";
-import { Box, Button, FormControl, IconButton, MenuItem, Select, Tooltip } from "@mui/material";
+import { Box, Button, FormControl, IconButton, LinearProgress, MenuItem, Select, Tooltip, Typography } from "@mui/material";
 import { Download, Edit } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
@@ -15,6 +15,13 @@ import {
     DEFAULT_GATEKEEPER_URL,
     GATEKEEPER_KEY
 } from "../constants"
+
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
 
 const FileTab = () => {
     const { keymaster } = useWalletContext();
@@ -34,6 +41,7 @@ const FileTab = () => {
     const [fileVersionMax, setFileVersionMax] = useState<number>(1);
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
+    const [uploadProgress, setUploadProgress] = useState<{ loaded: number; total: number } | null>(null);
 
     useEffect(() => {
         if (selectedFileName) {
@@ -68,17 +76,31 @@ const FileTab = () => {
         }
     }
 
-    async function streamFileToGatekeeper(file: File): Promise<string> {
+    function streamFileToGatekeeper(file: File): Promise<string> {
         const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
-        const response = await fetch(`${gatekeeperUrl}/api/v1/ipfs/stream`, {
-            method: 'POST',
-            body: file,
-            headers: { 'Content-Type': 'application/octet-stream' },
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    setUploadProgress({ loaded: e.loaded, total: e.total });
+                }
+            };
+            xhr.onload = () => {
+                setUploadProgress(null);
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(xhr.responseText);
+                } else {
+                    reject(new Error(`Upload failed: ${xhr.responseText}`));
+                }
+            };
+            xhr.onerror = () => {
+                setUploadProgress(null);
+                reject(new Error('Upload failed: network error'));
+            };
+            xhr.open('POST', `${gatekeeperUrl}/api/v1/ipfs/stream`);
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            xhr.send(file);
         });
-        if (!response.ok) {
-            throw new Error(`Upload failed: ${await response.text()}`);
-        }
-        return response.text();
     }
 
     async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
@@ -257,6 +279,15 @@ const FileTab = () => {
                         onChange={uploadFile}
                     />
                 </Box>
+
+                {uploadProgress !== null && (
+                    <Box sx={{ mt: 1 }}>
+                        <LinearProgress variant="determinate" value={Math.round((uploadProgress.loaded / uploadProgress.total) * 100)} />
+                        <Typography variant="caption">
+                            {formatBytes(uploadProgress.loaded)} / {formatBytes(uploadProgress.total)} ({((uploadProgress.loaded / uploadProgress.total) * 100).toFixed(1)}%)
+                        </Typography>
+                    </Box>
+                )}
 
                 {fileList && (
                     <Box className="flex-box" sx={{ display: "flex", alignItems: "center", width: "100%", flexWrap: "nowrap", mt: 1 }}>

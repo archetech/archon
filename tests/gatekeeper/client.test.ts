@@ -942,6 +942,7 @@ describe('getDataStream', () => {
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
 
         await expect(async () => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             for await (const _chunk of gatekeeper.getDataStream(mockCID)) {
                 // consume stream
             }

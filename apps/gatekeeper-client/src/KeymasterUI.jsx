@@ -33,6 +33,7 @@ import {
     TableHead,
     TableRow,
     TableSortLabel,
+    LinearProgress,
     TextField,
     Tooltip,
     Typography,
@@ -106,6 +107,13 @@ const DmailTags = {
     DELETED: 'deleted',
     UNREAD: 'unread',
 };
+
+function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
 
 function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, serverUrl, onServerUrlChange }) {
     const [tab, setTab] = useState(null);
@@ -207,6 +215,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [selectedFileURL, setSelectedFileURL] = useState('');
     const [fileVersion, setFileVersion] = useState(1);
     const [fileVersionMax, setFileVersionMax] = useState(1);
+    const [uploadProgress, setUploadProgress] = useState(null);
     const [vaultList, setVaultList] = useState(null);
     const [vaultName, setVaultName] = useState('');
     const [selectedVaultName, setSelectedVaultName] = useState('');
@@ -2581,6 +2590,32 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
+    function streamFileToServer(file) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    setUploadProgress({ loaded: e.loaded, total: e.total });
+                }
+            };
+            xhr.onload = () => {
+                setUploadProgress(null);
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(xhr.responseText);
+                } else {
+                    reject(new Error(`Upload failed: ${xhr.responseText}`));
+                }
+            };
+            xhr.onerror = () => {
+                setUploadProgress(null);
+                reject(new Error('Upload failed: network error'));
+            };
+            xhr.open('POST', `${serverUrl}/api/v1/ipfs/stream`);
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            xhr.send(file);
+        });
+    }
+
     async function uploadFile(event) {
         try {
             const fileInput = event.target;
@@ -2590,15 +2625,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
             fileInput.value = "";
 
-            const response = await fetch(`${serverUrl}/api/v1/ipfs/stream`, {
-                method: 'POST',
-                body: file,
-                headers: { 'Content-Type': 'application/octet-stream' },
-            });
-            if (!response.ok) {
-                throw new Error(`Upload failed: ${await response.text()}`);
-            }
-            const cid = await response.text();
+            const cid = await streamFileToServer(file);
             const fileAsset = { cid, filename: file.name, type: file.type || 'application/octet-stream', bytes: file.size };
 
             // Names have a 32-character limit. Truncating to 26 characters and appending a number if needed.
@@ -2628,15 +2655,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
             fileInput.value = "";
 
-            const response = await fetch(`${serverUrl}/api/v1/ipfs/stream`, {
-                method: 'POST',
-                body: file,
-                headers: { 'Content-Type': 'application/octet-stream' },
-            });
-            if (!response.ok) {
-                throw new Error(`Upload failed: ${await response.text()}`);
-            }
-            const cid = await response.text();
+            const cid = await streamFileToServer(file);
             const fileAsset = { cid, filename: file.name, type: file.type || 'application/octet-stream', bytes: file.size };
 
             const did = aliasList[selectedFileName];
@@ -4453,6 +4472,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             />
                                         </Grid>
                                     </Grid>
+                                    {uploadProgress !== null && (
+                                        <Box sx={{ mt: 1, width: 400 }}>
+                                            <LinearProgress variant="determinate" value={Math.round((uploadProgress.loaded / uploadProgress.total) * 100)} />
+                                            <Typography variant="caption">
+                                                {formatBytes(uploadProgress.loaded)} / {formatBytes(uploadProgress.total)} ({((uploadProgress.loaded / uploadProgress.total) * 100).toFixed(1)}%)
+                                            </Typography>
+                                        </Box>
+                                    )}
                                     <p />
                                     {fileList &&
                                         <Box>

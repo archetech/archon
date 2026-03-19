@@ -282,6 +282,7 @@ describe('getDataStream', () => {
         const cid = await ipfs.addData(mockData);
 
         try {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             for await (const _chunk of ipfs.getDataStream(cid)) {
                 // consume
             }
