@@ -2658,7 +2658,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setSelectedFileDocs(docs);
             setSelectedFile(file);
             setSelectedFileOwned(docs.didDocumentMetadata.isOwned);
-            setSelectedFileURL(`${serverUrl}/api/v1/ipfs/stream/${file.cid}?filename=${encodeURIComponent(file.filename || 'download.bin')}&type=${encodeURIComponent(file.type || 'application/octet-stream')}`)
+            setSelectedFileURL(`/api/v1/ipfs/stream/${file.cid}?filename=${encodeURIComponent(file.filename || 'download.bin')}&type=${encodeURIComponent(file.type || 'application/octet-stream')}`)
             setFileVersion(versions);
             setFileVersionMax(versions);
         } catch (error) {
@@ -2673,7 +2673,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
             setSelectedFileDocs(docs);
             setSelectedFile(file);
-            setSelectedFileURL(`${serverUrl}/api/v1/ipfs/stream/${file.cid}?filename=${encodeURIComponent(file.filename || 'download.bin')}&type=${encodeURIComponent(file.type || 'application/octet-stream')}`)
+            setSelectedFileURL(`/api/v1/ipfs/stream/${file.cid}?filename=${encodeURIComponent(file.filename || 'download.bin')}&type=${encodeURIComponent(file.type || 'application/octet-stream')}`)
             setFileVersion(version);
         } catch (error) {
             showError(error);
