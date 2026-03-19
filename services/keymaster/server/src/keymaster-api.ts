@@ -5726,12 +5726,10 @@ v1router.post('/images/:id/test', async (req, res) => {
  *                 error:
  *                   type: string
  */
-v1router.post('/files', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
+v1router.post('/files', async (req, res) => {
     try {
-        const data = req.body;
-        const headers = req.headers;
-        const options = typeof headers['x-options'] === 'string' ? JSON.parse(headers['x-options']) : {};
-        const did = await keymaster.createFile(data, options);
+        const options = typeof req.headers['x-options'] === 'string' ? JSON.parse(req.headers['x-options']) : {};
+        const did = await keymaster.createFileStream(req, options);
 
         res.json({ did });
     } catch (error: any) {
@@ -5790,12 +5788,10 @@ v1router.post('/files', express.raw({ type: 'application/octet-stream', limit: c
  *                 error:
  *                   type: string
  */
-v1router.put('/files/:id', express.raw({ type: 'application/octet-stream', limit: config.uploadLimit }), async (req, res) => {
+v1router.put('/files/:id', async (req, res) => {
     try {
-        const data = req.body;
-        const headers = req.headers;
-        const options = typeof headers['x-options'] === 'string' ? JSON.parse(headers['x-options']) : {};
-        const ok = await keymaster.updateFile(req.params.id, data, options);
+        const options = typeof req.headers['x-options'] === 'string' ? JSON.parse(req.headers['x-options']) : {};
+        const ok = await keymaster.updateFileStream(req.params.id, req, options);
 
         res.json({ ok });
     } catch (error: any) {

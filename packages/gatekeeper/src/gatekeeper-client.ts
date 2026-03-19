@@ -401,6 +401,22 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
+    async addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/ipfs/stream`, stream, {
+                headers: { 'Content-Type': 'application/octet-stream' },
+                responseType: 'text',
+            });
+            return response.data;
+        } catch (error) {
+            throwError(error);
+        }
+    }
+
+    getDataStream(cid: string): AsyncIterable<Uint8Array> {
+        throw new Error(`getDataStream not supported in GatekeeperClient — use ${this.API}/ipfs/stream/${cid} directly`);
+    }
+
     async getBlock(registry: string, block?: BlockId): Promise<BlockInfo | null> {
         try {
             const url = block

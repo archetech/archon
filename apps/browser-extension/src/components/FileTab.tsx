@@ -7,12 +7,9 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { FileAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
-import GatekeeperClient from "@didcid/gatekeeper/client";
 import VersionNavigator from "./VersionNavigator";
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";
-
-const gatekeeper = new GatekeeperClient();
 
 const FileTab = () => {
     const { keymaster } = useWalletContext();
@@ -27,19 +24,10 @@ const FileTab = () => {
     const [selectedFileName, setSelectedFileName] = useState<string>("");
     const [selectedFile, setSelectedFile] = useState<FileAsset | null>(null);
     const [selectedFileDocs, setSelectedFileDocs] = useState<DidCidDocument | null>(null);
-    const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>("");
     const [fileVersion, setFileVersion] = useState<number>(1);
     const [fileVersionMax, setFileVersionMax] = useState<number>(1);
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
-
-    useEffect(() => {
-        const init = async () => {
-            const { gatekeeperUrl } = await chrome.storage.sync.get(["gatekeeperUrl"]);
-            await gatekeeper.connect({ url: gatekeeperUrl as string });
-        };
-        init();
-    }, []);
 
     useEffect(() => {
         if (selectedFileName) {
@@ -69,19 +57,22 @@ const FileTab = () => {
                 return;
             }
             setSelectedFile(fileAsset.file);
-
-            const raw = await gatekeeper.getData(fileAsset.file.cid);
-            if (!raw) {
-                setError(`Could not fetch data for CID: ${fileAsset.file.cid}`);
-                return;
-            }
-
-            const base64 = raw.toString("base64");
-            const dataUrl = `data:${fileAsset.file.type};base64,${base64}`;
-            setSelectedFileDataUrl(dataUrl);
         } catch (error: any) {
             setError(error);
         }
+    }
+
+    async function streamFileToGatekeeper(file: File): Promise<string> {
+        const { gatekeeperUrl } = await chrome.storage.sync.get(["gatekeeperUrl"]);
+        const response = await fetch(`${gatekeeperUrl}/api/v1/ipfs/stream`, {
+            method: 'POST',
+            body: file,
+            headers: { 'Content-Type': 'application/octet-stream' },
+        });
+        if (!response.ok) {
+            throw new Error(`Upload failed: ${await response.text()}`);
+        }
+        return response.text();
     }
 
     async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
@@ -97,50 +88,29 @@ const FileTab = () => {
             const file = fileInput.files[0];
             fileInput.value = "";
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    if (!e.target || !e.target.result) {
-                        setError("Unexpected file reader result");
-                        return;
-                    }
-                    const arrayBuffer = e.target.result;
-                    let buffer: Buffer;
-                    if (arrayBuffer instanceof ArrayBuffer) {
-                        buffer = Buffer.from(arrayBuffer);
-                    } else {
-                        setError("Unexpected file reader result type");
-                        return;
-                    }
-
-                    const did = await keymaster.createFile(buffer, {
-                        registry,
-                        filename: file.name,
-                    });
-
-                    const aliasList = await keymaster.listAliases();
-                    let alias = file.name.slice(0, 26);
-                    let count = 1;
-
-                    while (alias in aliasList) {
-                        alias = `${file.name.slice(0, 26)} (${count++})`;
-                    }
-
-                    await keymaster.addAlias(alias, did);
-                    setSuccess(`File uploaded successfully: ${alias}`);
-
-                    await refreshAliases();
-                    setSelectedFileName(alias);
-                } catch (error: any) {
-                    setError(`Error processing file: ${error}`);
-                }
+            const cid = await streamFileToGatekeeper(file);
+            const fileAsset: FileAsset = {
+                cid,
+                filename: file.name,
+                type: file.type || 'application/octet-stream',
+                bytes: file.size,
             };
 
-            reader.onerror = (error) => {
-                setError(`Error reading file: ${error}`);
-            };
+            const did = await keymaster.createAsset({ file: fileAsset }, { registry });
 
-            reader.readAsArrayBuffer(file);
+            const aliasList = await keymaster.listAliases();
+            let alias = file.name.slice(0, 26);
+            let count = 1;
+
+            while (alias in aliasList) {
+                alias = `${file.name.slice(0, 26)} (${count++})`;
+            }
+
+            await keymaster.addAlias(alias, did);
+            setSuccess(`File uploaded successfully: ${alias}`);
+
+            await refreshAliases();
+            setSelectedFileName(alias);
         } catch (error: any) {
             setError(`Error uploading file: ${error}`);
         }
@@ -159,50 +129,34 @@ const FileTab = () => {
             const file = fileInput.files[0];
             fileInput.value = "";
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    if (!e.target || !e.target.result) {
-                        setError("Unexpected file reader result");
-                        return;
-                    }
-                    const arrayBuffer = e.target.result;
-                    let buffer: Buffer;
-                    if (arrayBuffer instanceof ArrayBuffer) {
-                        buffer = Buffer.from(arrayBuffer);
-                    } else {
-                        setError("Unexpected file reader result type");
-                        return;
-                    }
-
-                    await keymaster.updateFile(selectedFileName, buffer, {
-                        filename: file.name,
-                    });
-
-                    setSuccess(`File updated successfully`);
-                    await refreshFile(selectedFileName);
-                } catch (error: any) {
-                    setError(`Error updating file: ${error}`);
-                }
+            const cid = await streamFileToGatekeeper(file);
+            const fileAsset: FileAsset = {
+                cid,
+                filename: file.name,
+                type: file.type || 'application/octet-stream',
+                bytes: file.size,
             };
+            const did = aliasList[selectedFileName];
+            await keymaster.mergeData(did, { file: fileAsset });
 
-            reader.onerror = (error) => {
-                setError(`Error reading file: ${error}`);
-            };
-
-            reader.readAsArrayBuffer(file);
+            setSuccess(`File updated successfully`);
+            await refreshFile(selectedFileName);
         } catch (error: any) {
             setError(`Error uploading file: ${error}`);
         }
     }
 
-    function downloadFile() {
-        if (!selectedFile || !selectedFileDataUrl) {
+    async function downloadFile() {
+        if (!selectedFile || !selectedFile.cid) {
             return;
         }
 
+        const { gatekeeperUrl } = await chrome.storage.sync.get(["gatekeeperUrl"]);
+        const filename = encodeURIComponent(selectedFile.filename || 'download.bin');
+        const type = encodeURIComponent(selectedFile.type || 'application/octet-stream');
+        const url = `${gatekeeperUrl}/api/v1/ipfs/stream/${selectedFile.cid}?filename=${filename}&type=${type}`;
         const link = document.createElement("a");
-        link.href = selectedFileDataUrl;
+        link.href = url;
         link.download = selectedFile.filename || "download.bin";
         link.click();
     }
@@ -276,7 +230,7 @@ const FileTab = () => {
                 <input
                     type="file"
                     id="fileUpload"
-                    accept=".pdf,.doc,.docx,.txt"
+                    accept=".pdf,.doc,.docx,.txt,video/*"
                     style={{ display: "none" }}
                     onChange={uploadFile}
                 />
@@ -315,7 +269,7 @@ const FileTab = () => {
                         <input
                             type="file"
                             id="fileUpdate"
-                            accept=".pdf,.doc,.docx,.txt"
+                            accept=".pdf,.doc,.docx,.txt,video/*"
                             style={{ display: "none" }}
                             onChange={updateFile}
                         />
@@ -324,7 +278,7 @@ const FileTab = () => {
                             size="small"
                             onClick={downloadFile}
                             className="button-right"
-                            disabled={!selectedFile || !selectedFileDataUrl}
+                            disabled={!selectedFile}
                         >
                             Download
                         </Button>
@@ -338,7 +292,7 @@ const FileTab = () => {
 
                         <CopyResolveDID did={aliasList[selectedFileName]} />
                     </Box>
-                    {selectedFile && selectedFileDocs && selectedFileDataUrl && (
+                    {selectedFile && selectedFileDocs && (
                         <Box sx={{ mt: 2 }}>
                             <VersionNavigator
                                 version={fileVersion}

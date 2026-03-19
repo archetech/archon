@@ -72,6 +72,8 @@ export interface CreateAssetOptions {
 
 export interface FileAssetOptions extends CreateAssetOptions {
     filename?: string;
+    contentType?: string;
+    bytes?: number;
 }
 
 export interface EncryptOptions extends CreateAssetOptions {
