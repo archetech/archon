@@ -954,31 +954,9 @@ export default class Keymaster implements KeymasterInterface {
         contentType: string,
         bytes: number,
     ): Promise<FileAsset> {
-        let totalBytes = bytes;
-        let cid: string;
+        const cid = await this.gatekeeper.addDataStream(stream);
 
-        if (!totalBytes) {
-            totalBytes = 0;
-            const self = this;
-            async function* countingStream() {
-                for await (const chunk of stream) {
-                    totalBytes += chunk.length;
-                    yield chunk;
-                }
-            }
-            cid = await self.gatekeeper.addDataStream(countingStream());
-        } else {
-            cid = await this.gatekeeper.addDataStream(stream);
-        }
-
-        const file: FileAsset = {
-            cid,
-            filename,
-            type: contentType,
-            bytes: totalBytes,
-        };
-
-        return file;
+        return { cid, filename, type: contentType, bytes };
     }
 
     async createFileStream(

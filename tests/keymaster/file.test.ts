@@ -268,3 +268,68 @@ describe('testFile', () => {
         expect(isFile).toBe(false);
     });
 });
+
+describe('createFileStream', () => {
+    it('should create DID from streamed data', async () => {
+        const data = Buffer.from('This is streamed text data.', 'utf-8');
+        const cid = await generateCID(data);
+        const filename = 'streamed.txt';
+
+        await keymaster.createId('Bob');
+        const did = await keymaster.createFileStream(data, {
+            filename,
+            contentType: 'text/plain',
+            bytes: data.length,
+        });
+        const doc = await keymaster.resolveDID(did);
+
+        expect(doc.didDocument!.id).toBe(did);
+
+        const expected = {
+            file: {
+                cid,
+                filename,
+                bytes: 27,
+                type: 'text/plain',
+            }
+        };
+
+        expect(doc.didDocumentData).toStrictEqual(expected);
+    });
+
+    it('should default filename and contentType when not provided', async () => {
+        const data = Buffer.from('default options test', 'utf-8');
+
+        await keymaster.createId('Bob');
+        const did = await keymaster.createFileStream(data, { bytes: data.length });
+        const doc = await keymaster.resolveDID(did);
+
+        expect(doc.didDocumentData.file.filename).toBe('file');
+        expect(doc.didDocumentData.file.type).toBe('application/octet-stream');
+        expect(doc.didDocumentData.file.bytes).toBe(20);
+    });
+});
+
+describe('updateFileStream', () => {
+    it('should update file from streamed data', async () => {
+        const data_v1 = Buffer.from('Stream version one.', 'utf-8');
+        const data_v2 = Buffer.from('Stream version two.', 'utf-8');
+        const cid = await generateCID(data_v2);
+        const name = 'streamFile';
+        const filename = 'stream.txt';
+
+        await keymaster.createId('Bob');
+        await keymaster.createFile(data_v1, { alias: name, filename });
+        const ok = await keymaster.updateFileStream(name, data_v2, {
+            filename,
+            contentType: 'text/plain',
+            bytes: data_v2.length,
+        });
+        const doc = await keymaster.resolveDID(name);
+
+        expect(ok).toBe(true);
+        expect(doc.didDocumentData.file.cid).toBe(cid);
+        expect(doc.didDocumentData.file.bytes).toBe(19);
+        expect(doc.didDocumentMetadata!.versionSequence).toBe("2");
+    });
+});

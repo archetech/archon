@@ -5729,6 +5729,9 @@ v1router.post('/images/:id/test', async (req, res) => {
 v1router.post('/files', async (req, res) => {
     try {
         const options = typeof req.headers['x-options'] === 'string' ? JSON.parse(req.headers['x-options']) : {};
+        if (!options.bytes && req.headers['content-length']) {
+            options.bytes = parseInt(req.headers['content-length']);
+        }
         const did = await keymaster.createFileStream(req, options);
 
         res.json({ did });
@@ -5791,6 +5794,9 @@ v1router.post('/files', async (req, res) => {
 v1router.put('/files/:id', async (req, res) => {
     try {
         const options = typeof req.headers['x-options'] === 'string' ? JSON.parse(req.headers['x-options']) : {};
+        if (!options.bytes && req.headers['content-length']) {
+            options.bytes = parseInt(req.headers['content-length']);
+        }
         const ok = await keymaster.updateFileStream(req.params.id, req, options);
 
         res.json({ ok });
