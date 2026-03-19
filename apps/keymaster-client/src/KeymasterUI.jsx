@@ -4372,13 +4372,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             </Grid>
                                             <p />
                                             {selectedImage && selectedImageDocs &&
-                                                <div className="container">
+                                                <>
                                                     <VersionsNavigator
                                                         version={imageVersion}
                                                         maxVersion={imageVersionMax}
                                                         selectVersion={selectImageVersion}
                                                     />
-                                                    <br />
+                                                    <div className="container">
                                                     <div className="left-pane">
                                                         <img src={selectedImageURL} alt={selectedImageName} style={{ width: '100%', height: 'auto' }} />
                                                     </div>
@@ -4422,7 +4422,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                             </Table>
                                                         </TableContainer>
                                                     </div>
-                                                </div>
+                                                    </div>
+                                                </>
                                             }
                                         </Box>
                                     }
