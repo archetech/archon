@@ -36,6 +36,6 @@ const keymasterOptions = {
 
 const gatekeeperSpec = swaggerJsdoc(gatekeeperOptions);
 const keymasterSpec = swaggerJsdoc(keymasterOptions);
-fs.writeFileSync('doc/gatekeeper-api.json', JSON.stringify(gatekeeperSpec, null, 2));
-fs.writeFileSync('doc/keymaster-api.json', JSON.stringify(keymasterSpec, null, 2));
+fs.writeFileSync('docs/gatekeeper-api.json', JSON.stringify(gatekeeperSpec, null, 2));
+fs.writeFileSync('docs/keymaster-api.json', JSON.stringify(keymasterSpec, null, 2));
 
