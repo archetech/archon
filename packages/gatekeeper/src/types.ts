@@ -157,6 +157,8 @@ export interface GatekeeperInterface {
     clearQueue(registry: string, events: Operation[]): Promise<boolean>;
     addData(data: Buffer): Promise<string>;
     getData(cid: string): Promise<Buffer | null>;
+    addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string>;
+    getDataStream(cid: string): AsyncIterable<Uint8Array>;
     addJSON(json: object): Promise<string>;
     getJSON(cid: string): Promise<object | null>;
     addText(text: string): Promise<string>;

@@ -95,6 +95,7 @@ function normalizePath(path: string): string {
         .replace(/\/ipfs\/json\/[^/]+/, '/ipfs/json/:cid')
         .replace(/\/ipfs\/text\/[^/]+/, '/ipfs/text/:cid')
         .replace(/\/ipfs\/data\/[^/]+/, '/ipfs/data/:cid')
+        .replace(/\/ipfs\/stream\/[^/]+/, '/ipfs/stream/:cid')
         .replace(/\/queue\/[^/]+/, '/queue/:registry')
         .replace(/\/block\/[^/]+\/latest/, '/block/:registry/latest')
         .replace(/\/block\/[^/]+\/[^/]+/, '/block/:registry/:blockId')
@@ -140,7 +141,14 @@ async function main() {
 
     app.use(express.json({ limit: '10mb' }));
     app.use(express.text({ limit: '10mb' }));
-    app.use(express.raw({ type: 'application/octet-stream', limit: '10mb' }));
+    // Skip body buffering for streaming routes — they read req directly
+    const rawParser = express.raw({ type: 'application/octet-stream', limit: '10mb' });
+    app.use((req, res, next) => {
+        if (req.path === '/api/v1/ipfs/stream' && req.method === 'POST') {
+            return next();
+        }
+        rawParser(req, res, next);
+    });
 
     // Metrics tracking middleware
     app.use((req, res, next) => {
@@ -387,6 +395,36 @@ async function main() {
             } else {
                 res.status(404).send('Not found');
             }
+        } catch (error: any) {
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
+        }
+    });
+
+    // IPFS streaming routes (no body-size limit)
+
+    v1router.post('/ipfs/stream', ...authMiddleware, async (req, res) => {
+        try {
+            const cid = await gatekeeper.addDataStream(req);
+            res.send(cid);
+        } catch (error: any) {
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
+        }
+    });
+
+    v1router.get('/ipfs/stream/:cid', ...authMiddleware, async (req, res) => {
+        try {
+            const contentType = (req.query.type as string) || 'application/octet-stream';
+            const filename = req.query.filename as string;
+            if (filename) {
+                res.attachment(filename);
+            }
+            res.setHeader('Content-Type', contentType);
+            for await (const chunk of gatekeeper.getDataStream(req.params.cid as string)) {
+                res.write(chunk);
+            }
+            res.end();
         } catch (error: any) {
             logger.error({ err: error }, 'Gatekeeper proxy error');
             res.status(502).json({ error: 'Upstream gatekeeper error' });

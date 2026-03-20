@@ -112,6 +112,15 @@ class KuboClient implements IPFSClient {
         return Buffer.concat(chunks);
     }
 
+    async addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string> {
+        const { cid } = await this.ipfs.add(stream, { cidVersion: 1 });
+        return cid.toString();
+    }
+
+    getDataStream(cid: string): AsyncIterable<Uint8Array> {
+        return this.ipfs.cat(cid);
+    }
+
     async addJSON(json: any): Promise<string> {
         // Encode the JSON data using jsonCodec
         const buf = jsonCodec.encode(json);

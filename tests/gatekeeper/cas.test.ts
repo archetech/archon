@@ -94,6 +94,34 @@ describe('getData', () => {
     });
 });
 
+describe('addDataStream', () => {
+    const mockData = Buffer.from('streamed data');
+
+    it('should create CID from async iterable', async () => {
+        const hash = await generateCID(mockData);
+
+        async function* toStream() { yield mockData; }
+        const cid = await gatekeeper.addDataStream(toStream());
+
+        expect(cid).toBe(hash);
+    });
+});
+
+describe('getDataStream', () => {
+    const mockData = Buffer.from('streamed data');
+
+    it('should return data from CID as async iterable', async () => {
+        const cid = await gatekeeper.addData(mockData);
+
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of gatekeeper.getDataStream(cid)) {
+            chunks.push(chunk);
+        }
+
+        expect(Buffer.concat(chunks)).toStrictEqual(mockData);
+    });
+});
+
 const mockBlock: BlockInfo = {
     height: 100,
     hash: 'mockHash',

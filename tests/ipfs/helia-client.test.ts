@@ -231,3 +231,65 @@ describe('getData', () => {
         }
     });
 });
+
+describe('addDataStream', () => {
+    const mockData = Buffer.from('streamed data');
+
+    it('should create CID from async iterable', async () => {
+        const hash = await generateCID(mockData);
+        const ipfs = await HeliaClient.create();
+
+        async function* toStream() { yield mockData; }
+        const cid = await ipfs.addDataStream(toStream());
+        await ipfs.stop();
+
+        expect(cid).toBe(hash);
+    });
+
+    it('should throw exception if not connected', async () => {
+        const ipfs = new HeliaClient();
+
+        async function* toStream() { yield mockData; }
+
+        try {
+            await ipfs.addDataStream(toStream());
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Not connected');
+        }
+    });
+});
+
+describe('getDataStream', () => {
+    const mockData = Buffer.from('streamed data');
+
+    it('should return data from CID as async iterable', async () => {
+        const ipfs = await HeliaClient.create();
+        const cid = await ipfs.addData(mockData);
+
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of ipfs.getDataStream(cid)) {
+            chunks.push(chunk);
+        }
+        await ipfs.stop();
+
+        expect(Buffer.concat(chunks)).toStrictEqual(mockData);
+    });
+
+    it('should throw exception if not connected', async () => {
+        const ipfs = new HeliaClient();
+        const cid = await ipfs.addData(mockData);
+
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            for await (const _chunk of ipfs.getDataStream(cid)) {
+                // consume
+            }
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Not connected');
+        }
+    });
+});

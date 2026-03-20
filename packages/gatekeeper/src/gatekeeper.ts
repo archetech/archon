@@ -1416,6 +1416,14 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.ipfs.getData(cid);
     }
 
+    async addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string> {
+        return this.ipfs.addDataStream(stream);
+    }
+
+    getDataStream(cid: string): AsyncIterable<Uint8Array> {
+        return this.ipfs.getDataStream(cid);
+    }
+
     async addJSON(json: object): Promise<string> {
         return this.ipfs.addJSON(json);
     }

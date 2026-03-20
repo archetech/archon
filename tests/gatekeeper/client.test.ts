@@ -35,6 +35,7 @@ const Endpoints = {
         json: '/api/v1/ipfs/json',
         text: '/api/v1/ipfs/text',
         data: '/api/v1/ipfs/data',
+        stream: '/api/v1/ipfs/stream',
     },
     block: '/api/v1/block',
     search: '/api/v1/search',
@@ -881,6 +882,71 @@ describe('getData', () => {
         catch (error: any) {
             expect(error.message).toBe(ServerError.message);
         }
+    });
+});
+
+describe('addDataStream', () => {
+    const mockCID = 'mockStreamCID';
+
+    it('should return a CID for streamed data', async () => {
+        nock(GatekeeperURL)
+            .post(Endpoints.ipfs.stream)
+            .reply(200, mockCID);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        const cid = await gatekeeper.addDataStream(Buffer.from('stream data'));
+
+        expect(cid).toStrictEqual(mockCID);
+    });
+
+    it('should throw exception on addDataStream server error', async () => {
+        nock(GatekeeperURL)
+            .post(Endpoints.ipfs.stream)
+            .reply(500, 'Server error');
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        try {
+            await gatekeeper.addDataStream(Buffer.from('stream data'));
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error).toContain('Server error');
+        }
+    });
+});
+
+describe('getDataStream', () => {
+    const mockCID = 'mockStreamCID';
+    const mockData = Buffer.from('streamed content');
+
+    it('should yield streamed data', async () => {
+        nock(GatekeeperURL)
+            .get(`${Endpoints.ipfs.stream}/${mockCID}`)
+            .reply(200, mockData);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of gatekeeper.getDataStream(mockCID)) {
+            chunks.push(chunk);
+        }
+
+        expect(Buffer.concat(chunks).toString()).toBe('streamed content');
+    });
+
+    it('should throw on getDataStream server error', async () => {
+        nock(GatekeeperURL)
+            .get(`${Endpoints.ipfs.stream}/${mockCID}`)
+            .reply(500, 'Server error');
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        await expect(async () => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            for await (const _chunk of gatekeeper.getDataStream(mockCID)) {
+                // consume stream
+            }
+        }).rejects.toThrow();
     });
 });
 

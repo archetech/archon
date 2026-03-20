@@ -948,6 +948,42 @@ export default class Keymaster implements KeymasterInterface {
         return this.mergeData(id, { file });
     }
 
+    async generateFileAssetFromStream(
+        filename: string,
+        stream: AsyncIterable<Uint8Array>,
+        contentType: string,
+        bytes: number,
+    ): Promise<FileAsset> {
+        const cid = await this.gatekeeper.addDataStream(stream);
+
+        return { cid, filename, type: contentType, bytes };
+    }
+
+    async createFileStream(
+        stream: AsyncIterable<Uint8Array>,
+        options: FileAssetOptions = {}
+    ): Promise<string> {
+        const filename = options.filename || 'file';
+        const contentType = options.contentType || 'application/octet-stream';
+        const bytes = options.bytes || 0;
+        const file = await this.generateFileAssetFromStream(filename, stream, contentType, bytes);
+
+        return this.createAsset({ file }, options);
+    }
+
+    async updateFileStream(
+        id: string,
+        stream: AsyncIterable<Uint8Array>,
+        options: FileAssetOptions = {}
+    ): Promise<boolean> {
+        const filename = options.filename || 'file';
+        const contentType = options.contentType || 'application/octet-stream';
+        const bytes = options.bytes || 0;
+        const file = await this.generateFileAssetFromStream(filename, stream, contentType, bytes);
+
+        return this.mergeData(id, { file });
+    }
+
     async getFile(id: string): Promise<FileAsset | null> {
         const asset = await this.resolveAsset(id) as { file?: FileAsset };
         const file = asset.file;

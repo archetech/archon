@@ -152,6 +152,22 @@ class HeliaClient implements IPFSClient {
         return Buffer.concat(chunks);
     }
 
+    public async addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string> {
+        if (!this.unixfs) {
+            throw new NotConnectedError();
+        }
+        const cid = await this.unixfs.addByteStream(stream);
+        return cid.toString();
+    }
+
+    public getDataStream(b58cid: string): AsyncIterable<Uint8Array> {
+        if (!this.unixfs) {
+            throw new NotConnectedError();
+        }
+        const cid = CID.parse(b58cid);
+        return this.unixfs.cat(cid);
+    }
+
     // Factory method
     static async create(config: HeliaConfig = {}): Promise<HeliaClient> {
         const instance = new HeliaClient(config);

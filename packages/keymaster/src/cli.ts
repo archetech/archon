@@ -1164,9 +1164,10 @@ program
     .action(async (file, options) => {
         try {
             const { alias, registry } = options;
-            const data = fs.readFileSync(file);
             const filename = path.basename(file);
-            const did = await keymaster.createFile(data, { filename, alias, registry });
+            const bytes = fs.statSync(file).size;
+            const stream = fs.createReadStream(file);
+            const did = await keymaster.createFileStream(stream, { filename, alias, registry, bytes });
             console.log(did);
         }
         catch (error: any) {
@@ -1273,9 +1274,10 @@ program
     .description('Update an asset from a file')
     .action(async (id, file) => {
         try {
-            const data = fs.readFileSync(file);
             const filename = path.basename(file);
-            const ok = await keymaster.updateFile(id, data, { filename });
+            const bytes = fs.statSync(file).size;
+            const stream = fs.createReadStream(file);
+            const ok = await keymaster.updateFileStream(id, stream, { filename, bytes });
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error: any) {

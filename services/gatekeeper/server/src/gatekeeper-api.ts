@@ -1924,6 +1924,32 @@ v1router.get('/ipfs/data/:cid', async (req, res) => {
     }
 });
 
+v1router.post('/ipfs/stream', async (req, res) => {
+    try {
+        const cid = await gatekeeper.addDataStream(req);
+        res.send(cid);
+    } catch (error: any) {
+        res.status(500).send(error.toString());
+    }
+});
+
+v1router.get('/ipfs/stream/:cid', async (req, res) => {
+    try {
+        const contentType = (req.query.type as string) || 'application/octet-stream';
+        const filename = req.query.filename as string;
+        if (filename) {
+            res.attachment(filename);
+        }
+        res.setHeader('Content-Type', contentType);
+        for await (const chunk of gatekeeper.getDataStream(req.params.cid)) {
+            res.write(chunk);
+        }
+        res.end();
+    } catch (error: any) {
+        res.status(500).send(error.toString());
+    }
+});
+
 /**
  * @swagger
  * /block/{registry}/latest:

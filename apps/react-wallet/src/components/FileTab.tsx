@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useState } from "react";
-import { Box, Button, FormControl, IconButton, MenuItem, Select, Tooltip } from "@mui/material";
+import { Box, Button, FormControl, IconButton, LinearProgress, MenuItem, Select, Tooltip, Typography } from "@mui/material";
 import { Download, Edit } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
@@ -7,7 +7,6 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { FileAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
-import GatekeeperClient from "@didcid/gatekeeper/client";
 import VersionNavigator from "./VersionNavigator";
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";
@@ -17,7 +16,12 @@ import {
     GATEKEEPER_KEY
 } from "../constants"
 
-const gatekeeper = new GatekeeperClient();
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
 
 const FileTab = () => {
     const { keymaster } = useWalletContext();
@@ -33,19 +37,11 @@ const FileTab = () => {
     const [selectedFileName, setSelectedFileName] = useState<string>("");
     const [selectedFile, setSelectedFile] = useState<FileAsset | null>(null);
     const [selectedFileDocs, setSelectedFileDocs] = useState<DidCidDocument | null>(null);
-    const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>("");
     const [fileVersion, setFileVersion] = useState<number>(1);
     const [fileVersionMax, setFileVersionMax] = useState<number>(1);
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
-
-    useEffect(() => {
-        const init = async () => {
-            const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY);
-            await gatekeeper.connect({ url: gatekeeperUrl || DEFAULT_GATEKEEPER_URL });
-        };
-        init();
-    }, []);
+    const [uploadProgress, setUploadProgress] = useState<{ loaded: number; total: number } | null>(null);
 
     useEffect(() => {
         if (selectedFileName) {
@@ -75,19 +71,36 @@ const FileTab = () => {
                 return;
             }
             setSelectedFile(fileAsset.file);
-
-            const raw = await gatekeeper.getData(fileAsset.file.cid);
-            if (!raw) {
-                setError(`Could not fetch data for CID: ${fileAsset.file.cid}`);
-                return;
-            }
-
-            const base64 = raw.toString("base64");
-            const dataUrl = `data:${fileAsset.file.type};base64,${base64}`;
-            setSelectedFileDataUrl(dataUrl);
         } catch (error: any) {
             setError(error);
         }
+    }
+
+    function streamFileToGatekeeper(file: File): Promise<string> {
+        const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    setUploadProgress({ loaded: e.loaded, total: e.total });
+                }
+            };
+            xhr.onload = () => {
+                setUploadProgress(null);
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(xhr.responseText);
+                } else {
+                    reject(new Error(`Upload failed: ${xhr.responseText}`));
+                }
+            };
+            xhr.onerror = () => {
+                setUploadProgress(null);
+                reject(new Error('Upload failed: network error'));
+            };
+            xhr.open('POST', `${gatekeeperUrl}/api/v1/ipfs/stream`);
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            xhr.send(file);
+        });
     }
 
     async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
@@ -103,50 +116,29 @@ const FileTab = () => {
             const file = fileInput.files[0];
             fileInput.value = "";
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    if (!e.target || !e.target.result) {
-                        setError("Unexpected file reader result");
-                        return;
-                    }
-                    const arrayBuffer = e.target.result;
-                    let buffer: Buffer;
-                    if (arrayBuffer instanceof ArrayBuffer) {
-                        buffer = Buffer.from(arrayBuffer);
-                    } else {
-                        setError("Unexpected file reader result type");
-                        return;
-                    }
-
-                    const did = await keymaster.createFile(buffer, {
-                        registry,
-                        filename: file.name,
-                    });
-
-                    const aliasList = await keymaster.listAliases();
-                    let name = file.name.slice(0, 26);
-                    let count = 1;
-
-                    while (name in aliasList) {
-                        name = `${file.name.slice(0, 26)} (${count++})`;
-                    }
-
-                    await keymaster.addAlias(name, did);
-                    setSuccess(`File uploaded successfully: ${name}`);
-
-                    await refreshAliases();
-                    setSelectedFileName(name);
-                } catch (error: any) {
-                    setError(`Error processing file: ${error}`);
-                }
+            const cid = await streamFileToGatekeeper(file);
+            const fileAsset: FileAsset = {
+                cid,
+                filename: file.name,
+                type: file.type || 'application/octet-stream',
+                bytes: file.size,
             };
 
-            reader.onerror = (error) => {
-                setError(`Error reading file: ${error}`);
-            };
+            const did = await keymaster.createAsset({ file: fileAsset }, { registry });
 
-            reader.readAsArrayBuffer(file);
+            const aliasList = await keymaster.listAliases();
+            let name = file.name.slice(0, 26);
+            let count = 1;
+
+            while (name in aliasList) {
+                name = `${file.name.slice(0, 26)} (${count++})`;
+            }
+
+            await keymaster.addAlias(name, did);
+            setSuccess(`File uploaded successfully: ${name}`);
+
+            await refreshAliases();
+            setSelectedFileName(name);
         } catch (error: any) {
             setError(`Error uploading file: ${error}`);
         }
@@ -165,50 +157,34 @@ const FileTab = () => {
             const file = fileInput.files[0];
             fileInput.value = "";
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    if (!e.target || !e.target.result) {
-                        setError("Unexpected file reader result");
-                        return;
-                    }
-                    const arrayBuffer = e.target.result;
-                    let buffer: Buffer;
-                    if (arrayBuffer instanceof ArrayBuffer) {
-                        buffer = Buffer.from(arrayBuffer);
-                    } else {
-                        setError("Unexpected file reader result type");
-                        return;
-                    }
-
-                    await keymaster.updateFile(selectedFileName, buffer, {
-                        filename: file.name,
-                    });
-
-                    setSuccess(`File updated successfully`);
-                    await refreshFile(selectedFileName);
-                } catch (error: any) {
-                    setError(`Error updating file: ${error}`);
-                }
+            const cid = await streamFileToGatekeeper(file);
+            const fileAsset: FileAsset = {
+                cid,
+                filename: file.name,
+                type: file.type || 'application/octet-stream',
+                bytes: file.size,
             };
+            const did = aliasList[selectedFileName];
+            await keymaster.mergeData(did, { file: fileAsset });
 
-            reader.onerror = (error) => {
-                setError(`Error reading file: ${error}`);
-            };
-
-            reader.readAsArrayBuffer(file);
+            setSuccess(`File updated successfully`);
+            await refreshFile(selectedFileName);
         } catch (error: any) {
-            setError(`Error uploading file: ${error}`);
+            setError(`Error updating file: ${error}`);
         }
     }
 
     function downloadFile() {
-        if (!selectedFile || !selectedFileDataUrl) {
+        if (!selectedFile || !selectedFile.cid) {
             return;
         }
 
+        const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
+        const filename = encodeURIComponent(selectedFile.filename || 'download.bin');
+        const type = encodeURIComponent(selectedFile.type || 'application/octet-stream');
+        const url = `${gatekeeperUrl}/api/v1/ipfs/stream/${selectedFile.cid}?filename=${filename}&type=${type}`;
         const link = document.createElement("a");
-        link.href = selectedFileDataUrl;
+        link.href = url;
         link.download = selectedFile.filename || "download.bin";
         link.click();
     }
@@ -298,11 +274,20 @@ const FileTab = () => {
                     <input
                         type="file"
                         id="fileUpload"
-                        accept=".pdf,.doc,.docx,.txt"
+                        accept=".pdf,.doc,.docx,.txt,video/*"
                         style={{ display: "none" }}
                         onChange={uploadFile}
                     />
                 </Box>
+
+                {uploadProgress !== null && (
+                    <Box sx={{ mt: 1 }}>
+                        <LinearProgress variant="determinate" value={Math.round((uploadProgress.loaded / uploadProgress.total) * 100)} />
+                        <Typography variant="caption">
+                            {formatBytes(uploadProgress.loaded)} / {formatBytes(uploadProgress.total)} ({((uploadProgress.loaded / uploadProgress.total) * 100).toFixed(1)}%)
+                        </Typography>
+                    </Box>
+                )}
 
                 {fileList && (
                     <Box className="flex-box" sx={{ display: "flex", alignItems: "center", width: "100%", flexWrap: "nowrap", mt: 1 }}>
@@ -345,7 +330,7 @@ const FileTab = () => {
                             <input
                                 type="file"
                                 id="fileUpdate"
-                                accept=".pdf,.doc,.docx,.txt"
+                                accept=".pdf,.doc,.docx,.txt,video/*"
                                 style={{ display: "none" }}
                                 onChange={updateFile}
                             />
@@ -357,7 +342,7 @@ const FileTab = () => {
                                     <IconButton
                                         size="small"
                                         onClick={downloadFile}
-                                        disabled={!selectedFile || !selectedFileDataUrl}
+                                        disabled={!selectedFile}
                                     >
                                         <Download fontSize="small" />
                                     </IconButton>
@@ -377,7 +362,7 @@ const FileTab = () => {
                 )}
             </Box>
 
-            {selectedFile && selectedFileDocs && selectedFileDataUrl && (
+            {selectedFile && selectedFileDocs && (
                 <Box sx={{ mt: 1 }}>
                     <Box
                         sx={{
