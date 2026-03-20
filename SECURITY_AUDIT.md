@@ -38,7 +38,7 @@ This audit identified **37 findings** across the codebase, infrastructure, and c
 - Admin API key middleware (`ARCHON_ADMIN_API_KEY`) added to both services for defense-in-depth
 - Configurable bind address (`ARCHON_BIND_ADDRESS`) to restrict to localhost behind a proxy
 - `GET /db/reset` blocked in production (`NODE_ENV=production`)
-- Sample nginx reverse proxy configuration provided in `doc/nginx-proxy.conf.example`
+- Sample nginx reverse proxy configuration provided in `docs/nginx-proxy.conf.example`
 
 The cryptographic implementation (cipher package) uses sound primitives (secp256k1, XChaCha20-Poly1305, AES-256-GCM with PBKDF2), and no code injection vectors (`eval`, `exec`, `Function()`) were found. SQL queries are properly parameterized.
 
@@ -107,7 +107,7 @@ The cryptographic implementation (cipher package) uses sound primitives (secp256
 
 ~~Neither the Gatekeeper nor Keymaster service implements any authentication or authorization middleware.~~
 
-**Remediation applied:** Both services now support an `ARCHON_ADMIN_API_KEY` environment variable. When set, all admin/destructive endpoints require `Authorization: Bearer <key>`. Additionally, `ARCHON_BIND_ADDRESS` allows binding to `127.0.0.1` so only the local reverse proxy can reach the services. A sample nginx configuration (`doc/nginx-proxy.conf.example`) is provided that exposes only public-safe endpoints with rate limiting.
+**Remediation applied:** Both services now support an `ARCHON_ADMIN_API_KEY` environment variable. When set, all admin/destructive endpoints require `Authorization: Bearer <key>`. Additionally, `ARCHON_BIND_ADDRESS` allows binding to `127.0.0.1` so only the local reverse proxy can reach the services. A sample nginx configuration (`docs/nginx-proxy.conf.example`) is provided that exposes only public-safe endpoints with rate limiting.
 
 **Protected routes (Gatekeeper):** `/dids/remove`, `/db/reset`, `/db/verify`
 **Protected routes (Keymaster):** `/wallet` (GET/PUT), `/wallet/new`, `/wallet/backup`, `/wallet/recover`, `/wallet/check`, `/wallet/fix`, `/wallet/mnemonic`, `/export/wallet/encrypted`, `/did/:id` (DELETE), `/ids` (POST), `/ids/:id` (DELETE), `/keys/rotate`, `/assets/:id/transfer`
@@ -181,7 +181,7 @@ ARCHON_ADMIN_API_KEY=$(openssl rand -hex 32)  # Defense-in-depth for admin route
 **Severity:** 🟠 High → 🟡 **Mitigated by architecture**
 **Category:** Transport Security
 
-All inter-service and client-facing communication uses plain HTTP. This is acceptable when services are bound to `127.0.0.1` and a TLS-terminating reverse proxy handles external traffic. The sample nginx config (`doc/nginx-proxy.conf.example`) includes HTTPS server block templates.
+All inter-service and client-facing communication uses plain HTTP. This is acceptable when services are bound to `127.0.0.1` and a TLS-terminating reverse proxy handles external traffic. The sample nginx config (`docs/nginx-proxy.conf.example`) includes HTTPS server block templates.
 
 **Remaining risk:** Inter-container traffic within Docker remains unencrypted. For high-security deployments, consider enabling TLS for Redis, MongoDB, and inter-service HTTP.
 
@@ -219,7 +219,7 @@ app.use(helmet());
 **Severity:** 🟠 High → 🟡 **Mitigated at proxy layer**
 **Category:** Availability / DoS Protection
 
-No rate limiting middleware (`express-rate-limit` or equivalent) is present on either API server. The sample nginx config (`doc/nginx-proxy.conf.example`) provides rate limiting zones at the proxy level, which is the recommended approach.
+No rate limiting middleware (`express-rate-limit` or equivalent) is present on either API server. The sample nginx config (`docs/nginx-proxy.conf.example`) provides rate limiting zones at the proxy level, which is the recommended approach.
 
 **Remaining risk:** Without the reverse proxy, or for inter-service traffic, there is no rate limiting.
 
@@ -645,7 +645,7 @@ Both services now support `ARCHON_BIND_ADDRESS` (default `0.0.0.0`). Set to `127
 
 ### 4. Sample Nginx Reverse Proxy Configuration
 
-**File added:** `doc/nginx-proxy.conf.example`
+**File added:** `docs/nginx-proxy.conf.example`
 
 A comprehensive nginx configuration that:
 - Exposes only public-safe Gatekeeper endpoints
@@ -665,7 +665,7 @@ echo "ARCHON_ADMIN_API_KEY=$(openssl rand -hex 32)" >> .env
 echo "ARCHON_BIND_ADDRESS=127.0.0.1" >> .env
 
 # 3. Set up nginx with the provided config
-sudo cp doc/nginx-proxy.conf.example /etc/nginx/sites-available/archon
+sudo cp docs/nginx-proxy.conf.example /etc/nginx/sites-available/archon
 # Edit server_name and TLS settings
 sudo ln -s /etc/nginx/sites-available/archon /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
@@ -780,4 +780,4 @@ sudo nginx -t && sudo systemctl reload nginx
 - `services/keymaster/server/src/keymaster-api.ts` — added `requireAdminKey` middleware to all admin routes
 - `docker-compose.yml` — passes `ARCHON_BIND_ADDRESS` and `ARCHON_ADMIN_API_KEY` to services
 - `sample.env` — documents new security env vars
-- `doc/nginx-proxy.conf.example` — new file: sample reverse proxy configuration
+- `docs/nginx-proxy.conf.example` — new file: sample reverse proxy configuration
