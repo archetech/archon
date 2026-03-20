@@ -417,10 +417,10 @@ async function main() {
         try {
             const contentType = (req.query.type as string) || 'application/octet-stream';
             const filename = req.query.filename as string;
-            res.setHeader('Content-Type', contentType);
             if (filename) {
-                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                res.attachment(filename);
             }
+            res.setHeader('Content-Type', contentType);
             for await (const chunk of gatekeeper.getDataStream(req.params.cid as string)) {
                 res.write(chunk);
             }

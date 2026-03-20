@@ -109,7 +109,8 @@ server {
         # No body size limit — supports large file streaming uploads/downloads
         client_max_body_size 0;
         proxy_pass http://gatekeeper;
-        # Required for streaming responses
+        # Required for streaming requests and responses
+        proxy_request_buffering off;
         proxy_buffering off;
     }
 

@@ -5729,8 +5729,11 @@ v1router.post('/images/:id/test', async (req, res) => {
 v1router.post('/files', async (req, res) => {
     try {
         const options = typeof req.headers['x-options'] === 'string' ? JSON.parse(req.headers['x-options']) : {};
-        if (!options.bytes && req.headers['content-length']) {
-            options.bytes = parseInt(req.headers['content-length']);
+        if (!options.bytes && typeof req.headers['content-length'] === 'string') {
+            const parsedBytes = Number.parseInt(req.headers['content-length'], 10);
+            if (Number.isFinite(parsedBytes) && parsedBytes >= 0) {
+                options.bytes = parsedBytes;
+            }
         }
         const did = await keymaster.createFileStream(req, options);
 
@@ -5794,8 +5797,11 @@ v1router.post('/files', async (req, res) => {
 v1router.put('/files/:id', async (req, res) => {
     try {
         const options = typeof req.headers['x-options'] === 'string' ? JSON.parse(req.headers['x-options']) : {};
-        if (!options.bytes && req.headers['content-length']) {
-            options.bytes = parseInt(req.headers['content-length']);
+        if (!options.bytes && typeof req.headers['content-length'] === 'string') {
+            const parsedBytes = Number.parseInt(req.headers['content-length'], 10);
+            if (Number.isFinite(parsedBytes) && parsedBytes >= 0) {
+                options.bytes = parsedBytes;
+            }
         }
         const ok = await keymaster.updateFileStream(req.params.id, req, options);
 
