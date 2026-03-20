@@ -422,9 +422,12 @@ export default class GatekeeperClient implements GatekeeperInterface {
                 responseType: 'stream',
             });
             yield* response.data;
-        } catch (error) {
+        } catch (error: any) {
             if (response?.data?.destroy) {
                 response.data.destroy();
+            }
+            if (error?.response?.status) {
+                throw new Error(`HTTP ${error.response.status}`);
             }
             throwError(error);
         }
