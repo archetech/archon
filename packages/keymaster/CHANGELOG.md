@@ -3,6 +3,60 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.4](https://github.com/archetech/archon/compare/@didcid/keymaster@0.2.0...@didcid/keymaster@0.4.4) (2026-03-20)
+
+
+### Bug Fixes
+
+* Allow create-id to auto-create wallet ([#102](https://github.com/archetech/archon/issues/102)) ([#103](https://github.com/archetech/archon/issues/103)) ([bb6bc7a](https://github.com/archetech/archon/commit/bb6bc7a57d6bcfed679812b8489ab43ab9f10731)), closes [#53](https://github.com/archetech/archon/issues/53)
+* Better error message for missing wallet ([#53](https://github.com/archetech/archon/issues/53)) ([1a8dad0](https://github.com/archetech/archon/commit/1a8dad05a8a1eafb5d89e88224b913657d1f0530))
+* Incorrect passphrase on react-wallet ([#97](https://github.com/archetech/archon/issues/97)) ([5ce0523](https://github.com/archetech/archon/commit/5ce05238ecb2dd6e5a4a647ab0429a9cf9bdb6a4))
+
+
+### Features
+
+* Add ARCHON_ADMIN_API_KEY support to CLI docker container ([#128](https://github.com/archetech/archon/issues/128)) ([#131](https://github.com/archetech/archon/issues/131)) ([8526717](https://github.com/archetech/archon/commit/8526717c50b6fb71b3812fe9cd7867051d134c53))
+* Add change-passphrase command ([#111](https://github.com/archetech/archon/issues/111)) ([#112](https://github.com/archetech/archon/issues/112)) ([b6b24bb](https://github.com/archetech/archon/commit/b6b24bb6c32da91edebcf85e1212420975da70ed))
+* Add change-registry command to change a DID's registry ([#194](https://github.com/archetech/archon/issues/194)) ([0d258de](https://github.com/archetech/archon/commit/0d258def464394a9c49b6d07f7681c35cfda5721)), closes [#153](https://github.com/archetech/archon/issues/153)
+* Add decodeLightningInvoice to Keymaster ([#146](https://github.com/archetech/archon/issues/146)) ([2ed4139](https://github.com/archetech/archon/commit/2ed4139f3ae548b21ca509877f3b05d3ce68f1b6)), closes [#145](https://github.com/archetech/archon/issues/145)
+* Add getVersion() to KeymasterClient ([#219](https://github.com/archetech/archon/issues/219)) ([f06d89c](https://github.com/archetech/archon/commit/f06d89c8047d60c00611eef4b2a577b54ca6d6a6)), closes [#205](https://github.com/archetech/archon/issues/205)
+* Add Lightning tab to web clients ([#148](https://github.com/archetech/archon/issues/148)) ([73ed52e](https://github.com/archetech/archon/commit/73ed52ea0da92b391fa53a92ba2c671f91912bbd)), closes [#147](https://github.com/archetech/archon/issues/147) [#147](https://github.com/archetech/archon/issues/147) [#147](https://github.com/archetech/archon/issues/147) [#147](https://github.com/archetech/archon/issues/147)
+* Add Lightning wallet support via LNbits integration ([#136](https://github.com/archetech/archon/issues/136)) ([#140](https://github.com/archetech/archon/issues/140)) ([4d99d5a](https://github.com/archetech/archon/commit/4d99d5ab8da20897e5aecf8557b271c3b1779d45))
+* Add nostr support ([#133](https://github.com/archetech/archon/issues/133)) ([3591d62](https://github.com/archetech/archon/commit/3591d6281bf29c5e98e761e7ad56a7abf78a4106)), closes [#87](https://github.com/archetech/archon/issues/87)
+* Added update-credential to agent CLI ([#66](https://github.com/archetech/archon/issues/66)) ([002fce1](https://github.com/archetech/archon/commit/002fce1dcf2edb8c621eb77501cdf0abeed90484))
+* Adds dmail commands to agent CLI ([#67](https://github.com/archetech/archon/issues/67)) ([c5648b3](https://github.com/archetech/archon/commit/c5648b32b9c468e7dd2ead8225cbfc8ba28f929b))
+* Adds get-property command to CLI ([#73](https://github.com/archetech/archon/issues/73)) ([310d7fe](https://github.com/archetech/archon/commit/310d7fe5d95976b8ca37ec12b7d6dc16cc52f65a))
+* Adds view-credential command ([#96](https://github.com/archetech/archon/issues/96)) ([560a472](https://github.com/archetech/archon/commit/560a4727679a2b0e7154e26aef6ff3370b616d6c))
+* Adopt W3C JWE standard for encryption ([#90](https://github.com/archetech/archon/issues/90)) ([2321ca7](https://github.com/archetech/archon/commit/2321ca7fd6e074bac1f4b8fa7c12e58d4b45b181))
+* Allow any URI as credentialSubject.id per W3C VC Data Model v2 ([#92](https://github.com/archetech/archon/issues/92)) ([80d9f29](https://github.com/archetech/archon/commit/80d9f29a9653a93c19356c499512682794d270ce))
+* Display Lightning payment history ([#164](https://github.com/archetech/archon/issues/164)) ([#165](https://github.com/archetech/archon/issues/165)) ([c8ec283](https://github.com/archetech/archon/commit/c8ec2835b0cde542c71e02fdb7fc55c3d46a81d1))
+* Lightning zap — send sats to a DID ([#155](https://github.com/archetech/archon/issues/155)) ([39d7ee3](https://github.com/archetech/archon/commit/39d7ee3242973ace494e45f636ca12fe78d911ab)), closes [#154](https://github.com/archetech/archon/issues/154)
+* Refactor polls to use vault-based architecture ([#88](https://github.com/archetech/archon/issues/88)) ([#100](https://github.com/archetech/archon/issues/100)) ([8fa9eef](https://github.com/archetech/archon/commit/8fa9eef5230daf853c6f29194b72bbbec5de041a)), closes [#1](https://github.com/archetech/archon/issues/1) [#7](https://github.com/archetech/archon/issues/7) [#8](https://github.com/archetech/archon/issues/8) [#6](https://github.com/archetech/archon/issues/6) [#5](https://github.com/archetech/archon/issues/5) [#9](https://github.com/archetech/archon/issues/9)
+* stream large file uploads/downloads for multi-GB video support ([#238](https://github.com/archetech/archon/issues/238)) ([eca94a0](https://github.com/archetech/archon/commit/eca94a06c041849a181a5a072728b9fe0c22bfae)), closes [#208](https://github.com/archetech/archon/issues/208)
+* Support LUD-16 Lightning Addresses in zapLightning ([#168](https://github.com/archetech/archon/issues/168)) ([f81457e](https://github.com/archetech/archon/commit/f81457e058c1ed99b54dafa463c48353a95d99b0)), closes [#160](https://github.com/archetech/archon/issues/160) [#160](https://github.com/archetech/archon/issues/160)
+* V2 groups — promote name, add version field ([#109](https://github.com/archetech/archon/issues/109)) ([#132](https://github.com/archetech/archon/issues/132)) ([f04855d](https://github.com/archetech/archon/commit/f04855dac48a9a040c10143305029fb2d9c4c9ee))
+
+
+
+# 0.2.0 (2026-02-04)
+
+
+### Bug Fixes
+
+* Fix for duplicate credential types ([#37](https://github.com/archetech/archon/issues/37)) ([9613c46](https://github.com/archetech/archon/commit/9613c469a69b8c610df12bd64bea264a7cb6f8a9))
+* getVaultItem failed for small vault items ([#45](https://github.com/archetech/archon/issues/45)) ([a6fdd52](https://github.com/archetech/archon/commit/a6fdd5233ae2013879b28252d322e392211a59c2))
+
+
+### Features
+
+* Added import schema pack ([#29](https://github.com/archetech/archon/issues/29)) ([4af8acf](https://github.com/archetech/archon/commit/4af8acf4e9c15b36319f65f6a5b59a0c2c4bf2df))
+* Adds CLI to keymaster package ([#39](https://github.com/archetech/archon/issues/39)) ([894ce73](https://github.com/archetech/archon/commit/894ce732f5beaca37bb90ace6b760b8e80aba3e9))
+* Improve DTG credential support ([#48](https://github.com/archetech/archon/issues/48)) ([fb7e245](https://github.com/archetech/archon/commit/fb7e24538d93f36a310a36040e1608052969aba6))
+
+
+
+
+
 ## [0.4.3](https://github.com/archetech/archon/compare/@didcid/keymaster@0.2.0...@didcid/keymaster@0.4.3) (2026-03-05)
 
 
