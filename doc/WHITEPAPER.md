@@ -1,6 +1,6 @@
 # Archon: A Decentralized Identity Protocol
 
-## White Paper v1.0
+## White Paper v1.1
 
 **Abstract**
 
@@ -139,6 +139,17 @@ The Keymaster is the client-side wallet library responsible for:
 - ECDSA signing of DID operations
 - Encryption/decryption of messages and credentials
 - Wallet backup and recovery
+
+#### Drawbridge
+
+Drawbridge is an API gateway that bridges the Archon identity layer with the Lightning Network:
+
+- Proxies Gatekeeper and Keymaster APIs with optional paywall protection
+- Manages Lightning Network node connectivity (Core Lightning)
+- Provides invoice generation, payment, and routing for DID-to-DID Lightning transactions
+- Supports L402 (formerly LSAT) authentication for API monetization
+- Exposes Lightning service endpoints via DID document service entries
+- Optionally fronted by a Tor hidden service for privacy-preserving access
 
 #### Mediators
 
@@ -831,7 +842,97 @@ Archon provides a flexible challenge-response system for authentication and auth
 }
 ```
 
-### 8.6 Key Rotation
+### 8.6 Lightning Payments
+
+Archon integrates with the Bitcoin Lightning Network to enable instant, low-cost payments between DIDs. By binding Lightning capabilities directly to decentralized identities, Archon creates a payment layer where any DID holder can send and receive satoshis without revealing personal information.
+
+#### Publishing Lightning Capability
+
+An agent publishes its Lightning receiving capability by registering an invoice key with a Drawbridge gateway and adding a `#lightning` service entry to its DID document:
+
+```json
+{
+  "didDocument": {
+    "service": [
+      {
+        "id": "#lightning",
+        "type": "LightningService",
+        "serviceEndpoint": "https://drawbridge.example.com"
+      }
+    ]
+  }
+}
+```
+
+Any party resolving the DID can discover the Lightning endpoint and initiate a payment without prior coordination.
+
+#### Zap Protocol
+
+The [Archon "zap" protocol](lightning-zap-sequence.md) enables sending satoshis to any DID, alias, or LUD-16 Lightning Address:
+
+```
+zap <recipient> <amount_sats> [memo]
+```
+
+**DID/Alias Flow:**
+1. Keymaster resolves the recipient alias or DID, loads the sender's LNbits admin key from the wallet, and delegates to Drawbridge (`POST /lightning/zap`)
+2. Drawbridge resolves the recipient DID via Gatekeeper to locate the `#lightning` service endpoint
+3. Drawbridge requests a BOLT11 invoice from the recipient's Lightning service (`.onion` endpoints are proxied via Tor; clearnet endpoints require HTTPS with SSRF protection)
+4. Drawbridge pays the invoice through the sender's LNbits instance, which routes the payment across the Lightning Network
+
+**LUD-16 Address Flow (user@domain):**
+1. Keymaster detects the `@` in the recipient string and delegates to Drawbridge
+2. Drawbridge fetches `https://domain/.well-known/lnurlp/user` for the LNURL-pay metadata (SSRF-protected)
+3. Drawbridge requests a BOLT11 invoice from the callback URL with the amount in millisatoshis
+4. Drawbridge pays the invoice through the sender's LNbits instance
+
+Both flows return a `paymentHash` to the caller for tracking. This unified interface abstracts away the differences between DID-native Lightning endpoints and standard LNURL/Lightning Address recipients.
+
+#### Payment Tracking
+
+All Lightning payments are recorded with full lifecycle tracking:
+
+```json
+{
+  "paymentHash": "a1b2c3...",
+  "bolt11": "lnbc...",
+  "amount": 1000,
+  "memo": "Thanks for the article",
+  "status": "settled",
+  "preimage": "d4e5f6...",
+  "expiry": "2024-01-15T11:30:00Z"
+}
+```
+
+Payments transition through states: **pending** → **settled** | **failed** | **expired**, providing clear visibility into payment outcomes.
+
+### 8.7 L402 API Gateway
+
+Drawbridge implements the L402 protocol (formerly LSAT) to enable machine-readable, pay-per-use access to API endpoints. L402 combines HTTP 402 (Payment Required) status codes with Lightning invoices and macaroon-based authentication tokens.
+
+#### How L402 Works
+
+![L402 sequence](images/L402.png)
+
+
+1. Client requests a protected resource (any proxied Gatekeeper or Keymaster endpoint)
+2. Drawbridge returns HTTP 402 with a macaroon (containing caveats for scope, expiry, and payment hash) and a BOLT11 Lightning invoice
+3. Client pays the invoice through the Lightning Network, receiving a preimage as proof of payment
+4. Client re-requests the resource with `Authorization: L402 <macaroon>:<preimage>`
+5. Drawbridge verifies the preimage cryptographically (`SHA256(preimage) == paymentHash`) and validates the macaroon's HMAC chain and caveats, then grants access
+
+#### API Monetization
+
+L402 enables fine-grained monetization of identity services:
+
+- **Per-request pricing**: Each API call requires a micro-payment
+- **Subscription tiers**: Authenticated users bypass L402 for included quotas
+- **Hybrid auth**: Combine traditional API keys with Lightning fallback
+- **No accounts required**: Anonymous, permissionless access via payment alone
+
+This allows Archon node operators to offer public DID resolution, credential verification, and other services as paid APIs without requiring user registration or payment processors.
+
+### 8.8 Key Rotation
 
 Archon supports secure key rotation without changing the DID:
 
@@ -973,6 +1074,12 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 - Focus on specific registry synchronization
 - May run blockchain full nodes
 
+**Tor Hidden Service Nodes**
+- Expose Drawbridge API as a `.onion` address
+- Enable fully anonymous identity operations
+- Protect both client and server network identity
+- Particularly relevant for censorship-resistant use cases
+
 ### 11.2 Peer Discovery
 
 **Hyperswarm DHT**
@@ -1039,7 +1146,17 @@ Organizations implement transparent voting systems:
 - Proof of eligibility without identity disclosure
 - Auditable election results
 
-### 12.6 Digital Asset Provenance
+### 12.6 Micropayments and API Monetization
+
+Node operators monetize identity services using Lightning micropayments:
+
+- DID resolution as a paid service (fractions of a cent per query)
+- Credential verification APIs with per-request pricing
+- Anonymous API access without accounts or payment processors
+- Content creators receive tips and zaps directly to their DID
+- Machine-to-machine payments for automated identity workflows
+
+### 12.7 Digital Asset Provenance
 
 Track ownership and authenticity of digital assets:
 
@@ -1067,6 +1184,9 @@ Track ownership and authenticity of digital assets:
 | Blockchain Timestamps | Automatic (with bounds) | Implicit | No | No |
 | Time-Travel Resolution | Yes | No | No | No |
 | Built-in Messaging | Yes (D-Mail) | No | No | No |
+| Lightning Payments | Yes (L402 + Zaps) | No | No | No |
+| API Monetization | Yes (L402) | No | No | No |
+| Tor Hidden Services | Yes | No | No | No |
 | Voting/Governance | Yes | No | No | No |
 
 ### 13.2 Architectural Comparison
@@ -1145,12 +1265,15 @@ Key innovations include:
 4. **Automatic blockchain timestamping** providing cryptographic proof of when operations occurred
 5. **Time-travel resolution** allowing DIDs to be resolved at any point in their history
 6. **Decentralized messaging (D-Mail)** built on the identity layer
-7. **Privacy-preserving voting** with spoil ballots and two-phase revelation
-8. **Vaults with secret membership** for anonymous collaboration
-9. **Full W3C compliance** ensuring ecosystem interoperability
-10. **Comprehensive credential support** for real-world applications
+7. **Lightning Network integration** enabling instant DID-to-DID payments and zaps
+8. **L402 API monetization** allowing node operators to offer paid identity services without accounts
+9. **Privacy-preserving voting** with spoil ballots and two-phase revelation
+10. **Vaults with secret membership** for anonymous collaboration
+11. **Tor hidden service support** for censorship-resistant, anonymous access
+12. **Full W3C compliance** ensuring ecosystem interoperability
+13. **Comprehensive credential support** for real-world applications
 
-The protocol is production-ready, with multiple client implementations (CLI, web, mobile, browser extension), robust cryptographic foundations, and extensive testing. Organizations seeking to implement decentralized identity infrastructure will find Archon provides the flexibility, security, and performance required for diverse use cases.
+The protocol is production-ready, with multiple client implementations (CLI, web, mobile, browser extension), a Lightning-enabled API gateway (Drawbridge), robust cryptographic foundations, and extensive testing. Organizations seeking to implement decentralized identity infrastructure will find Archon provides the flexibility, security, and performance required for diverse use cases.
 
 As the digital identity landscape continues to evolve, Archon's modular architecture positions it to adapt to new requirements while maintaining backward compatibility and the core principles of user sovereignty and decentralization.
 
@@ -1182,47 +1305,10 @@ As the digital identity landscape continues to evolve, Archon's modular architec
 # Resolve the identity
 ./archon resolve-id alice
 
-# Export for backup
-./archon export-wallet
-```
-
-### Issuing a Credential
-
-```bash
-# Create a schema
-./archon create-schema EmployeeCredential
-
-# Issue credential to subject
-./archon issue-credential alice employee-schema bob
-
-# Subject accepts credential
-./archon accept-credential <credential-did>
+# Back up wallet to file
+./archon backup-wallet-file wallet-backup.json
 ```
 
 ---
 
-## Appendix B: API Reference
-
-### Gatekeeper REST API
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/did/:id` | GET | Resolve DID |
-| `/api/v1/did` | POST | Create DID operation |
-| `/api/v1/did/:id` | PUT | Update DID |
-| `/api/v1/did/:id` | DELETE | Deactivate DID |
-| `/api/v1/registries` | GET | List available registries |
-
-### Keymaster REST API
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/wallet` | POST | Create wallet |
-| `/api/v1/ids` | GET | List identities |
-| `/api/v1/ids` | POST | Create identity |
-| `/api/v1/credentials` | GET | List credentials |
-| `/api/v1/credentials` | POST | Issue credential |
-
----
-
-*Copyright 2024 Archetech. Released under MIT License.*
+*Copyright 2026 Archetech. Released under MIT License.*
