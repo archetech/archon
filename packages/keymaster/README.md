@@ -125,167 +125,105 @@ keymaster list-ids
 
 #### Commands
 
-##### Wallet Management
-
-| Command | Description |
-|---------|-------------|
-| `create-wallet` | Create a new wallet (or show existing) |
-| `new-wallet` | Create a new wallet |
-| `show-wallet` | Display wallet contents |
-| `check-wallet` | Validate DIDs in wallet |
-| `fix-wallet` | Remove invalid DIDs from wallet |
-| `import-wallet <phrase>` | Create wallet from recovery phrase |
-| `show-mnemonic` | Show recovery phrase |
-| `backup-wallet-file <file>` | Backup wallet to file |
-| `restore-wallet-file <file>` | Restore wallet from file |
-| `backup-wallet-did` | Backup wallet to encrypted DID |
-| `recover-wallet-did [did]` | Recover wallet from DID |
-| `change-passphrase <new>` | Re-encrypt wallet with a new passphrase |
-
-##### Identity Management
-
-| Command | Description |
-|---------|-------------|
-| `create-id <name>` | Create a new identity |
-| `list-ids` | List all identities |
-| `use-id <name>` | Set current identity |
-| `remove-id <name>` | Delete an identity |
-| `rename-id <old> <new>` | Rename an identity |
-| `resolve-id` | Resolve current identity |
-| `rotate-keys` | Generate new keys for current ID |
-| `backup-id` | Backup current ID to registry |
-| `recover-id <did>` | Recover ID from DID |
-
-##### DID Operations
-
-| Command | Description |
-|---------|-------------|
-| `resolve-did <did>` | Resolve a DID document |
-| `resolve-did-version <did> <ver>` | Resolve specific version |
-| `revoke-did <did>` | Permanently revoke a DID |
-
-##### Encryption & Signing
-
-| Command | Description |
-|---------|-------------|
-| `encrypt-message <msg> <did>` | Encrypt message for recipient |
-| `encrypt-file <file> <did>` | Encrypt file for recipient |
-| `decrypt-did <did>` | Decrypt an encrypted message |
-| `decrypt-json <did>` | Decrypt encrypted JSON |
-| `sign-file <file>` | Sign a JSON file |
-| `verify-file <file>` | Verify signature in file |
-
-##### Credentials
-
-| Command | Description |
-|---------|-------------|
-| `bind-credential <schema> <subject>` | Create bound credential |
-| `issue-credential <file>` | Issue a credential |
-| `list-issued` | List issued credentials |
-| `revoke-credential <did>` | Revoke a credential |
-| `accept-credential <did>` | Accept a credential |
-| `list-credentials` | List held credentials |
-| `get-credential <did>` | Get credential by DID |
-| `publish-credential <did>` | Publish credential existence |
-| `reveal-credential <did>` | Reveal credential publicly |
-| `unpublish-credential <did>` | Remove from manifest |
-
-##### Challenges & Responses
-
-| Command | Description |
-|---------|-------------|
-| `create-challenge [file]` | Create a challenge |
-| `create-challenge-cc <did>` | Create challenge from credential |
-| `create-response <challenge>` | Respond to a challenge |
-| `verify-response <response>` | Verify a response |
-
-##### Aliases
-
-| Command | Description |
-|---------|-------------|
-| `add-alias <alias> <did>` | Add alias for DID |
-| `get-alias <alias>` | Get DID by alias |
-| `remove-alias <alias>` | Remove alias |
-| `list-aliases` | List all aliases |
-
-##### Groups
-
-| Command | Description |
-|---------|-------------|
-| `create-group <name>` | Create a group |
-| `list-groups` | List owned groups |
-| `get-group <did>` | Get group details |
-| `add-group-member <group> <member>` | Add member to group |
-| `remove-group-member <group> <member>` | Remove member |
-| `test-group <group> [member]` | Test group membership |
-
-##### Schemas
-
-| Command | Description |
-|---------|-------------|
-| `create-schema <file>` | Create schema from file |
-| `list-schemas` | List owned schemas |
-| `get-schema <did>` | Get schema by DID |
-| `create-schema-template <schema>` | Generate template |
-
-##### Assets
-
-| Command | Description |
-|---------|-------------|
-| `create-asset` | Create empty asset |
-| `create-asset-json <file>` | Create from JSON file |
-| `create-asset-image <file>` | Create from image |
-| `create-asset-file <file>` | Create from file |
-| `get-asset <id>` | Get asset by ID |
-| `update-asset-json <id> <file>` | Update with JSON |
-| `update-asset-image <id> <file>` | Update with image |
-| `update-asset-file <id> <file>` | Update with file |
-| `transfer-asset <id> <controller>` | Transfer ownership |
-| `clone-asset <id>` | Clone an asset |
-| `set-property <id> <key> [value]` | Set asset property |
-| `list-assets` | List owned assets |
-
-##### Polls
-
-| Command | Description |
-|---------|-------------|
-| `create-poll-template` | Create poll template |
-| `create-poll <file>` | Create poll from file |
-| `view-poll <poll>` | View poll details |
-| `vote-poll <poll> <vote>` | Vote in poll |
-| `update-poll <ballot>` | Add ballot to poll |
-| `publish-poll <poll>` | Publish results (hidden) |
-| `reveal-poll <poll>` | Publish results (revealed) |
-| `unpublish-poll <poll>` | Remove results |
-
-##### Vaults
-
-| Command | Description |
-|---------|-------------|
-| `create-vault` | Create a vault |
-| `list-vault-items <id>` | List vault items |
-| `add-vault-member <id> <member>` | Add vault member |
-| `remove-vault-member <id> <member>` | Remove member |
-| `list-vault-members <id>` | List members |
-| `add-vault-item <id> <file>` | Add file to vault |
-| `remove-vault-item <id> <item>` | Remove item |
-| `get-vault-item <id> <item> <file>` | Download item |
-
-##### Lightning
-
-| Command | Description |
-|---------|-------------|
-| `add-lightning [id]` | Create a Lightning wallet for a DID |
-| `remove-lightning [id]` | Remove Lightning wallet from a DID |
-| `lightning-balance [id]` | Check Lightning wallet balance |
-| `lightning-invoice <amount> <memo> [id]` | Create invoice to receive sats |
-| `lightning-pay <bolt11> [id]` | Pay a Lightning invoice |
-| `lightning-check <hash> [id]` | Check status of a payment |
-| `lightning-decode <bolt11>` | Decode a BOLT11 invoice |
-| `lightning-zap <recipient> <amount> [memo]` | Send sats to a DID, alias, or Lightning Address |
-| `lightning-payments [id]` | Show payment history |
-| `publish-lightning [id]` | Publish Lightning service endpoint for a DID |
-| `unpublish-lightning [id]` | Remove Lightning service endpoint from a DID |
+| Category | Command | Description |
+|----------|---------|-------------|
+| Wallet | `create-wallet` | Create a new wallet (or show existing) |
+| Wallet | `new-wallet` | Create a new wallet |
+| Wallet | `show-wallet` | Display wallet contents |
+| Wallet | `check-wallet` | Validate DIDs in wallet |
+| Wallet | `fix-wallet` | Remove invalid DIDs from wallet |
+| Wallet | `import-wallet <phrase>` | Create wallet from recovery phrase |
+| Wallet | `show-mnemonic` | Show recovery phrase |
+| Wallet | `backup-wallet-file <file>` | Backup wallet to file |
+| Wallet | `restore-wallet-file <file>` | Restore wallet from file |
+| Wallet | `backup-wallet-did` | Backup wallet to encrypted DID |
+| Wallet | `recover-wallet-did [did]` | Recover wallet from DID |
+| Wallet | `change-passphrase <new>` | Re-encrypt wallet with a new passphrase |
+| Identity | `create-id <name>` | Create a new identity |
+| Identity | `list-ids` | List all identities |
+| Identity | `use-id <name>` | Set current identity |
+| Identity | `remove-id <name>` | Delete an identity |
+| Identity | `rename-id <old> <new>` | Rename an identity |
+| Identity | `resolve-id` | Resolve current identity |
+| Identity | `rotate-keys` | Generate new keys for current ID |
+| Identity | `backup-id` | Backup current ID to registry |
+| Identity | `recover-id <did>` | Recover ID from DID |
+| DID | `resolve-did <did>` | Resolve a DID document |
+| DID | `resolve-did-version <did> <ver>` | Resolve specific version |
+| DID | `revoke-did <did>` | Permanently revoke a DID |
+| Encryption | `encrypt-message <msg> <did>` | Encrypt message for recipient |
+| Encryption | `encrypt-file <file> <did>` | Encrypt file for recipient |
+| Encryption | `decrypt-did <did>` | Decrypt an encrypted message |
+| Encryption | `decrypt-json <did>` | Decrypt encrypted JSON |
+| Encryption | `sign-file <file>` | Sign a JSON file |
+| Encryption | `verify-file <file>` | Verify signature in file |
+| Credentials | `bind-credential <schema> <subject>` | Create bound credential |
+| Credentials | `issue-credential <file>` | Issue a credential |
+| Credentials | `list-issued` | List issued credentials |
+| Credentials | `revoke-credential <did>` | Revoke a credential |
+| Credentials | `accept-credential <did>` | Accept a credential |
+| Credentials | `list-credentials` | List held credentials |
+| Credentials | `get-credential <did>` | Get credential by DID |
+| Credentials | `publish-credential <did>` | Publish credential existence |
+| Credentials | `reveal-credential <did>` | Reveal credential publicly |
+| Credentials | `unpublish-credential <did>` | Remove from manifest |
+| Challenges | `create-challenge [file]` | Create a challenge |
+| Challenges | `create-challenge-cc <did>` | Create challenge from credential |
+| Challenges | `create-response <challenge>` | Respond to a challenge |
+| Challenges | `verify-response <response>` | Verify a response |
+| Aliases | `add-alias <alias> <did>` | Add alias for DID |
+| Aliases | `get-alias <alias>` | Get DID by alias |
+| Aliases | `remove-alias <alias>` | Remove alias |
+| Aliases | `list-aliases` | List all aliases |
+| Groups | `create-group <name>` | Create a group |
+| Groups | `list-groups` | List owned groups |
+| Groups | `get-group <did>` | Get group details |
+| Groups | `add-group-member <group> <member>` | Add member to group |
+| Groups | `remove-group-member <group> <member>` | Remove member |
+| Groups | `test-group <group> [member]` | Test group membership |
+| Schemas | `create-schema <file>` | Create schema from file |
+| Schemas | `list-schemas` | List owned schemas |
+| Schemas | `get-schema <did>` | Get schema by DID |
+| Schemas | `create-schema-template <schema>` | Generate template |
+| Assets | `create-asset` | Create empty asset |
+| Assets | `create-asset-json <file>` | Create from JSON file |
+| Assets | `create-asset-image <file>` | Create from image |
+| Assets | `create-asset-file <file>` | Create from file |
+| Assets | `get-asset <id>` | Get asset by ID |
+| Assets | `update-asset-json <id> <file>` | Update with JSON |
+| Assets | `update-asset-image <id> <file>` | Update with image |
+| Assets | `update-asset-file <id> <file>` | Update with file |
+| Assets | `transfer-asset <id> <controller>` | Transfer ownership |
+| Assets | `clone-asset <id>` | Clone an asset |
+| Assets | `set-property <id> <key> [value]` | Set asset property |
+| Assets | `list-assets` | List owned assets |
+| Polls | `create-poll-template` | Create poll template |
+| Polls | `create-poll <file>` | Create poll from file |
+| Polls | `view-poll <poll>` | View poll details |
+| Polls | `vote-poll <poll> <vote>` | Vote in poll |
+| Polls | `update-poll <ballot>` | Add ballot to poll |
+| Polls | `publish-poll <poll>` | Publish results (hidden) |
+| Polls | `reveal-poll <poll>` | Publish results (revealed) |
+| Polls | `unpublish-poll <poll>` | Remove results |
+| Vaults | `create-vault` | Create a vault |
+| Vaults | `list-vault-items <id>` | List vault items |
+| Vaults | `add-vault-member <id> <member>` | Add vault member |
+| Vaults | `remove-vault-member <id> <member>` | Remove member |
+| Vaults | `list-vault-members <id>` | List members |
+| Vaults | `add-vault-item <id> <file>` | Add file to vault |
+| Vaults | `remove-vault-item <id> <item>` | Remove item |
+| Vaults | `get-vault-item <id> <item> <file>` | Download item |
+| Lightning | `add-lightning [id]` | Create a Lightning wallet for a DID |
+| Lightning | `remove-lightning [id]` | Remove Lightning wallet from a DID |
+| Lightning | `lightning-balance [id]` | Check Lightning wallet balance |
+| Lightning | `lightning-invoice <amount> <memo> [id]` | Create invoice to receive sats |
+| Lightning | `lightning-pay <bolt11> [id]` | Pay a Lightning invoice |
+| Lightning | `lightning-check <hash> [id]` | Check status of a payment |
+| Lightning | `lightning-decode <bolt11>` | Decode a BOLT11 invoice |
+| Lightning | `lightning-zap <recipient> <amount> [memo]` | Send sats to a DID, alias, or Lightning Address |
+| Lightning | `lightning-payments [id]` | Show payment history |
+| Lightning | `publish-lightning [id]` | Publish Lightning service endpoint for a DID |
+| Lightning | `unpublish-lightning [id]` | Remove Lightning service endpoint from a DID |
 
 #### Command Options
 
