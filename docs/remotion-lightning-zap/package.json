@@ -1,0 +1,21 @@
+{
+  "name": "lightning-zap-remotion",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts LightningZap docs/lightning-zap-workflow.mp4"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "^4.0.367"
+  },
+  "devDependencies": {
+    "@remotion/cli": "^4.0.367",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}
