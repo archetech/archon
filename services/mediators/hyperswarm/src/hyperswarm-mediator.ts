@@ -187,6 +187,20 @@ function updateGauges(): void {
 function startMetricsServer(): void {
     const app = express();
 
+    app.get('/ready', async (_req, res) => {
+        try {
+            const [gatekeeperReady, keymasterReady, ipfsReady] = await Promise.all([
+                gatekeeper.isReady(),
+                keymaster.isReady(),
+                ipfs.isReady(),
+            ]);
+
+            res.json({ ready: gatekeeperReady && keymasterReady && ipfsReady && Boolean(nodeInfo) });
+        } catch {
+            res.json({ ready: false });
+        }
+    });
+
     app.get('/version', (_req, res) => {
         res.json({ version: serviceVersion, commit: serviceCommit });
     });

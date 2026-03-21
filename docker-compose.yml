@@ -12,6 +12,12 @@ services:
       - ./data/mongodb:/data/db
     ports:
       - 127.0.0.1:27017:27017
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
 
   redis:
     image: redis:8.0.4-alpine
@@ -21,6 +27,12 @@ services:
       - ./data/redis:/data
     ports:
       - 127.0.0.1:6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
 
   ipfs:
     image: ipfs/kubo:v0.40.1
@@ -59,10 +71,19 @@ services:
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_GATEKEEPER_PORT}:4224
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4224/api/v1/ready',res=>{let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.exit(res.statusCode===200&&(body.trim()==='true'||body.includes('\"ready\":true'))?0:1));});req.on('error',()=>process.exit(1));"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     depends_on:
-      - mongodb
-      - redis
-      - ipfs
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ipfs:
+        condition: service_healthy
 
   keymaster:
     build:
@@ -90,10 +111,19 @@ services:
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_KEYMASTER_PORT}:4226
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4226/api/v1/ready',res=>{let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.exit(res.statusCode===200&&body.includes('\"ready\":true')?0:1));});req.on('error',()=>process.exit(1));"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     depends_on:
-      - gatekeeper
-      - redis
-      - mongodb
+      gatekeeper:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
 
   hyperswarm-mediator:
     build:
@@ -115,10 +145,19 @@ services:
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "127.0.0.1:4232:4232"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4232/ready',res=>{let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.exit(res.statusCode===200&&body.includes('\"ready\":true')?0:1));});req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 25s
     depends_on:
-      - gatekeeper
-      - keymaster
-      - ipfs
+      gatekeeper:
+        condition: service_healthy
+      keymaster:
+        condition: service_healthy
+      ipfs:
+        condition: service_healthy
 
   cli:
     build:
@@ -136,9 +175,12 @@ services:
       - ./share:/app/share
     user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
-      - gatekeeper
-      - keymaster
-      - ipfs
+      gatekeeper:
+        condition: service_healthy
+      keymaster:
+        condition: service_healthy
+      ipfs:
+        condition: service_healthy
 
   explorer:
     build:
@@ -154,8 +196,15 @@ services:
       - VITE_OPERATION_NETWORKS=hyperswarm,local,BTC:signet,BTC:testnet4
     ports:
       - "4000:4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4000/version',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     depends_on:
-      - gatekeeper
+      gatekeeper:
+        condition: service_healthy
 
   gatekeeper-client:
     build:
@@ -170,8 +219,15 @@ services:
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_GATEKEEPER_CLIENT_PORT:-4225}:4225"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4225/',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     depends_on:
-      - gatekeeper
+      gatekeeper:
+        condition: service_healthy
 
   keymaster-client:
     build:
@@ -186,8 +242,15 @@ services:
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_KEYMASTER_CLIENT_PORT:-4227}:4227"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4227/',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     depends_on:
-      - keymaster
+      keymaster:
+        condition: service_healthy
 
   react-wallet:
     build:
@@ -204,8 +267,15 @@ services:
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_REACT_WALLET_PORT:-4228}:${ARCHON_REACT_WALLET_PORT:-4228}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4228/',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     depends_on:
-      - gatekeeper
+      gatekeeper:
+        condition: service_healthy
 
   # Observability Stack
   prometheus:
@@ -221,8 +291,10 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
     depends_on:
-      - gatekeeper
-      - keymaster
+      gatekeeper:
+        condition: service_healthy
+      keymaster:
+        condition: service_healthy
 
   grafana:
     image: grafana/grafana:10.4.0
