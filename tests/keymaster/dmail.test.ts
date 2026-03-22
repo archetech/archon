@@ -6,6 +6,7 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
 import { DmailMessage, NoticeMessage } from '@didcid/keymaster/types';
+import { jest } from '@jest/globals';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -30,6 +31,7 @@ beforeEach(() => {
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+    jest.restoreAllMocks();
 });
 
 describe('verifyTagList', () => {
@@ -111,6 +113,24 @@ describe('verifyRecipientList', () => {
         expect(verified).toStrictEqual([alice, bob, charles]);
     });
 
+    it('should resolve dmail names to DIDs without caching aliases', async () => {
+        const alice = await keymaster.createId('Alice');
+        const bob = await keymaster.createId('Bob');
+        const remoteName = 'atlas@archon.social';
+
+        jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            json: async () => ({ name: 'atlas', did: bob }),
+        } as Response);
+
+        const verified = await keymaster.verifyRecipientList([alice, remoteName]);
+        const aliases = await keymaster.listAliases({ includeIDs: true });
+
+        expect(verified).toStrictEqual([alice, bob]);
+        expect(aliases[remoteName]).toBeUndefined();
+        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names/atlas');
+    });
+
     it('should throw an exception on invalid list', async () => {
         await keymaster.createId('Alice');
         await keymaster.createAsset({ mock: 'mock' }, { alias: 'Asset' });
@@ -145,6 +165,20 @@ describe('verifyRecipientList', () => {
         }
         catch (error: any) {
             expect(error.message).toBe('Invalid parameter: Invalid recipient: Asset');
+        }
+
+        jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: false,
+            status: 404,
+            json: async () => ({ error: 'not found' }),
+        } as Response);
+
+        try {
+            await keymaster.verifyRecipientList(['atlas@archon.social']);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: Invalid recipient: atlas@archon.social');
         }
     });
 });
