@@ -92,6 +92,8 @@ function isPrivateHostname(hostname: string): boolean {
     return /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
 }
 
+const REMOTE_NAME_LOOKUP_TIMEOUT_MS = 5000;
+
 function isRemoteNameReference(value: string): boolean {
     if (typeof value !== 'string') {
         return false;
@@ -1399,8 +1401,11 @@ export default class Keymaster implements KeymasterInterface {
             return null;
         }
 
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REMOTE_NAME_LOOKUP_TIMEOUT_MS);
+
         try {
-            const response = await fetch(url.toString());
+            const response = await fetch(url.toString(), { signal: controller.signal });
 
             if (!response.ok) {
                 return null;
@@ -1415,6 +1420,9 @@ export default class Keymaster implements KeymasterInterface {
         }
         catch {
             return null;
+        }
+        finally {
+            clearTimeout(timeout);
         }
     }
 

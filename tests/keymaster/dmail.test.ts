@@ -128,7 +128,10 @@ describe('verifyRecipientList', () => {
 
         expect(verified).toStrictEqual([alice, bob]);
         expect(aliases[remoteName]).toBeUndefined();
-        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names/atlas');
+        expect(globalThis.fetch).toHaveBeenCalledWith(
+            'https://archon.social/.well-known/names/atlas',
+            expect.objectContaining({ signal: expect.any(AbortSignal) }),
+        );
     });
 
     it('should throw an exception on invalid list', async () => {
