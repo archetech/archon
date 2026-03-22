@@ -92,7 +92,7 @@ function isPrivateHostname(hostname: string): boolean {
     return /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
 }
 
-const REMOTE_NAME_LOOKUP_TIMEOUT_MS = 5000;
+const REMOTE_NAME_LOOKUP_TIMEOUT_MS = 2000;
 
 function isRemoteNameReference(value: string): boolean {
     if (typeof value !== 'string') {
