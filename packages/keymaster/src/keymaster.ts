@@ -88,6 +88,29 @@ function base64urlToHex(b64: string): string {
     return Buffer.from(bytes).toString('hex');
 }
 
+function isPrivateHostname(hostname: string): boolean {
+    return /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
+}
+
+const REMOTE_NAME_LOOKUP_TIMEOUT_MS = 2000;
+
+function isRemoteNameReference(value: string): boolean {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    if (value.startsWith('did:') || value.startsWith('mailto:') || value.includes('://')) {
+        return false;
+    }
+
+    if (/[/?#]/.test(value)) {
+        return false;
+    }
+
+    const parts = value.split('@');
+    return parts.length === 2 && !!parts[0] && !!parts[1];
+}
+
 const DefaultSchema = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
@@ -1351,7 +1374,56 @@ export default class Keymaster implements KeymasterInterface {
             return wallet.ids[name].did;
         }
 
+        const remoteDid = await this.resolveRemoteName(name);
+        if (remoteDid) {
+            return remoteDid;
+        }
+
         throw new UnknownIDError();
+    }
+
+    private async resolveRemoteName(name: string): Promise<string | null> {
+        if (!isRemoteNameReference(name)) {
+            return null;
+        }
+
+        const [localName, domain] = name.split('@');
+
+        let url: URL;
+        try {
+            url = new URL(`https://${domain}/.well-known/names/${encodeURIComponent(localName)}`);
+        }
+        catch {
+            return null;
+        }
+
+        if (isPrivateHostname(url.hostname)) {
+            return null;
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REMOTE_NAME_LOOKUP_TIMEOUT_MS);
+
+        try {
+            const response = await fetch(url.toString(), { signal: controller.signal });
+
+            if (!response.ok) {
+                return null;
+            }
+
+            const data = await response.json() as { did?: unknown };
+            if (typeof data.did !== 'string' || !isValidDID(data.did)) {
+                return null;
+            }
+
+            return data.did;
+        }
+        catch {
+            return null;
+        }
+        finally {
+            clearTimeout(timeout);
+        }
     }
 
     async resolveDID(
@@ -3866,9 +3938,17 @@ export default class Keymaster implements KeymasterInterface {
                 throw new InvalidParameterError(`Invalid recipient: ${id}`);
             }
 
-            if (isValidDID(id)) {
-                newList.push(id);
-                continue;
+            try {
+                const did = await this.lookupDID(id);
+                const isAgent = await this.testAgent(did);
+
+                if (isAgent) {
+                    newList.push(did);
+                    continue;
+                }
+            }
+            catch {
+                // Fall through to recipient-specific error below.
             }
 
             throw new InvalidParameterError(`Invalid recipient: ${id}`);
