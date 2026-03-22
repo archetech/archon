@@ -264,6 +264,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.options('/api/{*path}', cors(corsOptions));
+app.options('/.well-known/{*path}', cors(corsOptions));
 
 // Helper function for OAuth
 async function getMemberByDID(did: string): Promise<any> {
@@ -961,6 +962,162 @@ app.get('/api/lnurlp/:name/callback', async (req: Request, res: Response) => {
     catch (error: any) {
         console.log(error);
         res.json({ status: 'ERROR', reason: error.message || 'Internal error' });
+    }
+});
+
+// ── Well-Known Endpoints (Issue #4) ─────────────────────────────────
+
+// GET /.well-known/names — list/directory of registered names
+app.get('/.well-known/names', async (_: Request, res: Response) => {
+    try {
+        const currentDb = db.loadDb();
+        const names: Record<string, string> = {};
+
+        if (currentDb.users) {
+            for (const [did, user] of Object.entries(currentDb.users)) {
+                if (user.name) {
+                    names[user.name] = did;
+                }
+            }
+        }
+
+        res.json({
+            version: 1,
+            updated: new Date().toISOString(),
+            names
+        });
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send(String(error));
+    }
+});
+
+// GET /.well-known/names/:name — resolve a name to a DID
+app.get('/.well-known/names/:name', async (req: Request, res: Response) => {
+    try {
+        const name = (req.params.name as string).trim().toLowerCase();
+        const did = findNameDid(name);
+
+        if (!did) {
+            res.status(404).json({ error: 'Name not found' });
+            return;
+        }
+
+        res.json({ name, did });
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send(String(error));
+    }
+});
+
+// PUT /.well-known/names/:name — register/claim a name (requires Bearer DID auth)
+app.put('/.well-known/names/:name', async (req: Request, res: Response) => {
+    try {
+        const did = await verifyBearerToken(req);
+        if (!did) {
+            res.status(401).json({ ok: false, message: 'Valid Bearer token (response DID) required' });
+            return;
+        }
+
+        const validation = validateName(req.params.name);
+        if (!validation.ok) {
+            res.status(400).json({ ok: false, message: validation.message });
+            return;
+        }
+        const trimmedName = validation.trimmedName!;
+
+        const currentDb = db.loadDb();
+        const user = ensureUser(currentDb, did);
+
+        if (!checkNameAvailability(currentDb, trimmedName, did)) {
+            res.status(409).json({ ok: false, message: 'Name already taken' });
+            return;
+        }
+
+        user.name = trimmedName;
+        await issueOrUpdateCredential(did, user, trimmedName);
+        db.writeDb(currentDb);
+
+        let credential = null;
+        if (user.credentialDid) {
+            credential = await keymaster.getCredential(user.credentialDid);
+        }
+
+        res.json({
+            ok: true,
+            name: trimmedName,
+            did,
+            credentialDid: user.credentialDid,
+            credentialIssuedAt: user.credentialIssuedAt,
+            credential,
+        });
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send(String(error));
+    }
+});
+
+// GET /.well-known/webfinger — RFC 7033 WebFinger discovery
+app.get('/.well-known/webfinger', async (req: Request, res: Response) => {
+    try {
+        const resource = req.query.resource as string;
+
+        if (!resource) {
+            res.status(400).json({ error: 'Missing required "resource" query parameter' });
+            return;
+        }
+
+        // Parse acct: URI — expect "acct:name@domain"
+        const acctMatch = resource.match(/^acct:([^@]+)@(.+)$/);
+        if (!acctMatch) {
+            res.status(400).json({ error: 'Resource must be in "acct:name@domain" format' });
+            return;
+        }
+
+        const [, name, domain] = acctMatch;
+
+        // Verify the domain matches this service
+        if (SERVICE_DOMAIN && domain !== SERVICE_DOMAIN) {
+            res.status(404).json({ error: 'Unknown domain' });
+            return;
+        }
+
+        const did = findNameDid(name);
+        if (!did) {
+            res.status(404).json({ error: 'Name not found' });
+            return;
+        }
+
+        const jrd: any = {
+            subject: resource,
+            aliases: [did],
+            links: [
+                {
+                    rel: 'self',
+                    type: 'application/activity+json',
+                    href: `${PUBLIC_URL}/api/member/${name}`,
+                },
+            ],
+        };
+
+        // Add profile page link if service domain is configured
+        if (SERVICE_DOMAIN) {
+            jrd.links.push({
+                rel: 'http://webfinger.net/rel/profile-page',
+                type: 'text/html',
+                href: `${PUBLIC_URL}/${name}`,
+            });
+        }
+
+        res.set('Content-Type', 'application/jrd+json');
+        res.json(jrd);
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send(String(error));
     }
 });
 
