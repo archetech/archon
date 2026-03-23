@@ -17,10 +17,16 @@ let keymaster: Keymaster;
 
 const UPDATE_OK = "OK";
 const UPDATE_FAILED = "Update failed";
+const LIGHTNING_ZAP_STATUS_ATTEMPTS = 3;
+const LIGHTNING_ZAP_STATUS_DELAY_MS = 1000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', '..', 'package.json'), 'utf-8'));
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 program
     .version(pkg.version)
@@ -934,7 +940,12 @@ program
     .action(async (recipient, amount, memo) => {
         try {
             const result = await keymaster.zapLightning(recipient, parseInt(amount), memo);
-            const status = await keymaster.checkLightningPayment(result.paymentHash);
+            let status = await keymaster.checkLightningPayment(result.paymentHash);
+
+            for (let attempt = 1; attempt < LIGHTNING_ZAP_STATUS_ATTEMPTS && !status.paid; attempt++) {
+                await sleep(LIGHTNING_ZAP_STATUS_DELAY_MS);
+                status = await keymaster.checkLightningPayment(result.paymentHash);
+            }
 
             console.log(JSON.stringify({
                 ...result,
