@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.7](https://github.com/archetech/archon/compare/@didcid/common@0.1.3...@didcid/common@0.1.7) (2026-03-23)
+
+
+### Features
+
+* Add Lightning wallet support via LNbits integration ([#136](https://github.com/archetech/archon/issues/136)) ([#140](https://github.com/archetech/archon/issues/140)) ([4d99d5a](https://github.com/archetech/archon/commit/4d99d5ab8da20897e5aecf8557b271c3b1779d45))
+
+
+
+
+
 ## [0.1.6](https://github.com/archetech/archon/compare/@didcid/common@0.1.3...@didcid/common@0.1.6) (2026-03-20)
 
 
