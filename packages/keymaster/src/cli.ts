@@ -934,7 +934,13 @@ program
     .action(async (recipient, amount, memo) => {
         try {
             const result = await keymaster.zapLightning(recipient, parseInt(amount), memo);
-            console.log(JSON.stringify(result, null, 4));
+            const status = await keymaster.checkLightningPayment(result.paymentHash);
+
+            console.log(JSON.stringify({
+                ...result,
+                paid: status.paid,
+                preimage: status.preimage,
+            }, null, 4));
         }
         catch (error: any) {
             console.error(error.error || error.message || error);
