@@ -450,6 +450,17 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
+    async function checkLightningPaymentWithRetry(paymentHash) {
+        let status = await keymaster.checkLightningPayment(paymentHash);
+
+        for (let attempt = 1; attempt < 3 && !status.paid; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            status = await keymaster.checkLightningPayment(paymentHash);
+        }
+
+        return status;
+    }
+
     async function payLightningInvoice() {
         if (!bolt11Input.trim()) return;
         setLightningPaymentResult(null);
@@ -512,7 +523,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 amount,
                 zapMemo.trim() || undefined
             );
-            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            const status = await checkLightningPaymentWithRetry(payment.paymentHash);
             setZapResult(status);
             showSuccess('Zap sent successfully');
             setZapDid('');

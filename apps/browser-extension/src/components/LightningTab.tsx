@@ -165,6 +165,21 @@ const LightningTab: React.FC = () => {
         }
     }
 
+    async function checkLightningPaymentWithRetry(paymentHash: string) {
+        if (!keymaster) {
+            return null;
+        }
+
+        let status = await keymaster.checkLightningPayment(paymentHash);
+
+        for (let attempt = 1; attempt < 3 && !status.paid; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            status = await keymaster.checkLightningPayment(paymentHash);
+        }
+
+        return status;
+    }
+
     async function handlePay() {
         if (!keymaster || !bolt11Input.trim()) return;
         setLoadingPay(true);
@@ -232,7 +247,10 @@ const LightningTab: React.FC = () => {
                 amount,
                 zapMemo.trim() || undefined
             );
-            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            const status = await checkLightningPaymentWithRetry(payment.paymentHash);
+            if (!status) {
+                throw new Error("Lightning unavailable");
+            }
             setZapResult(status);
             setSuccess("Zap sent successfully");
             setZapDid("");
