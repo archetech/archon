@@ -1319,6 +1319,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             const trimmedName = name.trim();
             const docs = await keymaster.resolveDID(trimmedName);
             setSelectedName(trimmedName);
+            if (alias.trim()) {
+                setAliasDID(docs.didDocument.id);
+            }
             setAliasIsOwned(!!docs.didDocumentMetadata?.isOwned);
             setAliasDocs(JSON.stringify(docs, null, 4));
             const versions = docs.didDocumentMetadata.version ?? 1;
@@ -2300,7 +2303,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     async function addDmailContact(senderDID) {
         setAliasDID(senderDID);
         resolveAlias(senderDID);
-        setTab('names');
+        setTab('aliases');
     }
 
     async function showMnemonic() {
@@ -3799,7 +3802,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             <Tab key="identity" value="identity" label={'Identities'} icon={<PermIdentity />} />
                         }
                         {currentId && !widget &&
-                            <Tab key="names" value="names" label={'DIDs'} icon={<List />} />
+                            <Tab key="aliases" value="aliases" label={'Aliases'} icon={<List />} />
                         }
                         {currentId && !widget &&
                             <Tab key="properties" value="properties" label={'Properties'} icon={<Tune />} />
@@ -3954,7 +3957,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             }
                         </Box>
                     }
-                    {tab === 'names' &&
+                    {tab === 'aliases' &&
                         <Box>
                             <TableContainer component={Paper} style={{ maxHeight: '400px', overflow: 'auto' }}>
                                 <Table stickyHeader style={{ width: '1000px', tableLayout: 'fixed' }}>
@@ -3967,12 +3970,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         <TableRow>
                                             <TableCell style={{ borderBottom: 'none' }}>
                                                 <TextField
-                                                    label="Name"
+                                                    label="Alias"
                                                     size="small"
                                                     fullWidth
                                                     value={alias}
                                                     onChange={(e) => setAlias(e.target.value)}
-                                                    inputProps={{ maxLength: 20 }}
+                                                    inputProps={{ maxLength: 40 }}
                                                 />
                                             </TableCell>
                                             <TableCell style={{ borderBottom: 'none' }}>
@@ -3986,7 +3989,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 />
                                             </TableCell>
                                             <TableCell style={{ borderBottom: 'none', whiteSpace: 'nowrap' }}>
-                                                <Button variant="contained" color="primary" onClick={() => resolveAlias(aliasDID)} disabled={!aliasDID}>
+                                                <Button
+                                                    variant="contained"
+                                                    color="primary"
+                                                    onClick={() => resolveAlias(aliasDID || alias)}
+                                                    disabled={!alias.trim() && !aliasDID.trim()}
+                                                >
                                                     Resolve
                                                 </Button>
                                                 {' '}
