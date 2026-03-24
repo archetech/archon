@@ -21,7 +21,7 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 const LightningTab: React.FC = () => {
     const { keymaster } = useWalletContext();
     const { currentDID, agentList } = useVariablesContext();
-    const { setError, setSuccess } = useSnackbar();
+    const { setError, setSuccess, setWarning } = useSnackbar();
 
     const [activeTab, setActiveTab] = useState<"wallet" | "payments" | "receive" | "send" | "zap">("wallet");
 
@@ -252,7 +252,11 @@ const LightningTab: React.FC = () => {
                 throw new Error("Lightning unavailable");
             }
             setZapResult(status);
-            setSuccess("Zap sent successfully");
+            if (status.paid) {
+                setSuccess("Zap sent successfully");
+            } else {
+                setWarning("Zap submitted, but settlement is still pending");
+            }
             setZapDid("");
             setZapAmount("");
             setZapMemo("");
@@ -574,6 +578,9 @@ const LightningTab: React.FC = () => {
 
                     {zapResult && (
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: 1 }}>
+                            <Typography variant="body2">
+                                <strong>Status:</strong> {zapResult.paid ? "Settled" : "Pending"}
+                            </Typography>
                             <Typography variant="body2">
                                 <strong>Payment Hash:</strong> {zapResult.paymentHash}
                             </Typography>
