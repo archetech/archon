@@ -17,7 +17,7 @@ let keymaster: Keymaster;
 
 const UPDATE_OK = "OK";
 const UPDATE_FAILED = "Update failed";
-const LIGHTNING_ZAP_STATUS_ATTEMPTS = 3;
+const LIGHTNING_ZAP_STATUS_CHECKS = 3;
 const LIGHTNING_ZAP_STATUS_DELAY_MS = 1000;
 
 const __filename = fileURLToPath(import.meta.url);
@@ -942,7 +942,7 @@ program
             const result = await keymaster.zapLightning(recipient, parseInt(amount), memo);
             let status = await keymaster.checkLightningPayment(result.paymentHash);
 
-            for (let attempt = 1; attempt < LIGHTNING_ZAP_STATUS_ATTEMPTS && !status.paid; attempt++) {
+            for (let attempt = 1; attempt < LIGHTNING_ZAP_STATUS_CHECKS && !status.paid; attempt++) {
                 await sleep(LIGHTNING_ZAP_STATUS_DELAY_MS);
                 status = await keymaster.checkLightningPayment(result.paymentHash);
             }

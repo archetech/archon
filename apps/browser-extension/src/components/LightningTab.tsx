@@ -18,6 +18,9 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 
+const LIGHTNING_PAYMENT_STATUS_CHECKS = 3;
+const LIGHTNING_PAYMENT_STATUS_DELAY_MS = 1000;
+
 const LightningTab: React.FC = () => {
     const { keymaster } = useWalletContext();
     const { currentDID, agentList } = useVariablesContext();
@@ -166,15 +169,11 @@ const LightningTab: React.FC = () => {
     }
 
     async function checkLightningPaymentWithRetry(paymentHash: string) {
-        if (!keymaster) {
-            return null;
-        }
+        let status = await keymaster!.checkLightningPayment(paymentHash);
 
-        let status = await keymaster.checkLightningPayment(paymentHash);
-
-        for (let attempt = 1; attempt < 3 && !status.paid; attempt++) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            status = await keymaster.checkLightningPayment(paymentHash);
+        for (let attempt = 1; attempt < LIGHTNING_PAYMENT_STATUS_CHECKS && !status.paid; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, LIGHTNING_PAYMENT_STATUS_DELAY_MS));
+            status = await keymaster!.checkLightningPayment(paymentHash);
         }
 
         return status;
@@ -248,9 +247,6 @@ const LightningTab: React.FC = () => {
                 zapMemo.trim() || undefined
             );
             const status = await checkLightningPaymentWithRetry(payment.paymentHash);
-            if (!status) {
-                throw new Error("Lightning unavailable");
-            }
             setZapResult(status);
             if (status.paid) {
                 setSuccess("Zap sent successfully");
