@@ -1,6 +1,6 @@
 services:
   cln-mainnet-node:
-    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-2.13.2}
     environment:
       - NETWORK=bitcoin
       - ALIAS=${ARCHON_CLN_ALIAS:-archon}
@@ -30,7 +30,7 @@ services:
       - "127.0.0.1:3001:3001"
 
   drawbridge-init:
-    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-2.13.2}
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -73,7 +73,7 @@ services:
     restart: "no"
 
   rtl-init:
-    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-2.13.2}
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -135,7 +135,7 @@ services:
         condition: service_started
 
   lnbits-init:
-    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-latest}
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-2.13.2}
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
