@@ -222,4 +222,4 @@ services:
         condition: service_completed_successfully
       cln-mainnet-node:
         condition: service_started
-
+    restart: unless-stopped

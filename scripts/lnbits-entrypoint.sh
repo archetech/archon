@@ -36,10 +36,15 @@ fi
 
 # --- Wait for CLN REST ---
 if [ -n "$CLNREST_URL" ]; then
-    echo "[lnbits] Waiting for CLN REST at $CLNREST_URL..."
+    if [ -z "$CLNREST_READONLY_RUNE" ]; then
+        echo "[lnbits] ERROR: CLNREST_READONLY_RUNE is required for CLNRestWallet"
+        exit 1
+    fi
+
+    echo "[lnbits] Waiting for CLN REST at $CLNREST_URL/v1/listfunds..."
     timeout=120; elapsed=0
     while ! python3 -c "
-import urllib.request, ssl, os
+import urllib.request, ssl, os, json
 cafile = os.environ.get('CLNREST_CA')
 if cafile and os.path.isfile(cafile):
     ctx = ssl.create_default_context(cafile=cafile)
@@ -47,17 +52,25 @@ else:
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-urllib.request.urlopen('$CLNREST_URL', context=ctx, timeout=3)
+req = urllib.request.Request(
+    '$CLNREST_URL/v1/listfunds',
+    data=b'{}',
+    headers={
+        'Content-Type': 'application/json',
+        'rune': os.environ['CLNREST_READONLY_RUNE'],
+    },
+    method='POST',
+)
+with urllib.request.urlopen(req, context=ctx, timeout=3) as resp:
+    json.load(resp)
 " >/dev/null 2>&1; do
         sleep 2; elapsed=$((elapsed + 2))
         if [ $elapsed -ge $timeout ]; then
-            echo "[lnbits] WARNING: CLN REST not ready after ${timeout}s, starting anyway"
-            break
+            echo "[lnbits] ERROR: CLN REST not ready after ${timeout}s"
+            exit 1
         fi
     done
-    if [ $elapsed -lt $timeout ]; then
-        echo "[lnbits] CLN REST is ready"
-    fi
+    echo "[lnbits] CLN REST is ready"
 fi
 
 echo "[lnbits] Starting LNbits..."
