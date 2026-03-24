@@ -1322,6 +1322,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             if (alias.trim()) {
                 setAliasDID(docs.didDocument.id);
             }
+            else if (docs.didDocumentData?.name) {
+                setAlias(docs.didDocumentData.name);
+            }
             setAliasIsOwned(!!docs.didDocumentMetadata?.isOwned);
             setAliasDocs(JSON.stringify(docs, null, 4));
             const versions = docs.didDocumentMetadata.version ?? 1;
