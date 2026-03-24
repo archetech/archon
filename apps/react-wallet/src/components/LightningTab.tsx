@@ -18,10 +18,13 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 
+const LIGHTNING_PAYMENT_STATUS_CHECKS = 3;
+const LIGHTNING_PAYMENT_STATUS_DELAY_MS = 1000;
+
 const LightningTab: React.FC = () => {
     const { keymaster } = useWalletContext();
     const { currentDID, agentList } = useVariablesContext();
-    const { setError, setSuccess } = useSnackbar();
+    const { setError, setSuccess, setWarning } = useSnackbar();
 
     const [activeTab, setActiveTab] = useState<"wallet" | "payments" | "receive" | "send" | "zap">("wallet");
 
@@ -165,6 +168,17 @@ const LightningTab: React.FC = () => {
         }
     }
 
+    async function checkLightningPaymentWithRetry(paymentHash: string) {
+        let status = await keymaster!.checkLightningPayment(paymentHash);
+
+        for (let attempt = 1; attempt < LIGHTNING_PAYMENT_STATUS_CHECKS && !status.paid; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, LIGHTNING_PAYMENT_STATUS_DELAY_MS));
+            status = await keymaster!.checkLightningPayment(paymentHash);
+        }
+
+        return status;
+    }
+
     async function handlePay() {
         if (!keymaster || !bolt11Input.trim()) return;
         setLoadingPay(true);
@@ -232,9 +246,13 @@ const LightningTab: React.FC = () => {
                 amount,
                 zapMemo.trim() || undefined
             );
-            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            const status = await checkLightningPaymentWithRetry(payment.paymentHash);
             setZapResult(status);
-            setSuccess("Zap sent successfully");
+            if (status.paid) {
+                setSuccess("Zap sent successfully");
+            } else {
+                setWarning("Zap submitted, but settlement is still pending");
+            }
             setZapDid("");
             setZapAmount("");
             setZapMemo("");
@@ -556,6 +574,9 @@ const LightningTab: React.FC = () => {
 
                     {zapResult && (
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: 1 }}>
+                            <Typography variant="body2">
+                                <strong>Status:</strong> {zapResult.paid ? "Settled" : "Pending"}
+                            </Typography>
                             <Typography variant="body2">
                                 <strong>Payment Hash:</strong> {zapResult.paymentHash}
                             </Typography>
