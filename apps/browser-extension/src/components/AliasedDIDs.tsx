@@ -172,6 +172,36 @@ function AliasedDIDs() {
         }
     }
 
+    async function resolveAlias(name: string) {
+        if (!keymaster) {
+            return;
+        }
+        try {
+            const trimmedName = name.trim();
+            const docs = await keymaster.resolveDID(trimmedName);
+            const did = docs.didDocument?.id;
+            const data = (docs.didDocumentData as Record<string, unknown>) || {};
+            const resolvedName = typeof data.name === "string" ? data.name : "";
+            const resolvedAlias = alias.trim() || resolvedName;
+            if (!did) {
+                setError("Resolved document is missing a DID");
+                return;
+            }
+            if (alias.trim()) {
+                await setAliasDID(did);
+            }
+            else if (resolvedName) {
+                await setAlias(resolvedName);
+            }
+            openBrowserWindow({
+                title: resolvedAlias || did,
+                did,
+            });
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
     const confirmRemove = async () => {
         if (!keymaster) {
             return;
@@ -407,7 +437,7 @@ function AliasedDIDs() {
 
             <Box className="flex-box mt-2">
                 <TextField
-                    label="Name"
+                    label="Alias"
                     variant="outlined"
                     value={alias}
                     onChange={(e) => setAlias(e.target.value)}
@@ -416,7 +446,7 @@ function AliasedDIDs() {
                     style={{ flex: "0 0 150px" }}
                     slotProps={{
                         htmlInput: {
-                            maxLength: 32,
+                            maxLength: 40,
                         },
                     }}
                 />
@@ -439,9 +469,9 @@ function AliasedDIDs() {
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={() => openBrowserWindow({ title: alias, did: aliasDID })}
+                    onClick={() => resolveAlias(aliasDID || alias)}
                     className="button large bottom"
-                    disabled={!aliasDID}
+                    disabled={!alias.trim() && !aliasDID.trim()}
                 >
                     Resolve
                 </Button>
