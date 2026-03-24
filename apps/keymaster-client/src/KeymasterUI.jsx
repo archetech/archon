@@ -1296,6 +1296,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
+    function clearAliasFields() {
+        setAlias('');
+        setAliasDID('');
+    }
+
     async function cloneAsset() {
         try {
             await keymaster.cloneAsset(aliasList[selectedName], { alias: cloneName, registry });
@@ -4003,6 +4008,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 {' '}
                                                 <Button variant="contained" color="primary" onClick={addAlias} disabled={!alias || !aliasDID}>
                                                     Add
+                                                </Button>
+                                                {' '}
+                                                <Button variant="contained" color="primary" onClick={clearAliasFields} disabled={!alias && !aliasDID}>
+                                                    Clear
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
