@@ -1323,16 +1323,23 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         try {
             const trimmedName = name.trim();
             const docs = await keymaster.resolveDID(trimmedName);
+            const did = docs.didDocument?.id;
+            const data = docs.didDocumentData || {};
+            const resolvedName = typeof data.name === 'string' ? data.name : '';
+            if (!did) {
+                showError(`Unable to resolve DID document for "${trimmedName}".`);
+                return;
+            }
             setSelectedName(trimmedName);
             if (alias.trim()) {
-                setAliasDID(docs.didDocument.id);
+                setAliasDID(did);
             }
-            else if (docs.didDocumentData?.name) {
-                setAlias(docs.didDocumentData.name);
+            else if (resolvedName) {
+                setAlias(resolvedName);
             }
             setAliasIsOwned(!!docs.didDocumentMetadata?.isOwned);
             setAliasDocs(JSON.stringify(docs, null, 4));
-            const versions = docs.didDocumentMetadata.version ?? 1;
+            const versions = docs.didDocumentMetadata?.version ?? 1;
             setAliasDocsVersion(versions);
             setAliasDocsVersionMax(versions);
         } catch (error) {
@@ -3983,7 +3990,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     fullWidth
                                                     value={alias}
                                                     onChange={(e) => setAlias(e.target.value)}
-                                                    inputProps={{ maxLength: 40 }}
+                                                    inputProps={{ maxLength: 32 }}
                                                 />
                                             </TableCell>
                                             <TableCell style={{ borderBottom: 'none' }}>

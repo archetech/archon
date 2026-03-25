@@ -446,7 +446,7 @@ function AliasedDIDs() {
                     style={{ flex: "0 0 150px" }}
                     slotProps={{
                         htmlInput: {
-                            maxLength: 40,
+                            maxLength: 32,
                         },
                     }}
                 />
