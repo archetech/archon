@@ -96,6 +96,12 @@ The package includes a command-line interface for managing wallets and identitie
 npm install -g @didcid/keymaster
 ```
 
+Or use the guided installer:
+
+```bash
+curl -sSL https://archon.technology/install | bash
+```
+
 #### Environment Variables
 
 | Variable | Required | Default | Description |
@@ -109,6 +115,9 @@ npm install -g @didcid/keymaster
 #### Quick Start
 
 ```bash
+# Guided install and onboarding
+curl -sSL https://archon.technology/install | bash
+
 # Set required environment variables
 export ARCHON_GATEKEEPER_URL=http://localhost:4224
 export ARCHON_PASSPHRASE=your-secure-passphrase
@@ -122,6 +131,14 @@ keymaster create-id MyBot
 # List identities
 keymaster list-ids
 ```
+
+The installer checks for Node.js and npm before prompting, asks for:
+
+- an ID name with no default
+- a passphrase with no default
+- a Gatekeeper URL with default `https://archon.technology`
+
+It then uses `ARCHON_GATEKEEPER_URL` and `ARCHON_PASSPHRASE` during setup, creates the ID, and prints optional shell-profile snippets for persistence in future shells. Persisting the passphrase is convenient but less secure because it stores the secret in plaintext.
 
 #### Commands
 

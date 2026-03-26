@@ -19,6 +19,26 @@ $ cp sample.env .env
 $ ./start-node
 ```
 
+### Keymaster Onboarding
+
+For a local Keymaster wallet and identity without running a full node, use the hosted installer:
+
+```bash
+curl -sSL https://archon.technology/install | bash
+```
+
+The installer:
+
+- checks for Node.js and npm before prompting
+- installs `@didcid/keymaster` if needed
+- prompts for an ID name
+- prompts for a Keymaster passphrase with no default
+- prompts for a Gatekeeper URL with default `https://archon.technology`
+- uses `ARCHON_PASSPHRASE` and `ARCHON_GATEKEEPER_URL` during setup
+- runs `keymaster create-id`
+
+After setup it prints optional `.bashrc` and `.zshrc` snippets so users can persist the Gatekeeper URL and, if they choose, the passphrase for future shells.
+
 ### Local Development (for developers)
 
 If you're developing or working on Archon follow these additional steps after cloning.
