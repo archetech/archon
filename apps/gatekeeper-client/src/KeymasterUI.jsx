@@ -6654,7 +6654,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     {tab === 'settings' &&
                         <Box sx={{ display: 'flex', flexDirection: 'column', maxWidth: '400px', mt: 1 }}>
                             <TextField
-                                label="Node URL"
+                                label="Server URL"
                                 variant="outlined"
                                 value={settingsUrl}
                                 onChange={(e) => setSettingsUrl(e.target.value)}
