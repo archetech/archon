@@ -1887,7 +1887,10 @@ async function run() {
         return;
     }
 
-    const gatekeeperURL = process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224';
+    const gatekeeperURL =
+        process.env.ARCHON_NODE_URL ||
+        process.env.ARCHON_GATEKEEPER_URL ||
+        'http://localhost:4224';
     const walletPath = process.env.ARCHON_WALLET_PATH || './wallet.json';
     const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
     const passphrase = process.env.ARCHON_PASSPHRASE;

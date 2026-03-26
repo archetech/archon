@@ -134,7 +134,7 @@ prompt_hidden_confirm() {
 prompt_gatekeeper_url() {
     local value=""
     while true; do
-        read -r -p "Gatekeeper URL [${DEFAULT_GATEKEEPER_URL}]: " value < "${TTY}"
+        read -r -p "Node URL [${DEFAULT_GATEKEEPER_URL}]: " value < "${TTY}"
         if [ -z "${value}" ]; then
             printf '%s' "${DEFAULT_GATEKEEPER_URL}"
             return 0
@@ -159,7 +159,7 @@ print_shell_persistence() {
     say "This installer cannot export variables back into your current shell when run as 'curl | bash'."
     say "To use keymaster in later commands, add these to ~/.bashrc or ~/.zshrc, or export them manually:"
     say
-    say "export ARCHON_GATEKEEPER_URL=\"${gatekeeper_url}\""
+    say "export ARCHON_NODE_URL=\"${gatekeeper_url}\""
     say
     say "If you want to persist your passphrase too, add this line yourself:"
     say
@@ -209,7 +209,7 @@ main() {
     gatekeeper_url="$(prompt_gatekeeper_url)"
 
     export ARCHON_PASSPHRASE="${passphrase}"
-    export ARCHON_GATEKEEPER_URL="${gatekeeper_url}"
+    export ARCHON_NODE_URL="${gatekeeper_url}"
 
     say
     say "Creating your identity..."
@@ -217,12 +217,12 @@ main() {
 
     say
     say "Keymaster setup completed."
-    say "The Gatekeeper URL used for setup was: ${ARCHON_GATEKEEPER_URL}"
+    say "The Node URL used for setup was: ${ARCHON_NODE_URL}"
     say "If you ran this installer via 'curl | bash', your parent shell was not updated."
     print_shell_persistence "${gatekeeper_url}"
     say
     say "Next steps:"
-    say "  export ARCHON_GATEKEEPER_URL=\"${gatekeeper_url}\""
+    say "  export ARCHON_NODE_URL=\"${gatekeeper_url}\""
     say "  export ARCHON_PASSPHRASE=\"your-passphrase-here\""
     say "  keymaster list-ids"
     say "  keymaster resolve-id"
