@@ -50,7 +50,7 @@ const LoginModal = ({ isOpen, errorText, onSubmit, serverUrl, onServerUrlChange 
                 )}
                 <form onSubmit={handleSubmit} id="login-form">
                     <TextField
-                        label="Server URL"
+                        label="Node URL"
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         fullWidth
