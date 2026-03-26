@@ -24,7 +24,7 @@ $ ./start-node
 For a local Keymaster wallet and identity without running a full node, use the hosted installer:
 
 ```bash
-curl -sSL https://archon.technology/install | bash
+curl -fsSL https://archon.technology/install | bash
 ```
 
 The installer:

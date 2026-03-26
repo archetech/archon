@@ -3,6 +3,10 @@
 set -euo pipefail
 
 DEFAULT_GATEKEEPER_URL="https://archon.technology"
+MIN_NODE_MAJOR=22
+MIN_NPM_MAJOR=10
+MIN_NPM_MINOR=8
+MIN_NPM_PATCH=2
 TTY="/dev/tty"
 
 say() {
@@ -20,6 +24,13 @@ fail() {
 
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+version_ge() {
+    local a="$1"
+    local b="$2"
+
+    [ "$(printf '%s\n%s\n' "$a" "$b" | sort -V | head -n1)" = "$b" ]
 }
 
 detect_platform() {
@@ -63,6 +74,24 @@ print_node_install_help() {
             say "Install Node.js from https://nodejs.org/"
             ;;
     esac
+}
+
+check_runtime_versions() {
+    local node_version
+    local npm_version
+    local min_npm_version
+
+    node_version="$(node --version | sed 's/^v//')"
+    npm_version="$(npm --version)"
+    min_npm_version="${MIN_NPM_MAJOR}.${MIN_NPM_MINOR}.${MIN_NPM_PATCH}"
+
+    if [ "${node_version%%.*}" -lt "${MIN_NODE_MAJOR}" ]; then
+        fail "Node.js ${MIN_NODE_MAJOR}.x or newer is required. Found ${node_version}."
+    fi
+
+    if ! version_ge "${npm_version}" "${min_npm_version}"; then
+        fail "npm ${min_npm_version} or newer is required. Found ${npm_version}."
+    fi
 }
 
 prompt_required() {
@@ -144,14 +173,16 @@ main() {
     say "Archon Keymaster installer"
     say
 
-    if [ ! -r "${TTY}" ]; then
-        fail "Interactive prompts require a TTY. Run this script from a terminal."
+    if [ ! -r "${TTY}" ] || [ ! -w "${TTY}" ]; then
+        fail "Interactive prompts require a readable and writable TTY. Run this script from a terminal."
     fi
 
     if ! command_exists node || ! command_exists npm; then
         print_node_install_help
         exit 1
     fi
+
+    check_runtime_versions
 
     say "Found Node.js: $(node --version)"
     say "Found npm: $(npm --version)"

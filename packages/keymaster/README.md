@@ -99,7 +99,7 @@ npm install -g @didcid/keymaster
 Or use the guided installer:
 
 ```bash
-curl -sSL https://archon.technology/install | bash
+curl -fsSL https://archon.technology/install | bash
 ```
 
 #### Environment Variables
@@ -116,7 +116,7 @@ curl -sSL https://archon.technology/install | bash
 
 ```bash
 # Guided install and onboarding
-curl -sSL https://archon.technology/install | bash
+curl -fsSL https://archon.technology/install | bash
 
 # Set required environment variables
 export ARCHON_GATEKEEPER_URL=http://localhost:4224
