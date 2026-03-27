@@ -7,11 +7,12 @@ services:
     environment:
       - ARCHON_HERALD_NAME=${ARCHON_HERALD_NAME:-herald}
       - ARCHON_HERALD_DOMAIN=${ARCHON_HERALD_DOMAIN:-localhost}
-      - ARCHON_HERALD_PUBLIC_URL=${ARCHON_HERALD_PUBLIC_URL:-http://localhost:4222/names}
       - ARCHON_HERALD_SESSION_SECRET=${ARCHON_HERALD_SESSION_SECRET:-change-me}
       - ARCHON_HERALD_PORT=4230
-      - ARCHON_HERALD_GATEKEEPER_URL=http://gatekeeper:4224
-      - ARCHON_HERALD_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_DRAWBRIDGE_PORT=4222
+      - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
       - ARCHON_HERALD_WALLET_URL=${ARCHON_HERALD_WALLET_URL:-http://localhost:4228}
       - ARCHON_HERALD_DB=${ARCHON_HERALD_DB:-json}
       - ARCHON_REDIS_URL=redis://redis:6379
@@ -51,7 +52,7 @@ services:
       dockerfile: Dockerfile.herald-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-        VITE_API_URL: ${ARCHON_HERALD_API_URL:-http://localhost:4222/names/api}
+        VITE_API_URL: ${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-http://localhost:4222}/names/api
     image: ghcr.io/archetech/herald-client
     environment:
       - VITE_PORT=4231

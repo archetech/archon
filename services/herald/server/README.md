@@ -11,7 +11,7 @@ This folder contains the Express server for the name service, providing DID-base
 2. **.env configuration**
     - `ARCHON_HERALD_PORT=3300`
     - `ARCHON_HERALD_SERVE_CLIENT=true` (Whether to serve the client build or not)
-    - Additional variables like `ARCHON_HERALD_KEYMASTER_URL`, `ARCHON_HERALD_GATEKEEPER_URL`, `ARCHON_HERALD_WALLET_URL` for Keymaster/Gatekeeper integration.
+    - Additional variables like `ARCHON_KEYMASTER_URL`, `ARCHON_GATEKEEPER_URL`, `ARCHON_HERALD_WALLET_URL` for Keymaster/Gatekeeper integration.
 
 3. **Run**:
     - `npm start`

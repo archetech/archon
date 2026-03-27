@@ -10,7 +10,7 @@ This folder contains the React front-end for the name service. It provides login
 
 2. **.env configuration**:
     - `VITE_PORT=3001`
-    - `VITE_API_URL=http://localhost:4222/names/api` (or wherever Drawbridge exposes Herald)
+    - `VITE_API_URL=http://localhost:4222/names/api` (typically derived from the Drawbridge public URL)
 
 3. **Start** the client dev server:
     - `npm start`
@@ -23,7 +23,7 @@ This folder contains the React front-end for the name service. It provides login
 2. Serve those files from your hosting solution.
 
 ### Running with the Server
-This client is intended to run in its own container or Vite process and talk to Herald through Drawbridge. Access the app on its client URL (for example `http://localhost:4231`) and point `VITE_API_URL` at the Drawbridge Herald path (for example `http://localhost:4222/names/api`).
+This client is intended to run in its own container or Vite process and talk to Herald through Drawbridge. Access the app on its client URL (for example `http://localhost:4231`) and point `VITE_API_URL` at the Drawbridge Herald path (for example `http://localhost:4222/names/api`). In the Archon compose setup, this is derived from `ARCHON_DRAWBRIDGE_PUBLIC_HOST` as `/names/api`.
 
 ### Features
 - **QR Code Login** – Scan with your wallet to authenticate

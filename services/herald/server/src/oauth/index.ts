@@ -149,7 +149,8 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             }
 
             // Create DID challenge with OAuth context
-            const publicUrl = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${process.env.ARCHON_HERALD_PORT || 3300}`;
+            const drawbridgePublicHost = process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || `http://localhost:${process.env.ARCHON_DRAWBRIDGE_PORT || 4222}`;
+            const publicUrl = `${drawbridgePublicHost.replace(/\/$/, '')}/names`;
             const challenge = await keymaster().createChallenge({
                 callback: `${publicUrl}/oauth/callback`,
                 oauth: {
@@ -463,7 +464,8 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
 
             // Generate JWT id_token
             const member = await getMemberByDID(authCode.did);
-            const baseUrl = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${process.env.ARCHON_HERALD_PORT || 3300}`;
+            const drawbridgePublicHost = process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || `http://localhost:${process.env.ARCHON_DRAWBRIDGE_PORT || 4222}`;
+            const baseUrl = `${drawbridgePublicHost.replace(/\/$/, '')}/names`;
             const issuer = `${baseUrl}/oauth`;  // Must match OIDC discovery issuer
             const now = Math.floor(Date.now() / 1000);
 
@@ -566,7 +568,8 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
      * OIDC Discovery document
      */
     router.get('/.well-known/openid-configuration', (_req: Request, res: Response) => {
-        const baseUrl = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${process.env.ARCHON_HERALD_PORT || 3300}`;
+        const drawbridgePublicHost = process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || `http://localhost:${process.env.ARCHON_DRAWBRIDGE_PORT || 4222}`;
+        const baseUrl = `${drawbridgePublicHost.replace(/\/$/, '')}/names`;
         const issuer = `${baseUrl}/oauth`;  // Issuer matches where discovery is served
         
         res.json({

@@ -28,13 +28,15 @@ let db: DatabaseInterface;
 dotenv.config();
 
 const HOST_PORT = Number(process.env.ARCHON_HERALD_PORT) || 4230;
-const GATEKEEPER_URL = process.env.ARCHON_HERALD_GATEKEEPER_URL || 'http://localhost:4224';
+const DRAWBRIDGE_PORT = Number(process.env.ARCHON_DRAWBRIDGE_PORT) || 4222;
+const DRAWBRIDGE_PUBLIC_HOST = process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || `http://localhost:${DRAWBRIDGE_PORT}`;
+const GATEKEEPER_URL = process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224';
 const WALLET_URL = process.env.ARCHON_HERALD_WALLET_URL || 'http://localhost:4224';
 const HERALD_DATABASE_TYPE = process.env.ARCHON_HERALD_DB || 'json';
 const DATA_DIR = process.env.ARCHON_HERALD_DATA_DIR || '/app/server/data';
 const IPFS_API_URL = process.env.ARCHON_HERALD_IPFS_API_URL || 'http://localhost:5001/api/v0';
 const SERVICE_NAME = process.env.ARCHON_HERALD_NAME || 'name-service';
-const PUBLIC_URL = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${HOST_PORT}`;
+const PUBLIC_URL = `${DRAWBRIDGE_PUBLIC_HOST.replace(/\/$/, '')}/names`;
 const SERVICE_DOMAIN = process.env.ARCHON_HERALD_DOMAIN || '';
 const SESSION_SECRET = process.env.ARCHON_HERALD_SESSION_SECRET || SERVICE_NAME;
 const IPNS_KEY_NAME = process.env.ARCHON_HERALD_IPNS_KEY_NAME || SERVICE_NAME;
@@ -306,7 +308,7 @@ console.log('OAuth routes mounted at /oauth');
 
 // OIDC Discovery at root level (required by spec)
 app.get('/.well-known/openid-configuration', (_req: Request, res: Response) => {
-    const issuer = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${process.env.ARCHON_HERALD_PORT || 4230}`;
+    const issuer = PUBLIC_URL;
     res.json({
         issuer,
         authorization_endpoint: `${issuer}/oauth/authorize`,
@@ -1108,8 +1110,8 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
         }
     }
 
-    if (process.env.ARCHON_HERALD_KEYMASTER_URL) {
-        const keymasterUrl = process.env.ARCHON_HERALD_KEYMASTER_URL;
+    if (process.env.ARCHON_KEYMASTER_URL) {
+        const keymasterUrl = process.env.ARCHON_KEYMASTER_URL;
         keymaster = new KeymasterClient();
         await keymaster.connect({
             url: keymasterUrl,
