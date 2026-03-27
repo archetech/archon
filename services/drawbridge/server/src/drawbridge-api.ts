@@ -213,12 +213,20 @@ async function proxyHeraldRequest(req: express.Request, res: express.Response, p
 async function main() {
     const app = express();
     const v1router = express.Router();
-
-    // Middleware
-    app.use(cors({
+    const defaultCors = cors();
+    const heraldCors = cors({
         origin: true,
         credentials: true,
-    }));
+    });
+
+    // Middleware
+    app.use((req, res, next) => {
+        if (req.path.startsWith('/names') || req.path.startsWith('/.well-known/names')) {
+            return heraldCors(req, res, next);
+        }
+
+        return defaultCors(req, res, next);
+    });
 
     if (process.env.NODE_ENV === 'production') {
         app.use((pinoHttp as any)({ logger }));

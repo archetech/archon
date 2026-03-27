@@ -37,12 +37,21 @@ const IPFS_API_URL = process.env.ARCHON_HERALD_IPFS_API_URL || 'http://localhost
 const SERVICE_NAME = process.env.ARCHON_HERALD_NAME || 'name-service';
 const PUBLIC_URL = `${DRAWBRIDGE_PUBLIC_HOST.replace(/\/$/, '')}/names`;
 const SERVICE_DOMAIN = process.env.ARCHON_HERALD_DOMAIN || '';
-const SESSION_SECRET = process.env.ARCHON_HERALD_SESSION_SECRET || SERVICE_NAME;
+const SESSION_SECRET = process.env.ARCHON_HERALD_SESSION_SECRET;
 const IPNS_KEY_NAME = process.env.ARCHON_HERALD_IPNS_KEY_NAME || SERVICE_NAME;
 const DEFAULT_MEMBERSHIP_SCHEMA_DID = 'did:cid:bagaaieravnv5onsflewvrz6urhwfjixfnwq7bgc3ejhlrj2nekx75ddhdupq';
 const MEMBERSHIP_SCHEMA_DID = process.env.ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID || DEFAULT_MEMBERSHIP_SCHEMA_DID;
 const TOR_PROXY = process.env.ARCHON_HERALD_TOR_PROXY || '';
 const ADMIN_API_KEY = process.env.ARCHON_ADMIN_API_KEY || process.env.ARCHON_HERALD_ADMIN_API_KEY || '';
+const SESSION_SECRET_PLACEHOLDERS = new Set(['change-me', 'change-me-to-a-random-string']);
+
+if (!SESSION_SECRET) {
+    throw new Error('ARCHON_HERALD_SESSION_SECRET is required');
+}
+
+if (SESSION_SECRET_PLACEHOLDERS.has(SESSION_SECRET)) {
+    throw new Error('ARCHON_HERALD_SESSION_SECRET must be set to a non-placeholder value');
+}
 
 const app = express();
 const logins: Record<string, {
@@ -60,8 +69,12 @@ app.use(express.urlencoded({ extended: true }));  // OAuth2 token requests use f
 app.use(session({
     secret: SESSION_SECRET,
     resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false } // Set to true if using HTTPS
+    saveUninitialized: false,
+    cookie: {
+        secure: 'auto',
+        sameSite: 'lax',
+        httpOnly: true,
+    }
 }));
 
 let serviceDID = '';
