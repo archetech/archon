@@ -1,0 +1,23 @@
+.App {
+  padding: 40px 20px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+}
+
+a {
+  color: #3498db;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Override MUI button styles for consistency */
+.MuiButton-containedPrimary {
+  background-color: #2c3e50 !important;
+}
+
+.MuiButton-containedPrimary:hover {
+  background-color: #1a252f !important;
+}

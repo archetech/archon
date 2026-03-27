@@ -1,0 +1,14 @@
+{
+  "name": "auth-demo",
+  "private": true,
+  "scripts": {
+    "install": "npm install --prefix server && npm install --prefix client",
+    "start": "npm run build && npm run start:server",
+    "start:server": "npm start --prefix server",
+    "start:client": "npm start --prefix client",
+    "build": "npm run build --prefix client"
+  },
+  "dependencies": {
+    "jose": "^6.2.1"
+  }
+}

@@ -1,0 +1,36 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${NS_SERVICE_NAME:-name-service}
+    environment:
+      - NS_SERVICE_NAME=${NS_SERVICE_NAME}
+      - NS_SERVICE_DOMAIN=${NS_SERVICE_DOMAIN}
+      - NS_PUBLIC_URL=${NS_PUBLIC_URL}
+      - NS_SESSION_SECRET=${NS_SESSION_SECRET}
+      - NS_HOST_PORT=${NS_HOST_PORT:-3300}
+      - NS_GATEKEEPER_URL=${NS_GATEKEEPER_URL}
+      - NS_KEYMASTER_URL=${NS_KEYMASTER_URL:-}
+      - NS_WALLET_URL=${NS_WALLET_URL}
+      - NS_DATABASE=${NS_DATABASE}
+      - NS_WALLET_PASSPHRASE=${NS_WALLET_PASSPHRASE}
+      - NS_IPFS_API_URL=${NS_IPFS_API_URL:-http://host.docker.internal:5001/api/v0}
+      - NS_IPNS_KEY_NAME=${NS_IPNS_KEY_NAME:-${NS_SERVICE_NAME:-name-service}}
+      - NS_MEMBERSHIP_SCHEMA_DID=${NS_MEMBERSHIP_SCHEMA_DID}
+      - NS_OWNER_DID=${NS_OWNER_DID}
+      - NS_TOR_PROXY=${NS_TOR_PROXY:-}
+    volumes:
+      - ./server/data:/app/server/data
+    ports:
+      - "${NS_HOST_PORT:-3300}:${NS_HOST_PORT:-3300}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - archon
+
+networks:
+  archon:
+    external: true
+    name: archon_default
