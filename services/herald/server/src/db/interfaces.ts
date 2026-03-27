@@ -13,7 +13,11 @@ export interface DatabaseStructure {
 }
 
 export interface DatabaseInterface {
-    init?(): void;
-    loadDb(): DatabaseStructure;
-    writeDb(data: DatabaseStructure): void;
+    init?(): Promise<void>;
+    close?(): Promise<void>;
+    getUser(did: string): Promise<User | null>;
+    setUser(did: string, user: User): Promise<void>;
+    deleteUser(did: string): Promise<boolean>;
+    listUsers(): Promise<Record<string, User>>;
+    findDidByName(name: string): Promise<string | null>;
 }

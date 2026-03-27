@@ -5,8 +5,8 @@
 set -e
 
 # Configuration
-API_URL="${NS_PUBLIC_URL:-http://localhost:3300}"
-IPNS_KEY="${NS_IPNS_KEY_NAME:-${NS_SERVICE_NAME:-name-service}}"
+API_URL="${ARCHON_HERALD_PUBLIC_URL:-http://localhost:3300}"
+IPNS_KEY="${ARCHON_HERALD_IPNS_KEY_NAME:-${ARCHON_HERALD_NAME:-name-service}}"
 OUTPUT_FILE="/tmp/registry.json"
 
 echo "[$(date)] Starting registry publish..."

@@ -20,9 +20,9 @@ This repository is split into two main folders:
 ### Quick Start
 
 1. **Configure** – Copy `server/sample.env` to `server/.env` and set:
-   - `NS_SERVICE_NAME` – Unique name for this deployment (used for DID identity)
-   - `NS_PUBLIC_URL` – The canonical public URL (e.g. `https://your-domain.example`)
-   - `NS_SESSION_SECRET` – A random secret string for sessions
+   - `ARCHON_HERALD_NAME` – Unique name for this deployment (used for DID identity)
+   - `ARCHON_HERALD_PUBLIC_URL` – The canonical public URL (e.g. `https://your-domain.example`)
+   - `ARCHON_HERALD_SESSION_SECRET` – A random secret string for sessions
 
 2. **Install** dependencies:
    - `npm run install`
@@ -38,7 +38,7 @@ The QR code encodes a URL that includes the challenge DID as a query parameter:
 
 `https://wallet.archon.technology?challenge=did:cid:...`
 
-The wallet URL is specified in the environment variable `NS_WALLET_URL`.
+The wallet URL is specified in the environment variable `ARCHON_HERALD_WALLET_URL`.
 
 The API offers two ways to submit a response to the challenge, GET and POST.
 
@@ -62,13 +62,13 @@ Both login methods return a JSON object indicating whether the login was success
 ### Environment Variables
 
 See `server/sample.env` for all available settings including:
-- `NS_SERVICE_NAME` – Service identity name (used for DID owner identity)
-- `NS_PUBLIC_URL` – Canonical public URL for this deployment
-- `NS_SESSION_SECRET` – Session secret (change from default!)
-- `NS_WALLET_URL` – Wallet URL for QR codes
-- `NS_GATEKEEPER_URL` – Gatekeeper API endpoint
-- `NS_IPFS_API_URL` – IPFS API for registry publication
-- `NS_IPNS_KEY_NAME` – IPNS key for publishing
+- `ARCHON_HERALD_NAME` – Service identity name (used for DID owner identity)
+- `ARCHON_HERALD_PUBLIC_URL` – Canonical public URL for this deployment
+- `ARCHON_HERALD_SESSION_SECRET` – Session secret (change from default!)
+- `ARCHON_HERALD_WALLET_URL` – Wallet URL for QR codes
+- `ARCHON_HERALD_GATEKEEPER_URL` – Gatekeeper API endpoint
+- `ARCHON_HERALD_IPFS_API_URL` – IPFS API for registry publication
+- `ARCHON_HERALD_IPNS_KEY_NAME` – IPNS key for publishing
 
 ### Docker
 

@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { DatabaseInterface, DatabaseStructure, User } from './interfaces.js';
+import { DatabaseInterface, User } from './interfaces.js';
 
 export class DbSqlite implements DatabaseInterface {
     private db: Database.Database;
@@ -10,7 +10,7 @@ export class DbSqlite implements DatabaseInterface {
         this.db = new Database(this.dbPath);
     }
 
-    init(): void {
+    async init(): Promise<void> {
         const createUserTable = `
             CREATE TABLE IF NOT EXISTS users (
                 did TEXT PRIMARY KEY,
@@ -18,54 +18,84 @@ export class DbSqlite implements DatabaseInterface {
                 lastLogin TEXT,
                 logins INTEGER,
                 role TEXT,
-                name TEXT
+                name TEXT,
+                credentialDid TEXT,
+                credentialIssuedAt TEXT
             );
         `;
         this.db.exec(createUserTable);
+        this.ensureColumn('credentialDid', 'TEXT');
+        this.ensureColumn('credentialIssuedAt', 'TEXT');
         console.log('SQLite database initialised.');
     }
 
-    loadDb(): DatabaseStructure {
+    private ensureColumn(name: string, definition: string): void {
+        const columns = this.db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+        if (!columns.some(column => column.name === name)) {
+            this.db.exec(`ALTER TABLE users ADD COLUMN ${name} ${definition}`);
+        }
+    }
+
+    async getUser(did: string): Promise<User | null> {
+        const stmt = this.db.prepare('SELECT * FROM users WHERE did = ?');
+        const row = stmt.get(did) as (User & { did: string }) | undefined;
+        if (!row) {
+            return null;
+        }
+
+        const { did: _did, ...user } = row;
+        return user;
+    }
+
+    async setUser(did: string, user: User): Promise<void> {
+        const insertUserStmt = this.db.prepare(`
+            INSERT OR REPLACE INTO users (did, firstLogin, lastLogin, logins, role, name, credentialDid, credentialIssuedAt)
+            VALUES (@did, @firstLogin, @lastLogin, @logins, @role, @name, @credentialDid, @credentialIssuedAt)
+        `);
+
+        insertUserStmt.run({
+            did,
+            firstLogin: user.firstLogin || null,
+            lastLogin: user.lastLogin || null,
+            logins: user.logins || null,
+            role: user.role || null,
+            name: user.name || null,
+            credentialDid: user.credentialDid || null,
+            credentialIssuedAt: user.credentialIssuedAt || null,
+        });
+    }
+
+    async deleteUser(did: string): Promise<boolean> {
+        const result = this.db.prepare('DELETE FROM users WHERE did = ?').run(did);
+        return result.changes > 0;
+    }
+
+    async listUsers(): Promise<Record<string, User>> {
         const stmt = this.db.prepare('SELECT * FROM users');
         const rows = stmt.all();
         const users: Record<string, User> = {};
 
         for (const row of rows as any[]) {
-            const { ...mainProps } = row;
+            const { did, ...mainProps } = row;
             users[row.did] = {
                 ...mainProps
             };
         }
 
-        return { users };
+        return users;
     }
 
-    writeDb(data: DatabaseStructure): void {
-        const insertUserStmt = this.db.prepare(`
-            INSERT OR REPLACE INTO users (did, firstLogin, lastLogin, logins, role, name)
-            VALUES (@did, @firstLogin, @lastLogin, @logins, @role, @name)
-        `);
+    async findDidByName(name: string): Promise<string | null> {
+        const row = this.db.prepare('SELECT did FROM users WHERE lower(name) = lower(?)').get(name) as { did: string } | undefined;
+        return row?.did || null;
+    }
 
-        const transaction = this.db.transaction((dbData: DatabaseStructure) => {
-            if (dbData.users) {
-                for (const did in dbData.users) {
-                    const user = dbData.users[did];
-                    insertUserStmt.run({
-                        did, // 'did' is now part of the User object passed or should be the key
-                        firstLogin: user.firstLogin || null,
-                        lastLogin: user.lastLogin || null,
-                        logins: user.logins || null,
-                        role: user.role || null,
-                        name: user.name || null,
-                    });
-                }
-            }
-        });
-
+    async close(): Promise<void> {
         try {
-            transaction(data);
-        } catch (error) {
-            console.error('SQLite write transaction failed:', error);
+            this.db.close();
+        }
+        catch (error) {
+            console.error('SQLite close failed:', error);
         }
     }
 }

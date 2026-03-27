@@ -149,7 +149,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             }
 
             // Create DID challenge with OAuth context
-            const publicUrl = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
+            const publicUrl = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${process.env.ARCHON_HERALD_PORT || 3300}`;
             const challenge = await keymaster().createChallenge({
                 callback: `${publicUrl}/oauth/callback`,
                 oauth: {
@@ -170,7 +170,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             });
 
             // Return challenge for client to display
-            const walletUrl = process.env.NS_WALLET_URL || 'https://wallet.archon.technology';
+            const walletUrl = process.env.ARCHON_HERALD_WALLET_URL || 'https://wallet.archon.technology';
             const challengeURL = `${walletUrl}?challenge=${challenge}`;
 
             // If explicitly requesting JSON (API call), return JSON
@@ -190,7 +190,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Sign in with ${process.env.NS_SERVICE_NAME || 'Name Service'}</title>
+                    <title>Sign in with ${process.env.ARCHON_HERALD_NAME || 'Name Service'}</title>
                     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
                     <style>
                         body { 
@@ -239,7 +239,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                     </style>
                 </head>
                 <body>
-                    <h1>Sign in with ${process.env.NS_SERVICE_NAME || 'Name Service'}</h1>
+                    <h1>Sign in with ${process.env.ARCHON_HERALD_NAME || 'Name Service'}</h1>
                     <p class="subtitle"><strong>${client.name}</strong> wants to access your profile</p>
                     
                     <a href="${challengeURL}" target="_blank" class="qr-container" title="Click to open in wallet">
@@ -463,7 +463,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
 
             // Generate JWT id_token
             const member = await getMemberByDID(authCode.did);
-            const baseUrl = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
+            const baseUrl = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${process.env.ARCHON_HERALD_PORT || 3300}`;
             const issuer = `${baseUrl}/oauth`;  // Must match OIDC discovery issuer
             const now = Math.floor(Date.now() / 1000);
 
@@ -566,7 +566,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
      * OIDC Discovery document
      */
     router.get('/.well-known/openid-configuration', (_req: Request, res: Response) => {
-        const baseUrl = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
+        const baseUrl = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${process.env.ARCHON_HERALD_PORT || 3300}`;
         const issuer = `${baseUrl}/oauth`;  // Issuer matches where discovery is served
         
         res.json({

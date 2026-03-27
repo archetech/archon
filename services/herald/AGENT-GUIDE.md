@@ -71,7 +71,7 @@ Expected response shape:
 }
 ```
 
-Herald issues a verifiable credential for the claimed name using the default membership schema unless overridden by `NS_MEMBERSHIP_SCHEMA_DID`.
+Herald issues a verifiable credential for the claimed name using the default membership schema unless overridden by `ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID`.
 
 ### 4. Delete a Name
 

@@ -18,6 +18,7 @@ import KeymasterClient from '@didcid/keymaster/client';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { DatabaseInterface, User } from './db/interfaces.js';
 import { DbJson } from './db/json.js';
+import { DbRedis } from './db/redis.js';
 import { DbSqlite } from './db/sqlite.js';
 import { createOAuthRoutes } from './oauth/index.js';
 
@@ -26,21 +27,21 @@ let db: DatabaseInterface;
 
 dotenv.config();
 
-const HOST_PORT = Number(process.env.NS_HOST_PORT) || 4230;
-const GATEKEEPER_URL = process.env.NS_GATEKEEPER_URL || 'http://localhost:4224';
-const WALLET_URL = process.env.NS_WALLET_URL || 'http://localhost:4224';
-const NS_DATABASE_TYPE = process.env.NS_DATABASE || 'json';
-const DATA_DIR = process.env.NS_DATA_DIR || '/app/server/data';
-const IPFS_API_URL = process.env.NS_IPFS_API_URL || 'http://localhost:5001/api/v0';
-const SERVICE_NAME = process.env.NS_SERVICE_NAME || 'name-service';
-const PUBLIC_URL = process.env.NS_PUBLIC_URL || `http://localhost:${HOST_PORT}`;
-const SERVICE_DOMAIN = process.env.NS_SERVICE_DOMAIN || '';
-const SESSION_SECRET = process.env.NS_SESSION_SECRET || SERVICE_NAME;
-const IPNS_KEY_NAME = process.env.NS_IPNS_KEY_NAME || SERVICE_NAME;
+const HOST_PORT = Number(process.env.ARCHON_HERALD_PORT) || 4230;
+const GATEKEEPER_URL = process.env.ARCHON_HERALD_GATEKEEPER_URL || 'http://localhost:4224';
+const WALLET_URL = process.env.ARCHON_HERALD_WALLET_URL || 'http://localhost:4224';
+const HERALD_DATABASE_TYPE = process.env.ARCHON_HERALD_DB || 'json';
+const DATA_DIR = process.env.ARCHON_HERALD_DATA_DIR || '/app/server/data';
+const IPFS_API_URL = process.env.ARCHON_HERALD_IPFS_API_URL || 'http://localhost:5001/api/v0';
+const SERVICE_NAME = process.env.ARCHON_HERALD_NAME || 'name-service';
+const PUBLIC_URL = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${HOST_PORT}`;
+const SERVICE_DOMAIN = process.env.ARCHON_HERALD_DOMAIN || '';
+const SESSION_SECRET = process.env.ARCHON_HERALD_SESSION_SECRET || SERVICE_NAME;
+const IPNS_KEY_NAME = process.env.ARCHON_HERALD_IPNS_KEY_NAME || SERVICE_NAME;
 const DEFAULT_MEMBERSHIP_SCHEMA_DID = 'did:cid:bagaaieravnv5onsflewvrz6urhwfjixfnwq7bgc3ejhlrj2nekx75ddhdupq';
-const MEMBERSHIP_SCHEMA_DID = process.env.NS_MEMBERSHIP_SCHEMA_DID || DEFAULT_MEMBERSHIP_SCHEMA_DID;
-const TOR_PROXY = process.env.NS_TOR_PROXY || '';
-const ADMIN_API_KEY = process.env.ARCHON_ADMIN_API_KEY || process.env.NS_ADMIN_API_KEY || '';
+const MEMBERSHIP_SCHEMA_DID = process.env.ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID || DEFAULT_MEMBERSHIP_SCHEMA_DID;
+const TOR_PROXY = process.env.ARCHON_HERALD_TOR_PROXY || '';
+const ADMIN_API_KEY = process.env.ARCHON_ADMIN_API_KEY || process.env.ARCHON_HERALD_ADMIN_API_KEY || '';
 
 const app = express();
 const logins: Record<string, {
@@ -63,7 +64,7 @@ app.use(session({
 }));
 
 let serviceDID = '';
-const OWNER_DID = process.env.NS_OWNER_DID || '';
+const OWNER_DID = process.env.ARCHON_HERALD_OWNER_DID || '';
 
 async function initServiceIdentity(): Promise<void> {
     const currentId = await keymaster.getCurrentId();
@@ -84,7 +85,7 @@ async function initServiceIdentity(): Promise<void> {
     await keymaster.setCurrentId(SERVICE_NAME);
 
     if (!OWNER_DID) {
-        console.warn('Warning: NS_OWNER_DID not set — no user will have owner access');
+        console.warn('Warning: ARCHON_HERALD_OWNER_DID not set — no user will have owner access');
     } else {
         console.log(`Owner: ${OWNER_DID}`);
     }
@@ -108,19 +109,14 @@ function validateName(name: any): { ok: boolean; trimmedName?: string; message?:
     return { ok: true, trimmedName };
 }
 
-function checkNameAvailability(currentDb: any, trimmedName: string, excludeDid?: string): boolean {
-    if (!currentDb.users) return true;
-    for (const [existingDid, user] of Object.entries(currentDb.users) as [string, any][]) {
-        if (existingDid !== excludeDid && user.name?.toLowerCase() === trimmedName) {
-            return false;
-        }
-    }
-    return true;
+async function checkNameAvailability(trimmedName: string, excludeDid?: string): Promise<boolean> {
+    const existingDid = await db.findDidByName(trimmedName);
+    return !existingDid || existingDid === excludeDid;
 }
 
 async function issueOrUpdateCredential(did: string, user: any, trimmedName: string): Promise<void> {
     if (!MEMBERSHIP_SCHEMA_DID) {
-        console.warn(`Skipping credential issuance for ${trimmedName}: NS_MEMBERSHIP_SCHEMA_DID is not set`);
+        console.warn(`Skipping credential issuance for ${trimmedName}: ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID is not set`);
         return;
     }
 
@@ -172,28 +168,43 @@ async function verifyBearerToken(req: Request): Promise<string | null> {
     return verify.responder;
 }
 
-function ensureUser(currentDb: any, did: string): any {
-    if (!currentDb.users) currentDb.users = {};
+async function ensureUser(did: string): Promise<User> {
     const now = new Date().toISOString();
-    if (!currentDb.users[did]) {
-        currentDb.users[did] = { firstLogin: now, lastLogin: now, logins: 1 };
+    const existingUser = await db.getUser(did);
+    if (existingUser) {
+        return existingUser;
     }
-    return currentDb.users[did];
+    const user = { firstLogin: now, lastLogin: now, logins: 1 };
+    await db.setUser(did, user);
+    return user;
 }
 
-function findNameDid(name: string): string | null {
-    const currentDb = db.loadDb();
-    if (!currentDb.users) return null;
-    for (const [did, user] of Object.entries(currentDb.users)) {
-        if (user.name?.toLowerCase() === name.toLowerCase()) {
-            return did;
+async function findNameDid(name: string): Promise<string | null> {
+    return db.findDidByName(name);
+}
+
+async function listUsers(): Promise<Record<string, User>> {
+    return db.listUsers();
+}
+
+function buildRegistry(users: Record<string, User>): { version: number; updated: string; names: Record<string, string> } {
+    const names: Record<string, string> = {};
+
+    for (const [did, user] of Object.entries(users)) {
+        if (user.name) {
+            names[user.name] = did;
         }
     }
-    return null;
+
+    return {
+        version: 1,
+        updated: new Date().toISOString(),
+        names,
+    };
 }
 
 async function resolveLightningEndpoint(name: string): Promise<{ did: string; endpoint: string } | null> {
-    const did = findNameDid(name);
+    const did = await findNameDid(name);
     if (!did) return null;
 
     const didDoc: any = await keymaster.resolveDID(did);
@@ -237,27 +248,20 @@ async function loginUser(response: string): Promise<any> {
     if (verify.match) {
         const challenge = verify.challenge;
         const did = verify.responder!;
-        const currentDb = db.loadDb();
-
-        if (!currentDb.users) {
-            currentDb.users = {};
-        }
-
         const now = new Date().toISOString();
+        const user = await db.getUser(did);
 
-        if (currentDb.users[did]) {
-            currentDb.users[did].lastLogin = now;
-            currentDb.users[did].logins = (currentDb.users[did].logins || 0) + 1;
-        }
-        else {
-            currentDb.users[did] = {
+        if (user) {
+            user.lastLogin = now;
+            user.logins = (user.logins || 0) + 1;
+            await db.setUser(did, user);
+        } else {
+            await db.setUser(did, {
                 firstLogin: now,
                 lastLogin: now,
                 logins: 1,
-            }
+            });
         }
-
-        db.writeDb(currentDb);
 
         logins[challenge] = {
             response,
@@ -284,12 +288,12 @@ app.options('/.well-known/{*path}', cors(corsOptions));
 
 // Helper function for OAuth
 async function getMemberByDID(did: string): Promise<any> {
-    const currentDb = db.loadDb();
-    if (currentDb.users && currentDb.users[did]) {
+    const user = await db.getUser(did);
+    if (user) {
         return {
-            ...currentDb.users[did],
+            ...user,
             did,
-            handle: currentDb.users[did].name
+            handle: user.name
         };
     }
     return null;
@@ -302,7 +306,7 @@ console.log('OAuth routes mounted at /oauth');
 
 // OIDC Discovery at root level (required by spec)
 app.get('/.well-known/openid-configuration', (_req: Request, res: Response) => {
-    const issuer = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 4230}`;
+    const issuer = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${process.env.ARCHON_HERALD_PORT || 4230}`;
     res.json({
         issuer,
         authorization_endpoint: `${issuer}/oauth/authorize`,
@@ -417,12 +421,10 @@ app.get('/api/check-auth', async (req: Request, res: Response) => {
 
         const isAuthenticated = !!req.session.user;
         const userDID = isAuthenticated ? req.session.user?.did : null;
-        const currentDb = db.loadDb();
-
         let profile: any = null;
 
-        if (isAuthenticated && userDID && currentDb.users) {
-            profile = currentDb.users[userDID] || null;
+        if (isAuthenticated && userDID) {
+            profile = await db.getUser(userDID);
         }
 
         const auth = {
@@ -442,8 +444,7 @@ app.get('/api/check-auth', async (req: Request, res: Response) => {
 
 app.get('/api/users', isAuthenticated, async (_: Request, res: Response) => {
     try {
-        const currentDb = db.loadDb();
-        const users = currentDb.users ? Object.keys(currentDb.users) : [];
+        const users = Object.keys(await listUsers());
         res.json(users);
     }
     catch (error) {
@@ -454,7 +455,7 @@ app.get('/api/users', isAuthenticated, async (_: Request, res: Response) => {
 
 app.get('/api/admin', isOwner, async (_: Request, res: Response) => {
     try {
-        res.json(db.loadDb());
+        res.json({ users: await listUsers() });
     }
     catch (error) {
         console.log(error);
@@ -466,22 +467,7 @@ app.get('/api/admin', isOwner, async (_: Request, res: Response) => {
 app.post('/api/admin/publish', isOwner, async (_: Request, res: Response) => {
     try {
         // Build registry from DB
-        const currentDb = db.loadDb();
-        const names: Record<string, string> = {};
-
-        if (currentDb.users) {
-            for (const [did, user] of Object.entries(currentDb.users)) {
-                if (user.name) {
-                    names[user.name] = did;
-                }
-            }
-        }
-
-        const registry = {
-            version: 1,
-            updated: new Date().toISOString(),
-            names
-        };
+        const registry = buildRegistry(await listUsers());
 
         const registryJson = JSON.stringify(registry, null, 2);
 
@@ -533,14 +519,13 @@ app.post('/api/admin/publish', isOwner, async (_: Request, res: Response) => {
 app.get('/api/profile/:did', isAuthenticated, async (req: Request, res: Response) => {
     try {
         const did = req.params.did as string;
-        const currentDb = db.loadDb();
-
-        if (!currentDb.users || !currentDb.users[did]) {
+        const user = await db.getUser(did);
+        if (!user) {
             res.status(404).send('Not found');
             return;
         }
 
-        const profile: User = { ...currentDb.users[did] };
+        const profile: User = { ...user };
 
         profile.did = did;
         profile.isUser = (req.session?.user?.did === did);
@@ -556,15 +541,13 @@ app.get('/api/profile/:did', isAuthenticated, async (req: Request, res: Response
 app.get('/api/profile/:did/name', isAuthenticated, async (req: Request, res: Response) => {
     try {
         const did = req.params.did as string;
-        const currentDb = db.loadDb();
-
-        if (!currentDb.users || !currentDb.users[did]) {
+        const user = await db.getUser(did);
+        if (!user) {
             res.status(404).send('Not found');
             return;
         }
 
-        const profile = currentDb.users[did];
-        res.json({ name: profile.name });
+        res.json({ name: user.name });
     }
     catch (error) {
         console.log(error);
@@ -588,21 +571,20 @@ app.put('/api/profile/:did/name', isAuthenticated, async (req: Request, res: Res
         }
         const trimmedName = validation.trimmedName!;
 
-        const currentDb = db.loadDb();
-        if (!currentDb.users || !currentDb.users[did]) {
+        const user = await db.getUser(did);
+        if (!user) {
             res.status(404).send('Not found');
             return;
         }
 
-        if (!checkNameAvailability(currentDb, trimmedName, did)) {
+        if (!(await checkNameAvailability(trimmedName, did))) {
             res.status(409).json({ ok: false, message: 'Name already taken' });
             return;
         }
 
-        const user = currentDb.users[did];
         user.name = trimmedName;
         await issueOrUpdateCredential(did, user, trimmedName);
-        db.writeDb(currentDb);
+        await db.setUser(did, user);
 
         res.json({ ok: true, message: `name set to ${trimmedName}` });
     }
@@ -622,18 +604,17 @@ app.delete('/api/profile/:did/name', isAuthenticated, async (req: Request, res: 
             return;
         }
 
-        const currentDb = db.loadDb();
-        if (!currentDb.users || !currentDb.users[did]) {
+        const user = await db.getUser(did);
+        if (!user) {
             res.status(404).send('Not found');
             return;
         }
 
-        const user = currentDb.users[did];
         const deletedName = user.name;
 
         await revokeCredential(user, deletedName || '');
         delete user.name;
-        db.writeDb(currentDb);
+        await db.setUser(did, user);
 
         res.json({ ok: true, message: `name '${deletedName}' deleted and credential revoked` });
     }
@@ -659,17 +640,16 @@ app.put('/api/name', async (req: Request, res: Response) => {
         }
         const trimmedName = validation.trimmedName!;
 
-        const currentDb = db.loadDb();
-        const user = ensureUser(currentDb, did);
+        const user = await ensureUser(did);
 
-        if (!checkNameAvailability(currentDb, trimmedName, did)) {
+        if (!(await checkNameAvailability(trimmedName, did))) {
             res.status(409).json({ ok: false, message: 'Name already taken' });
             return;
         }
 
         user.name = trimmedName;
         await issueOrUpdateCredential(did, user, trimmedName);
-        db.writeDb(currentDb);
+        await db.setUser(did, user);
 
         let credential = null;
         if (user.credentialDid) {
@@ -700,13 +680,12 @@ app.delete('/api/name', async (req: Request, res: Response) => {
             return;
         }
 
-        const currentDb = db.loadDb();
-        if (!currentDb.users?.[did]) {
+        const user = await db.getUser(did);
+        if (!user) {
             res.status(404).json({ ok: false, message: 'User not found' });
             return;
         }
 
-        const user = currentDb.users[did];
         const deletedName = user.name;
 
         if (!deletedName) {
@@ -716,7 +695,7 @@ app.delete('/api/name', async (req: Request, res: Response) => {
 
         await revokeCredential(user, deletedName);
         delete user.name;
-        db.writeDb(currentDb);
+        await db.setUser(did, user);
 
         res.json({ ok: true, message: `name '${deletedName}' deleted and credential revoked` });
     }
@@ -729,24 +708,7 @@ app.delete('/api/name', async (req: Request, res: Response) => {
 // Export name registry for IPNS publication
 app.get('/api/registry', async (_: Request, res: Response) => {
     try {
-        const currentDb = db.loadDb();
-        const names: Record<string, string> = {};
-
-        if (currentDb.users) {
-            for (const [did, user] of Object.entries(currentDb.users)) {
-                if (user.name) {
-                    names[user.name] = did;
-                }
-            }
-        }
-
-        const registry = {
-            version: 1,
-            updated: new Date().toISOString(),
-            names
-        };
-
-        res.json(registry);
+        res.json(buildRegistry(await listUsers()));
     }
     catch (error) {
         console.log(error);
@@ -758,15 +720,10 @@ app.get('/api/registry', async (_: Request, res: Response) => {
 app.get('/api/name/:name', async (req: Request, res: Response) => {
     try {
         const name = (req.params.name as string).trim().toLowerCase();
-        const currentDb = db.loadDb();
-
-        if (currentDb.users) {
-            for (const [did, user] of Object.entries(currentDb.users)) {
-                if (user.name?.toLowerCase() === name) {
-                    res.json({ name, did });
-                    return;
-                }
-            }
+        const did = await findNameDid(name);
+        if (did) {
+            res.json({ name, did });
+            return;
         }
 
         res.status(404).json({ error: 'Name not found' });
@@ -780,24 +737,7 @@ app.get('/api/name/:name', async (req: Request, res: Response) => {
 // Public directory.json - same as /api/registry for IPNS compatibility
 app.get('/directory.json', async (_: Request, res: Response) => {
     try {
-        const currentDb = db.loadDb();
-        const names: Record<string, string> = {};
-
-        if (currentDb.users) {
-            for (const [did, user] of Object.entries(currentDb.users)) {
-                if (user.name) {
-                    names[user.name] = did;
-                }
-            }
-        }
-
-        const registry = {
-            version: 1,
-            updated: new Date().toISOString(),
-            names
-        };
-
-        res.json(registry);
+        res.json(buildRegistry(await listUsers()));
     }
     catch (error) {
         console.log(error);
@@ -810,19 +750,7 @@ app.get('/directory.json', async (_: Request, res: Response) => {
 app.get('/api/member/:name', async (req: Request, res: Response) => {
     try {
         const name = (req.params.name as string).trim().toLowerCase();
-        const currentDb = db.loadDb();
-
-        let memberDid: string | null = null;
-
-        if (currentDb.users) {
-            for (const [did, user] of Object.entries(currentDb.users)) {
-                if (user.name?.toLowerCase() === name) {
-                    memberDid = did;
-                    break;
-                }
-            }
-        }
-
+        const memberDid = await findNameDid(name);
         if (!memberDid) {
             res.status(404).json({ error: 'Name not found', name });
             return;
@@ -844,9 +772,8 @@ app.get('/api/member/:name', async (req: Request, res: Response) => {
 app.delete('/api/admin/user/:did', isOwner, async (req: Request, res: Response) => {
     try {
         const did = decodeURIComponent(req.params.did as string);
-        const currentDb = db.loadDb();
-
-        if (!currentDb.users || !currentDb.users[did]) {
+        const user = await db.getUser(did);
+        if (!user) {
             res.status(404).json({ error: 'User not found' });
             return;
         }
@@ -857,9 +784,8 @@ app.delete('/api/admin/user/:did', isOwner, async (req: Request, res: Response) 
             return;
         }
 
-        const userName = currentDb.users[did].name || did;
-        delete currentDb.users[did];
-        db.writeDb(currentDb);
+        const userName = user.name || did;
+        await db.deleteUser(did);
 
         console.log(`Deleted user ${userName} (${did})`);
         res.json({ ok: true, message: `User ${userName} deleted` });
@@ -879,8 +805,7 @@ app.get('/api/credential', isAuthenticated, async (req: Request, res: Response) 
             return;
         }
 
-        const currentDb = db.loadDb();
-        const user = currentDb.users?.[userDid];
+        const user = await db.getUser(userDid);
 
         if (!user) {
             res.status(404).json({ error: 'User not found' });
@@ -1002,22 +927,7 @@ app.get('/api/lnurlp/:name/callback', async (req: Request, res: Response) => {
 // GET /.well-known/names — list/directory of registered names
 app.get('/.well-known/names', async (_: Request, res: Response) => {
     try {
-        const currentDb = db.loadDb();
-        const names: Record<string, string> = {};
-
-        if (currentDb.users) {
-            for (const [did, user] of Object.entries(currentDb.users)) {
-                if (user.name) {
-                    names[user.name] = did;
-                }
-            }
-        }
-
-        res.json({
-            version: 1,
-            updated: new Date().toISOString(),
-            names
-        });
+        res.json(buildRegistry(await listUsers()));
     }
     catch (error) {
         console.log(error);
@@ -1029,7 +939,7 @@ app.get('/.well-known/names', async (_: Request, res: Response) => {
 app.get('/.well-known/names/:name', async (req: Request, res: Response) => {
     try {
         const name = (req.params.name as string).trim().toLowerCase();
-        const did = findNameDid(name);
+        const did = await findNameDid(name);
 
         if (!did) {
             res.status(404).json({ error: 'Name not found' });
@@ -1060,17 +970,16 @@ app.put('/.well-known/names/:name', async (req: Request, res: Response) => {
         }
         const trimmedName = validation.trimmedName!;
 
-        const currentDb = db.loadDb();
-        const user = ensureUser(currentDb, did);
+        const user = await ensureUser(did);
 
-        if (!checkNameAvailability(currentDb, trimmedName, did)) {
+        if (!(await checkNameAvailability(trimmedName, did))) {
             res.status(409).json({ ok: false, message: 'Name already taken' });
             return;
         }
 
         user.name = trimmedName;
         await issueOrUpdateCredential(did, user, trimmedName);
-        db.writeDb(currentDb);
+        await db.setUser(did, user);
 
         let credential = null;
         if (user.credentialDid) {
@@ -1117,7 +1026,7 @@ app.get('/.well-known/webfinger', async (req: Request, res: Response) => {
             return;
         }
 
-        const did = findNameDid(name);
+        const did = await findNameDid(name);
         if (!did) {
             res.status(404).json({ error: 'Name not found' });
             return;
@@ -1158,7 +1067,7 @@ app.get('/.well-known/webfinger', async (req: Request, res: Response) => {
     }
 });
 
-if (process.env.NS_SERVE_CLIENT !== 'false') {
+if (process.env.ARCHON_HERALD_SERVE_CLIENT !== 'false') {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const clientBuildPath = path.join(__dirname, '../../client/build');
     app.use(express.static(clientBuildPath));
@@ -1182,38 +1091,41 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 app.listen(HOST_PORT, '0.0.0.0', async () => {
-    if (NS_DATABASE_TYPE === 'sqlite') {
+    if (HERALD_DATABASE_TYPE === 'sqlite') {
         db = new DbSqlite(path.join(DATA_DIR, 'db.sqlite'));
+    } else if (HERALD_DATABASE_TYPE === 'redis') {
+        db = new DbRedis(SERVICE_NAME);
     } else {
         db = new DbJson(path.join(DATA_DIR, 'db.json'));
     }
 
     if (db.init) {
         try {
-            db.init();
+            await db.init();
         } catch (e: any) {
             console.error(`Error initialising database: ${e.message}`);
             process.exit(1);
         }
     }
 
-    if (process.env.NS_KEYMASTER_URL) {
+    if (process.env.ARCHON_HERALD_KEYMASTER_URL) {
+        const keymasterUrl = process.env.ARCHON_HERALD_KEYMASTER_URL;
         keymaster = new KeymasterClient();
         await keymaster.connect({
-            url: process.env.NS_KEYMASTER_URL,
+            url: keymasterUrl,
             waitUntilReady: true,
             intervalSeconds: 5,
             chatty: true,
             // @ts-ignore - apiKey added in @didcid/* 0.4.x
             apiKey: ADMIN_API_KEY || undefined,
         });
-        console.log(`${SERVICE_NAME} using keymaster at ${process.env.NS_KEYMASTER_URL}`);
+        console.log(`${SERVICE_NAME} using keymaster at ${keymasterUrl}`);
     }
     else {
-        const passphrase = process.env.NS_WALLET_PASSPHRASE;
+        const passphrase = process.env.ARCHON_HERALD_WALLET_PASSPHRASE;
 
         if (!passphrase) {
-            console.error('Error: NS_WALLET_PASSPHRASE environment variable not set');
+            console.error('Error: ARCHON_HERALD_WALLET_PASSPHRASE environment variable not set');
             process.exit(1);
         }
 

@@ -39,7 +39,7 @@ app.use('/oauth', oauthRouter);
 
 // OIDC discovery (must be at root)
 app.get('/.well-known/openid-configuration', (req, res) => {
-    const issuer = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
+    const issuer = process.env.ARCHON_HERALD_PUBLIC_URL || `http://localhost:${process.env.ARCHON_HERALD_PORT || 3300}`;
     res.json({
         issuer,
         authorization_endpoint: `${issuer}/oauth/authorize`,
