@@ -13,7 +13,7 @@ This folder contains the React front-end for the name service. It provides login
     - `VITE_API_URL=http://localhost:4222/names/api` (typically derived from the Drawbridge public URL)
 
 3. **Start** the client dev server:
-    - `npm start`
+    - `npm run dev`
 
 4. **Access** the React client:
     - `http://localhost:3001` (if using default port 3001)

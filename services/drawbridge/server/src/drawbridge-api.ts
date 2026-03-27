@@ -131,6 +131,8 @@ function buildProxyBody(req: express.Request): BodyInit | undefined {
         return undefined;
     }
 
+    const contentType = req.headers['content-type'] || '';
+
     if (Buffer.isBuffer(req.body)) {
         return new Uint8Array(req.body);
     }
@@ -140,6 +142,16 @@ function buildProxyBody(req: express.Request): BodyInit | undefined {
     }
 
     if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+        if (contentType.includes('application/x-www-form-urlencoded')) {
+            return new URLSearchParams(
+                Object.entries(req.body).flatMap(([key, value]) => {
+                    if (Array.isArray(value)) {
+                        return value.map(item => [key, String(item)] as [string, string]);
+                    }
+                    return [[key, String(value)] as [string, string]];
+                })
+            ).toString();
+        }
         return JSON.stringify(req.body);
     }
 
@@ -215,6 +227,7 @@ async function main() {
     }
 
     app.use(express.json({ limit: '10mb' }));
+    app.use(express.urlencoded({ extended: false, limit: '10mb' }));
     app.use(express.text({ limit: '10mb' }));
     // Skip body buffering for streaming routes — they read req directly
     const rawParser = express.raw({ type: 'application/octet-stream', limit: '10mb' });

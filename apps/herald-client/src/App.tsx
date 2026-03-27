@@ -781,7 +781,7 @@ function ViewProfile() {
                                                 onChange={(e) => { setNewName(e.target.value); setNameError(''); setNameAvailable(null); }}
                                                 slotProps={{
                                                     htmlInput: {
-                                                        maxLength: 20,
+                                                        maxLength: 32,
                                                     },
                                                 }}
                                                 sx={{ width: 300 }}

@@ -39,6 +39,7 @@ const router = Router();
 // In-memory stores (replace with DB in production)
 const authCodes: Map<string, AuthCode> = new Map();
 const accessTokens: Map<string, AccessToken> = new Map();
+const authRedirects: Map<string, string> = new Map();
 
 // Registered OAuth clients
 const clients: Map<string, OAuthClient> = new Map();
@@ -114,6 +115,31 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
         scope: string;
         challenge: string;
     }> = new Map();
+    const adminApiKey = process.env.ARCHON_ADMIN_API_KEY || process.env.ARCHON_HERALD_ADMIN_API_KEY || '';
+
+    function requireAdminKey(req: Request, res: Response): boolean {
+        if (!adminApiKey) {
+            res.status(403).json({ error: 'Admin API key not configured' });
+            return false;
+        }
+
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+            res.status(401).json({ error: 'Admin API key required' });
+            return false;
+        }
+
+        const key = authHeader.slice(7);
+        const keyBuf = Buffer.from(key);
+        const expectedBuf = Buffer.from(adminApiKey);
+
+        if (keyBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(keyBuf, expectedBuf)) {
+            res.status(401).json({ error: 'Invalid admin API key' });
+            return false;
+        }
+
+        return true;
+    }
 
     /**
      * GET /oauth/authorize
@@ -347,7 +373,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             // Store redirect for polling
             const redirectKey = `redirect:${challengeDID}`;
             const redirectUrl = `${pending.redirect_uri}?code=${code}&state=${pending.state}`;
-            (pendingAuths as any)[redirectKey] = redirectUrl;
+            authRedirects.set(redirectKey, redirectUrl);
             console.log('Stored redirect:', { redirectKey, redirectUrl });
 
             res.json({ 
@@ -367,12 +393,12 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
     router.get('/poll', (req: Request, res: Response) => {
         const { challenge } = req.query;
         const redirectKey = `redirect:${challenge}`;
-        const redirect = (pendingAuths as any)[redirectKey];
+        const redirect = authRedirects.get(redirectKey);
         
         console.log('Poll check:', { challenge, redirectKey, hasRedirect: !!redirect });
         
         if (redirect) {
-            delete (pendingAuths as any)[redirectKey];
+            authRedirects.delete(redirectKey);
             return res.json({ redirect });
         }
         
@@ -396,9 +422,16 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             if (authHeader && authHeader.startsWith('Basic ')) {
                 const base64Credentials = authHeader.substring(6);
                 const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
-                const [basicId, basicSecret] = credentials.split(':');
-                client_id = basicId;
-                client_secret = basicSecret;
+                const separatorIndex = credentials.indexOf(':');
+
+                if (separatorIndex === -1) {
+                    return res.status(401).json({
+                        error: 'invalid_client'
+                    });
+                }
+
+                client_id = credentials.slice(0, separatorIndex);
+                client_secret = credentials.slice(separatorIndex + 1);
             }
 
             if (grant_type !== 'authorization_code') {
@@ -413,8 +446,6 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 console.log('Client auth failed:', { 
                     client_id, 
                     hasClient: !!client, 
-                    expectedSecret: client?.client_secret?.substring(0, 8) + '...',
-                    receivedSecret: client_secret?.substring(0, 8) + '...',
                     authHeader: authHeader ? 'present' : 'missing',
                     bodyClientId: req.body.client_id,
                     bodyHasSecret: !!req.body.client_secret
@@ -591,7 +622,10 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
      * Register a new OAuth client
      */
     router.post('/clients', (req: Request, res: Response) => {
-    // TODO: Add admin authentication
+        if (!requireAdminKey(req, res)) {
+            return;
+        }
+
         const { name, redirect_uris } = req.body;
         
         const client_id = crypto.randomBytes(16).toString('hex');

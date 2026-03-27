@@ -47,7 +47,7 @@ app.get('/.well-known/openid-configuration', (req, res) => {
         userinfo_endpoint: `${issuer}/oauth/userinfo`,
         response_types_supported: ['code'],
         subject_types_supported: ['public'],
-        id_token_signing_alg_values_supported: ['none'],
+        id_token_signing_alg_values_supported: ['ES256'],
         scopes_supported: ['openid', 'profile'],
         claims_supported: ['sub', 'name', 'preferred_username', 'picture']
     });

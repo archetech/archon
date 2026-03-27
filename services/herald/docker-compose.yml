@@ -1,8 +1,8 @@
 services:
   server:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/herald/Dockerfile
     image: ${ARCHON_HERALD_NAME:-name-service}
     environment:
       - ARCHON_HERALD_NAME=${ARCHON_HERALD_NAME}
