@@ -1,25 +1,69 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { SignJWT, generateKeyPair, exportJWK } from 'jose';
+import { mkdir, readFile, writeFile } from 'fs/promises';
+import path from 'path';
+import { SignJWT, exportJWK, generateKeyPair, importJWK } from 'jose';
 
-// Generate ES256 signing key at startup (or load from env)
+const DATA_DIR = process.env.ARCHON_HERALD_DATA_DIR || '/app/server/data';
+const JWT_KEY_PATH = process.env.ARCHON_HERALD_JWT_KEY_PATH || path.join(DATA_DIR, 'oauth-signing-key.json');
+
+// Generate ES256 signing key at startup (or load persisted key)
 let jwtSigningKey: CryptoKey | null = null;
 let jwtPublicJWK: any = null;
 const JWT_KEY_ID = 'archon-social-signing-key-1';
 
+interface PersistedJwtKey {
+    kid: string;
+    privateJwk: Record<string, any>;
+}
+
+async function loadPersistedJWTKey(): Promise<boolean> {
+    try {
+        const raw = await readFile(JWT_KEY_PATH, 'utf8');
+        const persisted = JSON.parse(raw) as PersistedJwtKey;
+        jwtSigningKey = await importJWK(persisted.privateJwk, 'ES256') as CryptoKey;
+        jwtPublicJWK = await exportJWK(jwtSigningKey);
+        delete jwtPublicJWK.d;
+        delete jwtPublicJWK.key_ops;
+        jwtPublicJWK.kid = persisted.kid || JWT_KEY_ID;
+        jwtPublicJWK.use = 'sig';
+        jwtPublicJWK.alg = 'ES256';
+        console.log('Loaded persisted ES256 JWT signing key, kid:', jwtPublicJWK.kid);
+        return true;
+    }
+    catch (error: any) {
+        if (error?.code !== 'ENOENT') {
+            console.warn(`Failed to load persisted JWT signing key from ${JWT_KEY_PATH}:`, error);
+        }
+        return false;
+    }
+}
+
+async function persistJWTKey(privateKey: CryptoKey): Promise<void> {
+    const privateJwk = await exportJWK(privateKey);
+    await mkdir(path.dirname(JWT_KEY_PATH), { recursive: true });
+    await writeFile(JWT_KEY_PATH, JSON.stringify({
+        kid: JWT_KEY_ID,
+        privateJwk
+    }, null, 2));
+}
+
 async function initJWTKeys(): Promise<void> {
     if (!jwtSigningKey) {
-        // Generate ephemeral key pair (in production, persist this)
+        if (await loadPersistedJWTKey()) {
+            return;
+        }
+
         const { privateKey, publicKey } = await generateKeyPair('ES256');
         jwtSigningKey = privateKey as CryptoKey;
-        
-        // Export public key as JWK for JWKS endpoint
+        await persistJWTKey(jwtSigningKey);
+
         jwtPublicJWK = await exportJWK(publicKey);
         jwtPublicJWK.kid = JWT_KEY_ID;
         jwtPublicJWK.use = 'sig';
         jwtPublicJWK.alg = 'ES256';
-        
-        console.log('Generated ES256 JWT signing key, kid:', JWT_KEY_ID);
+
+        console.log('Generated and persisted ES256 JWT signing key, kid:', JWT_KEY_ID);
     }
 }
 

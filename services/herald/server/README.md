@@ -11,6 +11,7 @@ This folder contains the Express server for the name service, providing DID-base
 2. **.env configuration**
     - `ARCHON_HERALD_PORT=4230`
     - `ARCHON_HERALD_SESSION_SECRET=<random secret>` (required)
+    - `ARCHON_HERALD_JWT_KEY_PATH=<optional path>` to persist the OIDC signing key outside the default data dir
     - Additional variables like `ARCHON_KEYMASTER_URL`, `ARCHON_GATEKEEPER_URL`, `ARCHON_HERALD_WALLET_URL` for Keymaster/Gatekeeper integration.
 
 3. **Run**:
@@ -20,6 +21,7 @@ This folder contains the Express server for the name service, providing DID-base
 ### CORS and Sessions
 - This server uses `express-session` for session-based logins. Make sure to keep `credentials: true` if you want cross-origin cookies from your React dev server.
 - `ARCHON_HERALD_SESSION_SECRET` is required and must not be left on a placeholder value.
+- Herald persists its OIDC ES256 signing key under the data directory by default so JWKS and `id_token` validation stay stable across restarts.
 
 ### API Endpoints
 
