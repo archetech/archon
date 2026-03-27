@@ -1,0 +1,36 @@
+services:
+  server:
+    build:
+      context: ../..
+      dockerfile: services/herald/Dockerfile
+    image: ${ARCHON_HERALD_NAME:-name-service}
+    environment:
+      - ARCHON_HERALD_NAME=${ARCHON_HERALD_NAME}
+      - ARCHON_HERALD_DOMAIN=${ARCHON_HERALD_DOMAIN}
+      - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST}
+      - ARCHON_HERALD_SESSION_SECRET=${ARCHON_HERALD_SESSION_SECRET}
+      - ARCHON_HERALD_PORT=${ARCHON_HERALD_PORT:-4230}
+      - ARCHON_GATEKEEPER_URL=${ARCHON_GATEKEEPER_URL}
+      - ARCHON_KEYMASTER_URL=${ARCHON_KEYMASTER_URL:-}
+      - ARCHON_HERALD_WALLET_URL=${ARCHON_HERALD_WALLET_URL}
+      - ARCHON_HERALD_DB=${ARCHON_HERALD_DB}
+      - ARCHON_HERALD_WALLET_PASSPHRASE=${ARCHON_HERALD_WALLET_PASSPHRASE}
+      - ARCHON_HERALD_IPFS_API_URL=${ARCHON_HERALD_IPFS_API_URL:-http://host.docker.internal:5001/api/v0}
+      - ARCHON_HERALD_IPNS_KEY_NAME=${ARCHON_HERALD_IPNS_KEY_NAME:-${ARCHON_HERALD_NAME:-name-service}}
+      - ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID=${ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID}
+      - ARCHON_HERALD_OWNER_DID=${ARCHON_HERALD_OWNER_DID}
+      - ARCHON_HERALD_TOR_PROXY=${ARCHON_HERALD_TOR_PROXY:-}
+    volumes:
+      - ./server/data:/app/server/data
+    ports:
+      - "${ARCHON_HERALD_PORT:-4230}:${ARCHON_HERALD_PORT:-4230}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - archon
+
+networks:
+  archon:
+    external: true
+    name: archon_default

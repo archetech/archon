@@ -1,4 +1,73 @@
 services:
+  herald:
+    build:
+      context: .
+      dockerfile: services/herald/Dockerfile
+    image: ghcr.io/archetech/herald
+    environment:
+      - ARCHON_HERALD_NAME=${ARCHON_HERALD_NAME:-herald}
+      - ARCHON_HERALD_DOMAIN=${ARCHON_HERALD_DOMAIN:-localhost}
+      - ARCHON_HERALD_SESSION_SECRET=${ARCHON_HERALD_SESSION_SECRET}
+      - ARCHON_HERALD_PORT=4230
+      - ARCHON_DRAWBRIDGE_PORT=4222
+      - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_HERALD_WALLET_URL=${ARCHON_HERALD_WALLET_URL:-http://localhost:4228}
+      - ARCHON_HERALD_DB=${ARCHON_HERALD_DB:-json}
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_HERALD_DATA_DIR=/app/server/data
+      - ARCHON_HERALD_IPFS_API_URL=http://ipfs:5001/api/v0
+      - ARCHON_HERALD_IPNS_KEY_NAME=${ARCHON_HERALD_IPNS_KEY_NAME:-herald}
+      - ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID=${ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID:-did:cid:bagaaieravnv5onsflewvrz6urhwfjixfnwq7bgc3ejhlrj2nekx75ddhdupq}
+      - ARCHON_HERALD_OWNER_DID=${ARCHON_HERALD_OWNER_DID:-}
+      - ARCHON_HERALD_TOR_PROXY=${ARCHON_HERALD_TOR_PROXY:-tor:9050}
+      - ARCHON_HERALD_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+    volumes:
+      - ./data/herald:/app/server/data
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4230/api/version',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    depends_on:
+      gatekeeper:
+        condition: service_healthy
+      keymaster:
+        condition: service_healthy
+      ipfs:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      tor:
+        condition: service_started
+
+  herald-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.herald-client
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        VITE_API_URL: ${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-http://localhost:4222}/names/api
+    image: ghcr.io/archetech/herald-client
+    environment:
+      - VITE_PORT=4231
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "${ARCHON_HERALD_CLIENT_PORT:-4231}:4231"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4231/',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      herald:
+        condition: service_healthy
+
   drawbridge:
     build:
       context: .
@@ -23,6 +92,7 @@ services:
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX=${ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX:-100}
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW:-60}
       - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
+      - ARCHON_HERALD_URL=http://herald:4230
       - ARCHON_TOR_PROXY=tor:9050
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:

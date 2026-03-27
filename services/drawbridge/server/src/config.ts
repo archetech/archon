@@ -6,6 +6,7 @@ const config = {
     port: process.env.ARCHON_DRAWBRIDGE_PORT ? parseInt(process.env.ARCHON_DRAWBRIDGE_PORT) : 4222,
     bindAddress: process.env.ARCHON_BIND_ADDRESS || '0.0.0.0',
     gatekeeperURL: process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224',
+    heraldURL: process.env.ARCHON_HERALD_URL || 'http://localhost:4230',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
 
     // Lightning / L402
