@@ -6,7 +6,6 @@ import express, {
 import session from 'express-session';
 import morgan from 'morgan';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import { socksDispatcher } from 'fetch-socks';
@@ -1096,21 +1095,6 @@ app.get('/.well-known/webfinger', async (req: Request, res: Response) => {
         res.status(500).send(String(error));
     }
 });
-
-if (process.env.ARCHON_HERALD_SERVE_CLIENT !== 'false') {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const clientBuildPath = path.join(__dirname, '../../client/build');
-    app.use(express.static(clientBuildPath));
-
-    app.use((req, res) => {
-        if (!req.path.startsWith('/api')) {
-            res.sendFile(path.join(clientBuildPath, 'index.html'));
-        } else {
-            console.warn(`Warning: Unhandled API endpoint - ${req.method} ${req.originalUrl}`);
-            res.status(404).json({ message: 'Endpoint not found' });
-        }
-    });
-}
 
 process.on('uncaughtException', (error) => {
     console.error('Unhandled exception caught', error);
