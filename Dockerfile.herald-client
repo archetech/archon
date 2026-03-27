@@ -1,0 +1,21 @@
+FROM node:22.15.0-bullseye-slim
+
+WORKDIR /app/apps/herald-client
+
+COPY apps/herald-client/package*.json ./
+RUN npm ci
+
+COPY apps/herald-client ./
+
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
+ARG VITE_API_URL=http://localhost:4230/api
+ENV VITE_API_URL=$VITE_API_URL
+
+RUN npm run build
+
+ENV VITE_PORT=4231
+EXPOSE 4231
+
+CMD ["sh", "-c", "npm run preview -- --host 0.0.0.0 --port ${VITE_PORT}"]

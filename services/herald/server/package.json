@@ -1,19 +1,17 @@
 {
-  "name": "auth-demo",
+  "name": "herald-server",
   "version": "1.2.0",
   "type": "module",
-  "description": "Decentralized naming service",
+  "description": "Archon naming service",
   "main": "dist/index.js",
   "scripts": {
-    "start": "tsc && node dist/index.js"
+    "build": "tsc",
+    "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@didcid/cipher": "^0.2.1",
-    "@didcid/gatekeeper": "^0.4.1",
-    "@didcid/keymaster": "^0.4.1",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^11.10.0",
     "cors": "^2.8.5",
@@ -22,6 +20,7 @@
     "express-session": "^1.18.0",
     "fetch-socks": "^1.3.2",
     "https": "^1.0.0",
+    "jose": "^6.2.1",
     "morgan": "^1.10.0"
   },
   "devDependencies": {

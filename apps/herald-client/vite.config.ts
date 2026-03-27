@@ -3,12 +3,16 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const port = parseInt(env.VITE_PORT || env.ARCHON_HERALD_CLIENT_PORT || '4231', 10);
 
   return {
     base: '/',
     plugins: [react()],
     server: {
-      port: parseInt(env.VITE_EXPLORER_PORT) || 3001,
+      port,
+    },
+    preview: {
+      port,
     },
     build: {
       outDir: './build',

@@ -26,10 +26,11 @@ let db: DatabaseInterface;
 
 dotenv.config();
 
-const HOST_PORT = Number(process.env.NS_HOST_PORT) || 3300;
+const HOST_PORT = Number(process.env.NS_HOST_PORT) || 4230;
 const GATEKEEPER_URL = process.env.NS_GATEKEEPER_URL || 'http://localhost:4224';
 const WALLET_URL = process.env.NS_WALLET_URL || 'http://localhost:4224';
 const NS_DATABASE_TYPE = process.env.NS_DATABASE || 'json';
+const DATA_DIR = process.env.NS_DATA_DIR || '/app/server/data';
 const IPFS_API_URL = process.env.NS_IPFS_API_URL || 'http://localhost:5001/api/v0';
 const SERVICE_NAME = process.env.NS_SERVICE_NAME || 'name-service';
 const PUBLIC_URL = process.env.NS_PUBLIC_URL || `http://localhost:${HOST_PORT}`;
@@ -288,7 +289,7 @@ console.log('OAuth routes mounted at /oauth');
 
 // OIDC Discovery at root level (required by spec)
 app.get('/.well-known/openid-configuration', (_req: Request, res: Response) => {
-    const issuer = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 3300}`;
+    const issuer = process.env.NS_PUBLIC_URL || `http://localhost:${process.env.NS_HOST_PORT || 4230}`;
     res.json({
         issuer,
         authorization_endpoint: `${issuer}/oauth/authorize`,
@@ -1169,9 +1170,9 @@ process.on('unhandledRejection', (reason, promise) => {
 
 app.listen(HOST_PORT, '0.0.0.0', async () => {
     if (NS_DATABASE_TYPE === 'sqlite') {
-        db = new DbSqlite();
+        db = new DbSqlite(path.join(DATA_DIR, 'db.sqlite'));
     } else {
-        db = new DbJson();
+        db = new DbJson(path.join(DATA_DIR, 'db.json'));
     }
 
     if (db.init) {
@@ -1210,7 +1211,7 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             intervalSeconds: 5,
             chatty: true,
         });
-        const wallet = new WalletJson('wallet.json', 'data');
+        const wallet = new WalletJson('wallet.json', DATA_DIR);
         const cipher = new CipherNode();
         keymaster = new Keymaster({
             gatekeeper,
