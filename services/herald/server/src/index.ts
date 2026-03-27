@@ -97,6 +97,34 @@ async function initServiceIdentity(): Promise<void> {
     }
 }
 
+async function ensureIpnsKeyExists(): Promise<void> {
+    const listResponse = await fetch(`${IPFS_API_URL}/key/list`, {
+        method: 'POST',
+    });
+    if (!listResponse.ok) {
+        throw new Error(`IPFS key list failed: ${listResponse.statusText}`);
+    }
+
+    const listResult = await listResponse.json() as { Keys?: Array<{ Name?: string }> };
+    const hasKey = listResult.Keys?.some(key => key.Name === IPNS_KEY_NAME);
+
+    if (hasKey) {
+        return;
+    }
+
+    console.log(`Creating missing IPNS key: ${IPNS_KEY_NAME}`);
+    const genResponse = await fetch(`${IPFS_API_URL}/key/gen?arg=${encodeURIComponent(IPNS_KEY_NAME)}`, {
+        method: 'POST',
+    });
+
+    if (!genResponse.ok) {
+        throw new Error(`IPFS key gen failed: ${genResponse.statusText}`);
+    }
+
+    const genResult = await genResponse.json() as { Name?: string; Id?: string };
+    console.log(`Created IPNS key ${genResult.Name}: ${genResult.Id}`);
+}
+
 function validateName(name: any): { ok: boolean; trimmedName?: string; message?: string } {
     if (!name || typeof name !== 'string') {
         return { ok: false, message: 'Name is required' };
@@ -1153,6 +1181,7 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
     }
 
     await initServiceIdentity();
+    await ensureIpnsKeyExists();
     console.log(`${SERVICE_NAME} using wallet at ${WALLET_URL}`);
     console.log(`${SERVICE_NAME} listening on port ${HOST_PORT}`);
 });
