@@ -115,7 +115,7 @@ function Home() {
         };
 
         init();
-    }, []);
+    }, [navigate]);
 
     async function login() {
         navigate('/login');
@@ -244,7 +244,7 @@ function Home() {
                             First time? Create your DID identity:
                         </Typography>
                         <Typography variant="body2" component="pre" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
-{`# Set up environment
+                            {`# Set up environment
 export ARCHON_GATEKEEPER_URL=https://archon.technology
 export ARCHON_PASSPHRASE="your-secret-passphrase"
 
@@ -256,7 +256,7 @@ npx @didcid/keymaster create-id myagent`}
                             Then claim your name (2 calls, no cookies):
                         </Typography>
                         <Typography variant="body2" component="pre" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
-{`# 1. Get challenge
+                            {`# 1. Get challenge
 CHALLENGE=$(curl -s ${publicUrl}/api/challenge | jq -r .challenge)
 
 # 2. Create response
@@ -336,7 +336,7 @@ function ViewLogin() {
                 clearInterval(intervalIdRef.current);
             }
         }
-    }, []);
+    }, [navigate]);
 
     async function login() {
         setLoggingIn(true);
@@ -372,55 +372,55 @@ function ViewLogin() {
         <div className="App">
             <Header title="Login" />
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
-            <Table sx={{ width: '100%' }}>
-                <TableBody>
-                    <TableRow>
-                        <TableCell>Challenge:</TableCell>
-                        <TableCell>
-                            {challengeURL &&
+                <Table sx={{ width: '100%' }}>
+                    <TableBody>
+                        <TableRow>
+                            <TableCell>Challenge:</TableCell>
+                            <TableCell>
+                                {challengeURL &&
                                 <a href={challengeURL} target="_blank" rel="noopener noreferrer">
                                     <QRCodeSVG value={challengeURL} />
                                 </a>
-                            }
-                            <Typography
-                                component="a"
-                                href={extensionURL}
-                                style={{ fontFamily: 'Courier' }}
-                            >
-                                {challengeDID}
-                            </Typography>
-                        </TableCell>
-                        <TableCell>
-                            <Button variant="outlined" onClick={() => copyToClipboard(challengeDID)} disabled={challengeCopied}>
+                                }
+                                <Typography
+                                    component="a"
+                                    href={extensionURL}
+                                    style={{ fontFamily: 'Courier' }}
+                                >
+                                    {challengeDID}
+                                </Typography>
+                            </TableCell>
+                            <TableCell>
+                                <Button variant="outlined" onClick={() => copyToClipboard(challengeDID)} disabled={challengeCopied}>
                                 Copy
-                            </Button>
-                        </TableCell>
-                    </TableRow>
-                    <TableRow>
-                        <TableCell>Response:</TableCell>
-                        <TableCell>
-                            <TextField
-                                label="Response DID"
-                                style={{ width: '600px', fontFamily: 'Courier' }}
-                                value={responseDID}
-                                onChange={(e) => setResponseDID(e.target.value)}
-                                fullWidth
-                                margin="normal"
-                                slotProps={{
-                                    htmlInput: {
-                                        maxLength: 80,
-                                    },
-                                }}
-                            />
-                        </TableCell>
-                        <TableCell>
-                            <Button variant="outlined" onClick={login} disabled={!responseDID || loggingIn}>
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>Response:</TableCell>
+                            <TableCell>
+                                <TextField
+                                    label="Response DID"
+                                    style={{ width: '600px', fontFamily: 'Courier' }}
+                                    value={responseDID}
+                                    onChange={(e) => setResponseDID(e.target.value)}
+                                    fullWidth
+                                    margin="normal"
+                                    slotProps={{
+                                        htmlInput: {
+                                            maxLength: 80,
+                                        },
+                                    }}
+                                />
+                            </TableCell>
+                            <TableCell>
+                                <Button variant="outlined" onClick={login} disabled={!responseDID || loggingIn}>
                                 Login
-                            </Button>
-                        </TableCell>
-                    </TableRow>
-                </TableBody>
-            </Table>
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </Box>
         </div>
     )
@@ -646,7 +646,6 @@ function ViewOwner() {
 function ViewProfile() {
     const { did } = useParams();
     const navigate = useNavigate();
-    const [auth, setAuth] = useState<AuthState | null>(null);
     const [profile, setProfile] = useState<any>(null);
     const [currentName, setCurrentName] = useState<string>("");
     const [newName, setNewName] = useState<string>("");
@@ -656,10 +655,7 @@ function ViewProfile() {
     useEffect(() => {
         const init = async () => {
             try {
-                const getAuth = await api.get(`/check-auth`);
-                const auth: AuthState = getAuth.data;
-
-                setAuth(auth);
+                await api.get(`/check-auth`);
 
                 const getProfile = await api.get(`/profile/${did}`);
                 const profile = getProfile.data;
@@ -751,91 +747,91 @@ function ViewProfile() {
         <div className="App">
             <Header title="Profile" />
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
-            <Table sx={{ width: '100%' }}>
-                <TableBody>
-                    <TableRow>
-                        <TableCell>DID:</TableCell>
-                        <TableCell>
-                            <Typography style={{ fontFamily: 'Courier' }}>
-                                {profile.did}
-                            </Typography>
-                        </TableCell>
-                    </TableRow>
-                    <TableRow>
-                        <TableCell>First login:</TableCell>
-                        <TableCell>{formatDate(profile.firstLogin)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                        <TableCell>Last login:</TableCell>
-                        <TableCell>{formatDate(profile.lastLogin)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                        <TableCell>Login count:</TableCell>
-                        <TableCell>{profile.logins}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                        <TableCell>Name:</TableCell>
-                        <TableCell>
-                            {profile.isUser ? (
-                                <>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                        <TextField
-                                            label=""
-                                            value={newName}
-                                            onChange={(e) => { setNewName(e.target.value); setNameError(''); setNameAvailable(null); }}
-                                            slotProps={{
-                                                htmlInput: {
-                                                    maxLength: 20,
-                                                },
-                                            }}
-                                            sx={{ width: 300 }}
-                                            margin="normal"
-                                            fullWidth
-                                        />
-                                        <Button
-                                            variant="outlined"
-                                            onClick={checkName}
-                                            disabled={!newName.trim() || newName === currentName}
-                                        >
-                                            Check
-                                        </Button>
-                                        <Button
-                                            variant="outlined"
-                                            color="primary"
-                                            onClick={saveName}
-                                            disabled={newName === currentName}
-                                        >
-                                            Save
-                                        </Button>
-                                        {currentName && (
+                <Table sx={{ width: '100%' }}>
+                    <TableBody>
+                        <TableRow>
+                            <TableCell>DID:</TableCell>
+                            <TableCell>
+                                <Typography style={{ fontFamily: 'Courier' }}>
+                                    {profile.did}
+                                </Typography>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>First login:</TableCell>
+                            <TableCell>{formatDate(profile.firstLogin)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>Last login:</TableCell>
+                            <TableCell>{formatDate(profile.lastLogin)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>Login count:</TableCell>
+                            <TableCell>{profile.logins}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>Name:</TableCell>
+                            <TableCell>
+                                {profile.isUser ? (
+                                    <>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                            <TextField
+                                                label=""
+                                                value={newName}
+                                                onChange={(e) => { setNewName(e.target.value); setNameError(''); setNameAvailable(null); }}
+                                                slotProps={{
+                                                    htmlInput: {
+                                                        maxLength: 20,
+                                                    },
+                                                }}
+                                                sx={{ width: 300 }}
+                                                margin="normal"
+                                                fullWidth
+                                            />
                                             <Button
                                                 variant="outlined"
-                                                color="error"
-                                                onClick={deleteName}
+                                                onClick={checkName}
+                                                disabled={!newName.trim() || newName === currentName}
                                             >
-                                                Delete
+                                            Check
                                             </Button>
+                                            <Button
+                                                variant="outlined"
+                                                color="primary"
+                                                onClick={saveName}
+                                                disabled={newName === currentName}
+                                            >
+                                            Save
+                                            </Button>
+                                            {currentName && (
+                                                <Button
+                                                    variant="outlined"
+                                                    color="error"
+                                                    onClick={deleteName}
+                                                >
+                                                Delete
+                                                </Button>
+                                            )}
+                                        </Box>
+                                        {nameError && (
+                                            <Alert severity="error" sx={{ mt: 1 }}>{nameError}</Alert>
                                         )}
-                                    </Box>
-                                    {nameError && (
-                                        <Alert severity="error" sx={{ mt: 1 }}>{nameError}</Alert>
-                                    )}
-                                    {nameAvailable && (
-                                        <Alert severity="success" sx={{ mt: 1 }}>Name is available!</Alert>
-                                    )}
-                                </>
-                            ) : (
-                                currentName
-                            )}
-                        </TableCell>
-                    </TableRow>
-                </TableBody>
-            </Table>
-            <Box sx={{ mt: 3 }}>
-                <Button component={Link} to="/" variant="outlined">
+                                        {nameAvailable && (
+                                            <Alert severity="success" sx={{ mt: 1 }}>Name is available!</Alert>
+                                        )}
+                                    </>
+                                ) : (
+                                    currentName
+                                )}
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+                <Box sx={{ mt: 3 }}>
+                    <Button component={Link} to="/" variant="outlined">
                     ← Back to Home
-                </Button>
-            </Box>
+                    </Button>
+                </Box>
             </Box>
         </div>
     )
@@ -847,26 +843,26 @@ function ViewCredential() {
     const [error, setError] = useState<string>('');
     const navigate = useNavigate();
 
-    const fetchCredential = async () => {
-        try {
-            const response = await api.get('/credential');
-            setCredentialData(response.data);
-        }
-        catch (err: any) {
-            if (err.response?.status === 401) {
-                navigate('/login');
-            } else {
-                setError(err.response?.data?.error || 'Failed to fetch credential');
-            }
-        }
-        finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
+        const fetchCredential = async () => {
+            try {
+                const response = await api.get('/credential');
+                setCredentialData(response.data);
+            }
+            catch (err: any) {
+                if (err.response?.status === 401) {
+                    navigate('/login');
+                } else {
+                    setError(err.response?.data?.error || 'Failed to fetch credential');
+                }
+            }
+            finally {
+                setLoading(false);
+            }
+        };
+
         fetchCredential();
-    }, []);
+    }, [navigate]);
 
     if (loading) {
         return (
