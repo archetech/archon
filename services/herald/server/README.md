@@ -9,12 +9,12 @@ This folder contains the Express server for the name service, providing DID-base
     - `npm install`
 
 2. **.env configuration**
-    - `ARCHON_HERALD_PORT=3300`
+    - `ARCHON_HERALD_PORT=4230`
     - Additional variables like `ARCHON_KEYMASTER_URL`, `ARCHON_GATEKEEPER_URL`, `ARCHON_HERALD_WALLET_URL` for Keymaster/Gatekeeper integration.
 
 3. **Run**:
     - `npm start`
-      Starts the server at `http://localhost:3300`.
+      Starts the server at `http://localhost:4230`.
 
 ### CORS and Sessions
 - This server uses `express-session` for session-based logins. Make sure to keep `credentials: true` if you want cross-origin cookies from your React dev server.

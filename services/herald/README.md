@@ -30,7 +30,7 @@ This repository is split into two main folders:
 3. **Run** both client and server:
    - `npm start`
 
-4. **Visit** the site at `http://localhost:3300`
+4. **Visit** the site at `http://localhost:4230`
 
 ### QR Code Authentication
 
