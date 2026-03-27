@@ -37,7 +37,8 @@ const PUBLIC_URL = process.env.NS_PUBLIC_URL || `http://localhost:${HOST_PORT}`;
 const SERVICE_DOMAIN = process.env.NS_SERVICE_DOMAIN || '';
 const SESSION_SECRET = process.env.NS_SESSION_SECRET || SERVICE_NAME;
 const IPNS_KEY_NAME = process.env.NS_IPNS_KEY_NAME || SERVICE_NAME;
-const MEMBERSHIP_SCHEMA_DID = process.env.NS_MEMBERSHIP_SCHEMA_DID || '';
+const DEFAULT_MEMBERSHIP_SCHEMA_DID = 'did:cid:bagaaieravnv5onsflewvrz6urhwfjixfnwq7bgc3ejhlrj2nekx75ddhdupq';
+const MEMBERSHIP_SCHEMA_DID = process.env.NS_MEMBERSHIP_SCHEMA_DID || DEFAULT_MEMBERSHIP_SCHEMA_DID;
 const TOR_PROXY = process.env.NS_TOR_PROXY || '';
 const ADMIN_API_KEY = process.env.ARCHON_ADMIN_API_KEY || process.env.NS_ADMIN_API_KEY || '';
 
@@ -118,6 +119,11 @@ function checkNameAvailability(currentDb: any, trimmedName: string, excludeDid?:
 }
 
 async function issueOrUpdateCredential(did: string, user: any, trimmedName: string): Promise<void> {
+    if (!MEMBERSHIP_SCHEMA_DID) {
+        console.warn(`Skipping credential issuance for ${trimmedName}: NS_MEMBERSHIP_SCHEMA_DID is not set`);
+        return;
+    }
+
     await keymaster.setCurrentId(SERVICE_NAME);
 
     if (user.credentialDid) {
@@ -202,6 +208,13 @@ async function resolveLightningEndpoint(name: string): Promise<{ did: string; en
 }
 
 function isAuthenticated(req: Request, res: Response, next: NextFunction): void {
+    if (!req.session.user && req.session.challenge) {
+        const challengeData = logins[req.session.challenge];
+        if (challengeData) {
+            req.session.user = { did: challengeData.did };
+        }
+    }
+
     if (req.session.user) {
         return next();
     }

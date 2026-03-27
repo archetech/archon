@@ -126,12 +126,87 @@ function requireAdminKey(req: express.Request, res: express.Response, next: expr
     next();
 }
 
+function buildProxyBody(req: express.Request): BodyInit | undefined {
+    if (req.method === 'GET' || req.method === 'HEAD') {
+        return undefined;
+    }
+
+    if (Buffer.isBuffer(req.body)) {
+        return new Uint8Array(req.body);
+    }
+
+    if (typeof req.body === 'string') {
+        return req.body;
+    }
+
+    if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+        return JSON.stringify(req.body);
+    }
+
+    return undefined;
+}
+
+async function proxyHeraldRequest(req: express.Request, res: express.Response, prefixToStrip = '/names') {
+    const upstreamPath = prefixToStrip
+        ? (req.originalUrl.replace(new RegExp(`^${prefixToStrip}`), '') || '/')
+        : req.originalUrl;
+    const upstreamUrl = new URL(upstreamPath, config.heraldURL);
+
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(req.headers)) {
+        if (!value || name === 'host' || name === 'content-length') {
+            continue;
+        }
+
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                headers.append(name, item);
+            }
+        }
+        else {
+            headers.set(name, value);
+        }
+    }
+
+    const body = buildProxyBody(req);
+    if (body && !headers.has('content-type')) {
+        headers.set('content-type', 'application/json');
+    }
+
+    const upstream = await fetch(upstreamUrl, {
+        method: req.method,
+        headers,
+        body,
+        redirect: 'manual',
+    });
+
+    res.status(upstream.status);
+
+    upstream.headers.forEach((value, key) => {
+        if (key === 'content-length' || key === 'transfer-encoding' || key === 'connection') {
+            return;
+        }
+        res.setHeader(key, value);
+    });
+
+    const setCookies = (upstream.headers as any).getSetCookie?.();
+    if (Array.isArray(setCookies) && setCookies.length > 0) {
+        res.setHeader('Set-Cookie', setCookies);
+    }
+
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    res.send(buffer);
+}
+
 async function main() {
     const app = express();
     const v1router = express.Router();
 
     // Middleware
-    app.use(cors());
+    app.use(cors({
+        origin: true,
+        credentials: true,
+    }));
 
     if (process.env.NODE_ENV === 'production') {
         app.use((pinoHttp as any)({ logger }));
@@ -825,6 +900,24 @@ async function main() {
             const status = error instanceof LightningPaymentError ? 400 : 502;
             logger.error({ err: error }, 'Public invoice error');
             res.status(status).json({ error: error.message || 'Invoice creation failed' });
+        }
+    });
+
+    app.use('/.well-known/names', async (req, res) => {
+        try {
+            await proxyHeraldRequest(req, res, '');
+        } catch (error: any) {
+            logger.error({ err: error, path: req.originalUrl }, 'Herald proxy error');
+            res.status(502).json({ error: 'Upstream herald error' });
+        }
+    });
+
+    app.use('/names', async (req, res) => {
+        try {
+            await proxyHeraldRequest(req, res);
+        } catch (error: any) {
+            logger.error({ err: error, path: req.originalUrl }, 'Herald proxy error');
+            res.status(502).json({ error: 'Upstream herald error' });
         }
     });
 

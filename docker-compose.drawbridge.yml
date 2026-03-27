@@ -7,7 +7,7 @@ services:
     environment:
       - NS_SERVICE_NAME=${ARCHON_HERALD_NAME:-herald}
       - NS_SERVICE_DOMAIN=${ARCHON_HERALD_DOMAIN:-localhost}
-      - NS_PUBLIC_URL=${ARCHON_HERALD_PUBLIC_URL:-http://localhost:4230}
+      - NS_PUBLIC_URL=${ARCHON_HERALD_PUBLIC_URL:-http://localhost:4222/names}
       - NS_SESSION_SECRET=${ARCHON_HERALD_SESSION_SECRET:-change-me}
       - NS_HOST_PORT=4230
       - NS_GATEKEEPER_URL=http://gatekeeper:4224
@@ -17,7 +17,7 @@ services:
       - NS_DATA_DIR=/app/server/data
       - NS_IPFS_API_URL=http://ipfs:5001/api/v0
       - NS_IPNS_KEY_NAME=${ARCHON_HERALD_IPNS_KEY_NAME:-herald}
-      - NS_MEMBERSHIP_SCHEMA_DID=${ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID:-}
+      - NS_MEMBERSHIP_SCHEMA_DID=${ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID:-did:cid:bagaaieravnv5onsflewvrz6urhwfjixfnwq7bgc3ejhlrj2nekx75ddhdupq}
       - NS_OWNER_DID=${ARCHON_HERALD_OWNER_DID:-}
       - NS_TOR_PROXY=${ARCHON_HERALD_TOR_PROXY:-tor:9050}
       - NS_SERVE_CLIENT=false
@@ -25,8 +25,6 @@ services:
     volumes:
       - ./data/herald:/app/server/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
-    ports:
-      - "${ARCHON_HERALD_PORT:-4230}:4230"
     healthcheck:
       test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4230/api/version',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
       interval: 15s
@@ -49,7 +47,7 @@ services:
       dockerfile: Dockerfile.herald-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-        VITE_API_URL: ${ARCHON_HERALD_API_URL:-http://localhost:4230/api}
+        VITE_API_URL: ${ARCHON_HERALD_API_URL:-http://localhost:4222/names/api}
     image: ghcr.io/archetech/herald-client
     environment:
       - VITE_PORT=4231
@@ -90,6 +88,7 @@ services:
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX=${ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX:-100}
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW:-60}
       - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
+      - ARCHON_HERALD_URL=http://herald:4230
       - ARCHON_TOR_PROXY=tor:9050
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
