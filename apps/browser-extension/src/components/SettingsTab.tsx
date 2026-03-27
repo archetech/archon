@@ -55,7 +55,7 @@ const SettingsTab = () => {
             sx={{ display: "flex", flexDirection: "column", maxWidth: "400px" }}
         >
             <TextField
-                label="Gatekeeper URL"
+                label="Node URL"
                 variant="outlined"
                 value={gatekeeperUrl}
                 onChange={(e) => setGatekeeperUrl(e.target.value)}

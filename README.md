@@ -33,11 +33,11 @@ The installer:
 - installs `@didcid/keymaster` if needed
 - prompts for an ID name
 - prompts for a Keymaster passphrase with no default
-- prompts for a Gatekeeper URL with default `https://archon.technology`
-- uses `ARCHON_PASSPHRASE` and `ARCHON_GATEKEEPER_URL` during setup
+- prompts for a Node URL with default `https://archon.technology`
+- uses `ARCHON_PASSPHRASE` and `ARCHON_NODE_URL` during setup
 - runs `keymaster create-id`
 
-After setup it prints optional `.bashrc` and `.zshrc` snippets so users can persist the Gatekeeper URL and, if they choose, the passphrase for future shells.
+After setup it prints optional `.bashrc` and `.zshrc` snippets so users can persist the Node URL and, if they choose, the passphrase for future shells.
 
 ### Local Development (for developers)
 

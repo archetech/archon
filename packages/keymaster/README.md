@@ -106,7 +106,8 @@ curl -fsSL https://archon.technology/install | bash
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ARCHON_GATEKEEPER_URL` | No | `http://localhost:4224` | Gatekeeper service URL |
+| `ARCHON_NODE_URL` | No | `http://localhost:4224` | Node URL for the Gatekeeper/Drawbridge entry point |
+| `ARCHON_GATEKEEPER_URL` | No | - | Legacy fallback for `ARCHON_NODE_URL` |
 | `ARCHON_PASSPHRASE` | Yes | - | Passphrase for wallet encryption |
 | `ARCHON_WALLET_PATH` | No | `./wallet.json` | Path to wallet file |
 | `ARCHON_WALLET_TYPE` | No | `json` | Wallet type (`json` or `sqlite`) |
@@ -119,7 +120,7 @@ curl -fsSL https://archon.technology/install | bash
 curl -fsSL https://archon.technology/install | bash
 
 # Set required environment variables
-export ARCHON_GATEKEEPER_URL=http://localhost:4224
+export ARCHON_NODE_URL=http://localhost:4224
 export ARCHON_PASSPHRASE=your-secure-passphrase
 
 # Create a new wallet
@@ -136,9 +137,9 @@ The installer checks for Node.js and npm before prompting, asks for:
 
 - an ID name with no default
 - a passphrase with no default
-- a Gatekeeper URL with default `https://archon.technology`
+- a Node URL with default `https://archon.technology`
 
-It then uses `ARCHON_GATEKEEPER_URL` and `ARCHON_PASSPHRASE` during setup, creates the ID, and prints optional shell-profile snippets for persistence in future shells. Persisting the passphrase is convenient but less secure because it stores the secret in plaintext.
+It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the ID, and prints optional shell-profile snippets for persistence in future shells. `ARCHON_GATEKEEPER_URL` is still accepted as a legacy fallback. Persisting the passphrase is convenient but less secure because it stores the secret in plaintext.
 
 #### Commands
 
