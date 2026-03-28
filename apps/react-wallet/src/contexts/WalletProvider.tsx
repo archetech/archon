@@ -20,7 +20,7 @@ import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
 import { encryptWithPassphrase } from '@didcid/cipher/passphrase';
 import { takeDeepLink } from '../utils/deepLinkQueue';
-import { extractDid } from '../utils/utils';
+import { extractAlias, extractDid } from '../utils/utils';
 import {
     DEFAULT_GATEKEEPER_URL,
     GATEKEEPER_KEY,
@@ -188,18 +188,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
     }
 
-    function openEvent(did: string, type: string) {
-        const evt = new CustomEvent(type, { detail: { did } });
+    function openEvent(detail: { did?: string | null; alias?: string }, type: string) {
+        const evt = new CustomEvent(type, { detail });
         window.dispatchEvent(evt);
     }
 
-    function parsePrefix(url: string): { action?: string, did?: string | null } {
+    function parsePrefix(url: string): { action?: string, did?: string | null, alias?: string } {
         try {
             const u = new URL(url.replace(/^archon:\/\//, 'https://'));
             const action = (u.hostname || u.pathname.replace(/^\//, '') || '').toLowerCase();
+            const aliasResult = extractAlias(url);
+            if (aliasResult) {
+                return { action, did: aliasResult.did, alias: aliasResult.alias };
+            }
             const did = extractDid(url);
             return { action, did };
         } catch {
+            const aliasResult = extractAlias(url);
+            if (aliasResult) {
+                return { did: aliasResult.did, alias: aliasResult.alias };
+            }
             return { did: extractDid(url) };
         }
     }
@@ -215,15 +223,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 return;
             }
 
-            const { action, did } = parsePrefix(url);
+            const { action, did, alias } = parsePrefix(url);
 
             if (action === 'accept' && did) {
-                openEvent(did, "archon:openAccept");
+                if (alias) {
+                    openEvent({ did, alias }, "archon:openAlias");
+                    return;
+                }
+                openEvent({ did }, "archon:openAccept");
                 return;
             }
 
             if (did) {
-                openEvent(did, "archon:openAuth");
+                openEvent({ did }, "archon:openAuth");
             }
         };
 

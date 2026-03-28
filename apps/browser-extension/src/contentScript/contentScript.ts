@@ -31,6 +31,65 @@ window.addEventListener("message", (event) => {
     );
 });
 
+// Relay wallet handoff requests from the web wallet to the extension
+window.addEventListener("message", (event) => {
+    if (event.source !== window) {
+        return;
+    }
+
+    if (event.data?.type === "archon-wallet-extension-probe") {
+        window.postMessage({
+            type: "archon-wallet-extension-probe-response",
+            requestId: event.data.requestId,
+            available: true,
+        }, "*");
+        return;
+    }
+
+    if (event.data?.type !== "archon-wallet-extension-open") {
+        return;
+    }
+
+    const { requestId, action, challenge, credential, alias, did } = event.data;
+
+    let message: Record<string, unknown> | null = null;
+    if (action === "auth" && typeof challenge === "string") {
+        message = { action: "OPEN_AUTH_TAB", challenge };
+    } else if (action === "credential" && typeof credential === "string") {
+        message = { action: "OPEN_CREDENTIAL_TAB", credential };
+    } else if (action === "alias" && typeof alias === "string" && typeof did === "string") {
+        message = { action: "OPEN_ALIAS_TAB", alias, did };
+    }
+
+    if (!message) {
+        window.postMessage({
+            type: "archon-wallet-extension-open-response",
+            requestId,
+            ok: false,
+            error: "Unsupported wallet handoff request",
+        }, "*");
+        return;
+    }
+
+    chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+            window.postMessage({
+                type: "archon-wallet-extension-open-response",
+                requestId,
+                ok: false,
+                error: chrome.runtime.lastError.message,
+            }, "*");
+            return;
+        }
+
+        window.postMessage({
+            type: "archon-wallet-extension-open-response",
+            requestId,
+            ok: !!response?.success,
+        }, "*");
+    });
+});
+
 // Handle archon:// protocol links
 document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) {
