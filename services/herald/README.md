@@ -19,7 +19,7 @@ This repository is split into two main folders:
 
 ### Quick Start
 
-1. **Configure** – Copy `server/sample.env` to `server/.env` and set:
+1. **Configure** – Copy the root `sample.env` to `.env` and set:
    - `ARCHON_HERALD_NAME` – Unique name for this deployment (used for DID identity)
    - `ARCHON_DRAWBRIDGE_PUBLIC_HOST` – The canonical Drawbridge URL (e.g. `https://your-domain.example`)
    - `ARCHON_HERALD_SESSION_SECRET` – A random secret string for sessions (required)
@@ -61,11 +61,13 @@ Both login methods return a JSON object indicating whether the login was success
 
 ### Environment Variables
 
-See `server/sample.env` for all available settings including:
+See the root `sample.env` for all available settings including:
 - `ARCHON_HERALD_NAME` – Service identity name (used for DID owner identity)
 - `ARCHON_DRAWBRIDGE_PUBLIC_HOST` – Canonical Drawbridge URL; Herald derives its public URL as `${ARCHON_DRAWBRIDGE_PUBLIC_HOST}/names`
 - `ARCHON_HERALD_SESSION_SECRET` – Session secret (required; do not use a placeholder)
+- `ARCHON_HERALD_KEYMASTER_URL` – Shared Keymaster URL; leave blank to use Herald's own wallet
 - `ARCHON_HERALD_WALLET_URL` – Wallet URL for QR codes
+- `ARCHON_HERALD_WALLET_PASSPHRASE` – Required for standalone Herald wallet mode
 - `ARCHON_GATEKEEPER_URL` – Gatekeeper API endpoint
 - `ARCHON_HERALD_IPFS_API_URL` – IPFS API for registry publication
 - `ARCHON_HERALD_IPNS_KEY_NAME` – IPNS key for publishing

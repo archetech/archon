@@ -30,7 +30,7 @@ const HOST_PORT = Number(process.env.ARCHON_HERALD_PORT) || 4230;
 const DRAWBRIDGE_PORT = Number(process.env.ARCHON_DRAWBRIDGE_PORT) || 4222;
 const DRAWBRIDGE_PUBLIC_HOST = process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || `http://localhost:${DRAWBRIDGE_PORT}`;
 const GATEKEEPER_URL = process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224';
-const WALLET_URL = process.env.ARCHON_HERALD_WALLET_URL || 'http://localhost:4224';
+const WALLET_URL = process.env.ARCHON_HERALD_WALLET_URL || 'https://wallet.archon.technology';
 const HERALD_DATABASE_TYPE = process.env.ARCHON_HERALD_DB || 'json';
 const DATA_DIR = process.env.ARCHON_HERALD_DATA_DIR || '/app/server/data';
 const IPFS_API_URL = process.env.ARCHON_HERALD_IPFS_API_URL || 'http://localhost:5001/api/v0';
@@ -996,53 +996,6 @@ app.get('/.well-known/names/:name', async (req: Request, res: Response) => {
     }
 });
 
-// PUT /.well-known/names/:name — register/claim a name (requires Bearer DID auth)
-app.put('/.well-known/names/:name', async (req: Request, res: Response) => {
-    try {
-        const did = await verifyBearerToken(req);
-        if (!did) {
-            res.status(401).json({ ok: false, message: 'Valid Bearer token (response DID) required' });
-            return;
-        }
-
-        const validation = validateName(req.params.name);
-        if (!validation.ok) {
-            res.status(400).json({ ok: false, message: validation.message });
-            return;
-        }
-        const trimmedName = validation.trimmedName!;
-
-        const user = await ensureUser(did);
-
-        if (!(await checkNameAvailability(trimmedName, did))) {
-            res.status(409).json({ ok: false, message: 'Name already taken' });
-            return;
-        }
-
-        user.name = trimmedName;
-        await issueOrUpdateCredential(did, user, trimmedName);
-        await db.setUser(did, user);
-
-        let credential = null;
-        if (user.credentialDid) {
-            credential = await keymaster.getCredential(user.credentialDid);
-        }
-
-        res.json({
-            ok: true,
-            name: trimmedName,
-            did,
-            credentialDid: user.credentialDid,
-            credentialIssuedAt: user.credentialIssuedAt,
-            credential,
-        });
-    }
-    catch (error) {
-        console.log(error);
-        res.status(500).send(String(error));
-    }
-});
-
 // GET /.well-known/webfinger — RFC 7033 WebFinger discovery
 app.get('/.well-known/webfinger', async (req: Request, res: Response) => {
     try {
@@ -1135,8 +1088,9 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
         }
     }
 
-    if (process.env.ARCHON_KEYMASTER_URL) {
-        const keymasterUrl = process.env.ARCHON_KEYMASTER_URL;
+    const keymasterUrl = process.env.ARCHON_HERALD_KEYMASTER_URL?.trim();
+
+    if (keymasterUrl) {
         keymaster = new KeymasterClient();
         await keymaster.connect({
             url: keymasterUrl,
