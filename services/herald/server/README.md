@@ -12,7 +12,8 @@ This folder contains the Express server for the name service, providing DID-base
     - `ARCHON_HERALD_PORT=4230`
     - `ARCHON_HERALD_SESSION_SECRET=<random secret>` (required)
     - `ARCHON_HERALD_JWT_KEY_PATH=<optional path>` to persist the OIDC signing key outside the default data dir
-    - Additional variables like `ARCHON_KEYMASTER_URL`, `ARCHON_GATEKEEPER_URL`, `ARCHON_HERALD_WALLET_URL` for Keymaster/Gatekeeper integration.
+    - Use `ARCHON_HERALD_KEYMASTER_URL` for shared Keymaster mode, or leave it blank and set `ARCHON_HERALD_WALLET_PASSPHRASE` for local-wallet mode.
+    - Additional variables like `ARCHON_GATEKEEPER_URL` and `ARCHON_HERALD_WALLET_URL` control Gatekeeper integration and wallet challenge links.
 
 3. **Run**:
     - `npm start`

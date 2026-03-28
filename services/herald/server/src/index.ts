@@ -30,7 +30,7 @@ const HOST_PORT = Number(process.env.ARCHON_HERALD_PORT) || 4230;
 const DRAWBRIDGE_PORT = Number(process.env.ARCHON_DRAWBRIDGE_PORT) || 4222;
 const DRAWBRIDGE_PUBLIC_HOST = process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || `http://localhost:${DRAWBRIDGE_PORT}`;
 const GATEKEEPER_URL = process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224';
-const WALLET_URL = process.env.ARCHON_HERALD_WALLET_URL || 'http://localhost:4224';
+const WALLET_URL = process.env.ARCHON_HERALD_WALLET_URL || 'https://wallet.archon.technology';
 const HERALD_DATABASE_TYPE = process.env.ARCHON_HERALD_DB || 'json';
 const DATA_DIR = process.env.ARCHON_HERALD_DATA_DIR || '/app/server/data';
 const IPFS_API_URL = process.env.ARCHON_HERALD_IPFS_API_URL || 'http://localhost:5001/api/v0';
@@ -1088,8 +1088,9 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
         }
     }
 
-    if (process.env.ARCHON_KEYMASTER_URL) {
-        const keymasterUrl = process.env.ARCHON_KEYMASTER_URL;
+    const keymasterUrl = process.env.ARCHON_HERALD_KEYMASTER_URL?.trim();
+
+    if (keymasterUrl) {
         keymaster = new KeymasterClient();
         await keymaster.connect({
             url: keymasterUrl,
