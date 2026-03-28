@@ -221,7 +221,7 @@ async function main() {
 
     // Middleware
     app.use((req, res, next) => {
-        if (req.path.startsWith('/names') || req.path.startsWith('/.well-known/names')) {
+        if (req.path.startsWith('/names') || req.path.startsWith('/.well-known')) {
             return heraldCors(req, res, next);
         }
 
@@ -924,7 +924,7 @@ async function main() {
         }
     });
 
-    app.use('/.well-known/names', async (req, res) => {
+    app.use('/.well-known', async (req, res) => {
         try {
             await proxyHeraldRequest(req, res, '');
         } catch (error: any) {
