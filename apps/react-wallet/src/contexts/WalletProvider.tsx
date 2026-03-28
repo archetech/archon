@@ -101,8 +101,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
     }
 
+    function resolveGatekeeperUrl(): string {
+        const savedUrl = localStorage.getItem(GATEKEEPER_KEY);
+        if (!savedUrl) {
+            return DEFAULT_GATEKEEPER_URL;
+        }
+
+        try {
+            const parsed = new URL(savedUrl);
+            const isLoopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+            const browserHost = typeof window !== 'undefined' ? window.location.hostname : '';
+            const browserIsRemote = !!browserHost && browserHost !== 'localhost' && browserHost !== '127.0.0.1';
+
+            if (isLoopback && browserIsRemote) {
+                return DEFAULT_GATEKEEPER_URL;
+            }
+        } catch {
+            return DEFAULT_GATEKEEPER_URL;
+        }
+
+        return savedUrl;
+    }
+
     async function initialiseServices() {
-        const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
+        const gatekeeperUrl = resolveGatekeeperUrl();
         localStorage.setItem(GATEKEEPER_KEY, gatekeeperUrl);
         try {
             await gatekeeper.connect({ url: gatekeeperUrl });
