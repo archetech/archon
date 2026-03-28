@@ -1910,6 +1910,13 @@ export default class Keymaster implements KeymasterInterface {
             return { url, config };
         }
 
+        if (!activeUrl && entries.length > 1) {
+            throw new KeymasterError(
+                'Multiple Lightning wallets are configured and no active gatekeeper URL is available ' +
+                'to select the Nostr signer configuration.',
+            );
+        }
+
         throw new LightningNotConfiguredError(
             activeUrl
                 ? `No Lightning wallet configured for ${idInfo.did} on ${activeUrl}`
@@ -2027,10 +2034,15 @@ export default class Keymaster implements KeymasterInterface {
         let removedSigner = false;
         await this.mutateWallet(async (wallet) => {
             const idInfo = await this.fetchIdInfo(name, wallet);
-            const store = (idInfo.lightning || {}) as Record<string, LightningConfig>;
             if (!activeUrl) {
+                if (idInfo.lightning && 'walletId' in idInfo.lightning && idInfo.lightning.nostrSigner?.type === 'nsecbunker') {
+                    delete idInfo.lightning.nostrSigner;
+                    removedSigner = true;
+                }
                 return;
             }
+
+            const store = (idInfo.lightning || {}) as Record<string, LightningConfig>;
             const config = store[activeUrl];
 
             if (!config) {
