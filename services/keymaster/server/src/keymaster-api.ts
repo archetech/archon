@@ -1767,6 +1767,53 @@ v1router.delete('/aliases/:alias', async (req, res) => {
 
 /**
  * @swagger
+ * /nostr/pubkey:
+ *   post:
+ *     summary: Resolve the preferred Nostr public key for the active identity.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: "Identity name (optional, defaults to current)."
+ *     responses:
+ *       200:
+ *         description: The preferred Nostr keys.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 npub:
+ *                   type: string
+ *                 pubkey:
+ *                   type: string
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/nostr/pubkey', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const nostr = await keymaster.getNostrKeys(id);
+        res.json(nostr);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /nostr:
  *   post:
  *     summary: Add Nostr keys to the current identity.
@@ -1814,6 +1861,59 @@ v1router.post('/nostr', async (req, res) => {
 
 /**
  * @swagger
+ * /nostr/signer:
+ *   post:
+ *     summary: Configure delegated Nostr signing for the active identity.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nsec:
+ *                 type: string
+ *               id:
+ *                 type: string
+ *                 description: "Identity name (optional, defaults to current)."
+ *               extensionId:
+ *                 type: string
+ *               lnbitsUrl:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: The delegated Nostr keys.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 npub:
+ *                   type: string
+ *                 pubkey:
+ *                   type: string
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/nostr/signer', async (req, res) => {
+    try {
+        const { nsec, id, extensionId, lnbitsUrl } = req.body;
+        const nostr = await keymaster.addNostrSigner(nsec, id, extensionId, lnbitsUrl);
+        res.json(nostr);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /nostr:
  *   delete:
  *     summary: Remove Nostr keys from the current identity.
@@ -1851,6 +1951,51 @@ v1router.delete('/nostr', async (req, res) => {
     try {
         const { id } = req.body;
         const ok = await keymaster.removeNostr(id);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /nostr/signer:
+ *   delete:
+ *     summary: Remove delegated Nostr signer configuration from the active identity.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: "Identity name (optional, defaults to current)."
+ *     responses:
+ *       200:
+ *         description: Whether cleanup succeeded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.delete('/nostr/signer', async (req, res) => {
+    try {
+        const { id } = req.body;
+        const ok = await keymaster.removeNostrSigner(id);
         res.json({ ok });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });

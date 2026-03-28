@@ -4145,6 +4145,7 @@ describe('nostr preferences', () => {
     type KeymasterClientNostrApi = {
         getNostrKeys(): Promise<typeof mockNostrKeys>;
         removeNostrSigner(): Promise<boolean>;
+        addNostrSigner(nsec?: string, id?: string, extensionId?: string, lnbitsUrl?: string): Promise<typeof mockNostrKeys>;
     };
 
     it('should fetch preferred nostr keys from the pubkey route', async () => {
@@ -4171,5 +4172,18 @@ describe('nostr preferences', () => {
 
         expect(scope.isDone()).toBe(true);
         expect(ok).toBe(true);
+    });
+
+    it('should create delegated nostr signer config through the signer route', async () => {
+        const scope = nock(KeymasterURL)
+            .post(Endpoints.nostr_signer)
+            .reply(200, mockNostrKeys);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const nostrClient = keymaster as unknown as KeymasterClientNostrApi;
+        const result = await nostrClient.addNostrSigner('nsec1test', 'alice', 'archon', 'http://nsecbunker.test');
+
+        expect(scope.isDone()).toBe(true);
+        expect(result).toStrictEqual(mockNostrKeys);
     });
 });

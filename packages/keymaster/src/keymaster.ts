@@ -77,6 +77,7 @@ import {
 } from '@didcid/cipher/types';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { decryptWithPassphrase, encryptWithPassphrase } from '@didcid/cipher/passphrase';
+import axios from 'axios';
 
 function hexToBase64url(hex: string): string {
     const bytes = Buffer.from(hex, 'hex');
@@ -1842,15 +1843,135 @@ export default class Keymaster implements KeymasterInterface {
         return true;
     }
 
+    private async pubkeyHexToNostrKeys(pubkeyHex: string): Promise<NostrKeys> {
+        let npub = '';
+
+        try {
+            const pubkeyBytes = Buffer.from(pubkeyHex, 'hex');
+            const { bech32 } = await import('bech32');
+            npub = bech32.encode('npub', bech32.toWords(pubkeyBytes), 1000);
+        }
+        catch {
+            // Hex pubkey is still authoritative even if bech32 encoding fails.
+        }
+
+        return { npub, pubkey: pubkeyHex };
+    }
+
+    private async getLocalNostrKeys(name?: string): Promise<NostrKeys> {
+        const keypair = await this.fetchKeyPair(name);
+        if (!keypair) {
+            throw new InvalidParameterError('id');
+        }
+
+        return this.cipher.jwkToNostr(keypair.publicJwk);
+    }
+
+    private async getNostrLightningConfigEntry(name?: string): Promise<{ url?: string; config: LightningConfig }> {
+        const gk = this.gatekeeper as { url?: string };
+        const activeUrl = gk.url;
+        let wallet = await this.loadWallet();
+        let idInfo = await this.fetchIdInfo(name, wallet);
+
+        if (!idInfo.lightning) {
+            throw new LightningNotConfiguredError(`No Lightning wallet configured for ${idInfo.did}`);
+        }
+
+        if ('walletId' in idInfo.lightning) {
+            if (!activeUrl) {
+                return { config: idInfo.lightning as LightningConfig };
+            }
+
+            await this.mutateWallet(async (wallet) => {
+                const idInfo = await this.fetchIdInfo(name, wallet);
+                if (idInfo.lightning && 'walletId' in idInfo.lightning) {
+                    idInfo.lightning = { [activeUrl]: idInfo.lightning as LightningConfig };
+                }
+            });
+            wallet = await this.loadWallet();
+            idInfo = await this.fetchIdInfo(name, wallet);
+        }
+
+        const store = idInfo.lightning as Record<string, LightningConfig>;
+
+        if (activeUrl && store[activeUrl]) {
+            return { url: activeUrl, config: store[activeUrl] };
+        }
+
+        const signerEntries = Object.entries(store).filter(([, config]) => config?.nostrSigner?.type === 'nsecbunker');
+        if (!activeUrl && signerEntries.length === 1) {
+            const [url, config] = signerEntries[0];
+            return { url, config };
+        }
+
+        const entries = Object.entries(store);
+        if (!activeUrl && entries.length === 1) {
+            const [url, config] = entries[0];
+            return { url, config };
+        }
+
+        throw new LightningNotConfiguredError(
+            activeUrl
+                ? `No Lightning wallet configured for ${idInfo.did} on ${activeUrl}`
+                : `No Lightning wallet configured for ${idInfo.did}`,
+        );
+    }
+
+    private async restoreLocalNostrMetadata(name?: string): Promise<void> {
+        const nostr = await this.getLocalNostrKeys(name);
+
+        await this.mutateWallet(async (wallet) => {
+            const idInfo = await this.fetchIdInfo(name, wallet);
+            idInfo.didDocumentData = {
+                ...(idInfo.didDocumentData || {}),
+                nostr,
+            };
+        });
+
+        const id = await this.fetchIdInfo(name);
+        await this.mergeData(id.did, { nostr });
+    }
+
+    private async getRemoteNostrKeys(config: LightningConfig): Promise<NostrKeys | null> {
+        const signer = config.nostrSigner;
+        if (!signer || signer.type !== 'nsecbunker') {
+            return null;
+        }
+
+        const baseUrl = signer.lnbitsUrl.replace(/\/$/, '');
+
+        try {
+            const response = await axios.get(`${baseUrl}/nsecbunker/api/v1/pubkey`, {
+                params: {
+                    key_id: signer.keyId,
+                },
+                headers: {
+                    'X-Api-Key': config.invoiceKey,
+                },
+            });
+
+            const data = response.data as { pubkey_hex?: string; pubkey?: string };
+            const pubkeyHex = data.pubkey_hex || data.pubkey;
+            if (typeof pubkeyHex !== 'string' || !/^[0-9a-f]{64}$/i.test(pubkeyHex)) {
+                return null;
+            }
+
+            return await this.pubkeyHexToNostrKeys(pubkeyHex);
+        }
+        catch {
+            return null;
+        }
+    }
+
     async addNostr(name?: string): Promise<NostrKeys> {
         // If nsecbunker is configured, don't overwrite with DID-derived keys
         try {
-            const config = await this.getLightningConfig(name);
+            const { config } = await this.getNostrLightningConfigEntry(name);
             if (config?.nostrSigner?.type === 'nsecbunker') {
                 throw new KeymasterError(
                     'Nostr signing is delegated to nsecbunker. ' +
                     'Use "add-nostr-signer" to manage nsecbunker keys, ' +
-                    'or "remove-nostr" first to clear the existing config.'
+                    'or "remove-nostr-signer" first to clear the existing config.'
                 );
             }
         } catch (e: any) {
@@ -1867,15 +1988,72 @@ export default class Keymaster implements KeymasterInterface {
         return nostr;
     }
 
+    async getNostrKeys(name?: string): Promise<NostrKeys> {
+        try {
+            const { config } = await this.getNostrLightningConfigEntry(name);
+            const remote = await this.getRemoteNostrKeys(config);
+            if (remote) {
+                return remote;
+            }
+        }
+        catch (error: any) {
+            if (error.type !== LightningNotConfiguredError.type &&
+                error.type !== LightningUnavailableError.type) {
+                throw error;
+            }
+        }
+
+        return this.getLocalNostrKeys(name);
+    }
+
     async removeNostr(name?: string): Promise<boolean> {
         const id = await this.fetchIdInfo(name);
         return this.mergeData(id.did, { nostr: null });
     }
 
+    async removeNostrSigner(name?: string): Promise<boolean> {
+        let activeUrl: string | undefined;
+        try {
+            ({ url: activeUrl } = await this.getNostrLightningConfigEntry(name));
+        }
+        catch (error: any) {
+            if (error.type === LightningNotConfiguredError.type ||
+                error.type === LightningUnavailableError.type) {
+                return true;
+            }
+            throw error;
+        }
+
+        let removedSigner = false;
+        await this.mutateWallet(async (wallet) => {
+            const idInfo = await this.fetchIdInfo(name, wallet);
+            const store = (idInfo.lightning || {}) as Record<string, LightningConfig>;
+            if (!activeUrl) {
+                return;
+            }
+            const config = store[activeUrl];
+
+            if (!config) {
+                return;
+            }
+
+            if (config.nostrSigner?.type === 'nsecbunker') {
+                delete config.nostrSigner;
+                removedSigner = true;
+            }
+        });
+
+        if (removedSigner) {
+            await this.restoreLocalNostrMetadata(name);
+        }
+
+        return true;
+    }
+
     async exportNsec(name?: string): Promise<string> {
         // If nsecbunker is configured, don't expose the unrelated DID-derived key
         try {
-            const config = await this.getLightningConfig(name);
+            const { config } = await this.getNostrLightningConfigEntry(name);
             if (config?.nostrSigner?.type === 'nsecbunker') {
                 throw new KeymasterError(
                     'Nostr signing is delegated to nsecbunker. ' +
@@ -1898,7 +2076,7 @@ export default class Keymaster implements KeymasterInterface {
     async signNostrEvent(event: NostrEvent): Promise<NostrEvent> {
         // Check for nsecbunker remote signer in Lightning config
         try {
-            const config = await this.getLightningConfig();
+            const { config } = await this.getNostrLightningConfigEntry();
             if (config?.nostrSigner?.type === 'nsecbunker') {
                 const { keyId, extensionId, lnbitsUrl } = config.nostrSigner;
                 const baseUrl = lnbitsUrl.replace(/\/$/, '');
@@ -1957,7 +2135,7 @@ export default class Keymaster implements KeymasterInterface {
         extensionId: string = 'archon',
         lnbitsUrl?: string,
     ): Promise<NostrKeys> {
-        const config = await this.getLightningConfig(name);
+        const { url: lightningUrl, config } = await this.getNostrLightningConfigEntry(name);
         const adminKey = config.adminKey;
         const invoiceKey = config.invoiceKey;
 
@@ -2028,8 +2206,10 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         // Step 4: Store nostrSigner config in wallet
-        const drawbridge = this.requireDrawbridge();
-        const drawbridgeUrl = drawbridge.url;
+        const drawbridgeUrl = lightningUrl || (this.gatekeeper as { url?: string }).url;
+        if (!drawbridgeUrl) {
+            throw new LightningNotConfiguredError('No Lightning wallet configured for delegated signer storage');
+        }
 
         await this.mutateWallet(async (wallet) => {
             const id = await this.fetchIdInfo(name, wallet);
@@ -2045,15 +2225,7 @@ export default class Keymaster implements KeymasterInterface {
         });
 
         // Step 5: Build npub from hex pubkey
-        let npub = '';
-        try {
-            const pubkeyBytes = Buffer.from(pubkeyHex, 'hex');
-            const { bech32 } = await import('bech32');
-            npub = bech32.encode('npub', bech32.toWords(pubkeyBytes), 1000);
-        } catch {
-            // npub encoding failed; hex pubkey is still valid
-        }
-        const nostrKeys: NostrKeys = { npub, pubkey: pubkeyHex };
+        const nostrKeys = await this.pubkeyHexToNostrKeys(pubkeyHex);
 
         // Step 6: Merge nostr keys into DID document
         await this.mergeData(idInfo.did, { nostr: nostrKeys });
@@ -2140,7 +2312,8 @@ export default class Keymaster implements KeymasterInterface {
 
         // Try to get URL for targeted removal; fall back to removing all
         const gk = this.gatekeeper as { url?: string };
-        const url = gk.url ? new URL(gk.url).origin : null;
+        const url = gk.url || null;
+        let restoreLocalNostr = false;
 
         await this.mutateWallet(async (wallet) => {
             const idInfo = await this.fetchIdInfo(name, wallet);
@@ -2149,15 +2322,24 @@ export default class Keymaster implements KeymasterInterface {
 
             if (url) {
                 const store = idInfo.lightning as Record<string, LightningConfig>;
+                const removedConfig = store[url];
+                restoreLocalNostr = !!removedConfig?.nostrSigner && removedConfig.nostrSigner.type === 'nsecbunker';
                 delete store[url];
 
                 if (Object.keys(store).length === 0) {
                     delete idInfo.lightning;
                 }
             } else {
+                const store = idInfo.lightning as Record<string, LightningConfig>;
+                restoreLocalNostr = Object.values(store).some((config) => config?.nostrSigner?.type === 'nsecbunker');
                 delete idInfo.lightning;
             }
         });
+
+        if (restoreLocalNostr) {
+            await this.restoreLocalNostrMetadata(name);
+        }
+
         return true;
     }
 

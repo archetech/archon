@@ -366,7 +366,9 @@ export interface KeymasterInterface {
 
     // Nostr
     addNostr(id?: string): Promise<NostrKeys>;
+    getNostrKeys(id?: string): Promise<NostrKeys>;
     removeNostr(id?: string): Promise<boolean>;
+    removeNostrSigner(id?: string): Promise<boolean>;
     exportNsec(id?: string): Promise<string>;
     signNostrEvent(event: NostrEvent): Promise<NostrEvent>;
     addNostrSigner(nsec?: string, id?: string, extensionId?: string, lnbitsUrl?: string): Promise<NostrKeys>;

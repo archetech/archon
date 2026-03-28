@@ -481,6 +481,16 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async getNostrKeys(id?: string): Promise<NostrKeys> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr/pubkey`, { id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async exportNsec(id?: string): Promise<string> {
         try {
             const response = await this.axios.post(`${this.API}/nostr/nsec`, { id });
@@ -505,6 +515,16 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.post(`${this.API}/nostr/signer`, { nsec, id, extensionId, lnbitsUrl });
             return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeNostrSigner(id?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/nostr/signer`, { data: { id } });
+            return response.data.ok;
         }
         catch (error) {
             throwError(error);

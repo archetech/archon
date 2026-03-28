@@ -837,6 +837,19 @@ program
         }
     });
 
+program
+    .command('remove-nostr-signer [id]')
+    .description('Remove delegated nsecbunker signing from a DID and restore local nostr metadata')
+    .action(async (id) => {
+        try {
+            await keymaster.removeNostrSigner(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
 // Lightning commands
 program
     .command('add-lightning [id]')
