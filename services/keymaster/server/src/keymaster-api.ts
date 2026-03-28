@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { readFile } from 'fs/promises';
 import express from 'express';
 import cors from 'cors';
@@ -146,6 +149,33 @@ app.get('/metrics', async (req, res) => {
         res.status(500).end(error.toString());
     }
 });
+
+// Serve embedded client UI when ARCHON_KEYMASTER_SERVE_CLIENT is enabled
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const serveClient = (process.env.ARCHON_KEYMASTER_SERVE_CLIENT ?? 'true').toLowerCase() === 'true';
+if (serveClient) {
+    const clientBuildDir = path.join(__dirname, '../../client/build');
+    app.use(express.static(clientBuildDir, { index: false }));
+    const indexPath = path.join(clientBuildDir, 'index.html');
+    let indexHtml = '';
+    try {
+        indexHtml = fs.readFileSync(indexPath, 'utf-8');
+    } catch {
+        // Client build not available
+    }
+    app.use((req, res, next) => {
+        if (!req.path.startsWith('/api')) {
+            if (!indexHtml) {
+                res.status(404).send('Client build not found');
+                return;
+            }
+            const configScript = `<script>window.__ARCHON_CONFIG__=${JSON.stringify({ passphraseRequired: !!config.keymasterPassphrase })};</script>`;
+            res.send(indexHtml.replace('</head>', `${configScript}</head>`));
+        } else {
+            next();
+        }
+    });
+}
 
 const DIDNotFound = { error: 'DID not found' };
 

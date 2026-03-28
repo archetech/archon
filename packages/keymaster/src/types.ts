@@ -252,6 +252,13 @@ export type {
     LightningPaymentStatus,
 } from '@didcid/gatekeeper/types';
 
+export interface NostrSignerConfig {
+    type: "nsecbunker";
+    keyId: string;
+    extensionId: string;
+    lnbitsUrl: string;
+}
+
 export interface DecodedLightningInvoice {
     amount?: string;
     description?: string;
@@ -362,6 +369,7 @@ export interface KeymasterInterface {
     removeNostr(id?: string): Promise<boolean>;
     exportNsec(id?: string): Promise<string>;
     signNostrEvent(event: NostrEvent): Promise<NostrEvent>;
+    addNostrSigner(nsec?: string, id?: string, extensionId?: string, lnbitsUrl?: string): Promise<NostrKeys>;
 
     // Lightning
     addLightning(id?: string): Promise<LightningConfig>;

@@ -501,6 +501,16 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async addNostrSigner(nsec?: string, id?: string, extensionId?: string, lnbitsUrl?: string): Promise<NostrKeys> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr/signer`, { nsec, id, extensionId, lnbitsUrl });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     // Lightning
 
     async addLightning(id?: string): Promise<LightningConfig> {

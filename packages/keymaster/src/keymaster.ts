@@ -1843,6 +1843,20 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async addNostr(name?: string): Promise<NostrKeys> {
+        // If nsecbunker is configured, don't overwrite with DID-derived keys
+        try {
+            const config = await this.getLightningConfig(name);
+            if (config?.nostrSigner?.type === 'nsecbunker') {
+                throw new KeymasterError(
+                    'Nostr signing is delegated to nsecbunker. ' +
+                    'Use "add-nostr-signer" to manage nsecbunker keys, ' +
+                    'or "remove-nostr" first to clear the existing config.'
+                );
+            }
+        } catch (e: any) {
+            if (e.type === 'Keymaster') throw e;
+        }
+
         const keypair = await this.fetchKeyPair(name);
         if (!keypair) {
             throw new InvalidParameterError('id');
@@ -1859,6 +1873,21 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async exportNsec(name?: string): Promise<string> {
+        // If nsecbunker is configured, don't expose the unrelated DID-derived key
+        try {
+            const config = await this.getLightningConfig(name);
+            if (config?.nostrSigner?.type === 'nsecbunker') {
+                throw new KeymasterError(
+                    'Nostr signing is delegated to nsecbunker. ' +
+                    'The private key is stored remotely and cannot be exported from Archon. ' +
+                    'Use your nsecbunker instance to manage the key.'
+                );
+            }
+        } catch (e: any) {
+            // Re-throw if it's our nsecbunker message; ignore LightningNotConfigured
+            if (e.type === 'Keymaster') throw e;
+        }
+
         const keypair = await this.fetchKeyPair(name);
         if (!keypair) {
             throw new InvalidParameterError('id');
@@ -1867,6 +1896,38 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async signNostrEvent(event: NostrEvent): Promise<NostrEvent> {
+        // Check for nsecbunker remote signer in Lightning config
+        try {
+            const config = await this.getLightningConfig();
+            if (config?.nostrSigner?.type === 'nsecbunker') {
+                const { keyId, extensionId, lnbitsUrl } = config.nostrSigner;
+                const baseUrl = lnbitsUrl.replace(/\/$/, '');
+                const response = await fetch(`${baseUrl}/nsecbunker/api/v1/sign`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Api-Key': config.adminKey,
+                    },
+                    body: JSON.stringify({
+                        extension_id: extensionId,
+                        key_id: keyId,
+                        event: {
+                            kind: event.kind,
+                            content: event.content,
+                            tags: event.tags,
+                            created_at: event.created_at,
+                        },
+                    }),
+                });
+                if (response.ok) {
+                    const data = await response.json() as { event: NostrEvent };
+                    return data.event;
+                }
+            }
+        } catch {
+            // Fall through to derived key signing
+        }
+
         const keypair = await this.fetchKeyPair();
         if (!keypair) {
             throw new InvalidParameterError('id');
@@ -1888,6 +1949,116 @@ export default class Keymaster implements KeymasterInterface {
             pubkey: nostr.pubkey,
             sig,
         };
+    }
+
+    async addNostrSigner(
+        nsec?: string,
+        name?: string,
+        extensionId: string = 'archon',
+        lnbitsUrl?: string,
+    ): Promise<NostrKeys> {
+        const config = await this.getLightningConfig(name);
+        const adminKey = config.adminKey;
+        const invoiceKey = config.invoiceKey;
+
+        let baseUrl: string;
+        if (lnbitsUrl) {
+            baseUrl = lnbitsUrl.replace(/\/$/, '');
+        } else if (config.nostrSigner?.lnbitsUrl) {
+            baseUrl = config.nostrSigner.lnbitsUrl.replace(/\/$/, '');
+        } else {
+            throw new InvalidParameterError('lnbitsUrl is required to configure nsecbunker');
+        }
+
+        // Step 1: Import or generate key in nsecbunker
+        const idInfo = await this.fetchIdInfo(name);
+        const label = `archon:${name || idInfo.did.split(':').pop()?.substring(0, 12) || 'default'}`;
+
+        let keyResponse: Response;
+        if (nsec) {
+            keyResponse = await fetch(`${baseUrl}/nsecbunker/api/v1/keys`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Api-Key': adminKey },
+                body: JSON.stringify({ private_key: nsec, label }),
+            });
+        } else {
+            keyResponse = await fetch(`${baseUrl}/nsecbunker/api/v1/keys/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Api-Key': adminKey },
+                body: JSON.stringify({ label }),
+            });
+        }
+
+        if (!keyResponse.ok) {
+            const errText = await keyResponse.text();
+            throw new Error(`Failed to create/import nsecbunker key: ${errText}`);
+        }
+        const keyData = await keyResponse.json() as { id: string };
+        const keyId = keyData.id;
+
+        // Step 2: Get pubkey
+        const pubkeyResponse = await fetch(
+            `${baseUrl}/nsecbunker/api/v1/pubkey?key_id=${keyId}`,
+            { headers: { 'X-Api-Key': invoiceKey } },
+        );
+        if (!pubkeyResponse.ok) {
+            throw new Error(`Failed to retrieve nsecbunker pubkey`);
+        }
+        const pubkeyData = await pubkeyResponse.json() as { pubkey_hex: string };
+        const pubkeyHex = pubkeyData.pubkey_hex;
+
+        // Step 3: Grant permissions for common event kinds
+        const kinds = [
+            { kind: 0 }, { kind: 1 }, { kind: 4 },
+            { kind: 6 }, { kind: 7 }, { kind: 1059 }, { kind: 30023 },
+        ];
+
+        for (const k of kinds) {
+            await fetch(`${baseUrl}/nsecbunker/api/v1/permissions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Api-Key': adminKey },
+                body: JSON.stringify({
+                    key_id: keyId,
+                    extension_id: extensionId,
+                    kind: k.kind,
+                    rate_limit_count: 1000,
+                    rate_limit_seconds: 86400,
+                }),
+            });
+        }
+
+        // Step 4: Store nostrSigner config in wallet
+        const drawbridge = this.requireDrawbridge();
+        const drawbridgeUrl = drawbridge.url;
+
+        await this.mutateWallet(async (wallet) => {
+            const id = await this.fetchIdInfo(name, wallet);
+            const store = (id.lightning || {}) as Record<string, any>;
+            if (store[drawbridgeUrl]) {
+                store[drawbridgeUrl].nostrSigner = {
+                    type: 'nsecbunker',
+                    keyId,
+                    extensionId,
+                    lnbitsUrl: baseUrl,
+                };
+            }
+        });
+
+        // Step 5: Build npub from hex pubkey
+        let npub = '';
+        try {
+            const pubkeyBytes = Buffer.from(pubkeyHex, 'hex');
+            const { bech32 } = await import('bech32');
+            npub = bech32.encode('npub', bech32.toWords(pubkeyBytes), 1000);
+        } catch {
+            // npub encoding failed; hex pubkey is still valid
+        }
+        const nostrKeys: NostrKeys = { npub, pubkey: pubkeyHex };
+
+        // Step 6: Merge nostr keys into DID document
+        await this.mergeData(idInfo.did, { nostr: nostrKeys });
+
+        return nostrKeys;
     }
 
     // Lightning helpers

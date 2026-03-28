@@ -12,9 +12,16 @@ COPY packages/ ./packages/
 RUN npm ci
 RUN npm run build
 
-COPY services/keymaster/server ./keymaster/server/
+# Build the client UI
+COPY apps/keymaster-client ./apps/keymaster-client/
+RUN cd apps/keymaster-client && npm ci && npm run build
 
+# Build the server
+COPY services/keymaster/server ./keymaster/server/
 RUN cd keymaster/server && npm ci && npm run build
+
+# Copy client build to where the server expects it
+RUN mkdir -p keymaster/client/build && cp -r apps/keymaster-client/dist/* keymaster/client/build/
 
 WORKDIR /app/keymaster
 

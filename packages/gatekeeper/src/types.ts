@@ -177,6 +177,12 @@ export interface LightningConfig {
     walletId: string;
     adminKey: string;
     invoiceKey: string;
+    nostrSigner?: {
+        type: string;
+        keyId: string;
+        extensionId: string;
+        lnbitsUrl: string;
+    };
 }
 
 export interface LightningBalance {

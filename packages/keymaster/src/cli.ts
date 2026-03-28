@@ -804,6 +804,27 @@ program
     });
 
 program
+    .command('add-nostr-signer [id]')
+    .description('Configure nsecbunker remote signing for a DID')
+    .option('--nsec <nsec>', 'Import existing Nostr private key (hex or nsec format)')
+    .option('--extension-id <id>', 'Extension ID for permissions', 'archon')
+    .option('--lnbits-url <url>', 'LNbits base URL hosting nsecbunker (e.g. https://lnb.bolverker.com)')
+    .action(async (id, options) => {
+        try {
+            const nostr = await keymaster.addNostrSigner(
+                options.nsec,
+                id,
+                options.extensionId,
+                options.lnbitsUrl,
+            );
+            console.log(JSON.stringify(nostr, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('remove-nostr [id]')
     .description('Remove nostr keys from an agent DID')
     .action(async (id) => {
