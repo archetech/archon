@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
         },
         preview: {
             port,
+            // Herald client is typically published behind a reverse proxy on a public domain.
+            // Host validation is handled at that layer, so preview must accept forwarded hosts.
+            allowedHosts: true,
         },
         build: {
             outDir: './build',
