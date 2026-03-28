@@ -55,6 +55,8 @@ const Endpoints = {
     lightning_unpublish: '/api/v1/lightning/unpublish',
     lightning_zap: '/api/v1/lightning/zap',
     lightning_payments: '/api/v1/lightning/payments',
+    nostr_pubkey: '/api/v1/nostr/pubkey',
+    nostr_signer: '/api/v1/nostr/signer',
 };
 
 const mockConsole = {
@@ -4127,5 +4129,34 @@ describe('getLightningPayments', () => {
         catch (error: any) {
             expect(error.message).toBe(ServerError.message);
         }
+    });
+});
+
+describe('nostr preferences', () => {
+    const mockNostrKeys = {
+        npub: 'npub1test',
+        pubkey: 'e'.repeat(64),
+    };
+
+    it('should fetch preferred nostr keys from the pubkey route', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.nostr_pubkey)
+            .reply(200, mockNostrKeys);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const result = await (keymaster as any).getNostrKeys();
+
+        expect(result).toStrictEqual(mockNostrKeys);
+    });
+
+    it('should remove delegated nostr signer config through the cleanup route', async () => {
+        nock(KeymasterURL)
+            .delete(Endpoints.nostr_signer)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await (keymaster as any).removeNostrSigner();
+
+        expect(ok).toBe(true);
     });
 });

@@ -18,6 +18,10 @@ function trackCall(method: string, ...args: any[]) {
     calls.push({ method, args });
 }
 
+function getIdInfo(walletData: any) {
+    return Object.values(walletData.ids).find((id: any) => id.did);
+}
+
 beforeAll(async () => {
     ipfs = new HeliaClient();
     await ipfs.start();
@@ -318,6 +322,42 @@ describe('removeLightning', () => {
         const updated = await keymaster.loadWallet();
         const updatedBob = Object.values(updated.ids).find(id => id.did)!;
         expect(updatedBob.lightning).toBeUndefined();
+    });
+
+    it('should restore local nostr metadata when removing Lightning with delegated signer', async () => {
+        await keymaster.createId('Bob');
+        const localNostr = await keymaster.addNostr();
+        await keymaster.addLightning();
+
+        const walletData = await keymaster.loadWallet();
+        const bobInfo = getIdInfo(walletData);
+        bobInfo.didDocumentData = {
+            ...(bobInfo.didDocumentData || {}),
+            nostr: {
+                npub: 'npub1remote',
+                pubkey: 'd'.repeat(64),
+            },
+        };
+        bobInfo.lightning = {
+            [gatekeeper.url]: {
+                walletId: 'w1',
+                adminKey: 'admin1',
+                invoiceKey: 'invoice1',
+                nostrSigner: {
+                    type: 'nsecbunker',
+                    keyId: 'key-1',
+                    extensionId: 'archon',
+                    lnbitsUrl: 'http://nsecbunker.test',
+                },
+            },
+        };
+        await keymaster.saveWallet(walletData, true);
+
+        await keymaster.removeLightning();
+
+        const updated = await keymaster.loadWallet();
+        const updatedBob = getIdInfo(updated);
+        expect(updatedBob.didDocumentData?.nostr).toStrictEqual(localNostr);
     });
 
     it('should succeed even if Lightning was not configured', async () => {

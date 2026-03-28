@@ -5,6 +5,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { UnknownIDError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
+import nock from 'nock';
 import { bech32 } from 'bech32';
 import { schnorr } from '@noble/curves/secp256k1';
 
@@ -32,6 +33,55 @@ beforeEach(() => {
     cipher = new CipherNode();
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
 });
+
+function getIdInfo(walletData: any) {
+    return Object.values(walletData.ids).find((id: any) => id.did);
+}
+
+async function seedNsecbunkerSigner({
+    localNostr,
+    remotePubkey,
+    nsecbunkerUrl,
+    keyId = 'key-1',
+}: {
+    localNostr?: { npub: string; pubkey: string };
+    remotePubkey: string;
+    nsecbunkerUrl: string;
+    keyId?: string;
+    }) {
+    await keymaster.createId('Bob');
+
+    const walletData = await keymaster.loadWallet();
+    const bobInfo = getIdInfo(walletData);
+
+    if (localNostr) {
+        bobInfo.didDocumentData = {
+            ...(bobInfo.didDocumentData || {}),
+            nostr: localNostr,
+        };
+    }
+
+    bobInfo.lightning = {
+        [gatekeeper.url]: {
+            walletId: 'w1',
+            adminKey: 'admin1',
+            invoiceKey: 'invoice1',
+            nostrSigner: {
+                type: 'nsecbunker',
+                keyId,
+                extensionId: 'archon',
+                lnbitsUrl: nsecbunkerUrl,
+            },
+        },
+    };
+
+    await keymaster.saveWallet(walletData, true);
+
+    return {
+        walletData,
+        bobInfo,
+    };
+}
 
 describe('addNostr', () => {
     it('should derive and store nostr keys for current ID', async () => {
@@ -119,6 +169,103 @@ describe('addNostr', () => {
     });
 });
 
+describe('nsecbunker preference', () => {
+    it('should prefer remote nsecbunker pubkey when configured', async () => {
+        const remotePubkey = 'b'.repeat(64);
+        const { bobInfo } = await seedNsecbunkerSigner({
+            remotePubkey,
+            nsecbunkerUrl: 'http://nsecbunker.test',
+        });
+
+        nock('http://nsecbunker.test')
+            .get('/nsecbunker/api/v1/pubkey')
+            .query({ key_id: 'key-1' })
+            .reply(200, { pubkey_hex: remotePubkey });
+
+        const result = await (keymaster as any).getNostrKeys();
+
+        expect(result.pubkey).toBe(remotePubkey);
+        expect(result.npub).toBeDefined();
+        expect(bobInfo.didDocumentData?.nostr).toBeDefined();
+    });
+
+    it('should fall back to derived local keys when remote pubkey fetch fails', async () => {
+        const localNostr = await keymaster.createId('Bob').then(async () => {
+            const nostr = await keymaster.addNostr();
+            return nostr;
+        });
+
+        const walletData = await keymaster.loadWallet();
+        const bobInfo = getIdInfo(walletData);
+        bobInfo.lightning = {
+            [gatekeeper.url]: {
+                walletId: 'w1',
+                adminKey: 'admin1',
+                invoiceKey: 'invoice1',
+                nostrSigner: {
+                    type: 'nsecbunker',
+                    keyId: 'key-1',
+                    extensionId: 'archon',
+                    lnbitsUrl: 'http://nsecbunker.test',
+                },
+            },
+        };
+        await keymaster.saveWallet(walletData, true);
+
+        nock('http://nsecbunker.test')
+            .get('/nsecbunker/api/v1/pubkey')
+            .query({ key_id: 'key-1' })
+            .reply(500, { error: 'boom' });
+
+        const result = await (keymaster as any).getNostrKeys();
+
+        expect(result).toStrictEqual(localNostr);
+    });
+
+    it('should keep signing and public-key lookup aligned when remote lookup fails', async () => {
+        const localNostr = await keymaster.createId('Bob').then(async () => {
+            const nostr = await keymaster.addNostr();
+            return nostr;
+        });
+
+        const walletData = await keymaster.loadWallet();
+        const bobInfo = getIdInfo(walletData);
+        bobInfo.lightning = {
+            [gatekeeper.url]: {
+                walletId: 'w1',
+                adminKey: 'admin1',
+                invoiceKey: 'invoice1',
+                nostrSigner: {
+                    type: 'nsecbunker',
+                    keyId: 'key-1',
+                    extensionId: 'archon',
+                    lnbitsUrl: 'http://nsecbunker.test',
+                },
+            },
+        };
+        await keymaster.saveWallet(walletData, true);
+
+        nock('http://nsecbunker.test')
+            .get('/nsecbunker/api/v1/pubkey')
+            .query({ key_id: 'key-1' })
+            .reply(500, { error: 'boom' });
+        nock('http://nsecbunker.test')
+            .post('/nsecbunker/api/v1/sign')
+            .reply(500, { error: 'boom' });
+
+        const publicKeyResult = await (keymaster as any).getNostrKeys();
+        const signed = await keymaster.signNostrEvent({
+            created_at: 1,
+            kind: 1,
+            tags: [],
+            content: 'hello',
+        });
+
+        expect(publicKeyResult.pubkey).toBe(localNostr.pubkey);
+        expect(signed.pubkey).toBe(localNostr.pubkey);
+    });
+});
+
 describe('removeNostr', () => {
     it('should remove nostr keys from DID document data', async () => {
         const did = await keymaster.createId('Bob');
@@ -169,6 +316,46 @@ describe('removeNostr', () => {
         catch (error: any) {
             expect(error.type).toBe(UnknownIDError.type);
         }
+    });
+});
+
+describe('removeNostrSigner', () => {
+    it('should clean wallet config and restore local nostr metadata', async () => {
+        const localNostr = await keymaster.createId('Bob').then(async () => {
+            const nostr = await keymaster.addNostr();
+            return nostr;
+        });
+
+        const walletData = await keymaster.loadWallet();
+        const bobInfo = getIdInfo(walletData);
+        bobInfo.didDocumentData = {
+            ...(bobInfo.didDocumentData || {}),
+            nostr: {
+                npub: 'npub1remote',
+                pubkey: 'c'.repeat(64),
+            },
+        };
+        bobInfo.lightning = {
+            [gatekeeper.url]: {
+                walletId: 'w1',
+                adminKey: 'admin1',
+                invoiceKey: 'invoice1',
+                nostrSigner: {
+                    type: 'nsecbunker',
+                    keyId: 'key-1',
+                    extensionId: 'archon',
+                    lnbitsUrl: 'http://nsecbunker.test',
+                },
+            },
+        };
+        await keymaster.saveWallet(walletData, true);
+
+        await (keymaster as any).removeNostrSigner();
+
+        const updated = await keymaster.loadWallet();
+        const updatedBob = getIdInfo(updated);
+        expect(updatedBob.lightning?.[gatekeeper.url]?.nostrSigner).toBeUndefined();
+        expect(updatedBob.didDocumentData?.nostr).toStrictEqual(localNostr);
     });
 });
 
