@@ -66,6 +66,10 @@ const mockConsole = {
     timeEnd: () => { },
 }
 
+afterEach(() => {
+    nock.cleanAll();
+});
+
 const mockCredential = {
     "@context": [
         "https://www.w3.org/ns/credentials/v2",
@@ -4138,25 +4142,34 @@ describe('nostr preferences', () => {
         pubkey: 'e'.repeat(64),
     };
 
+    type KeymasterClientNostrApi = {
+        getNostrKeys(): Promise<typeof mockNostrKeys>;
+        removeNostrSigner(): Promise<boolean>;
+    };
+
     it('should fetch preferred nostr keys from the pubkey route', async () => {
-        nock(KeymasterURL)
+        const scope = nock(KeymasterURL)
             .post(Endpoints.nostr_pubkey)
             .reply(200, mockNostrKeys);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const result = await (keymaster as any).getNostrKeys();
+        const nostrClient = keymaster as unknown as KeymasterClientNostrApi;
+        const result = await nostrClient.getNostrKeys();
 
+        expect(scope.isDone()).toBe(true);
         expect(result).toStrictEqual(mockNostrKeys);
     });
 
     it('should remove delegated nostr signer config through the cleanup route', async () => {
-        nock(KeymasterURL)
+        const scope = nock(KeymasterURL)
             .delete(Endpoints.nostr_signer)
             .reply(200, { ok: true });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const ok = await (keymaster as any).removeNostrSigner();
+        const nostrClient = keymaster as unknown as KeymasterClientNostrApi;
+        const ok = await nostrClient.removeNostrSigner();
 
+        expect(scope.isDone()).toBe(true);
         expect(ok).toBe(true);
     });
 });
