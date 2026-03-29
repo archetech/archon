@@ -187,6 +187,10 @@ function updateGauges(): void {
 function startMetricsServer(): void {
     const app = express();
 
+    app.get('/health', (_req, res) => {
+        res.json({ ok: true });
+    });
+
     app.get('/ready', async (_req, res) => {
         try {
             const [gatekeeperReady, keymasterReady, ipfsReady] = await Promise.all([
