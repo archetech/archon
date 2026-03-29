@@ -13,8 +13,8 @@ services:
     ports:
       - 127.0.0.1:27017:27017
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 })"]
-      interval: 10s
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/27017 && exec 3<&- && exec 3>&-'"]
+      interval: 60s
       timeout: 5s
       retries: 6
       start_period: 15s
@@ -29,7 +29,7 @@ services:
       - 127.0.0.1:6379:6379
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 6
       start_period: 10s
@@ -258,6 +258,7 @@ services:
       dockerfile: Dockerfile.react-wallet
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        VITE_GATEKEEPER_URL: ${ARCHON_REACT_WALLET_GATEKEEPER_URL-}
     image: ghcr.io/archetech/react-wallet
     environment:
       - VITE_PORT=${ARCHON_REACT_WALLET_PORT:-4228}
