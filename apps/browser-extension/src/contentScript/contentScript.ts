@@ -4,14 +4,6 @@ script.src = chrome.runtime.getURL("nostr-provider.js");
 script.onload = () => script.remove();
 (document.head || document.documentElement).appendChild(script);
 
-const allowedWalletOrigins = new Set<string>(
-    (process.env.ARCHON_WALLET_ALLOWED_ORIGINS as string[] | undefined) || []
-);
-
-function isTrustedWalletPage(event: MessageEvent): boolean {
-    return event.source === window && allowedWalletOrigins.has(window.location.origin);
-}
-
 // Relay NIP-07 requests from page to background
 window.addEventListener("message", (event) => {
     if (event.source !== window || event.data?.type !== "archon-nostr-request") {
@@ -41,7 +33,7 @@ window.addEventListener("message", (event) => {
 
 // Relay wallet handoff requests from the web wallet to the extension
 window.addEventListener("message", (event) => {
-    if (!isTrustedWalletPage(event)) {
+    if (event.source !== window) {
         return;
     }
 
