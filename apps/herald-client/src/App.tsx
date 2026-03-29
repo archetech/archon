@@ -7,7 +7,7 @@ import {
     Routes,
     Route,
 } from "react-router-dom";
-import { Alert, Box, Button, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
 import { Table, TableBody, TableRow, TableCell } from '@mui/material';
 import axios from 'axios';
 import { format, differenceInDays } from 'date-fns';
@@ -129,7 +129,6 @@ function Home() {
         return (
             <div className="App">
                 <Header title={serviceName} showTagline />
-                <p>Loading...</p>
             </div>
         )
     }
@@ -140,17 +139,17 @@ function Home() {
 
             {isAuthenticated ? (
                 <Box sx={{ maxWidth: 600, mx: 'auto', textAlign: 'center' }}>
-                    <Box sx={{ 
-                        backgroundColor: '#f8f9fa', 
-                        borderRadius: 2, 
-                        p: 3, 
+                    <Box sx={{
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: 2,
+                        p: 3,
                         mb: 3,
                         border: '1px solid #e9ecef'
                     }}>
                         <Typography variant="h5" sx={{ mb: 2, color: '#2c3e50' }}>
                             {logins > 1 ? `Welcome back, ${userName || 'friend'}!` : `Welcome aboard!`}
                         </Typography>
-                        
+
                         {userName ? (
                             <Typography variant="h6" sx={{ color: '#27ae60', fontWeight: 600 }}>
                                 🎉 Your handle: <strong>{userName}@{serviceDomain}</strong>
@@ -165,7 +164,7 @@ function Home() {
                     <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
                         You have access to:
                     </Typography>
-                    
+
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', mb: 3 }}>
                         <Button component={Link} to={`/profile/${userDID}`} variant="outlined" size="small">
                             My Profile
@@ -189,10 +188,10 @@ function Home() {
                 </Box>
             ) : (
                 <Box sx={{ maxWidth: 700, mx: 'auto', textAlign: 'center' }}>
-                    <Box sx={{ 
-                        backgroundColor: '#f8f9fa', 
-                        borderRadius: 2, 
-                        p: 4, 
+                    <Box sx={{
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: 2,
+                        p: 4,
                         mb: 4,
                         border: '1px solid #e9ecef'
                     }}>
@@ -212,14 +211,14 @@ function Home() {
                         </Typography>
                     </Box>
 
-                    <Button 
-                        variant="contained" 
-                        color="primary" 
-                        onClick={login} 
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={login}
                         size="large"
-                        sx={{ 
-                            px: 5, 
-                            py: 1.5, 
+                        sx={{
+                            px: 5,
+                            py: 1.5,
                             fontSize: '1.1rem',
                             borderRadius: 2,
                             textTransform: 'none',
@@ -230,10 +229,10 @@ function Home() {
                     </Button>
 
                     {/* AI Agent Instructions */}
-                    <Box sx={{ 
-                        mt: 4, 
-                        p: 3, 
-                        backgroundColor: '#1a1a2e', 
+                    <Box sx={{
+                        mt: 4,
+                        p: 3,
+                        backgroundColor: '#1a1a2e',
                         borderRadius: 2,
                         textAlign: 'left'
                     }}>
@@ -244,13 +243,15 @@ function Home() {
                             First time? Create your DID identity:
                         </Typography>
                         <Typography variant="body2" component="pre" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
-                            {`# Set up environment
-export ARCHON_GATEKEEPER_URL=https://archon.technology
+                            {`# Install CLI
+npm install -g @didcid/keymaster
+
+# Set up environment
+export ARCHON_NODE_URL=https://archon.technology
 export ARCHON_PASSPHRASE="your-secret-passphrase"
 
 # Create wallet and identity
-npx @didcid/keymaster create-wallet
-npx @didcid/keymaster create-id myagent`}
+keymaster create-id myagent`}
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mb: 2, mt: 3 }}>
                             Then claim your name (2 calls, no cookies):
@@ -260,7 +261,7 @@ npx @didcid/keymaster create-id myagent`}
 CHALLENGE=$(curl -s ${publicUrl}/api/challenge | jq -r .challenge)
 
 # 2. Create response
-RESPONSE=$(npx @didcid/keymaster create-response $CHALLENGE)
+RESPONSE=$(keymaster create-response $CHALLENGE)
 
 # 3. Claim your name (credential auto-issued)
 curl -X PUT ${publicUrl}/api/name \\
@@ -292,10 +293,7 @@ curl -X PUT ${publicUrl}/api/name \\
 
 function ViewLogin() {
     const [challengeDID, setChallengeDID] = useState<string>('');
-    const [responseDID, setResponseDID] = useState<string>('');
-    const [loggingIn, setLoggingIn] = useState<boolean>(false);
     const [challengeURL, setChallengeURL] = useState<string | null>(null);
-    const [extensionURL, setExtensionURL] = useState<string>('');
     const [challengeCopied, setChallengeCopied] = useState<boolean>(false);
 
     const navigate = useNavigate();
@@ -321,7 +319,6 @@ function ViewLogin() {
                 const response = await api.get(`/challenge`);
                 const { challenge, challengeURL } = response.data;
                 setChallengeDID(challenge);
-                setExtensionURL(`archon://auth?challenge=${challenge}`);
                 setChallengeURL(encodeURI(challengeURL));
             }
             catch (error: any) {
@@ -338,26 +335,6 @@ function ViewLogin() {
         }
     }, [navigate]);
 
-    async function login() {
-        setLoggingIn(true);
-
-        try {
-            const getAuth = await api.post(`/login`, { challenge: challengeDID, response: responseDID });
-
-            if (getAuth.data.authenticated) {
-                navigate('/');
-            }
-            else {
-                alert('login failed');
-            }
-        }
-        catch (error: any) {
-            window.alert(error);
-        }
-
-        setLoggingIn(false);
-    }
-
     async function copyToClipboard(text: string) {
         try {
             await navigator.clipboard.writeText(text);
@@ -368,61 +345,70 @@ function ViewLogin() {
         }
     }
 
+    function cancelLogin() {
+        navigate('/');
+    }
+
     return (
-        <div className="App">
-            <Header title="Login" />
-            <Box sx={{ maxWidth: 800, mx: 'auto' }}>
-                <Table sx={{ width: '100%' }}>
-                    <TableBody>
-                        <TableRow>
-                            <TableCell>Challenge:</TableCell>
-                            <TableCell>
-                                {challengeURL &&
-                                <a href={challengeURL} target="_blank" rel="noopener noreferrer">
-                                    <QRCodeSVG value={challengeURL} />
-                                </a>
-                                }
-                                <Typography
-                                    component="a"
-                                    href={extensionURL}
-                                    style={{ fontFamily: 'Courier' }}
-                                >
-                                    {challengeDID}
-                                </Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Button variant="outlined" onClick={() => copyToClipboard(challengeDID)} disabled={challengeCopied}>
-                                Copy
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell>Response:</TableCell>
-                            <TableCell>
-                                <TextField
-                                    label="Response DID"
-                                    style={{ width: '600px', fontFamily: 'Courier' }}
-                                    value={responseDID}
-                                    onChange={(e) => setResponseDID(e.target.value)}
-                                    fullWidth
-                                    margin="normal"
-                                    slotProps={{
-                                        htmlInput: {
-                                            maxLength: 80,
-                                        },
-                                    }}
-                                />
-                            </TableCell>
-                            <TableCell>
-                                <Button variant="outlined" onClick={login} disabled={!responseDID || loggingIn}>
-                                Login
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </Box>
-        </div>
+        <Box
+            sx={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'radial-gradient(circle at top, #f5f8ff 0%, #eef2f8 45%, #e8edf5 100%)',
+                p: 2,
+            }}
+        >
+            <Dialog
+                open
+                onClose={cancelLogin}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        px: 1,
+                        py: 1.5,
+                    },
+                }}
+            >
+                <DialogContent sx={{ textAlign: 'center', pt: 2 }}>
+                    <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1.5 }}>
+                        Login
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#666', mb: 3 }}>
+                        Scan with Archon Wallet to continue.
+                    </Typography>
+                    {challengeURL && (
+                        <Box
+                            component="a"
+                            href={challengeURL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{
+                                display: 'inline-flex',
+                                p: 2,
+                                borderRadius: 2,
+                                backgroundColor: '#fff',
+                                border: '1px solid #e5e7eb',
+                                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
+                            }}
+                        >
+                            <QRCodeSVG value={challengeURL} />
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ justifyContent: 'center', gap: 1, pb: 3 }}>
+                    <Button variant="outlined" onClick={() => copyToClipboard(challengeDID)} disabled={challengeCopied}>
+                        {challengeCopied ? 'Copied' : 'Copy'}
+                    </Button>
+                    <Button variant="text" color="inherit" onClick={cancelLogin}>
+                        Cancel
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box>
     )
 }
 
@@ -475,14 +461,14 @@ function ViewMembers() {
                 // Fetch directory
                 const dirResponse = await api.get(`/registry`);
                 const data = dirResponse.data;
-                
+
                 setLastUpdated(data.updated || '');
-                
+
                 // Convert names object to array for easier rendering
                 const entries: DirectoryEntry[] = Object.entries(data.names || {}).map(
                     ([name, did]) => ({ name, did: did as string })
                 );
-                
+
                 // Sort alphabetically by name
                 entries.sort((a, b) => a.name.localeCompare(b.name));
                 setDirectory(entries);
@@ -511,7 +497,7 @@ function ViewMembers() {
     return (
         <div className="App">
             <Header title="Member Directory" />
-            
+
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
                 <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="body2" sx={{ color: '#666' }}>
@@ -527,9 +513,9 @@ function ViewMembers() {
                 <Table sx={{ backgroundColor: '#fff', borderRadius: 2, overflow: 'hidden' }}>
                     <TableBody>
                         {directory.map((entry) => (
-                            <TableRow 
+                            <TableRow
                                 key={entry.did}
-                                sx={{ 
+                                sx={{
                                     '&:hover': { backgroundColor: '#f8f9fa' },
                                     cursor: 'pointer'
                                 }}
@@ -542,8 +528,8 @@ function ViewMembers() {
                                     {entry.did.substring(0, 20)}...{entry.did.substring(entry.did.length - 8)}
                                 </TableCell>
                                 <TableCell align="right">
-                                    <Button 
-                                        component={Link} 
+                                    <Button
+                                        component={Link}
                                         to={`/member/${entry.name}`}
                                         size="small"
                                         variant="outlined"
@@ -876,15 +862,15 @@ function ViewCredential() {
     return (
         <div className="App">
             <Header title="My Credential" />
-            
+
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
                 {error && (
-                    <Box sx={{ 
-                        backgroundColor: '#fee', 
-                        border: '1px solid #fcc', 
-                        borderRadius: 2, 
-                        p: 2, 
-                        mb: 3 
+                    <Box sx={{
+                        backgroundColor: '#fee',
+                        border: '1px solid #fcc',
+                        borderRadius: 2,
+                        p: 2,
+                        mb: 3
                     }}>
                         <Typography color="error">{error}</Typography>
                     </Box>
@@ -910,10 +896,10 @@ function ViewCredential() {
                     </Box>
                 ) : (
                     <Box>
-                        <Box sx={{ 
-                            backgroundColor: '#e8f5e9', 
-                            borderRadius: 2, 
-                            p: 3, 
+                        <Box sx={{
+                            backgroundColor: '#e8f5e9',
+                            borderRadius: 2,
+                            p: 3,
                             mb: 3,
                             border: '1px solid #c8e6c9',
                             textAlign: 'center'
@@ -925,19 +911,19 @@ function ViewCredential() {
                                 {credentialData.credential?.credentialSubject?.name || 'Unknown'}
                             </Typography>
                             <Typography variant="body2" sx={{ color: '#666', mt: 1 }}>
-                                Issued: {credentialData.credentialIssuedAt ? 
-                                    format(new Date(credentialData.credentialIssuedAt), 'MMM d, yyyy h:mm a') : 
+                                Issued: {credentialData.credentialIssuedAt ?
+                                    format(new Date(credentialData.credentialIssuedAt), 'MMM d, yyyy h:mm a') :
                                     'Unknown'}
                             </Typography>
                         </Box>
 
                         <Typography variant="h6" sx={{ mb: 2 }}>Credential DID</Typography>
-                        <Typography 
-                            variant="body2" 
-                            sx={{ 
-                                fontFamily: 'monospace', 
-                                backgroundColor: '#f5f5f5', 
-                                p: 2, 
+                        <Typography
+                            variant="body2"
+                            sx={{
+                                fontFamily: 'monospace',
+                                backgroundColor: '#f5f5f5',
+                                p: 2,
                                 borderRadius: 1,
                                 wordBreak: 'break-all',
                                 mb: 3
@@ -951,16 +937,16 @@ function ViewCredential() {
                         </Typography>
 
                         <Typography variant="h6" sx={{ mb: 2 }}>Verifiable Credential</Typography>
-                        <Box sx={{ 
-                            backgroundColor: '#1e1e1e', 
-                            borderRadius: 2, 
+                        <Box sx={{
+                            backgroundColor: '#1e1e1e',
+                            borderRadius: 2,
                             p: 2,
                             overflow: 'auto',
                             maxHeight: 400
                         }}>
-                            <pre style={{ 
-                                color: '#d4d4d4', 
-                                margin: 0, 
+                            <pre style={{
+                                color: '#d4d4d4',
+                                margin: 0,
                                 fontSize: '0.8rem',
                                 fontFamily: 'Monaco, Consolas, monospace'
                             }}>
@@ -1037,7 +1023,7 @@ function ViewMember() {
     return (
         <div className="App">
             <Header title={`${name}@${serviceDomain}`} />
-            
+
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
                 <Box sx={{
                     backgroundColor: '#f8f9fa',
@@ -1058,16 +1044,16 @@ function ViewMember() {
                 </Box>
 
                 <Typography variant="h6" sx={{ mb: 2 }}>DID Document</Typography>
-                
-                <Box sx={{ 
-                    backgroundColor: '#1e1e1e', 
-                    borderRadius: 2, 
+
+                <Box sx={{
+                    backgroundColor: '#1e1e1e',
+                    borderRadius: 2,
                     p: 2,
                     overflow: 'auto'
                 }}>
-                    <pre style={{ 
-                        color: '#d4d4d4', 
-                        margin: 0, 
+                    <pre style={{
+                        color: '#d4d4d4',
+                        margin: 0,
                         fontSize: '0.85rem',
                         fontFamily: 'Monaco, Consolas, monospace'
                     }}>
@@ -1079,8 +1065,8 @@ function ViewMember() {
                     <Button component={Link} to="/members" variant="outlined">
                         ← Back to Directory
                     </Button>
-                    <Button 
-                        component="a" 
+                    <Button
+                        component="a"
                         href={`https://explorer.archon.technology/search?did=${memberData?.id}`}
                         target="_blank"
                         variant="outlined"

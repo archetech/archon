@@ -281,6 +281,23 @@ export function UIProvider(
     }, []);
 
     useEffect(() => {
+        const onOpenAlias = (e: Event) => {
+            const ce = e as CustomEvent<{ did?: string; alias?: string }>;
+            const did = ce.detail?.did;
+            const alias = ce.detail?.alias;
+            setPendingTab('aliases');
+            if (typeof alias === 'string') {
+                setAlias(alias);
+            }
+            if (typeof did === 'string' && did.startsWith('did:')) {
+                setAliasDID(did);
+            }
+        };
+        window.addEventListener('archon:openAlias', onOpenAlias as EventListener);
+        return () => window.removeEventListener('archon:openAlias', onOpenAlias as EventListener);
+    }, [setAlias, setAliasDID]);
+
+    useEffect(() => {
         if (!currentId) {
             return;
         }
