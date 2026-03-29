@@ -7,7 +7,7 @@ import {
     Routes,
     Route,
 } from "react-router-dom";
-import { Alert, Box, Button, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, Typography } from '@mui/material';
 import { Table, TableBody, TableRow, TableCell } from '@mui/material';
 import axios from 'axios';
 import { format, differenceInDays } from 'date-fns';
@@ -344,31 +344,70 @@ function ViewLogin() {
         }
     }
 
+    function cancelLogin() {
+        navigate('/');
+    }
+
     return (
-        <div className="App">
-            <Header title="Login" />
-            <Box sx={{ maxWidth: 800, mx: 'auto' }}>
-                <Table sx={{ width: '100%' }}>
-                    <TableBody>
-                        <TableRow>
-                            <TableCell>Challenge:</TableCell>
-                            <TableCell>
-                                {challengeURL &&
-                                <a href={challengeURL} target="_blank" rel="noopener noreferrer">
-                                    <QRCodeSVG value={challengeURL} />
-                                </a>
-                                }
-                            </TableCell>
-                            <TableCell>
-                                <Button variant="outlined" onClick={() => copyToClipboard(challengeDID)} disabled={challengeCopied}>
-                                    Copy
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </Box>
-        </div>
+        <Box
+            sx={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'radial-gradient(circle at top, #f5f8ff 0%, #eef2f8 45%, #e8edf5 100%)',
+                p: 2,
+            }}
+        >
+            <Dialog
+                open
+                onClose={cancelLogin}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        px: 1,
+                        py: 1.5,
+                    },
+                }}
+            >
+                <DialogContent sx={{ textAlign: 'center', pt: 2 }}>
+                    <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1.5 }}>
+                        Login
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#666', mb: 3 }}>
+                        Scan with Archon Wallet to continue.
+                    </Typography>
+                    {challengeURL && (
+                        <Box
+                            component="a"
+                            href={challengeURL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{
+                                display: 'inline-flex',
+                                p: 2,
+                                borderRadius: 2,
+                                backgroundColor: '#fff',
+                                border: '1px solid #e5e7eb',
+                                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
+                            }}
+                        >
+                            <QRCodeSVG value={challengeURL} />
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ justifyContent: 'center', gap: 1, pb: 3 }}>
+                    <Button variant="outlined" onClick={() => copyToClipboard(challengeDID)} disabled={challengeCopied}>
+                        {challengeCopied ? 'Copied' : 'Copy'}
+                    </Button>
+                    <Button variant="text" color="inherit" onClick={cancelLogin}>
+                        Cancel
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box>
     )
 }
 
