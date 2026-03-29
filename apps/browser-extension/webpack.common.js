@@ -4,6 +4,16 @@ const CopyPlugin = require('copy-webpack-plugin');
 const HtmlPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
+const defaultWalletAllowedOrigins = [
+    'http://localhost:4228',
+    'http://127.0.0.1:4228',
+];
+
+const walletAllowedOrigins = (process.env.ARCHON_WALLET_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
 module.exports = {
     entry: {
         popup: path.resolve("./src/popup.tsx"),
@@ -36,6 +46,9 @@ module.exports = {
         new webpack.DefinePlugin({
             'process.env.ARCHON_DEFAULT_REGISTRY': JSON.stringify(
                 process.env.ARCHON_DEFAULT_REGISTRY || 'hyperswarm'
+            ),
+            'process.env.ARCHON_WALLET_ALLOWED_ORIGINS': JSON.stringify(
+                walletAllowedOrigins.length > 0 ? walletAllowedOrigins : defaultWalletAllowedOrigins
             ),
         }),
         new CleanWebpackPlugin({
