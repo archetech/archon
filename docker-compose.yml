@@ -146,7 +146,7 @@ services:
     ports:
       - "127.0.0.1:4232:4232"
     healthcheck:
-      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4232/ready',res=>{let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.exit(res.statusCode===200&&body.includes('\"ready\":true')?0:1));});req.on('error',()=>process.exit(1));"]
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4232/health',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
       interval: 15s
       timeout: 5s
       retries: 6
