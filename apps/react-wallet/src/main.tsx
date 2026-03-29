@@ -67,6 +67,8 @@ function isNativeApp() {
     return Capacitor.getPlatform() !== 'web';
 }
 
+const handoffTargetOrigin = window.location.origin;
+
 function makeRequestId() {
     return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -101,7 +103,7 @@ async function tryExtensionHandoff(action: PendingWalletAction): Promise<boolean
         probeRequestId,
         300,
     );
-    window.postMessage({ type: 'archon-wallet-extension-probe', requestId: probeRequestId }, '*');
+    window.postMessage({ type: 'archon-wallet-extension-probe', requestId: probeRequestId }, handoffTargetOrigin);
     const probe = await probePromise;
     if (!probe?.available) {
         return false;
@@ -121,7 +123,7 @@ async function tryExtensionHandoff(action: PendingWalletAction): Promise<boolean
         credential: action.type === 'credential' ? action.credential : undefined,
         alias: action.type === 'alias' ? action.alias : undefined,
         did: action.type === 'alias' ? action.did : undefined,
-    }, '*');
+    }, handoffTargetOrigin);
 
     const response = await responsePromise;
     return !!response?.ok;

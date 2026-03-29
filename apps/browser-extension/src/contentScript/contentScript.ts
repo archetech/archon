@@ -4,6 +4,17 @@ script.src = chrome.runtime.getURL("nostr-provider.js");
 script.onload = () => script.remove();
 (document.head || document.documentElement).appendChild(script);
 
+const messageTargetOrigin = window.location.origin;
+const maxWalletPayloadLength = 4096;
+
+function isDidLike(value: unknown): value is string {
+    return typeof value === "string" && value.startsWith("did:") && value.length <= maxWalletPayloadLength;
+}
+
+function isAliasLike(value: unknown): value is string {
+    return typeof value === "string" && value.trim().length > 0 && value.length <= 256;
+}
+
 // Relay NIP-07 requests from page to background
 window.addEventListener("message", (event) => {
     if (event.source !== window || event.data?.type !== "archon-nostr-request") {
@@ -42,7 +53,7 @@ window.addEventListener("message", (event) => {
             type: "archon-wallet-extension-probe-response",
             requestId: event.data.requestId,
             available: true,
-        }, "*");
+        }, messageTargetOrigin);
         return;
     }
 
@@ -53,11 +64,11 @@ window.addEventListener("message", (event) => {
     const { requestId, action, challenge, credential, alias, did } = event.data;
 
     let message: Record<string, unknown> | null = null;
-    if (action === "auth" && typeof challenge === "string") {
+    if (action === "auth" && isDidLike(challenge)) {
         message = { action: "OPEN_AUTH_TAB", challenge };
-    } else if (action === "credential" && typeof credential === "string") {
+    } else if (action === "credential" && isDidLike(credential)) {
         message = { action: "OPEN_CREDENTIAL_TAB", credential };
-    } else if (action === "alias" && typeof alias === "string" && typeof did === "string") {
+    } else if (action === "alias" && isAliasLike(alias) && isDidLike(did)) {
         message = { action: "OPEN_ALIAS_TAB", alias, did };
     }
 
@@ -67,7 +78,7 @@ window.addEventListener("message", (event) => {
             requestId,
             ok: false,
             error: "Unsupported wallet handoff request",
-        }, "*");
+        }, messageTargetOrigin);
         return;
     }
 
@@ -78,7 +89,7 @@ window.addEventListener("message", (event) => {
                 requestId,
                 ok: false,
                 error: chrome.runtime.lastError.message,
-            }, "*");
+            }, messageTargetOrigin);
             return;
         }
 
@@ -86,7 +97,7 @@ window.addEventListener("message", (event) => {
             type: "archon-wallet-extension-open-response",
             requestId,
             ok: !!response?.success,
-        }, "*");
+        }, messageTargetOrigin);
     });
 });
 
