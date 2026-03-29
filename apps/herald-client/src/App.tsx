@@ -292,11 +292,8 @@ curl -X PUT ${publicUrl}/api/name \\
 
 function ViewLogin() {
     const [challengeDID, setChallengeDID] = useState<string>('');
-    const [responseDID, setResponseDID] = useState<string>('');
-    const [loggingIn, setLoggingIn] = useState<boolean>(false);
     const [challengeURL, setChallengeURL] = useState<string | null>(null);
     const [challengeCopied, setChallengeCopied] = useState<boolean>(false);
-    const [showResponseFields, setShowResponseFields] = useState<boolean>(false);
 
     const navigate = useNavigate();
     const intervalIdRef = useRef<number | null>(null);
@@ -337,26 +334,6 @@ function ViewLogin() {
         }
     }, [navigate]);
 
-    async function login() {
-        setLoggingIn(true);
-
-        try {
-            const getAuth = await api.post(`/login`, { challenge: challengeDID, response: responseDID });
-
-            if (getAuth.data.authenticated) {
-                navigate('/');
-            }
-            else {
-                alert('login failed');
-            }
-        }
-        catch (error: any) {
-            window.alert(error);
-        }
-
-        setLoggingIn(false);
-    }
-
     async function copyToClipboard(text: string) {
         try {
             await navigator.clipboard.writeText(text);
@@ -364,17 +341,6 @@ function ViewLogin() {
         }
         catch (error: any) {
             window.alert('Failed to copy text: ' + error);
-        }
-    }
-
-    async function pasteFromClipboard() {
-        try {
-            const text = await navigator.clipboard.readText();
-            setResponseDID(text);
-            setShowResponseFields(true);
-        }
-        catch (error: any) {
-            window.alert('Failed to read clipboard: ' + error);
         }
     }
 
@@ -394,41 +360,11 @@ function ViewLogin() {
                                 }
                             </TableCell>
                             <TableCell>
-                                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                    <Button variant="outlined" onClick={() => copyToClipboard(challengeDID)} disabled={challengeCopied}>
-                                        Copy
-                                    </Button>
-                                    <Button variant="outlined" onClick={pasteFromClipboard}>
-                                        Paste
-                                    </Button>
-                                </Box>
+                                <Button variant="outlined" onClick={() => copyToClipboard(challengeDID)} disabled={challengeCopied}>
+                                    Copy
+                                </Button>
                             </TableCell>
                         </TableRow>
-                        {showResponseFields && (
-                            <TableRow>
-                                <TableCell>Response:</TableCell>
-                                <TableCell>
-                                    <TextField
-                                        label="Response DID"
-                                        style={{ width: '600px', fontFamily: 'Courier' }}
-                                        value={responseDID}
-                                        onChange={(e) => setResponseDID(e.target.value)}
-                                        fullWidth
-                                        margin="normal"
-                                        slotProps={{
-                                            htmlInput: {
-                                                maxLength: 80,
-                                            },
-                                        }}
-                                    />
-                                </TableCell>
-                                <TableCell>
-                                    <Button variant="outlined" onClick={login} disabled={!responseDID || loggingIn}>
-                                        Login
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        )}
                     </TableBody>
                 </Table>
             </Box>
