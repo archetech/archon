@@ -141,16 +141,26 @@ async function handleWalletUrl(): Promise<WalletUrlResult> {
     }
 
     if (!isNativeApp() && isMobileBrowser()) {
-        const fallbackTimer = window.setTimeout(() => {
+        let fallbackTimer: number | null = null;
+
+        const cleanup = () => {
+            if (fallbackTimer !== null) {
+                window.clearTimeout(fallbackTimer);
+                fallbackTimer = null;
+            }
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+
+        fallbackTimer = window.setTimeout(() => {
             if (document.visibilityState === 'visible') {
                 queueAndDispatch(action.deepLinkUrl);
             }
+            cleanup();
         }, 1200);
 
         const onVisibility = () => {
             if (document.visibilityState === 'hidden') {
-                window.clearTimeout(fallbackTimer);
-                document.removeEventListener('visibilitychange', onVisibility);
+                cleanup();
             }
         };
 

@@ -4,6 +4,17 @@ script.src = chrome.runtime.getURL("nostr-provider.js");
 script.onload = () => script.remove();
 (document.head || document.documentElement).appendChild(script);
 
+const allowedWalletOrigins = new Set([
+    "http://localhost:4228",
+    "http://127.0.0.1:4228",
+    "https://wallet.archon.technology",
+    "https://wallet.4tress.org",
+]);
+
+function isTrustedWalletPage(event: MessageEvent): boolean {
+    return event.source === window && allowedWalletOrigins.has(window.location.origin);
+}
+
 // Relay NIP-07 requests from page to background
 window.addEventListener("message", (event) => {
     if (event.source !== window || event.data?.type !== "archon-nostr-request") {
@@ -33,7 +44,7 @@ window.addEventListener("message", (event) => {
 
 // Relay wallet handoff requests from the web wallet to the extension
 window.addEventListener("message", (event) => {
-    if (event.source !== window) {
+    if (!isTrustedWalletPage(event)) {
         return;
     }
 
