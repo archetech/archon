@@ -17,7 +17,12 @@ COPY apps/react-wallet ./apps/react-wallet/
 WORKDIR /app/apps/react-wallet
 
 RUN npm ci
-RUN npm run build
+
+ARG VITE_GATEKEEPER_URL
+RUN if [ -n "$VITE_GATEKEEPER_URL" ]; then \
+        export VITE_GATEKEEPER_URL="$VITE_GATEKEEPER_URL"; \
+    fi; \
+    npm run build
 
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
