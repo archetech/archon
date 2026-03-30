@@ -9,10 +9,10 @@ services:
   btc-signet-wallet:
     build:
       context: .
-      dockerfile: Dockerfile.wallet
+      dockerfile: Dockerfile.satoshi-wallet
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/wallet
+    image: ghcr.io/archetech/satoshi-wallet
     environment:
       - ARCHON_WALLET_PORT=4240
       - ARCHON_WALLET_METRICS_PORT=4241

@@ -1,8 +1,8 @@
 {
-  "name": "wallet-server",
+  "name": "satoshi-wallet",
   "version": "0.6.0",
   "type": "module",
-  "description": "Archon BTC Wallet Service",
+  "description": "Archon Satoshi Wallet Service",
   "main": "dist/wallet-api.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
