@@ -12,7 +12,7 @@ COPY packages/ ./packages/
 RUN npm ci
 RUN npm run build
 
-COPY services/wallet ./wallet/
+COPY services/satoshi-wallet ./wallet/
 
 RUN cd wallet/server && npm ci && npm run build
 
