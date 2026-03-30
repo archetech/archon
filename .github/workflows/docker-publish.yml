@@ -40,6 +40,8 @@ jobs:
             image: hyperswarm-mediator
           - dockerfile: Dockerfile.satoshi
             image: sat-mediator
+          - dockerfile: Dockerfile.satoshi-wallet
+            image: satoshi-wallet
           - dockerfile: Dockerfile.cli
             image: cli
           - dockerfile: Dockerfile.explorer
