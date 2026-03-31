@@ -12,6 +12,8 @@ These rules apply to coding agents working in this repository.
 
 - Check the current branch before making a commit if the task has changed or if there is any ambiguity about scope.
 - If the current branch contains unrelated work, create a new branch from `main` before proceeding.
+- When a PR shows unexpected files or checks fail on unrelated paths, inspect branch ancestry and merge-base state before making code changes.
+- If a feature branch was started from stale local history, rebuild it from `origin/main` early instead of patching around the contamination.
 
 ## Hygiene
 
