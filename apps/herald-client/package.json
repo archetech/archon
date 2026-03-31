@@ -11,12 +11,12 @@
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "@mui/material": "^7.1.0",
-    "axios": "^1.9.0",
+    "axios": "^1.13.5",
     "date-fns": "^4.1.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.0"
+    "react-router-dom": "^7.13.2"
   },
   "devDependencies": {
     "@types/node": "^22.15.17",
@@ -24,6 +24,6 @@
     "@types/react-dom": "^19.1.4",
     "@vitejs/plugin-react": "^4.4.1",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.4.1"
   }
 }
