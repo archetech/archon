@@ -333,6 +333,7 @@ async function main() {
             restUrl: config.clnRestUrl,
             rune: config.clnRune,
         },
+        lightningMediatorUrl: config.lightningMediatorURL,
         defaults: {
             amountSat: config.defaultPriceSats,
             expirySeconds: config.invoiceExpiry,

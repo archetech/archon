@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { randomBytes } from 'crypto';
 import { createMacaroon, verifyMacaroon, extractCaveats, getMacaroonId, verifyPreimage } from '../macaroon.js';
 import { checkLimit, checkAndRecordRequest } from '../rate-limiter.js';
-import { createInvoice } from '../lightning.js';
+import { createL402Invoice } from '../lightning-mediator-client.js';
 import { routeToScope, getPriceForOperation } from '../pricing.js';
 import {
     PaymentRequiredError,
@@ -221,7 +221,7 @@ async function handleChallenge(
         ? `Drawbridge: ${operationName} (${amountSat} sats)`
         : `Drawbridge: ${scope} (${amountSat} sats)`;
 
-    const invoice = await createInvoice(options.cln, amountSat, memo);
+    const invoice = await createL402Invoice(options.lightningMediatorUrl, amountSat, memo);
 
     // Record rate limit only after successful invoice creation
     await options.store.recordRequest(rateLimitId, options.rateLimitWindowSeconds);

@@ -141,6 +141,7 @@ export interface L402Options {
     rootSecret: string;
     location: string;
     cln: ClnConfig;
+    lightningMediatorUrl: string;
     defaults: {
         amountSat: number;
         expirySeconds: number;
