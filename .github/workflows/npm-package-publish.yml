@@ -55,6 +55,9 @@ jobs:
           node-version: "22.15.0"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Pin npm 10.9.2
+        run: npm install --global npm@10.9.2
+
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"

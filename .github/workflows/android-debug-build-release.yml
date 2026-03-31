@@ -20,6 +20,9 @@ jobs:
         with:
           node-version: "22.15.0"
 
+      - name: Pin npm 10.9.2
+        run: npm install --global npm@10.9.2
+
       - name: Install root dependencies
         run: npm ci
 

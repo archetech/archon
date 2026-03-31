@@ -4,6 +4,11 @@
   "type": "module",
   "description": "Self-sovereign identity infrastructure for the decentralized web",
   "private": true,
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": "22.15.x",
+    "npm": "10.9.x"
+  },
   "workspaces": [
     "packages/*"
   ],
