@@ -11,15 +11,15 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Compile TypeScript
         run: npm run build
@@ -32,7 +32,7 @@ jobs:
 
       - name: Generate Code Coverage report
         id: code-coverage
-        uses: barecheck/code-coverage-action@v1
+        uses: barecheck/code-coverage-action@d92cdaec187f89f0886ccec37acf11e2a6a85f70
         with:
           barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
           lcov-file: "./coverage/lcov.info"
@@ -40,5 +40,5 @@ jobs:
           show-annotations: "warning"
 
       - name: Coveralls GitHub Action
-        uses: coverallsapp/github-action@v2.3.6
+        uses: coverallsapp/github-action@648a8eb78e6d50909eff900e4ec85cab4524a45b
         continue-on-error: true
