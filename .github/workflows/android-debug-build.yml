@@ -9,10 +9,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Use Node 22.15.0
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22.15.0"
 
@@ -27,13 +27,13 @@ jobs:
         run: npm ci
 
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
           distribution: "temurin"
           java-version: "21"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
 
       - name: Decode signing keystore
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
@@ -52,7 +52,7 @@ jobs:
         run: npm run android:build
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: archon-android-debug-${{ github.sha }}
           path: apps/react-wallet/android/app/build/outputs/apk/debug/app-debug.apk

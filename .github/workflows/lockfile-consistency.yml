@@ -1,0 +1,57 @@
+name: Lockfile Consistency
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Ensure package manifests update lockfiles together
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          changed_manifests="$(printf '%s\n' "$changed_files" | grep -E '(^|/)package\.json$' || true)"
+
+          if [ -z "$changed_manifests" ]; then
+            exit 0
+          fi
+
+          missing_lockfiles=""
+
+          while IFS= read -r manifest; do
+            [ -z "$manifest" ] && continue
+            dir="$(dirname "$manifest")"
+
+            if [ "$manifest" = "package.json" ]; then
+              lockfile="package-lock.json"
+            elif [ -f "$dir/package-lock.json" ]; then
+              lockfile="$dir/package-lock.json"
+            else
+              lockfile="package-lock.json"
+            fi
+
+            if printf '%s\n' "$changed_files" | grep -Fxq "$lockfile"; then
+              continue
+            fi
+
+            missing_lockfiles="${missing_lockfiles}${lockfile}\n"
+          done <<EOF
+          $changed_manifests
+          EOF
+
+          if [ -n "$missing_lockfiles" ]; then
+            echo "The following lockfiles must be updated alongside package.json changes:"
+            printf '%b' "$missing_lockfiles"
+            exit 1
+          fi
