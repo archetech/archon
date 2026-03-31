@@ -1,16 +1,15 @@
 # Archon Lightning mediator
 
-The Lightning mediator is the planned home for all Lightning-specific runtime behavior that is currently embedded in Drawbridge.
+The Lightning mediator is the home for Lightning-specific runtime behavior that used to live inside Drawbridge.
 
-This initial scaffold only provides service startup, readiness, version, metrics, and a basic capability endpoint. Future stages of the refactor will move CLN, LNBits, public invoice generation, zap flows, and Lightning-specific Redis state into this service.
-
-## Planned responsibilities
+## Responsibilities
 
 - CLN-backed invoice creation and status checks
 - LNBits wallet and payment operations
 - Public invoice generation for published DIDs
 - Lightning Address and DID-based zap flows
 - Lightning-specific Redis state
+- L402 invoice creation and invoice-status lookups for Drawbridge
 
 ## Environment variables
 
