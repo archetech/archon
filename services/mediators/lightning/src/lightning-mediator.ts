@@ -11,7 +11,7 @@ import { LightningPaymentError } from './errors.js';
 import * as cln from './lightning.js';
 import * as lnbits from './lnbits.js';
 import { RedisStore } from './store.js';
-import type { ReadinessStatus } from './types.js';
+import type { PendingInvoiceData, ReadinessStatus } from './types.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -482,6 +482,80 @@ async function main(): Promise<void> {
         } catch (error: any) {
             logger.error({ err: error }, 'L402 invoice check error');
             res.status(502).json({ error: error.message || 'Invoice check failed' });
+        }
+    });
+
+    v1router.post('/l402/pending', async (req, res) => {
+        try {
+            const pendingInvoice = req.body as Partial<PendingInvoiceData>;
+            const amountSat = parsePositiveInteger(pendingInvoice?.amountSat);
+            const expiresAt = parsePositiveInteger(pendingInvoice?.expiresAt);
+            const createdAt = parsePositiveInteger(pendingInvoice?.createdAt);
+
+            if (!pendingInvoice?.paymentHash ||
+                !pendingInvoice?.macaroonId ||
+                !pendingInvoice?.serializedMacaroon ||
+                !pendingInvoice?.did ||
+                !Array.isArray(pendingInvoice?.scope) ||
+                !amountSat ||
+                !expiresAt ||
+                !createdAt) {
+                res.status(400).json({ error: 'Invalid pending invoice payload' });
+                return;
+            }
+
+            await store.savePendingInvoice({
+                paymentHash: pendingInvoice.paymentHash,
+                macaroonId: pendingInvoice.macaroonId,
+                serializedMacaroon: pendingInvoice.serializedMacaroon,
+                did: pendingInvoice.did,
+                scope: pendingInvoice.scope.map(item => String(item)),
+                amountSat,
+                expiresAt,
+                createdAt,
+            });
+
+            res.status(201).json({ ok: true, paymentHash: pendingInvoice.paymentHash });
+        } catch (error: any) {
+            logger.error({ err: error }, 'L402 pending invoice save error');
+            res.status(500).json({ error: error.message || 'Failed to save pending invoice' });
+        }
+    });
+
+    v1router.get('/l402/pending/:paymentHash', async (req, res) => {
+        try {
+            const paymentHash = String(req.params.paymentHash || '');
+            if (!paymentHash) {
+                res.status(400).json({ error: 'paymentHash is required' });
+                return;
+            }
+
+            const pendingInvoice = await store.getPendingInvoice(paymentHash);
+            if (!pendingInvoice) {
+                res.status(404).json({ error: 'No pending invoice found for this payment hash' });
+                return;
+            }
+
+            res.json(pendingInvoice);
+        } catch (error: any) {
+            logger.error({ err: error }, 'L402 pending invoice lookup error');
+            res.status(500).json({ error: error.message || 'Failed to get pending invoice' });
+        }
+    });
+
+    v1router.delete('/l402/pending/:paymentHash', async (req, res) => {
+        try {
+            const paymentHash = String(req.params.paymentHash || '');
+            if (!paymentHash) {
+                res.status(400).json({ error: 'paymentHash is required' });
+                return;
+            }
+
+            await store.deletePendingInvoice(paymentHash);
+            res.json({ ok: true, paymentHash });
+        } catch (error: any) {
+            logger.error({ err: error }, 'L402 pending invoice delete error');
+            res.status(500).json({ error: error.message || 'Failed to delete pending invoice' });
         }
     });
 

@@ -65,11 +65,6 @@ export interface DrawbridgeStore {
     recordRequest(did: string, windowSeconds: number): Promise<void>;
     checkAndRecordRequest(did: string, maxRequests: number, windowSeconds: number): Promise<RateLimitResult>;
 
-    // Pending invoices
-    savePendingInvoice(data: PendingInvoiceData): Promise<void>;
-    getPendingInvoice(paymentHash: string): Promise<PendingInvoiceData | null>;
-    deletePendingInvoice(paymentHash: string): Promise<void>;
-
 }
 
 // Persisted macaroon record
