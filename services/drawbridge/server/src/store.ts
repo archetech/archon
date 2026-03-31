@@ -239,21 +239,6 @@ export class RedisStore implements DrawbridgeStore {
         await this.redis.del(key);
     }
 
-    async savePublishedLightning(did: string, invoiceKey: string): Promise<void> {
-        const key = `${PREFIX}:published:${did}`;
-        await this.redis.set(key, invoiceKey);
-    }
-
-    async getPublishedLightning(did: string): Promise<string | null> {
-        const key = `${PREFIX}:published:${did}`;
-        return await this.redis.get(key);
-    }
-
-    async deletePublishedLightning(did: string): Promise<void> {
-        const key = `${PREFIX}:published:${did}`;
-        await this.redis.del(key);
-    }
-
     async disconnect(): Promise<void> {
         await this.redis.quit();
     }

@@ -17,30 +17,6 @@ import type { L402Options, DrawbridgeStore } from './types.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
-const TOR_HOSTNAME_FILE = '/data/tor/hostname';
-let cachedPublicHost: string | undefined;
-
-async function getPublicHost(): Promise<string | undefined> {
-    if (cachedPublicHost) {
-        return cachedPublicHost;
-    }
-    if (config.publicHost) {
-        cachedPublicHost = config.publicHost;
-        return cachedPublicHost;
-    }
-    try {
-        const onion = (await readFile(TOR_HOSTNAME_FILE, 'utf-8')).trim();
-        if (onion) {
-            cachedPublicHost = `http://${onion}:${config.port}`;
-            logger.info({ publicHost: cachedPublicHost }, 'Resolved public host from Tor hostname');
-            return cachedPublicHost;
-        }
-    } catch {
-        // File not available yet
-    }
-    return undefined;
-}
-
 // Prometheus metrics
 collectDefaultMetrics();
 
@@ -308,10 +284,6 @@ async function main() {
         process.exit(1);
     }
 
-    if (!config.clnRune) {
-        logger.warn('ARCHON_DRAWBRIDGE_CLN_RUNE is not set — Lightning invoices will fail until configured');
-    }
-
     // Connect to upstream Gatekeeper
     logger.info(`Connecting to Gatekeeper at ${config.gatekeeperURL}`);
     const gatekeeper = await GatekeeperClient.create({
@@ -329,10 +301,6 @@ async function main() {
     const l402Options: L402Options = {
         rootSecret: config.macaroonSecret,
         location: `http://localhost:${config.port}`,
-        cln: {
-            restUrl: config.clnRestUrl,
-            rune: config.clnRune,
-        },
         lightningMediatorUrl: config.lightningMediatorURL,
         defaults: {
             amountSat: config.defaultPriceSats,

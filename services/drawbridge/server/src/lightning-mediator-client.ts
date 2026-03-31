@@ -1,3 +1,4 @@
+import { LightningUnavailableError } from './errors.js';
 import type { LightningInvoice, LightningPaymentResult } from './types.js';
 
 async function postToLightningMediator<T>(
@@ -15,7 +16,9 @@ async function postToLightningMediator<T>(
 
     if (!response.ok) {
         const errorBody = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(String(errorBody.error || response.statusText || 'Lightning mediator request failed'));
+        throw new LightningUnavailableError(
+            String(errorBody.error || response.statusText || 'Lightning mediator request failed')
+        );
     }
 
     return response.json() as Promise<T>;

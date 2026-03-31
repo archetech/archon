@@ -31,12 +31,6 @@ export interface LightningPaymentResult {
     amountSat?: number;
 }
 
-// CLN REST API configuration
-export interface ClnConfig {
-    restUrl: string;
-    rune: string;
-}
-
 // Caveat verification context
 export interface CaveatContext {
     did?: string;
@@ -76,10 +70,6 @@ export interface DrawbridgeStore {
     getPendingInvoice(paymentHash: string): Promise<PendingInvoiceData | null>;
     deletePendingInvoice(paymentHash: string): Promise<void>;
 
-    // Published Lightning (public invoice generation)
-    savePublishedLightning(did: string, invoiceKey: string): Promise<void>;
-    getPublishedLightning(did: string): Promise<string | null>;
-    deletePublishedLightning(did: string): Promise<void>;
 }
 
 // Persisted macaroon record
@@ -140,7 +130,6 @@ export interface OperationPricingConfig {
 export interface L402Options {
     rootSecret: string;
     location: string;
-    cln: ClnConfig;
     lightningMediatorUrl: string;
     defaults: {
         amountSat: number;

@@ -53,10 +53,3 @@ export class LightningUnavailableError extends DrawbridgeError {
         this.name = 'LightningUnavailableError';
     }
 }
-
-export class LightningPaymentError extends DrawbridgeError {
-    constructor(detail?: string) {
-        super(detail || 'Lightning payment failed');
-        this.name = 'LightningPaymentError';
-    }
-}
