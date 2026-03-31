@@ -34,6 +34,7 @@ export default defineConfig({
         include: ['buffer'],
     },
     build: {
+        cssMinify: 'esbuild',
         sourcemap: true,
         outDir: 'dist',
         chunkSizeWarningLimit: 2000,
