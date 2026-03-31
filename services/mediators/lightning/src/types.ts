@@ -2,6 +2,7 @@ export interface LightningMediatorConfig {
     port: number;
     bindAddress: string;
     redisUrl: string;
+    gatekeeperUrl: string;
     clnRestUrl: string;
     clnRune: string;
     lnbitsUrl: string;
