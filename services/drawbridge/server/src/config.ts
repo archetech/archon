@@ -7,6 +7,7 @@ const config = {
     bindAddress: process.env.ARCHON_BIND_ADDRESS || '0.0.0.0',
     gatekeeperURL: process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224',
     heraldURL: process.env.ARCHON_HERALD_URL || 'http://localhost:4230',
+    lightningMediatorURL: process.env.ARCHON_LIGHTNING_MEDIATOR_URL || 'http://localhost:4235',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
 
     // Lightning / L402
