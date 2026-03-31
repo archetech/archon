@@ -115,6 +115,35 @@ services:
       redis:
         condition: service_healthy
 
+  lightning-mediator:
+    build:
+      context: .
+      dockerfile: Dockerfile.lightning-mediator
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/lightning-mediator
+    environment:
+      - ARCHON_LIGHTNING_MEDIATOR_PORT=${ARCHON_LIGHTNING_MEDIATOR_PORT:-4235}
+      - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
+      - ARCHON_LIGHTNING_MEDIATOR_REDIS_URL=redis://redis:6379
+      - ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL=${ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL:-https://cln:3001}
+      - ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE=${ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE:-}
+      - ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL=${ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL:-}
+      - ARCHON_LIGHTNING_MEDIATOR_PUBLIC_HOST=${ARCHON_LIGHTNING_MEDIATOR_PUBLIC_HOST:-}
+      - ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY=${ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY:-tor:9050}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - ${ARCHON_LIGHTNING_MEDIATOR_PORT:-4235}:4235
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4235/ready',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      redis:
+        condition: service_healthy
+
   drawbridge-client:
     build:
       context: .
