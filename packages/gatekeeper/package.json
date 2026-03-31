@@ -117,7 +117,7 @@
     "@didcid/cipher": "^0.2.5",
     "@didcid/common": "^0.1.7",
     "@didcid/ipfs": "^0.1.7",
-    "axios": "^1.7.7",
+    "axios": "^1.14.0",
     "canonicalize": "^2.0.0",
     "dotenv": "^16.4.5",
     "ioredis": "^5.4.1",
