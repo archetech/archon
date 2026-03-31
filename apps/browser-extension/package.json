@@ -15,7 +15,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@fontsource/roboto": "^5.2.9",
-    "@mui/icons-material": "^7.3.5",
+    "@mui/icons-material": "^7.3.9",
     "@mui/lab": "^7.0.1-beta.19",
     "@mui/material": "^7.3.5",
     "@types/chrome": "^0.1.31",
