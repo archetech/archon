@@ -18,6 +18,7 @@ These rules apply to coding agents working in this repository.
 ## Hygiene
 
 - Always save lessons learned in this file or another persistent repo instruction file. Do not rely on session memory for process corrections.
+- When generating or updating npm lockfiles, use the repo-pinned npm version from the root `package.json` so lockfiles stay compatible with CI.
 - Do not use stash-based branch juggling as the default workflow.
 - Never run mutating git operations in parallel. Serialize `git add`, `git commit`, `git push`, branch moves, stash operations, and any command that writes to `.git`.
 - Prefer a clean branch cut over moving changes around after the fact.

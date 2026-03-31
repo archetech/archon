@@ -22,7 +22,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 20
+          node-version: "22.15.0"
+
+      - name: Pin npm 10.9.2
+        run: npm install --global npm@10.9.2
 
       - name: Install dependencies
         run: npm ci
