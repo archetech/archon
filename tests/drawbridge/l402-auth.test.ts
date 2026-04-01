@@ -1,7 +1,4 @@
 import { jest } from '@jest/globals';
-import { createHash } from 'crypto';
-
-import { createL402Middleware, handlePaymentCompletion } from '../../services/drawbridge/server/src/middleware/l402-auth';
 import type {
     DrawbridgeStore,
     L402Options,
@@ -10,6 +7,49 @@ import type {
     PendingInvoiceData,
     RateLimitResult,
 } from '../../services/drawbridge/server/src/types';
+
+const mockCreateMacaroon = jest.fn();
+const mockVerifyMacaroon = jest.fn();
+const mockExtractCaveats = jest.fn();
+const mockGetMacaroonId = jest.fn();
+const mockVerifyPreimage = jest.fn();
+const mockCheckLimit = jest.fn();
+const mockCheckAndRecordRequest = jest.fn();
+const mockRouteToScope = jest.fn();
+const mockGetPriceForOperation = jest.fn();
+const mockCreateL402Invoice = jest.fn();
+const mockCheckL402Invoice = jest.fn();
+const mockSavePendingL402Invoice = jest.fn();
+const mockGetPendingL402Invoice = jest.fn();
+const mockDeletePendingL402Invoice = jest.fn();
+
+jest.unstable_mockModule('../../services/drawbridge/server/src/macaroon', () => ({
+    createMacaroon: mockCreateMacaroon,
+    verifyMacaroon: mockVerifyMacaroon,
+    extractCaveats: mockExtractCaveats,
+    getMacaroonId: mockGetMacaroonId,
+    verifyPreimage: mockVerifyPreimage,
+}));
+
+jest.unstable_mockModule('../../services/drawbridge/server/src/rate-limiter', () => ({
+    checkLimit: mockCheckLimit,
+    checkAndRecordRequest: mockCheckAndRecordRequest,
+}));
+
+jest.unstable_mockModule('../../services/drawbridge/server/src/pricing', () => ({
+    routeToScope: mockRouteToScope,
+    getPriceForOperation: mockGetPriceForOperation,
+}));
+
+jest.unstable_mockModule('../../services/drawbridge/server/src/lightning-mediator-client', () => ({
+    createL402Invoice: mockCreateL402Invoice,
+    checkL402Invoice: mockCheckL402Invoice,
+    savePendingL402Invoice: mockSavePendingL402Invoice,
+    getPendingL402Invoice: mockGetPendingL402Invoice,
+    deletePendingL402Invoice: mockDeletePendingL402Invoice,
+}));
+
+const { createL402Middleware, handlePaymentCompletion } = await import('../../services/drawbridge/server/src/middleware/l402-auth');
 
 type MockResponse = {
     statusCode: number;
@@ -102,15 +142,25 @@ function createOptions(store: DrawbridgeStore): L402Options {
 }
 
 describe('Drawbridge L402 mediator integration', () => {
-    let fetchMock: jest.SpiedFunction<typeof fetch>;
-
     beforeEach(() => {
-        fetchMock = jest.spyOn(globalThis, 'fetch');
-    });
-
-    afterEach(() => {
-        fetchMock.mockRestore();
         jest.clearAllMocks();
+        mockCreateMacaroon.mockReturnValue({ id: 'mac-123', macaroon: 'serialized-macaroon' });
+        mockVerifyMacaroon.mockReturnValue({ valid: true });
+        mockExtractCaveats.mockReturnValue({ paymentHash: 'a'.repeat(64) });
+        mockGetMacaroonId.mockReturnValue('mac-123');
+        mockVerifyPreimage.mockReturnValue(true);
+        mockCheckLimit.mockResolvedValue({
+            allowed: true,
+            remaining: 100,
+            resetAt: Math.floor(Date.now() / 1000) + 60,
+        });
+        mockCheckAndRecordRequest.mockResolvedValue({
+            allowed: true,
+            remaining: 100,
+            resetAt: Math.floor(Date.now() / 1000) + 60,
+        });
+        mockRouteToScope.mockReturnValue('resolveDID');
+        mockGetPriceForOperation.mockReturnValue(undefined);
     });
 
     it('issues a challenge and saves pending invoice state through lightning-mediator', async () => {
@@ -126,18 +176,17 @@ describe('Drawbridge L402 mediator integration', () => {
         const res = createMockResponse();
         const next = jest.fn();
 
-        fetchMock
-            .mockResolvedValueOnce(new Response(JSON.stringify({
-                paymentRequest: 'lnbc1challenge',
-                paymentHash: 'a'.repeat(64),
-                amountSat: 10,
-                expiry: 3600,
-                label: 'invoice-1',
-            }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
-            .mockResolvedValueOnce(new Response(JSON.stringify({
-                ok: true,
-                paymentHash: 'a'.repeat(64),
-            }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+        mockCreateL402Invoice.mockResolvedValue({
+            paymentRequest: 'lnbc1challenge',
+            paymentHash: 'a'.repeat(64),
+            amountSat: 10,
+            expiry: 3600,
+            label: 'invoice-1',
+        });
+        mockSavePendingL402Invoice.mockResolvedValue({
+            ok: true,
+            paymentHash: 'a'.repeat(64),
+        });
 
         await middleware(req, res as any, next);
 
@@ -145,9 +194,12 @@ describe('Drawbridge L402 mediator integration', () => {
         expect(res.statusCode).toBe(402);
         expect(res.headers.get('WWW-Authenticate')).toContain('invoice="lnbc1challenge"');
         expect(res.body.paymentHash).toBe('a'.repeat(64));
-        expect(fetchMock).toHaveBeenCalledTimes(2);
-        expect(fetchMock.mock.calls[0]?.[0].toString()).toBe('http://lightning-mediator.test/api/v1/l402/invoice');
-        expect(fetchMock.mock.calls[1]?.[0].toString()).toBe('http://lightning-mediator.test/api/v1/l402/pending');
+        expect(mockCreateL402Invoice).toHaveBeenCalledWith(
+            'http://lightning-mediator.test',
+            10,
+            'Drawbridge: resolveDID (10 sats)'
+        );
+        expect(mockSavePendingL402Invoice).toHaveBeenCalledTimes(1);
         expect(store.saveMacaroon).toHaveBeenCalledTimes(1);
         expect(store.recordRequest).toHaveBeenCalledTimes(1);
     });
@@ -156,15 +208,14 @@ describe('Drawbridge L402 mediator integration', () => {
         const store = createMockStore();
         const options = createOptions(store);
         const req = {
-            body: {},
+            body: {
+                paymentHash: 'b'.repeat(64),
+            },
         } as any;
         const res = createMockResponse();
 
-        const preimage = '11'.repeat(32);
-        const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex');
-        req.body.paymentHash = paymentHash;
         const pendingInvoice: PendingInvoiceData = {
-            paymentHash,
+            paymentHash: 'b'.repeat(64),
             macaroonId: 'mac-123',
             serializedMacaroon: 'serialized-macaroon',
             did: 'did:test:alice',
@@ -174,27 +225,14 @@ describe('Drawbridge L402 mediator integration', () => {
             createdAt: Math.floor(Date.now() / 1000),
         };
 
-        fetchMock
-            .mockResolvedValueOnce(new Response(JSON.stringify(pendingInvoice), {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' },
-            }))
-            .mockResolvedValueOnce(new Response(JSON.stringify({
-                paid: true,
-                preimage,
-                paymentHash: pendingInvoice.paymentHash,
-                amountSat: pendingInvoice.amountSat,
-            }), {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' },
-            }))
-            .mockResolvedValueOnce(new Response(JSON.stringify({
-                ok: true,
-                paymentHash: pendingInvoice.paymentHash,
-            }), {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' },
-            }));
+        mockGetPendingL402Invoice.mockResolvedValue(pendingInvoice);
+        mockCheckL402Invoice.mockResolvedValue({
+            paid: true,
+            preimage: '11'.repeat(32),
+            paymentHash: pendingInvoice.paymentHash,
+            amountSat: pendingInvoice.amountSat,
+        });
+        mockDeletePendingL402Invoice.mockResolvedValue(undefined);
 
         await handlePaymentCompletion(options, req, res as any);
 
@@ -204,11 +242,20 @@ describe('Drawbridge L402 mediator integration', () => {
             macaroon: 'serialized-macaroon',
             paymentHash: pendingInvoice.paymentHash,
             amountSat: 21,
-            preimage,
+            preimage: '11'.repeat(32),
         });
         expect(store.savePayment).toHaveBeenCalledTimes(1);
-        expect(fetchMock.mock.calls[0]?.[0].toString()).toBe(`http://lightning-mediator.test/api/v1/l402/pending/${pendingInvoice.paymentHash}`);
-        expect(fetchMock.mock.calls[1]?.[0].toString()).toBe('http://lightning-mediator.test/api/v1/l402/check');
-        expect(fetchMock.mock.calls[2]?.[0].toString()).toBe(`http://lightning-mediator.test/api/v1/l402/pending/${pendingInvoice.paymentHash}`);
+        expect(mockGetPendingL402Invoice).toHaveBeenCalledWith(
+            'http://lightning-mediator.test',
+            pendingInvoice.paymentHash
+        );
+        expect(mockCheckL402Invoice).toHaveBeenCalledWith(
+            'http://lightning-mediator.test',
+            pendingInvoice.paymentHash
+        );
+        expect(mockDeletePendingL402Invoice).toHaveBeenCalledWith(
+            'http://lightning-mediator.test',
+            pendingInvoice.paymentHash
+        );
     });
 });
