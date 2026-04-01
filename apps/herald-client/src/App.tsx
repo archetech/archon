@@ -7,7 +7,7 @@ import {
     Routes,
     Route,
 } from "react-router-dom";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
 import { Table, TableBody, TableRow, TableCell } from '@mui/material';
 import axios from 'axios';
 import { format, differenceInDays } from 'date-fns';
@@ -83,6 +83,29 @@ function Header({ title, showTagline = false } : { title: string, showTagline?: 
             )}
         </Box>
     )
+}
+
+function LoadingShell({ title }: { title: string }) {
+    return (
+        <div className="App">
+            <Header title={title} />
+            <Box
+                sx={{
+                    maxWidth: 720,
+                    mx: 'auto',
+                    minHeight: 180,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: 2,
+                    border: '1px solid #e9ecef',
+                }}
+            >
+                <CircularProgress size={32} />
+            </Box>
+        </div>
+    );
 }
 
 function Home() {
@@ -496,12 +519,7 @@ function ViewMembers() {
     }, [navigate]);
 
     if (loading) {
-        return (
-            <div className="App">
-                <Header title="Member Directory" />
-                <p>Loading directory...</p>
-            </div>
-        );
+        return <LoadingShell title="Member Directory" />;
     }
 
     return (
@@ -869,12 +887,7 @@ function ViewCredential() {
         : null;
 
     if (loading) {
-        return (
-            <div className="App">
-                <Header title="My Credential" />
-                <p>Loading...</p>
-            </div>
-        );
+        return <LoadingShell title="My Credential" />;
     }
 
     return (
@@ -1016,12 +1029,7 @@ function ViewMember() {
     }, [name]);
 
     if (loading) {
-        return (
-            <div className="App">
-                <Header title={`${name}@${serviceDomain}`} />
-                <p>Loading...</p>
-            </div>
-        );
+        return <LoadingShell title={`${name}@${serviceDomain}`} />;
     }
 
     if (error) {
