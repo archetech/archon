@@ -22,7 +22,6 @@ import { useAuthContext } from "./AuthContext";
 import { useVariablesContext } from "./VariablesProvider";
 import { useThemeContext } from "./ContextProviders";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
-import { requestBrowserRefresh } from "../utils/utils";
 
 export enum RefreshMode {
     NONE = 'NONE',
@@ -91,7 +90,7 @@ export function UIProvider(
         refreshFlag,
         reloadBrowserWallet,
     } = useWalletContext();
-    const { setError, setSuccess } = useSnackbar();
+    const { setError } = useSnackbar();
     const {
         setResponse,
         setCallback,
@@ -136,6 +135,8 @@ export function UIProvider(
         resetCredentialState,
         refreshCredentialsStored,
         setDmailList,
+        setAlias,
+        setAliasDID,
     } = useVariablesContext();
     const { updateThemeFromStorage } = useThemeContext();
 
@@ -320,14 +321,9 @@ export function UIProvider(
             setPendingUsed(true);
         } else if (pendingAlias && !pendingUsed) {
             (async () => {
-                try {
-                    await keymaster!.addAlias(pendingAlias.alias, pendingAlias.did);
-                    await refreshAliases();
-                    requestBrowserRefresh(isBrowser);
-                    setSuccess(`Added alias "${pendingAlias.alias}"`);
-                } catch (error: any) {
-                    setError(error);
-                }
+                await setSelectedTab("aliases");
+                await setAlias(pendingAlias.alias);
+                await setAliasDID(pendingAlias.did);
             })();
             setPendingUsed(true);
         } else if (pendingTab) {
