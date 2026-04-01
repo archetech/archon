@@ -7,7 +7,7 @@ import {
     Routes,
     Route,
 } from "react-router-dom";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
 import { Table, TableBody, TableRow, TableCell } from '@mui/material';
 import axios from 'axios';
 import { format, differenceInDays } from 'date-fns';
@@ -50,6 +50,21 @@ function App() {
     );
 }
 
+function buildWalletUrl(walletUrl: string, params: Record<string, string>) {
+    try {
+        const url = new URL(walletUrl);
+
+        for (const [key, value] of Object.entries(params)) {
+            url.searchParams.set(key, value);
+        }
+
+        return url.toString();
+    }
+    catch {
+        return null;
+    }
+}
+
 function Header({ title, showTagline = false } : { title: string, showTagline?: boolean }) {
     return (
         <Box
@@ -73,6 +88,29 @@ function Header({ title, showTagline = false } : { title: string, showTagline?: 
             )}
         </Box>
     )
+}
+
+function LoadingShell({ title }: { title: string }) {
+    return (
+        <div className="App">
+            <Header title={title} />
+            <Box
+                sx={{
+                    maxWidth: 720,
+                    mx: 'auto',
+                    minHeight: 180,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: 2,
+                    border: '1px solid #e9ecef',
+                }}
+            >
+                <CircularProgress size={32} />
+            </Box>
+        </div>
+    );
 }
 
 function Home() {
@@ -486,12 +524,7 @@ function ViewMembers() {
     }, [navigate]);
 
     if (loading) {
-        return (
-            <div className="App">
-                <Header title="Member Directory" />
-                <p>Loading directory...</p>
-            </div>
-        );
+        return <LoadingShell title="Member Directory" />;
     }
 
     return (
@@ -827,11 +860,16 @@ function ViewCredential() {
     const [credentialData, setCredentialData] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
+    const [walletUrl, setWalletUrl] = useState<string>('');
+    const [credentialDidCopied, setCredentialDidCopied] = useState<boolean>(false);
     const navigate = useNavigate();
 
     useEffect(() => {
         const fetchCredential = async () => {
             try {
+                const configResponse = await api.get('/config');
+                setWalletUrl(configResponse.data.walletUrl);
+
                 const response = await api.get('/credential');
                 setCredentialData(response.data);
             }
@@ -850,13 +888,22 @@ function ViewCredential() {
         fetchCredential();
     }, [navigate]);
 
+    const credentialWalletUrl = credentialData?.credentialDid && walletUrl
+        ? buildWalletUrl(walletUrl, { credential: credentialData.credentialDid })
+        : null;
+
+    async function copyCredentialDid(text: string) {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCredentialDidCopied(true);
+        }
+        catch (copyError: any) {
+            window.alert('Failed to copy text: ' + copyError);
+        }
+    }
+
     if (loading) {
-        return (
-            <div className="App">
-                <Header title="My Credential" />
-                <p>Loading...</p>
-            </div>
-        );
+        return <LoadingShell title="My Credential" />;
     }
 
     return (
@@ -918,23 +965,39 @@ function ViewCredential() {
                         </Box>
 
                         <Typography variant="h6" sx={{ mb: 2 }}>Credential DID</Typography>
-                        <Typography
-                            variant="body2"
+                        <Box
                             sx={{
-                                fontFamily: 'monospace',
                                 backgroundColor: '#f5f5f5',
                                 p: 2,
                                 borderRadius: 1,
-                                wordBreak: 'break-all',
-                                mb: 3
+                                mb: 3,
+                                textAlign: 'center',
                             }}
                         >
-                            <a href={`archon://accept?credential=${credentialData.credentialDid}`} style={{ color: 'inherit' }}>
-                                <QRCodeSVG value={`archon://accept?credential=${credentialData.credentialDid}`} />
-                                <br />
-                                {credentialData.credentialDid}
+                            <a href={credentialWalletUrl || '#'} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                                <QRCodeSVG value={credentialWalletUrl || credentialData.credentialDid} />
                             </a>
-                        </Typography>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    fontFamily: 'monospace',
+                                    wordBreak: 'break-all',
+                                    mt: 2,
+                                    color: '#666',
+                                }}
+                            >
+                                {credentialData.credentialDid}
+                            </Typography>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                sx={{ mt: 1.5, textTransform: 'none' }}
+                                onClick={() => copyCredentialDid(credentialData.credentialDid)}
+                                disabled={credentialDidCopied}
+                            >
+                                {credentialDidCopied ? 'Copied' : 'Copy DID'}
+                            </Button>
+                        </Box>
 
                         <Typography variant="h6" sx={{ mb: 2 }}>Verifiable Credential</Typography>
                         <Box sx={{
@@ -972,12 +1035,15 @@ function ViewMember() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
     const [serviceDomain, setServiceDomain] = useState<string>('');
+    const [walletUrl, setWalletUrl] = useState<string>('');
+    const [didCopied, setDidCopied] = useState<boolean>(false);
 
     useEffect(() => {
         const fetchMember = async () => {
             try {
                 const configResponse = await api.get('/config');
                 setServiceDomain(configResponse.data.serviceDomain);
+                setWalletUrl(configResponse.data.walletUrl);
 
                 const response = await api.get(`/member/${name}`);
                 setMemberData(response.data);
@@ -995,13 +1061,18 @@ function ViewMember() {
         }
     }, [name]);
 
+    async function copyDid(text: string) {
+        try {
+            await navigator.clipboard.writeText(text);
+            setDidCopied(true);
+        }
+        catch (copyError: any) {
+            window.alert('Failed to copy text: ' + copyError);
+        }
+    }
+
     if (loading) {
-        return (
-            <div className="App">
-                <Header title={`${name}@${serviceDomain}`} />
-                <p>Loading...</p>
-            </div>
-        );
+        return <LoadingShell title={`${name}@${serviceDomain}`} />;
     }
 
     if (error) {
@@ -1020,6 +1091,13 @@ function ViewMember() {
         );
     }
 
+    const aliasWalletUrl = memberData?.didDocument?.id && walletUrl
+        ? buildWalletUrl(walletUrl, {
+            alias: `${name}@${serviceDomain}`,
+            did: memberData.didDocument.id,
+        })
+        : null;
+
     return (
         <div className="App">
             <Header title={`${name}@${serviceDomain}`} />
@@ -1033,13 +1111,24 @@ function ViewMember() {
                     border: '1px solid #e9ecef',
                     textAlign: 'center'
                 }}>
-                    {memberData?.didDocument?.id && (
-                        <a href={`archon://accept?alias=${name}@${serviceDomain}&did=${memberData.didDocument.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-                            <QRCodeSVG value={`archon://accept?alias=${name}@${serviceDomain}&did=${memberData.didDocument.id}`} />
+                    {memberData?.didDocument?.id && aliasWalletUrl && (
+                        <Box>
+                            <a href={aliasWalletUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                                <QRCodeSVG value={aliasWalletUrl} />
+                            </a>
                             <Typography variant="body1" sx={{ fontFamily: 'monospace', color: '#666', wordBreak: 'break-all', mt: 2 }}>
                                 {memberData.didDocument.id}
                             </Typography>
-                        </a>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                sx={{ mt: 1.5, textTransform: 'none' }}
+                                onClick={() => copyDid(memberData.didDocument.id)}
+                                disabled={didCopied}
+                            >
+                                {didCopied ? 'Copied' : 'Copy DID'}
+                            </Button>
+                        </Box>
                     )}
                 </Box>
 

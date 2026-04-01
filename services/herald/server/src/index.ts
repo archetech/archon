@@ -376,6 +376,7 @@ app.get('/api/config', (_: Request, res: Response) => {
         serviceName: SERVICE_NAME,
         serviceDomain: SERVICE_DOMAIN,
         publicUrl: PUBLIC_URL,
+        walletUrl: WALLET_URL,
     });
 });
 
