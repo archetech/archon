@@ -51,13 +51,18 @@ function App() {
 }
 
 function buildWalletUrl(walletUrl: string, params: Record<string, string>) {
-    const url = new URL(walletUrl);
+    try {
+        const url = new URL(walletUrl);
 
-    for (const [key, value] of Object.entries(params)) {
-        url.searchParams.set(key, value);
+        for (const [key, value] of Object.entries(params)) {
+            url.searchParams.set(key, value);
+        }
+
+        return url.toString();
     }
-
-    return url.toString();
+    catch {
+        return null;
+    }
 }
 
 function Header({ title, showTagline = false } : { title: string, showTagline?: boolean }) {
