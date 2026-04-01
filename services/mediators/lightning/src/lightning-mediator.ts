@@ -2,6 +2,7 @@ import express from 'express';
 import morgan from 'morgan';
 import pino from 'pino';
 import { readFile } from 'fs/promises';
+import { timingSafeEqual } from 'crypto';
 import { Counter, Gauge, collectDefaultMetrics, register } from 'prom-client';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import { socksDispatcher } from 'fetch-socks';
@@ -118,6 +119,30 @@ async function buildReadinessStatus(): Promise<ReadinessStatus> {
     };
 }
 
+function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction) {
+    if (!config.adminApiKey) {
+        res.status(403).json({ error: 'Admin API key not configured' });
+        return;
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Admin API key required' });
+        return;
+    }
+
+    const key = authHeader.slice(7);
+    const keyBuf = Buffer.from(key);
+    const expectedBuf = Buffer.from(config.adminApiKey);
+
+    if (keyBuf.length !== expectedBuf.length || !timingSafeEqual(keyBuf, expectedBuf)) {
+        res.status(401).json({ error: 'Invalid admin API key' });
+        return;
+    }
+
+    next();
+}
+
 async function main(): Promise<void> {
     const app = express();
     const v1router = express.Router();
@@ -159,6 +184,8 @@ async function main(): Promise<void> {
             lnbitsConfigured: Boolean(config.lnbitsUrl),
         });
     });
+
+    v1router.use(requireAdminKey);
 
     v1router.post('/lightning/wallet', async (req, res) => {
         if (!config.lnbitsUrl) {

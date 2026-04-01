@@ -1,3 +1,4 @@
+import config from './config.js';
 import { LightningUnavailableError } from './errors.js';
 import type { LightningInvoice, LightningPaymentResult, PendingInvoiceData } from './types.js';
 
@@ -10,6 +11,7 @@ async function requestLightningMediator<T>(
         ...options,
         headers: {
             'Content-Type': 'application/json',
+            ...(config.adminApiKey ? { 'Authorization': `Bearer ${config.adminApiKey}` } : {}),
             ...(options.headers || {}),
         },
     });
@@ -64,7 +66,9 @@ export async function getPendingL402Invoice(
     baseUrl: string,
     paymentHash: string
 ): Promise<PendingInvoiceData | null> {
-    const response = await fetch(new URL(`/api/v1/l402/pending/${encodeURIComponent(paymentHash)}`, baseUrl));
+    const response = await fetch(new URL(`/api/v1/l402/pending/${encodeURIComponent(paymentHash)}`, baseUrl), {
+        headers: config.adminApiKey ? { 'Authorization': `Bearer ${config.adminApiKey}` } : {},
+    });
     if (response.status === 404) {
         return null;
     }

@@ -139,7 +139,7 @@ async function proxyHeraldRequest(req: express.Request, res: express.Response, p
 
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {
-        if (!value || name === 'host' || name === 'content-length') {
+        if (!value || name === 'host' || name === 'content-length' || name === 'authorization') {
             continue;
         }
 
@@ -156,6 +156,9 @@ async function proxyHeraldRequest(req: express.Request, res: express.Response, p
     const body = buildProxyBody(req);
     if (body && !headers.has('content-type')) {
         headers.set('content-type', 'application/json');
+    }
+    if (config.adminApiKey) {
+        headers.set('authorization', `Bearer ${config.adminApiKey}`);
     }
 
     const upstream = await fetch(upstreamUrl, {

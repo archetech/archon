@@ -24,6 +24,7 @@ That means pending L402 invoice state lives in the mediator, while Drawbridge st
 | --- | --- | --- |
 | `ARCHON_LIGHTNING_MEDIATOR_PORT` | `4235` | HTTP port for the mediator |
 | `ARCHON_BIND_ADDRESS` | `0.0.0.0` | Bind address |
+| `ARCHON_ADMIN_API_KEY` | empty | Protects internal `/api/v1` Lightning and L402 endpoints |
 | `ARCHON_LIGHTNING_MEDIATOR_REDIS_URL` | `ARCHON_REDIS_URL` or `redis://localhost:6379` | Redis connection string |
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Gatekeeper URL for DID-based Lightning lookups |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL` | `https://cln:3001` | CLN REST endpoint |
