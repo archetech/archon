@@ -24,7 +24,7 @@
     "@fontsource/roboto": "^5.2.10",
     "@mui/icons-material": "^7.3.5",
     "@mui/lab": "^7.0.1-beta.19",
-    "@mui/material": "^7.3.5",
+    "@mui/material": "^7.3.9",
     "@uiw/react-json-view": "^2.0.0-alpha.39",
     "buffer": "^6.0.3",
     "qrcode.react": "^4.2.0",
