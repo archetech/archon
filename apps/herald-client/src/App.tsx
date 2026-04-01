@@ -50,6 +50,16 @@ function App() {
     );
 }
 
+function buildWalletUrl(walletUrl: string, params: Record<string, string>) {
+    const url = new URL(walletUrl);
+
+    for (const [key, value] of Object.entries(params)) {
+        url.searchParams.set(key, value);
+    }
+
+    return url.toString();
+}
+
 function Header({ title, showTagline = false } : { title: string, showTagline?: boolean }) {
     return (
         <Box
@@ -827,11 +837,15 @@ function ViewCredential() {
     const [credentialData, setCredentialData] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
+    const [walletUrl, setWalletUrl] = useState<string>('');
     const navigate = useNavigate();
 
     useEffect(() => {
         const fetchCredential = async () => {
             try {
+                const configResponse = await api.get('/config');
+                setWalletUrl(configResponse.data.walletUrl);
+
                 const response = await api.get('/credential');
                 setCredentialData(response.data);
             }
@@ -849,6 +863,10 @@ function ViewCredential() {
 
         fetchCredential();
     }, [navigate]);
+
+    const credentialWalletUrl = credentialData?.credentialDid && walletUrl
+        ? buildWalletUrl(walletUrl, { credential: credentialData.credentialDid })
+        : null;
 
     if (loading) {
         return (
@@ -929,8 +947,8 @@ function ViewCredential() {
                                 mb: 3
                             }}
                         >
-                            <a href={`archon://accept?credential=${credentialData.credentialDid}`} style={{ color: 'inherit' }}>
-                                <QRCodeSVG value={`archon://accept?credential=${credentialData.credentialDid}`} />
+                            <a href={credentialWalletUrl || '#'} style={{ color: 'inherit' }}>
+                                <QRCodeSVG value={credentialWalletUrl || credentialData.credentialDid} />
                                 <br />
                                 {credentialData.credentialDid}
                             </a>
@@ -972,12 +990,14 @@ function ViewMember() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
     const [serviceDomain, setServiceDomain] = useState<string>('');
+    const [walletUrl, setWalletUrl] = useState<string>('');
 
     useEffect(() => {
         const fetchMember = async () => {
             try {
                 const configResponse = await api.get('/config');
                 setServiceDomain(configResponse.data.serviceDomain);
+                setWalletUrl(configResponse.data.walletUrl);
 
                 const response = await api.get(`/member/${name}`);
                 setMemberData(response.data);
@@ -1020,6 +1040,13 @@ function ViewMember() {
         );
     }
 
+    const aliasWalletUrl = memberData?.didDocument?.id && walletUrl
+        ? buildWalletUrl(walletUrl, {
+            alias: `${name}@${serviceDomain}`,
+            did: memberData.didDocument.id,
+        })
+        : null;
+
     return (
         <div className="App">
             <Header title={`${name}@${serviceDomain}`} />
@@ -1033,9 +1060,9 @@ function ViewMember() {
                     border: '1px solid #e9ecef',
                     textAlign: 'center'
                 }}>
-                    {memberData?.didDocument?.id && (
-                        <a href={`archon://accept?alias=${name}@${serviceDomain}&did=${memberData.didDocument.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-                            <QRCodeSVG value={`archon://accept?alias=${name}@${serviceDomain}&did=${memberData.didDocument.id}`} />
+                    {memberData?.didDocument?.id && aliasWalletUrl && (
+                        <a href={aliasWalletUrl} style={{ color: 'inherit', textDecoration: 'none' }}>
+                            <QRCodeSVG value={aliasWalletUrl} />
                             <Typography variant="body1" sx={{ fontFamily: 'monospace', color: '#666', wordBreak: 'break-all', mt: 2 }}>
                                 {memberData.didDocument.id}
                             </Typography>
