@@ -947,7 +947,7 @@ function ViewCredential() {
                                 mb: 3
                             }}
                         >
-                            <a href={credentialWalletUrl || '#'} style={{ color: 'inherit' }}>
+                            <a href={credentialWalletUrl || '#'} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
                                 <QRCodeSVG value={credentialWalletUrl || credentialData.credentialDid} />
                                 <br />
                                 {credentialData.credentialDid}
@@ -1061,7 +1061,7 @@ function ViewMember() {
                     textAlign: 'center'
                 }}>
                     {memberData?.didDocument?.id && aliasWalletUrl && (
-                        <a href={aliasWalletUrl} style={{ color: 'inherit', textDecoration: 'none' }}>
+                        <a href={aliasWalletUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
                             <QRCodeSVG value={aliasWalletUrl} />
                             <Typography variant="body1" sx={{ fontFamily: 'monospace', color: '#666', wordBreak: 'break-all', mt: 2 }}>
                                 {memberData.didDocument.id}
