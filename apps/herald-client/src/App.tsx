@@ -1004,6 +1004,7 @@ function ViewMember() {
     const [error, setError] = useState<string>('');
     const [serviceDomain, setServiceDomain] = useState<string>('');
     const [walletUrl, setWalletUrl] = useState<string>('');
+    const [didCopied, setDidCopied] = useState<boolean>(false);
 
     useEffect(() => {
         const fetchMember = async () => {
@@ -1027,6 +1028,16 @@ function ViewMember() {
             fetchMember();
         }
     }, [name]);
+
+    async function copyDid(text: string) {
+        try {
+            await navigator.clipboard.writeText(text);
+            setDidCopied(true);
+        }
+        catch (copyError: any) {
+            window.alert('Failed to copy text: ' + copyError);
+        }
+    }
 
     if (loading) {
         return <LoadingShell title={`${name}@${serviceDomain}`} />;
@@ -1069,12 +1080,23 @@ function ViewMember() {
                     textAlign: 'center'
                 }}>
                     {memberData?.didDocument?.id && aliasWalletUrl && (
-                        <a href={aliasWalletUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
-                            <QRCodeSVG value={aliasWalletUrl} />
+                        <Box>
+                            <a href={aliasWalletUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                                <QRCodeSVG value={aliasWalletUrl} />
+                            </a>
                             <Typography variant="body1" sx={{ fontFamily: 'monospace', color: '#666', wordBreak: 'break-all', mt: 2 }}>
                                 {memberData.didDocument.id}
                             </Typography>
-                        </a>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                sx={{ mt: 1.5, textTransform: 'none' }}
+                                onClick={() => copyDid(memberData.didDocument.id)}
+                                disabled={didCopied}
+                            >
+                                {didCopied ? 'Copied' : 'Copy DID'}
+                            </Button>
+                        </Box>
                     )}
                 </Box>
 
