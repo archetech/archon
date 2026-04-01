@@ -28,7 +28,7 @@ That means pending L402 invoice state lives in the mediator, while Drawbridge st
 | `ARCHON_LIGHTNING_MEDIATOR_REDIS_URL` | `ARCHON_REDIS_URL` or `redis://localhost:6379` | Redis connection string |
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Gatekeeper URL for DID-based Lightning lookups |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL` | `https://cln:3001` | CLN REST endpoint |
-| `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune |
+| `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune; if unset, the bundled stack loads `/data/lightning/drawbridge/rune.txt` automatically |
 | `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | empty | LNBits base URL |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Preferred public Drawbridge base URL for published invoice endpoints |
 | `ARCHON_DRAWBRIDGE_PORT` | `4222` | Drawbridge port used when deriving the onion fallback |

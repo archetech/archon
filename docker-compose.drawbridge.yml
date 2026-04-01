@@ -118,6 +118,7 @@ services:
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/lightning-mediator
+    entrypoint: ["/bin/sh", "/scripts/lightning-mediator-entrypoint.sh"]
     environment:
       - ARCHON_LIGHTNING_MEDIATOR_PORT=${ARCHON_LIGHTNING_MEDIATOR_PORT:-4235}
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
@@ -135,6 +136,8 @@ services:
     ports:
       - ${ARCHON_LIGHTNING_MEDIATOR_PORT:-4235}:4235
     volumes:
+      - ./scripts/lightning-mediator-entrypoint.sh:/scripts/lightning-mediator-entrypoint.sh:ro
+      - ./data/cln-mainnet:/data/lightning:ro
       - tor-hostname:/data/tor:ro
     healthcheck:
       test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4235/ready',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
@@ -143,6 +146,8 @@ services:
       retries: 6
       start_period: 20s
     depends_on:
+      drawbridge-init:
+        condition: service_completed_successfully
       gatekeeper:
         condition: service_healthy
       redis:

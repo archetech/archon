@@ -6,6 +6,7 @@ import { timingSafeEqual } from 'crypto';
 import { Counter, Gauge, collectDefaultMetrics, register } from 'prom-client';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import { socksDispatcher } from 'fetch-socks';
+import { Redis } from 'ioredis';
 
 import config from './config.js';
 import { LightningPaymentError } from './errors.js';
@@ -43,12 +44,27 @@ readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
 });
 
 async function checkRedis(redisUrl: string): Promise<boolean> {
+    let redis: Redis | undefined;
     try {
-        const redis = new RedisStore(redisUrl);
-        await redis.disconnect();
-        return true;
+        redis = new Redis(redisUrl, {
+            lazyConnect: true,
+            enableOfflineQueue: false,
+            maxRetriesPerRequest: 1,
+            connectTimeout: 3000,
+        });
+        await redis.connect();
+        const pong = await redis.ping();
+        return pong === 'PONG';
     } catch {
         return false;
+    } finally {
+        if (redis) {
+            try {
+                await redis.quit();
+            } catch {
+                redis.disconnect();
+            }
+        }
     }
 }
 
