@@ -31,6 +31,7 @@ const lightningMediatorVersionInfo = new Gauge({
 
 let serviceVersion = 'unknown';
 const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
+const TOR_HOSTNAME_FILE = '/data/tor/hostname';
 
 readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
     const pkg = JSON.parse(data);
@@ -71,6 +72,32 @@ function isPrivateHost(hostname: string): boolean {
 function parsePositiveInteger(value: unknown): number | null {
     const parsed = typeof value === 'number' ? value : parseInt(String(value), 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+let cachedPublicHost: string | undefined;
+
+async function getPublicHost(): Promise<string | undefined> {
+    if (cachedPublicHost) {
+        return cachedPublicHost;
+    }
+
+    if (config.publicHost) {
+        cachedPublicHost = config.publicHost;
+        return cachedPublicHost;
+    }
+
+    try {
+        const onion = (await readFile(TOR_HOSTNAME_FILE, 'utf-8')).trim();
+        if (onion) {
+            cachedPublicHost = `http://${onion}:${config.port}`;
+            logger.info({ publicHost: cachedPublicHost }, 'Resolved public host from Tor hostname');
+            return cachedPublicHost;
+        }
+    } catch {
+        // File not available yet
+    }
+
+    return undefined;
 }
 
 async function buildReadinessStatus(): Promise<ReadinessStatus> {
@@ -261,8 +288,16 @@ async function main(): Promise<void> {
                 return;
             }
 
+            const publicHost = await getPublicHost();
+            if (!publicHost) {
+                res.status(503).json({
+                    error: 'Lightning public host is not available yet',
+                });
+                return;
+            }
+
             await store.savePublishedLightning(did, invoiceKey);
-            res.json({ ok: true, publicHost: config.publicHost || undefined });
+            res.json({ ok: true, publicHost });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to publish Lightning');
             res.status(500).json({ error: error.message || 'Failed to publish Lightning' });
