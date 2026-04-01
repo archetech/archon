@@ -147,7 +147,7 @@
     "axios": "^1.14.0",
     "commander": "^11.1.0",
     "dotenv": "^16.4.5",
-    "file-type": "^21.3.2",
+    "file-type": "^22.0.0",
     "image-size": "^2.0.1",
     "ioredis": "^5.4.1",
     "light-bolt11-decoder": "^3.2.0",
