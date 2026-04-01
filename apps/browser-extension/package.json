@@ -18,7 +18,7 @@
     "@mui/icons-material": "^7.3.9",
     "@mui/lab": "^7.0.1-beta.19",
     "@mui/material": "^7.3.5",
-    "@types/chrome": "^0.1.31",
+    "@types/chrome": "^0.1.38",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@uiw/react-json-view": "^2.0.0-alpha.39",
