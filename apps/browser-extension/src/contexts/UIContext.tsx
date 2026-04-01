@@ -321,9 +321,9 @@ export function UIProvider(
             setPendingUsed(true);
         } else if (pendingAlias && !pendingUsed) {
             (async () => {
-                await setSelectedTab("aliases");
                 await setAlias(pendingAlias.alias);
                 await setAliasDID(pendingAlias.did);
+                openBrowserWindow({ tab: "aliases" });
             })();
             setPendingUsed(true);
         } else if (pendingTab) {
