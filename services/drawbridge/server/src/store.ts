@@ -1,6 +1,6 @@
 import { Redis } from 'ioredis';
 import { randomBytes } from 'crypto';
-import type { DrawbridgeStore, MacaroonRecord, PaymentRecord, PendingInvoiceData, RateLimitResult } from './types.js';
+import type { DrawbridgeStore, MacaroonRecord, PaymentRecord, RateLimitResult } from './types.js';
 
 function safeJsonParse<T>(value: string | undefined, fallback: T): T {
     if (!value) return fallback;
@@ -193,65 +193,6 @@ export class RedisStore implements DrawbridgeStore {
         const remaining = Math.max(0, maxRequests - count);
 
         return { allowed, remaining, resetAt };
-    }
-
-    async savePendingInvoice(data: PendingInvoiceData): Promise<void> {
-        const key = `${PREFIX}:pending:${data.paymentHash}`;
-        await this.redis.hmset(key, {
-            paymentHash: data.paymentHash,
-            macaroonId: data.macaroonId,
-            serializedMacaroon: data.serializedMacaroon,
-            did: data.did,
-            scope: JSON.stringify(data.scope),
-            amountSat: String(data.amountSat),
-            expiresAt: String(data.expiresAt),
-            createdAt: String(data.createdAt),
-        });
-
-        const ttl = data.expiresAt - Math.floor(Date.now() / 1000);
-        if (ttl > 0) {
-            await this.redis.expire(key, ttl);
-        }
-    }
-
-    async getPendingInvoice(paymentHash: string): Promise<PendingInvoiceData | null> {
-        const key = `${PREFIX}:pending:${paymentHash}`;
-        const data = await this.redis.hgetall(key);
-
-        if (!data || !data.paymentHash) {
-            return null;
-        }
-
-        return {
-            paymentHash: data.paymentHash,
-            macaroonId: data.macaroonId,
-            serializedMacaroon: data.serializedMacaroon || '',
-            did: data.did,
-            scope: safeJsonParse<string[]>(data.scope, []),
-            amountSat: parseInt(data.amountSat, 10),
-            expiresAt: parseInt(data.expiresAt, 10),
-            createdAt: parseInt(data.createdAt, 10),
-        };
-    }
-
-    async deletePendingInvoice(paymentHash: string): Promise<void> {
-        const key = `${PREFIX}:pending:${paymentHash}`;
-        await this.redis.del(key);
-    }
-
-    async savePublishedLightning(did: string, invoiceKey: string): Promise<void> {
-        const key = `${PREFIX}:published:${did}`;
-        await this.redis.set(key, invoiceKey);
-    }
-
-    async getPublishedLightning(did: string): Promise<string | null> {
-        const key = `${PREFIX}:published:${did}`;
-        return await this.redis.get(key);
-    }
-
-    async deletePublishedLightning(did: string): Promise<void> {
-        const key = `${PREFIX}:published:${did}`;
-        await this.redis.del(key);
     }
 
     async disconnect(): Promise<void> {

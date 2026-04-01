@@ -2,7 +2,13 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { randomBytes } from 'crypto';
 import { createMacaroon, verifyMacaroon, extractCaveats, getMacaroonId, verifyPreimage } from '../macaroon.js';
 import { checkLimit, checkAndRecordRequest } from '../rate-limiter.js';
-import { createInvoice } from '../lightning.js';
+import {
+    checkL402Invoice,
+    createL402Invoice,
+    deletePendingL402Invoice,
+    getPendingL402Invoice,
+    savePendingL402Invoice,
+} from '../lightning-mediator-client.js';
 import { routeToScope, getPriceForOperation } from '../pricing.js';
 import {
     PaymentRequiredError,
@@ -221,7 +227,7 @@ async function handleChallenge(
         ? `Drawbridge: ${operationName} (${amountSat} sats)`
         : `Drawbridge: ${scope} (${amountSat} sats)`;
 
-    const invoice = await createInvoice(options.cln, amountSat, memo);
+    const invoice = await createL402Invoice(options.lightningMediatorUrl, amountSat, memo);
 
     // Record rate limit only after successful invoice creation
     await options.store.recordRequest(rateLimitId, options.rateLimitWindowSeconds);
@@ -265,7 +271,7 @@ async function handleChallenge(
         expiresAt: expiryTime,
         createdAt: Math.floor(Date.now() / 1000),
     };
-    await options.store.savePendingInvoice(pendingInvoice);
+    await savePendingL402Invoice(options.lightningMediatorUrl, pendingInvoice);
 
     options.hooks?.onChallenge?.(!!did);
 
@@ -303,7 +309,7 @@ export async function handlePaymentCompletion(
         return;
     }
 
-    const pending = await options.store.getPendingInvoice(paymentHash);
+    const pending = await getPendingL402Invoice(options.lightningMediatorUrl, paymentHash);
     if (!pending) {
         res.status(404).json({ error: 'No pending invoice found for this payment hash' });
         return;
@@ -311,17 +317,19 @@ export async function handlePaymentCompletion(
 
     const now = Math.floor(Date.now() / 1000);
     if (pending.expiresAt > 0 && now >= pending.expiresAt) {
-        await options.store.deletePendingInvoice(paymentHash);
+        await deletePendingL402Invoice(options.lightningMediatorUrl, paymentHash);
         res.status(410).json({ error: 'Invoice has expired' });
         return;
     }
 
-    if (!preimage) {
-        res.status(400).json({ error: 'preimage is required' });
+    const paymentStatus = await checkL402Invoice(options.lightningMediatorUrl, paymentHash);
+    if (!paymentStatus.paid || !paymentStatus.preimage) {
+        res.status(402).json({ error: 'Invoice has not been paid' });
         return;
     }
 
-    if (!verifyPreimage(preimage, paymentHash)) {
+    const finalPreimage = paymentStatus.preimage;
+    if (!verifyPreimage(finalPreimage, paymentHash)) {
         res.status(400).json({ error: 'Invalid preimage' });
         return;
     }
@@ -339,7 +347,7 @@ export async function handlePaymentCompletion(
     };
     await options.store.savePayment(paymentRecord);
 
-    await options.store.deletePendingInvoice(paymentHash);
+    await deletePendingL402Invoice(options.lightningMediatorUrl, paymentHash);
 
     res.json({
         macaroonId: pending.macaroonId,
@@ -347,6 +355,7 @@ export async function handlePaymentCompletion(
         paymentHash,
         method: 'lightning',
         amountSat: pending.amountSat,
+        preimage: finalPreimage,
     });
 }
 

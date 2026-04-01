@@ -1,10 +1,10 @@
 import axios from 'axios';
 import https from 'https';
 import { randomBytes } from 'crypto';
+
 import { LightningUnavailableError } from './errors.js';
 import type { ClnConfig, LightningInvoice, LightningPaymentResult } from './types.js';
 
-// CLN REST uses a self-signed certificate
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 export async function createInvoice(
@@ -16,7 +16,7 @@ export async function createInvoice(
         throw new LightningUnavailableError('CLN rune is not configured');
     }
 
-    const label = `drawbridge-${Date.now()}-${randomBytes(4).toString('hex')}`;
+    const label = `lightning-mediator-${Date.now()}-${randomBytes(4).toString('hex')}`;
     const amountMsat = amountSat * 1000;
 
     try {
@@ -29,7 +29,7 @@ export async function createInvoice(
             },
             {
                 headers: {
-                    'Rune': config.rune,
+                    Rune: config.rune,
                     'Content-Type': 'application/json',
                 },
                 httpsAgent,
@@ -37,7 +37,6 @@ export async function createInvoice(
         );
 
         const data = response.data;
-
         return {
             paymentRequest: data.bolt11,
             paymentHash: data.payment_hash,
@@ -46,7 +45,9 @@ export async function createInvoice(
             label,
         };
     } catch (error: any) {
-        if (error instanceof LightningUnavailableError) throw error;
+        if (error instanceof LightningUnavailableError) {
+            throw error;
+        }
         const detail = error.response?.data?.message || error.response?.data?.error || error.code || error.message;
         throw new LightningUnavailableError(String(detail));
     }
@@ -56,31 +57,34 @@ export async function checkInvoice(
     config: ClnConfig,
     paymentHash: string
 ): Promise<LightningPaymentResult> {
-    const response = await axios.post(
-        `${config.restUrl}/v1/listinvoices`,
-        {
-            payment_hash: paymentHash,
-        },
-        {
-            headers: {
-                'Rune': config.rune,
-                'Content-Type': 'application/json',
-            },
-            httpsAgent,
+    try {
+        const response = await axios.post(
+            `${config.restUrl}/v1/listinvoices`,
+            { payment_hash: paymentHash },
+            {
+                headers: {
+                    Rune: config.rune,
+                    'Content-Type': 'application/json',
+                },
+                httpsAgent,
+            }
+        );
+
+        const invoices = response.data.invoices || [];
+        const invoice = invoices.find((entry: any) => entry.payment_hash === paymentHash);
+
+        if (!invoice) {
+            return { paid: false, paymentHash };
         }
-    );
 
-    const invoices = response.data.invoices || [];
-    const invoice = invoices.find((inv: any) => inv.payment_hash === paymentHash);
-
-    if (!invoice) {
-        return { paid: false, paymentHash };
+        return {
+            paid: invoice.status === 'paid',
+            preimage: invoice.payment_preimage,
+            paymentHash: invoice.payment_hash,
+            amountSat: invoice.amount_msat ? Math.floor(invoice.amount_msat / 1000) : undefined,
+        };
+    } catch (error: any) {
+        const detail = error.response?.data?.message || error.response?.data?.error || error.code || error.message;
+        throw new LightningUnavailableError(String(detail));
     }
-
-    return {
-        paid: invoice.status === 'paid',
-        preimage: invoice.payment_preimage,
-        paymentHash: invoice.payment_hash,
-        amountSat: invoice.amount_msat ? Math.floor(invoice.amount_msat / 1000) : undefined,
-    };
 }
