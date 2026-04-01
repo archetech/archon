@@ -183,7 +183,9 @@ include:
 
 ### Lightning Backend
 
-`lightning-mediator` owns Archon's Lightning runtime integrations. Drawbridge talks to it over HTTP for L402 invoice creation, and the mediator owns the public Lightning APIs, LNBits integration, and CLN access.
+`lightning-mediator` owns Archon's Lightning runtime integrations. Drawbridge talks to it over HTTP for L402 invoice creation and pending-invoice lifecycle, and the mediator owns the public Lightning APIs, LNBits integration, and CLN access.
+
+Drawbridge remains the policy layer: it still owns macaroons, pricing, rate limits, and the final payment records that show which paid requests were granted.
 
 You have two options for the mediator backend:
 

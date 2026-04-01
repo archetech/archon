@@ -9,7 +9,14 @@ The Lightning mediator is the home for Lightning-specific runtime behavior that 
 - Public invoice generation for published DIDs
 - Lightning Address and DID-based zap flows
 - Lightning-specific Redis state
-- L402 invoice creation and invoice-status lookups for Drawbridge
+- L402 invoice creation, pending-invoice storage, and invoice-status lookups for Drawbridge
+
+## Ownership boundary
+
+- `lightning-mediator` owns Lightning-facing integrations and invoice lifecycle state
+- Drawbridge owns macaroons, pricing, rate limits, and the final payment record that proves access was granted
+
+That means pending L402 invoice state lives in the mediator, while Drawbridge still records completed payments as part of its access-policy audit trail.
 
 ## Environment variables
 
