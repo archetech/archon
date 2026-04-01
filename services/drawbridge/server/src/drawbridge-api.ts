@@ -194,23 +194,22 @@ async function proxyLightningMediatorRequest(
     const upstreamUrl = new URL(upstreamPath, config.lightningMediatorURL);
 
     const headers = new Headers();
-    for (const [name, value] of Object.entries(req.headers)) {
-        if (!value || name === 'host' || name === 'content-length') {
-            continue;
-        }
+    const contentType = req.headers['content-type'];
+    if (contentType) {
+        headers.set('content-type', Array.isArray(contentType) ? contentType[0] as string : contentType);
+    }
 
-        if (Array.isArray(value)) {
-            for (const item of value) {
-                headers.append(name, item);
-            }
-        } else {
-            headers.set(name, value);
-        }
+    const accept = req.headers.accept;
+    if (accept) {
+        headers.set('accept', Array.isArray(accept) ? accept[0] as string : accept);
     }
 
     const body = buildProxyBody(req);
     if (body && !headers.has('content-type')) {
         headers.set('content-type', 'application/json');
+    }
+    if (config.adminApiKey) {
+        headers.set('authorization', `Bearer ${config.adminApiKey}`);
     }
 
     const upstream = await fetch(upstreamUrl, {
