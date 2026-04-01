@@ -81,6 +81,11 @@ async function getPublicHost(): Promise<string | undefined> {
         return cachedPublicHost;
     }
 
+    if (config.drawbridgePublicHost) {
+        cachedPublicHost = config.drawbridgePublicHost;
+        return cachedPublicHost;
+    }
+
     if (config.publicHost) {
         cachedPublicHost = config.publicHost;
         return cachedPublicHost;
@@ -89,7 +94,7 @@ async function getPublicHost(): Promise<string | undefined> {
     try {
         const onion = (await readFile(TOR_HOSTNAME_FILE, 'utf-8')).trim();
         if (onion) {
-            cachedPublicHost = `http://${onion}:${config.port}`;
+            cachedPublicHost = `http://${onion}:${config.drawbridgePort}`;
             logger.info({ publicHost: cachedPublicHost }, 'Resolved public host from Tor hostname');
             return cachedPublicHost;
         }

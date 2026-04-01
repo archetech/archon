@@ -226,9 +226,9 @@ Include the Lightning stack (see [Section 5](#5-bundled-lightning-stack-optional
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL` | `https://cln:3001` | CLN REST endpoint used by the mediator |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune used by the mediator |
 | `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | empty | LNBits base URL used by the mediator |
+| `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | *(auto)* | Public Drawbridge URL used for published invoice endpoints |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX` | `100` | Max requests per window |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW` | `60` | Rate limit window in seconds |
-| `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | *(auto)* | Public URL (auto-detected from Tor `.onion`) |
 | `ARCHON_DRAWBRIDGE_MACAROON_SECRET` | *(auto)* | L402 macaroon signing secret (auto-generated) |
 
 ### Auto-Generated Secrets

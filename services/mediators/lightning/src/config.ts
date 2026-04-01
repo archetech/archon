@@ -12,6 +12,8 @@ const config: LightningMediatorConfig = {
     clnRune: process.env.ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE || '',
     lnbitsUrl: process.env.ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL || '',
     publicHost: process.env.ARCHON_LIGHTNING_MEDIATOR_PUBLIC_HOST || '',
+    drawbridgePublicHost: process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || '',
+    drawbridgePort: process.env.ARCHON_DRAWBRIDGE_PORT ? parseInt(process.env.ARCHON_DRAWBRIDGE_PORT, 10) : 4222,
     torProxy: process.env.ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY || '',
 };
 

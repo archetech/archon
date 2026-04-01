@@ -29,5 +29,7 @@ That means pending L402 invoice state lives in the mediator, while Drawbridge st
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL` | `https://cln:3001` | CLN REST endpoint |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune |
 | `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | empty | LNBits base URL |
-| `ARCHON_LIGHTNING_MEDIATOR_PUBLIC_HOST` | empty | Public base URL for invoice publication |
+| `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Preferred public Drawbridge base URL for published invoice endpoints |
+| `ARCHON_DRAWBRIDGE_PORT` | `4222` | Drawbridge port used when deriving the onion fallback |
+| `ARCHON_LIGHTNING_MEDIATOR_PUBLIC_HOST` | empty | Legacy override for invoice publication when Drawbridge public host is unavailable |
 | `ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY` | empty | Tor SOCKS proxy for onion-aware Lightning flows |

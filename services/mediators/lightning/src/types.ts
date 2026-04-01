@@ -7,6 +7,8 @@ export interface LightningMediatorConfig {
     clnRune: string;
     lnbitsUrl: string;
     publicHost: string;
+    drawbridgePublicHost: string;
+    drawbridgePort: number;
     torProxy: string;
 }
 
