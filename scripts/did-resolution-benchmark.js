@@ -249,11 +249,13 @@ program
                     const durationMs = performance.now() - requestStarted;
 
                     if (!response.ok) {
+                        const errorSuffix = body?.error ? `: ${body.error}` : '';
+
                         results.push({
                             ok: false,
                             did,
                             durationMs,
-                            error: `${response.status} ${response.statusText}${body?.error ? `: ${body.error}` : ''}`,
+                            error: `${response.status} ${response.statusText}${errorSuffix}`,
                         });
                         continue;
                     }
