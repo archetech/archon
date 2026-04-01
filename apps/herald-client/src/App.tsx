@@ -856,6 +856,7 @@ function ViewCredential() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
     const [walletUrl, setWalletUrl] = useState<string>('');
+    const [credentialDidCopied, setCredentialDidCopied] = useState<boolean>(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -885,6 +886,16 @@ function ViewCredential() {
     const credentialWalletUrl = credentialData?.credentialDid && walletUrl
         ? buildWalletUrl(walletUrl, { credential: credentialData.credentialDid })
         : null;
+
+    async function copyCredentialDid(text: string) {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCredentialDidCopied(true);
+        }
+        catch (copyError: any) {
+            window.alert('Failed to copy text: ' + copyError);
+        }
+    }
 
     if (loading) {
         return <LoadingShell title="My Credential" />;
@@ -949,23 +960,39 @@ function ViewCredential() {
                         </Box>
 
                         <Typography variant="h6" sx={{ mb: 2 }}>Credential DID</Typography>
-                        <Typography
-                            variant="body2"
+                        <Box
                             sx={{
-                                fontFamily: 'monospace',
                                 backgroundColor: '#f5f5f5',
                                 p: 2,
                                 borderRadius: 1,
-                                wordBreak: 'break-all',
-                                mb: 3
+                                mb: 3,
+                                textAlign: 'center',
                             }}
                         >
-                            <a href={credentialWalletUrl || '#'} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
+                            <a href={credentialWalletUrl || '#'} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
                                 <QRCodeSVG value={credentialWalletUrl || credentialData.credentialDid} />
-                                <br />
-                                {credentialData.credentialDid}
                             </a>
-                        </Typography>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    fontFamily: 'monospace',
+                                    wordBreak: 'break-all',
+                                    mt: 2,
+                                    color: '#666',
+                                }}
+                            >
+                                {credentialData.credentialDid}
+                            </Typography>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                sx={{ mt: 1.5, textTransform: 'none' }}
+                                onClick={() => copyCredentialDid(credentialData.credentialDid)}
+                                disabled={credentialDidCopied}
+                            >
+                                {credentialDidCopied ? 'Copied' : 'Copy DID'}
+                            </Button>
+                        </Box>
 
                         <Typography variant="h6" sx={{ mb: 2 }}>Verifiable Credential</Typography>
                         <Box sx={{
