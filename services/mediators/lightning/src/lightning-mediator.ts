@@ -483,13 +483,27 @@ async function main(): Promise<void> {
                     return;
                 }
 
-                let invoiceUrl = `${lightningService.serviceEndpoint}?amount=${amount}`;
+                const publicHost = await getPublicHost();
+                let invoiceUrl = new URL(lightningService.serviceEndpoint);
+                invoiceUrl.searchParams.set('amount', String(amount));
                 if (memo) {
-                    invoiceUrl += `&memo=${encodeURIComponent(memo)}`;
+                    invoiceUrl.searchParams.set('memo', memo);
+                }
+
+                // When the recipient is published on this same stack, avoid
+                // looping back through our own onion service and use the
+                // internal Drawbridge route instead.
+                let useTorProxy = isOnion;
+                if (publicHost) {
+                    const publicUrl = new URL(publicHost);
+                    if (invoiceUrl.hostname === publicUrl.hostname) {
+                        invoiceUrl = new URL(invoiceUrl.pathname + invoiceUrl.search, `http://drawbridge:${config.drawbridgePort}`);
+                        useTorProxy = false;
+                    }
                 }
 
                 const fetchOptions: any = {};
-                if (isOnion && config.torProxy) {
+                if (useTorProxy && config.torProxy) {
                     const [host, port] = config.torProxy.split(':');
                     fetchOptions.dispatcher = socksDispatcher({
                         type: 5,
@@ -498,7 +512,7 @@ async function main(): Promise<void> {
                     });
                 }
 
-                const invoiceResponse = await fetch(invoiceUrl, fetchOptions);
+                const invoiceResponse = await fetch(invoiceUrl.toString(), fetchOptions);
                 if (!invoiceResponse.ok) {
                     const error = await invoiceResponse.json().catch(() => ({ error: invoiceResponse.statusText }));
                     res.status(502).json({ error: `Invoice request failed: ${error.error || invoiceResponse.statusText}` });
