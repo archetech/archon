@@ -107,7 +107,7 @@ The cryptographic implementation (cipher package) uses sound primitives (secp256
 
 ~~Neither the Gatekeeper nor Keymaster service implements any authentication or authorization middleware.~~
 
-**Remediation applied:** Both services now support an `ARCHON_ADMIN_API_KEY` environment variable. When set, all admin/destructive endpoints require `Authorization: Bearer <key>`. Additionally, `ARCHON_BIND_ADDRESS` allows binding to `127.0.0.1` so only the local reverse proxy can reach the services. A sample nginx configuration (`docs/nginx-proxy.conf.example`) is provided that exposes only public-safe endpoints with rate limiting.
+**Remediation applied:** Both services now support an `ARCHON_ADMIN_API_KEY` environment variable. When set, all admin/destructive endpoints require the internal `X-Archon-Admin-Key` header. Additionally, `ARCHON_BIND_ADDRESS` allows binding to `127.0.0.1` so only the local reverse proxy can reach the services. A sample nginx configuration (`docs/nginx-proxy.conf.example`) is provided that exposes only public-safe endpoints with rate limiting.
 
 **Protected routes (Gatekeeper):** `/dids/remove`, `/db/reset`, `/db/verify`
 **Protected routes (Keymaster):** `/wallet` (GET/PUT), `/wallet/new`, `/wallet/backup`, `/wallet/recover`, `/wallet/check`, `/wallet/fix`, `/wallet/mnemonic`, `/export/wallet/encrypted`, `/did/:id` (DELETE), `/ids` (POST), `/ids/:id` (DELETE), `/keys/rotate`, `/assets/:id/transfer`
@@ -628,7 +628,7 @@ The following changes were implemented in the `release-0.2` branch to address th
 - `services/gatekeeper/server/src/config.js`
 - `services/keymaster/server/src/config.js`
 
-A `requireAdminKey` middleware was added to both services. When `ARCHON_ADMIN_API_KEY` is set, all admin routes require `Authorization: Bearer <key>`. This protects against reverse proxy misconfiguration.
+A `requireAdminKey` middleware was added to both services. When `ARCHON_ADMIN_API_KEY` is set, all admin routes require the internal `X-Archon-Admin-Key` header. This protects against reverse proxy misconfiguration.
 
 **Gatekeeper admin routes protected:** `/dids/remove`, `/db/reset`, `/db/verify`
 **Keymaster admin routes protected:** All `/wallet/*` routes, `/did/:id` (DELETE), `/ids` (POST/DELETE), `/keys/rotate`, `/assets/:id/transfer`, `/export/wallet/encrypted`

@@ -94,19 +94,26 @@ readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
     walletVersionInfo.set({ version: 'unknown', commit: serviceCommit }, 1);
 });
 
+const ARCHON_ADMIN_HEADER = 'x-archon-admin-key';
+
 function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction) {
     if (!config.adminApiKey) {
         res.status(403).json({ error: 'Admin API key not configured' });
         return;
     }
 
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const adminHeader = req.headers[ARCHON_ADMIN_HEADER];
+    const key = typeof adminHeader === 'string'
+        ? adminHeader
+        : Array.isArray(adminHeader)
+            ? adminHeader[0]
+            : null;
+
+    if (!key) {
         res.status(401).json({ error: 'Admin API key required' });
         return;
     }
 
-    const key = authHeader.slice(7);
     const keyBuf = Buffer.from(key);
     const expectedBuf = Buffer.from(config.adminApiKey);
 
@@ -121,7 +128,7 @@ function requireAdminKey(req: express.Request, res: express.Response, next: expr
 async function fetchMnemonic(): Promise<string> {
     const headers: Record<string, string> = {};
     if (config.adminApiKey) {
-        headers['Authorization'] = `Bearer ${config.adminApiKey}`;
+        headers[ARCHON_ADMIN_HEADER] = config.adminApiKey;
     }
     const response = await axios.get(`${config.keymasterURL}/api/v1/wallet/mnemonic`, { headers });
     return response.data.mnemonic;
