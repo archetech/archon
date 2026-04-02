@@ -43,7 +43,6 @@ const DEFAULT_MEMBERSHIP_SCHEMA_DID = 'did:cid:bagaaieravnv5onsflewvrz6urhwfjixf
 const MEMBERSHIP_SCHEMA_DID = process.env.ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID || DEFAULT_MEMBERSHIP_SCHEMA_DID;
 const TOR_PROXY = process.env.ARCHON_HERALD_TOR_PROXY || '';
 const ADMIN_API_KEY = process.env.ARCHON_ADMIN_API_KEY || process.env.ARCHON_HERALD_ADMIN_API_KEY || '';
-const ARCHON_ADMIN_HEADER = 'x-archon-admin-key';
 const SESSION_SECRET_PLACEHOLDERS = new Set(['change-me', 'change-me-to-a-random-string']);
 
 if (!SESSION_SECRET) {
@@ -211,18 +210,6 @@ async function verifyBearerToken(req: Request): Promise<string | null> {
     return verify.responder;
 }
 
-function extractAdminKey(req: Request): string | null {
-    const internalHeader = req.headers[ARCHON_ADMIN_HEADER];
-    if (typeof internalHeader === 'string' && internalHeader) {
-        return internalHeader;
-    }
-    if (Array.isArray(internalHeader) && internalHeader[0]) {
-        return internalHeader[0];
-    }
-
-    return null;
-}
-
 async function ensureUser(did: string): Promise<User> {
     const now = new Date().toISOString();
     const existingUser = await db.getUser(did);
@@ -288,13 +275,6 @@ function isAuthenticated(req: Request, res: Response, next: NextFunction): void 
 }
 
 function isOwner(req: Request, res: Response, next: NextFunction): void {
-    if (ADMIN_API_KEY) {
-        const adminKey = extractAdminKey(req);
-        if (adminKey === ADMIN_API_KEY) {
-            return next();
-        }
-    }
-
     isAuthenticated(req, res, () => {
         const userDid = req.session.user?.did;
         if (userDid === OWNER_DID) {
