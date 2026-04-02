@@ -2,6 +2,8 @@ import config from './config.js';
 import { LightningUnavailableError } from './errors.js';
 import type { LightningInvoice, LightningPaymentResult, PendingInvoiceData } from './types.js';
 
+const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
+
 async function requestLightningMediator<T>(
     baseUrl: string,
     path: string,
@@ -11,7 +13,7 @@ async function requestLightningMediator<T>(
         ...options,
         headers: {
             'Content-Type': 'application/json',
-            ...(config.adminApiKey ? { 'Authorization': `Bearer ${config.adminApiKey}` } : {}),
+            ...(config.adminApiKey ? { [ARCHON_ADMIN_HEADER]: config.adminApiKey } : {}),
             ...(options.headers || {}),
         },
     });
@@ -67,7 +69,7 @@ export async function getPendingL402Invoice(
     paymentHash: string
 ): Promise<PendingInvoiceData | null> {
     const response = await fetch(new URL(`/api/v1/l402/pending/${encodeURIComponent(paymentHash)}`, baseUrl), {
-        headers: config.adminApiKey ? { 'Authorization': `Bearer ${config.adminApiKey}` } : {},
+        headers: config.adminApiKey ? { [ARCHON_ADMIN_HEADER]: config.adminApiKey } : {},
     });
     if (response.status === 404) {
         return null;

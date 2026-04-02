@@ -34,6 +34,7 @@ const lightningMediatorVersionInfo = new Gauge({
 let serviceVersion = 'unknown';
 const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
 const TOR_HOSTNAME_FILE = '/data/tor/hostname';
+const ARCHON_ADMIN_HEADER = 'x-archon-admin-key';
 
 readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
     const pkg = JSON.parse(data);
@@ -141,13 +142,18 @@ function requireAdminKey(req: express.Request, res: express.Response, next: expr
         return;
     }
 
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const adminHeader = req.headers[ARCHON_ADMIN_HEADER];
+    const key = typeof adminHeader === 'string'
+        ? adminHeader
+        : Array.isArray(adminHeader)
+            ? adminHeader[0]
+            : null;
+
+    if (!key) {
         res.status(401).json({ error: 'Admin API key required' });
         return;
     }
 
-    const key = authHeader.slice(7);
     const keyBuf = Buffer.from(key);
     const expectedBuf = Buffer.from(config.adminApiKey);
 

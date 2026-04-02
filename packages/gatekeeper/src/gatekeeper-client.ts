@@ -17,6 +17,7 @@ import {
 } from './types.js';
 
 const VERSION = '/api/v1';
+const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 
 function throwError(error: AxiosError | any): never {
     if (error.response) {
@@ -66,7 +67,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
 
         if (options?.apiKey) {
-            this.addCustomHeader('Authorization', `Bearer ${options.apiKey}`);
+            this.addCustomHeader(ARCHON_ADMIN_HEADER, options.apiKey);
         }
 
         // Only used for unit testing

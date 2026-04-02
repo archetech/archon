@@ -18,6 +18,7 @@ import axios from 'axios';
 const REGISTRY = config.chain;
 
 const READ_ONLY = config.exportInterval === 0;
+const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 
 const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
@@ -32,7 +33,7 @@ const btcClient = new BtcClient({
 function walletHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (config.adminApiKey) {
-        headers['Authorization'] = `Bearer ${config.adminApiKey}`;
+        headers[ARCHON_ADMIN_HEADER] = config.adminApiKey;
     }
     return headers;
 }
