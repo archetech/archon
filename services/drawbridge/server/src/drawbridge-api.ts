@@ -51,6 +51,8 @@ const drawbridgeVersionInfo = new Gauge({
     labelNames: ['version', 'commit'],
 });
 
+const ARCHON_ADMIN_HEADER = 'x-archon-admin-key';
+
 let serviceVersion = 'unknown';
 const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
 
@@ -139,7 +141,7 @@ async function proxyHeraldRequest(req: express.Request, res: express.Response, p
 
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {
-        if (!value || name === 'host' || name === 'content-length' || name === 'authorization') {
+        if (!value || name === 'host' || name === 'content-length') {
             continue;
         }
 
@@ -158,7 +160,7 @@ async function proxyHeraldRequest(req: express.Request, res: express.Response, p
         headers.set('content-type', 'application/json');
     }
     if (config.adminApiKey) {
-        headers.set('authorization', `Bearer ${config.adminApiKey}`);
+        headers.set(ARCHON_ADMIN_HEADER, config.adminApiKey);
     }
 
     const upstream = await fetch(upstreamUrl, {

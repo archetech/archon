@@ -160,6 +160,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
         challenge: string;
     }> = new Map();
     const adminApiKey = process.env.ARCHON_ADMIN_API_KEY || process.env.ARCHON_HERALD_ADMIN_API_KEY || '';
+    const adminHeaderName = 'x-archon-admin-key';
 
     function requireAdminKey(req: Request, res: Response): boolean {
         if (!adminApiKey) {
@@ -167,13 +168,20 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             return false;
         }
 
-        const authHeader = req.headers.authorization;
-        if (!authHeader?.startsWith('Bearer ')) {
+        const internalHeader = req.headers[adminHeaderName];
+        const key = typeof internalHeader === 'string'
+            ? internalHeader
+            : Array.isArray(internalHeader)
+                ? internalHeader[0]
+                : req.headers.authorization?.startsWith('Bearer ')
+                    ? req.headers.authorization.slice(7)
+                    : null;
+
+        if (!key) {
             res.status(401).json({ error: 'Admin API key required' });
             return false;
         }
 
-        const key = authHeader.slice(7);
         const keyBuf = Buffer.from(key);
         const expectedBuf = Buffer.from(adminApiKey);
 
