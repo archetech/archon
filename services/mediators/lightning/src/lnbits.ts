@@ -88,11 +88,22 @@ export async function getPayments(
     adminKey: string
 ): Promise<LnbitsPayment[]> {
     try {
-        const response = await axios.get(`${url}/api/v1/payments`, {
+        const response = await axios.get(`${url}/api/v1/payments/paginated`, {
             headers: { 'X-Api-Key': adminKey },
+            params: {
+                limit: 100,
+                sortby: 'time',
+                direction: 'desc',
+            },
         });
 
-        return (response.data || []).map((payment: any) => {
+        const payments = Array.isArray(response.data)
+            ? response.data
+            : Array.isArray(response.data?.data)
+                ? response.data.data
+                : [];
+
+        return payments.map((payment: any) => {
             const status = payment.status === 'success'
                 ? 'success'
                 : payment.status === 'failed'
