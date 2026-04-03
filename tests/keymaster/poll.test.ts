@@ -5,14 +5,17 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
+import { jest } from '@jest/globals';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
 let ownerWallet: WalletJsonMemory;
 let voterWallet: WalletJsonMemory;
+let outsiderWallet: WalletJsonMemory;
 let cipher: CipherNode;
 let owner: Keymaster;
 let voter: Keymaster;
+let outsider: Keymaster;
 
 beforeAll(async () => {
     ipfs = new HeliaClient();
@@ -31,8 +34,10 @@ beforeEach(() => {
     cipher = new CipherNode();
     ownerWallet = new WalletJsonMemory();
     voterWallet = new WalletJsonMemory();
+    outsiderWallet = new WalletJsonMemory();
     owner = new Keymaster({ gatekeeper, wallet: ownerWallet, cipher, passphrase: 'owner' });
     voter = new Keymaster({ gatekeeper, wallet: voterWallet, cipher, passphrase: 'voter' });
+    outsider = new Keymaster({ gatekeeper, wallet: outsiderWallet, cipher, passphrase: 'outsider' });
 });
 
 describe('pollTemplate', () => {
@@ -375,6 +380,29 @@ describe('viewPoll', () => {
         expect(view.hasVoted).toBe(false);
     });
 
+    it('should show published results to an eligible voter', async () => {
+        await owner.createId('Bob');
+        const aliceDid = await voter.createId('Alice');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        await owner.addPollVoter(pollDid, aliceDid);
+
+        const ownerBallot = await owner.votePoll(pollDid, 1);
+        await owner.updatePoll(ownerBallot);
+        const voterBallot = await voter.votePoll(pollDid, 2);
+        await owner.updatePoll(voterBallot);
+        await owner.publishPoll(pollDid);
+
+        const view = await voter.viewPoll(pollDid);
+
+        expect(view.isEligible).toBe(true);
+        expect(view.hasVoted).toBe(true);
+        expect(view.results!.final).toBe(true);
+        expect(view.results!.votes!.received).toBe(2);
+        expect(view.results!.tally[1].count).toBe(1);
+        expect(view.results!.tally[2].count).toBe(1);
+    });
+
     it('should throw when non-voter tries to view poll', async () => {
         await owner.createId('Bob');
         await voter.createId('Alice');
@@ -388,6 +416,22 @@ describe('viewPoll', () => {
         catch (error: any) {
             expect(error.message).toBe('Invalid parameter: pollId');
         }
+    });
+
+    it('should mark a voter ineligible if membership lookup fails', async () => {
+        await owner.createId('Bob');
+        const aliceDid = await voter.createId('Alice');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        await owner.addPollVoter(pollDid, aliceDid);
+
+        jest.spyOn(voter, 'getPoll').mockResolvedValue(template);
+        jest.spyOn(voter, 'getVault').mockRejectedValue(new Error('boom'));
+
+        const view = await voter.viewPoll(pollDid);
+
+        expect(view.isEligible).toBe(false);
+        expect(view.hasVoted).toBe(false);
     });
 
     it('should throw on invalid poll id', async () => {
@@ -460,6 +504,52 @@ describe('votePoll', () => {
         }
     });
 
+    it('should throw when the poll owner is missing', async () => {
+        await owner.createId('Bob');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        const resolveDID = owner.resolveDID.bind(owner);
+        jest.spyOn(owner, 'getPoll').mockResolvedValue(template);
+
+        jest.spyOn(owner, 'resolveDID').mockImplementation(async (id) => {
+            const doc = await resolveDID(id);
+            if (id === pollDid) {
+                return {
+                    ...doc,
+                    didDocument: {
+                        ...doc.didDocument,
+                        controller: undefined,
+                    },
+                };
+            }
+            return doc;
+        });
+
+        try {
+            await owner.votePoll(pollDid, 1);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Keymaster: owner missing from poll');
+        }
+    });
+
+    it('should not return a ballot for an expired poll', async () => {
+        await owner.createId('Bob');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        const expired = { ...template, deadline: new Date(Date.now() - 60_000).toISOString() };
+        await owner.addVaultItem(pollDid, 'poll', Buffer.from(JSON.stringify(expired), 'utf-8'));
+
+        try {
+            await owner.votePoll(pollDid, 1);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: poll has expired');
+        }
+    });
+
     it('should not return a ballot for an ineligible voter', async () => {
         await owner.createId('Bob');
         await voter.createId('Alice');
@@ -489,6 +579,43 @@ describe('votePoll', () => {
 });
 
 describe('sendBallot', () => {
+    it('should send a poll notice to eligible voters', async () => {
+        await owner.createId('Bob');
+        const aliceDid = await voter.createId('Alice');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        await owner.addPollVoter(pollDid, aliceDid);
+
+        const noticeDid = await owner.sendPoll(pollDid);
+        expect(noticeDid).toBeDefined();
+    });
+
+    it('should throw when a poll has no voters to notify', async () => {
+        await owner.createId('Bob');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+
+        try {
+            await owner.sendPoll(pollDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Keymaster: No poll voters found');
+        }
+    });
+
+    it('should throw when sending a non-poll notice', async () => {
+        const did = await owner.createId('Bob');
+
+        try {
+            await owner.sendPoll(did);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: pollId');
+        }
+    });
+
     it('should send a ballot notice to the poll owner', async () => {
         await owner.createId('Bob');
         const aliceDid = await voter.createId('Alice');
@@ -512,6 +639,39 @@ describe('sendBallot', () => {
         catch (error: any) {
             expect(error).not.toBeInstanceOf(ExpectedExceptionError);
             expect(error.message).toBe('Invalid parameter: pollId is not a valid poll');
+        }
+    });
+
+    it('should throw when the poll owner cannot be resolved', async () => {
+        await owner.createId('Bob');
+        const aliceDid = await voter.createId('Alice');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        await owner.addPollVoter(pollDid, aliceDid);
+        const ballotDid = await voter.votePoll(pollDid, 1);
+        const resolveDID = voter.resolveDID.bind(voter);
+        jest.spyOn(voter, 'getPoll').mockResolvedValue(template);
+
+        jest.spyOn(voter, 'resolveDID').mockImplementation(async (id) => {
+            const doc = await resolveDID(id);
+            if (id === pollDid) {
+                return {
+                    ...doc,
+                    didDocument: {
+                        ...doc.didDocument,
+                        controller: undefined,
+                    },
+                };
+            }
+            return doc;
+        });
+
+        try {
+            await voter.sendBallot(ballotDid, pollDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Keymaster: poll owner not found');
         }
     });
 });
@@ -548,6 +708,18 @@ describe('viewBallot', () => {
         expect(result.poll).toBe(pollDid);
         expect(result.vote).toBe(1);
         expect(result.option).toBe('yes');
+    });
+
+    it('should label spoiled ballots correctly', async () => {
+        await owner.createId('Bob');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+
+        const ballotDid = await owner.votePoll(pollDid, 0);
+        const result = await owner.viewBallot(ballotDid);
+
+        expect(result.vote).toBe(0);
+        expect(result.option).toBe('spoil');
     });
 });
 
@@ -615,6 +787,78 @@ describe('updatePoll', () => {
         }
         catch (error: any) {
             expect(error.message).toContain('Cannot find poll related to ballot');
+        }
+    });
+
+    it('should throw when non-owner tries to update a poll', async () => {
+        await owner.createId('Bob');
+        const aliceDid = await voter.createId('Alice');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        await owner.addPollVoter(pollDid, aliceDid);
+
+        const ballotDid = await voter.votePoll(pollDid, 2);
+
+        try {
+            await voter.updatePoll(ballotDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: only owner can update a poll');
+        }
+    });
+
+    it('should throw when ballot voter is not a poll member', async () => {
+        await owner.createId('Bob');
+        const malloryDid = await outsider.createId('Mallory');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        await owner.addPollVoter(pollDid, malloryDid);
+        const ballotDid = await outsider.votePoll(pollDid, 1);
+        await owner.removePollVoter(pollDid, malloryDid);
+
+        try {
+            await owner.updatePoll(ballotDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: voter is not a poll member');
+        }
+    });
+
+    it('should throw when poll has expired before update', async () => {
+        await owner.createId('Bob');
+        const aliceDid = await voter.createId('Alice');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        await owner.addPollVoter(pollDid, aliceDid);
+        const ballotDid = await voter.votePoll(pollDid, 1);
+
+        const expired = (await owner.getPoll(pollDid))!;
+        expired.deadline = new Date(Date.now() - 60_000).toISOString();
+        await owner.addVaultItem(pollDid, 'poll', Buffer.from(JSON.stringify(expired), 'utf-8'));
+
+        try {
+            await owner.updatePoll(ballotDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: poll has expired');
+        }
+    });
+
+    it('should throw when ballot vote exceeds available options', async () => {
+        const bob = await owner.createId('Bob');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        const ballotDid = await owner.encryptJSON({ poll: pollDid, vote: 99 }, bob);
+
+        try {
+            await owner.updatePoll(ballotDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: ballot.vote');
         }
     });
 });
@@ -704,6 +948,58 @@ describe('publishPoll', () => {
         expect(view.results!.tally[1].count).toBe(1); // yes
         expect(view.results!.tally[2].count).toBe(1); // no
     });
+
+    it('should throw when non-owner tries to publish a poll', async () => {
+        await owner.createId('Bob');
+        const aliceDid = await voter.createId('Alice');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        await owner.addPollVoter(pollDid, aliceDid);
+
+        try {
+            await voter.publishPoll(pollDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: only owner can publish a poll');
+        }
+    });
+
+    it('should throw when poll is not final', async () => {
+        await owner.createId('Bob');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+
+        try {
+            await owner.publishPoll(pollDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Invalid parameter: poll not final');
+        }
+    });
+
+    it('should throw when poll config cannot be loaded', async () => {
+        await owner.createId('Bob');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        const getPoll = owner.getPoll.bind(owner);
+
+        jest.spyOn(owner, 'getPoll').mockImplementation(async (id) => {
+            if (id === pollDid) {
+                return null;
+            }
+            return getPoll(id);
+        });
+
+        try {
+            await owner.publishPoll(pollDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(`Invalid parameter: ${pollDid}`);
+        }
+    });
 });
 
 describe('unpublishPoll', () => {
@@ -739,6 +1035,31 @@ describe('unpublishPoll', () => {
             await voter.unpublishPoll(pollDid);
             throw new ExpectedExceptionError();
         } catch (error: any) {
+            expect(error.message).toBe(`Invalid parameter: ${pollDid}`);
+        }
+    });
+
+    it('should throw when poll config cannot be loaded during unpublish', async () => {
+        await owner.createId('Bob');
+        const template = await owner.pollTemplate();
+        const pollDid = await owner.createPoll(template);
+        const ballotDid = await owner.votePoll(pollDid, 1);
+        await owner.updatePoll(ballotDid);
+        await owner.publishPoll(pollDid);
+        const getPoll = owner.getPoll.bind(owner);
+
+        jest.spyOn(owner, 'getPoll').mockImplementation(async (id) => {
+            if (id === pollDid) {
+                return null;
+            }
+            return getPoll(id);
+        });
+
+        try {
+            await owner.unpublishPoll(pollDid);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
             expect(error.message).toBe(`Invalid parameter: ${pollDid}`);
         }
     });

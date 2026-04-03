@@ -5,6 +5,8 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import HeliaClient from '@didcid/ipfs/helia';
 import { NoticeMessage } from '@didcid/keymaster/types';
+import { ExpectedExceptionError } from '@didcid/common/errors';
+import { jest } from '@jest/globals';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -397,6 +399,28 @@ describe('searchNotices', () => {
         await gatekeeper.removeDIDs([did]);
 
         const ok = await keymaster.searchNotices();
+        expect(ok).toBe(true);
+    });
+
+    it('should throw a keymaster error when search fails', async () => {
+        await keymaster.createId('Alice');
+        jest.spyOn(gatekeeper, 'search').mockRejectedValue(new Error('search failed'));
+
+        try {
+            await keymaster.searchNotices();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe('Keymaster: Failed to search for notices');
+        }
+    });
+});
+
+describe('cleanupNotices', () => {
+    it('should return true when there are no notices to clean', async () => {
+        await keymaster.createId('Alice');
+
+        const ok = await keymaster.cleanupNotices();
         expect(ok).toBe(true);
     });
 });

@@ -139,6 +139,24 @@ describe('loadWallet', () => {
         );
     });
 
+    it('should upgrade legacy wallet names into aliases', async () => {
+        const legacyWallet = {
+            ...structuredClone(MOCK_WALLET_V1),
+            names: {
+                bob: 'did:cid:bagaaieraexample',
+            },
+        };
+
+        await wallet.saveWallet(legacyWallet as any);
+        const loaded = await keymaster.loadWallet();
+
+        expect(loaded.version).toBe(2);
+        expect((loaded as any).names).toBeUndefined();
+        expect(loaded.aliases).toStrictEqual({
+            bob: 'did:cid:bagaaieraexample',
+        });
+    });
+
     it('should throw on unsupported wallet version', async () => {
         let clone = structuredClone(MOCK_WALLET_V1_ENCRYPTED);
         delete clone.seed.mnemonicEnc;
@@ -748,4 +766,3 @@ describe('updateWallet', () => {
         }
     });
 });
-
