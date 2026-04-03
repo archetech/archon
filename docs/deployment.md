@@ -238,7 +238,7 @@ Include the Lightning stack (see [Section 5](#5-bundled-lightning-stack-optional
 | `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://lightning-mediator:4235` | Drawbridge's upstream Lightning mediator |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL` | `https://cln:3001` | CLN REST endpoint used by the mediator |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune used by the mediator; auto-loaded from `./data/cln-mainnet/drawbridge/rune.txt` in the bundled stack |
-| `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | empty | LNbits base URL used by the mediator |
+| `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | `http://lnbits:5000` | LNbits base URL used by the mediator |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | *(auto)* | Public Drawbridge URL used for published invoice endpoints |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX` | `100` | Max requests per window |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW` | `60` | Rate limit window in seconds |
