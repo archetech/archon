@@ -35,5 +35,15 @@
     "@types/node": "^22.13.16",
     "patch-package": "^8.0.1",
     "typescript": "^5.8.2"
+  },
+  "overrides": {
+    "bitcoin-core": {
+      "lodash": "4.18.1"
+    },
+    "request": {
+      "form-data": "2.5.5",
+      "qs": "6.14.2",
+      "tough-cookie": "4.1.4"
+    }
   }
 }

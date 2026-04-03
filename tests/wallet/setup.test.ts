@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { buildDescriptors } from '../../services/satoshi-wallet/server/src/derivation';
+import { buildDescriptors } from '../../services/mediators/satoshi-wallet/src/derivation';
 
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
@@ -20,6 +20,15 @@ function createMockClient(): MockBtcClient {
         getDescriptorInfo: jest.fn(),
         importDescriptors: jest.fn(),
     };
+}
+
+function needsDescriptorTopUp(descriptor: any): boolean {
+    if (!descriptor.active || !descriptor.range || typeof descriptor.next !== 'number') {
+        return false;
+    }
+
+    const [, end] = descriptor.range;
+    return descriptor.next > end;
 }
 
 // Replicate the setup logic from btc-wallet.ts
@@ -48,10 +57,14 @@ async function setupWatchOnlyWallet(
 
     const existing = await btcClient.listDescriptors(false);
     const existingDescs = existing.descriptors.map((d: any) => d.desc);
-    const hasExternal = existingDescs.some((d: string) => d.includes('/0/*'));
-    const hasInternal = existingDescs.some((d: string) => d.includes('/1/*'));
+    const existingExternal = existing.descriptors.find((d: any) => d.desc.includes('/0/*'));
+    const existingInternal = existing.descriptors.find((d: any) => d.desc.includes('/1/*'));
+    const hasExternal = Boolean(existingExternal);
+    const hasInternal = Boolean(existingInternal);
+    const needsExternalImport = !hasExternal || (existingExternal ? needsDescriptorTopUp(existingExternal) : false);
+    const needsInternalImport = !hasInternal || (existingInternal ? needsDescriptorTopUp(existingInternal) : false);
 
-    if (hasExternal && hasInternal) {
+    if (!needsExternalImport && !needsInternalImport) {
         return { walletName, descriptors: existingDescs };
     }
 
@@ -78,6 +91,28 @@ async function setupWatchOnlyWallet(
             timestamp: 'now',
             active: true,
             range: [0, gapLimit],
+            internal: true,
+        });
+    }
+
+    if (existingExternal && needsDescriptorTopUp(existingExternal)) {
+        requests.push({
+            desc: extInfo.descriptor,
+            timestamp: 'now',
+            active: true,
+            range: [0, existingExternal.next + gapLimit],
+            next_index: existingExternal.next,
+            internal: false,
+        });
+    }
+
+    if (existingInternal && needsDescriptorTopUp(existingInternal)) {
+        requests.push({
+            desc: intInfo.descriptor,
+            timestamp: 'now',
+            active: true,
+            range: [0, existingInternal.next + gapLimit],
+            next_index: existingInternal.next,
             internal: true,
         });
     }
@@ -143,8 +178,8 @@ describe('setupWatchOnlyWallet', () => {
     it('returns early with existing descriptors if both external and internal found', async () => {
         btcClient.listDescriptors.mockResolvedValue({
             descriptors: [
-                { desc: 'wpkh([abc]/0/*)#ext' },
-                { desc: 'wpkh([abc]/1/*)#int' },
+                { desc: 'wpkh([abc]/0/*)#ext', active: true, range: [0, 20], next: 5 },
+                { desc: 'wpkh([abc]/1/*)#int', active: true, range: [0, 20], next: 3 },
             ],
         });
 
@@ -153,6 +188,32 @@ describe('setupWatchOnlyWallet', () => {
         expect(result.descriptors).toEqual(['wpkh([abc]/0/*)#ext', 'wpkh([abc]/1/*)#int']);
         expect(btcClient.getDescriptorInfo).not.toHaveBeenCalled();
         expect(btcClient.importDescriptors).not.toHaveBeenCalled();
+    });
+
+    it('tops up an exhausted external descriptor range', async () => {
+        btcClient.listDescriptors.mockResolvedValue({
+            descriptors: [
+                { desc: 'wpkh([abc]/0/*)#ext', active: true, range: [0, 138], next: 139 },
+                { desc: 'wpkh([abc]/1/*)#int', active: true, range: [0, 20], next: 11 },
+            ],
+        });
+        btcClient.getDescriptorInfo
+            .mockResolvedValueOnce({ descriptor: 'wpkh(ext)#abc' })
+            .mockResolvedValueOnce({ descriptor: 'wpkh(int)#def' });
+        btcClient.importDescriptors.mockResolvedValue([{ success: true }]);
+
+        await setupWatchOnlyWallet(btcClient, TEST_MNEMONIC, 'signet', 'test-wallet', 20);
+
+        expect(btcClient.importDescriptors).toHaveBeenCalledWith([
+            {
+                desc: 'wpkh(ext)#abc',
+                timestamp: 'now',
+                active: true,
+                range: [0, 159],
+                next_index: 139,
+                internal: false,
+            },
+        ]);
     });
 
     it('imports both external and internal descriptors on fresh wallet', async () => {

@@ -12,9 +12,9 @@ COPY packages/ ./packages/
 RUN npm ci
 RUN npm run build
 
-COPY services/satoshi-wallet ./wallet/
+COPY services/mediators/satoshi-wallet ./wallet/
 
-RUN cd wallet/server && npm ci && npm run build
+RUN cd wallet && npm ci && npm run build
 
 WORKDIR /app/wallet
 
@@ -24,4 +24,4 @@ ENV GIT_COMMIT=$GIT_COMMIT
 EXPOSE 4240 4241
 
 # Run...
-CMD ["node", "server/dist/wallet-api.js"]
+CMD ["node", "dist/wallet-api.js"]
