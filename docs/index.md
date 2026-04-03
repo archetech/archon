@@ -10,6 +10,7 @@ Archon is a decentralized identity protocol implementing the W3C-compliant `did:
 ## Operations
 
 - [Deployment Guide](deployment.md) — Docker Compose setup from core node to full Lightning stack
+- [Runtime Docker Architecture](runtime-container-architecture.md) — Mermaid diagrams of the live container topology
 - [Nginx Reverse Proxy](nginx-proxy.conf.example) — example config for production
 
 ## Lightning
