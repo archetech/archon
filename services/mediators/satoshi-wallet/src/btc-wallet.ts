@@ -23,6 +23,15 @@ export { getXpub } from './derivation.js';
 const ECPair = ECPairFactory(ecc);
 bitcoin.initEccLib(ecc);
 
+function needsDescriptorTopUp(descriptor: ListDescriptorsResult['descriptors'][number]): boolean {
+    if (!descriptor.active || !descriptor.range || typeof descriptor.next !== 'number') {
+        return false;
+    }
+
+    const [, end] = descriptor.range;
+    return descriptor.next > end;
+}
+
 function getBtcNetwork(network: WalletNetwork): bitcoin.Network {
     return network === 'mainnet' ? bitcoin.networks.bitcoin : bitcoin.networks.testnet;
 }
@@ -72,10 +81,14 @@ export async function setupWatchOnlyWallet(
     // Check which descriptors are already imported
     const existing: ListDescriptorsResult = await btcClient.listDescriptors(false);
     const existingDescs = existing.descriptors.map(d => d.desc);
-    const hasExternal = existingDescs.some(d => d.includes('/0/*'));
-    const hasInternal = existingDescs.some(d => d.includes('/1/*'));
+    const existingExternal = existing.descriptors.find(d => d.desc.includes('/0/*'));
+    const existingInternal = existing.descriptors.find(d => d.desc.includes('/1/*'));
+    const hasExternal = Boolean(existingExternal);
+    const hasInternal = Boolean(existingInternal);
+    const needsExternalImport = !hasExternal || (existingExternal ? needsDescriptorTopUp(existingExternal) : false);
+    const needsInternalImport = !hasInternal || (existingInternal ? needsDescriptorTopUp(existingInternal) : false);
 
-    if (hasExternal && hasInternal) {
+    if (!needsExternalImport && !needsInternalImport) {
         return {
             walletName: config.walletName,
             descriptors: existingDescs,
@@ -107,6 +120,28 @@ export async function setupWatchOnlyWallet(
             timestamp: 'now',
             active: true,
             range: [0, config.gapLimit],
+            internal: true,
+        });
+    }
+
+    if (existingExternal && needsDescriptorTopUp(existingExternal)) {
+        requests.push({
+            desc: extInfo.descriptor,
+            timestamp: 'now',
+            active: true,
+            range: [0, existingExternal.next! + config.gapLimit],
+            next_index: existingExternal.next,
+            internal: false,
+        });
+    }
+
+    if (existingInternal && needsDescriptorTopUp(existingInternal)) {
+        requests.push({
+            desc: intInfo.descriptor,
+            timestamp: 'now',
+            active: true,
+            range: [0, existingInternal.next! + config.gapLimit],
+            next_index: existingInternal.next,
             internal: true,
         });
     }
