@@ -14,6 +14,10 @@ function safeJsonParse<T>(value: string | undefined, fallback: T): T {
 
 const PREFIX = 'lightning-mediator';
 
+export function normalizePublishedLightningKey(did: string): string {
+    return did.startsWith('did:') ? did.split(':').pop() || did : did;
+}
+
 export class RedisStore implements LightningStore {
     private redis: InstanceType<typeof Redis>;
 
@@ -122,17 +126,17 @@ export class RedisStore implements LightningStore {
     }
 
     async savePublishedLightning(did: string, invoiceKey: string): Promise<void> {
-        const key = `${PREFIX}:published:${did}`;
+        const key = `${PREFIX}:published:${normalizePublishedLightningKey(did)}`;
         await this.redis.set(key, invoiceKey);
     }
 
     async getPublishedLightning(did: string): Promise<string | null> {
-        const key = `${PREFIX}:published:${did}`;
+        const key = `${PREFIX}:published:${normalizePublishedLightningKey(did)}`;
         return await this.redis.get(key);
     }
 
     async deletePublishedLightning(did: string): Promise<void> {
-        const key = `${PREFIX}:published:${did}`;
+        const key = `${PREFIX}:published:${normalizePublishedLightningKey(did)}`;
         await this.redis.del(key);
     }
 
