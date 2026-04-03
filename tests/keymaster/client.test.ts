@@ -6,6 +6,7 @@ import {Seed, WalletEncFile, WalletFile} from "@didcid/keymaster/types";
 const KeymasterURL = 'http://keymaster.org';
 const ServerError = { message: 'Server error' };
 const Endpoints = {
+    version: '/api/v1/version',
     ready: '/api/v1/ready',
     wallet: '/api/v1/wallet',
     wallet_new: '/api/v1/wallet/new',
@@ -84,6 +85,81 @@ const mockCredential = {
         "email": "TBD"
     }
 };
+
+async function* mockStream(...chunks: string[]) {
+    for (const chunk of chunks) {
+        yield Buffer.from(chunk);
+    }
+}
+
+describe('getVersion', () => {
+    const mockVersion = { version: '0.6.0', commit: 'abc123' };
+
+    it('should return version info', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.version)
+            .reply(200, mockVersion);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const version = await keymaster.getVersion();
+
+        expect(version).toStrictEqual(mockVersion);
+    });
+
+    it('should throw exception on getVersion server error', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.version)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.getVersion();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('connect and custom headers', () => {
+    it('should add and remove custom headers', async () => {
+        const keymaster = new KeymasterClient() as any;
+
+        keymaster.addCustomHeader('X-Test', 'value');
+        expect(keymaster.axios.defaults.headers.common['X-Test']).toBe('value');
+
+        keymaster.removeCustomHeader('X-Test');
+        expect(keymaster.axios.defaults.headers.common['X-Test']).toBeUndefined();
+    });
+
+    it('should send admin api key header when configured', async () => {
+        nock(KeymasterURL, {
+            reqheaders: {
+                'X-Archon-Admin-Key': 'secret-key',
+            },
+        })
+            .get(Endpoints.version)
+            .reply(200, { version: '0.6.0', commit: 'abc123' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL, apiKey: 'secret-key' });
+        const version = await keymaster.getVersion();
+
+        expect(version.version).toBe('0.6.0');
+    });
+
+    it('should rethrow non-HTTP errors unchanged', async () => {
+        const keymaster = new KeymasterClient() as any;
+        const boom = new Error('boom');
+        keymaster.API = `${KeymasterURL}/api/v1`;
+        keymaster.axios.get = async () => {
+            throw boom;
+        };
+
+        await expect(keymaster.getVersion()).rejects.toBe(boom);
+    });
+});
 
 describe('isReady', () => {
     it('should return ready flag', async () => {
@@ -1032,6 +1108,127 @@ describe('removeAlias', () => {
     });
 });
 
+describe('addNostr', () => {
+    const mockKeys = { npub: 'npub1test', nsec: 'nsec1test' };
+
+    it('should add nostr keys', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/nostr')
+            .reply(200, mockKeys);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const keys = await keymaster.addNostr('alice');
+
+        expect(keys).toStrictEqual(mockKeys);
+    });
+
+    it('should throw exception on addNostr server error', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/nostr')
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.addNostr('alice');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('removeNostr', () => {
+    it('should remove nostr keys', async () => {
+        nock(KeymasterURL)
+            .delete('/api/v1/nostr', { id: 'alice' })
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.removeNostr('alice');
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on removeNostr server error', async () => {
+        nock(KeymasterURL)
+            .delete('/api/v1/nostr', { id: 'alice' })
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.removeNostr('alice');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('exportNsec', () => {
+    it('should export nsec', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/nostr/nsec')
+            .reply(200, { nsec: 'nsec1test' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const nsec = await keymaster.exportNsec('alice');
+
+        expect(nsec).toBe('nsec1test');
+    });
+
+    it('should throw exception on exportNsec server error', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/nostr/nsec')
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.exportNsec('alice');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('signNostrEvent', () => {
+    const mockEvent = { kind: 1, content: 'hello', tags: [], created_at: 1 };
+    const signedEvent = { ...mockEvent, id: 'event-id', pubkey: 'pubkey', sig: 'sig' };
+
+    it('should sign a nostr event', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/nostr/sign')
+            .reply(200, signedEvent);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const event = await keymaster.signNostrEvent(mockEvent as any);
+
+        expect(event).toStrictEqual(signedEvent);
+    });
+
+    it('should throw exception on signNostrEvent server error', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/nostr/sign')
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.signNostrEvent(mockEvent as any);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('resolveDID', () => {
     const mockDID = 'did:example:123456789abcdefghi';
     const mockDocument = { id: mockDID, publicKey: [] };
@@ -1230,6 +1427,18 @@ describe('resolveAsset', () => {
         catch (error: any) {
             expect(error.message).toBe(ServerError.message);
         }
+    });
+
+    it('should resolve asset with query options', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.assets}/${mockAssetId}`)
+            .query({ versionId: '1' })
+            .reply(200, { asset: { ...mockAsset, versionId: '1' } });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const asset = await keymaster.resolveAsset(mockAssetId, { versionId: '1' } as any);
+
+        expect(asset).toStrictEqual({ ...mockAsset, versionId: '1' });
     });
 });
 
@@ -2360,6 +2569,70 @@ describe('getPoll', () => {
     });
 });
 
+describe('testPoll', () => {
+    const mockPollId = 'poll1';
+
+    it('should test poll', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.polls}/${mockPollId}/test`)
+            .reply(200, { test: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.testPoll(mockPollId);
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on testPoll server error', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.polls}/${mockPollId}/test`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.testPoll(mockPollId);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('listPolls', () => {
+    const mockPolls = ['poll1', 'poll2'];
+
+    it('should list polls', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.polls)
+            .query({ owner: 'alice' })
+            .reply(200, { polls: mockPolls });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const polls = await keymaster.listPolls('alice');
+
+        expect(polls).toStrictEqual(mockPolls);
+    });
+
+    it('should throw exception on listPolls server error', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.polls)
+            .query({ owner: 'alice' })
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.listPolls('alice');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('viewPoll', () => {
     const mockPollId = 'poll1';
     const mockPoll = { id: mockPollId, question: 'Test Poll' };
@@ -2417,6 +2690,95 @@ describe('votePoll', () => {
 
         try {
             await keymaster.votePoll(mockPollId, mockVote);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('sendPoll', () => {
+    it('should send poll', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.polls}/mockPoll/send`)
+            .reply(200, { did: 'noticeDid' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const did = await keymaster.sendPoll('mockPoll');
+
+        expect(did).toBe('noticeDid');
+    });
+
+    it('should throw exception on sendPoll server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.polls}/mockPoll/send`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.sendPoll('mockPoll');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('sendBallot', () => {
+    it('should send ballot', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.polls}/ballot/send`)
+            .reply(200, { did: 'noticeDid' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const did = await keymaster.sendBallot('ballotDid', 'pollDid');
+
+        expect(did).toBe('noticeDid');
+    });
+
+    it('should throw exception on sendBallot server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.polls}/ballot/send`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.sendBallot('ballotDid', 'pollDid');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('viewBallot', () => {
+    const mockBallot = { ballotDid: 'ballotDid', vote: 1 };
+
+    it('should view ballot', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.polls}/ballot/ballotDid`)
+            .reply(200, { ballot: mockBallot });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ballot = await keymaster.viewBallot('ballotDid');
+
+        expect(ballot).toStrictEqual(mockBallot);
+    });
+
+    it('should throw exception on viewBallot server error', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.polls}/ballot/ballotDid`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.viewBallot('ballotDid');
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -2776,6 +3138,35 @@ describe('createFile', () => {
     });
 });
 
+describe('createFileStream', () => {
+    it('should create a streamed file asset', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.files)
+            .reply(200, { did: 'mockDid' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const did = await keymaster.createFileStream(mockStream('hello'), { name: 'file.txt' });
+
+        expect(did).toBe('mockDid');
+    });
+
+    it('should throw exception on createFileStream server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.files)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.createFileStream(mockStream('hello'), { name: 'file.txt' });
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('updateFile', () => {
     const mockFile = Buffer.from('file data');
     const mockDID = 'did:example:923456789abcd';
@@ -2800,6 +3191,37 @@ describe('updateFile', () => {
 
         try {
             await keymaster.updateFile(mockDID, mockFile);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('updateFileStream', () => {
+    const mockDID = 'did:example:923456789abcd';
+
+    it('should update a streamed file asset', async () => {
+        nock(KeymasterURL)
+            .put(`${Endpoints.files}/${mockDID}`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.updateFileStream(mockDID, mockStream('hello'), { name: 'file.txt' });
+
+        expect(ok).toBe(true);
+    });
+
+    it('should throw exception on updateFileStream server error', async () => {
+        nock(KeymasterURL)
+            .put(`${Endpoints.files}/${mockDID}`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.updateFileStream(mockDID, mockStream('hello'), { name: 'file.txt' });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
