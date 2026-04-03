@@ -35,16 +35,32 @@ jobs:
             image: gatekeeper
           - dockerfile: Dockerfile.keymaster
             image: keymaster
+          - dockerfile: services/herald/Dockerfile
+            image: herald
+          - dockerfile: Dockerfile.drawbridge
+            image: drawbridge
           - dockerfile: Dockerfile.hyperswarm
             image: hyperswarm-mediator
+          - dockerfile: Dockerfile.satoshi-wallet
+            image: satoshi-wallet
           - dockerfile: Dockerfile.satoshi
-            image: sat-mediator
+            image: satoshi-mediator
           - dockerfile: Dockerfile.lightning-mediator
             image: lightning-mediator
           - dockerfile: Dockerfile.cli
             image: cli
           - dockerfile: Dockerfile.explorer
             image: explorer
+          - dockerfile: Dockerfile.gatekeeper-client
+            image: gatekeeper-client
+          - dockerfile: Dockerfile.keymaster-client
+            image: keymaster-client
+          - dockerfile: Dockerfile.react-wallet
+            image: react-wallet
+          - dockerfile: Dockerfile.herald-client
+            image: herald-client
+          - dockerfile: Dockerfile.gatekeeper-client
+            image: drawbridge-client
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
