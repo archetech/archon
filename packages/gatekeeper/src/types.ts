@@ -194,6 +194,7 @@ export interface LightningPayment {
 
 export interface LightningPaymentStatus {
     paid: boolean;
+    status?: 'success' | 'pending' | 'failed';
     preimage?: string;
     paymentHash: string;
 }

@@ -37,6 +37,7 @@ export interface LightningInvoice {
 
 export interface LightningPaymentResult {
     paid: boolean;
+    status?: 'success' | 'pending' | 'failed';
     preimage?: string;
     paymentHash: string;
     amountSat?: number;

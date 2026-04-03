@@ -250,6 +250,8 @@ const LightningTab: React.FC = () => {
             setZapResult(status);
             if (status.paid) {
                 setSuccess("Zap sent successfully");
+            } else if (status.status === 'failed') {
+                setError("Zap failed");
             } else {
                 setWarning("Zap submitted, but settlement is still pending");
             }
@@ -575,7 +577,7 @@ const LightningTab: React.FC = () => {
                     {zapResult && (
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: 1 }}>
                             <Typography variant="body2">
-                                <strong>Status:</strong> {zapResult.paid ? "Settled" : "Pending"}
+                                <strong>Status:</strong> {zapResult.paid ? "Settled" : zapResult.status === 'failed' ? "Failed" : "Pending"}
                             </Typography>
                             <Typography variant="body2">
                                 <strong>Payment Hash:</strong> {zapResult.paymentHash}
