@@ -1,6 +1,6 @@
 {
   "name": "drawbridge-server",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "description": "Archon Drawbridge L402 API Gateway",
   "main": "dist/drawbridge-api.js",
