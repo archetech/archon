@@ -35,5 +35,10 @@
     "@types/node": "^22.13.16",
     "patch-package": "^8.0.1",
     "typescript": "^5.8.2"
+  },
+  "overrides": {
+    "request": {
+      "form-data": "2.5.5"
+    }
   }
 }
