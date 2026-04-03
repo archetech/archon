@@ -88,11 +88,22 @@ export async function getPayments(
     adminKey: string
 ): Promise<LnbitsPayment[]> {
     try {
-        const response = await axios.get(`${url}/api/v1/payments`, {
+        const response = await axios.get(`${url}/api/v1/payments/paginated`, {
             headers: { 'X-Api-Key': adminKey },
+            params: {
+                limit: 100,
+                sortby: 'time',
+                direction: 'desc',
+            },
         });
 
-        return (response.data || []).map((payment: any) => {
+        const payments = Array.isArray(response.data)
+            ? response.data
+            : Array.isArray(response.data?.data)
+                ? response.data.data
+                : [];
+
+        return payments.map((payment: any) => {
             const status = payment.status === 'success'
                 ? 'success'
                 : payment.status === 'failed'
@@ -119,14 +130,20 @@ export async function checkPayment(
     url: string,
     invoiceKey: string,
     paymentHash: string
-): Promise<{ paid: boolean; preimage?: string }> {
+): Promise<{ paid: boolean; status?: 'success' | 'pending' | 'failed'; preimage?: string }> {
     const doCheck = async () => {
         const response = await axios.get(
             `${url}/api/v1/payments/${paymentHash}`,
             { headers: { 'X-Api-Key': invoiceKey } }
         );
+        const status: 'success' | 'pending' | 'failed' = response.data.status === 'success'
+            ? 'success'
+            : response.data.status === 'failed'
+                ? 'failed'
+                : 'pending';
         return {
             paid: response.data.paid === true,
+            status,
             preimage: response.data.preimage || undefined,
         };
     };

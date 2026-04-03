@@ -543,6 +543,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setZapResult(status);
             if (status.paid) {
                 showSuccess('Zap sent successfully');
+            } else if (status.status === 'failed') {
+                showError('Zap failed');
             } else {
                 showAlert('Zap submitted, but settlement is still pending');
             }
@@ -6591,12 +6593,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             {loadingZap ? 'Zapping...' : 'Zap'}
                                         </Button>
                                     </Box>
-                                    {zapResult &&
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
-                                            <Typography variant="body2"><strong>Status:</strong> {zapResult.paid ? 'Settled' : 'Pending'}</Typography>
-                                            <Typography variant="body2"><strong>Payment Hash:</strong> {zapResult.paymentHash}</Typography>
-                                            {zapResult.preimage &&
-                                                <Typography variant="body2"><strong>Preimage (Proof):</strong> {zapResult.preimage}</Typography>
+                                        {zapResult &&
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+                                                <Typography variant="body2"><strong>Status:</strong> {zapResult.paid ? 'Settled' : zapResult.status === 'failed' ? 'Failed' : 'Pending'}</Typography>
+                                                <Typography variant="body2"><strong>Payment Hash:</strong> {zapResult.paymentHash}</Typography>
+                                                {zapResult.preimage &&
+                                                    <Typography variant="body2"><strong>Preimage (Proof):</strong> {zapResult.preimage}</Typography>
                                             }
                                         </Box>
                                     }

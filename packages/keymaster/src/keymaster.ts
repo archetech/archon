@@ -2023,6 +2023,7 @@ export default class Keymaster implements KeymasterInterface {
         const data = await drawbridge.checkLightningPayment(config.invoiceKey, paymentHash);
         return {
             paid: data.paid,
+            status: data.status,
             preimage: data.preimage,
             paymentHash,
         };

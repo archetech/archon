@@ -950,6 +950,7 @@ program
             console.log(JSON.stringify({
                 ...result,
                 paid: status.paid,
+                status: status.status,
                 preimage: status.preimage,
             }, null, 4));
         }
