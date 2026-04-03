@@ -6,7 +6,7 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 import packageJson from "../../package.json";
 
 const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
-const DEFAULT_REFRESH_INTERVAL_SECONDS = 10;
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
 
 const SettingsTab = () => {
     const [gatekeeperUrl, setGatekeeperUrl] = useState<string>("");

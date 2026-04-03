@@ -11,7 +11,7 @@ import {
 import packageJson from "../../package.json";
 
 const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
-const DEFAULT_REFRESH_INTERVAL_SECONDS = 10;
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
 
 function loadRefreshIntervalSeconds() {
     const saved = localStorage.getItem(REFRESH_INTERVAL_STORAGE_KEY);

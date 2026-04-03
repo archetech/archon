@@ -24,7 +24,7 @@ import { useThemeContext } from "./ContextProviders";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
 
 const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
-const DEFAULT_REFRESH_INTERVAL_SECONDS = 10;
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
 
 export enum RefreshMode {
     NONE = 'NONE',
