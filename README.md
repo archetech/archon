@@ -9,7 +9,7 @@ Archon is a decentralized identity (DID) protocol implementation. Visit our webs
 Recommended system requirements:
 
 - GNU/Linux OS with [docker](https://www.docker.com/) for containerized operation
-- node 22.15.0 and npm 10.8.2 or newer for manual and local operation
+- node 22.15.0 and npm 10.9.2 for manual and local operation
 - minimum of 8Gb RAM if operating a full trustless node
 
 ```
@@ -50,7 +50,7 @@ npm run build
 
 ## Overview
 
-An Archon node includes several interoperating microservices. If you follow the dependency arrows on the diagram below, you will end up at the central core service, the [Gatekeeper service](https://github.com/archetech/archon/blob/main/services/gatekeeper/server/README.md) responsible for maintaining the integrity of the local DID database. The mediators are responsible for connecting the Gatekeeper to various networks such as [Hyperswarm](https://github.com/archetech/archon/blob/main/services/mediators/hyperswarm/README.md). The BTC:testnet4 (Bitcoin testnet) and BTC:signet (another Bitcoin testnet) mediators are both instances of the [Satoshi mediator](https://github.com/archetech/archon/blob/main/services/mediators/satoshi/README.md) since they are derived from Bitcoin core (they differ only in how they are configured). [Keymaster](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md) is the Archon client responsible for holding the private keys and signing DID operations (create, update, delete) sent to Gatekeeper. The [browser web wallet](https://github.com/archetech/archon/blob/main/services/gatekeeper/client/README.md), [browser extension](https://github.com/archetech/archon/blob/main/apps/chrome-extension/README.md), and [Keymaster service](https://github.com/archetech/archon/blob/main/services/keymaster/server/README.md) all use the [Keymaster library](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md). The [server web wallet](https://github.com/archetech/archon/blob/main/services/keymaster/client/README.md) is the same as the browser web wallet, except it is configured to talk to the Keymaster service instead of hosting its own wallet. It uses the same [KeymasterClient](https://github.com/archetech/archon/blob/main/packages/keymaster/src/keymaster-sdk.ts) as the archon CLI. There are two CLI (command line interface) components: [archon](scripts/archon-cli.js) for talking to the Keymaster service, and [admin](scripts/admin-cli.js) for talking to the Gatekeeper service. The admin script uses the same [GatekeeperClient](https://github.com/archetech/archon/blob/main/packages/gatekeeper/README.md) as the Keymaster service and the mediators.
+An Archon node includes several interoperating microservices. If you follow the dependency arrows on the diagram below, you will end up at the central core service, the [Gatekeeper service](https://github.com/archetech/archon/blob/main/services/gatekeeper/server/README.md) responsible for maintaining the integrity of the local DID database. The mediators are responsible for connecting the Gatekeeper to various networks such as [Hyperswarm](https://github.com/archetech/archon/blob/main/services/mediators/hyperswarm/README.md). The BTC:testnet4 (Bitcoin testnet) and BTC:signet (another Bitcoin testnet) mediators are both instances of the [Satoshi mediator](https://github.com/archetech/archon/blob/main/services/mediators/satoshi/README.md) since they are derived from Bitcoin core (they differ only in how they are configured). [Keymaster](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md) is the Archon client responsible for holding the private keys and signing DID operations (create, update, delete) sent to Gatekeeper. The [Gatekeeper client app](https://github.com/archetech/archon/blob/main/apps/gatekeeper-client), [browser extension](https://github.com/archetech/archon/blob/main/apps/browser-extension/README.md), [React wallet](https://github.com/archetech/archon/blob/main/apps/react-wallet/README.md), and [Keymaster service](https://github.com/archetech/archon/blob/main/services/keymaster/server/README.md) all use the [Keymaster library](https://github.com/archetech/archon/blob/main/packages/keymaster/README.md). The [Keymaster client app](https://github.com/archetech/archon/blob/main/apps/keymaster-client) is configured to talk to the Keymaster service instead of hosting its own wallet. It uses the same [KeymasterClient](https://github.com/archetech/archon/blob/main/packages/keymaster/src/keymaster-client.ts) as the Archon CLI. There are two CLI (command line interface) components: [archon](scripts/archon-cli.js) for talking to the Keymaster service, and [admin](scripts/admin-cli.js) for talking to the Gatekeeper service. The admin script uses the same [GatekeeperClient](https://github.com/archetech/archon/blob/main/packages/gatekeeper/README.md) as the Keymaster service and the mediators.
 
 
 ![alt text](archon-node.png)
@@ -82,8 +82,9 @@ $ ./scripts/tbtc-cli getwalletinfo                   # Get a general status of c
 
 ## Command line interface wallet
 
-Use the CLI `./archon` or the web app at http://localhost:4226 to access the server-side wallet.
-Use the web app at http://localhost:4224 to access a client-side (browser) wallet.
+Use the CLI `./archon` or the Keymaster client at `http://localhost:4226` to access the server-side wallet.
+Use the Gatekeeper client at `http://localhost:4224` to access the local Gatekeeper API.
+Use the React wallet at `http://localhost:4228` for the client-side browser wallet.
 
 ```
 $ ./archon

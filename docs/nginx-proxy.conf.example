@@ -7,6 +7,8 @@
 #   1. Set ARCHON_BIND_ADDRESS=127.0.0.1 in your .env so services
 #      only accept connections from localhost (nginx).
 #   2. Set ARCHON_ADMIN_API_KEY to a strong random key for defense-in-depth.
+#      Internal service-to-service calls use X-Archon-Admin-Key; do not
+#      forward that header from public clients.
 #   3. Copy this file to /etc/nginx/sites-available/ and adjust server_name.
 #   4. Enable with: ln -s /etc/nginx/sites-available/archon /etc/nginx/sites-enabled/
 #   5. Test with: nginx -t && systemctl reload nginx
@@ -114,7 +116,7 @@ server {
         proxy_buffering off;
     }
 
-    # Gatekeeper web wallet (static files)
+    # Gatekeeper client UI (static files)
     location / {
         limit_req zone=api_general burst=30 nodelay;
         proxy_pass http://gatekeeper;
@@ -137,11 +139,11 @@ server {
 
     # ──────────────────────────────────────────────────
     # KEYMASTER — typically not exposed externally at all.
-    # If you need the web wallet UI, expose only these:
+    # If you need the Keymaster client UI, expose only these:
     # ──────────────────────────────────────────────────
 
     # Uncomment the block below ONLY if you want to expose the
-    # keymaster web wallet. Most deployments should NOT do this.
+    # Keymaster client UI. Most deployments should NOT do this.
 
     # location /keymaster/ {
     #     # Only the web wallet static files and public-safe read endpoints
