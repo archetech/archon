@@ -21,6 +21,20 @@ import { useVariablesContext } from "./VariablesProvider";
 import { useSnackbar } from "./SnackbarProvider";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 
+const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
+
+function loadRefreshIntervalSeconds() {
+    const saved = localStorage.getItem(REFRESH_INTERVAL_STORAGE_KEY);
+    const parsed = Number(saved);
+
+    if (!saved || !Number.isFinite(parsed) || parsed < 0) {
+        return DEFAULT_REFRESH_INTERVAL_SECONDS;
+    }
+
+    return Math.floor(parsed);
+}
+
 interface UIContextValue {
     selectedTab: string;
     setSelectedTab: Dispatch<SetStateAction<string>>;
@@ -107,6 +121,7 @@ export function UIProvider(
     } = useVariablesContext();
 
     const walletWeb = new WalletWeb();
+    const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(() => loadRefreshIntervalSeconds());
 
     useEffect(() => {
         const refresh = async () => {
@@ -220,17 +235,30 @@ export function UIProvider(
 
         refresh();
 
+        if (refreshIntervalSeconds === 0) {
+            return;
+        }
+
         const interval = setInterval(async () => {
             if (!keymaster) {
                 return;
             }
             await refresh();
-        }, 10000);
+        }, refreshIntervalSeconds * 1000);
 
         return () => clearInterval(interval);
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [keymaster]);
+    }, [keymaster, refreshIntervalSeconds]);
+
+    useEffect(() => {
+        const handleRefreshIntervalChange = () => {
+            setRefreshIntervalSeconds(loadRefreshIntervalSeconds());
+        };
+
+        window.addEventListener('archon:refresh-interval-change', handleRefreshIntervalChange);
+        return () => window.removeEventListener('archon:refresh-interval-change', handleRefreshIntervalChange);
+    }, []);
 
     async function getValidIds() {
         const valid: string[] = [];

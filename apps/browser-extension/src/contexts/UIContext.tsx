@@ -23,6 +23,9 @@ import { useVariablesContext } from "./VariablesProvider";
 import { useThemeContext } from "./ContextProviders";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
 
+const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
+
 export enum RefreshMode {
     NONE = 'NONE',
     WALLET = 'WALLET',
@@ -57,6 +60,18 @@ export interface openBrowserValues {
 }
 
 const UIContext = createContext<UIContextValue | null>(null);
+
+async function loadRefreshIntervalSeconds() {
+    const result = await chrome.storage.sync.get([REFRESH_INTERVAL_STORAGE_KEY]);
+    const saved = result[REFRESH_INTERVAL_STORAGE_KEY];
+    const parsed = Number(saved);
+
+    if (saved === undefined || !Number.isFinite(parsed) || parsed < 0) {
+        return DEFAULT_REFRESH_INTERVAL_SECONDS;
+    }
+
+    return Math.floor(parsed);
+}
 
 export function UIProvider(
     {
@@ -141,6 +156,7 @@ export function UIProvider(
     const { updateThemeFromStorage } = useThemeContext();
 
     const walletChrome = new WalletChrome();
+    const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(DEFAULT_REFRESH_INTERVAL_SECONDS);
 
     function arraysEqual(a: string[], b: string[]): boolean {
         return a.length === b.length && a.every((v, i) => v === b[i]);
@@ -209,6 +225,34 @@ export function UIProvider(
     }, [keymaster]);
 
     useEffect(() => {
+        const initRefreshInterval = async () => {
+            setRefreshIntervalSeconds(await loadRefreshIntervalSeconds());
+        };
+
+        initRefreshInterval();
+
+        const handleStorageChange = (
+            changes: { [key: string]: chrome.storage.StorageChange },
+            areaName: string
+        ) => {
+            if (areaName !== 'sync' || !changes[REFRESH_INTERVAL_STORAGE_KEY]) {
+                return;
+            }
+
+            const newValue = changes[REFRESH_INTERVAL_STORAGE_KEY].newValue;
+            const parsed = Number(newValue);
+            if (newValue === undefined || !Number.isFinite(parsed) || parsed < 0) {
+                setRefreshIntervalSeconds(DEFAULT_REFRESH_INTERVAL_SECONDS);
+                return;
+            }
+            setRefreshIntervalSeconds(Math.floor(parsed));
+        };
+
+        chrome.storage.onChanged.addListener(handleStorageChange);
+        return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+    }, []);
+
+    useEffect(() => {
         if (!keymaster) {
             return;
         }
@@ -227,17 +271,21 @@ export function UIProvider(
 
         refresh();
 
+        if (refreshIntervalSeconds === 0) {
+            return;
+        }
+
         const interval = setInterval(async () => {
             if (!keymaster) {
                 return;
             }
             await refresh();
-        }, 10000);
+        }, refreshIntervalSeconds * 1000);
 
         return () => clearInterval(interval);
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [keymaster]);
+    }, [keymaster, refreshIntervalSeconds]);
 
     async function getValidIds() {
         const valid: string[] = [];

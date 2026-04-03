@@ -108,6 +108,20 @@ const DmailTags = {
     UNREAD: 'unread',
 };
 
+const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
+
+function loadRefreshIntervalSeconds() {
+    const saved = localStorage.getItem(REFRESH_INTERVAL_STORAGE_KEY);
+    const parsed = Number(saved);
+
+    if (!saved || !Number.isFinite(parsed) || parsed < 0) {
+        return DEFAULT_REFRESH_INTERVAL_SECONDS;
+    }
+
+    return Math.floor(parsed);
+}
+
 function formatBytes(bytes) {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -312,6 +326,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [lightningStatusFilter, setLightningStatusFilter] = useState({ settled: true, pending: true, failed: true, expired: true });
     const [isPublished, setIsPublished] = useState(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState(false);
+    const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(() => loadRefreshIntervalSeconds());
+    const [settingsRefreshIntervalSeconds, setSettingsRefreshIntervalSeconds] = useState(() => loadRefreshIntervalSeconds());
 
     const pollExpired = pollDeadline ? Date.now() > pollDeadline.getTime() : false;
     const selectedPollDid = selectedPollName ? aliasList[selectedPollName] ?? "" : "";
@@ -3074,19 +3090,46 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         } catch { }
     }, [keymaster, aliasList, pollList]);
 
-    // Check notices and update DMail and polls every 30 seconds
     useEffect(() => {
+        if (refreshIntervalSeconds === 0) {
+            return undefined;
+        }
+
         const interval = setInterval(async () => {
             try {
                 await keymaster.refreshNotices();
                 await refreshInbox();
                 await refreshPoll();
             } catch { }
-        }, 30000);
+        }, refreshIntervalSeconds * 1000);
 
         return () => clearInterval(interval);
 
-    }, [keymaster, refreshInbox, refreshPoll]);
+    }, [keymaster, refreshInbox, refreshPoll, refreshIntervalSeconds]);
+
+    const saveSettings = () => {
+        const trimmedUrl = settingsUrl.trim();
+        const parsedInterval = Number(settingsRefreshIntervalSeconds);
+
+        if (!Number.isFinite(parsedInterval) || parsedInterval < 0) {
+            showError({ message: 'Refresh interval must be 0 or greater' });
+            return;
+        }
+
+        const nextInterval = Math.floor(parsedInterval);
+        localStorage.setItem(REFRESH_INTERVAL_STORAGE_KEY, String(nextInterval));
+        setRefreshIntervalSeconds(nextInterval);
+        setSettingsRefreshIntervalSeconds(nextInterval);
+
+        if (trimmedUrl !== (serverUrl || '')) {
+            onServerUrlChange && onServerUrlChange(trimmedUrl);
+            return;
+        }
+
+        showSuccess(nextInterval === 0
+            ? 'Settings saved. Auto-refresh disabled.'
+            : `Settings saved. Auto-refresh every ${nextInterval} seconds.`);
+    };
 
     const buildPoll = async () => {
         const template = await keymaster.pollTemplate();
@@ -6660,10 +6703,20 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 onChange={(e) => setSettingsUrl(e.target.value)}
                                 sx={{ mb: 2 }}
                             />
+                            <TextField
+                                label="Auto-refresh interval (seconds)"
+                                variant="outlined"
+                                type="number"
+                                value={settingsRefreshIntervalSeconds}
+                                onChange={(e) => setSettingsRefreshIntervalSeconds(e.target.value)}
+                                inputProps={{ min: 0, step: 1 }}
+                                helperText="Set to 0 to disable automatic DMail and poll refresh."
+                                sx={{ mb: 2 }}
+                            />
                             <Button
                                 variant="contained"
                                 color="primary"
-                                onClick={() => onServerUrlChange && onServerUrlChange(settingsUrl)}
+                                onClick={saveSettings}
                                 startIcon={<Save />}
                                 sx={{ alignSelf: 'start' }}
                             >
