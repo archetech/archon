@@ -10,8 +10,23 @@ import {
 } from "../constants";
 import packageJson from "../../package.json";
 
+const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 10;
+
+function loadRefreshIntervalSeconds() {
+    const saved = localStorage.getItem(REFRESH_INTERVAL_STORAGE_KEY);
+    const parsed = Number(saved);
+
+    if (!saved || !Number.isFinite(parsed) || parsed < 0) {
+        return DEFAULT_REFRESH_INTERVAL_SECONDS;
+    }
+
+    return Math.floor(parsed);
+}
+
 const SettingsTab = () => {
     const [gatekeeperUrl, setGatekeeperUrl] = useState<string>(DEFAULT_GATEKEEPER_URL);
+    const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<string>(String(DEFAULT_REFRESH_INTERVAL_SECONDS));
     const [serverVersion, setServerVersion] = useState<string>("");
     const {
         darkMode,
@@ -30,6 +45,7 @@ const SettingsTab = () => {
                 if (gatekeeperUrl) {
                     setGatekeeperUrl(gatekeeperUrl);
                 }
+                setRefreshIntervalSeconds(String(loadRefreshIntervalSeconds()));
             } catch (error: any) {
                 console.error("Error retrieving gatekeeperUrl:", error);
             }
@@ -51,7 +67,14 @@ const SettingsTab = () => {
 
     const handleSave = async () => {
         try {
+            const parsedRefreshInterval = Number(refreshIntervalSeconds);
+            if (!Number.isFinite(parsedRefreshInterval) || parsedRefreshInterval < 0) {
+                throw new Error("Auto-refresh interval must be 0 or greater");
+            }
+
             localStorage.setItem(GATEKEEPER_KEY, gatekeeperUrl);
+            localStorage.setItem(REFRESH_INTERVAL_STORAGE_KEY, String(Math.floor(parsedRefreshInterval)));
+            window.dispatchEvent(new Event('archon:refresh-interval-change'));
             await initialiseServices();
             await initialiseWallet();
             fetchServerVersion(gatekeeperUrl);
@@ -85,6 +108,18 @@ const SettingsTab = () => {
                 onChange={(e) => setGatekeeperUrl(e.target.value)}
                 sx={{ mb: 2 }}
                 className="text-field"
+            />
+
+            <TextField
+                label="Auto-refresh interval (seconds)"
+                variant="outlined"
+                type="number"
+                value={refreshIntervalSeconds}
+                onChange={(e) => setRefreshIntervalSeconds(e.target.value)}
+                sx={{ mb: 2 }}
+                className="text-field"
+                inputProps={{ min: 0, step: 1 }}
+                helperText="Set to 0 to disable automatic DMail and poll refresh."
             />
 
             <Button
