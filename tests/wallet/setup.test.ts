@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { buildDescriptors } from '../../services/satoshi-wallet/server/src/derivation';
+import { buildDescriptors } from '../../services/mediators/satoshi-wallet/src/derivation';
 
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
