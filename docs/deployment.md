@@ -44,6 +44,8 @@ Generate an admin API key:
 openssl rand -hex 32
 ```
 
+Internal service-to-service admin requests use the `X-Archon-Admin-Key` header. Reserve `Authorization` for user/session/OAuth-style flows.
+
 ### Data Directories
 
 All persistent data lives under `./data/`. Create the directory and ensure it's owned by your user:
@@ -80,6 +82,8 @@ Comment out the `include:` lines at the top of `docker-compose.yml` for any serv
 | `ARCHON_NODE_NAME` | `mynodeName` | Human-readable node name for peer discovery |
 | `ARCHON_GATEKEEPER_PORT` | `4224` | Gatekeeper API port |
 | `ARCHON_KEYMASTER_PORT` | `4226` | Keymaster API port |
+| `ARCHON_GATEKEEPER_CLIENT_PORT` | `4225` | Gatekeeper client UI port |
+| `ARCHON_REACT_WALLET_PORT` | `4228` | React wallet UI port |
 | `ARCHON_GATEKEEPER_DB` | `redis` | Storage backend (`redis` or `json`) |
 | `ARCHON_GATEKEEPER_DID_PREFIX` | `did:cid` | DID method prefix |
 | `ARCHON_GATEKEEPER_REGISTRIES` | `hyperswarm` | Comma-separated list of registries |
@@ -98,6 +102,8 @@ Comment out the `include:` lines at the top of `docker-compose.yml` for any serv
 | **hyperswarm-mediator** | P2P DID synchronization |
 | **cli** | Command-line interface container |
 | **explorer** | DID explorer web app |
+| **gatekeeper-client** | Browser UI for the Gatekeeper API |
+| **keymaster-client** | Browser UI for the Keymaster service |
 | **react-wallet** | Web wallet UI |
 | **prometheus** | Metrics collection |
 | **grafana** | Metrics dashboards |
@@ -109,14 +115,21 @@ docker compose up -d
 docker compose logs -f gatekeeper   # watch for startup
 
 # Verify gatekeeper is running
-curl http://localhost:4224/api/v1/gatekeeper/version
+curl http://localhost:4224/api/v1/version
 ```
+
+Core UIs:
+
+- Gatekeeper client: `http://localhost:4225`
+- Keymaster client: `http://localhost:4226`
+- React wallet: `http://localhost:4228`
+- Explorer: `http://localhost:4000`
 
 ---
 
 ## 3. Adding Bitcoin Registries
 
-Bitcoin registries anchor DIDs on-chain via the Satoshi mediator. There are separate compose files per network:
+Bitcoin registries anchor DIDs on-chain via the Satoshi mediator. Each bundled network also includes a dedicated watch-only wallet service under `services/mediators/satoshi-wallet`. There are separate compose files per network:
 
 | File | Network | Bitcoin Node |
 |------|---------|-------------|
@@ -170,7 +183,7 @@ curl http://localhost:4236/metrics
 
 ## 4. Adding Drawbridge (API Gateway + Tor)
 
-Drawbridge is the L402 API gateway that enables Lightning payments for API access and Lightning zaps between DIDs. It includes a Tor hidden service for privacy.
+Drawbridge is the L402 API gateway that enables Lightning payments for API access and Lightning zaps between DIDs. The Drawbridge compose layer also brings in Herald, Herald client, Drawbridge client, the Lightning mediator, and a Tor hidden service for privacy.
 
 ### Enable Drawbridge
 
@@ -185,7 +198,7 @@ include:
 
 `lightning-mediator` owns Archon's Lightning runtime integrations. Drawbridge talks to it over HTTP for L402 invoice creation and pending-invoice lifecycle, and the mediator owns the public Lightning APIs, LNBits integration, and CLN access.
 
-Drawbridge remains the policy layer: it still owns macaroons, pricing, rate limits, and the final payment records that show which paid requests were granted.
+Drawbridge remains the policy layer: it still owns macaroons, pricing, rate limits, and the final payment records that show which paid requests were granted. Internal admin requests between these services use `X-Archon-Admin-Key`.
 
 You have two options for the mediator backend:
 
@@ -225,7 +238,7 @@ Include the Lightning stack (see [Section 5](#5-bundled-lightning-stack-optional
 | `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://lightning-mediator:4235` | Drawbridge's upstream Lightning mediator |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL` | `https://cln:3001` | CLN REST endpoint used by the mediator |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune used by the mediator; auto-loaded from `./data/cln-mainnet/drawbridge/rune.txt` in the bundled stack |
-| `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | empty | LNBits base URL used by the mediator |
+| `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | empty | LNbits base URL used by the mediator |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | *(auto)* | Public Drawbridge URL used for published invoice endpoints |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX` | `100` | Max requests per window |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW` | `60` | Rate limit window in seconds |
@@ -242,8 +255,13 @@ The Drawbridge entrypoint script handles secrets automatically:
 ### Verify
 
 ```bash
-curl http://localhost:4222/health
+curl http://localhost:4222/api/v1/ready
 ```
+
+Optional UIs when Drawbridge is enabled:
+
+- Herald client: `http://localhost:4231`
+- Drawbridge client: `http://localhost:4223`
 
 ---
 
@@ -305,7 +323,7 @@ Three one-shot init containers automatically create CLN runes:
 | `rtl-init` | Creates unrestricted rune for RTL | `./data/cln-mainnet/rtl/rune.txt` |
 | `lnbits-init` | Creates three runes (readonly, invoice, pay) + copies TLS certs | `./data/cln-mainnet/lnbits/runes.env` |
 
-These run once and exit. If a rune file already exists, they skip creation.
+These run once and exit. If a rune file already exists, they skip creation. The bundled LNbits service now runs from the published image `ghcr.io/archetech/lnbits:1.5.3-archetech.1`.
 
 ### Important: Back Up Lightning Data
 
@@ -320,8 +338,8 @@ open http://localhost:3002
 # LNbits web interface
 open http://localhost:5000
 
-# CLN node info (via CLI container)
-docker compose exec cli keymaster lightning-info
+# Lightning mediator health
+curl http://localhost:4235/ready
 ```
 
 ---
@@ -356,7 +374,7 @@ Back up the entire `./data/` directory regularly. Critical data:
 |------|----------|----------|
 | `./data/cln-mainnet/` | Lightning wallet, channels, keys | **Critical** — loss means lost funds |
 | `./data/tor-drawbridge/` | Tor hidden service keys | High — loss means new `.onion` address |
-| `./data/mongodb/` | DID documents and credentials | High |
+| `./data/mongodb/` | Registry and wallet-side service state used by bundled Bitcoin mediators | High |
 | `./data/redis/` | Cache (reconstructible) | Low |
 
 ### Monitoring
@@ -380,14 +398,21 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | Port | Service | Default | Env Var | Binding |
 |------|---------|---------|---------|---------|
 | 4224 | Gatekeeper | 4224 | `ARCHON_GATEKEEPER_PORT` | configurable |
+| 4225 | Gatekeeper Client | 4225 | `ARCHON_GATEKEEPER_CLIENT_PORT` | configurable |
 | 4226 | Keymaster | 4226 | `ARCHON_KEYMASTER_PORT` | configurable |
+| 4223 | Drawbridge Client | 4223 | `ARCHON_DRAWBRIDGE_CLIENT_PORT` | configurable |
 | 4228 | React Wallet | 4228 | `ARCHON_REACT_WALLET_PORT` | configurable |
 | 4222 | Drawbridge | 4222 | `ARCHON_DRAWBRIDGE_PORT` | public |
+| 4230 | Herald | 4230 | `ARCHON_HERALD_PORT` | configurable |
+| 4231 | Herald Client | 4231 | `ARCHON_HERALD_CLIENT_PORT` | configurable |
+| 4235 | Lightning Mediator | 4235 | `ARCHON_LIGHTNING_MEDIATOR_PORT` | configurable |
 | 4000 | Explorer | 4000 | -- | public |
 | 9736 | CLN P2P | 9736 | `ARCHON_CLN_PORT` | public |
 | 3001 | CLN REST | 3001 | -- | localhost |
 | 3002 | RTL | 3002 | `ARCHON_RTL_PORT` | localhost |
 | 5000 | LNbits | 5000 | `ARCHON_LNBITS_PORT` | localhost |
+| 4240 | BTC Signet Wallet API | 4240 | -- | localhost |
+| 4241 | BTC Signet Wallet Metrics | 4241 | -- | localhost |
 | 27017 | MongoDB | 27017 | -- | localhost |
 | 6379 | Redis | 6379 | -- | localhost |
 | 5001 | IPFS API | 5001 | -- | localhost |
