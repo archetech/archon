@@ -73,6 +73,8 @@ function normalizePath(path: string): string {
         .replace(/\/did\/[^/]+/g, '/did/:id')
         .replace(/\/ids\/[^/]+/g, '/ids/:id')
         .replace(/\/aliases\/[^/]+/g, '/aliases/:alias')
+        .replace(/\/addresses\/check\/[^/]+/g, '/addresses/check/:address')
+        .replace(/\/addresses\/[^/]+/g, '/addresses/:address')
         .replace(/\/groups\/[^/]+/g, '/groups/:name')
         .replace(/\/schemas\/[^/]+/g, '/schemas/:id')
         .replace(/\/agents\/[^/]+/g, '/agents/:id')
@@ -1736,6 +1738,55 @@ v1router.get('/aliases/:alias', async (req, res) => {
 v1router.delete('/aliases/:alias', async (req, res) => {
     try {
         const ok = await keymaster.removeAlias(req.params.alias);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+v1router.get('/addresses', async (_req, res) => {
+    try {
+        const addresses = await keymaster.listAddresses();
+        res.json({ addresses });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+v1router.post('/addresses/import', async (req, res) => {
+    try {
+        const { domain } = req.body;
+        const addresses = await keymaster.importAddress(domain);
+        res.json({ addresses });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+v1router.get('/addresses/check/:address', async (req, res) => {
+    try {
+        const address = decodeURIComponent(req.params.address);
+        const result = await keymaster.checkAddress(address);
+        res.json(result);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+v1router.post('/addresses', async (req, res) => {
+    try {
+        const { address } = req.body;
+        const ok = await keymaster.addAddress(address);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+v1router.delete('/addresses/:address', async (req, res) => {
+    try {
+        const address = decodeURIComponent(req.params.address);
+        const ok = await keymaster.removeAddress(address);
         res.json({ ok });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });

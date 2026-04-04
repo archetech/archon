@@ -1882,12 +1882,55 @@ export default class Keymaster implements KeymasterInterface {
         return fallback;
     }
 
-    private async createAddressBearerToken(domain: string): Promise<string> {
-        const response = await fetch(`https://${domain}/names/api/challenge`);
+    private addressApiEndpoints(domain: string, path: string): string[] {
+        return [
+            `https://${domain}/names/api/${path}`,
+            `https://${domain}/api/${path}`,
+        ];
+    }
 
-        if (!response.ok) {
-            throw new KeymasterError(await this.getResponseError(response, 'Failed to fetch address challenge'));
+    private async fetchAddressApiResponse(
+        domain: string,
+        path: string,
+        init: RequestInit | undefined,
+        fallback: string
+    ): Promise<Response> {
+        let lastResponse: Response | null = null;
+        let sawNetworkError = false;
+
+        for (const endpoint of this.addressApiEndpoints(domain, path)) {
+            try {
+                const response = await fetch(endpoint, init);
+
+                if (response.ok) {
+                    return response;
+                }
+
+                lastResponse = response;
+            }
+            catch {
+                sawNetworkError = true;
+            }
         }
+
+        if (lastResponse) {
+            throw new KeymasterError(await this.getResponseError(lastResponse, fallback));
+        }
+
+        if (sawNetworkError) {
+            throw new KeymasterError(fallback);
+        }
+
+        throw new KeymasterError(fallback);
+    }
+
+    private async createAddressBearerToken(domain: string): Promise<string> {
+        const response = await this.fetchAddressApiResponse(
+            domain,
+            'challenge',
+            undefined,
+            'Failed to fetch address challenge',
+        );
 
         const data = await this.getResponseData(response);
         if (typeof data?.challenge !== 'string') {
@@ -2016,18 +2059,14 @@ export default class Keymaster implements KeymasterInterface {
     async addAddress(address: string): Promise<boolean> {
         const parsed = this.parseAddress(address);
         const bearerToken = await this.createAddressBearerToken(parsed.domain);
-        const response = await fetch(`https://${parsed.domain}/names/api/name`, {
+        await this.fetchAddressApiResponse(parsed.domain, 'name', {
             method: 'PUT',
             headers: {
                 Authorization: `Bearer ${bearerToken}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ name: parsed.name }),
-        });
-
-        if (!response.ok) {
-            throw new KeymasterError(await this.getResponseError(response, 'Failed to add address'));
-        }
+        }, 'Failed to add address');
 
         await this.mutateWallet((wallet) => {
             const id = wallet.ids[wallet.current!];
@@ -2046,17 +2085,20 @@ export default class Keymaster implements KeymasterInterface {
 
     async removeAddress(address: string): Promise<boolean> {
         const parsed = this.parseAddress(address);
+        const id = await this.fetchIdInfo();
+        const stored = id.addresses?.[parsed.domain];
+
+        if (!stored || stored.name !== parsed.name) {
+            throw new InvalidParameterError('address');
+        }
+
         const bearerToken = await this.createAddressBearerToken(parsed.domain);
-        const response = await fetch(`https://${parsed.domain}/names/api/name`, {
+        await this.fetchAddressApiResponse(parsed.domain, 'name', {
             method: 'DELETE',
             headers: {
                 Authorization: `Bearer ${bearerToken}`,
             },
-        });
-
-        if (!response.ok) {
-            throw new KeymasterError(await this.getResponseError(response, 'Failed to remove address'));
-        }
+        }, 'Failed to remove address');
 
         await this.mutateWallet((wallet) => {
             const id = wallet.ids[wallet.current!];
