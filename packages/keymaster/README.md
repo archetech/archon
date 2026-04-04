@@ -194,6 +194,7 @@ It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the
 | Aliases | `remove-alias <alias>` | Remove alias |
 | Aliases | `list-aliases` | List all aliases |
 | Addresses | `list-addresses` | List all wallet addresses |
+| Addresses | `get-address <domain>` | Get the current address for a domain |
 | Addresses | `import-address <domain>` | Import addresses for the current ID from a domain |
 | Addresses | `check-address <address>` | Check whether an address is available |
 | Addresses | `add-address <address>` | Claim an address for the current ID |

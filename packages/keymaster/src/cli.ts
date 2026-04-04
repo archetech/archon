@@ -810,6 +810,25 @@ program
     });
 
 program
+    .command('get-address <domain>')
+    .description('Get the current address for a domain')
+    .action(async (domain) => {
+        try {
+            const address = await keymaster.getAddress(domain);
+
+            if (address) {
+                console.log(JSON.stringify(address, null, 4));
+            }
+            else {
+                console.log(`${domain} not found`);
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('import-address <domain>')
     .description('Import any existing address for the current ID from a domain')
     .action(async (domain) => {

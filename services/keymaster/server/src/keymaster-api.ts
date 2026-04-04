@@ -74,6 +74,7 @@ function normalizePath(path: string): string {
         .replace(/\/ids\/[^/]+/g, '/ids/:id')
         .replace(/\/aliases\/[^/]+/g, '/aliases/:alias')
         .replace(/\/addresses\/check\/[^/]+/g, '/addresses/check/:address')
+        .replace(/\/addresses\/import/g, '/addresses/import')
         .replace(/\/addresses\/[^/]+/g, '/addresses/:address')
         .replace(/\/groups\/[^/]+/g, '/groups/:name')
         .replace(/\/schemas\/[^/]+/g, '/schemas/:id')
@@ -1781,6 +1782,68 @@ v1router.get('/addresses', async (_req, res) => {
         res.json({ addresses });
     } catch (error: any) {
         res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /addresses/{domain}:
+ *   get:
+ *     summary: Get the current stored address for a specific domain.
+ *     parameters:
+ *       - in: path
+ *         name: domain
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: URL-encoded domain to look up.
+ *     responses:
+ *       200:
+ *         description: Address record for the requested domain or null if none is stored.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 address:
+ *                   nullable: true
+ *                   type: object
+ *                   properties:
+ *                     domain:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     address:
+ *                       type: string
+ *                     added:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.get('/addresses/:domain', async (req, res) => {
+    try {
+        const domain = decodeURIComponent(req.params.domain);
+        const addresses = await keymaster.listAddresses();
+        const entry = Object.entries(addresses).find(([address]) => address.endsWith(`@${domain}`));
+        const address = entry
+            ? {
+                domain,
+                name: entry[0].slice(0, -(domain.length + 1)),
+                address: entry[0],
+                ...entry[1],
+            }
+            : null;
+        res.json({ address });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
     }
 });
 

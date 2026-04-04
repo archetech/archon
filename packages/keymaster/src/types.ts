@@ -53,6 +53,12 @@ export interface AddressCheckResult {
     did: string | null;
 }
 
+export interface ResolvedAddressInfo extends AddressInfo {
+    domain: string;
+    name: string;
+    address: string;
+}
+
 export interface WalletEncFile {
     version: number;
     seed: Seed;
@@ -378,6 +384,7 @@ export interface KeymasterInterface {
 
     // Address system
     listAddresses(): Promise<Record<string, AddressInfo>>;
+    getAddress(domain: string): Promise<ResolvedAddressInfo | null>;
     importAddress(domain: string): Promise<Record<string, AddressInfo>>;
     checkAddress(address: string): Promise<AddressCheckResult>;
     addAddress(address: string): Promise<boolean>;

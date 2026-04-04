@@ -25,6 +25,7 @@ import {
     ChallengeResponse,
     AddressInfo,
     AddressCheckResult,
+    ResolvedAddressInfo,
     CheckWalletResult,
     CreateAssetOptions,
     EncryptedMessage,
@@ -1955,6 +1956,23 @@ export default class Keymaster implements KeymasterInterface {
     async listAddresses(): Promise<Record<string, AddressInfo>> {
         const wallet = await this.loadWallet();
         return this.collectAddresses(wallet);
+    }
+
+    async getAddress(domain: string): Promise<ResolvedAddressInfo | null> {
+        const normalizedDomain = this.normalizeAddressDomain(domain);
+        const id = await this.fetchIdInfo();
+        const stored = id.addresses?.[normalizedDomain];
+
+        if (!stored) {
+            return null;
+        }
+
+        return {
+            domain: normalizedDomain,
+            name: stored.name,
+            address: `${stored.name}@${normalizedDomain}`,
+            added: stored.added,
+        };
     }
 
     async importAddress(domain: string): Promise<Record<string, AddressInfo>> {

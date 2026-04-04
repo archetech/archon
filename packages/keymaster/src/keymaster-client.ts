@@ -7,6 +7,7 @@ import {
     ChallengeResponse,
     AddressInfo,
     AddressCheckResult,
+    ResolvedAddressInfo,
     CheckWalletResult,
     CreateAssetOptions,
     DmailItem,
@@ -468,6 +469,16 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.get(`${this.API}/addresses`);
             return response.data.addresses;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getAddress(domain: string): Promise<ResolvedAddressInfo | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/addresses/${encodeURIComponent(domain)}`);
+            return response.data.address;
         }
         catch (error) {
             throwError(error);

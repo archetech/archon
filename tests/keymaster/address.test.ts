@@ -61,6 +61,37 @@ describe('listAddresses', () => {
     });
 });
 
+describe('getAddress', () => {
+    it('should return the stored address for a domain', async () => {
+        await keymaster.createId('Alice');
+        const walletData = await keymaster.loadWallet();
+        walletData.ids.Alice.addresses = {
+            'archon.social': {
+                name: 'alice',
+                added: '2026-04-04T13:00:00.000Z',
+            },
+        };
+        await keymaster.saveWallet(walletData, true);
+
+        const address = await keymaster.getAddress('archon.social');
+
+        expect(address).toStrictEqual({
+            domain: 'archon.social',
+            name: 'alice',
+            address: 'alice@archon.social',
+            added: '2026-04-04T13:00:00.000Z',
+        });
+    });
+
+    it('should return null when no address is stored for a domain', async () => {
+        await keymaster.createId('Alice');
+
+        const address = await keymaster.getAddress('archon.social');
+
+        expect(address).toBeNull();
+    });
+});
+
 describe('importAddress', () => {
     it('should import matching addresses for the current DID from a domain registry', async () => {
         const alice = await keymaster.createId('Alice');

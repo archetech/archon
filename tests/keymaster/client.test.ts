@@ -1142,6 +1142,43 @@ describe('listAddresses', () => {
     });
 });
 
+describe('getAddress', () => {
+    const mockDomain = 'archon.social';
+    const mockAddress = {
+        domain: 'archon.social',
+        name: 'alice',
+        address: 'alice@archon.social',
+        added: '2026-04-04T13:00:00.000Z',
+    };
+
+    it('should get an address', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.addresses}/${encodeURIComponent(mockDomain)}`)
+            .reply(200, { address: mockAddress });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const address = await keymaster.getAddress(mockDomain);
+
+        expect(address).toStrictEqual(mockAddress);
+    });
+
+    it('should throw exception on getAddress server error', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.addresses}/${encodeURIComponent(mockDomain)}`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.getAddress(mockDomain);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('importAddress', () => {
     const mockAddresses = {
         'alice@archon.social': { added: '2026-04-04T13:00:00.000Z' },
