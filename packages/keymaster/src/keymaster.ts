@@ -1901,8 +1901,8 @@ export default class Keymaster implements KeymasterInterface {
         const addresses: Record<string, AddressInfo> = {};
 
         for (const id of Object.values(wallet.ids || {})) {
-            for (const [address, info] of Object.entries(id.addresses || {})) {
-                addresses[address] = { ...info };
+            for (const [domain, info] of Object.entries(id.addresses || {})) {
+                addresses[`${info.name}@${domain}`] = { added: info.added };
             }
         }
 
@@ -1940,9 +1940,11 @@ export default class Keymaster implements KeymasterInterface {
                 }
 
                 const address = `${String(name).toLowerCase()}@${normalizedDomain}`;
-                const info = { added };
-                id.addresses[address] = info;
-                imported[address] = info;
+                id.addresses[normalizedDomain] = {
+                    name: String(name).toLowerCase(),
+                    added,
+                };
+                imported[address] = { added };
             }
         });
 
@@ -2033,7 +2035,8 @@ export default class Keymaster implements KeymasterInterface {
                 id.addresses = {};
             }
 
-            id.addresses[parsed.address] = {
+            id.addresses[parsed.domain] = {
+                name: parsed.name,
                 added: new Date().toISOString(),
             };
         });
@@ -2057,11 +2060,13 @@ export default class Keymaster implements KeymasterInterface {
 
         await this.mutateWallet((wallet) => {
             const id = wallet.ids[wallet.current!];
-            if (!id.addresses || !(parsed.address in id.addresses)) {
+            const addresses = id.addresses;
+            const stored = addresses?.[parsed.domain];
+            if (!addresses || !stored || stored.name !== parsed.name) {
                 return;
             }
 
-            delete id.addresses[parsed.address];
+            delete addresses[parsed.domain];
         });
 
         return true;

@@ -29,10 +29,16 @@ export interface IDInfo {
     index: number;
     held?: string[];
     owned?: string[];
-    addresses?: Record<string, AddressInfo>;
+    addresses?: Record<string, StoredAddressInfo>;
     dmail?: Record<string, any>;
     notices?: Record<string, any>;
     [key: string]: any; // Allow custom metadata fields
+}
+
+export interface StoredAddressInfo {
+    name: string;
+    added: string;
+    [key: string]: any;
 }
 
 export interface AddressInfo {

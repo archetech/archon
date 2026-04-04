@@ -85,7 +85,12 @@ describe('importAddress', () => {
 
         expect(imported).toStrictEqual({ 'alice@archon.social': info });
         expect(addresses).toStrictEqual({ 'alice@archon.social': info });
-        expect(walletData.ids.Alice.addresses).toStrictEqual({ 'alice@archon.social': info });
+        expect(walletData.ids.Alice.addresses).toStrictEqual({
+            'archon.social': {
+                name: 'alice',
+                added: '2026-04-04T12:00:00.000Z',
+            },
+        });
         expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names');
     });
 });
@@ -169,7 +174,12 @@ describe('addAddress', () => {
 
         expect(ok).toBe(true);
         expect(addresses).toStrictEqual({ 'alice@archon.social': info });
-        expect(walletData.ids.Alice.addresses).toStrictEqual({ 'alice@archon.social': info });
+        expect(walletData.ids.Alice.addresses).toStrictEqual({
+            'archon.social': {
+                name: 'alice',
+                added: '2026-04-04T13:00:00.000Z',
+            },
+        });
         expect(keymaster.createResponse).toHaveBeenCalledWith('did:cid:challenge');
         expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge');
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
@@ -191,7 +201,12 @@ describe('removeAddress', () => {
     it('should delete an address through Herald and remove it from the wallet', async () => {
         await keymaster.createId('Alice');
         const walletData = await keymaster.loadWallet();
-        walletData.ids.Alice.addresses = { 'alice@archon.social': { added: '2026-04-04T13:00:00.000Z' } };
+        walletData.ids.Alice.addresses = {
+            'archon.social': {
+                name: 'alice',
+                added: '2026-04-04T13:00:00.000Z',
+            },
+        };
         await keymaster.saveWallet(walletData, true);
 
         jest.spyOn(keymaster, 'createResponse').mockResolvedValue('did:cid:response');
@@ -219,4 +234,33 @@ describe('removeAddress', () => {
         );
     });
 
+    it('should replace the stored name for a domain when a new one is added', async () => {
+        await keymaster.createId('Alice');
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date('2026-04-04T14:00:00.000Z'));
+
+        jest.spyOn(keymaster, 'createResponse').mockResolvedValue('did:cid:response');
+        jest.spyOn(globalThis, 'fetch')
+            .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge' }))
+            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }))
+            .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge-2' }))
+            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice2' }));
+
+        await keymaster.addAddress('alice@archon.social');
+        jest.setSystemTime(new Date('2026-04-04T14:05:00.000Z'));
+        await keymaster.addAddress('alice2@archon.social');
+
+        const addresses = await keymaster.listAddresses();
+        const walletData = await keymaster.loadWallet();
+
+        expect(addresses).toStrictEqual({
+            'alice2@archon.social': { added: '2026-04-04T14:05:00.000Z' },
+        });
+        expect(walletData.ids.Alice.addresses).toStrictEqual({
+            'archon.social': {
+                name: 'alice2',
+                added: '2026-04-04T14:05:00.000Z',
+            },
+        });
+    });
 });
