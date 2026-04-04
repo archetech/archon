@@ -75,8 +75,9 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "up{job=\"btc-signet-mediator\"}",
-          "legendFormat": "v${svc_version} (${svc_commit})",
+          "expr": "up{job=\"btc-signet-mediator\"} * on(job, instance) group_left(version, commit) service_version_info{job=\"btc-signet-mediator\"}",
+          "instant": true,
+          "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }
       ],
@@ -924,7 +925,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 29 },
       "id": 21,
       "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
-      "targets": [{ "expr": "wallet_setup_status{job=\"btc-signet-wallet\"}", "legendFormat": "v${wallet_version} (${wallet_commit})", "refId": "A" }],
+      "targets": [{ "expr": "wallet_setup_status{job=\"btc-signet-wallet\"} * on(job, instance) group_left(version, commit) wallet_version_info{job=\"btc-signet-wallet\"}", "instant": true, "legendFormat": "v{{version}} ({{commit}})", "refId": "A" }],
       "title": "Wallet Status",
       "type": "stat"
     },
@@ -1073,78 +1074,7 @@
     "btc-signet"
   ],
   "templating": {
-    "list": [
-      {
-        "name": "svc_version",
-        "label": "svc_version",
-        "type": "query",
-        "query": "label_values(service_version_info{job=\"btc-signet-mediator\"}, version)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "refresh": 1,
-        "hide": 2,
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "sort": 0,
-        "multi": false,
-        "includeAll": false
-      },
-      {
-        "name": "svc_commit",
-        "label": "svc_commit",
-        "type": "query",
-        "query": "label_values(service_version_info{job=\"btc-signet-mediator\"}, commit)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "refresh": 1,
-        "hide": 2,
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "sort": 0,
-        "multi": false,
-        "includeAll": false
-      },
-      {
-        "name": "wallet_version",
-        "label": "wallet_version",
-        "type": "query",
-        "query": "label_values(wallet_version_info{job=\"btc-signet-wallet\"}, version)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "refresh": 1,
-        "hide": 2,
-        "current": { "text": "", "value": "" },
-        "sort": 0,
-        "multi": false,
-        "includeAll": false
-      },
-      {
-        "name": "wallet_commit",
-        "label": "wallet_commit",
-        "type": "query",
-        "query": "label_values(wallet_version_info{job=\"btc-signet-wallet\"}, commit)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "refresh": 1,
-        "hide": 2,
-        "current": { "text": "", "value": "" },
-        "sort": 0,
-        "multi": false,
-        "includeAll": false
-      }
-    ]
+    "list": []
   },
   "time": {
     "from": "now-1h",

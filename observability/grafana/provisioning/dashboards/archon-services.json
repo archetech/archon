@@ -75,8 +75,9 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "up{job=\"gatekeeper\"}",
-          "legendFormat": "v${gk_version} (${gk_commit})",
+          "expr": "up{job=\"gatekeeper\"} * on(job, instance) group_left(version, commit) service_version_info{job=\"gatekeeper\"}",
+          "instant": true,
+          "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }
       ],
@@ -149,8 +150,9 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "up{job=\"keymaster\"}",
-          "legendFormat": "v${km_version} (${km_commit})",
+          "expr": "up{job=\"keymaster\"} * on(job, instance) group_left(version, commit) service_version_info{job=\"keymaster\"}",
+          "instant": true,
+          "legendFormat": "v{{version}} ({{commit}})",
           "refId": "A"
         }
       ],
@@ -1490,84 +1492,7 @@
     "observability"
   ],
   "templating": {
-    "list": [
-      {
-        "name": "gk_version",
-        "label": "gk_version",
-        "type": "query",
-        "query": "label_values(service_version_info{job=\"gatekeeper\"}, version)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "refresh": 1,
-        "hide": 2,
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "sort": 0,
-        "multi": false,
-        "includeAll": false
-      },
-      {
-        "name": "gk_commit",
-        "label": "gk_commit",
-        "type": "query",
-        "query": "label_values(service_version_info{job=\"gatekeeper\"}, commit)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "refresh": 1,
-        "hide": 2,
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "sort": 0,
-        "multi": false,
-        "includeAll": false
-      },
-      {
-        "name": "km_version",
-        "label": "km_version",
-        "type": "query",
-        "query": "label_values(service_version_info{job=\"keymaster\"}, version)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "refresh": 1,
-        "hide": 2,
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "sort": 0,
-        "multi": false,
-        "includeAll": false
-      },
-      {
-        "name": "km_commit",
-        "label": "km_commit",
-        "type": "query",
-        "query": "label_values(service_version_info{job=\"keymaster\"}, commit)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "refresh": 1,
-        "hide": 2,
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "sort": 0,
-        "multi": false,
-        "includeAll": false
-      }
-    ]
+    "list": []
   },
   "time": {
     "from": "now-1h",
