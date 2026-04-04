@@ -1954,7 +1954,7 @@ export default class Keymaster implements KeymasterInterface {
         did: string | null;
     }> {
         const parsed = this.parseAddress(address);
-        const response = await fetch(`https://${parsed.domain}/names/api/name/${encodeURIComponent(parsed.name)}`);
+        const response = await fetch(`https://${parsed.domain}/.well-known/names/${encodeURIComponent(parsed.name)}`);
 
         if (response.status === 404) {
             return {

@@ -113,6 +113,7 @@ describe('checkAddress', () => {
             available: false,
             did: 'did:cid:alice',
         });
+        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names/alice');
     });
 });
 
