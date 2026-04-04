@@ -23,6 +23,9 @@ import {
 import {
     Challenge,
     ChallengeResponse,
+    AddressInfo,
+    AddressCheckResult,
+    ResolvedAddressInfo,
     CheckWalletResult,
     CreateAssetOptions,
     EncryptedMessage,
@@ -1806,6 +1809,327 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         return aliases;
+    }
+
+    private normalizeAddressDomain(domain: string): string {
+        if (typeof domain !== 'string' || !domain.trim()) {
+            throw new InvalidParameterError('domain');
+        }
+
+        const trimmed = domain.trim().toLowerCase();
+
+        try {
+            const url = trimmed.includes('://')
+                ? new URL(trimmed)
+                : new URL(`https://${trimmed}`);
+
+            if (!url.hostname) {
+                throw new Error('missing hostname');
+            }
+
+            return url.host.toLowerCase();
+        }
+        catch {
+            throw new InvalidParameterError('domain');
+        }
+    }
+
+    private parseAddress(address: string): {
+        address: string;
+        name: string;
+        domain: string;
+    } {
+        if (typeof address !== 'string' || !address.trim()) {
+            throw new InvalidParameterError('address');
+        }
+
+        const trimmed = address.trim().toLowerCase();
+        const parts = trimmed.split('@');
+
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            throw new InvalidParameterError('address');
+        }
+
+        const [name, domainText] = parts;
+        const domain = this.normalizeAddressDomain(domainText);
+
+        return {
+            address: `${name}@${domain}`,
+            name,
+            domain,
+        };
+    }
+
+    private async getResponseData(response: Response): Promise<any> {
+        try {
+            return await response.json();
+        }
+        catch {
+            return null;
+        }
+    }
+
+    private async getResponseError(response: Response, fallback: string): Promise<string> {
+        const data = await this.getResponseData(response);
+
+        if (typeof data?.message === 'string') {
+            return data.message;
+        }
+
+        if (typeof data?.error === 'string') {
+            return data.error;
+        }
+
+        return fallback;
+    }
+
+    private addressApiEndpoints(domain: string, path: string): string[] {
+        return [
+            `https://${domain}/names/api/${path}`,
+            `https://${domain}/api/${path}`,
+        ];
+    }
+
+    private async fetchAddressApiResponse(
+        domain: string,
+        path: string,
+        init: RequestInit | undefined,
+        fallback: string
+    ): Promise<Response> {
+        let lastResponse: Response | null = null;
+        let sawNetworkError = false;
+
+        for (const endpoint of this.addressApiEndpoints(domain, path)) {
+            try {
+                const response = await fetch(endpoint, init);
+
+                if (response.ok) {
+                    return response;
+                }
+
+                lastResponse = response;
+            }
+            catch {
+                sawNetworkError = true;
+            }
+        }
+
+        if (lastResponse) {
+            throw new KeymasterError(await this.getResponseError(lastResponse, fallback));
+        }
+
+        if (sawNetworkError) {
+            throw new KeymasterError(fallback);
+        }
+
+        throw new KeymasterError(fallback);
+    }
+
+    private async createAddressBearerToken(domain: string): Promise<string> {
+        const response = await this.fetchAddressApiResponse(
+            domain,
+            'challenge',
+            undefined,
+            'Failed to fetch address challenge',
+        );
+
+        const data = await this.getResponseData(response);
+        if (typeof data?.challenge !== 'string') {
+            throw new KeymasterError('Invalid address challenge');
+        }
+
+        return this.createResponse(data.challenge);
+    }
+
+    private collectAddresses(wallet: WalletFile): Record<string, AddressInfo> {
+        const addresses: Record<string, AddressInfo> = {};
+
+        for (const id of Object.values(wallet.ids || {})) {
+            for (const [domain, info] of Object.entries(id.addresses || {})) {
+                addresses[`${info.name}@${domain}`] = { added: info.added };
+            }
+        }
+
+        return addresses;
+    }
+
+    async listAddresses(): Promise<Record<string, AddressInfo>> {
+        const wallet = await this.loadWallet();
+        return this.collectAddresses(wallet);
+    }
+
+    async getAddress(domain: string): Promise<ResolvedAddressInfo | null> {
+        const normalizedDomain = this.normalizeAddressDomain(domain);
+        const id = await this.fetchIdInfo();
+        const stored = id.addresses?.[normalizedDomain];
+
+        if (!stored) {
+            return null;
+        }
+
+        return {
+            domain: normalizedDomain,
+            name: stored.name,
+            address: `${stored.name}@${normalizedDomain}`,
+            added: stored.added,
+        };
+    }
+
+    async importAddress(domain: string): Promise<Record<string, AddressInfo>> {
+        const normalizedDomain = this.normalizeAddressDomain(domain);
+        const current = await this.fetchIdInfo();
+        const response = await fetch(`https://${normalizedDomain}/.well-known/names`);
+
+        if (!response.ok) {
+            throw new KeymasterError(await this.getResponseError(response, 'Failed to import addresses'));
+        }
+
+        const data = await this.getResponseData(response) as { names?: Record<string, string> } | null;
+        const names = data?.names && typeof data.names === 'object' ? data.names : {};
+        const imported: Record<string, AddressInfo> = {};
+        const added = new Date().toISOString();
+
+        await this.mutateWallet((wallet) => {
+            const id = wallet.ids[wallet.current!];
+            if (!id.addresses) {
+                id.addresses = {};
+            }
+
+            for (const [name, did] of Object.entries(names)) {
+                if (did !== current.did) {
+                    continue;
+                }
+
+                const address = `${String(name).toLowerCase()}@${normalizedDomain}`;
+                id.addresses[normalizedDomain] = {
+                    name: String(name).toLowerCase(),
+                    added,
+                };
+                imported[address] = { added };
+            }
+        });
+
+        return imported;
+    }
+
+    async checkAddress(address: string): Promise<AddressCheckResult> {
+        const parsed = this.parseAddress(address);
+
+        let response: Response;
+        try {
+            response = await fetch(`https://${parsed.domain}/.well-known/names/${encodeURIComponent(parsed.name)}`);
+        }
+        catch {
+            return {
+                address: parsed.address,
+                status: 'unreachable',
+                available: false,
+                did: null,
+            };
+        }
+
+        if (response.status === 404) {
+            const contentType = response.headers.get('content-type') || '';
+            const data = contentType.includes('application/json')
+                ? await this.getResponseData(response)
+                : null;
+
+            if (typeof data?.error === 'string' && data.error === 'Name not found') {
+                return {
+                    address: parsed.address,
+                    status: 'available',
+                    available: true,
+                    did: null,
+                };
+            }
+
+            return {
+                address: parsed.address,
+                status: 'unsupported',
+                available: false,
+                did: null,
+            };
+        }
+
+        if (!response.ok) {
+            throw new KeymasterError(await this.getResponseError(response, 'Failed to check address'));
+        }
+
+        const data = await this.getResponseData(response);
+
+        if (typeof data?.did !== 'string') {
+            return {
+                address: parsed.address,
+                status: 'unsupported',
+                available: false,
+                did: null,
+            };
+        }
+
+        return {
+            address: parsed.address,
+            status: 'claimed',
+            available: false,
+            did: data.did,
+        };
+    }
+
+    async addAddress(address: string): Promise<boolean> {
+        const parsed = this.parseAddress(address);
+        const bearerToken = await this.createAddressBearerToken(parsed.domain);
+        await this.fetchAddressApiResponse(parsed.domain, 'name', {
+            method: 'PUT',
+            headers: {
+                Authorization: `Bearer ${bearerToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name: parsed.name }),
+        }, 'Failed to add address');
+
+        await this.mutateWallet((wallet) => {
+            const id = wallet.ids[wallet.current!];
+            if (!id.addresses) {
+                id.addresses = {};
+            }
+
+            id.addresses[parsed.domain] = {
+                name: parsed.name,
+                added: new Date().toISOString(),
+            };
+        });
+
+        return true;
+    }
+
+    async removeAddress(address: string): Promise<boolean> {
+        const parsed = this.parseAddress(address);
+        const id = await this.fetchIdInfo();
+        const stored = id.addresses?.[parsed.domain];
+
+        if (!stored || stored.name !== parsed.name) {
+            throw new InvalidParameterError('address');
+        }
+
+        const bearerToken = await this.createAddressBearerToken(parsed.domain);
+        await this.fetchAddressApiResponse(parsed.domain, 'name', {
+            method: 'DELETE',
+            headers: {
+                Authorization: `Bearer ${bearerToken}`,
+            },
+        }, 'Failed to remove address');
+
+        await this.mutateWallet((wallet) => {
+            const id = wallet.ids[wallet.current!];
+            const addresses = id.addresses;
+            const stored = addresses?.[parsed.domain];
+            if (!addresses || !stored || stored.name !== parsed.name) {
+                return;
+            }
+
+            delete addresses[parsed.domain];
+        });
+
+        return true;
     }
 
     async addAlias(

@@ -73,6 +73,9 @@ function normalizePath(path: string): string {
         .replace(/\/did\/[^/]+/g, '/did/:id')
         .replace(/\/ids\/[^/]+/g, '/ids/:id')
         .replace(/\/aliases\/[^/]+/g, '/aliases/:alias')
+        .replace(/\/addresses\/check\/[^/]+/g, '/addresses/check/:address')
+        .replace(/\/addresses\/import/g, '/addresses/import')
+        .replace(/\/addresses\/[^/]+/g, '/addresses/:address')
         .replace(/\/groups\/[^/]+/g, '/groups/:name')
         .replace(/\/schemas\/[^/]+/g, '/schemas/:id')
         .replace(/\/agents\/[^/]+/g, '/agents/:id')
@@ -1736,6 +1739,298 @@ v1router.get('/aliases/:alias', async (req, res) => {
 v1router.delete('/aliases/:alias', async (req, res) => {
     try {
         const ok = await keymaster.removeAlias(req.params.alias);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /addresses:
+ *   get:
+ *     summary: List addresses stored for the current wallet.
+ *     responses:
+ *       200:
+ *         description: A map of flattened `name@domain` addresses to metadata.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 addresses:
+ *                   type: object
+ *                   additionalProperties:
+ *                     type: object
+ *                     properties:
+ *                       added:
+ *                         type: string
+ *                         format: date-time
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.get('/addresses', async (_req, res) => {
+    try {
+        const addresses = await keymaster.listAddresses();
+        res.json({ addresses });
+    } catch (error: any) {
+        res.status(500).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /addresses/{domain}:
+ *   get:
+ *     summary: Get the current stored address for a specific domain.
+ *     parameters:
+ *       - in: path
+ *         name: domain
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: URL-encoded domain to look up.
+ *     responses:
+ *       200:
+ *         description: Address record for the requested domain or null if none is stored.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 address:
+ *                   nullable: true
+ *                   type: object
+ *                   properties:
+ *                     domain:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     address:
+ *                       type: string
+ *                     added:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.get('/addresses/:domain', async (req, res) => {
+    try {
+        const domain = decodeURIComponent(req.params.domain);
+        const addresses = await keymaster.listAddresses();
+        const entry = Object.entries(addresses).find(([address]) => address.endsWith(`@${domain}`));
+        const address = entry
+            ? {
+                domain,
+                name: entry[0].slice(0, -(domain.length + 1)),
+                address: entry[0],
+                ...entry[1],
+            }
+            : null;
+        res.json({ address });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /addresses/import:
+ *   post:
+ *     summary: Import existing addresses for the current identity from a domain registry.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               domain:
+ *                 type: string
+ *             required:
+ *               - domain
+ *     responses:
+ *       200:
+ *         description: Imported flattened `name@domain` addresses and metadata.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 addresses:
+ *                   type: object
+ *                   additionalProperties:
+ *                     type: object
+ *                     properties:
+ *                       added:
+ *                         type: string
+ *                         format: date-time
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/addresses/import', async (req, res) => {
+    try {
+        const { domain } = req.body;
+        const addresses = await keymaster.importAddress(domain);
+        res.json({ addresses });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /addresses/check/{address}:
+ *   get:
+ *     summary: Check whether an address is claimed, available, unsupported, or unreachable.
+ *     parameters:
+ *       - in: path
+ *         name: address
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: URL-encoded `name@domain` address to check.
+ *     responses:
+ *       200:
+ *         description: Address availability result.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 address:
+ *                   type: string
+ *                 status:
+ *                   type: string
+ *                   enum: [claimed, available, unsupported, unreachable]
+ *                 available:
+ *                   type: boolean
+ *                 did:
+ *                   type: string
+ *                   nullable: true
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.get('/addresses/check/:address', async (req, res) => {
+    try {
+        const address = decodeURIComponent(req.params.address);
+        const result = await keymaster.checkAddress(address);
+        res.json(result);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /addresses:
+ *   post:
+ *     summary: Claim an address for the current identity.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               address:
+ *                 type: string
+ *             required:
+ *               - address
+ *     responses:
+ *       200:
+ *         description: Indicates whether the address was successfully claimed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/addresses', async (req, res) => {
+    try {
+        const { address } = req.body;
+        const ok = await keymaster.addAddress(address);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /addresses/{address}:
+ *   delete:
+ *     summary: Remove the stored address for the current identity and revoke it remotely.
+ *     parameters:
+ *       - in: path
+ *         name: address
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: URL-encoded `name@domain` address to remove.
+ *     responses:
+ *       200:
+ *         description: Indicates whether the address was successfully removed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.delete('/addresses/:address', async (req, res) => {
+    try {
+        const address = decodeURIComponent(req.params.address);
+        const ok = await keymaster.removeAddress(address);
         res.json({ ok });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });

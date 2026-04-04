@@ -25,6 +25,7 @@ const Endpoints = {
     keys_encrypt_json: '/api/v1/keys/encrypt/json',
     keys_decrypt_json: '/api/v1/keys/decrypt/json',
     aliases: '/api/v1/aliases',
+    addresses: '/api/v1/addresses',
     did: '/api/v1/did',
     assets: '/api/v1/assets',
     challenge: '/api/v1/challenge',
@@ -1100,6 +1101,202 @@ describe('removeAlias', () => {
 
         try {
             await keymaster.removeAlias(mockAlias);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('listAddresses', () => {
+    const mockAddresses = {
+        'alice@archon.social': { added: '2026-04-04T13:00:00.000Z' },
+    };
+
+    it('should list addresses', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.addresses)
+            .reply(200, { addresses: mockAddresses });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const addresses = await keymaster.listAddresses();
+
+        expect(addresses).toStrictEqual(mockAddresses);
+    });
+
+    it('should throw exception on listAddresses server error', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.addresses)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.listAddresses();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('getAddress', () => {
+    const mockDomain = 'archon.social';
+    const mockAddress = {
+        domain: 'archon.social',
+        name: 'alice',
+        address: 'alice@archon.social',
+        added: '2026-04-04T13:00:00.000Z',
+    };
+
+    it('should get an address', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.addresses}/${encodeURIComponent(mockDomain)}`)
+            .reply(200, { address: mockAddress });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const address = await keymaster.getAddress(mockDomain);
+
+        expect(address).toStrictEqual(mockAddress);
+    });
+
+    it('should throw exception on getAddress server error', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.addresses}/${encodeURIComponent(mockDomain)}`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.getAddress(mockDomain);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('importAddress', () => {
+    const mockAddresses = {
+        'alice@archon.social': { added: '2026-04-04T13:00:00.000Z' },
+    };
+
+    it('should import addresses', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.addresses}/import`)
+            .reply(200, { addresses: mockAddresses });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const addresses = await keymaster.importAddress('archon.social');
+
+        expect(addresses).toStrictEqual(mockAddresses);
+    });
+
+    it('should throw exception on importAddress server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.addresses}/import`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.importAddress('archon.social');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('checkAddress', () => {
+    const mockAddress = 'alice@archon.social';
+
+    it('should check address', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.addresses}/check/${encodeURIComponent(mockAddress)}`)
+            .reply(200, { address: mockAddress, status: 'claimed', available: false, did: 'did:cid:alice' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const result = await keymaster.checkAddress(mockAddress);
+
+        expect(result).toStrictEqual({ address: mockAddress, status: 'claimed', available: false, did: 'did:cid:alice' });
+    });
+
+    it('should throw exception on checkAddress server error', async () => {
+        nock(KeymasterURL)
+            .get(`${Endpoints.addresses}/check/${encodeURIComponent(mockAddress)}`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.checkAddress(mockAddress);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('addAddress', () => {
+    const mockAddress = 'alice@archon.social';
+
+    it('should add address', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.addresses)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.addAddress(mockAddress);
+
+        expect(ok).toStrictEqual(true);
+    });
+
+    it('should throw exception on addAddress server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.addresses)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.addAddress(mockAddress);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('removeAddress', () => {
+    const mockAddress = 'alice@archon.social';
+
+    it('should remove address', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.addresses}/${encodeURIComponent(mockAddress)}`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.removeAddress(mockAddress);
+
+        expect(ok).toStrictEqual(true);
+    });
+
+    it('should throw exception on removeAddress server error', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.addresses}/${encodeURIComponent(mockAddress)}`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.removeAddress(mockAddress);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

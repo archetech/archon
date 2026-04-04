@@ -789,6 +789,115 @@ program
         }
     });
 
+// Address commands
+program
+    .command('list-addresses')
+    .description('List wallet addresses')
+    .action(async () => {
+        try {
+            const addresses = await keymaster.listAddresses();
+
+            if (Object.keys(addresses).length) {
+                console.log(JSON.stringify(addresses, null, 4));
+            }
+            else {
+                console.log('No addresses defined');
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('get-address <domain>')
+    .description('Get the current address for a domain')
+    .action(async (domain) => {
+        try {
+            const address = await keymaster.getAddress(domain);
+
+            if (address) {
+                console.log(JSON.stringify(address, null, 4));
+            }
+            else {
+                console.log(`${domain} not found`);
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('import-address <domain>')
+    .description('Import any existing address for the current ID from a domain')
+    .action(async (domain) => {
+        try {
+            const addresses = await keymaster.importAddress(domain);
+
+            if (Object.keys(addresses).length) {
+                console.log(JSON.stringify(addresses, null, 4));
+            }
+            else {
+                console.log('No addresses imported');
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('check-address <address>')
+    .description('Check whether an address is available')
+    .action(async (address) => {
+        try {
+            const result = await keymaster.checkAddress(address);
+
+            if (result.status === 'available') {
+                console.log(`${result.address} is available`);
+            }
+            else if (result.status === 'claimed') {
+                console.log(`${result.address} is claimed by ${result.did}`);
+            }
+            else if (result.status === 'unsupported') {
+                console.log(`${result.address} domain does not appear to support names`);
+            }
+            else {
+                console.log(`${result.address} domain is unreachable`);
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('add-address <address>')
+    .description('Claim an address for the current ID')
+    .action(async (address) => {
+        try {
+            await keymaster.addAddress(address);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('remove-address <address>')
+    .description('Remove an address for the current ID')
+    .action(async (address) => {
+        try {
+            await keymaster.removeAddress(address);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
 // Nostr commands
 program
     .command('add-nostr [id]')

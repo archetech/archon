@@ -5,6 +5,9 @@ import {
 import {
     Challenge,
     ChallengeResponse,
+    AddressInfo,
+    AddressCheckResult,
+    ResolvedAddressInfo,
     CheckWalletResult,
     CreateAssetOptions,
     DmailItem,
@@ -455,6 +458,66 @@ export default class KeymasterClient implements KeymasterInterface {
     async removeAlias(alias: string): Promise<boolean> {
         try {
             const response = await this.axios.delete(`${this.API}/aliases/${alias}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listAddresses(): Promise<Record<string, AddressInfo>> {
+        try {
+            const response = await this.axios.get(`${this.API}/addresses`);
+            return response.data.addresses;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getAddress(domain: string): Promise<ResolvedAddressInfo | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/addresses/${encodeURIComponent(domain)}`);
+            return response.data.address;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async importAddress(domain: string): Promise<Record<string, AddressInfo>> {
+        try {
+            const response = await this.axios.post(`${this.API}/addresses/import`, { domain });
+            return response.data.addresses;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async checkAddress(address: string): Promise<AddressCheckResult> {
+        try {
+            const response = await this.axios.get(`${this.API}/addresses/check/${encodeURIComponent(address)}`);
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addAddress(address: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/addresses`, { address });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeAddress(address: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/addresses/${encodeURIComponent(address)}`);
             return response.data.ok;
         }
         catch (error) {
