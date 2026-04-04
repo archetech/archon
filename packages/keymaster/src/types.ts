@@ -40,6 +40,13 @@ export interface AddressInfo {
     [key: string]: any;
 }
 
+export interface AddressCheckResult {
+    address: string;
+    status: 'claimed' | 'available' | 'unsupported' | 'unreachable';
+    available: boolean;
+    did: string | null;
+}
+
 export interface WalletEncFile {
     version: number;
     seed: Seed;
@@ -366,11 +373,7 @@ export interface KeymasterInterface {
     // Address system
     listAddresses(): Promise<Record<string, AddressInfo>>;
     importAddress(domain: string): Promise<Record<string, AddressInfo>>;
-    checkAddress(address: string): Promise<{
-        address: string;
-        available: boolean;
-        did: string | null;
-    }>;
+    checkAddress(address: string): Promise<AddressCheckResult>;
     addAddress(address: string): Promise<boolean>;
     removeAddress(address: string): Promise<boolean>;
 

@@ -40,10 +40,14 @@ function mockFetchResponse(
     ok: boolean,
     body: unknown,
     status = ok ? 200 : 500,
+    contentType = 'application/json; charset=utf-8',
 ): Response {
     return {
         ok,
         status,
+        headers: {
+            get: (name: string) => name.toLowerCase() === 'content-type' ? contentType : null,
+        },
         json: async () => body,
         text: async () => JSON.stringify(body),
     } as Response;
@@ -96,6 +100,7 @@ describe('checkAddress', () => {
 
         expect(result).toStrictEqual({
             address: 'alice@archon.social',
+            status: 'available',
             available: true,
             did: null,
         });
@@ -110,10 +115,39 @@ describe('checkAddress', () => {
 
         expect(result).toStrictEqual({
             address: 'alice@archon.social',
+            status: 'claimed',
             available: false,
             did: 'did:cid:alice',
         });
         expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names/alice');
+    });
+
+    it('should report when a domain does not appear to support names', async () => {
+        jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+            mockFetchResponse(false, '<html>404</html>', 404, 'text/html; charset=utf-8'),
+        );
+
+        const result = await keymaster.checkAddress('alice@google.com');
+
+        expect(result).toStrictEqual({
+            address: 'alice@google.com',
+            status: 'unsupported',
+            available: false,
+            did: null,
+        });
+    });
+
+    it('should report when a domain is unreachable', async () => {
+        jest.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
+
+        const result = await keymaster.checkAddress('alice@lucifer.com');
+
+        expect(result).toStrictEqual({
+            address: 'alice@lucifer.com',
+            status: 'unreachable',
+            available: false,
+            did: null,
+        });
     });
 });
 

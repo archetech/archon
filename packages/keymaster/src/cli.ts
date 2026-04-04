@@ -835,11 +835,17 @@ program
         try {
             const result = await keymaster.checkAddress(address);
 
-            if (result.available) {
+            if (result.status === 'available') {
                 console.log(`${result.address} is available`);
             }
-            else {
+            else if (result.status === 'claimed') {
                 console.log(`${result.address} is claimed by ${result.did}`);
+            }
+            else if (result.status === 'unsupported') {
+                console.log(`${result.address} domain does not appear to support names`);
+            }
+            else {
+                console.log(`${result.address} domain is unreachable`);
             }
         }
         catch (error: any) {

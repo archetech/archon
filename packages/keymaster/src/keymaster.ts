@@ -24,6 +24,7 @@ import {
     Challenge,
     ChallengeResponse,
     AddressInfo,
+    AddressCheckResult,
     CheckWalletResult,
     CreateAssetOptions,
     EncryptedMessage,
@@ -1948,18 +1949,41 @@ export default class Keymaster implements KeymasterInterface {
         return imported;
     }
 
-    async checkAddress(address: string): Promise<{
-        address: string;
-        available: boolean;
-        did: string | null;
-    }> {
+    async checkAddress(address: string): Promise<AddressCheckResult> {
         const parsed = this.parseAddress(address);
-        const response = await fetch(`https://${parsed.domain}/.well-known/names/${encodeURIComponent(parsed.name)}`);
 
-        if (response.status === 404) {
+        let response: Response;
+        try {
+            response = await fetch(`https://${parsed.domain}/.well-known/names/${encodeURIComponent(parsed.name)}`);
+        }
+        catch {
             return {
                 address: parsed.address,
-                available: true,
+                status: 'unreachable',
+                available: false,
+                did: null,
+            };
+        }
+
+        if (response.status === 404) {
+            const contentType = response.headers.get('content-type') || '';
+            const data = contentType.includes('application/json')
+                ? await this.getResponseData(response)
+                : null;
+
+            if (typeof data?.error === 'string' && data.error === 'Name not found') {
+                return {
+                    address: parsed.address,
+                    status: 'available',
+                    available: true,
+                    did: null,
+                };
+            }
+
+            return {
+                address: parsed.address,
+                status: 'unsupported',
+                available: false,
                 did: null,
             };
         }
@@ -1970,10 +1994,20 @@ export default class Keymaster implements KeymasterInterface {
 
         const data = await this.getResponseData(response);
 
+        if (typeof data?.did !== 'string') {
+            return {
+                address: parsed.address,
+                status: 'unsupported',
+                available: false,
+                did: null,
+            };
+        }
+
         return {
             address: parsed.address,
+            status: 'claimed',
             available: false,
-            did: typeof data?.did === 'string' ? data.did : null,
+            did: data.did,
         };
     }
 
