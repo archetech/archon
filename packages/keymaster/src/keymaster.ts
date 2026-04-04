@@ -23,6 +23,7 @@ import {
 import {
     Challenge,
     ChallengeResponse,
+    AddressInfo,
     CheckWalletResult,
     CreateAssetOptions,
     EncryptedMessage,
@@ -1806,6 +1807,230 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         return aliases;
+    }
+
+    private normalizeAddressDomain(domain: string): string {
+        if (typeof domain !== 'string' || !domain.trim()) {
+            throw new InvalidParameterError('domain');
+        }
+
+        const trimmed = domain.trim().toLowerCase();
+
+        try {
+            const url = trimmed.includes('://')
+                ? new URL(trimmed)
+                : new URL(`https://${trimmed}`);
+
+            if (!url.hostname) {
+                throw new Error('missing hostname');
+            }
+
+            return url.host.toLowerCase();
+        }
+        catch {
+            throw new InvalidParameterError('domain');
+        }
+    }
+
+    private parseAddress(address: string): {
+        address: string;
+        name: string;
+        domain: string;
+    } {
+        if (typeof address !== 'string' || !address.trim()) {
+            throw new InvalidParameterError('address');
+        }
+
+        const trimmed = address.trim().toLowerCase();
+        const parts = trimmed.split('@');
+
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            throw new InvalidParameterError('address');
+        }
+
+        const [name, domainText] = parts;
+        const domain = this.normalizeAddressDomain(domainText);
+
+        return {
+            address: `${name}@${domain}`,
+            name,
+            domain,
+        };
+    }
+
+    private async getResponseData(response: Response): Promise<any> {
+        try {
+            return await response.json();
+        }
+        catch {
+            return null;
+        }
+    }
+
+    private async getResponseError(response: Response, fallback: string): Promise<string> {
+        const data = await this.getResponseData(response);
+
+        if (typeof data?.message === 'string') {
+            return data.message;
+        }
+
+        if (typeof data?.error === 'string') {
+            return data.error;
+        }
+
+        return fallback;
+    }
+
+    private async createAddressBearerToken(domain: string): Promise<string> {
+        const response = await fetch(`https://${domain}/names/api/challenge`);
+
+        if (!response.ok) {
+            throw new KeymasterError(await this.getResponseError(response, 'Failed to fetch address challenge'));
+        }
+
+        const data = await this.getResponseData(response);
+        if (typeof data?.challenge !== 'string') {
+            throw new KeymasterError('Invalid address challenge');
+        }
+
+        return this.createResponse(data.challenge);
+    }
+
+    private collectAddresses(wallet: WalletFile): Record<string, AddressInfo> {
+        const addresses: Record<string, AddressInfo> = {};
+
+        for (const id of Object.values(wallet.ids || {})) {
+            for (const [address, info] of Object.entries(id.addresses || {})) {
+                addresses[address] = { ...info };
+            }
+        }
+
+        return addresses;
+    }
+
+    async listAddresses(): Promise<Record<string, AddressInfo>> {
+        const wallet = await this.loadWallet();
+        return this.collectAddresses(wallet);
+    }
+
+    async importAddress(domain: string): Promise<Record<string, AddressInfo>> {
+        const normalizedDomain = this.normalizeAddressDomain(domain);
+        const current = await this.fetchIdInfo();
+        const response = await fetch(`https://${normalizedDomain}/.well-known/names`);
+
+        if (!response.ok) {
+            throw new KeymasterError(await this.getResponseError(response, 'Failed to import addresses'));
+        }
+
+        const data = await this.getResponseData(response) as { names?: Record<string, string> } | null;
+        const names = data?.names && typeof data.names === 'object' ? data.names : {};
+        const imported: Record<string, AddressInfo> = {};
+        const added = new Date().toISOString();
+
+        await this.mutateWallet((wallet) => {
+            const id = wallet.ids[wallet.current!];
+            if (!id.addresses) {
+                id.addresses = {};
+            }
+
+            for (const [name, did] of Object.entries(names)) {
+                if (did !== current.did) {
+                    continue;
+                }
+
+                const address = `${String(name).toLowerCase()}@${normalizedDomain}`;
+                const info = { added };
+                id.addresses[address] = info;
+                imported[address] = info;
+            }
+        });
+
+        return imported;
+    }
+
+    async checkAddress(address: string): Promise<{
+        address: string;
+        available: boolean;
+        did: string | null;
+    }> {
+        const parsed = this.parseAddress(address);
+        const response = await fetch(`https://${parsed.domain}/names/api/name/${encodeURIComponent(parsed.name)}`);
+
+        if (response.status === 404) {
+            return {
+                address: parsed.address,
+                available: true,
+                did: null,
+            };
+        }
+
+        if (!response.ok) {
+            throw new KeymasterError(await this.getResponseError(response, 'Failed to check address'));
+        }
+
+        const data = await this.getResponseData(response);
+
+        return {
+            address: parsed.address,
+            available: false,
+            did: typeof data?.did === 'string' ? data.did : null,
+        };
+    }
+
+    async addAddress(address: string): Promise<boolean> {
+        const parsed = this.parseAddress(address);
+        const bearerToken = await this.createAddressBearerToken(parsed.domain);
+        const response = await fetch(`https://${parsed.domain}/names/api/name`, {
+            method: 'PUT',
+            headers: {
+                Authorization: `Bearer ${bearerToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name: parsed.name }),
+        });
+
+        if (!response.ok) {
+            throw new KeymasterError(await this.getResponseError(response, 'Failed to add address'));
+        }
+
+        await this.mutateWallet((wallet) => {
+            const id = wallet.ids[wallet.current!];
+            if (!id.addresses) {
+                id.addresses = {};
+            }
+
+            id.addresses[parsed.address] = {
+                added: new Date().toISOString(),
+            };
+        });
+
+        return true;
+    }
+
+    async removeAddress(address: string): Promise<boolean> {
+        const parsed = this.parseAddress(address);
+        const bearerToken = await this.createAddressBearerToken(parsed.domain);
+        const response = await fetch(`https://${parsed.domain}/names/api/name`, {
+            method: 'DELETE',
+            headers: {
+                Authorization: `Bearer ${bearerToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new KeymasterError(await this.getResponseError(response, 'Failed to remove address'));
+        }
+
+        await this.mutateWallet((wallet) => {
+            const id = wallet.ids[wallet.current!];
+            if (!id.addresses || !(parsed.address in id.addresses)) {
+                return;
+            }
+
+            delete id.addresses[parsed.address];
+        });
+
+        return true;
     }
 
     async addAlias(

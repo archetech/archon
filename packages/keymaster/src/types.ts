@@ -29,9 +29,15 @@ export interface IDInfo {
     index: number;
     held?: string[];
     owned?: string[];
+    addresses?: Record<string, AddressInfo>;
     dmail?: Record<string, any>;
     notices?: Record<string, any>;
     [key: string]: any; // Allow custom metadata fields
+}
+
+export interface AddressInfo {
+    added: string;
+    [key: string]: any;
 }
 
 export interface WalletEncFile {
@@ -356,6 +362,17 @@ export interface KeymasterInterface {
     addAlias(alias: string, did: string): Promise<boolean>;
     getAlias(alias: string): Promise<string | null>;
     removeAlias(alias: string): Promise<boolean>;
+
+    // Address system
+    listAddresses(): Promise<Record<string, AddressInfo>>;
+    importAddress(domain: string): Promise<Record<string, AddressInfo>>;
+    checkAddress(address: string): Promise<{
+        address: string;
+        available: boolean;
+        did: string | null;
+    }>;
+    addAddress(address: string): Promise<boolean>;
+    removeAddress(address: string): Promise<boolean>;
 
     // Nostr
     addNostr(id?: string): Promise<NostrKeys>;

@@ -193,6 +193,11 @@ It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the
 | Aliases | `get-alias <alias>` | Get DID by alias |
 | Aliases | `remove-alias <alias>` | Remove alias |
 | Aliases | `list-aliases` | List all aliases |
+| Addresses | `list-addresses` | List all wallet addresses |
+| Addresses | `import-address <domain>` | Import addresses for the current ID from a domain |
+| Addresses | `check-address <address>` | Check whether an address is available |
+| Addresses | `add-address <address>` | Claim an address for the current ID |
+| Addresses | `remove-address <address>` | Remove an address from the current ID |
 | Groups | `create-group <name>` | Create a group |
 | Groups | `list-groups` | List owned groups |
 | Groups | `get-group <did>` | Get group details |
