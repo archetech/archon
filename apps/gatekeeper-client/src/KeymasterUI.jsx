@@ -129,11 +129,27 @@ function formatBytes(bytes) {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
+function parseAddressDomain(address) {
+    if (!address || typeof address !== 'string') {
+        return '';
+    }
+
+    const trimmed = address.trim().toLowerCase();
+    const at = trimmed.lastIndexOf('@');
+
+    if (at < 0) {
+        return trimmed;
+    }
+
+    return trimmed.slice(at + 1);
+}
+
 function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, serverUrl, onServerUrlChange }) {
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
     const [saveId, setSaveId] = useState('');
     const [currentDID, setCurrentDID] = useState('');
+    const [identityTab, setIdentityTab] = useState('details');
     const [selectedId, setSelectedId] = useState('');
     const [docsString, setDocsString] = useState(null);
     const [docsVersion, setDocsVersion] = useState(1);
@@ -154,6 +170,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [aliasDocs, setAliasDocs] = useState('');
     const [aliasDocsVersion, setAliasDocsVersion] = useState(1);
     const [aliasDocsVersionMax, setAliasDocsVersionMax] = useState(1);
+    const [addressList, setAddressList] = useState({});
+    const [addressInput, setAddressInput] = useState('');
+    const [addressDomain, setAddressDomain] = useState('');
+    const [selectedAddress, setSelectedAddress] = useState('');
+    const [addressDocs, setAddressDocs] = useState('');
     const [registries, setRegistries] = useState(null);
     const [groupList, setGroupList] = useState(null);
     const [groupName, setGroupName] = useState('');
@@ -598,6 +619,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 refreshDmail();
 
                 setTab('identity');
+                setIdentityTab('details');
                 setAssetsTab('schemas');
                 setCredentialTab('held');
                 setDmailTab('inbox');
@@ -607,6 +629,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 setSelectedId('');
                 setCurrentDID('');
                 setNostrKeys(null);
+                setAddressList({});
+                setAddressInput('');
+                setAddressDomain('');
+                setSelectedAddress('');
+                setAddressDocs('');
+                setIdentityTab('details');
                 setNsecString('');
                 setTab('create');
             }
@@ -1128,9 +1156,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function refreshNames() {
         const aliasList = await keymaster.listAliases({ includeIDs: false });
+        const addressList = await keymaster.listAddresses();
         const names = Object.keys(aliasList);
 
         setAliasList(aliasList);
+        setAddressList(addressList);
         setAlias('');
         setAliasDID('');
         setAliasDocs('');
@@ -1237,6 +1267,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
 
         setPollList(pollList);
+
+        if (selectedAddress && !addressList[selectedAddress]) {
+            setSelectedAddress('');
+            setAddressDocs('');
+        }
     }
 
     function getDID(alias) {
@@ -1305,6 +1340,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [aliasList, idList, nameSearch, nameTypeFilter, agentList, vaultList, groupList, schemaList, imageList, fileList, pollList]);
 
+    const filteredAddresses = useMemo(() => {
+        return Object.entries(addressList || {})
+            .sort(([a], [b]) => a.localeCompare(b));
+    }, [addressList]);
+
     async function addAlias() {
         try {
             await keymaster.addAlias(alias, aliasDID);
@@ -1317,6 +1357,139 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     function clearAliasFields() {
         setAlias('');
         setAliasDID('');
+    }
+
+    function clearAddressFields() {
+        setAddressInput('');
+        setAddressDomain('');
+        setSelectedAddress('');
+        setAddressDocs('');
+    }
+
+    async function resolveStoredAddress(domain) {
+        try {
+            const normalizedDomain = parseAddressDomain(domain);
+
+            if (!normalizedDomain) {
+                showAlert('Enter a domain');
+                return;
+            }
+
+            const info = await keymaster.getAddress(normalizedDomain);
+            setAddressDomain(normalizedDomain);
+
+            if (info) {
+                setSelectedAddress(info.address);
+                setAddressInput(info.address);
+                setAddressDocs(JSON.stringify(info, null, 4));
+            }
+            else {
+                setSelectedAddress('');
+                setAddressDocs(JSON.stringify(null, null, 4));
+                showAlert(`No address stored for ${normalizedDomain}`);
+            }
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function selectAddress(address) {
+        const normalizedAddress = address.trim().toLowerCase();
+        setSelectedAddress(normalizedAddress);
+        setAddressInput(normalizedAddress);
+        await resolveStoredAddress(normalizedAddress);
+    }
+
+    async function checkAddressValue() {
+        try {
+            const normalizedAddress = addressInput.trim().toLowerCase();
+
+            if (!normalizedAddress) {
+                showAlert('Enter an address');
+                return;
+            }
+
+            const result = await keymaster.checkAddress(normalizedAddress);
+            setAddressInput(normalizedAddress);
+            setAddressDomain(parseAddressDomain(normalizedAddress));
+            setAddressDocs(JSON.stringify(result, null, 4));
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function importAddressDomain() {
+        try {
+            const normalizedDomain = parseAddressDomain(addressDomain);
+
+            if (!normalizedDomain) {
+                showAlert('Enter a domain');
+                return;
+            }
+
+            const imported = await keymaster.importAddress(normalizedDomain);
+            setAddressDomain(normalizedDomain);
+            setAddressDocs(JSON.stringify(imported, null, 4));
+            await refreshNames();
+
+            const importedAddresses = Object.keys(imported);
+            if (importedAddresses.length > 0) {
+                const importedAddress = importedAddresses[0];
+                setSelectedAddress(importedAddress);
+                setAddressInput(importedAddress);
+                showSuccess(`Imported ${importedAddresses.length} address(es) from ${normalizedDomain}`);
+            }
+            else {
+                showAlert(`No addresses imported from ${normalizedDomain}`);
+            }
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function addAddressValue() {
+        try {
+            const normalizedAddress = addressInput.trim().toLowerCase();
+
+            if (!normalizedAddress) {
+                showAlert('Enter an address');
+                return;
+            }
+
+            await keymaster.addAddress(normalizedAddress);
+            setAddressInput(normalizedAddress);
+            setAddressDomain(parseAddressDomain(normalizedAddress));
+            await refreshNames();
+            await resolveStoredAddress(normalizedAddress);
+            showSuccess(`${normalizedAddress} added`);
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function removeAddressValue(address = selectedAddress || addressInput) {
+        try {
+            const normalizedAddress = address.trim().toLowerCase();
+
+            if (!normalizedAddress) {
+                showAlert('Select an address to remove');
+                return;
+            }
+
+            if (await showConfirm(`Are you sure you want to remove ${normalizedAddress}?`)) {
+                await keymaster.removeAddress(normalizedAddress);
+                if (selectedAddress === normalizedAddress) {
+                    setSelectedAddress('');
+                    setAddressDocs('');
+                }
+                setAddressInput('');
+                setAddressDomain(parseAddressDomain(normalizedAddress));
+                await refreshNames();
+                showSuccess(`${normalizedAddress} removed`);
+            }
+        } catch (error) {
+            showError(error);
+        }
     }
 
     async function cloneAsset() {
@@ -3914,104 +4087,223 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                     </Select>
                                 </Grid>
                             </Grid>
+                            <Box sx={{ mt: 2, mb: 2 }}>
+                                <Tabs
+                                    value={identityTab}
+                                    onChange={(event, newTab) => setIdentityTab(newTab)}
+                                    indicatorColor="primary"
+                                    textColor="primary"
+                                    variant="scrollable"
+                                    scrollButtons="auto"
+                                >
+                                    <Tab key="details" value="details" label={'Details'} icon={<PermIdentity />} />
+                                    <Tab key="addresses" value="addresses" label={'Addresses'} icon={<Badge />} />
+                                </Tabs>
+                            </Box>
                             <p />
-                            <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={showCreate}>
-                                        Create...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={renameId}>
-                                        Rename...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={removeId}>
-                                        Remove...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={backupId}>
-                                        Backup...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={recoverId}>
-                                        Recover...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={rotateKeys}>
-                                        Rotate keys
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={() => openMigrate(selectedId)}>
-                                        Migrate...
-                                    </Button>
-                                </Grid>
-                            </Grid>
-                            <Accordion sx={{ mt: 1 }}>
-                                <AccordionSummary expandIcon={<ExpandMore />} sx={{ flexDirection: 'row-reverse', gap: 1 }}>
-                                    <Typography>Nostr</Typography>
-                                </AccordionSummary>
-                                <AccordionDetails>
-                                    <Grid container spacing={1} sx={{ mb: 1 }}>
+                            {identityTab === 'details' &&
+                                <Box>
+                                    <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                         <Grid item>
-                                            {nostrKeys ?
-                                                <Button variant="contained" color="error" onClick={removeNostr}>
-                                                    Remove Nostr
-                                                </Button>
-                                                :
-                                                <Button variant="contained" color="primary" onClick={addNostr}>
-                                                    Add Nostr
-                                                </Button>
-                                            }
+                                            <Button variant="contained" color="primary" onClick={showCreate}>
+                                                Create...
+                                            </Button>
                                         </Grid>
-                                        {nostrKeys &&
-                                            <Grid item>
-                                                {nsecString ? (
-                                                    <Button variant="contained" color="warning" onClick={hideNsec}>
-                                                        Hide nsec
-                                                    </Button>
-                                                ) : (
-                                                    <Button variant="contained" color="warning" onClick={showNsec}>
-                                                        Show nsec
-                                                    </Button>
-                                                )}
-                                            </Grid>
-                                        }
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={renameId}>
+                                                Rename...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={removeId}>
+                                                Remove...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={backupId}>
+                                                Backup...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={recoverId}>
+                                                Recover...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={rotateKeys}>
+                                                Rotate keys
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={() => openMigrate(selectedId)}>
+                                                Migrate...
+                                            </Button>
+                                        </Grid>
                                     </Grid>
-                                    {nostrKeys &&
-                                        <Box>
-                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                                <strong>npub:</strong> {nostrKeys.npub}
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                                <strong>pubkey:</strong> {nostrKeys.pubkey}
-                                            </Typography>
-                                            {nsecString &&
-                                                <Typography variant="body2" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                                    <strong>nsec:</strong> {nsecString}
-                                                </Typography>
+                                    <Accordion sx={{ mt: 1 }}>
+                                        <AccordionSummary expandIcon={<ExpandMore />} sx={{ flexDirection: 'row-reverse', gap: 1 }}>
+                                            <Typography>Nostr</Typography>
+                                        </AccordionSummary>
+                                        <AccordionDetails>
+                                            <Grid container spacing={1} sx={{ mb: 1 }}>
+                                                <Grid item>
+                                                    {nostrKeys ?
+                                                        <Button variant="contained" color="error" onClick={removeNostr}>
+                                                            Remove Nostr
+                                                        </Button>
+                                                        :
+                                                        <Button variant="contained" color="primary" onClick={addNostr}>
+                                                            Add Nostr
+                                                        </Button>
+                                                    }
+                                                </Grid>
+                                                {nostrKeys &&
+                                                    <Grid item>
+                                                        {nsecString ? (
+                                                            <Button variant="contained" color="warning" onClick={hideNsec}>
+                                                                Hide nsec
+                                                            </Button>
+                                                        ) : (
+                                                            <Button variant="contained" color="warning" onClick={showNsec}>
+                                                                Show nsec
+                                                            </Button>
+                                                        )}
+                                                    </Grid>
+                                                }
+                                            </Grid>
+                                            {nostrKeys &&
+                                                <Box>
+                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                                        <strong>npub:</strong> {nostrKeys.npub}
+                                                    </Typography>
+                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                                        <strong>pubkey:</strong> {nostrKeys.pubkey}
+                                                    </Typography>
+                                                    {nsecString &&
+                                                        <Typography variant="body2" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                                            <strong>nsec:</strong> {nsecString}
+                                                        </Typography>
+                                                    }
+                                                </Box>
                                             }
+                                        </AccordionDetails>
+                                    </Accordion>
+                                    {!widget &&
+                                        <Box>
+                                            <VersionsNavigator
+                                                version={docsVersion}
+                                                maxVersion={docsVersionMax}
+                                                selectVersion={selectDocsVersion}
+                                            />
+                                            <br />
+                                            <textarea
+                                                value={docsString}
+                                                readOnly
+                                                style={{ width: '800px', height: '600px', overflow: 'auto' }}
+                                            />
                                         </Box>
                                     }
-                                </AccordionDetails>
-                            </Accordion>
-                            {!widget &&
+                                </Box>
+                            }
+                            {identityTab === 'addresses' &&
                                 <Box>
-                                    <VersionsNavigator
-                                        version={docsVersion}
-                                        maxVersion={docsVersionMax}
-                                        selectVersion={selectDocsVersion}
-                                    />
-                                    <br />
+                                    <Grid container spacing={1} style={{ marginBottom: '8px' }}>
+                                        <Grid item xs={12} md={5}>
+                                            <TextField
+                                                label="Address"
+                                                size="small"
+                                                fullWidth
+                                                value={addressInput}
+                                                onChange={(e) => setAddressInput(e.target.value)}
+                                                placeholder="name@example.com"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} md={3}>
+                                            <TextField
+                                                label="Domain"
+                                                size="small"
+                                                fullWidth
+                                                value={addressDomain}
+                                                onChange={(e) => setAddressDomain(e.target.value)}
+                                                placeholder="example.com"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} md={4}>
+                                            <Grid container spacing={1}>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={checkAddressValue} disabled={!addressInput.trim()}>
+                                                        Check
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={addAddressValue} disabled={!addressInput.trim()}>
+                                                        Add
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={() => resolveStoredAddress(addressDomain || addressInput)} disabled={!addressDomain.trim() && !addressInput.trim()}>
+                                                        Get
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={importAddressDomain} disabled={!addressDomain.trim()}>
+                                                        Import
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={() => removeAddressValue()} disabled={!selectedAddress && !addressInput.trim()}>
+                                                        Remove
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={clearAddressFields} disabled={!addressInput && !addressDomain && !selectedAddress && !addressDocs}>
+                                                        Clear
+                                                    </Button>
+                                                </Grid>
+                                            </Grid>
+                                        </Grid>
+                                    </Grid>
+                                    <TableContainer component={Paper} style={{ maxHeight: '260px', overflow: 'auto', marginBottom: '8px' }}>
+                                        <Table stickyHeader style={{ width: '100%', tableLayout: 'fixed' }}>
+                                            <colgroup>
+                                                <col />
+                                                <col style={{ width: '220px' }} />
+                                                <col style={{ width: '120px' }} />
+                                            </colgroup>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Address</TableCell>
+                                                    <TableCell>Added</TableCell>
+                                                    <TableCell>Actions</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {filteredAddresses.map(([address, info]) => (
+                                                    <TableRow key={address} selected={address === selectedAddress}>
+                                                        <TableCell>
+                                                            <Typography style={{ fontFamily: 'Courier' }}>
+                                                                {address}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography style={{ fontSize: '.9em', fontFamily: 'Courier' }}>
+                                                                {info.added}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Button variant="contained" color="primary" onClick={() => selectAddress(address)}>
+                                                                Select
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
                                     <textarea
-                                        value={docsString}
+                                        value={addressDocs}
                                         readOnly
-                                        style={{ width: '800px', height: '600px', overflow: 'auto' }}
+                                        style={{ width: '800px', height: '240px', overflow: 'auto' }}
                                     />
                                 </Box>
                             }
