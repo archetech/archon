@@ -1474,11 +1474,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             }
 
             const imported = await keymaster.importAddress(normalizedDomain);
+            await refreshNames();
+            const importedAddresses = Object.keys(imported);
             setAddressDomain(normalizedDomain);
             setAddressDocs(JSON.stringify(imported, null, 4));
-            await refreshNames();
-
-            const importedAddresses = Object.keys(imported);
             if (importedAddresses.length > 0) {
                 const importedAddress = importedAddresses[0];
                 setSelectedAddress(importedAddress);

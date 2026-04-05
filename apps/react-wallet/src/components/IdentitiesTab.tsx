@@ -391,10 +391,10 @@ function IdentitiesTab() {
                 return;
             }
             const imported = await keymaster.importAddress(normalizedDomain);
-            setAddressDomain(normalizedDomain);
-            setAddressDetails(JSON.stringify(imported, null, 4));
             await refreshAddresses();
             const importedAddresses = Object.keys(imported);
+            setAddressDomain(normalizedDomain);
+            setAddressDetails(JSON.stringify(imported, null, 4));
             if (importedAddresses.length > 0) {
                 const importedAddress = importedAddresses[0];
                 setSelectedAddress(importedAddress);
