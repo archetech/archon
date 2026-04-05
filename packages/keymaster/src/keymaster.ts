@@ -96,6 +96,8 @@ function isPrivateHostname(hostname: string): boolean {
 }
 
 const REMOTE_NAME_LOOKUP_TIMEOUT_MS = 2000;
+const ADDRESS_CHALLENGE_RESPONSE_RETRIES = 5;
+const ADDRESS_CHALLENGE_RESPONSE_DELAY_MS = 1000;
 
 function isRemoteNameReference(value: string): boolean {
     if (typeof value !== 'string') {
@@ -1926,19 +1928,34 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     private async createAddressBearerToken(domain: string): Promise<string> {
-        const response = await this.fetchAddressApiResponse(
-            domain,
-            'challenge',
-            undefined,
-            'Failed to fetch address challenge',
-        );
+        let lastError = 'Failed to fetch address challenge';
 
-        const data = await this.getResponseData(response);
-        if (typeof data?.challenge !== 'string') {
-            throw new KeymasterError('Invalid address challenge');
+        for (const endpoint of this.addressApiEndpoints(domain, 'challenge')) {
+            try {
+                const response = await fetch(endpoint);
+
+                if (!response.ok) {
+                    lastError = await this.getResponseError(response, lastError);
+                    continue;
+                }
+
+                const data = await this.getResponseData(response);
+                if (typeof data?.challenge !== 'string') {
+                    lastError = 'Invalid address challenge';
+                    continue;
+                }
+
+                return this.createResponse(data.challenge, {
+                    retries: ADDRESS_CHALLENGE_RESPONSE_RETRIES,
+                    delay: ADDRESS_CHALLENGE_RESPONSE_DELAY_MS,
+                });
+            }
+            catch {
+                lastError = 'Failed to fetch address challenge';
+            }
         }
 
-        return this.createResponse(data.challenge);
+        throw new KeymasterError(lastError);
     }
 
     private collectAddresses(wallet: WalletFile): Record<string, AddressInfo> {

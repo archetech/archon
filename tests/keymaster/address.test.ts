@@ -211,8 +211,11 @@ describe('addAddress', () => {
                 added: '2026-04-04T13:00:00.000Z',
             },
         });
-        expect(keymaster.createResponse).toHaveBeenCalledWith('did:cid:challenge');
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', undefined);
+        expect(keymaster.createResponse).toHaveBeenCalledWith('did:cid:challenge', {
+            retries: 5,
+            delay: 1000,
+        });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge');
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
             2,
             'https://archon.social/names/api/name',
@@ -244,8 +247,47 @@ describe('addAddress', () => {
 
         expect(ok).toBe(true);
         expect(addresses).toStrictEqual({ 'alice@archon.social': { added: '2026-04-04T13:30:00.000Z' } });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', undefined);
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge', undefined);
+        expect(keymaster.createResponse).toHaveBeenCalledWith('did:cid:challenge', {
+            retries: 5,
+            delay: 1000,
+        });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge');
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge');
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(
+            3,
+            'https://archon.social/names/api/name',
+            expect.objectContaining({ method: 'PUT' }),
+        );
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(
+            4,
+            'https://archon.social/api/name',
+            expect.objectContaining({ method: 'PUT' }),
+        );
+    });
+
+    it('should ignore invalid drawbridge challenge responses and fall back to direct Herald', async () => {
+        await keymaster.createId('Alice');
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date('2026-04-04T13:45:00.000Z'));
+
+        jest.spyOn(keymaster, 'createResponse').mockResolvedValue('did:cid:response');
+        jest.spyOn(globalThis, 'fetch')
+            .mockResolvedValueOnce(mockFetchResponse(true, '<html>Name Service</html>', 200, 'text/html; charset=utf-8'))
+            .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge' }))
+            .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404))
+            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }));
+
+        const ok = await keymaster.addAddress('alice@archon.social');
+        const addresses = await keymaster.listAddresses();
+
+        expect(ok).toBe(true);
+        expect(addresses).toStrictEqual({ 'alice@archon.social': { added: '2026-04-04T13:45:00.000Z' } });
+        expect(keymaster.createResponse).toHaveBeenCalledWith('did:cid:challenge', {
+            retries: 5,
+            delay: 1000,
+        });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge');
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge');
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
             3,
             'https://archon.social/names/api/name',
@@ -283,7 +325,11 @@ describe('removeAddress', () => {
         expect(ok).toBe(true);
         expect(addresses).toStrictEqual({});
         expect(updatedWallet.ids.Alice.addresses).toStrictEqual({});
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', undefined);
+        expect(keymaster.createResponse).toHaveBeenCalledWith('did:cid:challenge', {
+            retries: 5,
+            delay: 1000,
+        });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge');
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
             2,
             'https://archon.social/names/api/name',
@@ -364,8 +410,12 @@ describe('removeAddress', () => {
         const ok = await keymaster.removeAddress('alice@archon.social');
 
         expect(ok).toBe(true);
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', undefined);
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge', undefined);
+        expect(keymaster.createResponse).toHaveBeenCalledWith('did:cid:challenge', {
+            retries: 5,
+            delay: 1000,
+        });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge');
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge');
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
             3,
             'https://archon.social/names/api/name',
