@@ -59,6 +59,42 @@ describe('listAddresses', () => {
 
         expect(addresses).toStrictEqual({});
     });
+
+    it('should return only addresses for the current ID', async () => {
+        await keymaster.createId('Alice');
+        await keymaster.createId('Bob');
+
+        let walletData = await keymaster.loadWallet();
+        walletData.ids.Alice.addresses = {
+            'archon.social': {
+                name: 'alice',
+                added: '2026-04-04T13:00:00.000Z',
+            },
+        };
+        walletData.ids.Bob.addresses = {
+            '4tress.org': {
+                name: 'bob',
+                added: '2026-04-04T14:00:00.000Z',
+            },
+        };
+        await keymaster.saveWallet(walletData, true);
+
+        await keymaster.setCurrentId('Alice');
+        let addresses = await keymaster.listAddresses();
+        expect(addresses).toStrictEqual({
+            'alice@archon.social': {
+                added: '2026-04-04T13:00:00.000Z',
+            },
+        });
+
+        await keymaster.setCurrentId('Bob');
+        addresses = await keymaster.listAddresses();
+        expect(addresses).toStrictEqual({
+            'bob@4tress.org': {
+                added: '2026-04-04T14:00:00.000Z',
+            },
+        });
+    });
 });
 
 describe('getAddress', () => {

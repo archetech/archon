@@ -640,13 +640,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 setDocsVersion(versions);
                 setDocsVersionMax(versions);
 
-                refreshNames();
-                refreshHeld();
-                refreshIssued();
-                refreshDmail();
+                await refreshNames();
+                await refreshHeld();
+                await refreshIssued();
+                await refreshDmail();
 
                 setTab('identity');
-                setIdentityTab('details');
                 setAssetsTab('schemas');
                 setCredentialTab('held');
                 setDmailTab('inbox');
@@ -694,7 +693,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         try {
             setSelectedId(id);
             await keymaster.setCurrentId(id);
-            refreshAll();
+            await refreshAll();
         } catch (error) {
             showError(error);
         }
@@ -1191,6 +1190,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         setAlias('');
         setAliasDID('');
         setAliasDocs('');
+        setAddressInput('');
+        setAddressDomain('');
+        setSelectedAddress('');
+        setAddressDocs('');
 
         const docList = {};
         const agentList = await keymaster.listIds();
@@ -1295,10 +1298,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
         setPollList(pollList);
 
-        if (selectedAddress && !addressList[selectedAddress]) {
-            setSelectedAddress('');
-            setAddressDocs('');
-        }
     }
 
     function getDID(alias) {
