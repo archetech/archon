@@ -1958,13 +1958,11 @@ export default class Keymaster implements KeymasterInterface {
         throw new KeymasterError(lastError);
     }
 
-    private collectAddresses(wallet: WalletFile): Record<string, AddressInfo> {
+    private collectAddresses(id: IDInfo | undefined): Record<string, AddressInfo> {
         const addresses: Record<string, AddressInfo> = {};
 
-        for (const id of Object.values(wallet.ids || {})) {
-            for (const [domain, info] of Object.entries(id.addresses || {})) {
-                addresses[`${info.name}@${domain}`] = { added: info.added };
-            }
+        for (const [domain, info] of Object.entries(id?.addresses || {})) {
+            addresses[`${info.name}@${domain}`] = { added: info.added };
         }
 
         return addresses;
@@ -1972,7 +1970,12 @@ export default class Keymaster implements KeymasterInterface {
 
     async listAddresses(): Promise<Record<string, AddressInfo>> {
         const wallet = await this.loadWallet();
-        return this.collectAddresses(wallet);
+
+        if (!wallet.current) {
+            return {};
+        }
+
+        return this.collectAddresses(wallet.ids[wallet.current]);
     }
 
     async getAddress(domain: string): Promise<ResolvedAddressInfo | null> {

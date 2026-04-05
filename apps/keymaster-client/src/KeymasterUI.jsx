@@ -129,11 +129,61 @@ function formatBytes(bytes) {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
+function parseAddressDomain(address) {
+    if (!address || typeof address !== 'string') {
+        return '';
+    }
+
+    const trimmed = address.trim().toLowerCase();
+    const at = trimmed.lastIndexOf('@');
+
+    if (at < 0) {
+        return trimmed;
+    }
+
+    return trimmed.slice(at + 1);
+}
+
+function parseAddressName(address) {
+    if (!address || typeof address !== 'string') {
+        return '';
+    }
+
+    const trimmed = address.trim().toLowerCase();
+    const at = trimmed.lastIndexOf('@');
+
+    if (at < 0) {
+        return trimmed;
+    }
+
+    return trimmed.slice(0, at);
+}
+
+function composeAddress(name, domain) {
+    const normalizedName = parseAddressName(name);
+    const normalizedDomain = parseAddressDomain(domain);
+
+    if (!normalizedName || !normalizedDomain) {
+        return '';
+    }
+
+    return `${normalizedName}@${normalizedDomain}`;
+}
+
+function formatAddedDate(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    return value.slice(0, 10);
+}
+
 function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, serverUrl, onServerUrlChange }) {
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
     const [saveId, setSaveId] = useState('');
     const [currentDID, setCurrentDID] = useState('');
+    const [identityTab, setIdentityTab] = useState('details');
     const [selectedId, setSelectedId] = useState('');
     const [docsString, setDocsString] = useState(null);
     const [docsVersion, setDocsVersion] = useState(1);
@@ -154,6 +204,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [aliasDocs, setAliasDocs] = useState('');
     const [aliasDocsVersion, setAliasDocsVersion] = useState(1);
     const [aliasDocsVersionMax, setAliasDocsVersionMax] = useState(1);
+    const [addressList, setAddressList] = useState({});
+    const [addressInput, setAddressInput] = useState('');
+    const [addressDomain, setAddressDomain] = useState('');
+    const [selectedAddress, setSelectedAddress] = useState('');
+    const [addressDocs, setAddressDocs] = useState('');
+    const [addressBusy, setAddressBusy] = useState(false);
     const [registries, setRegistries] = useState(null);
     const [groupList, setGroupList] = useState(null);
     const [groupName, setGroupName] = useState('');
@@ -275,6 +331,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [eligiblePolls, setEligiblePolls] = useState({});
     const [migrateTarget, setMigrateTarget] = useState('');
     const [showMigrateDialog, setShowMigrateDialog] = useState(false);
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [nameSearch, setNameSearch] = useState('');
     const [nameTypeFilter, setNameTypeFilter] = useState('all');
     const [serverVersion, setServerVersion] = useState('');
@@ -592,10 +649,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 setDocsVersion(versions);
                 setDocsVersionMax(versions);
 
-                refreshNames();
-                refreshHeld();
-                refreshIssued();
-                refreshDmail();
+                await refreshNames();
+                await refreshHeld();
+                await refreshIssued();
+                await refreshDmail();
 
                 setTab('identity');
                 setAssetsTab('schemas');
@@ -607,6 +664,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 setSelectedId('');
                 setCurrentDID('');
                 setNostrKeys(null);
+                setAddressList({});
+                setAddressInput('');
+                setAddressDomain('');
+                setSelectedAddress('');
+                setAddressDocs('');
+                setIdentityTab('details');
                 setNsecString('');
                 setTab('create');
             }
@@ -639,7 +702,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         try {
             setSelectedId(id);
             await keymaster.setCurrentId(id);
-            refreshAll();
+            await refreshAll();
         } catch (error) {
             showError(error);
         }
@@ -788,16 +851,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         setSaveId(currentId);
         setCurrentId('');
         setTab('create');
+        setShowCreateDialog(true);
     }
 
     async function cancelCreate() {
+        setShowCreateDialog(false);
         setCurrentId(saveId);
-        setTab('identity');
+        setTab(saveId ? 'identity' : 'create');
     }
 
     async function createId() {
         try {
             await keymaster.createId(newName, { registry });
+            setShowCreateDialog(false);
             refreshAll();
         } catch (error) {
             showError(error);
@@ -1128,12 +1194,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function refreshNames() {
         const aliasList = await keymaster.listAliases({ includeIDs: false });
+        const addressList = await keymaster.listAddresses();
         const names = Object.keys(aliasList);
 
         setAliasList(aliasList);
+        setAddressList(addressList);
         setAlias('');
         setAliasDID('');
         setAliasDocs('');
+        setAddressInput('');
+        setAddressDomain('');
+        setSelectedAddress('');
+        setAddressDocs('');
 
         const docList = {};
         const agentList = await keymaster.listIds();
@@ -1237,6 +1309,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
 
         setPollList(pollList);
+
     }
 
     function getDID(alias) {
@@ -1305,6 +1378,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [aliasList, idList, nameSearch, nameTypeFilter, agentList, vaultList, groupList, schemaList, imageList, fileList, pollList]);
 
+    const filteredAddresses = useMemo(() => {
+        return Object.entries(addressList || {})
+            .sort(([a], [b]) => a.localeCompare(b));
+    }, [addressList]);
+
     async function addAlias() {
         try {
             await keymaster.addAlias(alias, aliasDID);
@@ -1317,6 +1395,154 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     function clearAliasFields() {
         setAlias('');
         setAliasDID('');
+    }
+
+    function clearAddressFields() {
+        setAddressInput('');
+        setAddressDomain('');
+        setSelectedAddress('');
+        setAddressDocs('');
+    }
+
+    async function resolveStoredAddress(domain) {
+        setAddressBusy(true);
+        try {
+            const normalizedDomain = parseAddressDomain(domain);
+
+            if (!normalizedDomain) {
+                showAlert('Enter a domain');
+                return;
+            }
+
+            const info = await keymaster.getAddress(normalizedDomain);
+            setAddressDomain(normalizedDomain);
+
+            if (info) {
+                setSelectedAddress(info.address);
+                setAddressInput(info.name);
+                setAddressDocs(JSON.stringify(info, null, 4));
+            }
+            else {
+                setSelectedAddress('');
+                setAddressDocs(JSON.stringify(null, null, 4));
+                showAlert(`No address stored for ${normalizedDomain}`);
+            }
+        } catch (error) {
+            showError(error);
+        } finally {
+            setAddressBusy(false);
+        }
+    }
+
+    async function selectAddress(address) {
+        const normalizedAddress = address.trim().toLowerCase();
+        setSelectedAddress(normalizedAddress);
+        setAddressInput(parseAddressName(normalizedAddress));
+        setAddressDomain(parseAddressDomain(normalizedAddress));
+        await resolveStoredAddress(normalizedAddress);
+    }
+
+    async function checkAddressValue() {
+        setAddressBusy(true);
+        try {
+            const normalizedAddress = composeAddress(addressInput, addressDomain);
+
+            if (!normalizedAddress) {
+                showAlert('Enter a name and domain');
+                return;
+            }
+
+            const result = await keymaster.checkAddress(normalizedAddress);
+            setAddressInput(parseAddressName(normalizedAddress));
+            setAddressDomain(parseAddressDomain(normalizedAddress));
+            setAddressDocs(JSON.stringify(result, null, 4));
+        } catch (error) {
+            showError(error);
+        } finally {
+            setAddressBusy(false);
+        }
+    }
+
+    async function importAddressDomain() {
+        setAddressBusy(true);
+        try {
+            const normalizedDomain = parseAddressDomain(addressDomain);
+
+            if (!normalizedDomain) {
+                showAlert('Enter a domain');
+                return;
+            }
+
+            const imported = await keymaster.importAddress(normalizedDomain);
+            await refreshNames();
+            const importedAddresses = Object.keys(imported);
+            setAddressDomain(normalizedDomain);
+            setAddressDocs(JSON.stringify(imported, null, 4));
+            if (importedAddresses.length > 0) {
+                const importedAddress = importedAddresses[0];
+                setSelectedAddress(importedAddress);
+                setAddressInput(parseAddressName(importedAddress));
+                showSuccess(`Imported ${importedAddresses.length} address(es) from ${normalizedDomain}`);
+            }
+            else {
+                showAlert(`No addresses imported from ${normalizedDomain}`);
+            }
+        } catch (error) {
+            showError(error);
+        } finally {
+            setAddressBusy(false);
+        }
+    }
+
+    async function addAddressValue() {
+        setAddressBusy(true);
+        try {
+            const normalizedAddress = composeAddress(addressInput, addressDomain);
+
+            if (!normalizedAddress) {
+                showAlert('Enter a name and domain');
+                return;
+            }
+
+            await keymaster.addAddress(normalizedAddress);
+            setAddressInput(parseAddressName(normalizedAddress));
+            setAddressDomain(parseAddressDomain(normalizedAddress));
+            await refreshNames();
+            await resolveStoredAddress(normalizedAddress);
+            showSuccess(`${normalizedAddress} added`);
+        } catch (error) {
+            showError(error);
+        } finally {
+            setAddressBusy(false);
+        }
+    }
+
+    async function removeAddressValue(address = selectedAddress || composeAddress(addressInput, addressDomain)) {
+        setAddressBusy(true);
+        try {
+            const normalizedAddress = address.trim().toLowerCase();
+
+            if (!normalizedAddress) {
+                showAlert('Select an address or enter a name and domain');
+                return;
+            }
+
+            if (await showConfirm(`Are you sure you want to remove ${normalizedAddress}?`)) {
+                await keymaster.removeAddress(normalizedAddress);
+                if (selectedAddress === normalizedAddress) {
+                    setSelectedAddress('');
+                    setAddressDocs('');
+                }
+                setAddressInput('');
+                setAddressDomain(parseAddressDomain(normalizedAddress));
+                await refreshNames();
+                showSuccess(`${normalizedAddress} removed`);
+            }
+        } catch (error) {
+            showError(error);
+        } finally {
+            setAddressBusy(false);
+        }
     }
 
     async function cloneAsset() {
@@ -3722,6 +3948,29 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 </DialogActions>
             </Dialog>
 
+            <Dialog open={showCreateDialog} onClose={cancelCreate}>
+                <DialogTitle>Create ID</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: '320px' }}>
+                        <TextField
+                            label="Name"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value.trim())}
+                            fullWidth
+                            autoFocus
+                            inputProps={{ maxLength: 30 }}
+                        />
+                        <RegistrySelect />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={cancelCreate}>Cancel</Button>
+                    <Button variant="contained" onClick={createId} disabled={!newName || !registry}>
+                        Create
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <Dialog open={showCloneDialog} onClose={closeClone}>
                 <DialogTitle>Clone {selectedName}</DialogTitle>
                 <DialogContent>
@@ -3914,50 +4163,182 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                     </Select>
                                 </Grid>
                             </Grid>
+                            <Box sx={{ mt: 2, mb: 2 }}>
+                                <Tabs
+                                    value={identityTab}
+                                    onChange={(event, newTab) => setIdentityTab(newTab)}
+                                    indicatorColor="primary"
+                                    textColor="primary"
+                                    variant="scrollable"
+                                    scrollButtons="auto"
+                                >
+                                    <Tab key="details" value="details" label={'Details'} icon={<PermIdentity />} />
+                                    <Tab key="addresses" value="addresses" label={'Addresses'} icon={<Badge />} />
+                                    <Tab key="nostr" value="nostr" label={'Nostr'} icon={<Login />} />
+                                </Tabs>
+                            </Box>
                             <p />
-                            <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={showCreate}>
-                                        Create...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={renameId}>
-                                        Rename...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={removeId}>
-                                        Remove...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={backupId}>
-                                        Backup...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={recoverId}>
-                                        Recover...
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={rotateKeys}>
-                                        Rotate keys
-                                    </Button>
-                                </Grid>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={() => openMigrate(selectedId)}>
-                                        Migrate...
-                                    </Button>
-                                </Grid>
-                            </Grid>
-                            <Accordion sx={{ mt: 1 }}>
-                                <AccordionSummary expandIcon={<ExpandMore />} sx={{ flexDirection: 'row-reverse', gap: 1 }}>
-                                    <Typography>Nostr</Typography>
-                                </AccordionSummary>
-                                <AccordionDetails>
-                                    <Grid container spacing={1} sx={{ mb: 1 }}>
+                            {identityTab === 'details' &&
+                                <Box>
+                                    <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={showCreate}>
+                                                Create...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={renameId}>
+                                                Rename...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={removeId}>
+                                                Remove...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={backupId}>
+                                                Backup...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={recoverId}>
+                                                Recover...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={rotateKeys}>
+                                                Rotate keys
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
+                                            <Button variant="contained" color="primary" onClick={() => openMigrate(selectedId)}>
+                                                Migrate...
+                                            </Button>
+                                        </Grid>
+                                    </Grid>
+                                    {!widget &&
+                                        <Box>
+                                            <VersionsNavigator
+                                                version={docsVersion}
+                                                maxVersion={docsVersionMax}
+                                                selectVersion={selectDocsVersion}
+                                            />
+                                            <br />
+                                            <textarea
+                                                value={docsString}
+                                                readOnly
+                                                style={{ width: '800px', height: '600px', overflow: 'auto' }}
+                                            />
+                                        </Box>
+                                    }
+                                </Box>
+                            }
+                            {identityTab === 'addresses' &&
+                                <Box sx={{ width: '800px', maxWidth: '100%' }}>
+                                    <Grid container spacing={1} style={{ marginBottom: '8px' }}>
+                                        <Grid item xs={12} md={5}>
+                                            <TextField
+                                                label="Name"
+                                                size="small"
+                                                fullWidth
+                                                value={addressInput}
+                                                onChange={(e) => setAddressInput(e.target.value)}
+                                                placeholder="name"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} md={3}>
+                                            <TextField
+                                                label="Domain"
+                                                size="small"
+                                                fullWidth
+                                                value={addressDomain}
+                                                onChange={(e) => setAddressDomain(e.target.value)}
+                                                placeholder="example.com"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} md={4}>
+                                            <Grid container spacing={1}>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={checkAddressValue} disabled={addressBusy || !addressInput.trim() || !addressDomain.trim()}>
+                                                        Check
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={addAddressValue} disabled={addressBusy || !addressInput.trim() || !addressDomain.trim()}>
+                                                        Add
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={() => resolveStoredAddress(addressDomain)} disabled={addressBusy || !addressDomain.trim()}>
+                                                        Get
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={importAddressDomain} disabled={addressBusy || !addressDomain.trim()}>
+                                                        Import
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={() => removeAddressValue()} disabled={addressBusy || (!selectedAddress && (!addressInput.trim() || !addressDomain.trim()))}>
+                                                        Remove
+                                                    </Button>
+                                                </Grid>
+                                                <Grid item>
+                                                    <Button variant="contained" color="primary" onClick={clearAddressFields} disabled={addressBusy || (!addressInput && !addressDomain && !selectedAddress && !addressDocs)}>
+                                                        Clear
+                                                    </Button>
+                                                </Grid>
+                                            </Grid>
+                                        </Grid>
+                                    </Grid>
+                                    <TableContainer component={Paper} style={{ maxHeight: '260px', overflow: 'auto', marginBottom: '8px' }}>
+                                        <Table stickyHeader style={{ width: '100%', tableLayout: 'fixed' }}>
+                                            <colgroup>
+                                                <col />
+                                                <col style={{ width: '220px' }} />
+                                                <col style={{ width: '120px' }} />
+                                            </colgroup>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Address</TableCell>
+                                                    <TableCell>Added</TableCell>
+                                                    <TableCell>Actions</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {filteredAddresses.map(([address, info]) => (
+                                                    <TableRow key={address} selected={address === selectedAddress}>
+                                                        <TableCell>
+                                                            <Typography style={{ fontFamily: 'Courier' }}>
+                                                                {address}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography style={{ fontSize: '.9em', fontFamily: 'Courier' }}>
+                                                                {formatAddedDate(info.added)}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Button variant="contained" color="primary" onClick={() => selectAddress(address)}>
+                                                                Select
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                    <textarea
+                                        value={addressDocs}
+                                        readOnly
+                                        style={{ width: '100%', height: '240px', overflow: 'auto' }}
+                                    />
+                                </Box>
+                            }
+                            {identityTab === 'nostr' &&
+                                <Box sx={{ width: '800px', maxWidth: '100%' }}>
+                                    <Grid container spacing={1} sx={{ mb: 2 }}>
                                         <Grid item>
                                             {nostrKeys ?
                                                 <Button variant="contained" color="error" onClick={removeNostr}>
@@ -3983,12 +4364,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             </Grid>
                                         }
                                     </Grid>
-                                    {nostrKeys &&
+                                    {nostrKeys ?
                                         <Box>
-                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', mb: 1 }}>
                                                 <strong>npub:</strong> {nostrKeys.npub}
                                             </Typography>
-                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', mb: 1 }}>
                                                 <strong>pubkey:</strong> {nostrKeys.pubkey}
                                             </Typography>
                                             {nsecString &&
@@ -3997,22 +4378,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 </Typography>
                                             }
                                         </Box>
+                                        :
+                                        <Typography variant="body2" color="text.secondary">
+                                            No Nostr keys are configured for this identity yet.
+                                        </Typography>
                                     }
-                                </AccordionDetails>
-                            </Accordion>
-                            {!widget &&
-                                <Box>
-                                    <VersionsNavigator
-                                        version={docsVersion}
-                                        maxVersion={docsVersionMax}
-                                        selectVersion={selectDocsVersion}
-                                    />
-                                    <br />
-                                    <textarea
-                                        value={docsString}
-                                        readOnly
-                                        style={{ width: '800px', height: '600px', overflow: 'auto' }}
-                                    />
                                 </Box>
                             }
                         </Box>
@@ -6204,26 +6574,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                         <Grid>
                             <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                 <Grid item>
-                                    <TextField
-                                        label="Name"
-                                        style={{ width: '300px' }}
-                                        value={newName}
-                                        onChange={(e) => setNewName(e.target.value.trim())}
-                                        fullWidth
-                                        margin="normal"
-                                        inputProps={{ maxLength: 30 }}
-                                    />
-                                </Grid>
-                                <Grid item>
-                                    <RegistrySelect />
+                                    <Button variant="contained" color="primary" onClick={() => setShowCreateDialog(true)}>
+                                        Create ID...
+                                    </Button>
                                 </Grid>
                             </Grid>
                             <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={createId} disabled={!newName || !registry}>
-                                        Create
-                                    </Button>
-                                </Grid>
                                 <Grid item>
                                     <Button variant="contained" color="primary" onClick={cancelCreate} disabled={!saveId}>
                                         Cancel
