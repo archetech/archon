@@ -170,6 +170,14 @@ function composeAddress(name, domain) {
     return `${normalizedName}@${normalizedDomain}`;
 }
 
+function formatAddedDate(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    return value.slice(0, 10);
+}
+
 function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, serverUrl, onServerUrlChange }) {
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
@@ -4282,7 +4290,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                         </TableCell>
                                                         <TableCell>
                                                             <Typography style={{ fontSize: '.9em', fontFamily: 'Courier' }}>
-                                                                {info.added}
+                                                                {formatAddedDate(info.added)}
                                                             </Typography>
                                                         </TableCell>
                                                         <TableCell>

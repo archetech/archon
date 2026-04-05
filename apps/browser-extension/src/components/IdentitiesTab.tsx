@@ -33,6 +33,10 @@ function composeAddress(name: string, domain: string): string {
     return `${normalizedName}@${normalizedDomain}`;
 }
 
+function formatAddedDate(value: string): string {
+    return typeof value === "string" ? value.slice(0, 10) : "";
+}
+
 function IdentitiesTab() {
     const [identityTab, setIdentityTab] = useState<"details" | "addresses" | "nostr">("details");
     const [name, setName] = useState<string>("");
@@ -641,7 +645,7 @@ function IdentitiesTab() {
                                         {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
                                             <TableRow key={address} selected={address === selectedAddress}>
                                                 <TableCell sx={{ fontFamily: 'monospace' }}>{address}</TableCell>
-                                                <TableCell sx={{ fontFamily: 'monospace' }}>{info.added}</TableCell>
+                                                <TableCell sx={{ fontFamily: 'monospace' }}>{formatAddedDate(info.added)}</TableCell>
                                                 <TableCell><Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button></TableCell>
                                             </TableRow>
                                         ))}
