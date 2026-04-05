@@ -11,7 +11,6 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { requestBrowserRefresh } from '../utils/utils'
-import CopyResolveDID from "./CopyResolveDID";
 
 const DropDownID = () => {
     const {
@@ -75,8 +74,6 @@ const DropDownID = () => {
     return (
         currentId && (
             <Box display="flex" alignItems="center" gap={0}>
-                <CopyResolveDID did={currentDID} />
-
                 {multipleIds ? (
                     <>
                         <Button
@@ -85,8 +82,13 @@ const DropDownID = () => {
                             endIcon={<ArrowDropDown />}
                             sx={{
                                 textTransform: "none",
+                                fontSize: "1.25rem",
+                                fontWeight: 600,
+                                lineHeight: 1.2,
+                                px: 1.5,
+                                py: 0.75,
                             }}
-                            size="small"
+                            size="medium"
                             variant="outlined"
                         >
                             {truncatedId}
@@ -117,7 +119,9 @@ const DropDownID = () => {
                         </Menu>
                     </>
                 ) : (
-                    <Box className="drop-down-id-box">{truncatedId}</Box>
+                    <Box className="drop-down-id-box" sx={{ fontSize: "1.25rem", fontWeight: 600, lineHeight: 1.2 }}>
+                        {truncatedId}
+                    </Box>
                 )}
             </Box>
         )
