@@ -4141,6 +4141,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 >
                                     <Tab key="details" value="details" label={'Details'} icon={<PermIdentity />} />
                                     <Tab key="addresses" value="addresses" label={'Addresses'} icon={<Badge />} />
+                                    <Tab key="nostr" value="nostr" label={'Nostr'} icon={<Login />} />
                                 </Tabs>
                             </Box>
                             <p />
@@ -4183,54 +4184,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             </Button>
                                         </Grid>
                                     </Grid>
-                                    <Accordion sx={{ mt: 1 }}>
-                                        <AccordionSummary expandIcon={<ExpandMore />} sx={{ flexDirection: 'row-reverse', gap: 1 }}>
-                                            <Typography>Nostr</Typography>
-                                        </AccordionSummary>
-                                        <AccordionDetails>
-                                            <Grid container spacing={1} sx={{ mb: 1 }}>
-                                                <Grid item>
-                                                    {nostrKeys ?
-                                                        <Button variant="contained" color="error" onClick={removeNostr}>
-                                                            Remove Nostr
-                                                        </Button>
-                                                        :
-                                                        <Button variant="contained" color="primary" onClick={addNostr}>
-                                                            Add Nostr
-                                                        </Button>
-                                                    }
-                                                </Grid>
-                                                {nostrKeys &&
-                                                    <Grid item>
-                                                        {nsecString ? (
-                                                            <Button variant="contained" color="warning" onClick={hideNsec}>
-                                                                Hide nsec
-                                                            </Button>
-                                                        ) : (
-                                                            <Button variant="contained" color="warning" onClick={showNsec}>
-                                                                Show nsec
-                                                            </Button>
-                                                        )}
-                                                    </Grid>
-                                                }
-                                            </Grid>
-                                            {nostrKeys &&
-                                                <Box>
-                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                                        <strong>npub:</strong> {nostrKeys.npub}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                                        <strong>pubkey:</strong> {nostrKeys.pubkey}
-                                                    </Typography>
-                                                    {nsecString &&
-                                                        <Typography variant="body2" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                                            <strong>nsec:</strong> {nsecString}
-                                                        </Typography>
-                                                    }
-                                                </Box>
-                                            }
-                                        </AccordionDetails>
-                                    </Accordion>
                                     {!widget &&
                                         <Box>
                                             <VersionsNavigator
@@ -4348,6 +4301,55 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         readOnly
                                         style={{ width: '100%', height: '240px', overflow: 'auto' }}
                                     />
+                                </Box>
+                            }
+                            {identityTab === 'nostr' &&
+                                <Box sx={{ width: '800px', maxWidth: '100%' }}>
+                                    <Grid container spacing={1} sx={{ mb: 2 }}>
+                                        <Grid item>
+                                            {nostrKeys ?
+                                                <Button variant="contained" color="error" onClick={removeNostr}>
+                                                    Remove Nostr
+                                                </Button>
+                                                :
+                                                <Button variant="contained" color="primary" onClick={addNostr}>
+                                                    Add Nostr
+                                                </Button>
+                                            }
+                                        </Grid>
+                                        {nostrKeys &&
+                                            <Grid item>
+                                                {nsecString ? (
+                                                    <Button variant="contained" color="warning" onClick={hideNsec}>
+                                                        Hide nsec
+                                                    </Button>
+                                                ) : (
+                                                    <Button variant="contained" color="warning" onClick={showNsec}>
+                                                        Show nsec
+                                                    </Button>
+                                                )}
+                                            </Grid>
+                                        }
+                                    </Grid>
+                                    {nostrKeys ?
+                                        <Box>
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', mb: 1 }}>
+                                                <strong>npub:</strong> {nostrKeys.npub}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', mb: 1 }}>
+                                                <strong>pubkey:</strong> {nostrKeys.pubkey}
+                                            </Typography>
+                                            {nsecString &&
+                                                <Typography variant="body2" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                                    <strong>nsec:</strong> {nsecString}
+                                                </Typography>
+                                            }
+                                        </Box>
+                                        :
+                                        <Typography variant="body2" color="text.secondary">
+                                            No Nostr keys are configured for this identity yet.
+                                        </Typography>
+                                    }
                                 </Box>
                             }
                         </Box>
