@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { Box, Button, MenuItem, Paper, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Paper, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
 import { Badge, Login, PermIdentity } from "@mui/icons-material";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
@@ -10,7 +10,7 @@ import TextInputModal from "../modals/TextInputModal";
 import SelectInputModal from "../modals/SelectInputModal";
 import { useThemeContext } from "../contexts/ContextProviders";
 import { useVariablesContext } from "../contexts/VariablesProvider";
-import type { AddressCheckResult, AddressInfo, NostrKeys, ResolvedAddressInfo } from "@didcid/keymaster/types";
+import type { AddressCheckResult, AddressInfo, NostrKeys } from "@didcid/keymaster/types";
 
 function parseAddressDomain(address: string): string {
     const trimmed = address.trim().toLowerCase();
@@ -47,6 +47,7 @@ function IdentitiesTab() {
     const [nostrKeys, setNostrKeys] = useState<NostrKeys | null>(null);
     const [removeNostrModal, setRemoveNostrModal] = useState<boolean>(false);
     const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
+    const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
     const [nsecValue, setNsecValue] = useState<string | null>(null);
     const [currentIdDocs, setCurrentIdDocs] = useState<Record<string, unknown> | null>(null);
     const [addressList, setAddressList] = useState<Record<string, AddressInfo>>({});
@@ -72,19 +73,29 @@ function IdentitiesTab() {
 
     const handleCreateId = async () => {
         if (!keymaster) {
-            return;
+            return false;
         }
         if (!name.trim()) {
-            return;
+            return false;
         }
         try {
             await keymaster.createId(name.trim(), { registry });
             await resetCurrentID();
             setName("");
+            return true;
         } catch (error: any) {
             setError(error);
+            return false;
         }
     };
+
+    function openCreateModal() {
+        setCreateModalOpen(true);
+    }
+
+    function closeCreateModal() {
+        setCreateModalOpen(false);
+    }
 
     function handleRenameId() {
         setRenameModalOpen(true);
@@ -497,43 +508,57 @@ function IdentitiesTab() {
                 onClose={() => setMigrateOpen(false)}
             />
 
-            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0, width: isTabletUp ? '80%' : '100%' }}>
-                <Box sx={{ display: 'flex', gap: 0, width: '100%', flexWrap: 'nowrap', flexDirection: 'row' }}>
-                    <TextField
-                        label="Create ID"
-                        variant="outlined"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        size="small"
-                        className="text-field name"
-                        slotProps={{
-                            htmlInput: {
-                                maxLength: 30,
-                            },
-                        }}
-                    />
+            <Dialog open={createModalOpen} onClose={closeCreateModal} fullWidth maxWidth="sm">
+                <DialogTitle>Create Identity</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                        <TextField
+                            label="Name"
+                            variant="outlined"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            slotProps={{
+                                htmlInput: {
+                                    maxLength: 30,
+                                },
+                            }}
+                        />
 
-                    <Select
-                        value={registries.includes(registry) ? registry : ""}
-                        onChange={(e) => setRegistry(e.target.value)}
-                        size="small"
-                        variant="outlined"
-                        className="select-small"
-                    >
-                        {registries.map((r) => (
-                            <MenuItem key={r} value={r}>
-                                {r}
-                            </MenuItem>
-                        ))}
-                    </Select>
-
+                        <Select
+                            value={registries.includes(registry) ? registry : ""}
+                            onChange={(e) => setRegistry(e.target.value)}
+                            size="small"
+                            variant="outlined"
+                        >
+                            {registries.map((r) => (
+                                <MenuItem key={r} value={r}>
+                                    {r}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeCreateModal}>Cancel</Button>
                     <Button
                         variant="contained"
-                        onClick={handleCreateId}
-                        size="small"
-                        className="button-right"
+                        onClick={async () => {
+                            const ok = await handleCreateId();
+                            if (ok) {
+                                closeCreateModal();
+                            }
+                        }}
+                        disabled={!name.trim() || !registry}
                     >
                         Create
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0, width: isTabletUp ? '80%' : '100%' }}>
+                <Box sx={{ display: 'flex', gap: 1, width: '100%', flexWrap: 'wrap', flexDirection: 'row' }}>
+                    <Button variant="contained" onClick={openCreateModal}>
+                        Create ID
                     </Button>
                 </Box>
                 {currentId && (
@@ -589,31 +614,31 @@ function IdentitiesTab() {
                     </Box>
                 )}
                 {currentId && (
-                <Box sx={{ mt: 2, width: '100%' }}>
-                    <Tabs
-                        value={identityTab}
+                    <Box sx={{ mt: 2, width: '100%' }}>
+                        <Tabs
+                            value={identityTab}
                             onChange={(_event, newValue) => setIdentityTab(newValue)}
                             variant="scrollable"
                             scrollButtons="auto"
-                    >
-                        <Tab value="details" label="Details" icon={<PermIdentity />} iconPosition="top" />
-                        <Tab value="addresses" label="Addresses" icon={<Badge />} iconPosition="top" />
-                        <Tab value="nostr" label="Nostr" icon={<Login />} iconPosition="top" />
-                    </Tabs>
-                    {identityTab === "details" && (
-                        <Box sx={{ mt: 2, width: '100%', maxWidth: isTabletUp ? '80%' : '100%' }}>
-                            <Paper variant="outlined" sx={{ p: 2, overflowX: "auto" }}>
-                                {currentIdDocs ? (
-                                    <JsonView value={currentIdDocs} displayDataTypes={false} />
-                                ) : (
-                                    <Typography variant="body2" color="text.secondary">
+                        >
+                            <Tab value="details" label="Details" icon={<PermIdentity />} iconPosition="top" />
+                            <Tab value="addresses" label="Addresses" icon={<Badge />} iconPosition="top" />
+                            <Tab value="nostr" label="Nostr" icon={<Login />} iconPosition="top" />
+                        </Tabs>
+                        {identityTab === "details" && (
+                            <Box sx={{ mt: 2, width: '100%', maxWidth: isTabletUp ? '80%' : '100%' }}>
+                                <Paper variant="outlined" sx={{ p: 2, overflowX: "auto" }}>
+                                    {currentIdDocs ? (
+                                        <JsonView value={currentIdDocs} displayDataTypes={false} />
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary">
                                         No DID document available for the current identity.
-                                    </Typography>
-                                )}
-                            </Paper>
-                        </Box>
-                    )}
-                    {identityTab === "addresses" && (
+                                        </Typography>
+                                    )}
+                                </Paper>
+                            </Box>
+                        )}
+                        {identityTab === "addresses" && (
                             <Box sx={{ mt: 2, width: '100%', maxWidth: isTabletUp ? '80%' : '100%' }}>
                                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
                                     <TextField label="Name" size="small" value={addressName} onChange={(e) => setAddressName(e.target.value)} />

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
-import { Box, Button, MenuItem, Paper, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Paper, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
 import { Badge, Login, PermIdentity } from "@mui/icons-material";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "../contexts/VariablesProvider";
@@ -47,6 +47,7 @@ function IdentitiesTab() {
     const [nostrKeys, setNostrKeys] = useState<NostrKeys | null>(null);
     const [removeNostrModal, setRemoveNostrModal] = useState<boolean>(false);
     const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
+    const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
     const [nsecValue, setNsecValue] = useState<string | null>(null);
     const [currentIdDocs, setCurrentIdDocs] = useState<Record<string, unknown> | null>(null);
     const [addressList, setAddressList] = useState<Record<string, AddressInfo>>({});
@@ -77,20 +78,30 @@ function IdentitiesTab() {
 
     const handleCreateId = async () => {
         if (!keymaster) {
-            return;
+            return false;
         }
         if (!name.trim()) {
-            return;
+            return false;
         }
         try {
             await keymaster.createId(name.trim(), { registry });
             await resetCurrentID();
             setName("");
             requestBrowserRefresh(isBrowser);
+            return true;
         } catch (error: any) {
             setError(error);
+            return false;
         }
     };
+
+    function openCreateModal() {
+        setCreateModalOpen(true);
+    }
+
+    function closeCreateModal() {
+        setCreateModalOpen(false);
+    }
 
     function handleRenameId() {
         setRenameModalOpen(true);
@@ -503,42 +514,59 @@ function IdentitiesTab() {
                 onClose={() => setMigrateOpen(false)}
             />
 
-            <Box className="flex-box mt-2">
-                <TextField
-                    label="Create ID"
-                    variant="outlined"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    size="small"
-                    className="text-field name"
-                    slotProps={{
-                        htmlInput: {
-                            maxLength: 30,
-                        },
-                    }}
-                />
+            <Dialog open={createModalOpen} onClose={closeCreateModal} fullWidth maxWidth="sm">
+                <DialogTitle>Create Identity</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                        <TextField
+                            label="Name"
+                            variant="outlined"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            slotProps={{
+                                htmlInput: {
+                                    maxLength: 30,
+                                },
+                            }}
+                        />
 
-                <Select
-                    value={registries.includes(registry) ? registry : ""}
-                    onChange={(e) => setRegistry(e.target.value)}
-                    size="small"
-                    variant="outlined"
-                    className="select-small"
-                >
-                    {registries.map((r) => (
-                        <MenuItem key={r} value={r}>
-                            {r}
-                        </MenuItem>
-                    ))}
-                </Select>
+                        <Select
+                            value={registries.includes(registry) ? registry : ""}
+                            onChange={(e) => setRegistry(e.target.value)}
+                            size="small"
+                            variant="outlined"
+                        >
+                            {registries.map((r) => (
+                                <MenuItem key={r} value={r}>
+                                    {r}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeCreateModal}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={async () => {
+                            const ok = await handleCreateId();
+                            if (ok) {
+                                closeCreateModal();
+                            }
+                        }}
+                        disabled={!name.trim() || !registry}
+                    >
+                        Create
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
+            <Box className="flex-box mt-2" sx={{ gap: 1 }}>
                 <Button
                     variant="contained"
-                    onClick={handleCreateId}
-                    size="small"
-                    className="button-right"
+                    onClick={openCreateModal}
                 >
-                    Create
+                    Create ID
                 </Button>
             </Box>
             {currentId && (

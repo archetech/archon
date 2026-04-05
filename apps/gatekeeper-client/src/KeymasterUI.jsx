@@ -331,6 +331,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [eligiblePolls, setEligiblePolls] = useState({});
     const [migrateTarget, setMigrateTarget] = useState('');
     const [showMigrateDialog, setShowMigrateDialog] = useState(false);
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [nameSearch, setNameSearch] = useState('');
     const [nameTypeFilter, setNameTypeFilter] = useState('all');
     const [serverVersion, setServerVersion] = useState('');
@@ -850,16 +851,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         setSaveId(currentId);
         setCurrentId('');
         setTab('create');
+        setShowCreateDialog(true);
     }
 
     async function cancelCreate() {
+        setShowCreateDialog(false);
         setCurrentId(saveId);
-        setTab('identity');
+        setTab(saveId ? 'identity' : 'create');
     }
 
     async function createId() {
         try {
             await keymaster.createId(newName, { registry });
+            setShowCreateDialog(false);
             refreshAll();
         } catch (error) {
             showError(error);
@@ -3945,6 +3949,29 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 </DialogActions>
             </Dialog>
 
+            <Dialog open={showCreateDialog} onClose={cancelCreate}>
+                <DialogTitle>Create ID</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: '320px' }}>
+                        <TextField
+                            label="Name"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value.trim())}
+                            fullWidth
+                            autoFocus
+                            inputProps={{ maxLength: 30 }}
+                        />
+                        <RegistrySelect />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={cancelCreate}>Cancel</Button>
+                    <Button variant="contained" onClick={createId} disabled={!newName || !registry}>
+                        Create
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <Dialog open={showCloneDialog} onClose={closeClone}>
                 <DialogTitle>Clone {selectedName}</DialogTitle>
                 <DialogContent>
@@ -6548,26 +6575,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                         <Grid>
                             <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                 <Grid item>
-                                    <TextField
-                                        label="Name"
-                                        style={{ width: '300px' }}
-                                        value={newName}
-                                        onChange={(e) => setNewName(e.target.value.trim())}
-                                        fullWidth
-                                        margin="normal"
-                                        inputProps={{ maxLength: 30 }}
-                                    />
-                                </Grid>
-                                <Grid item>
-                                    <RegistrySelect />
+                                    <Button variant="contained" color="primary" onClick={() => setShowCreateDialog(true)}>
+                                        Create ID...
+                                    </Button>
                                 </Grid>
                             </Grid>
                             <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
-                                <Grid item>
-                                    <Button variant="contained" color="primary" onClick={createId} disabled={!newName || !registry}>
-                                        Create
-                                    </Button>
-                                </Grid>
                                 <Grid item>
                                     <Button variant="contained" color="primary" onClick={cancelCreate} disabled={!saveId}>
                                         Cancel
