@@ -466,7 +466,7 @@ function IdentitiesTab() {
     }
 
     return (
-        <Box>
+        <Box sx={{ width: '100%' }}>
             <WarningModal
                 title="Remove Nostr Keys"
                 warningText="Are you sure you want to remove Nostr keys from this identity?"
@@ -634,9 +634,11 @@ function IdentitiesTab() {
                     </Tabs>
                     {identityTab === "details" && (
                         <Box sx={{ mt: 2, width: '100%' }}>
-                            <Paper variant="outlined" sx={{ p: 2, overflowX: "auto" }}>
+                            <Paper variant="outlined" sx={{ p: 2, overflowX: "auto", width: '100%' }}>
                                 {currentIdDocs ? (
-                                    <JsonView value={currentIdDocs} displayDataTypes={false} />
+                                    <Box sx={{ width: '100%' }}>
+                                        <JsonView value={currentIdDocs} displayDataTypes={false} />
+                                    </Box>
                                 ) : (
                                     <Typography variant="body2" color="text.secondary">
                                         No DID document available for the current identity.

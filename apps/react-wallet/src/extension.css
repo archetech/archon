@@ -282,5 +282,6 @@ body {
 .browser-context {
     padding: 8px 16px 16px 16px;
     overflow: auto;
-    width: 742px;
+    flex: 1;
+    min-width: 0;
 }

@@ -460,7 +460,7 @@ function IdentitiesTab() {
     }
 
     return (
-        <Box>
+        <Box sx={{ width: '100%' }}>
             <WarningModal
                 title="Remove Nostr Keys"
                 warningText="Are you sure you want to remove Nostr keys from this identity?"
@@ -555,7 +555,7 @@ function IdentitiesTab() {
                 </DialogActions>
             </Dialog>
 
-            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0, width: isTabletUp ? '80%' : '100%' }}>
+            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0, width: '100%' }}>
                 <Box sx={{ mt: currentId ? 2 : 0, display: 'flex', alignItems: 'center', width: '100%', flexWrap: 'wrap', flexDirection: 'row', gap: 1 }}>
                     <Button variant="contained" onClick={openCreateModal}>
                         Create ID
@@ -625,10 +625,12 @@ function IdentitiesTab() {
                             <Tab value="nostr" label="Nostr" icon={<Login />} iconPosition="top" />
                         </Tabs>
                         {identityTab === "details" && (
-                            <Box sx={{ mt: 2, width: '100%', maxWidth: isTabletUp ? '80%' : '100%' }}>
-                                <Paper variant="outlined" sx={{ p: 2, overflowX: "auto" }}>
+                            <Box sx={{ mt: 2, width: '100%' }}>
+                                <Paper variant="outlined" sx={{ p: 2, overflowX: "auto", width: '100%' }}>
                                     {currentIdDocs ? (
-                                        <JsonView value={currentIdDocs} displayDataTypes={false} />
+                                        <Box sx={{ width: '100%' }}>
+                                            <JsonView value={currentIdDocs} displayDataTypes={false} />
+                                        </Box>
                                     ) : (
                                         <Typography variant="body2" color="text.secondary">
                                         No DID document available for the current identity.
@@ -638,7 +640,7 @@ function IdentitiesTab() {
                             </Box>
                         )}
                         {identityTab === "addresses" && (
-                            <Box sx={{ mt: 2, width: '100%', maxWidth: isTabletUp ? '80%' : '100%' }}>
+                            <Box sx={{ mt: 2, width: '100%' }}>
                                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
                                     <TextField label="Name" size="small" value={addressName} onChange={(e) => setAddressName(e.target.value)} />
                                     <TextField label="Domain" size="small" value={addressDomain} onChange={(e) => setAddressDomain(e.target.value)} />
@@ -675,7 +677,7 @@ function IdentitiesTab() {
                             </Box>
                         )}
                         {identityTab === "nostr" && (
-                            <Box sx={{ mt: 2, width: '100%', maxWidth: isTabletUp ? '80%' : '100%' }}>
+                            <Box sx={{ mt: 2, width: '100%' }}>
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
                                     {nostrKeys ? (
                                         <Button variant="contained" color="error" onClick={() => setRemoveNostrModal(true)} sx={{ whiteSpace: 'nowrap' }}>
