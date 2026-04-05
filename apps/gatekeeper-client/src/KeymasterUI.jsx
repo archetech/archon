@@ -144,6 +144,32 @@ function parseAddressDomain(address) {
     return trimmed.slice(at + 1);
 }
 
+function parseAddressName(address) {
+    if (!address || typeof address !== 'string') {
+        return '';
+    }
+
+    const trimmed = address.trim().toLowerCase();
+    const at = trimmed.lastIndexOf('@');
+
+    if (at < 0) {
+        return trimmed;
+    }
+
+    return trimmed.slice(0, at);
+}
+
+function composeAddress(name, domain) {
+    const normalizedName = parseAddressName(name);
+    const normalizedDomain = parseAddressDomain(domain);
+
+    if (!normalizedName || !normalizedDomain) {
+        return '';
+    }
+
+    return `${normalizedName}@${normalizedDomain}`;
+}
+
 function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, serverUrl, onServerUrlChange }) {
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
@@ -1380,7 +1406,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
             if (info) {
                 setSelectedAddress(info.address);
-                setAddressInput(info.address);
+                setAddressInput(info.name);
                 setAddressDocs(JSON.stringify(info, null, 4));
             }
             else {
@@ -1396,21 +1422,22 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     async function selectAddress(address) {
         const normalizedAddress = address.trim().toLowerCase();
         setSelectedAddress(normalizedAddress);
-        setAddressInput(normalizedAddress);
+        setAddressInput(parseAddressName(normalizedAddress));
+        setAddressDomain(parseAddressDomain(normalizedAddress));
         await resolveStoredAddress(normalizedAddress);
     }
 
     async function checkAddressValue() {
         try {
-            const normalizedAddress = addressInput.trim().toLowerCase();
+            const normalizedAddress = composeAddress(addressInput, addressDomain);
 
             if (!normalizedAddress) {
-                showAlert('Enter an address');
+                showAlert('Enter a name and domain');
                 return;
             }
 
             const result = await keymaster.checkAddress(normalizedAddress);
-            setAddressInput(normalizedAddress);
+            setAddressInput(parseAddressName(normalizedAddress));
             setAddressDomain(parseAddressDomain(normalizedAddress));
             setAddressDocs(JSON.stringify(result, null, 4));
         } catch (error) {
@@ -1436,7 +1463,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             if (importedAddresses.length > 0) {
                 const importedAddress = importedAddresses[0];
                 setSelectedAddress(importedAddress);
-                setAddressInput(importedAddress);
+                setAddressInput(parseAddressName(importedAddress));
                 showSuccess(`Imported ${importedAddresses.length} address(es) from ${normalizedDomain}`);
             }
             else {
@@ -1449,15 +1476,15 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function addAddressValue() {
         try {
-            const normalizedAddress = addressInput.trim().toLowerCase();
+            const normalizedAddress = composeAddress(addressInput, addressDomain);
 
             if (!normalizedAddress) {
-                showAlert('Enter an address');
+                showAlert('Enter a name and domain');
                 return;
             }
 
             await keymaster.addAddress(normalizedAddress);
-            setAddressInput(normalizedAddress);
+            setAddressInput(parseAddressName(normalizedAddress));
             setAddressDomain(parseAddressDomain(normalizedAddress));
             await refreshNames();
             await resolveStoredAddress(normalizedAddress);
@@ -1467,12 +1494,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
-    async function removeAddressValue(address = selectedAddress || addressInput) {
+    async function removeAddressValue(address = selectedAddress || composeAddress(addressInput, addressDomain)) {
         try {
             const normalizedAddress = address.trim().toLowerCase();
 
             if (!normalizedAddress) {
-                showAlert('Select an address to remove');
+                showAlert('Select an address or enter a name and domain');
                 return;
             }
 
@@ -4206,16 +4233,16 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 </Box>
                             }
                             {identityTab === 'addresses' &&
-                                <Box>
+                                <Box sx={{ width: '800px', maxWidth: '100%' }}>
                                     <Grid container spacing={1} style={{ marginBottom: '8px' }}>
                                         <Grid item xs={12} md={5}>
                                             <TextField
-                                                label="Address"
+                                                label="Name"
                                                 size="small"
                                                 fullWidth
                                                 value={addressInput}
                                                 onChange={(e) => setAddressInput(e.target.value)}
-                                                placeholder="name@example.com"
+                                                placeholder="name"
                                             />
                                         </Grid>
                                         <Grid item xs={12} md={3}>
@@ -4231,17 +4258,17 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         <Grid item xs={12} md={4}>
                                             <Grid container spacing={1}>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={checkAddressValue} disabled={!addressInput.trim()}>
+                                                    <Button variant="contained" color="primary" onClick={checkAddressValue} disabled={!addressInput.trim() || !addressDomain.trim()}>
                                                         Check
                                                     </Button>
                                                 </Grid>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={addAddressValue} disabled={!addressInput.trim()}>
+                                                    <Button variant="contained" color="primary" onClick={addAddressValue} disabled={!addressInput.trim() || !addressDomain.trim()}>
                                                         Add
                                                     </Button>
                                                 </Grid>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={() => resolveStoredAddress(addressDomain || addressInput)} disabled={!addressDomain.trim() && !addressInput.trim()}>
+                                                    <Button variant="contained" color="primary" onClick={() => resolveStoredAddress(addressDomain)} disabled={!addressDomain.trim()}>
                                                         Get
                                                     </Button>
                                                 </Grid>
@@ -4251,7 +4278,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     </Button>
                                                 </Grid>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={() => removeAddressValue()} disabled={!selectedAddress && !addressInput.trim()}>
+                                                    <Button variant="contained" color="primary" onClick={() => removeAddressValue()} disabled={!selectedAddress && (!addressInput.trim() || !addressDomain.trim())}>
                                                         Remove
                                                     </Button>
                                                 </Grid>
@@ -4303,7 +4330,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                     <textarea
                                         value={addressDocs}
                                         readOnly
-                                        style={{ width: '800px', height: '240px', overflow: 'auto' }}
+                                        style={{ width: '100%', height: '240px', overflow: 'auto' }}
                                     />
                                 </Box>
                             }
