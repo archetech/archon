@@ -561,66 +561,65 @@ function IdentitiesTab() {
                 </DialogActions>
             </Dialog>
 
-            <Box className="flex-box mt-2" sx={{ gap: 1 }}>
+            <Box display="flex" flexDirection="row" sx={{ gap: 1, mt: 2, flexWrap: 'wrap' }}>
                 <Button
                     variant="contained"
                     onClick={openCreateModal}
                 >
                     Create ID
                 </Button>
+                {currentId && (
+                    <>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleRenameId}
+                        >
+                            Rename
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleRemoveId}
+                        >
+                            Remove
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={backupId}
+                        >
+                            Backup
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleRecoverId}
+                        >
+                            Recover
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={rotateKeys}
+                        >
+                            Rotate
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => setMigrateOpen(true)}
+                        >
+                            Migrate...
+                        </Button>
+                    </>
+                )}
             </Box>
-            {currentId && (
-                <Box display="flex" flexDirection="row" sx={{ gap: 1, mt: 2, flexWrap: 'wrap' }}>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={handleRenameId}
-                    >
-                        Rename
-                    </Button>
-
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={handleRemoveId}
-                    >
-                        Remove
-                    </Button>
-
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={backupId}
-                    >
-                        Backup
-                    </Button>
-
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={handleRecoverId}
-                    >
-                        Recover
-                    </Button>
-
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={rotateKeys}
-                    >
-                        Rotate
-                    </Button>
-
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={() => setMigrateOpen(true)}
-                    >
-                        Migrate...
-                    </Button>
-
-                </Box>
-            )}
             {currentId && (
                 <Box sx={{ mt: 2, width: '100%' }}>
                     <Tabs
