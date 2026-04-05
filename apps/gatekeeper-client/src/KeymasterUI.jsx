@@ -201,6 +201,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [addressDomain, setAddressDomain] = useState('');
     const [selectedAddress, setSelectedAddress] = useState('');
     const [addressDocs, setAddressDocs] = useState('');
+    const [addressBusy, setAddressBusy] = useState(false);
     const [registries, setRegistries] = useState(null);
     const [groupList, setGroupList] = useState(null);
     const [groupName, setGroupName] = useState('');
@@ -1393,6 +1394,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function resolveStoredAddress(domain) {
+        setAddressBusy(true);
         try {
             const normalizedDomain = parseAddressDomain(domain);
 
@@ -1416,6 +1418,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             }
         } catch (error) {
             showError(error);
+        } finally {
+            setAddressBusy(false);
         }
     }
 
@@ -1428,6 +1432,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function checkAddressValue() {
+        setAddressBusy(true);
         try {
             const normalizedAddress = composeAddress(addressInput, addressDomain);
 
@@ -1442,10 +1447,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setAddressDocs(JSON.stringify(result, null, 4));
         } catch (error) {
             showError(error);
+        } finally {
+            setAddressBusy(false);
         }
     }
 
     async function importAddressDomain() {
+        setAddressBusy(true);
         try {
             const normalizedDomain = parseAddressDomain(addressDomain);
 
@@ -1471,10 +1479,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             }
         } catch (error) {
             showError(error);
+        } finally {
+            setAddressBusy(false);
         }
     }
 
     async function addAddressValue() {
+        setAddressBusy(true);
         try {
             const normalizedAddress = composeAddress(addressInput, addressDomain);
 
@@ -1491,10 +1502,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             showSuccess(`${normalizedAddress} added`);
         } catch (error) {
             showError(error);
+        } finally {
+            setAddressBusy(false);
         }
     }
 
     async function removeAddressValue(address = selectedAddress || composeAddress(addressInput, addressDomain)) {
+        setAddressBusy(true);
         try {
             const normalizedAddress = address.trim().toLowerCase();
 
@@ -1516,6 +1530,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             }
         } catch (error) {
             showError(error);
+        } finally {
+            setAddressBusy(false);
         }
     }
 
@@ -4258,32 +4274,32 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         <Grid item xs={12} md={4}>
                                             <Grid container spacing={1}>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={checkAddressValue} disabled={!addressInput.trim() || !addressDomain.trim()}>
+                                                    <Button variant="contained" color="primary" onClick={checkAddressValue} disabled={addressBusy || !addressInput.trim() || !addressDomain.trim()}>
                                                         Check
                                                     </Button>
                                                 </Grid>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={addAddressValue} disabled={!addressInput.trim() || !addressDomain.trim()}>
+                                                    <Button variant="contained" color="primary" onClick={addAddressValue} disabled={addressBusy || !addressInput.trim() || !addressDomain.trim()}>
                                                         Add
                                                     </Button>
                                                 </Grid>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={() => resolveStoredAddress(addressDomain)} disabled={!addressDomain.trim()}>
+                                                    <Button variant="contained" color="primary" onClick={() => resolveStoredAddress(addressDomain)} disabled={addressBusy || !addressDomain.trim()}>
                                                         Get
                                                     </Button>
                                                 </Grid>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={importAddressDomain} disabled={!addressDomain.trim()}>
+                                                    <Button variant="contained" color="primary" onClick={importAddressDomain} disabled={addressBusy || !addressDomain.trim()}>
                                                         Import
                                                     </Button>
                                                 </Grid>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={() => removeAddressValue()} disabled={!selectedAddress && (!addressInput.trim() || !addressDomain.trim())}>
+                                                    <Button variant="contained" color="primary" onClick={() => removeAddressValue()} disabled={addressBusy || (!selectedAddress && (!addressInput.trim() || !addressDomain.trim()))}>
                                                         Remove
                                                     </Button>
                                                 </Grid>
                                                 <Grid item>
-                                                    <Button variant="contained" color="primary" onClick={clearAddressFields} disabled={!addressInput && !addressDomain && !selectedAddress && !addressDocs}>
+                                                    <Button variant="contained" color="primary" onClick={clearAddressFields} disabled={addressBusy || (!addressInput && !addressDomain && !selectedAddress && !addressDocs)}>
                                                         Clear
                                                     </Button>
                                                 </Grid>
