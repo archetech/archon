@@ -11,6 +11,7 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { requestBrowserRefresh } from '../utils/utils'
+import CopyDID from "./CopyDID";
 
 const DropDownID = () => {
     const {
@@ -123,6 +124,7 @@ const DropDownID = () => {
                         {truncatedId}
                     </Box>
                 )}
+                <CopyDID did={currentDID} />
             </Box>
         )
     );

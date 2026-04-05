@@ -10,6 +10,7 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
+import CopyDID from "./CopyDID";
 
 const DropDownID = () => {
     const { keymaster } = useWalletContext();
@@ -114,6 +115,7 @@ const DropDownID = () => {
                         {truncatedId}
                     </Box>
                 )}
+                <CopyDID did={currentDID} />
             </Box>
         )
     );
