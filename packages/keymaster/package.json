@@ -1,6 +1,6 @@
 {
   "name": "@didcid/keymaster",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Archon Keymaster",
   "type": "module",
   "module": "./dist/esm/index.js",
@@ -141,9 +141,9 @@
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@didcid/cipher": "^0.2.6",
-    "@didcid/common": "^0.1.8",
-    "@didcid/gatekeeper": "^0.4.6",
+    "@didcid/cipher": "^0.2.7",
+    "@didcid/common": "^0.1.9",
+    "@didcid/gatekeeper": "^0.4.7",
     "axios": "^1.14.0",
     "commander": "^11.1.0",
     "dotenv": "^16.4.5",
