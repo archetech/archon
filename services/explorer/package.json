@@ -8,6 +8,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@didcid/gatekeeper": "^0.4.6",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.0.2",
@@ -23,7 +24,7 @@
   "devDependencies": {
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^5.1.1",
     "typescript": "^4.9.0",
     "vite": "^8.0.5"
   }
