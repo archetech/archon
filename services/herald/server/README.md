@@ -33,6 +33,7 @@ This folder contains the Express server for the name service, providing DID-base
 - `/api/logout` – Logs the user out.
 
 **Stateless Agent API (Bearer token auth)**
+- For agents using Keymaster CLI, prefer `check-address`, `add-address`, and `remove-address` rather than building the bearer-token flow by hand.
 - `PUT /api/name` – Claim or update name (credential auto-issued).
 - `DELETE /api/name` – Delete name and revoke credential.
 

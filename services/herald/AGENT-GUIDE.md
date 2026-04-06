@@ -2,6 +2,8 @@
 
 A guide for AI agents to authenticate and manage names against Archon's Herald service.
 
+For most agent workflows, prefer the Keymaster address commands over manually calling Herald's bearer-token endpoints. The API reference remains below for direct integrations and debugging.
+
 In Archon, Herald is:
 - served internally as the `herald` backend on port `4230`
 - exposed publicly through Drawbridge under `/names`
@@ -28,61 +30,68 @@ HERALD_API_URL="$DRAWBRIDGE_URL/names/api"
 ## Prerequisites
 
 - A DID controlled by your keymaster
-- Ability to sign challenges with Keymaster
+- Keymaster CLI with the new address commands
 - `curl` and `jq`
 
-## Quick Start (Stateless API)
+## Quick Start (Recommended CLI Flow)
 
-The stateless API is the simplest way for an agent to claim or delete a name.
+The simplest way for an agent to claim or remove a Herald name is through Keymaster's address commands. Keymaster handles the challenge-response flow for you.
 
-### 1. Get a Challenge
-
-```bash
-CHALLENGE=$(curl -s "$HERALD_API_URL/challenge" | jq -r '.challenge')
-```
-
-### 2. Sign the Challenge
-
-Use Keymaster to create a response:
+### 1. Install and Configure Keymaster
 
 ```bash
-RESPONSE=$(npx @didcid/keymaster create-response "$CHALLENGE")
+# Install CLI
+npm install -g @didcid/keymaster
+
+# Set up environment
+export ARCHON_NODE_URL=https://archon.technology
+export ARCHON_PASSPHRASE="your-secret-passphrase"
 ```
 
-### 3. Claim or Update a Name
+### 2. Create or Select an Identity
 
 ```bash
-curl -s -X PUT "$HERALD_API_URL/name" \
-  -H "Authorization: Bearer $RESPONSE" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"my-agent"}' | jq .
+keymaster create-id myagent
 ```
 
-Expected response shape:
+### 3. Check and Claim an Address
+
+```bash
+keymaster check-address myagent@your-domain.com
+keymaster add-address myagent@your-domain.com
+```
+
+### 4. Inspect or Remove an Address
+
+```bash
+keymaster list-addresses
+keymaster get-address your-domain.com
+keymaster remove-address myagent@your-domain.com
+```
+
+### 5. Optional: Import an Existing Herald Address
+
+If the current DID already owns a name on a Herald domain, import it into the local wallet view:
+
+```bash
+keymaster import-address your-domain.com
+```
+
+Expected `get-address` response shape:
 
 ```json
 {
-  "ok": true,
-  "name": "my-agent",
+  "address": "myagent@your-domain.com",
   "did": "did:cid:...",
-  "credentialDid": "did:cid:...",
-  "credentialIssuedAt": "2026-03-27T00:00:00.000Z",
-  "credential": { "...": "..." }
+  "document": { "...": "..." }
 }
 ```
 
-Herald issues a verifiable credential for the claimed name using the default membership schema unless overridden by `ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID`.
+When you claim an address on a Herald domain, Herald issues a verifiable credential for the claimed name using the default membership schema unless overridden by `ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID`.
 
-### 4. Delete a Name
+## Direct Stateless API
 
-```bash
-curl -s -X DELETE "$HERALD_API_URL/name" \
-  -H "Authorization: Bearer $RESPONSE" | jq .
-```
-
-This deletes the name and revokes the associated credential.
-
-## Complete Example
+Use this lower-level flow only if you need to integrate directly with Herald instead of going through Keymaster CLI.
 
 ```bash
 #!/bin/bash
@@ -100,6 +109,15 @@ curl -s -X PUT "$HERALD_API_URL/name" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"$NAME\"}" | jq .
 ```
+
+Delete a name:
+
+```bash
+curl -s -X DELETE "$HERALD_API_URL/name" \
+  -H "Authorization: Bearer $RESPONSE" | jq .
+```
+
+This deletes the name and revokes the associated credential.
 
 ## Public Endpoints
 

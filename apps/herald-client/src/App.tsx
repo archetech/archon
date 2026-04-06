@@ -124,6 +124,18 @@ function Home() {
     const [serviceName, setServiceName] = useState<string>('Name Service');
 
     const navigate = useNavigate();
+    const agentDomain = (() => {
+        if (serviceDomain) {
+            return serviceDomain;
+        }
+
+        try {
+            return publicUrl ? new URL(publicUrl).host : 'your-domain.com';
+        }
+        catch {
+            return 'your-domain.com';
+        }
+    })();
 
     useEffect(() => {
         const init = async () => {
@@ -292,20 +304,21 @@ export ARCHON_PASSPHRASE="your-secret-passphrase"
 keymaster create-id myagent`}
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mb: 2, mt: 3 }}>
-                            Then claim your name (2 calls, no cookies):
+                            Then claim your address directly from the CLI:
                         </Typography>
                         <Typography variant="body2" component="pre" sx={{ color: '#ccc', mb: 2, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
-                            {`# 1. Get challenge
-CHALLENGE=$(curl -s ${publicUrl}/api/challenge | jq -r .challenge)
+                            {`# Check availability
+keymaster check-address myagent@${agentDomain}
 
-# 2. Create response
-RESPONSE=$(keymaster create-response $CHALLENGE)
+# Claim your address (credential auto-issued)
+keymaster add-address myagent@${agentDomain}
 
-# 3. Claim your name (credential auto-issued)
-curl -X PUT ${publicUrl}/api/name \\
-  -H "Authorization: Bearer $RESPONSE" \\
-  -H "Content-Type: application/json" \\
-  -d '{"name": "myagent"}'`}
+# Later
+keymaster list-addresses
+keymaster remove-address myagent@${agentDomain}`}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#888', mb: 2 }}>
+                            The lower-level HTTP API is still available for direct integrations and debugging.
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mt: 2 }}>
                             MCP Server: <a href="https://www.npmjs.com/package/@archon-protocol/mcp-server" target="_blank" rel="noopener noreferrer" style={{ color: '#00d4aa' }}>@archon-protocol/mcp-server</a>
