@@ -369,6 +369,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('');
     const [avatarLoading, setAvatarLoading] = useState(false);
     const [avatarError, setAvatarError] = useState('');
+    const [avatarCandidateDid, setAvatarCandidateDid] = useState('');
+    const [avatarCandidateAlias, setAvatarCandidateAlias] = useState('');
+    const [avatarCandidatePreviewUrl, setAvatarCandidatePreviewUrl] = useState('');
+    const [avatarCandidateLoading, setAvatarCandidateLoading] = useState(false);
+    const [avatarCandidateError, setAvatarCandidateError] = useState('');
 
     const [lightningTab, setLightningTab] = useState('wallet');
     const [lightningBalance, setLightningBalance] = useState(null);
@@ -875,6 +880,62 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         return cid ? `${serverUrl}/api/v1/ipfs/data/${cid}` : '';
     }
 
+    function clearAvatarCandidate() {
+        setAvatarCandidateDid('');
+        setAvatarCandidateAlias('');
+        setAvatarCandidatePreviewUrl('');
+        setAvatarCandidateLoading(false);
+        setAvatarCandidateError('');
+    }
+
+    function handleAvatarModeChange(event) {
+        setAvatarMode(event.target.value);
+        clearAvatarCandidate();
+    }
+
+    async function previewAvatarCandidate(input, options = {}) {
+        const value = input?.trim();
+        const preferredAlias = options.alias || '';
+
+        if (!value) {
+            showAlert('Choose an image alias or enter a DID');
+            return;
+        }
+
+        setAvatarCandidateLoading(true);
+        setAvatarCandidateError('');
+
+        try {
+            const doc = await keymaster.resolveDID(value);
+            const did = doc?.didDocument?.id;
+            const previewUrl = getImagePreviewUrl(doc);
+
+            if (!did) {
+                showAlert('Unable to resolve avatar DID');
+                clearAvatarCandidate();
+                return;
+            }
+
+            if (!previewUrl) {
+                setAvatarCandidateDid(did);
+                setAvatarCandidateAlias(preferredAlias || findAliasByDid(did, imageList || []));
+                setAvatarCandidatePreviewUrl('');
+                setAvatarCandidateError('Avatar must resolve to an image asset DID');
+                return;
+            }
+
+            setAvatarCandidateDid(did);
+            setAvatarCandidateAlias(preferredAlias || findAliasByDid(did, imageList || []));
+            setAvatarCandidatePreviewUrl(previewUrl);
+            setAvatarCandidateError('');
+        } catch (error) {
+            clearAvatarCandidate();
+            setAvatarCandidateError(error.error || error.message || String(error));
+        } finally {
+            setAvatarCandidateLoading(false);
+        }
+    }
+
     async function loadAvatar() {
         if (!selectedId) {
             setAvatarAlias('');
@@ -882,6 +943,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setAvatarDid('');
             setAvatarPreviewUrl('');
             setAvatarError('');
+            clearAvatarCandidate();
             setAvatarLoading(false);
             return;
         }
@@ -935,35 +997,20 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedId, aliasList, imageList]);
 
-    async function setAvatarProperty(input) {
-        const value = input?.trim();
-
-        if (!value) {
-            showAlert('Choose an image alias or enter a DID');
+    async function applyAvatarCandidate() {
+        if (!avatarCandidateDid || !avatarCandidatePreviewUrl) {
+            showAlert('Preview an image avatar before setting it');
             return;
         }
 
         try {
-            const doc = await keymaster.resolveDID(value);
-            const did = doc?.didDocument?.id;
-            const previewUrl = getImagePreviewUrl(doc);
-
-            if (!did) {
-                showAlert('Unable to resolve avatar DID');
-                return;
-            }
-
-            if (!previewUrl) {
-                showAlert('Avatar must resolve to an image asset DID');
-                return;
-            }
-
-            await keymaster.mergeData(selectedId, { avatar: did });
-            setAvatarDid(did);
-            setAvatarInputDid(did);
-            setAvatarAlias(findAliasByDid(did, imageList || []));
-            setAvatarPreviewUrl(previewUrl);
+            await keymaster.mergeData(selectedId, { avatar: avatarCandidateDid });
+            setAvatarDid(avatarCandidateDid);
+            setAvatarInputDid(avatarCandidateDid);
+            setAvatarAlias(avatarCandidateAlias || findAliasByDid(avatarCandidateDid, imageList || []));
+            setAvatarPreviewUrl(avatarCandidatePreviewUrl);
             setAvatarError('');
+            clearAvatarCandidate();
             showSuccess('Avatar updated');
             await resolveId();
         } catch (error) {
@@ -979,6 +1026,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setAvatarDid('');
             setAvatarPreviewUrl('');
             setAvatarError('');
+            clearAvatarCandidate();
             showSuccess('Avatar removed');
             await resolveId();
         } catch (error) {
@@ -1012,15 +1060,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
                     await keymaster.addAlias(alias, did);
                     await refreshNames();
-                    await keymaster.mergeData(selectedId, { avatar: did });
-                    setAvatarDid(did);
-                    setAvatarInputDid(did);
-                    setAvatarAlias(alias);
-                    setAvatarPreviewUrl(getImagePreviewUrl(await keymaster.resolveDID(did)));
-                    setAvatarError('');
-                    setAvatarMode('alias');
-                    await resolveId();
-                    showSuccess(`Avatar image uploaded successfully: ${alias}`);
+                    setAvatarMode('upload');
+                    await previewAvatarCandidate(did, { alias });
+                    showSuccess(`Avatar image uploaded successfully: ${alias}. Review the preview, then set the avatar.`);
                 } catch (error) {
                     showError(`Error processing avatar image: ${error}`);
                 }
@@ -4568,7 +4610,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
                                     <FormControl sx={{ mb: 2 }}>
                                         <FormLabel>Set Avatar From</FormLabel>
-                                        <RadioGroup row value={avatarMode} onChange={(e) => setAvatarMode(e.target.value)}>
+                                        <RadioGroup row value={avatarMode} onChange={handleAvatarModeChange}>
                                             <FormControlLabel value="alias" control={<Radio />} label="Image Alias" />
                                             <FormControlLabel value="did" control={<Radio />} label="DID" />
                                             <FormControlLabel value="upload" control={<Radio />} label="Upload Image" />
@@ -4591,10 +4633,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             </Select>
                                             <Button
                                                 variant="contained"
-                                                onClick={() => setAvatarProperty(avatarAlias)}
+                                                onClick={() => previewAvatarCandidate(avatarAlias, { alias: avatarAlias })}
                                                 disabled={!avatarAlias}
                                             >
-                                                Set Avatar
+                                                Preview
                                             </Button>
                                         </Box>
                                     }
@@ -4610,10 +4652,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             />
                                             <Button
                                                 variant="contained"
-                                                onClick={() => setAvatarProperty(avatarInputDid)}
+                                                onClick={() => previewAvatarCandidate(avatarInputDid)}
                                                 disabled={!avatarInputDid.trim()}
                                             >
-                                                Set Avatar
+                                                Preview
                                             </Button>
                                         </Box>
                                     }
@@ -4638,6 +4680,60 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             />
                                         </Box>
                                     }
+
+                                    <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-start', mt: 3 }}>
+                                        <Box sx={{ width: 220 }}>
+                                            <Typography variant="subtitle1" sx={{ mb: 1 }}>Pending Avatar</Typography>
+                                            <Paper variant="outlined" sx={{ width: 220, height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', bgcolor: 'grey.50' }}>
+                                                {avatarCandidatePreviewUrl ? (
+                                                    <img src={avatarCandidatePreviewUrl} alt="Pending avatar preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                                ) : (
+                                                    <Typography color="text.secondary" sx={{ textAlign: 'center', px: 2 }}>
+                                                        {avatarCandidateLoading ? 'Loading preview...' : avatarCandidateError ? 'Preview unavailable' : 'Preview an avatar before setting it'}
+                                                    </Typography>
+                                                )}
+                                            </Paper>
+                                        </Box>
+                                        <Box sx={{ flex: 1, minWidth: 280 }}>
+                                            <TextField
+                                                label="Pending Avatar DID"
+                                                value={avatarCandidateDid}
+                                                fullWidth
+                                                size="small"
+                                                margin="normal"
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                            <TextField
+                                                label="Pending Avatar Alias"
+                                                value={avatarCandidateAlias}
+                                                fullWidth
+                                                size="small"
+                                                margin="normal"
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                            {avatarCandidateError &&
+                                                <Alert severity="warning" sx={{ mt: 1 }}>
+                                                    {avatarCandidateError}
+                                                </Alert>
+                                            }
+                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+                                                <Button
+                                                    variant="contained"
+                                                    onClick={applyAvatarCandidate}
+                                                    disabled={!avatarCandidateDid || !avatarCandidatePreviewUrl}
+                                                >
+                                                    Set Avatar
+                                                </Button>
+                                                <Button
+                                                    variant="outlined"
+                                                    onClick={clearAvatarCandidate}
+                                                    disabled={!avatarCandidateDid && !avatarCandidatePreviewUrl && !avatarCandidateError}
+                                                >
+                                                    Clear Preview
+                                                </Button>
+                                            </Box>
+                                        </Box>
+                                    </Box>
                                 </Box>
                             }
                             {identityTab === 'nostr' &&
