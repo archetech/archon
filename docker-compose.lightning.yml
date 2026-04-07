@@ -1,6 +1,6 @@
 services:
   cln-mainnet-node:
-    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-2.13.2}
+    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-3.1.0}
     environment:
       - NETWORK=bitcoin
       - ALIAS=${ARCHON_CLN_ALIAS:-archon}
