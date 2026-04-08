@@ -50,6 +50,7 @@ import {
     Block,
     Bolt,
     Clear,
+    ContentCopy,
     Create,
     Groups,
     Delete,
@@ -362,6 +363,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [propsEditValue, setPropsEditValue] = useState('');
     const [propsDeleteOpen, setPropsDeleteOpen] = useState(false);
     const [propsDeleteKey, setPropsDeleteKey] = useState('');
+    const [avatarMode, setAvatarMode] = useState('alias');
+    const [avatarAlias, setAvatarAlias] = useState('');
+    const [avatarInputDid, setAvatarInputDid] = useState('');
+    const [avatarDid, setAvatarDid] = useState('');
+    const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('');
+    const [avatarLoading, setAvatarLoading] = useState(false);
+    const [avatarError, setAvatarError] = useState('');
+    const [avatarCandidateDid, setAvatarCandidateDid] = useState('');
+    const [avatarCandidateAlias, setAvatarCandidateAlias] = useState('');
+    const [avatarCandidatePreviewUrl, setAvatarCandidatePreviewUrl] = useState('');
+    const [avatarCandidateLoading, setAvatarCandidateLoading] = useState(false);
+    const [avatarCandidateError, setAvatarCandidateError] = useState('');
 
     const [lightningTab, setLightningTab] = useState('wallet');
     const [lightningBalance, setLightningBalance] = useState(null);
@@ -846,6 +859,247 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         if (typeof value === 'string') return value;
         return JSON.stringify(value);
     }
+
+    function findAliasByDid(did, allowedAliases = null) {
+        if (!did || !aliasList) {
+            return '';
+        }
+
+        const allowed = allowedAliases ? new Set(allowedAliases) : null;
+
+        for (const [name, aliasDid] of Object.entries(aliasList)) {
+            if (aliasDid === did && (!allowed || allowed.has(name))) {
+                return name;
+            }
+        }
+
+        return '';
+    }
+
+    function getImagePreviewUrl(doc) {
+        const cid = doc?.didDocumentData?.file?.cid;
+        return cid ? `${serverUrl}/api/v1/ipfs/data/${cid}` : '';
+    }
+
+    function clearAvatarCandidate() {
+        setAvatarCandidateDid('');
+        setAvatarCandidateAlias('');
+        setAvatarCandidatePreviewUrl('');
+        setAvatarCandidateLoading(false);
+        setAvatarCandidateError('');
+    }
+
+    function handleAvatarModeChange(event) {
+        setAvatarMode(event.target.value);
+        clearAvatarCandidate();
+    }
+
+    async function previewAvatarCandidate(input, options = {}) {
+        const value = input?.trim();
+        const preferredAlias = options.alias || '';
+
+        if (!value) {
+            showAlert('Choose an image alias or enter a DID');
+            return;
+        }
+
+        setAvatarCandidateLoading(true);
+        setAvatarCandidateError('');
+
+        try {
+            const doc = await keymaster.resolveDID(value);
+            const did = doc?.didDocument?.id;
+            const previewUrl = getImagePreviewUrl(doc);
+
+            if (!did) {
+                showAlert('Unable to resolve avatar DID');
+                clearAvatarCandidate();
+                return;
+            }
+
+            if (!previewUrl) {
+                setAvatarCandidateDid(did);
+                setAvatarCandidateAlias(preferredAlias || findAliasByDid(did, imageList || []));
+                setAvatarCandidatePreviewUrl('');
+                setAvatarCandidateError('Avatar must resolve to an image asset DID');
+                return;
+            }
+
+            setAvatarCandidateDid(did);
+            setAvatarCandidateAlias(preferredAlias || findAliasByDid(did, imageList || []));
+            setAvatarCandidatePreviewUrl(previewUrl);
+            setAvatarCandidateError('');
+        } catch (error) {
+            clearAvatarCandidate();
+            setAvatarCandidateError(error.error || error.message || String(error));
+        } finally {
+            setAvatarCandidateLoading(false);
+        }
+    }
+
+    async function loadAvatar() {
+        if (!selectedId) {
+            setAvatarAlias('');
+            setAvatarInputDid('');
+            setAvatarDid('');
+            setAvatarPreviewUrl('');
+            setAvatarError('');
+            clearAvatarCandidate();
+            setAvatarLoading(false);
+            return;
+        }
+
+        setAvatarLoading(true);
+        setAvatarError('');
+
+        try {
+            const identityDoc = await keymaster.resolveDID(selectedId);
+            const rawAvatar = identityDoc?.didDocumentData?.avatar;
+            const nextDid = typeof rawAvatar === 'string' ? rawAvatar.trim() : '';
+
+            if (!nextDid) {
+                setAvatarAlias('');
+                setAvatarInputDid('');
+                setAvatarDid('');
+                setAvatarPreviewUrl('');
+                return;
+            }
+
+            setAvatarDid(nextDid);
+            setAvatarInputDid(nextDid);
+            setAvatarAlias(findAliasByDid(nextDid, imageList || []));
+            try {
+                const avatarDoc = await keymaster.resolveDID(nextDid);
+                const previewUrl = getImagePreviewUrl(avatarDoc);
+
+                if (previewUrl) {
+                    setAvatarPreviewUrl(previewUrl);
+                } else {
+                    setAvatarPreviewUrl('');
+                    setAvatarError('The current avatar does not resolve to an image asset.');
+                }
+            } catch (error) {
+                setAvatarPreviewUrl('');
+                setAvatarError(error.error || error.message || String(error));
+            }
+        } catch (error) {
+            setAvatarPreviewUrl('');
+            setAvatarDid('');
+            setAvatarAlias('');
+            setAvatarInputDid('');
+            setAvatarError(error.error || error.message || String(error));
+        } finally {
+            setAvatarLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        loadAvatar();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedId, aliasList, imageList]);
+
+    async function applyAvatarCandidate() {
+        if (!avatarCandidateDid || !avatarCandidatePreviewUrl) {
+            showAlert('Preview an image avatar before setting it');
+            return;
+        }
+
+        try {
+            await keymaster.mergeData(selectedId, { avatar: avatarCandidateDid });
+            setAvatarDid(avatarCandidateDid);
+            setAvatarInputDid(avatarCandidateDid);
+            setAvatarAlias(avatarCandidateAlias || findAliasByDid(avatarCandidateDid, imageList || []));
+            setAvatarPreviewUrl(avatarCandidatePreviewUrl);
+            setAvatarError('');
+            clearAvatarCandidate();
+            showSuccess('Avatar updated');
+            await resolveId();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function removeAvatarProperty() {
+        try {
+            await keymaster.mergeData(selectedId, { avatar: null });
+            setAvatarAlias('');
+            setAvatarInputDid('');
+            setAvatarDid('');
+            setAvatarPreviewUrl('');
+            setAvatarError('');
+            clearAvatarCandidate();
+            showSuccess('Avatar removed');
+            await resolveId();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function uploadAvatarImage(event) {
+        try {
+            const fileInput = event.target;
+            const file = fileInput.files[0];
+
+            if (!file) return;
+
+            fileInput.value = "";
+
+            const reader = new FileReader();
+
+            reader.onload = async (e) => {
+                try {
+                    const arrayBuffer = e.target.result;
+                    const buffer = Buffer.from(arrayBuffer);
+                    const did = await keymaster.createImage(buffer, { registry });
+                    const names = await keymaster.listAliases();
+                    let alias = file.name.slice(0, 26);
+                    let count = 1;
+
+                    while (alias in names) {
+                        alias = `${file.name.slice(0, 26)} (${count++})`;
+                    }
+
+                    await keymaster.addAlias(alias, did);
+                    await refreshNames();
+                    setAvatarMode('upload');
+                    await previewAvatarCandidate(did, { alias });
+                    showSuccess(`Avatar image uploaded successfully: ${alias}. Review the preview, then set the avatar.`);
+                } catch (error) {
+                    showError(`Error processing avatar image: ${error}`);
+                }
+            };
+
+            reader.onerror = (error) => {
+                showError(`Error reading file: ${error}`);
+            };
+
+            reader.readAsArrayBuffer(file);
+        } catch (error) {
+            showError(`Error uploading avatar image: ${error}`);
+        }
+    }
+
+    async function copyCurrentDid() {
+        try {
+            await navigator.clipboard.writeText(currentDID);
+            showSuccess('DID copied to clipboard');
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    const isAvatarPreviewMode = !!(avatarCandidateDid || avatarCandidatePreviewUrl || avatarCandidateError || avatarCandidateLoading);
+    const displayedAvatarPreviewUrl = isAvatarPreviewMode ? avatarCandidatePreviewUrl : avatarPreviewUrl;
+    const displayedAvatarDid = isAvatarPreviewMode ? avatarCandidateDid : avatarDid;
+    const displayedAvatarError = isAvatarPreviewMode ? avatarCandidateError : avatarError;
+    const displayedAvatarLoading = isAvatarPreviewMode ? avatarCandidateLoading : avatarLoading;
+    const displayedAvatarTitle = isAvatarPreviewMode ? 'Avatar Preview' : 'Current Avatar';
+    const displayedAvatarDidLabel = isAvatarPreviewMode ? 'Preview Avatar DID' : 'Current Avatar DID';
+    const displayedAvatarEmptyText = displayedAvatarLoading
+        ? (isAvatarPreviewMode ? 'Loading preview...' : 'Loading avatar...')
+        : displayedAvatarError
+            ? (isAvatarPreviewMode ? 'Preview unavailable' : 'Avatar preview unavailable')
+            : 'No avatar set';
 
     async function showCreate() {
         setSaveId(currentId);
@@ -4087,15 +4341,47 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                         </Typography>
                     </Grid>
                     <Grid item>
-                        <Typography style={{ fontSize: '1.5em', fontWeight: 'bold' }}>
-                            {currentId}
-                        </Typography>
+                        <Select
+                            size="small"
+                            style={{ width: '300px' }}
+                            value={selectedId}
+                            onChange={(event) => selectId(event.target.value)}
+                        >
+                            {idList?.map((idname, index) => (
+                                <MenuItem value={idname} key={index}>
+                                    {idname}
+                                </MenuItem>
+                            ))}
+                        </Select>
                     </Grid>
                     <Grid item>
-                        <Typography style={{ fontSize: '1em', fontFamily: 'Courier' }}>
-                            {currentDID}
-                        </Typography>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<ContentCopy />}
+                            onClick={copyCurrentDid}
+                            disabled={!currentDID}
+                        >
+                            Copy DID
+                        </Button>
                     </Grid>
+                    {avatarPreviewUrl &&
+                        <Grid item>
+                            <Box
+                                component="img"
+                                src={avatarPreviewUrl}
+                                alt={`${currentId} avatar`}
+                                sx={{
+                                    width: 40,
+                                    height: 40,
+                                    objectFit: 'cover',
+                                    borderRadius: '50%',
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                }}
+                            />
+                        </Grid>
+                    }
                 </Grid>
 
                 <Box>
@@ -4147,22 +4433,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 <Box style={{ width: '90vw' }}>
                     {tab === 'identity' &&
                         <Box>
-                            <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
-                                <Grid item>
-                                    <Select
-                                        style={{ width: '300px' }}
-                                        value={selectedId}
-                                        fullWidth
-                                        onChange={(event) => selectId(event.target.value)}
-                                    >
-                                        {idList.map((idname, index) => (
-                                            <MenuItem value={idname} key={index}>
-                                                {idname}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </Grid>
-                            </Grid>
                             <Box sx={{ mt: 2, mb: 2 }}>
                                 <Tabs
                                     value={identityTab}
@@ -4174,6 +4444,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 >
                                     <Tab key="details" value="details" label={'Details'} icon={<PermIdentity />} />
                                     <Tab key="addresses" value="addresses" label={'Addresses'} icon={<Badge />} />
+                                    <Tab key="avatar" value="avatar" label={'Avatar'} icon={<Image />} />
                                     <Tab key="nostr" value="nostr" label={'Nostr'} icon={<Login />} />
                                 </Tabs>
                             </Box>
@@ -4334,6 +4605,141 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         readOnly
                                         style={{ width: '100%', height: '240px', overflow: 'auto' }}
                                     />
+                                </Box>
+                            }
+                            {identityTab === 'avatar' &&
+                                <Box sx={{ width: '800px', maxWidth: '100%' }}>
+                                    <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-start', mb: 3 }}>
+                                        <Box sx={{ width: 220 }}>
+                                            <Typography variant="subtitle1" sx={{ mb: 1 }}>{displayedAvatarTitle}</Typography>
+                                            <Paper variant="outlined" sx={{ width: 220, height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', bgcolor: 'grey.50' }}>
+                                                {displayedAvatarPreviewUrl ? (
+                                                    <img src={displayedAvatarPreviewUrl} alt={`${selectedId} avatar`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                                ) : (
+                                                    <Typography color="text.secondary" sx={{ textAlign: 'center', px: 2 }}>
+                                                        {displayedAvatarEmptyText}
+                                                    </Typography>
+                                                )}
+                                            </Paper>
+                                        </Box>
+                                        <Box sx={{ flex: 1, minWidth: 280 }}>
+                                            <Typography variant="body2" sx={{ mb: 1 }}>
+                                                {isAvatarPreviewMode
+                                                    ? 'Review the preview below, then apply it to the selected identity.'
+                                                    : 'The selected identity stores its avatar as the `avatar` property.'}
+                                            </Typography>
+                                            <TextField
+                                                label={displayedAvatarDidLabel}
+                                                value={displayedAvatarDid}
+                                                fullWidth
+                                                size="small"
+                                                margin="normal"
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                            {displayedAvatarError &&
+                                                <Alert severity="warning" sx={{ mt: 1 }}>
+                                                    {displayedAvatarError}
+                                                </Alert>
+                                            }
+                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+                                                {isAvatarPreviewMode ? (
+                                                    <>
+                                                        <Button
+                                                            variant="contained"
+                                                            onClick={applyAvatarCandidate}
+                                                            disabled={!avatarCandidateDid || !avatarCandidatePreviewUrl}
+                                                        >
+                                                            Set Avatar
+                                                        </Button>
+                                                        <Button
+                                                            variant="outlined"
+                                                            onClick={clearAvatarCandidate}
+                                                            disabled={!avatarCandidateDid && !avatarCandidatePreviewUrl && !avatarCandidateError}
+                                                        >
+                                                            Clear Preview
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <Button variant="contained" color="error" onClick={removeAvatarProperty} disabled={!avatarDid}>
+                                                        Remove Avatar
+                                                    </Button>
+                                                )}
+                                            </Box>
+                                        </Box>
+                                    </Box>
+
+                                    <FormControl sx={{ mb: 2 }}>
+                                        <FormLabel>Set Avatar From</FormLabel>
+                                        <RadioGroup row value={avatarMode} onChange={handleAvatarModeChange}>
+                                            <FormControlLabel value="alias" control={<Radio />} label="Image Alias" />
+                                            <FormControlLabel value="did" control={<Radio />} label="DID" />
+                                            <FormControlLabel value="upload" control={<Radio />} label="Upload Image" />
+                                        </RadioGroup>
+                                    </FormControl>
+
+                                    {avatarMode === 'alias' &&
+                                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <Select
+                                                value={avatarAlias}
+                                                displayEmpty
+                                                size="small"
+                                                sx={{ minWidth: 280 }}
+                                                onChange={(event) => setAvatarAlias(event.target.value)}
+                                            >
+                                                <MenuItem value="" disabled>Select image alias</MenuItem>
+                                                {(imageList || []).map((name) => (
+                                                    <MenuItem key={name} value={name}>{name}</MenuItem>
+                                                ))}
+                                            </Select>
+                                            <Button
+                                                variant="contained"
+                                                onClick={() => previewAvatarCandidate(avatarAlias, { alias: avatarAlias })}
+                                                disabled={!avatarAlias}
+                                            >
+                                                Preview
+                                            </Button>
+                                        </Box>
+                                    }
+
+                                    {avatarMode === 'did' &&
+                                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <TextField
+                                                label="Avatar DID"
+                                                value={avatarInputDid}
+                                                onChange={(e) => setAvatarInputDid(e.target.value)}
+                                                size="small"
+                                                sx={{ minWidth: 420, flex: 1 }}
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                onClick={() => previewAvatarCandidate(avatarInputDid)}
+                                                disabled={!avatarInputDid.trim()}
+                                            >
+                                                Preview
+                                            </Button>
+                                        </Box>
+                                    }
+
+                                    {avatarMode === 'upload' &&
+                                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <RegistrySelect />
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                onClick={() => document.getElementById('avatarUpload').click()}
+                                                disabled={!registry}
+                                            >
+                                                Upload Image...
+                                            </Button>
+                                            <input
+                                                type="file"
+                                                id="avatarUpload"
+                                                accept="image/*"
+                                                style={{ display: 'none' }}
+                                                onChange={uploadAvatarImage}
+                                            />
+                                        </Box>
+                                    }
                                 </Box>
                             }
                             {identityTab === 'nostr' &&
