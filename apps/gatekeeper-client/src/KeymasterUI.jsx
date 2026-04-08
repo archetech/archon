@@ -50,6 +50,7 @@ import {
     Block,
     Bolt,
     Clear,
+    ContentCopy,
     Create,
     Groups,
     Delete,
@@ -1075,6 +1076,15 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             reader.readAsArrayBuffer(file);
         } catch (error) {
             showError(`Error uploading avatar image: ${error}`);
+        }
+    }
+
+    async function copyCurrentDid() {
+        try {
+            await navigator.clipboard.writeText(currentDID);
+            showSuccess('DID copied to clipboard');
+        } catch (error) {
+            showError(error);
         }
     }
 
@@ -4348,14 +4358,29 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                         </Grid>
                     }
                     <Grid item>
-                        <Typography style={{ fontSize: '1.5em', fontWeight: 'bold' }}>
-                            {currentId}
-                        </Typography>
+                        <Select
+                            size="small"
+                            style={{ width: '300px' }}
+                            value={selectedId}
+                            onChange={(event) => selectId(event.target.value)}
+                        >
+                            {idList?.map((idname, index) => (
+                                <MenuItem value={idname} key={index}>
+                                    {idname}
+                                </MenuItem>
+                            ))}
+                        </Select>
                     </Grid>
                     <Grid item>
-                        <Typography style={{ fontSize: '1em', fontFamily: 'Courier' }}>
-                            {currentDID}
-                        </Typography>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<ContentCopy />}
+                            onClick={copyCurrentDid}
+                            disabled={!currentDID}
+                        >
+                            Copy DID
+                        </Button>
                     </Grid>
                 </Grid>
 
@@ -4408,22 +4433,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 <Box style={{ width: '90vw' }}>
                     {tab === 'identity' &&
                         <Box>
-                            <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
-                                <Grid item>
-                                    <Select
-                                        style={{ width: '300px' }}
-                                        value={selectedId}
-                                        fullWidth
-                                        onChange={(event) => selectId(event.target.value)}
-                                    >
-                                        {idList.map((idname, index) => (
-                                            <MenuItem value={idname} key={index}>
-                                                {idname}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </Grid>
-                            </Grid>
                             <Box sx={{ mt: 2, mb: 2 }}>
                                 <Tabs
                                     value={identityTab}
