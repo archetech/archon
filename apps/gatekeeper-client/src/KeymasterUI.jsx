@@ -1006,6 +1006,21 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedId, aliasList, imageList]);
 
+    useEffect(() => {
+        if (!selectedId) {
+            setIdentityNameValue('');
+            setIdentityNameInput('');
+            setIdentityNameError('');
+            setIdentityNameLoading(false);
+            return;
+        }
+
+        setIdentityNameValue('');
+        setIdentityNameInput('');
+        setIdentityNameError('');
+        setIdentityNameLoading(true);
+    }, [selectedId]);
+
     async function applyAvatarCandidate() {
         if (!avatarCandidateDid || !avatarCandidatePreviewUrl) {
             showAlert('Preview an image avatar before setting it');
@@ -1096,39 +1111,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
-    async function loadIdentityName() {
-        if (!selectedId) {
-            setIdentityNameValue('');
-            setIdentityNameInput('');
-            setIdentityNameError('');
-            setIdentityNameLoading(false);
-            return;
-        }
-
-        setIdentityNameLoading(true);
-        setIdentityNameError('');
-
-        try {
-            const identityDoc = await keymaster.resolveDID(selectedId);
-            const rawName = identityDoc?.didDocumentData?.name;
-            const nextName = typeof rawName === 'string' ? rawName : '';
-
-            setIdentityNameValue(nextName);
-            setIdentityNameInput(nextName);
-        } catch (error) {
-            setIdentityNameValue('');
-            setIdentityNameInput('');
-            setIdentityNameError(error.error || error.message || String(error));
-        } finally {
-            setIdentityNameLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        loadIdentityName();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedId]);
-
     async function setIdentityNameProperty() {
         const nextName = identityNameInput.trim();
 
@@ -1204,11 +1186,21 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setManifest(docs.didDocumentData.manifest);
             setNostrKeys(docs.didDocumentData.nostr || null);
             setDocsString(JSON.stringify(docs, null, 4));
+            const rawName = docs?.didDocumentData?.name;
+            const nextName = typeof rawName === 'string' ? rawName : '';
+            setIdentityNameValue(nextName);
+            setIdentityNameInput(nextName);
+            setIdentityNameError('');
+            setIdentityNameLoading(false);
 
             const versions = docs.didDocumentMetadata.version ?? 1;
             setDocsVersion(versions);
             setDocsVersionMax(versions);
         } catch (error) {
+            setIdentityNameValue('');
+            setIdentityNameInput('');
+            setIdentityNameError(error.error || error.message || String(error));
+            setIdentityNameLoading(false);
             showError(error);
         }
     }

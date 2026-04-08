@@ -526,13 +526,28 @@ function IdentitiesTab() {
     const refreshCurrentIdDocs = useCallback(async () => {
         if (!keymaster || !currentDID) {
             setCurrentIdDocs(null);
+            setIdentityNameValue("");
+            setIdentityNameInput("");
+            setIdentityNameError("");
+            setIdentityNameLoading(false);
             return;
         }
         try {
             const docs = await keymaster.resolveDID(currentDID);
             setCurrentIdDocs(docs as Record<string, unknown>);
+            const rawName = (docs.didDocumentData as Record<string, unknown>)?.name;
+            const nextName = typeof rawName === "string" ? rawName : "";
+
+            setIdentityNameValue(nextName);
+            setIdentityNameInput(nextName);
+            setIdentityNameError("");
         } catch {
             setCurrentIdDocs(null);
+            setIdentityNameValue("");
+            setIdentityNameInput("");
+            setIdentityNameError("Unable to load identity details");
+        } finally {
+            setIdentityNameLoading(false);
         }
     }, [keymaster, currentDID]);
 
@@ -540,8 +555,8 @@ function IdentitiesTab() {
         refreshCurrentIdDocs();
     }, [refreshCurrentIdDocs]);
 
-    const loadIdentityName = useCallback(async () => {
-        if (!keymaster || !currentDID) {
+    useEffect(() => {
+        if (!currentDID) {
             setIdentityNameValue("");
             setIdentityNameInput("");
             setIdentityNameError("");
@@ -551,26 +566,7 @@ function IdentitiesTab() {
 
         setIdentityNameLoading(true);
         setIdentityNameError("");
-
-        try {
-            const identityDoc = await keymaster.resolveDID(currentDID);
-            const rawName = (identityDoc.didDocumentData as Record<string, unknown>)?.name;
-            const nextName = typeof rawName === "string" ? rawName : "";
-
-            setIdentityNameValue(nextName);
-            setIdentityNameInput(nextName);
-        } catch (error: any) {
-            setIdentityNameValue("");
-            setIdentityNameInput("");
-            setIdentityNameError(error.error || error.message || String(error));
-        } finally {
-            setIdentityNameLoading(false);
-        }
-    }, [currentDID, keymaster]);
-
-    useEffect(() => {
-        loadIdentityName();
-    }, [loadIdentityName]);
+    }, [currentDID]);
 
     const refreshAddresses = useCallback(async () => {
         if (!keymaster || !currentId) {
