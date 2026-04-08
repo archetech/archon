@@ -76,19 +76,23 @@ const DropDownID = () => {
                     return;
                 }
 
-                if (requestId === avatarRequestCounter) {
+                if (isActive && requestId === avatarRequestCounter) {
                     setAvatarPreviewUrl(`data:${asset.file.type};base64,${raw.toString("base64")}`);
                 }
             } catch {
-                if (requestId === avatarRequestCounter) {
+                if (isActive && requestId === avatarRequestCounter) {
                     setAvatarPreviewUrl("");
                 }
             }
         };
 
+        let isActive = true;
         loadAvatar();
         window.addEventListener("archon:avatar-changed", loadAvatar);
-        return () => window.removeEventListener("archon:avatar-changed", loadAvatar);
+        return () => {
+            isActive = false;
+            window.removeEventListener("archon:avatar-changed", loadAvatar);
+        };
     }, [currentDID, currentId, keymaster]);
 
     async function selectId(id: string) {

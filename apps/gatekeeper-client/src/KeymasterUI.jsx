@@ -877,8 +877,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     function getImagePreviewUrl(doc) {
+        const image = doc?.didDocumentData?.image;
         const cid = doc?.didDocumentData?.file?.cid;
-        return cid ? `${serverUrl}/api/v1/ipfs/data/${cid}` : '';
+        const fileType = doc?.didDocumentData?.file?.type;
+        const isImageType = !fileType || fileType.startsWith('image/');
+
+        return image && cid && isImageType ? `${serverUrl}/api/v1/ipfs/data/${cid}` : '';
     }
 
     function clearAvatarCandidate() {
