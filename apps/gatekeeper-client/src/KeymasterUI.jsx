@@ -1078,6 +1078,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
+    const isAvatarPreviewMode = !!(avatarCandidateDid || avatarCandidatePreviewUrl || avatarCandidateError || avatarCandidateLoading);
+    const displayedAvatarPreviewUrl = isAvatarPreviewMode ? avatarCandidatePreviewUrl : avatarPreviewUrl;
+    const displayedAvatarDid = isAvatarPreviewMode ? avatarCandidateDid : avatarDid;
+    const displayedAvatarError = isAvatarPreviewMode ? avatarCandidateError : avatarError;
+    const displayedAvatarLoading = isAvatarPreviewMode ? avatarCandidateLoading : avatarLoading;
+    const displayedAvatarTitle = isAvatarPreviewMode ? 'Avatar Preview' : 'Current Avatar';
+    const displayedAvatarDidLabel = isAvatarPreviewMode ? 'Preview Avatar DID' : 'Current Avatar DID';
+    const displayedAvatarEmptyText = displayedAvatarLoading
+        ? (isAvatarPreviewMode ? 'Loading preview...' : 'Loading avatar...')
+        : displayedAvatarError
+            ? (isAvatarPreviewMode ? 'Preview unavailable' : 'Avatar preview unavailable')
+            : 'No avatar set';
+
     async function showCreate() {
         setSaveId(currentId);
         setCurrentId('');
@@ -4572,38 +4585,59 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 <Box sx={{ width: '800px', maxWidth: '100%' }}>
                                     <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-start', mb: 3 }}>
                                         <Box sx={{ width: 220 }}>
-                                            <Typography variant="subtitle1" sx={{ mb: 1 }}>Current Avatar</Typography>
+                                            <Typography variant="subtitle1" sx={{ mb: 1 }}>{displayedAvatarTitle}</Typography>
                                             <Paper variant="outlined" sx={{ width: 220, height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', bgcolor: 'grey.50' }}>
-                                                {avatarPreviewUrl ? (
-                                                    <img src={avatarPreviewUrl} alt={`${selectedId} avatar`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                                {displayedAvatarPreviewUrl ? (
+                                                    <img src={displayedAvatarPreviewUrl} alt={`${selectedId} avatar`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                                                 ) : (
                                                     <Typography color="text.secondary" sx={{ textAlign: 'center', px: 2 }}>
-                                                        {avatarLoading ? 'Loading avatar...' : avatarError ? 'Avatar preview unavailable' : 'No avatar set'}
+                                                        {displayedAvatarEmptyText}
                                                     </Typography>
                                                 )}
                                             </Paper>
                                         </Box>
                                         <Box sx={{ flex: 1, minWidth: 280 }}>
                                             <Typography variant="body2" sx={{ mb: 1 }}>
-                                                The selected identity stores its avatar as the `avatar` property.
+                                                {isAvatarPreviewMode
+                                                    ? 'Review the preview below, then apply it to the selected identity.'
+                                                    : 'The selected identity stores its avatar as the `avatar` property.'}
                                             </Typography>
                                             <TextField
-                                                label="Current Avatar DID"
-                                                value={avatarDid}
+                                                label={displayedAvatarDidLabel}
+                                                value={displayedAvatarDid}
                                                 fullWidth
                                                 size="small"
                                                 margin="normal"
                                                 InputProps={{ readOnly: true }}
                                             />
-                                            {avatarError &&
+                                            {displayedAvatarError &&
                                                 <Alert severity="warning" sx={{ mt: 1 }}>
-                                                    {avatarError}
+                                                    {displayedAvatarError}
                                                 </Alert>
                                             }
-                                            <Box sx={{ mt: 2 }}>
-                                                <Button variant="contained" color="error" onClick={removeAvatarProperty} disabled={!avatarDid}>
-                                                    Remove Avatar
-                                                </Button>
+                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+                                                {isAvatarPreviewMode ? (
+                                                    <>
+                                                        <Button
+                                                            variant="contained"
+                                                            onClick={applyAvatarCandidate}
+                                                            disabled={!avatarCandidateDid || !avatarCandidatePreviewUrl}
+                                                        >
+                                                            Set Avatar
+                                                        </Button>
+                                                        <Button
+                                                            variant="outlined"
+                                                            onClick={clearAvatarCandidate}
+                                                            disabled={!avatarCandidateDid && !avatarCandidatePreviewUrl && !avatarCandidateError}
+                                                        >
+                                                            Clear Preview
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <Button variant="contained" color="error" onClick={removeAvatarProperty} disabled={!avatarDid}>
+                                                        Remove Avatar
+                                                    </Button>
+                                                )}
                                             </Box>
                                         </Box>
                                     </Box>
@@ -4680,60 +4714,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             />
                                         </Box>
                                     }
-
-                                    <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-start', mt: 3 }}>
-                                        <Box sx={{ width: 220 }}>
-                                            <Typography variant="subtitle1" sx={{ mb: 1 }}>Pending Avatar</Typography>
-                                            <Paper variant="outlined" sx={{ width: 220, height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', bgcolor: 'grey.50' }}>
-                                                {avatarCandidatePreviewUrl ? (
-                                                    <img src={avatarCandidatePreviewUrl} alt="Pending avatar preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                                                ) : (
-                                                    <Typography color="text.secondary" sx={{ textAlign: 'center', px: 2 }}>
-                                                        {avatarCandidateLoading ? 'Loading preview...' : avatarCandidateError ? 'Preview unavailable' : 'Preview an avatar before setting it'}
-                                                    </Typography>
-                                                )}
-                                            </Paper>
-                                        </Box>
-                                        <Box sx={{ flex: 1, minWidth: 280 }}>
-                                            <TextField
-                                                label="Pending Avatar DID"
-                                                value={avatarCandidateDid}
-                                                fullWidth
-                                                size="small"
-                                                margin="normal"
-                                                InputProps={{ readOnly: true }}
-                                            />
-                                            <TextField
-                                                label="Pending Avatar Alias"
-                                                value={avatarCandidateAlias}
-                                                fullWidth
-                                                size="small"
-                                                margin="normal"
-                                                InputProps={{ readOnly: true }}
-                                            />
-                                            {avatarCandidateError &&
-                                                <Alert severity="warning" sx={{ mt: 1 }}>
-                                                    {avatarCandidateError}
-                                                </Alert>
-                                            }
-                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
-                                                <Button
-                                                    variant="contained"
-                                                    onClick={applyAvatarCandidate}
-                                                    disabled={!avatarCandidateDid || !avatarCandidatePreviewUrl}
-                                                >
-                                                    Set Avatar
-                                                </Button>
-                                                <Button
-                                                    variant="outlined"
-                                                    onClick={clearAvatarCandidate}
-                                                    disabled={!avatarCandidateDid && !avatarCandidatePreviewUrl && !avatarCandidateError}
-                                                >
-                                                    Clear Preview
-                                                </Button>
-                                            </Box>
-                                        </Box>
-                                    </Box>
                                 </Box>
                             }
                             {identityTab === 'nostr' &&
