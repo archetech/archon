@@ -4330,6 +4330,23 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             ID:
                         </Typography>
                     </Grid>
+                    {avatarPreviewUrl && !avatarLoading &&
+                        <Grid item>
+                            <Box
+                                component="img"
+                                src={avatarPreviewUrl}
+                                alt={`${currentId} avatar`}
+                                sx={{
+                                    width: 40,
+                                    height: 40,
+                                    objectFit: 'cover',
+                                    borderRadius: '50%',
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                }}
+                            />
+                        </Grid>
+                    }
                     <Grid item>
                         <Typography style={{ fontSize: '1.5em', fontWeight: 'bold' }}>
                             {currentId}
