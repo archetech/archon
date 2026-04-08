@@ -2,7 +2,7 @@ import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
-import { Badge, Image, Login, PermIdentity } from "@mui/icons-material";
+import { Badge, Create, Image, Login, PermIdentity } from "@mui/icons-material";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
@@ -44,7 +44,7 @@ function formatAddedDate(value: string): string {
 }
 
 function IdentitiesTab() {
-    const [identityTab, setIdentityTab] = useState<"details" | "addresses" | "avatar" | "nostr">("details");
+    const [identityTab, setIdentityTab] = useState<"details" | "addresses" | "name" | "avatar" | "nostr">("details");
     const [name, setName] = useState<string>("");
     const [warningModal, setWarningModal] = useState<boolean>(false);
     const [removeCalled, setRemoveCalled] = useState<boolean>(false);
@@ -62,6 +62,10 @@ function IdentitiesTab() {
     const [selectedAddress, setSelectedAddress] = useState<string>("");
     const [addressDetails, setAddressDetails] = useState<string>("");
     const [addressBusy, setAddressBusy] = useState<boolean>(false);
+    const [identityNameValue, setIdentityNameValue] = useState<string>("");
+    const [identityNameInput, setIdentityNameInput] = useState<string>("");
+    const [identityNameLoading, setIdentityNameLoading] = useState<boolean>(false);
+    const [identityNameError, setIdentityNameError] = useState<string>("");
     const [avatarMode, setAvatarMode] = useState<"alias" | "did" | "upload">("alias");
     const [avatarAlias, setAvatarAlias] = useState<string>("");
     const [avatarInputDid, setAvatarInputDid] = useState<string>("");
@@ -97,7 +101,7 @@ function IdentitiesTab() {
         init();
     }, []);
 
-    function findAliasByDid(did: string, allowedAliases?: string[]): string {
+    const findAliasByDid = useCallback((did: string, allowedAliases?: string[]): string => {
         if (!did) {
             return "";
         }
@@ -111,7 +115,7 @@ function IdentitiesTab() {
         }
 
         return "";
-    }
+    }, [aliasList]);
 
     async function getImagePreviewDataUrl(doc: Record<string, unknown>): Promise<string> {
         const docAsset = doc as { file?: FileAsset; image?: ImageAsset };
@@ -244,7 +248,7 @@ function IdentitiesTab() {
         } finally {
             setAvatarLoading(false);
         }
-    }, [currentDID, imageList, keymaster, aliasList]);
+    }, [currentDID, findAliasByDid, imageList, keymaster]);
 
     useEffect(() => {
         loadAvatar();
@@ -521,19 +525,47 @@ function IdentitiesTab() {
     const refreshCurrentIdDocs = useCallback(async () => {
         if (!keymaster || !currentDID) {
             setCurrentIdDocs(null);
+            setIdentityNameValue("");
+            setIdentityNameInput("");
+            setIdentityNameError("");
+            setIdentityNameLoading(false);
             return;
         }
         try {
             const docs = await keymaster.resolveDID(currentDID);
             setCurrentIdDocs(docs as Record<string, unknown>);
+            const rawName = (docs.didDocumentData as Record<string, unknown>)?.name;
+            const nextName = typeof rawName === "string" ? rawName : "";
+
+            setIdentityNameValue(nextName);
+            setIdentityNameInput(nextName);
+            setIdentityNameError("");
         } catch {
             setCurrentIdDocs(null);
+            setIdentityNameValue("");
+            setIdentityNameInput("");
+            setIdentityNameError("Unable to load identity details");
+        } finally {
+            setIdentityNameLoading(false);
         }
     }, [keymaster, currentDID]);
 
     useEffect(() => {
         refreshCurrentIdDocs();
     }, [refreshCurrentIdDocs]);
+
+    useEffect(() => {
+        if (!currentDID) {
+            setIdentityNameValue("");
+            setIdentityNameInput("");
+            setIdentityNameError("");
+            setIdentityNameLoading(false);
+            return;
+        }
+
+        setIdentityNameLoading(true);
+        setIdentityNameError("");
+    }, [currentDID]);
 
     const refreshAddresses = useCallback(async () => {
         if (!keymaster || !currentId) {
@@ -750,6 +782,47 @@ function IdentitiesTab() {
         }
     }
 
+    async function setIdentityNameProperty() {
+        if (!keymaster) {
+            return;
+        }
+
+        const nextName = identityNameInput.trim();
+
+        if (!nextName) {
+            setError("Enter a name to set");
+            return;
+        }
+
+        try {
+            await keymaster.mergeData(currentId, { name: nextName });
+            setIdentityNameValue(nextName);
+            setIdentityNameInput(nextName);
+            setIdentityNameError("");
+            await refreshCurrentIdDocs();
+            setSuccess("Name updated");
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
+    async function removeIdentityNameProperty() {
+        if (!keymaster) {
+            return;
+        }
+
+        try {
+            await keymaster.mergeData(currentId, { name: null });
+            setIdentityNameValue("");
+            setIdentityNameInput("");
+            setIdentityNameError("");
+            await refreshCurrentIdDocs();
+            setSuccess("Name removed");
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
     return (
         <Box sx={{ width: '100%' }}>
             <WarningModal
@@ -913,6 +986,7 @@ function IdentitiesTab() {
                         >
                             <Tab value="details" label="Details" icon={<PermIdentity />} iconPosition="top" />
                             <Tab value="addresses" label="Addresses" icon={<Badge />} iconPosition="top" />
+                            <Tab value="name" label="Name" icon={<Create />} iconPosition="top" />
                             <Tab value="avatar" label="Avatar" icon={<Image />} iconPosition="top" />
                             <Tab value="nostr" label="Nostr" icon={<Login />} iconPosition="top" />
                         </Tabs>
@@ -966,6 +1040,53 @@ function IdentitiesTab() {
                                     </Table>
                                 </TableContainer>
                                 <TextField multiline minRows={8} fullWidth value={addressDetails} InputProps={{ readOnly: true }} />
+                            </Box>
+                        )}
+                        {identityTab === "name" && (
+                            <Box sx={{ mt: 2, width: '100%', maxWidth: 520 }}>
+                                <Typography variant="body2" sx={{ mb: 1 }}>
+                                    The selected identity stores its display name as the `name` property.
+                                </Typography>
+                                <TextField
+                                    label="Current Name"
+                                    value={identityNameValue}
+                                    fullWidth
+                                    size="small"
+                                    margin="normal"
+                                    slotProps={{ input: { readOnly: true } }}
+                                    placeholder={identityNameLoading ? "Loading..." : "No name set"}
+                                />
+                                <TextField
+                                    label="Name"
+                                    value={identityNameInput}
+                                    onChange={(e) => setIdentityNameInput(e.target.value)}
+                                    fullWidth
+                                    size="small"
+                                    margin="normal"
+                                    placeholder="Enter name"
+                                />
+                                {identityNameError && (
+                                    <Alert severity="warning" sx={{ mt: 1 }}>
+                                        {identityNameError}
+                                    </Alert>
+                                )}
+                                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
+                                    <Button
+                                        variant="contained"
+                                        onClick={setIdentityNameProperty}
+                                        disabled={!identityNameInput.trim()}
+                                    >
+                                        Set Name
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        color="error"
+                                        onClick={removeIdentityNameProperty}
+                                        disabled={!identityNameValue}
+                                    >
+                                        Remove Name
+                                    </Button>
+                                </Box>
                             </Box>
                         )}
                         {identityTab === "avatar" && (

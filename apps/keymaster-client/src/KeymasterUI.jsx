@@ -375,6 +375,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [avatarCandidatePreviewUrl, setAvatarCandidatePreviewUrl] = useState('');
     const [avatarCandidateLoading, setAvatarCandidateLoading] = useState(false);
     const [avatarCandidateError, setAvatarCandidateError] = useState('');
+    const [identityNameValue, setIdentityNameValue] = useState('');
+    const [identityNameInput, setIdentityNameInput] = useState('');
+    const [identityNameLoading, setIdentityNameLoading] = useState(false);
+    const [identityNameError, setIdentityNameError] = useState('');
 
     const [lightningTab, setLightningTab] = useState('wallet');
     const [lightningBalance, setLightningBalance] = useState(null);
@@ -1002,6 +1006,21 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedId, aliasList, imageList]);
 
+    useEffect(() => {
+        if (!selectedId) {
+            setIdentityNameValue('');
+            setIdentityNameInput('');
+            setIdentityNameError('');
+            setIdentityNameLoading(false);
+            return;
+        }
+
+        setIdentityNameValue('');
+        setIdentityNameInput('');
+        setIdentityNameError('');
+        setIdentityNameLoading(true);
+    }, [selectedId]);
+
     async function applyAvatarCandidate() {
         if (!avatarCandidateDid || !avatarCandidatePreviewUrl) {
             showAlert('Preview an image avatar before setting it');
@@ -1092,6 +1111,39 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
+    async function setIdentityNameProperty() {
+        const nextName = identityNameInput.trim();
+
+        if (!nextName) {
+            showAlert('Enter a name to set');
+            return;
+        }
+
+        try {
+            await keymaster.mergeData(selectedId, { name: nextName });
+            setIdentityNameValue(nextName);
+            setIdentityNameInput(nextName);
+            setIdentityNameError('');
+            showSuccess('Name updated');
+            await resolveId();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function removeIdentityNameProperty() {
+        try {
+            await keymaster.mergeData(selectedId, { name: null });
+            setIdentityNameValue('');
+            setIdentityNameInput('');
+            setIdentityNameError('');
+            showSuccess('Name removed');
+            await resolveId();
+        } catch (error) {
+            showError(error);
+        }
+    }
+
     const isAvatarPreviewMode = !!(avatarCandidateDid || avatarCandidatePreviewUrl || avatarCandidateError || avatarCandidateLoading);
     const displayedAvatarPreviewUrl = isAvatarPreviewMode ? avatarCandidatePreviewUrl : avatarPreviewUrl;
     const displayedAvatarDid = isAvatarPreviewMode ? avatarCandidateDid : avatarDid;
@@ -1134,11 +1186,21 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setManifest(docs.didDocumentData.manifest);
             setNostrKeys(docs.didDocumentData.nostr || null);
             setDocsString(JSON.stringify(docs, null, 4));
+            const rawName = docs?.didDocumentData?.name;
+            const nextName = typeof rawName === 'string' ? rawName : '';
+            setIdentityNameValue(nextName);
+            setIdentityNameInput(nextName);
+            setIdentityNameError('');
+            setIdentityNameLoading(false);
 
             const versions = docs.didDocumentMetadata.version ?? 1;
             setDocsVersion(versions);
             setDocsVersionMax(versions);
         } catch (error) {
+            setIdentityNameValue('');
+            setIdentityNameInput('');
+            setIdentityNameError(error.error || error.message || String(error));
+            setIdentityNameLoading(false);
             showError(error);
         }
     }
@@ -4448,6 +4510,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 >
                                     <Tab key="details" value="details" label={'Details'} icon={<PermIdentity />} />
                                     <Tab key="addresses" value="addresses" label={'Addresses'} icon={<Badge />} />
+                                    <Tab key="name" value="name" label={'Name'} icon={<Create />} />
                                     <Tab key="avatar" value="avatar" label={'Avatar'} icon={<Image />} />
                                     <Tab key="nostr" value="nostr" label={'Nostr'} icon={<Login />} />
                                 </Tabs>
@@ -4609,6 +4672,55 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         readOnly
                                         style={{ width: '100%', height: '240px', overflow: 'auto' }}
                                     />
+                                </Box>
+                            }
+                            {identityTab === 'name' &&
+                                <Box sx={{ width: '800px', maxWidth: '100%' }}>
+                                    <Box sx={{ maxWidth: 520 }}>
+                                        <Typography variant="body2" sx={{ mb: 1 }}>
+                                            The selected identity stores its display name as the `name` property.
+                                        </Typography>
+                                        <TextField
+                                            label="Current Name"
+                                            value={identityNameValue}
+                                            fullWidth
+                                            size="small"
+                                            margin="normal"
+                                            InputProps={{ readOnly: true }}
+                                            placeholder={identityNameLoading ? 'Loading...' : 'No name set'}
+                                        />
+                                        <TextField
+                                            label="Name"
+                                            value={identityNameInput}
+                                            onChange={(e) => setIdentityNameInput(e.target.value)}
+                                            fullWidth
+                                            size="small"
+                                            margin="normal"
+                                            placeholder="Enter name"
+                                        />
+                                        {identityNameError &&
+                                            <Alert severity="warning" sx={{ mt: 1 }}>
+                                                {identityNameError}
+                                            </Alert>
+                                        }
+                                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+                                            <Button
+                                                variant="contained"
+                                                onClick={setIdentityNameProperty}
+                                                disabled={!identityNameInput.trim()}
+                                            >
+                                                Set Name
+                                            </Button>
+                                            <Button
+                                                variant="contained"
+                                                color="error"
+                                                onClick={removeIdentityNameProperty}
+                                                disabled={!identityNameValue}
+                                            >
+                                                Remove Name
+                                            </Button>
+                                        </Box>
+                                    </Box>
                                 </Box>
                             }
                             {identityTab === 'avatar' &&
