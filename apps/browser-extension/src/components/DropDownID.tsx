@@ -16,6 +16,7 @@ import GatekeeperClient from "@didcid/gatekeeper/client";
 import type { FileAsset, ImageAsset } from "@didcid/keymaster/types";
 
 const gatekeeper = new GatekeeperClient();
+let avatarRequestCounter = 0;
 
 const DropDownID = () => {
     const {
@@ -47,8 +48,10 @@ const DropDownID = () => {
 
     useEffect(() => {
         const loadAvatar = async () => {
+            const requestId = ++avatarRequestCounter;
+            setAvatarPreviewUrl("");
+
             if (!keymaster || !currentDID) {
-                setAvatarPreviewUrl("");
                 return;
             }
 
@@ -58,7 +61,6 @@ const DropDownID = () => {
                 const avatarDid = typeof identityData.avatar === "string" ? identityData.avatar.trim() : "";
 
                 if (!avatarDid) {
-                    setAvatarPreviewUrl("");
                     return;
                 }
 
@@ -66,19 +68,21 @@ const DropDownID = () => {
                 const asset = avatarDoc.didDocumentData as { file?: FileAsset; image?: ImageAsset };
 
                 if (!asset.file?.cid || !asset.file?.type || !asset.image) {
-                    setAvatarPreviewUrl("");
                     return;
                 }
 
                 const raw = await gatekeeper.getData(asset.file.cid);
                 if (!raw) {
-                    setAvatarPreviewUrl("");
                     return;
                 }
 
-                setAvatarPreviewUrl(`data:${asset.file.type};base64,${raw.toString("base64")}`);
+                if (requestId === avatarRequestCounter) {
+                    setAvatarPreviewUrl(`data:${asset.file.type};base64,${raw.toString("base64")}`);
+                }
             } catch {
-                setAvatarPreviewUrl("");
+                if (requestId === avatarRequestCounter) {
+                    setAvatarPreviewUrl("");
+                }
             }
         };
 
