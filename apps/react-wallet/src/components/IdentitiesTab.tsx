@@ -101,7 +101,7 @@ function IdentitiesTab() {
         init();
     }, []);
 
-    function findAliasByDid(did: string, allowedAliases?: string[]): string {
+    const findAliasByDid = useCallback((did: string, allowedAliases?: string[]): string => {
         if (!did) {
             return "";
         }
@@ -115,7 +115,7 @@ function IdentitiesTab() {
         }
 
         return "";
-    }
+    }, [aliasList]);
 
     async function getImagePreviewDataUrl(doc: Record<string, unknown>): Promise<string> {
         const docAsset = doc as { file?: FileAsset; image?: ImageAsset };
@@ -248,7 +248,7 @@ function IdentitiesTab() {
         } finally {
             setAvatarLoading(false);
         }
-    }, [currentDID, imageList, keymaster, aliasList]);
+    }, [currentDID, findAliasByDid, imageList, keymaster]);
 
     useEffect(() => {
         loadAvatar();
