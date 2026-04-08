@@ -984,7 +984,7 @@ function IdentitiesTab() {
                                             )}
                                         </Paper>
                                     </Box>
-                                    <Box sx={{ flex: 1, minWidth: 280 }}>
+                                    <Box sx={{ flex: "0 1 520px", minWidth: 280, maxWidth: 520 }}>
                                         <Typography variant="body2" sx={{ mb: 1 }}>
                                             {isAvatarPreviewMode
                                                 ? "Review the preview below, then apply it to the selected identity."
