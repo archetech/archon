@@ -1096,8 +1096,10 @@ function IdentitiesTab() {
                                         <TableBody>
                                             {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
                                                 <TableRow key={address} selected={address === selectedAddress}>
-                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400 }}>{address}</TableCell>
-                                                    <TableCell sx={{ fontFamily: 'monospace' }}>{formatAddedDate(info.added)}</TableCell>
+                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400, whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                                                        {address}
+                                                    </TableCell>
+                                                    <TableCell sx={{ fontFamily: 'monospace', whiteSpace: "nowrap" }}>{formatAddedDate(info.added)}</TableCell>
                                                     <TableCell>
                                                         <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
                                                             <Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button>

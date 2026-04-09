@@ -1906,6 +1906,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 if (publishedAddress === normalizedAddress && selectedId) {
                     await keymaster.mergeData(selectedId, { address: null });
                     setPublishedAddress('');
+                    await resolveId();
                 }
                 if (selectedAddress === normalizedAddress) {
                     setSelectedAddress('');
