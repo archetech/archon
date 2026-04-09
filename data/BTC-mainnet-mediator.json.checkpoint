@@ -1,10 +1,10 @@
 {
-    "height": 940417,
-    "time": "2026-03-12T16:58:44.000Z",
-    "blockCount": 940417,
-    "blocksScanned": 6418,
+    "height": 944226,
+    "time": "2026-04-08T18:18:32.000Z",
+    "blockCount": 944226,
+    "blocksScanned": 10227,
     "blocksPending": 0,
-    "txnsScanned": 19779434,
+    "txnsScanned": 33734491,
     "registered": [
         {
             "did": "did:cid:bagaaierax7pa5nqcur6y7w5sciggm7xadjzdieapcma6vft6xocoorzmtxra",
@@ -73,6 +73,54 @@
         {
             "did": "did:cid:bagaaieracssm3rj7dm7vb3ht3oatz24zqx3ndqb4secr6wn5kpx2xr6ef7oq",
             "txid": "96e555227edb2d902ed052a36680fa324f8291d73dc92c0ef049dfe61fdc14cc"
+        },
+        {
+            "did": "did:cid:bagaaieram5uhm53hzdbl2el6yidjtxmedxty7sedsxsodjdihkhp7go5rj7q",
+            "txid": "b9eac57e810ba0749e3024ff4aa2d4fdaa6530e97707da4c4c146194332f3a48"
+        },
+        {
+            "did": "did:cid:bagaaieracx5sukt3z4qgjnbrfo5qjf65p6wjj73x6x4qq33ij7ablo3q42qa",
+            "txid": "532f928e9f3f339a0d44f2f8d82879301f3e5c073d9a18a0b217014c26c06c1e"
+        },
+        {
+            "did": "did:cid:bagaaierabwogcxa73twkdqw6tefki2fvptc75ghm2265yp53qyhikdnqhmta",
+            "txid": "5e83eb720b9a426d15a41a179c0ffa1ec6ee2e6cf3c771cec6b15e254fd63f14"
+        },
+        {
+            "did": "did:cid:bagaaieraqvvvogvwfu7sq5rapvi3k5lllstozdzdyhvp6acic67ybobgmyaq",
+            "txid": "8560a15fe20fbfe51ea27b188b778ac74d366ce0ceb9db51e826e6de5cbadb47"
+        },
+        {
+            "did": "did:cid:bagaaierankfjd7tijjyxnwjhbnqtg67xieetdjz6zkyt6tgdpqyuft24itka",
+            "txid": "2767822484fe1a5de7c99dab3f80fc3a2f1fb1a982921980949593f5d80f9adc"
+        },
+        {
+            "did": "did:cid:bagaaieramgdz5yfvz6wer7lafwkcdu7tq32xuqpr7ko6atnl2ixs4whbhjqa",
+            "txid": "2475ea4667bb44de3d3433a7e43186f54a9a3a9ef0c1bf26318e057a08d2a5f7"
+        },
+        {
+            "did": "did:cid:bagaaierar6cawgm2pkwwcmqxcnghz5sxvn4h57yz3tlvdsrtglaawiaucs2a",
+            "txid": "cc2c6c15196404759df099d813425805189dd2aeb6c4cb141828bb41fc2349e3"
+        },
+        {
+            "did": "did:cid:bagaaieraitycl45hpfdongfrux3we46hul7hkqnude4trt4tdw5smel54kjq",
+            "txid": "c3f137b3f10726c6e22bdc3bf559f7d462e6af926a8472ac04945005b1eaf286"
+        },
+        {
+            "did": "did:cid:bagaaierambzdwpvadc6l6s62nrvzbhh2473nrzxv5j6aokahz4dkqsvnsv2a",
+            "txid": "4e419629dab95f079b555a210928ba06ee94501bc42f9a52f53b604c40beaefe"
+        },
+        {
+            "did": "did:cid:bagaaiera3yfhpqe2fmnlq7z5besaawcfgddymjwcccmydho6xx4tr5cnqjfq",
+            "txid": "7984700783b3434613d568647713e141992902a79131fb7dbfce923a1622e0ad"
+        },
+        {
+            "did": "did:cid:bagaaiera7ofvifheznkczvo3khuwignyjdswfq22e3na5vk63cenp3y6kqia",
+            "txid": "1fd7f7ffeaa51bf2f168f4659365fceee7f93df64ec3a22bf605248e2e586b75"
+        },
+        {
+            "did": "did:cid:bagaaieraplchcual5ic4i2lwi73xsf57ebk4z2uwmnfcj44ehlkbww2lzeya",
+            "txid": "b25fd805560dfff22f743cfe973679500fd3d46fdcbd5695fb7d2cedb34983ea"
         }
     ],
     "discovered": [
@@ -83,17 +131,18 @@
             "txid": "357666351cb7305906bafc2178b687ade3b37bd423849bf1fc2867ce2cf857fa",
             "did": "did:cid:bagaaierax7pa5nqcur6y7w5sciggm7xadjzdieapcma6vft6xocoorzmtxra",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 934149,
@@ -102,17 +151,18 @@
             "txid": "023512d6f0463c37f3d6ee25b53a4b3174bb5bca2fd29ebf5096a5431a6f43bc",
             "did": "did:cid:bagaaiera4pauwxsqbhisdpy2n5av3q6adh7ryiqlisrajkucalss47tju3gq",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 2,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 934241,
@@ -121,17 +171,18 @@
             "txid": "a7d66b5c1ba5ca8d85758d38c9eea1b805857cedc2b261da0da0883316157129",
             "did": "did:cid:bagaaieramlsmwfqnxhacsbcc2apbynag5zdjz3puvdwctx3ila6sn5i253iq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 934260,
@@ -140,17 +191,18 @@
             "txid": "9a27f2a823ec4ecc3b10be9bca667591c6d201559c1f9b75369ea4a93ebe8c25",
             "did": "did:cid:bagaaiera3zcj7t5j3cqnlmsjyeicfpamr5qdgg3tuosmklmzcbyoda3xkmqa",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 934513,
@@ -159,17 +211,18 @@
             "txid": "c24c119ec628b5ec514f969fd6301ec16ac4baa1c961ac4635f7b2bed50b1a43",
             "did": "did:cid:bagaaieral6hku5odb23oilcag52yhx4k5wjm4pfnbr43cjmg4vouxcvzidsq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 935207,
@@ -178,17 +231,18 @@
             "txid": "703551447b116062846f011829ebd2faa24b837535db158637858482422d43b2",
             "did": "did:cid:bagaaieratfscshlibwv3oyjv3f23towivjtjrivkltgpv7ka2ivgmxtfxl6a",
             "imported": {
-                "queued": 3,
-                "processed": 0,
+                "queued": 0,
+                "processed": 3,
                 "rejected": 0,
-                "total": 3
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 3,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 935214,
@@ -197,17 +251,18 @@
             "txid": "76134a8cb97ba7ce4b23de2dc9155485add5843a3189dca4a3ce3ef440096fa0",
             "did": "did:cid:bagaaieraucaww363yppp4ia7db52xmcr2pqlhpw37uqfz736kkpn77gbupza",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 2,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 935794,
@@ -216,17 +271,18 @@
             "txid": "97c6f2ad108793040216e4e017e92338d29a994cb832266a77cc034026f8ba46",
             "did": "did:cid:bagaaierafcioahyceyhf7eqwgcjvl2s3lohwg3aw3rygeut7plk4jtw5xpka",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 935977,
@@ -235,17 +291,18 @@
             "txid": "d510aebe3ce60e11349a27e2e3512f77bca3436270b603aeffe7d0e6f806ce47",
             "did": "did:cid:bagaaiera3oerrxb4ijgqc2d47uokbfhw2s66q5ehpblmlstoqpestgxza3pq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 935983,
@@ -254,17 +311,18 @@
             "txid": "4f27de2a631f6b906461b039df874b9e60f105e320a0afd4a3f09d9ba4c3f307",
             "did": "did:cid:bagaaieragltrr57xinrrclirugmjfaj6zywnhjld7agr33isrid62pjgxc2a",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 935984,
@@ -273,17 +331,18 @@
             "txid": "e8e6d282b8adc987bd995fad25c79eb31126301028db0a4af0498536e9eefa61",
             "did": "did:cid:bagaaieraffl2btt5bogsb6jhsovq64gud3z6bc3ecprun5h73fdsnllao4lq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 936634,
@@ -292,17 +351,18 @@
             "txid": "d791cb9be61374532cc94638cae27801fb790dad7126bf46bfee900b45d41c9b",
             "did": "did:cid:bagaaierauynxhaypbw2u4ur5cgbbg7zqygs6niw3zmqvhhhiroola2wvdexq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 936640,
@@ -311,17 +371,18 @@
             "txid": "27c28ee44dfb53a1ad4c748ae1b3e4e8910fff2ced1bad9f759cba04bb8f13b4",
             "did": "did:cid:bagaaieraidb3zncislqvfv43yzh66nl2mx5g6km7mwc7kgtjz6p2irlomxsa",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 2,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 936641,
@@ -330,17 +391,18 @@
             "txid": "88c3facd30cda1d665bc0ecafc8b770efef151f8bae6e73e7655aea58ccfa636",
             "did": "did:cid:bagaaieragrm2rre56yoouguslxznpxwgy77iniztt2tc5u3hjpypyzji2c7q",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 2,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 936642,
@@ -349,17 +411,18 @@
             "txid": "e66e62508c43173be0b2e96dd38690a034deeb72228039bafbd163b9f73a1c1c",
             "did": "did:cid:bagaaierahvxsn6a2kil2ptxw2fcrxodvordlsp55mw6357b77w7vdqn23dcq",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 2,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 936778,
@@ -368,17 +431,18 @@
             "txid": "4c05251a5066693b3af71faff22c1c3d8dc719bcedc042be3239a591d1d27b0b",
             "did": "did:cid:bagaaieraglvnyfngh2m255jygkkaqew5rygeutlmmooix6d6ocrvg6dxco6q",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 938156,
@@ -387,17 +451,18 @@
             "txid": "54c43a0ee11d26f06322075e19715b4fafcfd54403cd5eb7e52d5e5ff39e28b5",
             "did": "did:cid:bagaaieraasx4ktepfy2gdbokb7rfxk2mjarqb7akosilw52f37tdbmw5tmfq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 938499,
@@ -406,17 +471,18 @@
             "txid": "f13f942e08b9e0dc0c5ab92dafd18f9bb6918a306bc002bd0f563b3a2bd701ca",
             "did": "did:cid:bagaaieratfmzz3eknx5rmwhzwwffchbrd46w2unlxiokapucx6tgfpd4gepq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 938507,
@@ -425,17 +491,18 @@
             "txid": "740b8de9bc08eb1a364258e5c7bc64a9b03e26076ff2252b6e8f396546ee8355",
             "did": "did:cid:bagaaieraivkqco5dkresb4w3s3gd7csyridexiccdqppscojjketqrmj65da",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 2,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 939308,
@@ -444,17 +511,18 @@
             "txid": "d837dca7f3b83c8374dcf42bf8e9349782ef9175f0c6986bb46666197bc9e4ea",
             "did": "did:cid:bagaaieraciokd32kv27wxftbylltdk76reg2hkg5dtrl3xydferjuu56zwja",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 939471,
@@ -463,17 +531,18 @@
             "txid": "bac33b63528c3875fbe8db3a05a152ffde4686ea67902c15005eead04e3d3950",
             "did": "did:cid:bagaaieracbvlab7cumu5owr3tf6smrrid7iidsdenycqbr2t27dcnwuqfdtq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 940132,
@@ -482,17 +551,18 @@
             "txid": "cf88102736c097f8bd72bc94847d968c595e3e3d369662f6819ed07fc10827a9",
             "did": "did:cid:bagaaierar53jh5lg5psjr6q32knjd6ucraicet2ounfcv5zis3msgqhvcu3q",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
                 "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 940141,
@@ -501,17 +571,18 @@
             "txid": "392824d80ffbc0ad7d48c7c731d594a759cee2355d83bd26bd46d328cd177011",
             "did": "did:cid:bagaaiera7crwdv2tzkwrlz7cttxydj3sm7hpcmewyrkh7lxdeb2tcf3k7qba",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 2,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 940154,
@@ -520,17 +591,18 @@
             "txid": "ee625180dd78255ddd0e0e94357a0da454b7662d34c9ffe030693fed39bf1bd2",
             "did": "did:cid:bagaaieraptvi3z4xj4s2y5mpucfh5t6is7jmdaq5ffayotolopwsdlaffjfa",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 2,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 940294,
@@ -539,17 +611,18 @@
             "txid": "0466b6e461b2055c201dc79d9a03c871f0756f6534cec642e795eacf975d948b",
             "did": "did:cid:bagaaierayovsofj2h5m3ssotubh4vhmhvaom4wo4fxp6bjg2klqffgsfxkza",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 2,
+                "merged": 0,
                 "rejected": 0,
-                "pending": 0
-            }
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
         },
         {
             "height": 940299,
@@ -558,14 +631,14 @@
             "txid": "8680dda182169f3c2000fc53f5344f9b742e5ae157b128d9a3dcc4c09a04112a",
             "did": "did:cid:bagaaierav5ysbdeisfgaxtoy26u5a4aoi5wnlqvy4ozziuiqjtx6m7b2ebba",
             "imported": {
-                "queued": 2,
-                "processed": 0,
+                "queued": 0,
+                "processed": 2,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
                 "pending": 1
             },
@@ -578,14 +651,14 @@
             "txid": "987d4569e0990917b7079d11225e83edace83e789dd7e95da06dd737c9be4e49",
             "did": "did:cid:bagaaieran7s4sw3crskzdj5k74zfgsujobhncirgsns6axkxly5lozrw7ahq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
                 "rejected": 0,
                 "pending": 1
             },
@@ -598,20 +671,480 @@
             "txid": "96e555227edb2d902ed052a36680fa324f8291d73dc92c0ef049dfe61fdc14cc",
             "did": "did:cid:bagaaieracssm3rj7dm7vb3ht3oatz24zqx3ndqb4secr6wn5kpx2xr6ef7oq",
             "imported": {
-                "queued": 1,
-                "processed": 0,
+                "queued": 0,
+                "processed": 1,
                 "rejected": 0,
-                "total": 2
+                "total": 1
             },
             "processed": {
                 "added": 0,
-                "merged": 1,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 940533,
+            "index": 56,
+            "time": "2026-03-13T14:54:32.000Z",
+            "txid": "99078b2fbd3030c667b4264c8cc6bf459d0bb9471b1b935d22f8468ce4dbe068",
+            "did": "did:cid:bagaaieram5uhm53hzdbl2el6yidjtxmedxty7sedsxsodjdihkhp7go5rj7q",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 940671,
+            "index": 535,
+            "time": "2026-03-14T18:41:08.000Z",
+            "txid": "532f928e9f3f339a0d44f2f8d82879301f3e5c073d9a18a0b217014c26c06c1e",
+            "did": "did:cid:bagaaieracx5sukt3z4qgjnbrfo5qjf65p6wjj73x6x4qq33ij7ablo3q42qa",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 941189,
+            "index": 1891,
+            "time": "2026-03-18T19:25:53.000Z",
+            "txid": "1b5ff3455b2cce2fb622d60fa4b87eb1294731d1466fabef2cd4fcd7df9134b1",
+            "did": "did:cid:bagaaieragqhj2ph6gfypcg2qdw4kx4k76pgsfvhnt5hgchjtwttwjnjlhl6a",
+            "imported": {
+                "queued": 0,
+                "processed": 3,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 941193,
+            "index": 1350,
+            "time": "2026-03-18T19:51:25.000Z",
+            "txid": "c33ea17b8620361812861fc62d7ee76e014ee42a7a8a9581d99df7e0e1460e70",
+            "did": "did:cid:bagaaierabwogcxa73twkdqw6tefki2fvptc75ghm2265yp53qyhikdnqhmta",
+            "imported": {
+                "queued": 0,
+                "processed": 2,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 941196,
+            "index": 1393,
+            "time": "2026-03-18T20:17:08.000Z",
+            "txid": "8560a15fe20fbfe51ea27b188b778ac74d366ce0ceb9db51e826e6de5cbadb47",
+            "did": "did:cid:bagaaieraqvvvogvwfu7sq5rapvi3k5lllstozdzdyhvp6acic67ybobgmyaq",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 942199,
+            "index": 991,
+            "time": "2026-03-25T20:32:28.000Z",
+            "txid": "ffdbb3119cbcfe5bf2a10a8adb9cdeea0628c7cc55221645eddbb7d6ae359a0d",
+            "did": "did:cid:bagaaiera7r5vzgaobxk7unuwo564ngum7nablf5k6ulrjhjkinae32ma2qoq",
+            "imported": {
+                "queued": 0,
+                "processed": 2,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 942200,
+            "index": 761,
+            "time": "2026-03-25T20:38:54.000Z",
+            "txid": "7d14256476a8cdd70a30b0456b5f953ff1bf3b134cab8a84bad0fffd19d931a7",
+            "did": "did:cid:bagaaiera4v26ap6fsbyu7fl73eaurxmudhlpkbjtazqjympsazq5tecxwzna",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 942375,
+            "index": 993,
+            "time": "2026-03-26T22:47:55.000Z",
+            "txid": "0f78fe0c176a11ea641393d045231f8318eff1a901e8cd4260f098a65c690b85",
+            "did": "did:cid:bagaaierarzxdlenvqzeysgbnkovyxrqy7cjgiph7nwl5ya3t5j4ersp5p4za",
+            "imported": {
+                "queued": 0,
+                "processed": 9,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 942523,
+            "index": 2840,
+            "time": "2026-03-27T21:48:50.000Z",
+            "txid": "2f1ad43f25df58757d8f708e2204edc3bd1d3fde736c58be2bc84e415e454202",
+            "did": "did:cid:bagaaierapwvoezsq3ym23frab5ekuvcjll56qugxpw5slrmia763cfwvdksa",
+            "imported": {
+                "queued": 0,
+                "processed": 7,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 942538,
+            "index": 1022,
+            "time": "2026-03-27T23:24:51.000Z",
+            "txid": "76e63d08378d06eee2ae870d9db7a68fc13a3528880043864eecce6bc080c40b",
+            "did": "did:cid:bagaaieraz734usbvsdswcbrppednbpmlr2l4472n6d36eoutqo3vnwnuyqwa",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 942851,
+            "index": 569,
+            "time": "2026-03-29T21:49:26.000Z",
+            "txid": "307d18d886a4454a247502502fab1a825b4b4de90c4beb91e62db4d71295d211",
+            "did": "did:cid:bagaaiera3valuvww5f7hbrekhl532wds6bapj32fax5sfy5r4254rfpffkwa",
+            "imported": {
+                "queued": 0,
+                "processed": 2,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 942853,
+            "index": 1297,
+            "time": "2026-03-29T22:27:05.000Z",
+            "txid": "95d4d59c2a3bb3dd04104fe3ef4a78a111954ed770c763dec3d132607e8cba60",
+            "did": "did:cid:bagaaierax7kka5sybcj2zf6piixiwnjc6qnp2fkgb2oggsv6v3x3oy3jz3ba",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 943134,
+            "index": 964,
+            "time": "2026-04-01T00:52:04.000Z",
+            "txid": "2767822484fe1a5de7c99dab3f80fc3a2f1fb1a982921980949593f5d80f9adc",
+            "did": "did:cid:bagaaierankfjd7tijjyxnwjhbnqtg67xieetdjz6zkyt6tgdpqyuft24itka",
+            "imported": {
+                "queued": 0,
+                "processed": 2,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 943135,
+            "index": 167,
+            "time": "2026-04-01T00:53:53.000Z",
+            "txid": "2475ea4667bb44de3d3433a7e43186f54a9a3a9ef0c1bf26318e057a08d2a5f7",
+            "did": "did:cid:bagaaieramgdz5yfvz6wer7lafwkcdu7tq32xuqpr7ko6atnl2ixs4whbhjqa",
+            "imported": {
+                "queued": 0,
+                "processed": 2,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 943137,
+            "index": 1119,
+            "time": "2026-04-01T01:24:27.000Z",
+            "txid": "cc2c6c15196404759df099d813425805189dd2aeb6c4cb141828bb41fc2349e3",
+            "did": "did:cid:bagaaierar6cawgm2pkwwcmqxcnghz5sxvn4h57yz3tlvdsrtglaawiaucs2a",
+            "imported": {
+                "queued": 0,
+                "processed": 2,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 943141,
+            "index": 1632,
+            "time": "2026-04-01T02:20:39.000Z",
+            "txid": "c3f137b3f10726c6e22bdc3bf559f7d462e6af926a8472ac04945005b1eaf286",
+            "did": "did:cid:bagaaieraitycl45hpfdongfrux3we46hul7hkqnude4trt4tdw5smel54kjq",
+            "imported": {
+                "queued": 0,
+                "processed": 2,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 943403,
+            "index": 1829,
+            "time": "2026-04-02T20:23:21.000Z",
+            "txid": "cdb9c582826405a729ec4e31005f2cfb4a73030bd2dabfa6cefc20b53ee6c9d2",
+            "did": "did:cid:bagaaieragmbbj7wyoec6mchve3uyzgpay46upkgc4aq7ytuah7qcyhtf6eua",
+            "imported": {
+                "queued": 0,
+                "processed": 2,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 943564,
+            "index": 645,
+            "time": "2026-04-03T23:04:00.000Z",
+            "txid": "d54dd32c947badf90d8da1431b2d135abe000c1acc0d59e37e1a80c5da6a0985",
+            "did": "did:cid:bagaaierasa5kbdxuwyxdipyxxmtbkaztuhawgzg27dp7vul7jpwbv4cblrdq",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 943990,
+            "index": 810,
+            "time": "2026-04-07T03:06:14.000Z",
+            "txid": "4e419629dab95f079b555a210928ba06ee94501bc42f9a52f53b604c40beaefe",
+            "did": "did:cid:bagaaierambzdwpvadc6l6s62nrvzbhh2473nrzxv5j6aokahz4dkqsvnsv2a",
+            "imported": {
+                "queued": 0,
+                "processed": 2,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 944107,
+            "index": 1545,
+            "time": "2026-04-07T23:18:43.000Z",
+            "txid": "7984700783b3434613d568647713e141992902a79131fb7dbfce923a1622e0ad",
+            "did": "did:cid:bagaaiera3yfhpqe2fmnlq7z5besaawcfgddymjwcccmydho6xx4tr5cnqjfq",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 944114,
+            "index": 1561,
+            "time": "2026-04-08T00:29:44.000Z",
+            "txid": "1fd7f7ffeaa51bf2f168f4659365fceee7f93df64ec3a22bf605248e2e586b75",
+            "did": "did:cid:bagaaiera7ofvifheznkczvo3khuwignyjdswfq22e3na5vk63cenp3y6kqia",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 944121,
+            "index": 1633,
+            "time": "2026-04-08T03:00:25.000Z",
+            "txid": "b25fd805560dfff22f743cfe973679500fd3d46fdcbd5695fb7d2cedb34983ea",
+            "did": "did:cid:bagaaieraplchcual5ic4i2lwi73xsf57ebk4z2uwmnfcj44ehlkbww2lzeya",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
+                "rejected": 0,
+                "pending": 1
+            },
+            "error": "No progress: 1 pending event(s) unresolved"
+        },
+        {
+            "height": 944201,
+            "index": 953,
+            "time": "2026-04-08T14:49:56.000Z",
+            "txid": "60f4161098a8599bc27861c5f9acdd15f58461d15330338bd43d751a549fe3fc",
+            "did": "did:cid:bagaaieranp3hbi7ayxsmteruitbkf3zrr3n7lzf75h3ag2x6osupqboxpvja",
+            "imported": {
+                "queued": 0,
+                "processed": 1,
+                "rejected": 0,
+                "total": 1
+            },
+            "processed": {
+                "added": 0,
+                "merged": 0,
                 "rejected": 0,
                 "pending": 1
             },
             "error": "No progress: 1 pending event(s) unresolved"
         }
     ],
-    "lastExport": "2026-03-12T02:35:46.564Z",
-    "hash": "00000000000000000000ef31222c6fa96d96e5980daae9283f43c8b7010ccaa9"
+    "lastExport": "2026-04-08T02:48:45.858Z",
+    "hash": "000000000000000000019a4bb8ec32dab5f9e70f4a11077c1b04d183bade39ff"
 }
