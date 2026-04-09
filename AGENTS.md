@@ -18,6 +18,7 @@ These rules apply to coding agents working in this repository.
 ## Hygiene
 
 - Always save lessons learned in this file or another persistent repo instruction file. Do not rely on session memory for process corrections.
+- Herald avatar/image handlers that use `KeymasterClient` should normalize JSON-serialized Buffer payloads (`{ type: "Buffer", data: [...] }`) back into real `Buffer` instances before sending binary responses.
 - For GitHub operations in this repo, prefer `gh` by default, especially for write actions. Do not try the GitHub app first and then fall back to `gh` unless there is a clear reason to use the app.
 - When generating or updating npm lockfiles, use the repo-pinned npm version from the root `package.json` so lockfiles stay compatible with CI.
 - Internal service-to-service admin auth should use `X-Archon-Admin-Key` consistently. Reserve `Authorization` for user/session/OAuth-style flows unless a file explicitly documents a different scheme.
