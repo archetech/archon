@@ -264,7 +264,7 @@ async function resolveAvatarImage(name: string): Promise<{
     did: string;
     avatarDid: string;
     file: {
-        data?: Buffer;
+        data: Buffer;
         type: string;
         filename?: string;
         bytes?: number;
@@ -300,6 +300,22 @@ async function resolveAvatarImage(name: string): Promise<{
             data,
         },
     };
+}
+
+function getSafeAvatarContentType(contentType: string): string {
+    const normalizedType = contentType.trim().toLowerCase();
+    const allowedAvatarContentTypes = new Set([
+        'image/avif',
+        'image/gif',
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/webp',
+    ]);
+
+    return allowedAvatarContentTypes.has(normalizedType)
+        ? normalizedType
+        : 'application/octet-stream';
 }
 
 function isAuthenticated(req: Request, res: Response, next: NextFunction): void {
@@ -863,10 +879,9 @@ app.get('/api/name/:name/avatar', async (req: Request, res: Response) => {
             return;
         }
 
-        res.set('Content-Type', avatar.file.type);
-        if (avatar.file.bytes) {
-            res.set('Content-Length', String(avatar.file.bytes));
-        }
+        res.set('X-Content-Type-Options', 'nosniff');
+        res.set('Content-Type', getSafeAvatarContentType(avatar.file.type));
+        res.set('Content-Length', String(avatar.file.data.length));
         if (avatar.file.filename) {
             res.set('Content-Disposition', `inline; filename="${encodeURIComponent(avatar.file.filename)}"`);
         }
