@@ -4689,7 +4689,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         </Grid>
                                     </Grid>
                                     <TableContainer component={Paper} style={{ maxHeight: '260px', overflow: 'auto', marginBottom: '8px' }}>
-                                        <Table stickyHeader style={{ width: '100%', tableLayout: 'fixed' }}>
+                                            <Table stickyHeader style={{ width: '100%', tableLayout: 'fixed' }}>
                                             <colgroup>
                                                 <col />
                                                 <col style={{ width: '220px' }} />
