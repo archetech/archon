@@ -260,6 +260,48 @@ async function resolveLightningEndpoint(name: string): Promise<{ did: string; en
     return { did, endpoint: lightning.serviceEndpoint };
 }
 
+async function resolveAvatarImage(name: string): Promise<{
+    did: string;
+    avatarDid: string;
+    file: {
+        data?: Buffer;
+        type: string;
+        filename?: string;
+        bytes?: number;
+    };
+} | null> {
+    const did = await findNameDid(name);
+    if (!did) return null;
+
+    const memberDoc: any = await keymaster.resolveDID(did);
+    const avatarDid = typeof memberDoc?.didDocumentData?.avatar === 'string'
+        ? memberDoc.didDocumentData.avatar.trim()
+        : '';
+
+    if (!avatarDid) return null;
+
+    const image = await keymaster.getImage(avatarDid);
+    const rawData = image?.file?.data;
+    const data = Buffer.isBuffer(rawData)
+        ? rawData
+        : rawData && typeof rawData === 'object' && (rawData as any).type === 'Buffer' && Array.isArray((rawData as any).data)
+            ? Buffer.from((rawData as any).data)
+            : null;
+
+    if (!data || !image?.file?.type || !image.image) {
+        return null;
+    }
+
+    return {
+        did,
+        avatarDid,
+        file: {
+            ...image.file,
+            data,
+        },
+    };
+}
+
 function isAuthenticated(req: Request, res: Response, next: NextFunction): void {
     if (!req.session.user && req.session.challenge) {
         const challengeData = logins[req.session.challenge];
@@ -803,6 +845,33 @@ app.get('/api/member/:name', async (req: Request, res: Response) => {
         const didDoc = await keymaster.resolveDID(memberDid);
 
         res.json(didDoc);
+    }
+    catch (error: any) {
+        console.log(error);
+        res.status(500).json({ error: error.message || String(error) });
+    }
+});
+
+// Resolve a member name to their avatar image
+app.get('/api/name/:name/avatar', async (req: Request, res: Response) => {
+    try {
+        const name = (req.params.name as string).trim().toLowerCase();
+        const avatar = await resolveAvatarImage(name);
+
+        if (!avatar) {
+            res.status(404).json({ error: 'Avatar not found', name });
+            return;
+        }
+
+        res.set('Content-Type', avatar.file.type);
+        if (avatar.file.bytes) {
+            res.set('Content-Length', String(avatar.file.bytes));
+        }
+        if (avatar.file.filename) {
+            res.set('Content-Disposition', `inline; filename="${encodeURIComponent(avatar.file.filename)}"`);
+        }
+
+        res.send(avatar.file.data);
     }
     catch (error: any) {
         console.log(error);
