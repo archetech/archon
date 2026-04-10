@@ -7,7 +7,10 @@ import {
     Button,
     DialogContentText,
     TextField,
+    IconButton,
+    InputAdornment,
 } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useThemeContext } from "../contexts/ContextProviders";
 
 interface TextInputModalProps {
@@ -17,6 +20,8 @@ interface TextInputModalProps {
     label?: string;
     confirmText?: string;
     defaultValue?: string;
+    inputType?: string;
+    allowReveal?: boolean;
     onSubmit: (value: string) => void;
     onClose: () => void;
 }
@@ -29,15 +34,19 @@ const TextInputModal: React.FC<TextInputModalProps> = (
         label = "Name",
         confirmText = "Confirm",
         defaultValue = "",
+        inputType = "text",
+        allowReveal = false,
         onSubmit,
         onClose,
     }) => {
     const [value, setValue] = useState(defaultValue);
+    const [revealed, setRevealed] = useState(false);
     const { isTabletUp } = useThemeContext();
 
     useEffect(() => {
         if (isOpen) {
             setValue(defaultValue);
+            setRevealed(false);
         }
     }, [isOpen, defaultValue]);
 
@@ -70,11 +79,26 @@ const TextInputModal: React.FC<TextInputModalProps> = (
                         autoFocus
                         margin="dense"
                         label={label}
-                        type="text"
+                        type={allowReveal && inputType === "password" && revealed ? "text" : inputType}
                         fullWidth
                         variant="outlined"
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
+                        slotProps={{
+                            input: allowReveal && inputType === "password" ? {
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            edge="end"
+                                            onClick={() => setRevealed((value) => !value)}
+                                            aria-label={revealed ? "Hide value" : "Show value"}
+                                        >
+                                            {revealed ? <VisibilityOff /> : <Visibility />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            } : undefined,
+                        }}
                     />
                 </DialogContent>
                 <DialogActions>

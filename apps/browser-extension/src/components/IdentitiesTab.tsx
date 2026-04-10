@@ -50,6 +50,7 @@ function IdentitiesTab() {
     const [recoverModalOpen, setRecoverModalOpen] = useState<boolean>(false);
     const [nostrKeys, setNostrKeys] = useState<NostrKeys | null>(null);
     const [removeNostrModal, setRemoveNostrModal] = useState<boolean>(false);
+    const [importNostrModal, setImportNostrModal] = useState<boolean>(false);
     const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
     const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
     const [nsecValue, setNsecValue] = useState<string | null>(null);
@@ -630,6 +631,24 @@ function IdentitiesTab() {
         }
     }
 
+    async function importNostr(nsec: string) {
+        if (!keymaster) {
+            return;
+        }
+        setImportNostrModal(false);
+        if (!nsec) {
+            return;
+        }
+        try {
+            const nostr = await keymaster.importNostr(nsec);
+            setNostrKeys(nostr);
+            setNsecValue(null);
+            setSuccess("Nostr keys imported");
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
     async function showNsec() {
         if (!keymaster) {
             return;
@@ -921,6 +940,18 @@ function IdentitiesTab() {
                 confirmText="Recover"
                 onSubmit={recoverId}
                 onClose={() => setRecoverModalOpen(false)}
+            />
+
+            <TextInputModal
+                isOpen={importNostrModal}
+                title="Import Nostr nsec"
+                description="Enter the bech32-encoded nsec private key to import for this identity."
+                label="nsec"
+                inputType="password"
+                allowReveal
+                confirmText="Import"
+                onSubmit={importNostr}
+                onClose={() => setImportNostrModal(false)}
             />
 
             <SelectInputModal
@@ -1361,9 +1392,14 @@ function IdentitiesTab() {
                                             Remove Nostr
                                         </Button>
                                     ) : (
-                                        <Button variant="contained" color="primary" onClick={addNostr} sx={{ whiteSpace: 'nowrap' }}>
-                                            Add Nostr
-                                        </Button>
+                                        <>
+                                            <Button variant="contained" color="primary" onClick={addNostr} sx={{ whiteSpace: 'nowrap' }}>
+                                                Add Nostr
+                                            </Button>
+                                            <Button variant="contained" color="primary" onClick={() => setImportNostrModal(true)} sx={{ whiteSpace: 'nowrap' }}>
+                                                Import nsec
+                                            </Button>
+                                        </>
                                     )}
                                     {nostrKeys && (
                                         nsecValue ? (

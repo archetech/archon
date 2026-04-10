@@ -535,6 +535,16 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async importNostr(nsec: string, id?: string): Promise<NostrKeys> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr/import`, { nsec, id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async removeNostr(id?: string): Promise<boolean> {
         try {
             const response = await this.axios.delete(`${this.API}/nostr`, { data: { id } });

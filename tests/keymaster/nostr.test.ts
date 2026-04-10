@@ -55,6 +55,15 @@ describe('addNostr', () => {
         expect(data.nostr).toStrictEqual(nostr);
     });
 
+    it('should store generated nsec in wallet metadata', async () => {
+        await keymaster.createId('Bob');
+
+        await keymaster.addNostr();
+
+        const walletData = await keymaster.loadWallet();
+        expect(walletData.ids.Bob.nostr?.nsec).toMatch(/^nsec1/);
+    });
+
     it('should derive nostr keys for a named ID', async () => {
         await keymaster.createId('Alice');
         await keymaster.createId('Bob');
@@ -137,6 +146,9 @@ describe('removeNostr', () => {
         doc = await keymaster.resolveDID(did);
         data = doc.didDocumentData as Record<string, unknown>;
         expect(data.nostr).toBeUndefined();
+
+        const walletData = await keymaster.loadWallet();
+        expect(walletData.ids.Bob.nostr).toBeUndefined();
     });
 
     it('should remove nostr keys for a named ID', async () => {
@@ -169,6 +181,49 @@ describe('removeNostr', () => {
         catch (error: any) {
             expect(error.type).toBe(UnknownIDError.type);
         }
+    });
+});
+
+describe('importNostr', () => {
+    it('should import nsec into wallet metadata and DID document data', async () => {
+        const did = await keymaster.createId('Bob');
+        const keypair = cipher.generateRandomJwk();
+        const nsec = cipher.jwkToNsec(keypair.privateJwk);
+        const expectedNostr = cipher.jwkToNostr(keypair.publicJwk);
+
+        const nostr = await keymaster.importNostr(nsec);
+
+        expect(nostr).toStrictEqual(expectedNostr);
+
+        const walletData = await keymaster.loadWallet();
+        expect(walletData.ids.Bob.nostr).toStrictEqual({ nsec });
+
+        const doc = await keymaster.resolveDID(did);
+        const data = doc.didDocumentData as Record<string, any>;
+        expect(data.nostr).toStrictEqual(expectedNostr);
+    });
+
+    it('should import nsec for a named ID', async () => {
+        await keymaster.createId('Alice');
+        await keymaster.createId('Bob');
+        const keypair = cipher.generateRandomJwk();
+        const nsec = cipher.jwkToNsec(keypair.privateJwk);
+
+        const nostr = await keymaster.importNostr(nsec, 'Alice');
+
+        const walletData = await keymaster.loadWallet();
+        expect(walletData.ids.Alice.nostr).toStrictEqual({ nsec });
+        expect(walletData.ids.Bob.nostr).toBeUndefined();
+        expect(nostr.pubkey).toBe(cipher.jwkToNostr(keypair.publicJwk).pubkey);
+    });
+
+    it('should throw for invalid nsec', async () => {
+        await keymaster.createId('Bob');
+
+        await expect(keymaster.importNostr('not-an-nsec')).rejects.toMatchObject({
+            type: 'Invalid parameter',
+            detail: 'nsec',
+        });
     });
 });
 
@@ -311,6 +366,19 @@ describe('jwkToNsec', () => {
     });
 });
 
+describe('nsecToJwk', () => {
+    it('should round-trip an nsec back to the same public key', () => {
+        const keypair = cipher.generateRandomJwk();
+        const nsec = cipher.jwkToNsec(keypair.privateJwk);
+
+        const decodedKeypair = cipher.nsecToJwk(nsec);
+
+        expect(cipher.jwkToNostr(decodedKeypair.publicJwk)).toStrictEqual(
+            cipher.jwkToNostr(keypair.publicJwk)
+        );
+    });
+});
+
 describe('exportNsec', () => {
     it('should return a valid nsec for the current ID', async () => {
         await keymaster.createId('Bob');
@@ -319,6 +387,16 @@ describe('exportNsec', () => {
         const nsec = await keymaster.exportNsec();
 
         expect(nsec.startsWith('nsec1')).toBe(true);
+    });
+
+    it('should return stored imported nsec when present', async () => {
+        await keymaster.createId('Bob');
+        const imported = cipher.jwkToNsec(cipher.generateRandomJwk().privateJwk);
+        await keymaster.importNostr(imported);
+
+        const nsec = await keymaster.exportNsec();
+
+        expect(nsec).toBe(imported);
     });
 
     it('should return a valid nsec for a named ID', async () => {
@@ -406,6 +484,24 @@ describe('signNostrEvent', () => {
         const signed = await keymaster.signNostrEvent(event);
 
         expect(signed.pubkey).toBe(nostr.pubkey);
+    });
+
+    it('should sign with an imported nsec when one is stored', async () => {
+        await keymaster.createId('Bob');
+        const importedKeypair = cipher.generateRandomJwk();
+        const importedNostr = cipher.jwkToNostr(importedKeypair.publicJwk);
+        await keymaster.importNostr(cipher.jwkToNsec(importedKeypair.privateJwk));
+
+        const event = {
+            created_at: Math.floor(Date.now() / 1000),
+            kind: 1,
+            tags: [],
+            content: 'imported signer',
+        };
+
+        const signed = await keymaster.signNostrEvent(event);
+
+        expect(signed.pubkey).toBe(importedNostr.pubkey);
     });
 
     it('should produce a verifiable Schnorr signature', async () => {

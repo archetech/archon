@@ -328,6 +328,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [removePollName, setRemovePollName] = useState("");
     const [nostrKeys, setNostrKeys] = useState(null);
     const [nsecString, setNsecString] = useState('');
+    const [importNostrOpen, setImportNostrOpen] = useState(false);
     const [pollList, setPollList] = useState([]);
     const [canVote, setCanVote] = useState(false);
     const [eligiblePolls, setEligiblePolls] = useState({});
@@ -1363,6 +1364,23 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setNostrKeys(nostr);
             resolveId();
             showSuccess('Nostr keys added');
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function importNostr(nsec) {
+        setImportNostrOpen(false);
+        if (!nsec) {
+            return;
+        }
+
+        try {
+            const nostr = await keymaster.importNostr(nsec);
+            setNostrKeys(nostr);
+            setNsecString('');
+            resolveId();
+            showSuccess('Nostr keys imported');
         } catch (error) {
             showError(error);
         }
@@ -4455,6 +4473,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 </DialogActions>
             </Dialog>
 
+            <TextInputModal
+                isOpen={importNostrOpen}
+                title="Import Nostr nsec"
+                description="Enter the bech32-encoded nsec private key to import for this identity."
+                label="nsec"
+                inputType="password"
+                allowReveal
+                confirmText="Import"
+                onSubmit={importNostr}
+                onClose={() => setImportNostrOpen(false)}
+            />
+
             <header className="App-header">
 
                 <h1>{title}</h1>
@@ -4936,9 +4966,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     Remove Nostr
                                                 </Button>
                                                 :
-                                                <Button variant="contained" color="primary" onClick={addNostr}>
-                                                    Add Nostr
-                                                </Button>
+                                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                                    <Button variant="contained" color="primary" onClick={addNostr}>
+                                                        Add Nostr
+                                                    </Button>
+                                                    <Button variant="contained" color="primary" onClick={() => setImportNostrOpen(true)}>
+                                                        Import nsec
+                                                    </Button>
+                                                </Box>
                                             }
                                         </Grid>
                                         {nostrKeys &&

@@ -30,9 +30,15 @@ export interface IDInfo {
     held?: string[];
     owned?: string[];
     addresses?: Record<string, StoredAddressInfo>;
+    nostr?: StoredNostrInfo;
     dmail?: Record<string, any>;
     notices?: Record<string, any>;
     [key: string]: any; // Allow custom metadata fields
+}
+
+export interface StoredNostrInfo {
+    nsec: string;
+    [key: string]: any;
 }
 
 export interface StoredAddressInfo {
@@ -392,6 +398,7 @@ export interface KeymasterInterface {
 
     // Nostr
     addNostr(id?: string): Promise<NostrKeys>;
+    importNostr(nsec: string, id?: string): Promise<NostrKeys>;
     removeNostr(id?: string): Promise<boolean>;
     exportNsec(id?: string): Promise<string>;
     signNostrEvent(event: NostrEvent): Promise<NostrEvent>;
