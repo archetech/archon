@@ -57,6 +57,7 @@ function BrowserContent() {
 
     const assetTabs = ["groups", "schemas", "images", "files", "vaults"];
     const displayComponent = validId && currentId !== "";
+    const browserPageWidth = menuOpen ? 890 : 790;
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -191,7 +192,14 @@ function BrowserContent() {
             <Box className="rootContainer">
                 <BrowserHeader menuOpen={menuOpen} toggleMenuOpen={toggleMenuOpen} />
                 <TabContext value={activeTab}>
-                    <Box className="layoutContainer">
+                    <Box
+                        className="layoutContainer"
+                        sx={{
+                            width: browserPageWidth,
+                            maxWidth: browserPageWidth,
+                            transition: "width 0.2s ease-in-out",
+                        }}
+                    >
                         <Box className={`sidebar ${menuOpen ? "open" : ""}`}>
                             <TabList orientation="vertical" onChange={handleTabChange} className="tabList">
                                 <Tab

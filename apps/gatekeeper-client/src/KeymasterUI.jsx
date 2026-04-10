@@ -209,6 +209,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [addressInput, setAddressInput] = useState('');
     const [addressDomain, setAddressDomain] = useState('');
     const [selectedAddress, setSelectedAddress] = useState('');
+    const [publishedAddress, setPublishedAddress] = useState('');
     const [addressDocs, setAddressDocs] = useState('');
     const [addressBusy, setAddressBusy] = useState(false);
     const [registries, setRegistries] = useState(null);
@@ -661,6 +662,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 setManifest(docs.didDocumentData.manifest);
                 setNostrKeys(docs.didDocumentData.nostr || null);
                 setDocsString(JSON.stringify(docs, null, 4));
+                const rawAddress = docs?.didDocumentData?.address;
+                const nextAddress = typeof rawAddress === 'string' ? rawAddress.trim().toLowerCase() : '';
+                setPublishedAddress(nextAddress);
 
                 const versions = docs.didDocumentMetadata.version ?? 1;
                 setDocsVersion(versions);
@@ -685,6 +689,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 setAddressInput('');
                 setAddressDomain('');
                 setSelectedAddress('');
+                setPublishedAddress('');
                 setAddressDocs('');
                 setIdentityTab('details');
                 setNsecString('');
@@ -1188,10 +1193,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setDocsString(JSON.stringify(docs, null, 4));
             const rawName = docs?.didDocumentData?.name;
             const nextName = typeof rawName === 'string' ? rawName : '';
+            const rawAddress = docs?.didDocumentData?.address;
+            const nextAddress = typeof rawAddress === 'string' ? rawAddress.trim().toLowerCase() : '';
             setIdentityNameValue(nextName);
             setIdentityNameInput(nextName);
             setIdentityNameError('');
             setIdentityNameLoading(false);
+            setPublishedAddress(nextAddress);
 
             const versions = docs.didDocumentMetadata.version ?? 1;
             setDocsVersion(versions);
@@ -1201,6 +1209,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setIdentityNameInput('');
             setIdentityNameError(error.error || error.message || String(error));
             setIdentityNameLoading(false);
+            setPublishedAddress('');
             showError(error);
         }
     }
@@ -1837,6 +1846,51 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
+    async function setPublishedAddressValue(address) {
+        setAddressBusy(true);
+        try {
+            const normalizedAddress = address.trim().toLowerCase();
+
+            if (!selectedId) {
+                showAlert('Select an identity first');
+                return;
+            }
+
+            if (!normalizedAddress) {
+                showAlert('Select an address to publish');
+                return;
+            }
+
+            await keymaster.mergeData(selectedId, { address: normalizedAddress });
+            setPublishedAddress(normalizedAddress);
+            showSuccess(`${normalizedAddress} published`);
+            await resolveId();
+        } catch (error) {
+            showError(error);
+        } finally {
+            setAddressBusy(false);
+        }
+    }
+
+    async function clearPublishedAddressValue() {
+        setAddressBusy(true);
+        try {
+            if (!selectedId) {
+                showAlert('Select an identity first');
+                return;
+            }
+
+            await keymaster.mergeData(selectedId, { address: null });
+            setPublishedAddress('');
+            showSuccess('Address unpublished');
+            await resolveId();
+        } catch (error) {
+            showError(error);
+        } finally {
+            setAddressBusy(false);
+        }
+    }
+
     async function removeAddressValue(address = selectedAddress || composeAddress(addressInput, addressDomain)) {
         setAddressBusy(true);
         try {
@@ -1849,6 +1903,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
             if (await showConfirm(`Are you sure you want to remove ${normalizedAddress}?`)) {
                 await keymaster.removeAddress(normalizedAddress);
+                if (publishedAddress === normalizedAddress && selectedId) {
+                    await keymaster.mergeData(selectedId, { address: null });
+                    setPublishedAddress('');
+                    await resolveId();
+                }
                 if (selectedAddress === normalizedAddress) {
                     setSelectedAddress('');
                     setAddressDocs('');
@@ -4631,11 +4690,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         </Grid>
                                     </Grid>
                                     <TableContainer component={Paper} style={{ maxHeight: '260px', overflow: 'auto', marginBottom: '8px' }}>
-                                        <Table stickyHeader style={{ width: '100%', tableLayout: 'fixed' }}>
+                                            <Table stickyHeader style={{ width: '100%', tableLayout: 'fixed' }}>
                                             <colgroup>
                                                 <col />
                                                 <col style={{ width: '220px' }} />
-                                                <col style={{ width: '120px' }} />
+                                                <col style={{ width: '210px' }} />
                                             </colgroup>
                                             <TableHead>
                                                 <TableRow>
@@ -4648,7 +4707,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 {filteredAddresses.map(([address, info]) => (
                                                     <TableRow key={address} selected={address === selectedAddress}>
                                                         <TableCell>
-                                                            <Typography style={{ fontFamily: 'Courier' }}>
+                                                            <Typography style={{ fontFamily: 'Courier', fontWeight: address === publishedAddress ? 700 : 400 }}>
                                                                 {address}
                                                             </Typography>
                                                         </TableCell>
@@ -4658,9 +4717,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                             </Typography>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Button variant="contained" color="primary" onClick={() => selectAddress(address)}>
-                                                                Select
-                                                            </Button>
+                                                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                                                                <Button variant="contained" color="primary" onClick={() => selectAddress(address)} disabled={addressBusy}>
+                                                                    Select
+                                                                </Button>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    color={address === publishedAddress ? 'error' : 'primary'}
+                                                                    onClick={() => address === publishedAddress ? clearPublishedAddressValue() : setPublishedAddressValue(address)}
+                                                                    disabled={addressBusy || !selectedId}
+                                                                >
+                                                                    {address === publishedAddress ? 'Unpublish' : 'Publish'}
+                                                                </Button>
+                                                            </Box>
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}

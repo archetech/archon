@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography, useMediaQuery } from "@mui/material";
 import { Badge, Create, Image, Login, PermIdentity } from "@mui/icons-material";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
@@ -41,6 +41,7 @@ function formatAddedDate(value: string): string {
 }
 
 function IdentitiesTab() {
+    const isNarrowViewport = useMediaQuery("(max-width:560px)");
     const [identityTab, setIdentityTab] = useState<"details" | "addresses" | "name" | "avatar" | "nostr">("details");
     const [name, setName] = useState<string>("");
     const [warningModal, setWarningModal] = useState<boolean>(false);
@@ -57,6 +58,7 @@ function IdentitiesTab() {
     const [addressName, setAddressName] = useState<string>("");
     const [addressDomain, setAddressDomain] = useState<string>("");
     const [selectedAddress, setSelectedAddress] = useState<string>("");
+    const [publishedAddress, setPublishedAddress] = useState<string>("");
     const [addressDetails, setAddressDetails] = useState<string>("");
     const [addressBusy, setAddressBusy] = useState<boolean>(false);
     const [identityNameValue, setIdentityNameValue] = useState<string>("");
@@ -79,6 +81,7 @@ function IdentitiesTab() {
         isBrowser,
         keymaster,
     } = useWalletContext();
+    const hideAddressAddedColumn = !isBrowser && isNarrowViewport;
     const { setError, setSuccess } = useSnackbar();
     const {
         refreshAll,
@@ -574,15 +577,21 @@ function IdentitiesTab() {
             setAddressName("");
             setAddressDomain("");
             setSelectedAddress("");
+            setPublishedAddress("");
             setAddressDetails("");
             return;
         }
         try {
             const addresses = await keymaster.listAddresses();
+            const docs = await keymaster.resolveDID(currentId);
+            const identityData = docs?.didDocumentData as Record<string, unknown> | undefined;
+            const rawAddress = identityData?.address;
+            const nextAddress = typeof rawAddress === "string" ? rawAddress.trim().toLowerCase() : "";
             setAddressList(addresses);
             setAddressName("");
             setAddressDomain("");
             setSelectedAddress("");
+            setPublishedAddress(nextAddress);
             setAddressDetails("");
         } catch (error: any) {
             setError(error);
@@ -758,6 +767,53 @@ function IdentitiesTab() {
         }
     }
 
+    async function setPublishedAddressValue(address: string) {
+        if (!keymaster) {
+            return;
+        }
+        setAddressBusy(true);
+        try {
+            const normalizedAddress = address.trim().toLowerCase();
+            if (!currentId) {
+                setError("Select an identity first");
+                return;
+            }
+            if (!normalizedAddress) {
+                setError("Select an address to publish");
+                return;
+            }
+            await keymaster.mergeData(currentId, { address: normalizedAddress });
+            setPublishedAddress(normalizedAddress);
+            await refreshCurrentIdDocs();
+            setSuccess(`${normalizedAddress} published`);
+        } catch (error: any) {
+            setError(error);
+        } finally {
+            setAddressBusy(false);
+        }
+    }
+
+    async function clearPublishedAddressValue() {
+        if (!keymaster) {
+            return;
+        }
+        setAddressBusy(true);
+        try {
+            if (!currentId) {
+                setError("Select an identity first");
+                return;
+            }
+            await keymaster.mergeData(currentId, { address: null });
+            setPublishedAddress("");
+            await refreshCurrentIdDocs();
+            setSuccess("Address unpublished");
+        } catch (error: any) {
+            setError(error);
+        } finally {
+            setAddressBusy(false);
+        }
+    }
+
     async function removeAddressValue(address = selectedAddress || composeAddress(addressName, addressDomain)) {
         if (!keymaster) {
             return;
@@ -770,6 +826,11 @@ function IdentitiesTab() {
                 return;
             }
             await keymaster.removeAddress(normalizedAddress);
+            if (publishedAddress === normalizedAddress && currentId) {
+                await keymaster.mergeData(currentId, { address: null });
+                setPublishedAddress("");
+                await refreshCurrentIdDocs();
+            }
             setAddressName("");
             setAddressDomain(parseAddressDomain(normalizedAddress));
             setSelectedAddress("");
@@ -1021,24 +1082,83 @@ function IdentitiesTab() {
                                     <Button variant="contained" size="small" onClick={clearAddressFields} disabled={addressBusy || (!addressName && !addressDomain && !selectedAddress && !addressDetails)}>Clear</Button>
                                 </Box>
                                 <TableContainer component={Paper} sx={{ mb: 1 }}>
-                                    <Table size="small">
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>Address</TableCell>
-                                                <TableCell>Added</TableCell>
-                                                <TableCell>Actions</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
-                                                <TableRow key={address} selected={address === selectedAddress}>
-                                                    <TableCell sx={{ fontFamily: 'monospace' }}>{address}</TableCell>
-                                                    <TableCell sx={{ fontFamily: 'monospace' }}>{formatAddedDate(info.added)}</TableCell>
-                                                    <TableCell><Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button></TableCell>
+                                    {isBrowser ? (
+                                        <Table size="small" sx={{ tableLayout: "fixed" }}>
+                                            <colgroup>
+                                                <col />
+                                                <col style={{ width: "140px" }} />
+                                                <col style={{ width: "210px" }} />
+                                            </colgroup>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Address</TableCell>
+                                                    <TableCell>Added</TableCell>
+                                                    <TableCell>Actions</TableCell>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                            </TableHead>
+                                            <TableBody>
+                                                {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
+                                                    <TableRow key={address} selected={address === selectedAddress}>
+                                                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400 }}>{address}</TableCell>
+                                                        <TableCell sx={{ fontFamily: 'monospace' }}>{formatAddedDate(info.added)}</TableCell>
+                                                        <TableCell>
+                                                            <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                                                                <Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    size="small"
+                                                                    color={address === publishedAddress ? "error" : "primary"}
+                                                                    onClick={() => address === publishedAddress ? clearPublishedAddressValue() : setPublishedAddressValue(address)}
+                                                                    disabled={addressBusy || !currentId}
+                                                                >
+                                                                    {address === publishedAddress ? "Unpublish" : "Publish"}
+                                                                </Button>
+                                                            </Box>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    ) : (
+                                        <Table size="small" sx={{ tableLayout: "fixed" }}>
+                                            <colgroup>
+                                                <col />
+                                                {!hideAddressAddedColumn && <col style={{ width: "140px" }} />}
+                                                <col style={{ width: "210px" }} />
+                                            </colgroup>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Address</TableCell>
+                                                    {!hideAddressAddedColumn && <TableCell>Added</TableCell>}
+                                                    <TableCell>Actions</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
+                                                    <TableRow key={address} selected={address === selectedAddress}>
+                                                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400, whiteSpace: hideAddressAddedColumn ? "nowrap" : "normal", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                            {address}
+                                                        </TableCell>
+                                                        {!hideAddressAddedColumn && <TableCell sx={{ fontFamily: 'monospace', whiteSpace: "nowrap" }}>{formatAddedDate(info.added)}</TableCell>}
+                                                        <TableCell>
+                                                            <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                                                                <Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    size="small"
+                                                                    color={address === publishedAddress ? "error" : "primary"}
+                                                                    onClick={() => address === publishedAddress ? clearPublishedAddressValue() : setPublishedAddressValue(address)}
+                                                                    disabled={addressBusy || !currentId}
+                                                                >
+                                                                    {address === publishedAddress ? "Unpublish" : "Publish"}
+                                                                </Button>
+                                                            </Box>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    )}
                                 </TableContainer>
                                 <TextField multiline minRows={8} fullWidth value={addressDetails} InputProps={{ readOnly: true }} />
                             </Box>
