@@ -2186,35 +2186,96 @@ export default class Keymaster implements KeymasterInterface {
         return true;
     }
 
+    private async storeNostrNsec(nsec: string, name?: string): Promise<void> {
+        await this.mutateWallet(async (wallet) => {
+            const id = await this.fetchIdInfo(name, wallet);
+            id.nostr = {
+                ...id.nostr,
+                nsec,
+            };
+        });
+    }
+
+    private async removeStoredNostr(name?: string): Promise<void> {
+        await this.mutateWallet(async (wallet) => {
+            const id = await this.fetchIdInfo(name, wallet);
+            delete id.nostr;
+        });
+    }
+
+    private async fetchNostrKeyPair(name?: string): Promise<EcdsaJwkPair> {
+        const wallet = await this.loadWallet();
+        const id = await this.fetchIdInfo(name, wallet);
+
+        if (typeof id.nostr?.nsec === 'string' && id.nostr.nsec) {
+            return this.cipher.nsecToJwk(id.nostr.nsec);
+        }
+
+        const keypair = await this.fetchKeyPair(name);
+        if (!keypair) {
+            throw new InvalidParameterError('id');
+        }
+
+        return keypair;
+    }
+
     async addNostr(name?: string): Promise<NostrKeys> {
         const keypair = await this.fetchKeyPair(name);
         if (!keypair) {
             throw new InvalidParameterError('id');
         }
         const nostr = this.cipher.jwkToNostr(keypair.publicJwk);
+        const nsec = this.cipher.jwkToNsec(keypair.privateJwk);
         const id = await this.fetchIdInfo(name);
+        await this.storeNostrNsec(nsec, name);
+        await this.mergeData(id.did, { nostr });
+        return nostr;
+    }
+
+    async importNostr(nsec: string, name?: string): Promise<NostrKeys> {
+        if (!nsec || typeof nsec !== 'string') {
+            throw new InvalidParameterError('nsec');
+        }
+
+        let keypair: EcdsaJwkPair;
+        try {
+            keypair = this.cipher.nsecToJwk(nsec);
+        }
+        catch {
+            throw new InvalidParameterError('nsec');
+        }
+
+        const nostr = this.cipher.jwkToNostr(keypair.publicJwk);
+        const id = await this.fetchIdInfo(name);
+        await this.storeNostrNsec(nsec, name);
         await this.mergeData(id.did, { nostr });
         return nostr;
     }
 
     async removeNostr(name?: string): Promise<boolean> {
         const id = await this.fetchIdInfo(name);
+        await this.removeStoredNostr(name);
         return this.mergeData(id.did, { nostr: null });
     }
 
     async exportNsec(name?: string): Promise<string> {
+        const wallet = await this.loadWallet();
+        const id = await this.fetchIdInfo(name, wallet);
+
+        if (typeof id.nostr?.nsec === 'string' && id.nostr.nsec) {
+            return id.nostr.nsec;
+        }
+
         const keypair = await this.fetchKeyPair(name);
         if (!keypair) {
             throw new InvalidParameterError('id');
         }
+
         return this.cipher.jwkToNsec(keypair.privateJwk);
     }
 
     async signNostrEvent(event: NostrEvent): Promise<NostrEvent> {
-        const keypair = await this.fetchKeyPair();
-        if (!keypair) {
-            throw new InvalidParameterError('id');
-        }
+        const keypair = await this.fetchNostrKeyPair();
         const nostr = this.cipher.jwkToNostr(keypair.publicJwk);
         const serialized = JSON.stringify([
             0,

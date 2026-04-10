@@ -913,6 +913,19 @@ program
     });
 
 program
+    .command('import-nostr <nsec> [id]')
+    .description('Import nostr keys for an agent DID from an nsec private key')
+    .action(async (nsec, id) => {
+        try {
+            const nostr = await keymaster.importNostr(nsec, id);
+            console.log(JSON.stringify(nostr, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('remove-nostr [id]')
     .description('Remove nostr keys from an agent DID')
     .action(async (id) => {

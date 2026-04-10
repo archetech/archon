@@ -56,6 +56,7 @@ export interface Cipher {
     generateRandomJwk(): EcdsaJwkPair,
     convertJwkToCompressedBytes(jwk: EcdsaJwkPublic): Uint8Array,
     jwkToNostr(publicJwk: EcdsaJwkPublic): NostrKeys,
+    nsecToJwk(nsec: string): EcdsaJwkPair,
 
     hashMessage(msg: string | Uint8Array): string,
     hashJSON(obj: unknown): string,

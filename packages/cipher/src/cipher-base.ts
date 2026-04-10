@@ -65,6 +65,18 @@ export default abstract class CipherBase implements Cipher {
         return { npub, pubkey };
     }
 
+    nsecToJwk(nsec: string): EcdsaJwkPair {
+        const decoded = bech32.decode(nsec, 1000);
+        if (decoded.prefix !== 'nsec') {
+            throw new Error('Invalid nsec prefix');
+        }
+        const privateKeyBytes = Buffer.from(bech32.fromWords(decoded.words));
+        if (privateKeyBytes.length !== 32) {
+            throw new Error('Invalid nsec payload');
+        }
+        return this.generateJwk(privateKeyBytes);
+    }
+
     hashMessage(msg: string | Uint8Array): string {
         const hash = sha256(msg);
         return Buffer.from(hash).toString('hex');
