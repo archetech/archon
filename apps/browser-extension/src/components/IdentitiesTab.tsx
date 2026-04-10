@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography, useMediaQuery } from "@mui/material";
 import { Badge, Create, Image, Login, PermIdentity } from "@mui/icons-material";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
@@ -41,6 +41,7 @@ function formatAddedDate(value: string): string {
 }
 
 function IdentitiesTab() {
+    const isNarrowViewport = useMediaQuery("(max-width:560px)");
     const [identityTab, setIdentityTab] = useState<"details" | "addresses" | "name" | "avatar" | "nostr">("details");
     const [name, setName] = useState<string>("");
     const [warningModal, setWarningModal] = useState<boolean>(false);
@@ -80,6 +81,7 @@ function IdentitiesTab() {
         isBrowser,
         keymaster,
     } = useWalletContext();
+    const hideAddressAddedColumn = !isBrowser && isNarrowViewport;
     const { setError, setSuccess } = useSnackbar();
     const {
         refreshAll,
@@ -1083,25 +1085,25 @@ function IdentitiesTab() {
                                     <Table size="small" sx={{ tableLayout: "fixed" }}>
                                         <colgroup>
                                             <col />
-                                            <col style={{ width: "140px" }} />
+                                            {!hideAddressAddedColumn && <col style={{ width: "140px" }} />}
                                             <col style={{ width: "210px" }} />
                                         </colgroup>
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell>Address</TableCell>
-                                                <TableCell>Added</TableCell>
+                                                {!hideAddressAddedColumn && <TableCell>Added</TableCell>}
                                                 <TableCell>Actions</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
                                                 <TableRow key={address} selected={address === selectedAddress}>
-                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400, whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400, whiteSpace: hideAddressAddedColumn ? "nowrap" : "normal", overflow: "hidden", textOverflow: "ellipsis" }}>
                                                         {address}
                                                     </TableCell>
-                                                    <TableCell sx={{ fontFamily: 'monospace', whiteSpace: "nowrap" }}>{formatAddedDate(info.added)}</TableCell>
+                                                    {!hideAddressAddedColumn && <TableCell sx={{ fontFamily: 'monospace', whiteSpace: "nowrap" }}>{formatAddedDate(info.added)}</TableCell>}
                                                     <TableCell>
-                                                        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                                                        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
                                                             <Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button>
                                                             <Button
                                                                 variant="contained"
