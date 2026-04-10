@@ -26,6 +26,10 @@ const Endpoints = {
     keys_decrypt_json: '/api/v1/keys/decrypt/json',
     aliases: '/api/v1/aliases',
     addresses: '/api/v1/addresses',
+    nostr: '/api/v1/nostr',
+    nostr_import: '/api/v1/nostr/import',
+    nostr_nsec: '/api/v1/nostr/nsec',
+    nostr_sign: '/api/v1/nostr/sign',
     did: '/api/v1/did',
     assets: '/api/v1/assets',
     challenge: '/api/v1/challenge',
@@ -1310,7 +1314,7 @@ describe('addNostr', () => {
 
     it('should add nostr keys', async () => {
         nock(KeymasterURL)
-            .post('/api/v1/nostr')
+            .post(Endpoints.nostr)
             .reply(200, mockKeys);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
@@ -1321,7 +1325,7 @@ describe('addNostr', () => {
 
     it('should throw exception on addNostr server error', async () => {
         nock(KeymasterURL)
-            .post('/api/v1/nostr')
+            .post(Endpoints.nostr)
             .reply(500, ServerError);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
@@ -1339,7 +1343,7 @@ describe('addNostr', () => {
 describe('removeNostr', () => {
     it('should remove nostr keys', async () => {
         nock(KeymasterURL)
-            .delete('/api/v1/nostr', { id: 'alice' })
+            .delete(Endpoints.nostr, { id: 'alice' })
             .reply(200, { ok: true });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
@@ -1350,7 +1354,7 @@ describe('removeNostr', () => {
 
     it('should throw exception on removeNostr server error', async () => {
         nock(KeymasterURL)
-            .delete('/api/v1/nostr', { id: 'alice' })
+            .delete(Endpoints.nostr, { id: 'alice' })
             .reply(500, ServerError);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
@@ -1370,7 +1374,7 @@ describe('importNostr', () => {
 
     it('should import nostr keys', async () => {
         nock(KeymasterURL)
-            .post('/api/v1/nostr/import')
+            .post(Endpoints.nostr_import)
             .reply(200, mockKeys);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
@@ -1381,7 +1385,7 @@ describe('importNostr', () => {
 
     it('should throw exception on importNostr server error', async () => {
         nock(KeymasterURL)
-            .post('/api/v1/nostr/import')
+            .post(Endpoints.nostr_import)
             .reply(500, ServerError);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
@@ -1399,7 +1403,7 @@ describe('importNostr', () => {
 describe('exportNsec', () => {
     it('should export nsec', async () => {
         nock(KeymasterURL)
-            .post('/api/v1/nostr/nsec')
+            .post(Endpoints.nostr_nsec)
             .reply(200, { nsec: 'nsec1test' });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
@@ -1410,7 +1414,7 @@ describe('exportNsec', () => {
 
     it('should throw exception on exportNsec server error', async () => {
         nock(KeymasterURL)
-            .post('/api/v1/nostr/nsec')
+            .post(Endpoints.nostr_nsec)
             .reply(500, ServerError);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
@@ -1431,7 +1435,7 @@ describe('signNostrEvent', () => {
 
     it('should sign a nostr event', async () => {
         nock(KeymasterURL)
-            .post('/api/v1/nostr/sign')
+            .post(Endpoints.nostr_sign)
             .reply(200, signedEvent);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
@@ -1442,7 +1446,7 @@ describe('signNostrEvent', () => {
 
     it('should throw exception on signNostrEvent server error', async () => {
         nock(KeymasterURL)
-            .post('/api/v1/nostr/sign')
+            .post(Endpoints.nostr_sign)
             .reply(500, ServerError);
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
