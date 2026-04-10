@@ -2227,8 +2227,8 @@ export default class Keymaster implements KeymasterInterface {
         const nostr = this.cipher.jwkToNostr(keypair.publicJwk);
         const nsec = this.cipher.jwkToNsec(keypair.privateJwk);
         const id = await this.fetchIdInfo(name);
-        await this.storeNostrNsec(nsec, name);
         await this.mergeData(id.did, { nostr });
+        await this.storeNostrNsec(nsec, name);
         return nostr;
     }
 
@@ -2247,15 +2247,16 @@ export default class Keymaster implements KeymasterInterface {
 
         const nostr = this.cipher.jwkToNostr(keypair.publicJwk);
         const id = await this.fetchIdInfo(name);
-        await this.storeNostrNsec(nsec, name);
         await this.mergeData(id.did, { nostr });
+        await this.storeNostrNsec(nsec, name);
         return nostr;
     }
 
     async removeNostr(name?: string): Promise<boolean> {
         const id = await this.fetchIdInfo(name);
+        const removed = await this.mergeData(id.did, { nostr: null });
         await this.removeStoredNostr(name);
-        return this.mergeData(id.did, { nostr: null });
+        return removed;
     }
 
     async exportNsec(name?: string): Promise<string> {

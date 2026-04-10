@@ -2131,6 +2131,58 @@ v1router.delete('/nostr', async (req, res) => {
 
 /**
  * @swagger
+ * /nostr/import:
+ *   post:
+ *     summary: Import a Nostr private key (nsec) for the current identity.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nsec:
+ *                 type: string
+ *                 description: Bech32-encoded Nostr private key.
+ *               id:
+ *                 type: string
+ *                 description: "Identity name (optional, defaults to current)."
+ *             required:
+ *               - nsec
+ *     responses:
+ *       200:
+ *         description: The imported Nostr public keys.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 npub:
+ *                   type: string
+ *                 pubkey:
+ *                   type: string
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/nostr/import', async (req, res) => {
+    try {
+        const { nsec, id } = req.body;
+        const nostr = await keymaster.importNostr(nsec, id);
+        res.json(nostr);
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /nostr/nsec:
  *   post:
  *     summary: Export the Nostr private key (nsec) for the current identity.

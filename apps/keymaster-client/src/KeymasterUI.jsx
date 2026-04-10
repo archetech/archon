@@ -4478,6 +4478,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 title="Import Nostr nsec"
                 description="Enter the bech32-encoded nsec private key to import for this identity."
                 label="nsec"
+                inputType="password"
+                allowReveal
                 confirmText="Import"
                 onSubmit={importNostr}
                 onClose={() => setImportNostrOpen(false)}

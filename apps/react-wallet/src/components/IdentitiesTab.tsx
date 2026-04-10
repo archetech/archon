@@ -944,6 +944,8 @@ function IdentitiesTab() {
                 title="Import Nostr nsec"
                 description="Enter the bech32-encoded nsec private key to import for this identity."
                 label="nsec"
+                inputType="password"
+                allowReveal
                 confirmText="Import"
                 onSubmit={importNostr}
                 onClose={() => setImportNostrModal(false)}

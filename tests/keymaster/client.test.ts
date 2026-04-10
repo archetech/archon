@@ -1365,6 +1365,37 @@ describe('removeNostr', () => {
     });
 });
 
+describe('importNostr', () => {
+    const mockKeys = { npub: 'npub1test', pubkey: 'a'.repeat(64) };
+
+    it('should import nostr keys', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/nostr/import')
+            .reply(200, mockKeys);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const keys = await keymaster.importNostr('nsec1test', 'alice');
+
+        expect(keys).toStrictEqual(mockKeys);
+    });
+
+    it('should throw exception on importNostr server error', async () => {
+        nock(KeymasterURL)
+            .post('/api/v1/nostr/import')
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.importNostr('nsec1test', 'alice');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('exportNsec', () => {
     it('should export nsec', async () => {
         nock(KeymasterURL)

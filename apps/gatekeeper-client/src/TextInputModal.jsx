@@ -7,7 +7,10 @@ import {
     Button,
     DialogContentText,
     TextField,
+    IconButton,
+    InputAdornment,
 } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 
 const TextInputModal = (
     {
@@ -17,14 +20,18 @@ const TextInputModal = (
         label = "Name",
         confirmText = "Confirm",
         defaultValue = "",
+        inputType = "text",
+        allowReveal = false,
         onSubmit,
         onClose,
     }) => {
     const [value, setValue] = useState(defaultValue);
+    const [revealed, setRevealed] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             setValue(defaultValue);
+            setRevealed(false);
         }
     }, [isOpen, defaultValue]);
 
@@ -45,11 +52,24 @@ const TextInputModal = (
                         autoFocus
                         margin="dense"
                         label={label}
-                        type="text"
+                        type={allowReveal && inputType === "password" && revealed ? "text" : inputType}
                         fullWidth
                         variant="outlined"
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
+                        InputProps={allowReveal && inputType === "password" ? {
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        edge="end"
+                                        onClick={() => setRevealed((value) => !value)}
+                                        aria-label={revealed ? "Hide value" : "Show value"}
+                                    >
+                                        {revealed ? <VisibilityOff /> : <Visibility />}
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
+                        } : undefined}
                     />
                 </DialogContent>
                 <DialogActions>
