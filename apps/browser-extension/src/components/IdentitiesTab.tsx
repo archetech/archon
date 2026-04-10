@@ -1082,44 +1082,83 @@ function IdentitiesTab() {
                                     <Button variant="contained" size="small" onClick={clearAddressFields} disabled={addressBusy || (!addressName && !addressDomain && !selectedAddress && !addressDetails)}>Clear</Button>
                                 </Box>
                                 <TableContainer component={Paper} sx={{ mb: 1 }}>
-                                    <Table size="small" sx={{ tableLayout: "fixed" }}>
-                                        <colgroup>
-                                            <col />
-                                            {!hideAddressAddedColumn && <col style={{ width: "140px" }} />}
-                                            <col style={{ width: "210px" }} />
-                                        </colgroup>
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>Address</TableCell>
-                                                {!hideAddressAddedColumn && <TableCell>Added</TableCell>}
-                                                <TableCell>Actions</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
-                                                <TableRow key={address} selected={address === selectedAddress}>
-                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400, whiteSpace: hideAddressAddedColumn ? "nowrap" : "normal", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                        {address}
-                                                    </TableCell>
-                                                    {!hideAddressAddedColumn && <TableCell sx={{ fontFamily: 'monospace', whiteSpace: "nowrap" }}>{formatAddedDate(info.added)}</TableCell>}
-                                                    <TableCell>
-                                                        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                                                            <Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button>
-                                                            <Button
-                                                                variant="contained"
-                                                                size="small"
-                                                                color={address === publishedAddress ? "error" : "primary"}
-                                                                onClick={() => address === publishedAddress ? clearPublishedAddressValue() : setPublishedAddressValue(address)}
-                                                                disabled={addressBusy || !currentId}
-                                                            >
-                                                                {address === publishedAddress ? "Unpublish" : "Publish"}
-                                                            </Button>
-                                                        </Box>
-                                                    </TableCell>
+                                    {isBrowser ? (
+                                        <Table size="small" sx={{ tableLayout: "fixed" }}>
+                                            <colgroup>
+                                                <col />
+                                                <col style={{ width: "140px" }} />
+                                                <col style={{ width: "210px" }} />
+                                            </colgroup>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Address</TableCell>
+                                                    <TableCell>Added</TableCell>
+                                                    <TableCell>Actions</TableCell>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                            </TableHead>
+                                            <TableBody>
+                                                {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
+                                                    <TableRow key={address} selected={address === selectedAddress}>
+                                                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400 }}>{address}</TableCell>
+                                                        <TableCell sx={{ fontFamily: 'monospace' }}>{formatAddedDate(info.added)}</TableCell>
+                                                        <TableCell>
+                                                            <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                                                                <Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    size="small"
+                                                                    color={address === publishedAddress ? "error" : "primary"}
+                                                                    onClick={() => address === publishedAddress ? clearPublishedAddressValue() : setPublishedAddressValue(address)}
+                                                                    disabled={addressBusy || !currentId}
+                                                                >
+                                                                    {address === publishedAddress ? "Unpublish" : "Publish"}
+                                                                </Button>
+                                                            </Box>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    ) : (
+                                        <Table size="small" sx={{ tableLayout: "fixed" }}>
+                                            <colgroup>
+                                                <col />
+                                                {!hideAddressAddedColumn && <col style={{ width: "140px" }} />}
+                                                <col style={{ width: "210px" }} />
+                                            </colgroup>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Address</TableCell>
+                                                    {!hideAddressAddedColumn && <TableCell>Added</TableCell>}
+                                                    <TableCell>Actions</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
+                                                    <TableRow key={address} selected={address === selectedAddress}>
+                                                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400, whiteSpace: hideAddressAddedColumn ? "nowrap" : "normal", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                            {address}
+                                                        </TableCell>
+                                                        {!hideAddressAddedColumn && <TableCell sx={{ fontFamily: 'monospace', whiteSpace: "nowrap" }}>{formatAddedDate(info.added)}</TableCell>}
+                                                        <TableCell>
+                                                            <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                                                                <Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    size="small"
+                                                                    color={address === publishedAddress ? "error" : "primary"}
+                                                                    onClick={() => address === publishedAddress ? clearPublishedAddressValue() : setPublishedAddressValue(address)}
+                                                                    disabled={addressBusy || !currentId}
+                                                                >
+                                                                    {address === publishedAddress ? "Unpublish" : "Publish"}
+                                                                </Button>
+                                                            </Box>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    )}
                                 </TableContainer>
                                 <TextField multiline minRows={8} fullWidth value={addressDetails} InputProps={{ readOnly: true }} />
                             </Box>
