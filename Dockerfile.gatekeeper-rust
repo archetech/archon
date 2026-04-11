@@ -1,0 +1,21 @@
+FROM rust:1.86-bullseye AS builder
+
+WORKDIR /build
+COPY rust/services/gatekeeper/Cargo.toml ./Cargo.toml
+COPY rust/services/gatekeeper/src ./src
+RUN cargo build --release
+
+FROM debian:bullseye-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app/gatekeeper
+
+COPY --from=builder /build/target/release/archon-rust-gatekeeper /usr/local/bin/archon-rust-gatekeeper
+
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
+CMD ["archon-rust-gatekeeper"]

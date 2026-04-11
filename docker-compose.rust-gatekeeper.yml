@@ -1,0 +1,8 @@
+services:
+  gatekeeper:
+    build:
+      context: .
+      dockerfile: Dockerfile.gatekeeper-rust
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/gatekeeper-rust
