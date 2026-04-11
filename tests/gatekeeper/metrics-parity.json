@@ -10,12 +10,12 @@
     "service_version_info"
   ],
   "requiredNormalizedRoutes": [
-    "/api/v1/did/:did",
-    "/api/v1/block/:registry/latest",
-    "/api/v1/block/:registry/123",
-    "/api/v1/queue/:registry/clear",
-    "/api/v1/queue/:registry",
-    "/api/v1/events/:registry",
-    "/api/v1/dids/:prefix"
+    "/did/:did",
+    "/block/:registry/latest",
+    "/block/:registry/:blockId",
+    "/queue/:registry/clear",
+    "/queue/:registry",
+    "/events/:registry",
+    "/dids/"
   ]
 }

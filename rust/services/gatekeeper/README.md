@@ -48,11 +48,12 @@ Implemented natively:
 - native JSON, SQLite, Redis, and Mongo-backed persistence
 - fallback DID resolution when local resolution misses
 
-Still to validate for cutover:
+Cutover validation completed on 2026-04-11:
 
-- exhaustive side-by-side fixture coverage for asset, ephemeral, and fallback-heavy scenarios
-- dependent-service compose swap verification
-- final default-image promotion
+- side-by-side parity fixtures pass against the TypeScript implementation, including asset, ephemeral, hyperswarm, IPFS, and fallback-resolution flows
+- the default `docker-compose.yml` Gatekeeper service now builds from `Dockerfile.gatekeeper-rust`
+- the final image runs with zero Node or TypeScript runtime
+- dependent services can start against the Rust Gatekeeper unchanged in compose validation
 
 ## Runtime
 

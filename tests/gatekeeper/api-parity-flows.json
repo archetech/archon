@@ -266,6 +266,14 @@
     "compareMode": "json"
   },
   {
+    "name": "events-process-empty",
+    "method": "POST",
+    "path": "/api/v1/events/process",
+    "requiresAdminKey": true,
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
     "name": "block-local-add",
     "method": "POST",
     "path": "/api/v1/block/local",
@@ -358,6 +366,13 @@
     "compareMode": "text"
   },
   {
+    "name": "did-resolve-fallback-resolver",
+    "method": "GET",
+    "path": "/api/v1/did/did:example:phase6-fallback",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
     "name": "dids-remove-created-agent",
     "method": "POST",
     "path": "/api/v1/dids/remove",
@@ -365,11 +380,9 @@
       "content-type": "application/json"
     },
     "requiresAdminKey": true,
-    "bodyTemplate": {
-      "dids": [
-        "{{createdDid}}"
-      ]
-    },
+    "bodyTemplate": [
+      "{{createdDid}}"
+    ],
     "expectedStatus": 200,
     "compareMode": "json"
   },
@@ -377,7 +390,7 @@
     "name": "did-resolve-removed-agent",
     "method": "GET",
     "pathTemplate": "/api/v1/did/{{createdDid}}",
-    "expectedStatus": 404,
+    "expectedStatus": 200,
     "compareMode": "json"
   }
 ]

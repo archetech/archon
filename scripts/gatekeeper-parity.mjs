@@ -312,11 +312,29 @@ async function runDeterministicVectorChecks() {
 }
 
 function parseMetricNames(metricsText) {
-    return metricsText
-        .split('\n')
-        .filter(line => line && !line.startsWith('#'))
-        .map(line => line.split('{')[0].split(' ')[0])
-        .filter(Boolean);
+    const names = new Set();
+    for (const line of metricsText.split('\n')) {
+        if (!line) {
+            continue;
+        }
+
+        if (line.startsWith('# TYPE ')) {
+            const parts = line.split(/\s+/);
+            if (parts[2]) {
+                names.add(parts[2]);
+            }
+            continue;
+        }
+
+        if (!line.startsWith('#')) {
+            const name = line.split('{')[0].split(' ')[0];
+            if (name) {
+                names.add(name);
+            }
+        }
+    }
+
+    return [...names];
 }
 
 async function runMetricsChecks() {

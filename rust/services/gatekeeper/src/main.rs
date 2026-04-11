@@ -1416,7 +1416,39 @@ async fn ipfs_add_json(State(state): State<AppState>, Json(payload): Json<Value>
 
 async fn ipfs_get_json(State(state): State<AppState>, Path(cid): Path<String>) -> Response {
     let start = Instant::now();
-    proxy_ipfs_cat(&state, &cid, "application/json", "/ipfs/json/:cid", start).await
+    let url = format!("{}/block/get", state.config.ipfs_url.trim_end_matches('/'));
+    let response = state
+        .client
+        .post(url)
+        .query(&[("arg", cid.as_str())])
+        .send()
+        .await;
+
+    let response = match response {
+        Ok(response) => response,
+        Err(error) => {
+            error!("ipfs json block get failed: {error}");
+            record_metrics(&state, "GET", "/ipfs/json/:cid", 502, start.elapsed().as_secs_f64());
+            return (StatusCode::BAD_GATEWAY, error_json("IPFS cat failed")).into_response();
+        }
+    };
+
+    let status = response.status();
+    let body = match response.bytes().await {
+        Ok(body) => body,
+        Err(error) => {
+            error!("ipfs json block get body read failed: {error}");
+            record_metrics(&state, "GET", "/ipfs/json/:cid", 502, start.elapsed().as_secs_f64());
+            return (StatusCode::BAD_GATEWAY, error_json("IPFS cat response failed")).into_response();
+        }
+    };
+
+    record_metrics(&state, "GET", "/ipfs/json/:cid", status.as_u16(), start.elapsed().as_secs_f64());
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body))
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
 async fn ipfs_add_text(State(state): State<AppState>, request: Request) -> Response {
@@ -2485,6 +2517,9 @@ async fn update_metrics_from_check(state: &AppState, did_check: &CheckDidsResult
             event.registry.clone()
         };
         *queue_by_registry.entry(registry).or_insert(0) += 1;
+    }
+    for registry in &state.config.registries {
+        queue_by_registry.entry(registry.clone()).or_insert(0);
     }
     for (registry, count) in queue_by_registry {
         state
