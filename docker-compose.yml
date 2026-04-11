@@ -43,11 +43,17 @@ services:
     volumes:
       - ./data/ipfs:/data/ipfs
       - ./share:/export/share
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5001/api/v0/version >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   gatekeeper:
     build:
       context: .
-      dockerfile: Dockerfile.gatekeeper
+      dockerfile: Dockerfile.gatekeeper-rust
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/gatekeeper
@@ -72,7 +78,7 @@ services:
     ports:
       - ${ARCHON_GATEKEEPER_PORT}:4224
     healthcheck:
-      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4224/api/v1/ready',res=>{let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.exit(res.statusCode===200&&(body.trim()==='true'||body.includes('\"ready\":true'))?0:1));});req.on('error',()=>process.exit(1));"]
+      test: ["CMD-SHELL", "test \"$(wget -qO- http://127.0.0.1:4224/api/v1/ready)\" = \"true\""]
       interval: 10s
       timeout: 5s
       retries: 6

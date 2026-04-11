@@ -57,16 +57,14 @@
     "method": "GET",
     "path": "/api/v1/db/reset",
     "expectedStatus": 401,
-    "compareMode": "json",
-    "requiresAdminKey": true
+    "compareMode": "json"
   },
   {
     "name": "admin-unauthorized-verify",
     "method": "GET",
     "path": "/api/v1/db/verify",
     "expectedStatus": 401,
-    "compareMode": "json",
-    "requiresAdminKey": true
+    "compareMode": "json"
   },
   {
     "name": "queue-invalid-registry",
@@ -74,9 +72,7 @@
     "path": "/api/v1/queue/mock",
     "expectedStatus": 500,
     "compareMode": "text",
-    "headers": {
-      "X-Archon-Admin-Key": "test-admin-key"
-    }
+    "requiresAdminKey": true
   },
   {
     "name": "queue-clear-invalid-registry",
@@ -85,9 +81,9 @@
     "expectedStatus": 500,
     "compareMode": "text",
     "headers": {
-      "content-type": "application/json",
-      "X-Archon-Admin-Key": "test-admin-key"
+      "content-type": "application/json"
     },
+    "requiresAdminKey": true,
     "body": []
   },
   {
@@ -104,9 +100,9 @@
     "expectedStatus": 500,
     "compareMode": "text",
     "headers": {
-      "content-type": "application/json",
-      "X-Archon-Admin-Key": "test-admin-key"
+      "content-type": "application/json"
     },
+    "requiresAdminKey": true,
     "body": {}
   },
   {
@@ -116,9 +112,9 @@
     "expectedStatus": 500,
     "compareMode": "text",
     "headers": {
-      "content-type": "application/json",
-      "X-Archon-Admin-Key": "test-admin-key"
+      "content-type": "application/json"
     },
+    "requiresAdminKey": true,
     "body": {
       "metadata": {
         "registry": "local",
@@ -136,9 +132,9 @@
     "expectedStatus": 500,
     "compareMode": "text",
     "headers": {
-      "content-type": "application/json",
-      "X-Archon-Admin-Key": "test-admin-key"
+      "content-type": "application/json"
     },
+    "requiresAdminKey": true,
     "body": {
       "cids": [
         "bafyreicidplaceholder"

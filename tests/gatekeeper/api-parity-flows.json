@@ -17,6 +17,20 @@
     }
   },
   {
+    "name": "did-generate-hyperswarm-agent",
+    "method": "POST",
+    "path": "/api/v1/did/generate",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyFrom": {
+      "file": "deterministic-vectors.json",
+      "pointer": "hyperswarmAgent.operation"
+    },
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
     "name": "did-create-agent",
     "method": "POST",
     "path": "/api/v1/did",
@@ -32,6 +46,102 @@
     "capture": {
       "key": "createdDid"
     }
+  },
+  {
+    "name": "did-create-deterministic-agent",
+    "method": "POST",
+    "path": "/api/v1/did",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyFrom": {
+      "file": "deterministic-vectors.json",
+      "pointer": "localAgent.operation"
+    },
+    "expectedStatus": 200,
+    "compareMode": "json",
+    "capture": {
+      "key": "deterministicAgentDid"
+    }
+  },
+  {
+    "name": "did-resolve-deterministic-agent",
+    "method": "GET",
+    "pathTemplate": "/api/v1/did/{{deterministicAgentDid}}",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "did-create-asset",
+    "method": "POST",
+    "path": "/api/v1/did",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyFrom": {
+      "file": "deterministic-vectors.json",
+      "pointer": "asset.operation"
+    },
+    "expectedStatus": 200,
+    "compareMode": "json",
+    "capture": {
+      "key": "assetDid"
+    }
+  },
+  {
+    "name": "did-resolve-created-asset",
+    "method": "GET",
+    "pathTemplate": "/api/v1/did/{{assetDid}}",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "did-create-ephemeral-asset",
+    "method": "POST",
+    "path": "/api/v1/did",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyFrom": {
+      "file": "deterministic-vectors.json",
+      "pointer": "ephemeralAsset.operation"
+    },
+    "expectedStatus": 200,
+    "compareMode": "json",
+    "capture": {
+      "key": "ephemeralDid"
+    }
+  },
+  {
+    "name": "did-resolve-created-ephemeral-asset",
+    "method": "GET",
+    "pathTemplate": "/api/v1/did/{{ephemeralDid}}",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "did-create-hyperswarm-agent",
+    "method": "POST",
+    "path": "/api/v1/did",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyFrom": {
+      "file": "deterministic-vectors.json",
+      "pointer": "hyperswarmAgent.operation"
+    },
+    "expectedStatus": 200,
+    "compareMode": "json",
+    "capture": {
+      "key": "hyperswarmDid"
+    }
+  },
+  {
+    "name": "did-resolve-created-hyperswarm-agent",
+    "method": "GET",
+    "pathTemplate": "/api/v1/did/{{hyperswarmDid}}",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
   },
   {
     "name": "did-resolve-created-agent",
@@ -56,6 +166,20 @@
     "compareMode": "json"
   },
   {
+    "name": "dids-filter-updated-after",
+    "method": "POST",
+    "path": "/api/v1/dids/",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyTemplate": {
+      "updatedAfter": "2026-04-11T13:05:00Z",
+      "resolve": false
+    },
+    "expectedStatus": 200,
+    "compareMode": "jsonSet"
+  },
+  {
     "name": "dids-resolve-created-agent",
     "method": "POST",
     "path": "/api/v1/dids/",
@@ -69,6 +193,23 @@
       "resolve": true,
       "verify": true,
       "confirm": true
+    },
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "dids-resolve-asset-and-ephemeral",
+    "method": "POST",
+    "path": "/api/v1/dids/",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyTemplate": {
+      "dids": [
+        "{{assetDid}}",
+        "{{ephemeralDid}}"
+      ],
+      "resolve": true
     },
     "expectedStatus": 200,
     "compareMode": "jsonLoose"
@@ -95,6 +236,14 @@
     "requiresAdminKey": true,
     "expectedStatus": 200,
     "compareMode": "jsonLoose"
+  },
+  {
+    "name": "queue-hyperswarm-empty",
+    "method": "GET",
+    "path": "/api/v1/queue/hyperswarm",
+    "requiresAdminKey": true,
+    "expectedStatus": 200,
+    "compareMode": "json"
   },
   {
     "name": "queue-local-empty",
@@ -158,7 +307,7 @@
       "pointer": "agentCreateInvalidProof.operation"
     },
     "expectedStatus": 500,
-    "compareMode": "json"
+    "compareMode": "errorText"
   },
   {
     "name": "ipfs-json-roundtrip",

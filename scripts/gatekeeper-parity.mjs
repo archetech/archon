@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs/promises';
+import CipherNode from '@didcid/cipher/node';
+import { generateCID } from '@didcid/ipfs/utils';
 
 const tsBaseUrl = process.env.TS_GATEKEEPER_URL;
 const rustBaseUrl = process.env.RUST_GATEKEEPER_URL;
@@ -23,6 +25,10 @@ const metricsFixture = JSON.parse(
 const proofVectors = JSON.parse(
     await fs.readFile(new URL('../tests/gatekeeper/proof-vectors.json', import.meta.url), 'utf8'),
 );
+const deterministicVectors = JSON.parse(
+    await fs.readFile(new URL('../tests/gatekeeper/deterministic-vectors.json', import.meta.url), 'utf8'),
+);
+const cipher = new CipherNode();
 
 function normalizeJson(value) {
     if (Array.isArray(value)) {
@@ -36,6 +42,16 @@ function normalizeJson(value) {
                 continue;
             }
             if (key === 'uptimeSeconds') {
+                copy[key] = '<dynamic>';
+                continue;
+            }
+            if (
+                key === 'rss' ||
+                key === 'heapTotal' ||
+                key === 'heapUsed' ||
+                key === 'external' ||
+                key === 'arrayBuffers'
+            ) {
                 copy[key] = '<dynamic>';
                 continue;
             }
@@ -83,6 +99,23 @@ async function request(baseUrl, fixture) {
     };
 }
 
+async function resetServiceState(baseUrl) {
+    if (!adminKey) {
+        return;
+    }
+
+    const response = await fetch(`${baseUrl}/api/v1/db/reset`, {
+        method: 'GET',
+        headers: {
+            'X-Archon-Admin-Key': adminKey,
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to reset ${baseUrl}: ${response.status} ${await response.text()}`);
+    }
+}
+
 function deepClone(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
@@ -117,6 +150,32 @@ function assertEqual(label, left, right) {
     }
 }
 
+function normalizeErrorText(value) {
+    if (typeof value === 'string') {
+        return value;
+    }
+    if (value && typeof value === 'object' && typeof value.error === 'string') {
+        return value.error.startsWith('Error: ') ? value.error : `Error: ${value.error}`;
+    }
+    return value;
+}
+
+function normalizeSetLikeJson(value) {
+    if (Array.isArray(value)) {
+        return value
+            .map(item => normalizeSetLikeJson(item))
+            .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    }
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(
+            Object.keys(value)
+                .sort()
+                .map(key => [key, normalizeSetLikeJson(value[key])]),
+        );
+    }
+    return value;
+}
+
 async function runApiFixtures() {
     for (const fixture of apiFixtures) {
         const ts = await request(tsBaseUrl, fixture);
@@ -133,8 +192,22 @@ async function runApiFixtures() {
 
         assertEqual(`${fixture.name} status`, ts.status, rust.status);
 
-        const leftBody = fixture.compareMode === 'jsonLoose' ? normalizeJson(ts.body) : ts.body;
-        const rightBody = fixture.compareMode === 'jsonLoose' ? normalizeJson(rust.body) : rust.body;
+        const leftBody =
+            fixture.compareMode === 'jsonLoose'
+                ? normalizeJson(ts.body)
+                : fixture.compareMode === 'errorText'
+                  ? normalizeErrorText(ts.body)
+                : fixture.compareMode === 'jsonSet'
+                  ? normalizeSetLikeJson(ts.body)
+                  : ts.body;
+        const rightBody =
+            fixture.compareMode === 'jsonLoose'
+                ? normalizeJson(rust.body)
+                : fixture.compareMode === 'errorText'
+                  ? normalizeErrorText(rust.body)
+                : fixture.compareMode === 'jsonSet'
+                  ? normalizeSetLikeJson(rust.body)
+                  : rust.body;
         assertEqual(`${fixture.name} body`, leftBody, rightBody);
         console.log(`ok api ${fixture.name}`);
     }
@@ -146,7 +219,12 @@ async function runApiFlows() {
     for (const flow of apiFlows) {
         let body = flow.body;
         if (flow.bodyFrom) {
-            const source = flow.bodyFrom.file === 'proof-vectors.json' ? proofVectors : null;
+            const source =
+                flow.bodyFrom.file === 'proof-vectors.json'
+                    ? proofVectors
+                    : flow.bodyFrom.file === 'deterministic-vectors.json'
+                      ? deterministicVectors
+                      : null;
             if (!source) {
                 throw new Error(`Unsupported bodyFrom file: ${flow.bodyFrom.file}`);
             }
@@ -176,8 +254,22 @@ async function runApiFlows() {
         assertEqual(`${flow.name} status`, ts.status, rust.status);
 
         const compareMode = flow.compareMode || 'json';
-        const leftBody = compareMode === 'jsonLoose' ? normalizeJson(ts.body) : ts.body;
-        const rightBody = compareMode === 'jsonLoose' ? normalizeJson(rust.body) : rust.body;
+        const leftBody =
+            compareMode === 'jsonLoose'
+                ? normalizeJson(ts.body)
+                : compareMode === 'errorText'
+                  ? normalizeErrorText(ts.body)
+                : compareMode === 'jsonSet'
+                  ? normalizeSetLikeJson(ts.body)
+                  : ts.body;
+        const rightBody =
+            compareMode === 'jsonLoose'
+                ? normalizeJson(rust.body)
+                : compareMode === 'errorText'
+                  ? normalizeErrorText(rust.body)
+                : compareMode === 'jsonSet'
+                  ? normalizeSetLikeJson(rust.body)
+                  : rust.body;
         assertEqual(`${flow.name} body`, leftBody, rightBody);
 
         if (flow.capture?.key) {
@@ -185,6 +277,37 @@ async function runApiFlows() {
         }
 
         console.log(`ok flow ${flow.name}`);
+    }
+}
+
+async function runDeterministicVectorChecks() {
+    for (const [name, vector] of Object.entries(deterministicVectors)) {
+        const canonical = cipher.canonicalizeJSON(vector.operation);
+        if (canonical !== vector.canonical) {
+            throw new Error(`${name}: canonical JSON mismatch\nexpected: ${vector.canonical}\nactual:   ${canonical}`);
+        }
+
+        const cid = await generateCID(JSON.parse(canonical));
+        if (cid !== vector.cid) {
+            throw new Error(`${name}: CID mismatch\nexpected: ${vector.cid}\nactual:   ${cid}`);
+        }
+
+        const fixture = {
+            method: 'POST',
+            path: '/api/v1/did/generate',
+            headers: { 'content-type': 'application/json' },
+            body: vector.operation,
+        };
+
+        const ts = await request(tsBaseUrl, fixture);
+        const rust = await request(rustBaseUrl, fixture);
+
+        assertEqual(`${name} /did/generate status`, ts.status, 200);
+        assertEqual(`${name} /did/generate status parity`, ts.status, rust.status);
+        assertEqual(`${name} /did/generate body parity`, ts.body, rust.body);
+        assertEqual(`${name} /did/generate expected`, rust.body, vector.did);
+
+        console.log(`ok vector ${name}`);
     }
 }
 
@@ -223,7 +346,10 @@ async function runMetricsChecks() {
     console.log('ok metrics required names');
 }
 
+await resetServiceState(tsBaseUrl);
+await resetServiceState(rustBaseUrl);
 await runApiFixtures();
+await runDeterministicVectorChecks();
 await runApiFlows();
 await runMetricsChecks();
 console.log('Gatekeeper parity checks passed');

@@ -453,11 +453,7 @@ async fn create_did(State(state): State<AppState>, Json(payload): Json<Value>) -
                 .inc();
             let status = StatusCode::INTERNAL_SERVER_ERROR;
             record_metrics(&state, "POST", "/did", status.as_u16(), start.elapsed().as_secs_f64());
-            (
-                status,
-                Json(json!({ "error": error.to_string() })),
-            )
-                .into_response()
+            text_error_response(status, &format!("Error: {}", error))
         }
     }
 }
@@ -493,8 +489,7 @@ async fn list_dids(State(state): State<AppState>, Json(payload): Json<Value>) ->
     };
 
     if resolve || updated_after.is_some() || updated_before.is_some() {
-        let mut docs = Vec::new();
-        let mut filtered_dids = Vec::new();
+        let mut matches = Vec::new();
         for did in dids {
             let doc = resolve_local_doc_async(&state, &did, resolve_options.clone()).await;
             let Ok(doc) = doc else {
@@ -517,13 +512,13 @@ async fn list_dids(State(state): State<AppState>, Json(payload): Json<Value>) ->
                     continue;
                 }
             }
-
-            if resolve {
-                docs.push(doc);
-            } else {
-                filtered_dids.push(did);
-            }
+            matches.push((updated.to_string(), did, doc));
         }
+
+        matches.sort_by(|a, b| a.0.cmp(&b.0));
+        let docs = matches.iter().map(|(_, _, doc)| doc.clone()).collect::<Vec<_>>();
+        let filtered_dids = matches.into_iter().map(|(_, did, _)| did).collect::<Vec<_>>();
+
         record_metrics(&state, "POST", "/dids/", 200, start.elapsed().as_secs_f64());
         if resolve {
             Json(json!(docs)).into_response()
@@ -588,7 +583,7 @@ async fn remove_dids(
 
     if dids.is_empty() {
         record_metrics(&state, "POST", "/dids/remove", 500, start.elapsed().as_secs_f64());
-        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid parameter: dids");
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Error: Invalid parameter: dids");
     }
 
     let mut store = state.store.lock().await;
@@ -699,7 +694,7 @@ async fn import_batch(
         Some(items) => items.iter().cloned().collect::<Vec<_>>(),
         None => {
             record_metrics(&state, "POST", "/batch/import", 500, start.elapsed().as_secs_f64());
-            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid parameter: batch");
+            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Error: Invalid parameter: batch");
         }
     };
 
@@ -723,14 +718,14 @@ async fn import_batch_by_cids(
         Some(items) if !items.is_empty() => items,
         _ => {
             record_metrics(&state, "POST", "/batch/import/cids", 500, start.elapsed().as_secs_f64());
-            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid parameter: cids");
+            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Error: Invalid parameter: cids");
         }
     };
     let metadata = match payload.get("metadata") {
         Some(value) if value.is_object() => value,
         _ => {
             record_metrics(&state, "POST", "/batch/import/cids", 500, start.elapsed().as_secs_f64());
-            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid parameter: metadata");
+            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Error: Invalid parameter: metadata");
         }
     };
 
@@ -796,7 +791,7 @@ async fn get_queue(
         record_metrics(&state, "GET", "/queue/:registry", 500, start.elapsed().as_secs_f64());
         return text_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("Invalid parameter: registry={registry}"),
+            &format!("Error: Invalid parameter: registry={registry}"),
         );
     }
 
@@ -827,7 +822,7 @@ async fn clear_queue(
         record_metrics(&state, "POST", "/queue/:registry/clear", 500, start.elapsed().as_secs_f64());
         return text_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("Invalid parameter: registry={registry}"),
+            &format!("Error: Invalid parameter: registry={registry}"),
         );
     }
 
@@ -952,7 +947,7 @@ async fn get_latest_block(State(state): State<AppState>, Path(registry): Path<St
         record_metrics(&state, "GET", "/block/:registry/latest", 500, start.elapsed().as_secs_f64());
         return text_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("Invalid parameter: registry={registry}"),
+            &format!("Error: Invalid parameter: registry={registry}"),
         );
     }
 
@@ -971,7 +966,7 @@ async fn get_block_by_id(
         record_metrics(&state, "GET", "/block/:registry/:blockId", 500, start.elapsed().as_secs_f64());
         return text_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("Invalid parameter: registry={registry}"),
+            &format!("Error: Invalid parameter: registry={registry}"),
         );
     }
 
@@ -996,7 +991,7 @@ async fn add_block(
         record_metrics(&state, "POST", "/block/:registry", 500, start.elapsed().as_secs_f64());
         return text_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("Invalid parameter: registry={registry}"),
+            &format!("Error: Invalid parameter: registry={registry}"),
         );
     }
 
@@ -1153,13 +1148,7 @@ async fn resolve_local_doc_async(state: &AppState, did: &str, options: ResolveOp
     let mut resolved = ResolvedDoc {
         did_document: initial_document,
         did_document_data: anchor_operation.get("data").cloned().unwrap_or_else(|| json!({})),
-        did_document_registration: {
-            let mut value = Value::Object(registration.clone());
-            if value.get("created").is_none() {
-                value["created"] = Value::String(created.clone());
-            }
-            value
-        },
+        did_document_registration: Value::Object(registration.clone()),
         created: created.clone(),
         updated: None,
         deleted: None,
@@ -1379,15 +1368,50 @@ async fn handle_did_operation(state: &AppState, payload: &Value) -> Result<Value
 
 async fn ipfs_add_json(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
     let start = Instant::now();
-    proxy_ipfs_add(
-        &state,
-        "json",
-        vec![("pin".to_string(), "true".to_string())],
-        reqwest::multipart::Form::new().text("file", payload.to_string()),
-        "/ipfs/json",
-        start,
-    )
-    .await
+    let url = format!("{}/block/put", state.config.ipfs_url.trim_end_matches('/'));
+    let response = state
+        .client
+        .post(url)
+        .query(&[
+            ("pin", "true"),
+            ("cid-codec", "json"),
+            ("mhtype", "sha2-256"),
+        ])
+        .multipart(reqwest::multipart::Form::new().part(
+            "file",
+            reqwest::multipart::Part::bytes(payload.to_string().into_bytes())
+                .mime_str("application/json")
+                .unwrap(),
+        ))
+        .send()
+        .await;
+
+    let response = match response {
+        Ok(response) => response,
+        Err(error) => {
+            error!("ipfs json block put failed: {error}");
+            record_metrics(&state, "POST", "/ipfs/json", 502, start.elapsed().as_secs_f64());
+            return (StatusCode::BAD_GATEWAY, error_json("IPFS add failed")).into_response();
+        }
+    };
+
+    let status = response.status();
+    let body = match response.text().await {
+        Ok(body) => body,
+        Err(error) => {
+            error!("ipfs json block put body read failed: {error}");
+            record_metrics(&state, "POST", "/ipfs/json", 502, start.elapsed().as_secs_f64());
+            return (StatusCode::BAD_GATEWAY, error_json("IPFS add response failed")).into_response();
+        }
+    };
+
+    let cid = extract_ipfs_hash(&body).unwrap_or(body.trim().to_string());
+    record_metrics(&state, "POST", "/ipfs/json", status.as_u16(), start.elapsed().as_secs_f64());
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .body(Body::from(cid))
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
 async fn ipfs_get_json(State(state): State<AppState>, Path(cid): Path<String>) -> Response {
@@ -1405,7 +1429,10 @@ async fn ipfs_add_text(State(state): State<AppState>, request: Request) -> Respo
     proxy_ipfs_add(
         &state,
         "text",
-        vec![("pin".to_string(), "true".to_string())],
+        vec![
+            ("pin".to_string(), "true".to_string()),
+            ("cid-version".to_string(), "1".to_string()),
+        ],
         reqwest::multipart::Form::new().part(
             "file",
             reqwest::multipart::Part::bytes(body.to_vec()).mime_str("text/plain").unwrap(),
@@ -1431,7 +1458,10 @@ async fn ipfs_add_data(State(state): State<AppState>, request: Request) -> Respo
     proxy_ipfs_add(
         &state,
         "data",
-        vec![("pin".to_string(), "true".to_string())],
+        vec![
+            ("pin".to_string(), "true".to_string()),
+            ("cid-version".to_string(), "1".to_string()),
+        ],
         reqwest::multipart::Form::new().part(
             "file",
             reqwest::multipart::Part::bytes(body.to_vec())
@@ -1459,7 +1489,10 @@ async fn ipfs_add_stream(State(state): State<AppState>, request: Request) -> Res
     proxy_ipfs_add(
         &state,
         "stream",
-        vec![("pin".to_string(), "true".to_string())],
+        vec![
+            ("pin".to_string(), "true".to_string()),
+            ("cid-version".to_string(), "1".to_string()),
+        ],
         reqwest::multipart::Form::new().part("file", reqwest::multipart::Part::bytes(body.to_vec())),
         "/ipfs/stream",
         start,
@@ -2824,6 +2857,16 @@ fn extract_ipfs_hash(body: &str) -> Option<String> {
             if let Some(hash) = json.get("Hash").and_then(Value::as_str) {
                 return Some(hash.to_string());
             }
+            if let Some(hash) = json.get("Key").and_then(Value::as_str) {
+                return Some(hash.to_string());
+            }
+            if let Some(hash) = json
+                .get("Cid")
+                .and_then(|value| value.get("/"))
+                .and_then(Value::as_str)
+            {
+                return Some(hash.to_string());
+            }
         }
     }
     None
@@ -3322,14 +3365,6 @@ impl JsonDb {
             .context("missing block.hash")?
             .to_string();
 
-        if block.get("timeISO").is_none() {
-            if let Some(time) = block.get("time").and_then(Value::as_i64) {
-                let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(time, 0)
-                    .context("invalid block.time")?;
-                block["timeISO"] = Value::String(dt.to_rfc3339());
-            }
-        }
-
         self.data
             .blocks
             .entry(registry.to_string())
@@ -3435,13 +3470,7 @@ impl JsonDb {
         let mut state = ResolvedDoc {
             did_document: initial_document,
             did_document_data: anchor_operation.get("data").cloned().unwrap_or_else(|| json!({})),
-            did_document_registration: {
-                let mut value = Value::Object(registration.clone());
-                if value.get("created").is_none() {
-                    value["created"] = Value::String(created.to_string());
-                }
-                value
-            },
+            did_document_registration: Value::Object(registration.clone()),
             created: created.to_string(),
             updated: None,
             deleted: None,

@@ -1,0 +1,113 @@
+{
+  "localAgent": {
+    "operation": {
+      "type": "create",
+      "created": "2026-04-11T13:00:00Z",
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao",
+        "y": "OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE"
+      },
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "local"
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-04-11T13:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "authentication",
+        "proofValue": "Fsskgnzp2Ac_RaTtuCZNpWwsoJB6ymauf2on6NL5dWs8E3C-gN2p9IIMEv-mQpO5ysuJYDrCINXRxMbbyDns6g"
+      }
+    },
+    "canonical": "{\"created\":\"2026-04-11T13:00:00Z\",\"proof\":{\"created\":\"2026-04-11T13:00:00Z\",\"proofPurpose\":\"authentication\",\"proofValue\":\"Fsskgnzp2Ac_RaTtuCZNpWwsoJB6ymauf2on6NL5dWs8E3C-gN2p9IIMEv-mQpO5ysuJYDrCINXRxMbbyDns6g\",\"type\":\"EcdsaSecp256k1Signature2019\",\"verificationMethod\":\"#key-1\"},\"publicJwk\":{\"crv\":\"secp256k1\",\"kty\":\"EC\",\"x\":\"TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao\",\"y\":\"OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE\"},\"registration\":{\"registry\":\"local\",\"type\":\"agent\",\"version\":1},\"type\":\"create\"}",
+    "cid": "bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha",
+    "did": "did:cid:bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha"
+  },
+  "hyperswarmAgent": {
+    "operation": {
+      "type": "create",
+      "created": "2026-04-11T13:05:00Z",
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao",
+        "y": "OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE"
+      },
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm"
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-04-11T13:05:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "authentication",
+        "proofValue": "_lpQXL33xeMIfp4DZJGSfN8PjCcXTP8fZbUYV_CW4nRgsUHBsRUl63_p7oM6ILAk19ntkS3v74bKS6Kq1ckvVA"
+      }
+    },
+    "canonical": "{\"created\":\"2026-04-11T13:05:00Z\",\"proof\":{\"created\":\"2026-04-11T13:05:00Z\",\"proofPurpose\":\"authentication\",\"proofValue\":\"_lpQXL33xeMIfp4DZJGSfN8PjCcXTP8fZbUYV_CW4nRgsUHBsRUl63_p7oM6ILAk19ntkS3v74bKS6Kq1ckvVA\",\"type\":\"EcdsaSecp256k1Signature2019\",\"verificationMethod\":\"#key-1\"},\"publicJwk\":{\"crv\":\"secp256k1\",\"kty\":\"EC\",\"x\":\"TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao\",\"y\":\"OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE\"},\"registration\":{\"registry\":\"hyperswarm\",\"type\":\"agent\",\"version\":1},\"type\":\"create\"}",
+    "cid": "bagaaieraecz5kvwx3b3zre5mqhx6rqi7hmwxi4hlpxdf6xpnyxobmrr6dyba",
+    "did": "did:cid:bagaaieraecz5kvwx3b3zre5mqhx6rqi7hmwxi4hlpxdf6xpnyxobmrr6dyba"
+  },
+  "asset": {
+    "operation": {
+      "type": "create",
+      "created": "2026-04-11T13:10:00Z",
+      "registration": {
+        "version": 1,
+        "type": "asset",
+        "registry": "local"
+      },
+      "controller": "did:cid:bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha",
+      "data": {
+        "name": "Phase 6 Asset",
+        "tags": [
+          "rust",
+          "cutover"
+        ],
+        "value": 7
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-04-11T13:10:00Z",
+        "verificationMethod": "did:cid:bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha#key-1",
+        "proofPurpose": "authentication",
+        "proofValue": "N7uBtUeOjJazzPA1OE-Ahek2jVDDOUqKSxKf3E1pO2AGbxEeLDeR5SBk6rClZ6CiKiISnoH5IPoCPr2M3KSy5A"
+      }
+    },
+    "canonical": "{\"controller\":\"did:cid:bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha\",\"created\":\"2026-04-11T13:10:00Z\",\"data\":{\"name\":\"Phase 6 Asset\",\"tags\":[\"rust\",\"cutover\"],\"value\":7},\"proof\":{\"created\":\"2026-04-11T13:10:00Z\",\"proofPurpose\":\"authentication\",\"proofValue\":\"N7uBtUeOjJazzPA1OE-Ahek2jVDDOUqKSxKf3E1pO2AGbxEeLDeR5SBk6rClZ6CiKiISnoH5IPoCPr2M3KSy5A\",\"type\":\"EcdsaSecp256k1Signature2019\",\"verificationMethod\":\"did:cid:bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha#key-1\"},\"registration\":{\"registry\":\"local\",\"type\":\"asset\",\"version\":1},\"type\":\"create\"}",
+    "cid": "bagaaierapx5kferym6hhrfl3jrz423buvanvbku7zkchn2ulrupciyfl56wa",
+    "did": "did:cid:bagaaierapx5kferym6hhrfl3jrz423buvanvbku7zkchn2ulrupciyfl56wa"
+  },
+  "ephemeralAsset": {
+    "operation": {
+      "type": "create",
+      "created": "2026-04-11T13:15:00Z",
+      "registration": {
+        "version": 1,
+        "type": "asset",
+        "registry": "local",
+        "validUntil": "2026-12-31T00:00:00Z"
+      },
+      "controller": "did:cid:bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha",
+      "data": {
+        "kind": "ephemeral",
+        "expires": "2026-12-31T00:00:00Z"
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-04-11T13:15:00Z",
+        "verificationMethod": "did:cid:bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha#key-1",
+        "proofPurpose": "authentication",
+        "proofValue": "H-BZkAHFv_Sh1riPIu8MRvhib18WF2rhpp_HQ8u6-EIaJEghi789sblHt8QYyJ-UsjjfyjtkNaKV9HPtXhxeGw"
+      }
+    },
+    "canonical": "{\"controller\":\"did:cid:bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha\",\"created\":\"2026-04-11T13:15:00Z\",\"data\":{\"expires\":\"2026-12-31T00:00:00Z\",\"kind\":\"ephemeral\"},\"proof\":{\"created\":\"2026-04-11T13:15:00Z\",\"proofPurpose\":\"authentication\",\"proofValue\":\"H-BZkAHFv_Sh1riPIu8MRvhib18WF2rhpp_HQ8u6-EIaJEghi789sblHt8QYyJ-UsjjfyjtkNaKV9HPtXhxeGw\",\"type\":\"EcdsaSecp256k1Signature2019\",\"verificationMethod\":\"did:cid:bagaaieraionsypdcyovag7w4ehdjmr65fsdixuuuq6hfvkc3gc4u7uulrdha#key-1\"},\"registration\":{\"registry\":\"local\",\"type\":\"asset\",\"validUntil\":\"2026-12-31T00:00:00Z\",\"version\":1},\"type\":\"create\"}",
+    "cid": "bagaaiera2y5ffi7gg6z64b5754iiukkakc3acati5itxzmwog3ble6ml2sva",
+    "did": "did:cid:bagaaiera2y5ffi7gg6z64b5754iiukkakc3acati5itxzmwog3ble6ml2sva"
+  }
+}
