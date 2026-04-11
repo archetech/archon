@@ -150,11 +150,14 @@ including these normalizations:
 ## Memory usage compatibility
 
 The TypeScript service returns Node/V8 memory statistics in `/status`.
-The Rust port preserves the same response shape and currently returns zeroes for
-those fields as a compatibility-safe placeholder:
+The Rust port preserves the same response shape and reports:
 
 - `rss`
+  - native resident memory when `/proc/self/status` is available
 - `heapTotal`
 - `heapUsed`
 - `external`
 - `arrayBuffers`
+
+The V8-specific fields remain zero-filled in Rust because there is no JS heap
+to report; keeping the keys stable is the compatibility requirement.

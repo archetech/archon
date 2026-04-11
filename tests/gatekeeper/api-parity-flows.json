@@ -1,0 +1,234 @@
+[
+  {
+    "name": "did-generate-agent-create",
+    "method": "POST",
+    "path": "/api/v1/did/generate",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyFrom": {
+      "file": "proof-vectors.json",
+      "pointer": "agentCreateValid.operation"
+    },
+    "expectedStatus": 200,
+    "compareMode": "json",
+    "capture": {
+      "key": "generatedDid"
+    }
+  },
+  {
+    "name": "did-create-agent",
+    "method": "POST",
+    "path": "/api/v1/did",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyFrom": {
+      "file": "proof-vectors.json",
+      "pointer": "agentCreateValid.operation"
+    },
+    "expectedStatus": 200,
+    "compareMode": "json",
+    "capture": {
+      "key": "createdDid"
+    }
+  },
+  {
+    "name": "did-resolve-created-agent",
+    "method": "GET",
+    "pathTemplate": "/api/v1/did/{{createdDid}}",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "dids-list-created-agent",
+    "method": "POST",
+    "path": "/api/v1/dids",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyTemplate": {
+      "dids": [
+        "{{createdDid}}"
+      ]
+    },
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "dids-resolve-created-agent",
+    "method": "POST",
+    "path": "/api/v1/dids/",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyTemplate": {
+      "dids": [
+        "{{createdDid}}"
+      ],
+      "resolve": true,
+      "verify": true,
+      "confirm": true
+    },
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "dids-export-created-agent",
+    "method": "POST",
+    "path": "/api/v1/dids/export",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyTemplate": {
+      "dids": [
+        "{{createdDid}}"
+      ]
+    },
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "db-verify-after-create",
+    "method": "GET",
+    "path": "/api/v1/db/verify",
+    "requiresAdminKey": true,
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "queue-local-empty",
+    "method": "GET",
+    "path": "/api/v1/queue/local",
+    "requiresAdminKey": true,
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "queue-local-clear-empty",
+    "method": "POST",
+    "path": "/api/v1/queue/local/clear",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "requiresAdminKey": true,
+    "bodyTemplate": [],
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "block-local-add",
+    "method": "POST",
+    "path": "/api/v1/block/local",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "requiresAdminKey": true,
+    "bodyTemplate": {
+      "hash": "phase5-test-block",
+      "height": 7,
+      "time": 1710000000
+    },
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "block-local-latest",
+    "method": "GET",
+    "path": "/api/v1/block/local/latest",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "block-local-by-height",
+    "method": "GET",
+    "path": "/api/v1/block/local/7",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "did-create-invalid-proof",
+    "method": "POST",
+    "path": "/api/v1/did",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyFrom": {
+      "file": "proof-vectors.json",
+      "pointer": "agentCreateInvalidProof.operation"
+    },
+    "expectedStatus": 500,
+    "compareMode": "json"
+  },
+  {
+    "name": "ipfs-json-roundtrip",
+    "method": "POST",
+    "path": "/api/v1/ipfs/json",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyTemplate": {
+      "kind": "parity",
+      "value": 42,
+      "nested": {
+        "ok": true
+      }
+    },
+    "expectedStatus": 200,
+    "compareMode": "text",
+    "capture": {
+      "key": "jsonCid"
+    }
+  },
+  {
+    "name": "ipfs-json-fetch",
+    "method": "GET",
+    "pathTemplate": "/api/v1/ipfs/json/{{jsonCid}}",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "ipfs-text-roundtrip",
+    "method": "POST",
+    "path": "/api/v1/ipfs/text",
+    "headers": {
+      "content-type": "text/plain"
+    },
+    "rawBody": "rust-gatekeeper-phase5-text",
+    "expectedStatus": 200,
+    "compareMode": "text",
+    "capture": {
+      "key": "textCid"
+    }
+  },
+  {
+    "name": "ipfs-text-fetch",
+    "method": "GET",
+    "pathTemplate": "/api/v1/ipfs/text/{{textCid}}",
+    "expectedStatus": 200,
+    "compareMode": "text"
+  },
+  {
+    "name": "dids-remove-created-agent",
+    "method": "POST",
+    "path": "/api/v1/dids/remove",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "requiresAdminKey": true,
+    "bodyTemplate": {
+      "dids": [
+        "{{createdDid}}"
+      ]
+    },
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "did-resolve-removed-agent",
+    "method": "GET",
+    "pathTemplate": "/api/v1/did/{{createdDid}}",
+    "expectedStatus": 404,
+    "compareMode": "json"
+  }
+]

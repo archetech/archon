@@ -23,10 +23,16 @@ use bytes::Bytes;
 use cid::Cid;
 use k256::ecdsa::{signature::hazmat::PrehashVerifier, Signature as K256Signature, VerifyingKey};
 use multihash_codetable::{Code, MultihashDigest};
+use mongodb::{
+    bson::{doc, Document},
+    sync::Client as MongoClient,
+};
 use prometheus::{
     Encoder, Gauge, GaugeVec, HistogramOpts, HistogramVec, IntCounterVec, Registry, TextEncoder,
 };
+use redis::Commands;
 use reqwest::Client;
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
@@ -128,9 +134,24 @@ struct JsonDbFile {
 }
 
 struct JsonDb {
-    path: PathBuf,
+    backend: DbBackend,
     data: JsonDbFile,
 }
+
+#[derive(Clone)]
+enum DbBackend {
+    JsonFile { path: PathBuf },
+    Sqlite { path: PathBuf },
+    Redis { url: String, key: String },
+    Mongo {
+        url: String,
+        database: String,
+        collection: String,
+        document_id: String,
+    },
+}
+
+const STATE_KEY: &str = "jsondb";
 
 trait GatekeeperDb {
     fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String>;
@@ -345,17 +366,34 @@ async fn status(State(state): State<AppState>) -> impl IntoResponse {
     let payload = StatusPayload {
         uptimeSeconds: state.started_at.elapsed().as_secs(),
         dids: serde_json::to_value(dids).unwrap_or_else(|_| json!({})),
-        memoryUsage: MemoryUsage {
-            rss: 0,
-            heapTotal: 0,
-            heapUsed: 0,
-            external: 0,
-            arrayBuffers: 0,
-        },
+        memoryUsage: current_memory_usage(),
     };
 
     record_metrics(&state, "GET", "/status", 200, 0.0);
     Json(payload)
+}
+
+fn current_memory_usage() -> MemoryUsage {
+    // Preserve the Node-compatible response shape. Only RSS maps cleanly to a
+    // native Rust process; the V8-specific heap fields remain zero-filled.
+    let rss = fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|contents| {
+            contents.lines().find_map(|line| {
+                let value = line.strip_prefix("VmRSS:")?.trim();
+                let kilobytes = value.split_whitespace().next()?.parse::<u64>().ok()?;
+                Some(kilobytes.saturating_mul(1024))
+            })
+        })
+        .unwrap_or(0);
+
+    MemoryUsage {
+        rss,
+        heapTotal: 0,
+        heapUsed: 0,
+        external: 0,
+        arrayBuffers: 0,
+    }
 }
 
 async fn registries(State(state): State<AppState>) -> impl IntoResponse {
@@ -3058,23 +3096,14 @@ fn canonical_json(value: &Value) -> String {
 
 impl JsonDb {
     fn load(config: &Config) -> Result<Self> {
-        let path = config.data_dir.join("archon.json");
-        let data = match fs::read_to_string(&path) {
-            Ok(raw) => serde_json::from_str::<JsonDbFile>(&raw).unwrap_or_default(),
-            Err(_) => JsonDbFile::default(),
-        };
+        let backend = DbBackend::from_config(config);
+        let data = backend.load_state()?;
 
-        Ok(Self { path, data })
+        Ok(Self { backend, data })
     }
 
     fn save(&self) -> Result<()> {
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create {}", parent.display()))?;
-        }
-
-        let body = serde_json::to_string_pretty(&self.data).context("failed to encode db")?;
-        fs::write(&self.path, body).with_context(|| format!("failed to write {}", self.path.display()))
+        self.backend.save_state(&self.data)
     }
 
     fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
@@ -3524,6 +3553,140 @@ impl JsonDb {
                 "retrieved": chrono_like_now()
             }
         }))
+    }
+}
+
+impl DbBackend {
+    fn from_config(config: &Config) -> Self {
+        match config.db.as_str() {
+            "sqlite" => Self::Sqlite {
+                path: config.data_dir.join("archon.sqlite"),
+            },
+            "redis" => Self::Redis {
+                url: env::var("ARCHON_REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string()),
+                key: "gatekeeper:archon:state".to_string(),
+            },
+            "mongodb" => Self::Mongo {
+                url: env::var("ARCHON_MONGODB_URL").unwrap_or_else(|_| "mongodb://localhost:27017".to_string()),
+                database: "archon".to_string(),
+                collection: "gatekeeper_state".to_string(),
+                document_id: STATE_KEY.to_string(),
+            },
+            _ => Self::JsonFile {
+                path: config.data_dir.join("archon.json"),
+            },
+        }
+    }
+
+    fn load_state(&self) -> Result<JsonDbFile> {
+        match self {
+            Self::JsonFile { path } => match fs::read_to_string(path) {
+                Ok(raw) => serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode json db"),
+                Err(_) => Ok(JsonDbFile::default()),
+            },
+            Self::Sqlite { path } => {
+                let conn = Self::open_sqlite(path)?;
+                let raw = conn
+                    .query_row("SELECT value FROM kv WHERE key = ?1", [STATE_KEY], |row| row.get::<_, String>(0))
+                    .optional()
+                    .context("failed to load sqlite state")?;
+                match raw {
+                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode sqlite state"),
+                    None => Ok(JsonDbFile::default()),
+                }
+            }
+            Self::Redis { url, key } => {
+                let client = redis::Client::open(url.as_str()).context("failed to open redis client")?;
+                let mut conn = client.get_connection().context("failed to connect to redis")?;
+                let raw: Option<String> = conn.get(key).context("failed to load redis state")?;
+                match raw {
+                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode redis state"),
+                    None => Ok(JsonDbFile::default()),
+                }
+            }
+            Self::Mongo {
+                url,
+                database,
+                collection,
+                document_id,
+            } => {
+                let client = MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
+                let coll = client.database(database).collection::<Document>(collection);
+                let raw = coll
+                    .find_one(doc! { "_id": document_id }, None)
+                    .context("failed to load mongodb state")?
+                    .and_then(|doc| doc.get_str("value").ok().map(ToString::to_string));
+                match raw {
+                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode mongodb state"),
+                    None => Ok(JsonDbFile::default()),
+                }
+            }
+        }
+    }
+
+    fn save_state(&self, data: &JsonDbFile) -> Result<()> {
+        let body = serde_json::to_string_pretty(data).context("failed to encode db")?;
+        match self {
+            Self::JsonFile { path } => {
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)
+                        .with_context(|| format!("failed to create {}", parent.display()))?;
+                }
+                fs::write(path, body).with_context(|| format!("failed to write {}", path.display()))
+            }
+            Self::Sqlite { path } => {
+                let conn = Self::open_sqlite(path)?;
+                conn.execute(
+                    "INSERT INTO kv (key, value) VALUES (?1, ?2)
+                     ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    params![STATE_KEY, body],
+                )
+                .context("failed to persist sqlite state")?;
+                Ok(())
+            }
+            Self::Redis { url, key } => {
+                let client = redis::Client::open(url.as_str()).context("failed to open redis client")?;
+                let mut conn = client.get_connection().context("failed to connect to redis")?;
+                let _: () = conn.set(key, body).context("failed to persist redis state")?;
+                Ok(())
+            }
+            Self::Mongo {
+                url,
+                database,
+                collection,
+                document_id,
+            } => {
+                let client = MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
+                let coll = client.database(database).collection::<Document>(collection);
+                coll.replace_one(
+                    doc! { "_id": document_id },
+                    doc! {
+                        "_id": document_id,
+                        "value": body,
+                    },
+                    mongodb::options::ReplaceOptions::builder().upsert(true).build(),
+                )
+                .context("failed to persist mongodb state")?;
+                Ok(())
+            }
+        }
+    }
+
+    fn open_sqlite(path: &PathBuf) -> Result<Connection> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create {}", parent.display()))?;
+        }
+        let conn = Connection::open(path).with_context(|| format!("failed to open sqlite db {}", path.display()))?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS kv (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )",
+            [],
+        )
+        .context("failed to initialize sqlite schema")?;
+        Ok(conn)
     }
 }
 

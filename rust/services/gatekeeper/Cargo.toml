@@ -16,9 +16,12 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dotenvy = "0.15"
 futures-util = "0.3"
 k256 = { version = "0.13", features = ["ecdsa"] }
+mongodb = { version = "2.8", default-features = false, features = ["sync"] }
 multihash-codetable = { version = "0.1", features = ["sha2"] }
 prometheus = "0.13"
+redis = "0.27"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.42", features = ["full"] }

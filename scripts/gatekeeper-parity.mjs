@@ -14,8 +14,14 @@ if (!tsBaseUrl || !rustBaseUrl) {
 const apiFixtures = JSON.parse(
     await fs.readFile(new URL('../tests/gatekeeper/api-parity-fixtures.json', import.meta.url), 'utf8'),
 );
+const apiFlows = JSON.parse(
+    await fs.readFile(new URL('../tests/gatekeeper/api-parity-flows.json', import.meta.url), 'utf8'),
+);
 const metricsFixture = JSON.parse(
     await fs.readFile(new URL('../tests/gatekeeper/metrics-parity.json', import.meta.url), 'utf8'),
+);
+const proofVectors = JSON.parse(
+    await fs.readFile(new URL('../tests/gatekeeper/proof-vectors.json', import.meta.url), 'utf8'),
 );
 
 function normalizeJson(value) {
@@ -46,10 +52,17 @@ async function request(baseUrl, fixture) {
         headers['X-Archon-Admin-Key'] = adminKey;
     }
 
+    let requestBody;
+    if (fixture.rawBody !== undefined) {
+        requestBody = fixture.rawBody;
+    } else if (fixture.body !== undefined) {
+        requestBody = JSON.stringify(fixture.body);
+    }
+
     const response = await fetch(`${baseUrl}${fixture.path}`, {
         method: fixture.method,
         headers,
-        body: fixture.body === undefined ? undefined : JSON.stringify(fixture.body),
+        body: requestBody,
     });
 
     const contentType = response.headers.get('content-type') || '';
@@ -68,6 +81,32 @@ async function request(baseUrl, fixture) {
         headers: contentType,
         body,
     };
+}
+
+function deepClone(value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function pointerLookup(root, pointer) {
+    return pointer.split('.').reduce((current, segment) => current?.[segment], root);
+}
+
+function renderTemplate(value, context) {
+    if (typeof value === 'string') {
+        return value.replace(/\{\{([^}]+)\}\}/g, (_match, key) => {
+            const trimmed = key.trim();
+            return context[trimmed] ?? '';
+        });
+    }
+    if (Array.isArray(value)) {
+        return value.map(item => renderTemplate(item, context));
+    }
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value).map(([key, item]) => [key, renderTemplate(item, context)]),
+        );
+    }
+    return value;
 }
 
 function assertEqual(label, left, right) {
@@ -98,6 +137,54 @@ async function runApiFixtures() {
         const rightBody = fixture.compareMode === 'jsonLoose' ? normalizeJson(rust.body) : rust.body;
         assertEqual(`${fixture.name} body`, leftBody, rightBody);
         console.log(`ok api ${fixture.name}`);
+    }
+}
+
+async function runApiFlows() {
+    const context = {};
+
+    for (const flow of apiFlows) {
+        let body = flow.body;
+        if (flow.bodyFrom) {
+            const source = flow.bodyFrom.file === 'proof-vectors.json' ? proofVectors : null;
+            if (!source) {
+                throw new Error(`Unsupported bodyFrom file: ${flow.bodyFrom.file}`);
+            }
+            body = deepClone(pointerLookup(source, flow.bodyFrom.pointer));
+        } else if (flow.bodyTemplate) {
+            body = renderTemplate(deepClone(flow.bodyTemplate), context);
+        }
+
+        const fixture = {
+            ...flow,
+            path: flow.pathTemplate ? renderTemplate(flow.pathTemplate, context) : flow.path,
+            body,
+        };
+
+        const ts = await request(tsBaseUrl, fixture);
+        const rust = await request(rustBaseUrl, fixture);
+
+        if (flow.expectedStatus != null) {
+            if (ts.status !== flow.expectedStatus) {
+                throw new Error(`${flow.name}: TypeScript status ${ts.status} != expected ${flow.expectedStatus}`);
+            }
+            if (rust.status !== flow.expectedStatus) {
+                throw new Error(`${flow.name}: Rust status ${rust.status} != expected ${flow.expectedStatus}`);
+            }
+        }
+
+        assertEqual(`${flow.name} status`, ts.status, rust.status);
+
+        const compareMode = flow.compareMode || 'json';
+        const leftBody = compareMode === 'jsonLoose' ? normalizeJson(ts.body) : ts.body;
+        const rightBody = compareMode === 'jsonLoose' ? normalizeJson(rust.body) : rust.body;
+        assertEqual(`${flow.name} body`, leftBody, rightBody);
+
+        if (flow.capture?.key) {
+            context[flow.capture.key] = rust.body;
+        }
+
+        console.log(`ok flow ${flow.name}`);
     }
 }
 
@@ -137,5 +224,6 @@ async function runMetricsChecks() {
 }
 
 await runApiFixtures();
+await runApiFlows();
 await runMetricsChecks();
 console.log('Gatekeeper parity checks passed');

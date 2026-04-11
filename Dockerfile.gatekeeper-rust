@@ -1,4 +1,4 @@
-FROM rust:1.86-bullseye AS builder
+FROM rust:1.90-bullseye AS builder
 
 WORKDIR /build
 COPY rust/services/gatekeeper/Cargo.toml ./Cargo.toml

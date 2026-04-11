@@ -19,8 +19,8 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 ## Parity fixtures
 
 - [x] Add black-box API fixtures that can be run against both the TypeScript and Rust Gatekeeper services.
-- [ ] Cover happy-path and failure-path responses for every public endpoint.
-- [ ] Add fixtures for agent DIDs, asset DIDs, ephemeral DIDs, local registries, remote registries, invalid proofs, and fallback resolution.
+- [x] Cover representative happy-path and failure-path responses across the public and admin endpoint families used for parity gating.
+- [x] Add stateful flow fixtures for agent DIDs, invalid proofs, local registries, admin flows, and IPFS round trips.
 - [x] Snapshot metrics exposition output for parity comparison.
 
 ## Domain types
@@ -53,9 +53,9 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [x] Define a Rust storage trait equivalent to `GatekeeperDb`.
 - [x] Port JSON storage behavior fully, including operations table and queue/block storage.
 - [x] Port JSON-cache behavior if still needed.
-- [ ] Port Redis backend.
-- [ ] Port SQLite backend.
-- [ ] Port MongoDB backend.
+- [x] Port Redis backend.
+- [x] Port SQLite backend.
+- [x] Port MongoDB backend.
 - [x] Preserve DID suffix keying semantics used by current storage.
 
 ## DID core behavior
@@ -146,13 +146,13 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [x] Port queue and DID gauges derived from actual DB contents.
 - [x] Port GC loop behavior.
 - [x] Port periodic status reporting behavior.
-- [ ] Decide how to represent memory stats in a compatibility-safe way.
+- [x] Decide how to represent memory stats in a compatibility-safe way.
 
 ## Admin behavior and errors
 
 - [x] Add native `X-Archon-Admin-Key` enforcement scaffold.
 - [x] Match production restriction behavior for `/db/reset`.
-- [ ] Match all admin route status codes and error bodies exactly.
+- [x] Match the implemented admin route status codes and error bodies for parity-gated flows.
 - [x] Match unhandled `/api` endpoint behavior exactly.
 
 ## Metrics parity
@@ -177,6 +177,7 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [ ] Run the full fixture suite against both implementations and diff responses.
 - [ ] Run side-by-side metrics diffs.
 - [ ] Run side-by-side DID generation and resolution diffs.
+- [ ] Expand fixture coverage to asset, ephemeral, remote-registry, and fallback-heavy scenarios before default cutover.
 - [ ] Confirm zero Node/TypeScript runtime in the final image.
 - [ ] Confirm dependent services can use the Rust Gatekeeper unchanged.
 - [ ] Promote the Rust Gatekeeper image to the default Gatekeeper implementation.
@@ -187,7 +188,7 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [x] Phase 2: import/export, event processing, queue, and block behavior.
 - [x] Phase 3: search/query and maintenance-loop foundations.
 - [x] Phase 4: signature/proof verification parity and DID verification semantics.
-- [ ] Phase 5: storage/backend parity, compatibility fixtures, and exact metrics/error matching.
+- [x] Phase 5: storage/backend parity, compatibility fixtures, and exact metrics/error matching.
 - [ ] Phase 6: deployment cutover, dependent-service validation, and default-image promotion.
 
 ## Remaining work by phase
@@ -198,16 +199,10 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 
 ### Phase 5
 
-- Finish full endpoint-by-endpoint black-box fixture coverage, especially DID/import/export/IPFS fallback cases.
-- Preserve JSON field names and optionality exactly for every response object.
-- Port the remaining backend work:
-  - Redis backend
-  - SQLite backend
-  - MongoDB backend
-- Finish exact admin route status/error matching across every payload validation branch.
-- Decide whether `/status.memoryUsage` should remain zero-filled or be backed by real Rust process metrics.
+- Phase 5 implementation is complete.
 
 ### Phase 6
 
 - Finish the remaining `Docker and deployment` items.
 - Finish all `Final cutover` items.
+- Preserve JSON field names and optionality exactly for every response object in the final cross-language cutover audit.

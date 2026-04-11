@@ -1,6 +1,6 @@
 # Rust Gatekeeper
 
-This service is a native Rust rewrite target for Gatekeeper.
+This service is a native Rust implementation of Gatekeeper.
 
 The goal is strict:
 
@@ -8,8 +8,6 @@ The goal is strict:
 - zero TypeScript runtime dependency
 - same public container contract
 - same public HTTP contract
-
-The current state is a native Rust foundation, not full feature parity yet.
 
 Implemented natively:
 
@@ -20,19 +18,41 @@ Implemented natively:
 - `/api/v1/version`
 - `/api/v1/status`
 - `/api/v1/registries`
+- `/api/v1/did/generate`
+- `/api/v1/did`
+- `/api/v1/did/:did`
+- `/api/v1/dids`
+- `/api/v1/dids/`
+- `/api/v1/dids/export`
+- `/api/v1/dids/import`
+- `/api/v1/dids/remove`
+- `/api/v1/batch/export`
+- `/api/v1/batch/import`
+- `/api/v1/batch/import/cids`
+- `/api/v1/queue/:registry`
+- `/api/v1/queue/:registry/clear`
+- `/api/v1/events/process`
+- `/api/v1/db/reset`
+- `/api/v1/db/verify`
+- `/api/v1/block/:registry`
+- `/api/v1/block/:registry/latest`
+- `/api/v1/block/:registry/:blockId`
+- `/api/v1/search`
+- `/api/v1/query`
 - `/api/v1/ipfs/json`
 - `/api/v1/ipfs/text`
 - `/api/v1/ipfs/data`
 - `/api/v1/ipfs/stream`
-- `/api/v1/did/:did` via the configured universal resolver fallback
+- native create, update, delete, import, queue, block, and search behavior
+- native signature and proof verification
+- native JSON, SQLite, Redis, and Mongo-backed persistence
+- fallback DID resolution when local resolution misses
 
-Still to port natively:
+Still to validate for cutover:
 
-- DID create/update/delete logic
-- DID database and event processing
-- batch import/export
-- queue and block operations
-- search and structured query
+- exhaustive side-by-side fixture coverage for asset, ephemeral, and fallback-heavy scenarios
+- dependent-service compose swap verification
+- final default-image promotion
 
 ## Runtime
 
@@ -51,6 +71,12 @@ The service reads the same core Gatekeeper env vars:
 - `ARCHON_ADMIN_API_KEY`
 - `ARCHON_GATEKEEPER_FALLBACK_URL`
 - `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT`
+- `ARCHON_DATA_DIR`
+
+Backend-specific runtime knobs:
+
+- `ARCHON_REDIS_URL` for `ARCHON_GATEKEEPER_DB=redis`
+- `ARCHON_MONGODB_URL` for `ARCHON_GATEKEEPER_DB=mongodb`
 
 ## Docker
 
