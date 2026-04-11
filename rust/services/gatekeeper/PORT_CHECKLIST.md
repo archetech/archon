@@ -83,13 +83,13 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 ## DID listing and export/import
 
 - [x] Implement native `POST /api/v1/dids` and `POST /api/v1/dids/` basic listing.
-- [ ] Match `updatedAfter` filtering.
-- [ ] Match `updatedBefore` filtering.
+- [x] Match `updatedAfter` filtering.
+- [x] Match `updatedBefore` filtering.
 - [ ] Match local `resolve`, `confirm`, and `verify` options in DID listing.
 - [x] Port `exportDID`.
 - [x] Port `exportDIDs`.
 - [x] Port `importDIDs`.
-- [ ] Port `removeDIDs`.
+- [x] Port `removeDIDs`.
 
 ## Event import and processing
 
@@ -120,10 +120,10 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 
 ## Search and structured query
 
-- [ ] Port the search index behavior from [packages/gatekeeper/src/search-index.ts](/home/david/archetech/archon/packages/gatekeeper/src/search-index.ts).
-- [ ] Port `searchDocs`.
-- [ ] Port `queryDocs`.
-- [ ] Port `search`.
+- [x] Port the search index behavior from [packages/gatekeeper/src/search-index.ts](/home/david/archetech/archon/packages/gatekeeper/src/search-index.ts).
+- [x] Port `searchDocs`.
+- [x] Port `queryDocs`.
+- [x] Port `search`.
 - [ ] Add parity tests for search and query results.
 
 ## IPFS behavior
@@ -141,17 +141,17 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [x] Implement native `/api/v1/ready`.
 - [x] Implement native `/api/v1/version`.
 - [x] Implement native `/api/v1/status` foundation.
-- [ ] Port `checkDIDs`.
-- [ ] Port `verifyDb`.
-- [ ] Port queue and DID gauges derived from actual DB contents.
-- [ ] Port GC loop behavior.
-- [ ] Port periodic status reporting behavior.
+- [x] Port `checkDIDs`.
+- [x] Port `verifyDb`.
+- [x] Port queue and DID gauges derived from actual DB contents.
+- [x] Port GC loop behavior.
+- [x] Port periodic status reporting behavior.
 - [ ] Decide how to represent memory stats in a compatibility-safe way.
 
 ## Admin behavior and errors
 
 - [x] Add native `X-Archon-Admin-Key` enforcement scaffold.
-- [ ] Match production restriction behavior for `/db/reset`.
+- [x] Match production restriction behavior for `/db/reset`.
 - [ ] Match all admin route status codes and error bodies exactly.
 - [ ] Match unhandled `/api` endpoint behavior exactly.
 

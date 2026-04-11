@@ -37,6 +37,7 @@ struct AppState {
     metrics: Arc<Metrics>,
     store: Arc<Mutex<JsonDb>>,
     events_seen: Arc<Mutex<HashMap<String, bool>>>,
+    verified_dids: Arc<Mutex<HashMap<String, bool>>>,
     supported_registries: Arc<Mutex<Vec<String>>>,
     processing_events: Arc<Mutex<bool>>,
     started_at: Instant,
@@ -179,6 +180,33 @@ struct ProcessEventsResult {
     pending: Option<usize>,
 }
 
+#[derive(Clone, Serialize, Default)]
+struct CheckDidsByType {
+    agents: usize,
+    assets: usize,
+    confirmed: usize,
+    unconfirmed: usize,
+    ephemeral: usize,
+    invalid: usize,
+}
+
+#[derive(Clone, Serialize, Default)]
+struct CheckDidsResult {
+    total: usize,
+    byType: CheckDidsByType,
+    byRegistry: HashMap<String, usize>,
+    byVersion: HashMap<String, usize>,
+    eventsQueue: Vec<EventRecord>,
+}
+
+#[derive(Serialize, Default)]
+struct VerifyDbResult {
+    total: usize,
+    verified: usize,
+    expired: usize,
+    invalid: usize,
+}
+
 enum ImportStatus {
     Added,
     Merged,
@@ -205,6 +233,7 @@ async fn main() -> Result<()> {
         metrics,
         store,
         events_seen: Arc::new(Mutex::new(HashMap::new())),
+        verified_dids: Arc::new(Mutex::new(HashMap::new())),
         supported_registries: Arc::new(Mutex::new(config.registries.clone())),
         processing_events: Arc::new(Mutex::new(false)),
         started_at: Instant::now(),
@@ -224,7 +253,7 @@ async fn main() -> Result<()> {
                 .route("/did/:did", get(resolve_did))
                 .route("/dids", post(list_dids))
                 .route("/dids/", post(list_dids))
-                .route("/dids/remove", post(not_implemented_admin))
+                .route("/dids/remove", post(remove_dids))
                 .route("/dids/export", post(export_dids))
                 .route("/dids/import", post(import_dids))
                 .route("/batch/export", post(export_batch))
@@ -232,8 +261,8 @@ async fn main() -> Result<()> {
                 .route("/batch/import/cids", post(import_batch_by_cids))
                 .route("/queue/:registry", get(get_queue))
                 .route("/queue/:registry/clear", post(clear_queue))
-                .route("/db/reset", get(not_implemented_admin))
-                .route("/db/verify", get(not_implemented_admin))
+                .route("/db/reset", get(db_reset))
+                .route("/db/verify", get(db_verify))
                 .route("/events/process", post(process_events_route))
                 .route("/ipfs/json", post(ipfs_add_json))
                 .route("/ipfs/json/:cid", get(ipfs_get_json))
@@ -246,11 +275,14 @@ async fn main() -> Result<()> {
                 .route("/block/:registry/latest", get(get_latest_block))
                 .route("/block/:registry/:blockId", get(get_block_by_id))
                 .route("/block/:registry", post(add_block))
-                .route("/search", get(not_implemented))
-                .route("/query", post(not_implemented)),
+                .route("/search", get(search_docs))
+                .route("/query", post(query_docs)),
         )
         .fallback(not_found)
         .with_state(state.clone());
+
+    refresh_metrics_snapshot(&state).await;
+    start_background_tasks(state.clone());
 
     let listener = TcpListener::bind(SocketAddr::new(config.bind_address, config.port))
         .await
@@ -281,15 +313,11 @@ async fn version(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 async fn status(State(state): State<AppState>) -> impl IntoResponse {
+    let dids = check_dids_impl(&state, None, false).await;
+    update_metrics_from_check(&state, &dids).await;
     let payload = StatusPayload {
         uptimeSeconds: state.started_at.elapsed().as_secs(),
-        dids: json!({
-            "total": 0,
-            "byType": {},
-            "byRegistry": {},
-            "byVersion": {},
-            "eventsQueue": []
-        }),
+        dids: serde_json::to_value(dids).unwrap_or_else(|_| json!({})),
         memoryUsage: MemoryUsage {
             rss: 0,
             heapTotal: 0,
@@ -348,6 +376,7 @@ async fn create_did(State(state): State<AppState>, Json(payload): Json<Value>) -
                 .did_operations_total
                 .with_label_values(&[&op_type, &registry, "success"])
                 .inc();
+            refresh_metrics_snapshot(&state).await;
             record_metrics(&state, "POST", "/did", 200, start.elapsed().as_secs_f64());
             Json(result_value).into_response()
         }
@@ -380,6 +409,8 @@ async fn create_did(State(state): State<AppState>, Json(payload): Json<Value>) -
 async fn list_dids(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
     let start = Instant::now();
     let resolve = payload.get("resolve").and_then(Value::as_bool).unwrap_or(false);
+    let updated_after = payload.get("updatedAfter").and_then(Value::as_str).map(ToString::to_string);
+    let updated_before = payload.get("updatedBefore").and_then(Value::as_str).map(ToString::to_string);
     let resolve_options = ResolveOptions {
         version_time: payload.get("versionTime").and_then(Value::as_str).map(ToString::to_string),
         version_sequence: payload
@@ -403,13 +434,43 @@ async fn list_dids(State(state): State<AppState>, Json(payload): Json<Value>) ->
     let store = state.store.lock().await;
     let dids = store.list_dids(&state.config.did_prefix, requested.as_deref());
 
-    if resolve {
-        let docs = dids
-            .into_iter()
-            .filter_map(|did| store.resolve_doc(&state.config, &did, resolve_options.clone()).ok())
-            .collect::<Vec<_>>();
+    if resolve || updated_after.is_some() || updated_before.is_some() {
+        let mut docs = Vec::new();
+        let mut filtered_dids = Vec::new();
+        for did in dids {
+            let Ok(doc) = store.resolve_doc(&state.config, &did, resolve_options.clone()) else {
+                continue;
+            };
+
+            let updated = doc
+                .get("didDocumentMetadata")
+                .and_then(|value| value.get("updated").or_else(|| value.get("created")))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+
+            if let Some(after) = updated_after.as_deref() {
+                if updated <= after {
+                    continue;
+                }
+            }
+            if let Some(before) = updated_before.as_deref() {
+                if updated >= before {
+                    continue;
+                }
+            }
+
+            if resolve {
+                docs.push(doc);
+            } else {
+                filtered_dids.push(did);
+            }
+        }
         record_metrics(&state, "POST", "/dids/", 200, start.elapsed().as_secs_f64());
-        Json(json!(docs)).into_response()
+        if resolve {
+            Json(json!(docs)).into_response()
+        } else {
+            Json(json!(filtered_dids)).into_response()
+        }
     } else {
         record_metrics(&state, "POST", "/dids/", 200, start.elapsed().as_secs_f64());
         Json(json!(dids)).into_response()
@@ -435,6 +496,52 @@ async fn export_dids(State(state): State<AppState>, Json(payload): Json<Value>) 
 
     record_metrics(&state, "POST", "/dids/export", 200, start.elapsed().as_secs_f64());
     Json(json!(batch)).into_response()
+}
+
+async fn remove_dids(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+
+    let dids = match payload.get("dids").and_then(Value::as_array) {
+        Some(items) => items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        None if payload.is_array() => payload
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+        None => Vec::new(),
+    };
+
+    if dids.is_empty() {
+        record_metrics(&state, "POST", "/dids/remove", 400, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid dids payload" })),
+        )
+            .into_response();
+    }
+
+    let mut store = state.store.lock().await;
+    let ok = dids.iter().all(|did| store.delete_events(did).is_ok());
+    drop(store);
+    refresh_metrics_snapshot(&state).await;
+    record_metrics(&state, "POST", "/dids/remove", 200, start.elapsed().as_secs_f64());
+    Json(json!(ok)).into_response()
 }
 
 async fn import_dids(
@@ -466,6 +573,7 @@ async fn import_dids(
         .collect::<Vec<_>>();
 
     let result = import_batch_impl(&state, &flat_batch).await;
+    refresh_metrics_snapshot(&state).await;
     record_metrics(&state, "POST", "/dids/import", 200, start.elapsed().as_secs_f64());
     Json(json!(result)).into_response()
 }
@@ -549,6 +657,7 @@ async fn import_batch(
     };
 
     let result = import_batch_impl(&state, &batch).await;
+    refresh_metrics_snapshot(&state).await;
     record_metrics(&state, "POST", "/batch/import", 200, start.elapsed().as_secs_f64());
     Json(json!(result)).into_response()
 }
@@ -630,6 +739,7 @@ async fn import_batch_by_cids(
     }
 
     let result = import_batch_impl(&state, &batch).await;
+    refresh_metrics_snapshot(&state).await;
     record_metrics(&state, "POST", "/batch/import/cids", 200, start.elapsed().as_secs_f64());
     Json(json!(result)).into_response()
 }
@@ -692,6 +802,8 @@ async fn clear_queue(
 
     let mut store = state.store.lock().await;
     let ok = store.clear_queue(&registry, &operations).is_ok();
+    drop(store);
+    refresh_metrics_snapshot(&state).await;
     record_metrics(&state, "POST", "/queue/:registry/clear", 200, start.elapsed().as_secs_f64());
     Json(json!(ok)).into_response()
 }
@@ -703,8 +815,98 @@ async fn process_events_route(State(state): State<AppState>, headers: HeaderMap)
     }
 
     let result = process_events_impl(&state).await;
+    refresh_metrics_snapshot(&state).await;
     record_metrics(&state, "POST", "/events/process", 200, start.elapsed().as_secs_f64());
     Json(json!(result)).into_response()
+}
+
+async fn db_reset(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+    if env::var("NODE_ENV").ok().as_deref() == Some("production") {
+        record_metrics(&state, "GET", "/db/reset", 403, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Database reset is disabled in production" })),
+        )
+            .into_response();
+    }
+
+    let ok = {
+        let mut store = state.store.lock().await;
+        store.reset_db().is_ok()
+    };
+    state.events_seen.lock().await.clear();
+    state.verified_dids.lock().await.clear();
+    *state.supported_registries.lock().await = state.config.registries.clone();
+    refresh_metrics_snapshot(&state).await;
+    record_metrics(&state, "GET", "/db/reset", 200, start.elapsed().as_secs_f64());
+    Json(json!(ok)).into_response()
+}
+
+async fn db_verify(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+
+    let result = verify_db_impl(&state, false).await;
+    refresh_metrics_snapshot(&state).await;
+    record_metrics(&state, "GET", "/db/verify", 200, start.elapsed().as_secs_f64());
+    Json(json!(result)).into_response()
+}
+
+async fn search_docs(
+    State(state): State<AppState>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let start = Instant::now();
+    let q = query.get("q").cloned().unwrap_or_default();
+    if q.is_empty() {
+        record_metrics(&state, "GET", "/search", 200, start.elapsed().as_secs_f64());
+        return Json(json!([])).into_response();
+    }
+
+    let result = search_docs_impl(&state, &q).await;
+    record_metrics(&state, "GET", "/search", 200, start.elapsed().as_secs_f64());
+    Json(json!(result)).into_response()
+}
+
+async fn query_docs(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
+    let start = Instant::now();
+    let Some(where_clause) = payload.get("where") else {
+        record_metrics(&state, "POST", "/query", 400, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "`where` must be an object" })),
+        )
+            .into_response();
+    };
+    if !where_clause.is_object() {
+        record_metrics(&state, "POST", "/query", 400, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "`where` must be an object" })),
+        )
+            .into_response();
+    }
+
+    match query_docs_impl(&state, where_clause).await {
+        Ok(result) => {
+            record_metrics(&state, "POST", "/query", 200, start.elapsed().as_secs_f64());
+            Json(json!(result)).into_response()
+        }
+        Err(error) => {
+            record_metrics(&state, "POST", "/query", 500, start.elapsed().as_secs_f64());
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": error.to_string() })),
+            )
+                .into_response()
+        }
+    }
 }
 
 async fn get_latest_block(State(state): State<AppState>, Path(registry): Path<String>) -> Response {
@@ -766,6 +968,8 @@ async fn add_block(
 
     let mut store = state.store.lock().await;
     let ok = store.add_block(&registry, payload).is_ok();
+    drop(store);
+    refresh_metrics_snapshot(&state).await;
     record_metrics(&state, "POST", "/block/:registry", 200, start.elapsed().as_secs_f64());
     Json(json!(ok)).into_response()
 }
@@ -1642,6 +1846,371 @@ fn event_record_to_value(event: &EventRecord) -> Value {
     })
 }
 
+async fn refresh_metrics_snapshot(state: &AppState) {
+    let did_check = check_dids_impl(state, None, false).await;
+    update_metrics_from_check(state, &did_check).await;
+}
+
+async fn update_metrics_from_check(state: &AppState, did_check: &CheckDidsResult) {
+    state.metrics.events_queue_size.reset();
+    let mut queue_by_registry: HashMap<String, usize> = HashMap::new();
+    for event in &did_check.eventsQueue {
+        let registry = if event.registry.is_empty() {
+            "unknown".to_string()
+        } else {
+            event.registry.clone()
+        };
+        *queue_by_registry.entry(registry).or_insert(0) += 1;
+    }
+    for (registry, count) in queue_by_registry {
+        state
+            .metrics
+            .events_queue_size
+            .with_label_values(&[&registry])
+            .set(count as f64);
+    }
+
+    state.metrics.gatekeeper_dids_total.set(did_check.total as f64);
+    state.metrics.gatekeeper_dids_by_type.reset();
+    for (ty, count) in [
+        ("agents", did_check.byType.agents),
+        ("assets", did_check.byType.assets),
+        ("confirmed", did_check.byType.confirmed),
+        ("unconfirmed", did_check.byType.unconfirmed),
+        ("ephemeral", did_check.byType.ephemeral),
+        ("invalid", did_check.byType.invalid),
+    ] {
+        state
+            .metrics
+            .gatekeeper_dids_by_type
+            .with_label_values(&[ty])
+            .set(count as f64);
+    }
+
+    state.metrics.gatekeeper_dids_by_registry.reset();
+    for (registry, count) in &did_check.byRegistry {
+        state
+            .metrics
+            .gatekeeper_dids_by_registry
+            .with_label_values(&[registry])
+            .set(*count as f64);
+    }
+}
+
+async fn check_dids_impl(state: &AppState, dids: Option<Vec<String>>, _chatty: bool) -> CheckDidsResult {
+    let dids = {
+        let store = state.store.lock().await;
+        dids.unwrap_or_else(|| store.list_dids(&state.config.did_prefix, None))
+    };
+
+    let mut by_type = CheckDidsByType::default();
+    let mut by_registry = HashMap::new();
+    let mut by_version = HashMap::new();
+
+    for did in &dids {
+        let doc = {
+            let store = state.store.lock().await;
+            store.resolve_doc(&state.config, did, ResolveOptions::default())
+        };
+        let Ok(doc) = doc else {
+            by_type.invalid += 1;
+            continue;
+        };
+
+        match doc
+            .get("didDocumentRegistration")
+            .and_then(|value| value.get("type"))
+            .and_then(Value::as_str)
+        {
+            Some("agent") => by_type.agents += 1,
+            Some("asset") => by_type.assets += 1,
+            _ => {}
+        }
+
+        if doc
+            .get("didDocumentMetadata")
+            .and_then(|value| value.get("confirmed"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            by_type.confirmed += 1;
+        } else {
+            by_type.unconfirmed += 1;
+        }
+
+        if doc
+            .get("didDocumentRegistration")
+            .and_then(|value| value.get("validUntil"))
+            .and_then(Value::as_str)
+            .is_some()
+        {
+            by_type.ephemeral += 1;
+        }
+
+        if let Some(registry) = doc
+            .get("didDocumentRegistration")
+            .and_then(|value| value.get("registry"))
+            .and_then(Value::as_str)
+        {
+            *by_registry.entry(registry.to_string()).or_insert(0) += 1;
+        }
+
+        if let Some(version) = doc
+            .get("didDocumentMetadata")
+            .and_then(|value| value.get("versionSequence"))
+            .and_then(Value::as_str)
+        {
+            *by_version.entry(version.to_string()).or_insert(0) += 1;
+        }
+    }
+
+    let events_queue = state.store.lock().await.import_queue_snapshot();
+
+    CheckDidsResult {
+        total: dids.len(),
+        byType: by_type,
+        byRegistry: by_registry,
+        byVersion: by_version,
+        eventsQueue: events_queue,
+    }
+}
+
+async fn verify_db_impl(state: &AppState, _chatty: bool) -> VerifyDbResult {
+    let dids = {
+        let store = state.store.lock().await;
+        store.list_dids(&state.config.did_prefix, None)
+    };
+    let total = dids.len();
+    let mut expired = 0;
+    let mut invalid = 0;
+    let mut verified = state.verified_dids.lock().await.len();
+
+    for did in dids {
+        if state.verified_dids.lock().await.contains_key(&did) {
+            continue;
+        }
+
+        let doc = {
+            let store = state.store.lock().await;
+            store.resolve_doc(
+                &state.config,
+                &did,
+                ResolveOptions {
+                    verify: true,
+                    ..ResolveOptions::default()
+                },
+            )
+        };
+
+        let Ok(doc) = doc else {
+            invalid += 1;
+            let mut store = state.store.lock().await;
+            let _ = store.delete_events(&did);
+            continue;
+        };
+
+        let valid_until = doc
+            .get("didDocumentRegistration")
+            .and_then(|value| value.get("validUntil"))
+            .and_then(Value::as_str)
+            .map(ToString::to_string);
+
+        if let Some(valid_until) = valid_until {
+            if valid_until < chrono_like_now() {
+                expired += 1;
+                let mut store = state.store.lock().await;
+                let _ = store.delete_events(&did);
+            } else {
+                verified += 1;
+            }
+        } else {
+            state.verified_dids.lock().await.insert(did, true);
+            verified += 1;
+        }
+    }
+
+    {
+        let mut store = state.store.lock().await;
+        store.clear_import_queue();
+    }
+
+    VerifyDbResult {
+        total,
+        verified,
+        expired,
+        invalid,
+    }
+}
+
+async fn search_docs_impl(state: &AppState, q: &str) -> Vec<String> {
+    let dids = {
+        let store = state.store.lock().await;
+        store.list_dids(&state.config.did_prefix, None)
+    };
+
+    let mut result = Vec::new();
+    for did in dids {
+        let doc = {
+            let store = state.store.lock().await;
+            store.resolve_doc(&state.config, &did, ResolveOptions::default())
+        };
+        let Ok(doc) = doc else {
+            continue;
+        };
+        let data = doc
+            .get("didDocumentData")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+        if data.to_string().contains(q) {
+            result.push(did);
+        }
+    }
+    result
+}
+
+async fn query_docs_impl(state: &AppState, where_clause: &Value) -> Result<Vec<String>> {
+    let dids = {
+        let store = state.store.lock().await;
+        store.list_dids(&state.config.did_prefix, None)
+    };
+
+    let Some((raw_path, cond)) = where_clause.as_object().and_then(|map| map.iter().next()) else {
+        return Ok(Vec::new());
+    };
+    let list = cond
+        .get("$in")
+        .and_then(Value::as_array)
+        .context("Only {$in:[...]} supported")?;
+
+    let mut result = Vec::new();
+    for did in dids {
+        let doc = {
+            let store = state.store.lock().await;
+            store.resolve_doc(&state.config, &did, ResolveOptions::default())
+        };
+        let Ok(doc) = doc else {
+            continue;
+        };
+        let data = doc
+            .get("didDocumentData")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+        if query_match(&data, raw_path, list) {
+            result.push(did);
+        }
+    }
+    Ok(result)
+}
+
+fn query_match(root: &Value, raw_path: &str, list: &[Value]) -> bool {
+    if let Some(base_path) = raw_path.strip_suffix("[*]") {
+        return json_path_get(root, base_path)
+            .and_then(Value::as_array)
+            .map(|arr| arr.iter().any(|value| list.contains(value)))
+            .unwrap_or(false);
+    }
+
+    if let Some((prefix, suffix)) = raw_path.split_once("[*].") {
+        return json_path_get(root, prefix)
+            .and_then(Value::as_array)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|item| json_path_get(item, suffix))
+                    .any(|value| list.contains(value))
+            })
+            .unwrap_or(false);
+    }
+
+    if let Some(base_path) = raw_path.strip_suffix(".*") {
+        return json_path_get(root, base_path)
+            .and_then(Value::as_object)
+            .map(|obj| obj.keys().any(|key| list.contains(&Value::String(key.clone()))))
+            .unwrap_or(false);
+    }
+
+    if let Some((prefix, suffix)) = raw_path.split_once(".*.") {
+        return json_path_get(root, prefix)
+            .and_then(Value::as_object)
+            .map(|obj| {
+                obj.values()
+                    .filter_map(|item| json_path_get(item, suffix))
+                    .any(|value| list.contains(value))
+            })
+            .unwrap_or(false);
+    }
+
+    json_path_get(root, raw_path)
+        .map(|value| list.contains(value))
+        .unwrap_or(false)
+}
+
+fn json_path_get<'a>(root: &'a Value, path: &str) -> Option<&'a Value> {
+    if path.is_empty() {
+        return Some(root);
+    }
+
+    let clean = path
+        .strip_prefix("$.")
+        .or_else(|| path.strip_prefix('$'))
+        .unwrap_or(path);
+    if clean.is_empty() {
+        return Some(root);
+    }
+
+    let mut current = root;
+    for raw_part in clean.split('.') {
+        if let Ok(index) = raw_part.parse::<usize>() {
+            current = current.as_array()?.get(index)?;
+        } else {
+            current = current.get(raw_part)?;
+        }
+    }
+    Some(current)
+}
+
+fn start_background_tasks(state: AppState) {
+    if state.config.status_interval_minutes > 0 {
+        let interval_minutes = state.config.status_interval_minutes;
+        let status_state = state.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(interval_minutes * 60));
+            loop {
+                interval.tick().await;
+                refresh_metrics_snapshot(&status_state).await;
+                log_status_snapshot(&status_state).await;
+            }
+        });
+    }
+
+    if state.config.gc_interval_minutes > 0 {
+        let interval_minutes = state.config.gc_interval_minutes;
+        let gc_state = state.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(interval_minutes * 60)).await;
+            let mut interval = tokio::time::interval(Duration::from_secs(interval_minutes * 60));
+            loop {
+                let result = verify_db_impl(&gc_state, false).await;
+                info!("DID garbage collection: {}", serde_json::to_string(&result).unwrap_or_default());
+                refresh_metrics_snapshot(&gc_state).await;
+                interval.tick().await;
+            }
+        });
+    }
+}
+
+async fn log_status_snapshot(state: &AppState) {
+    let status = check_dids_impl(state, None, false).await;
+    info!(
+        total = status.total,
+        agents = status.byType.agents,
+        assets = status.byType.assets,
+        confirmed = status.byType.confirmed,
+        unconfirmed = status.byType.unconfirmed,
+        pending_events = status.eventsQueue.len(),
+        "Gatekeeper status snapshot"
+    );
+}
+
 fn require_admin_key(state: &AppState, headers: &HeaderMap) -> Option<Response> {
     if state.config.admin_api_key.is_empty() {
         return None;
@@ -1687,7 +2256,32 @@ fn record_metrics(state: &AppState, method: &str, route: &str, status: u16, dura
 }
 
 fn normalize_path(path: &str) -> String {
-    path.replace("/did/did:", "/did/:did")
+    let base_path = path.split('?').next().unwrap_or(path);
+    if base_path.contains("/did/did:") {
+        return base_path.replace("/did/did:", "/did/:did");
+    }
+
+    let segments = base_path.split('/').filter(|segment| !segment.is_empty()).collect::<Vec<_>>();
+    if segments.len() >= 3 && segments[0] == "api" && segments[1] == "v1" {
+        match segments[2] {
+            "block" if segments.len() >= 4 => {
+                if segments.get(4) == Some(&"latest") {
+                    return "/api/v1/block/:registry/latest".to_string();
+                }
+                return "/api/v1/block/:registry".to_string();
+            }
+            "queue" if segments.len() >= 4 => {
+                if segments.get(4) == Some(&"clear") {
+                    return "/api/v1/queue/:registry/clear".to_string();
+                }
+                return "/api/v1/queue/:registry".to_string();
+            }
+            "events" if segments.len() >= 4 => return "/api/v1/events/:registry".to_string(),
+            "dids" if segments.len() >= 4 => return "/api/v1/dids/:prefix".to_string(),
+            _ => {}
+        }
+    }
+    base_path.to_string()
 }
 
 fn init_tracing() {
@@ -2027,6 +2621,21 @@ impl JsonDb {
         self.save()
     }
 
+    fn delete_events(&mut self, did: &str) -> Result<()> {
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?
+            .to_string();
+        self.data.dids.remove(&suffix);
+        self.save()
+    }
+
+    fn reset_db(&mut self) -> Result<()> {
+        self.data = JsonDbFile::default();
+        self.save()
+    }
+
     fn add_operation(&mut self, opid: &str, operation: Value) -> Result<()> {
         self.data.ops.insert(opid.to_string(), operation);
         self.save()
@@ -2049,6 +2658,15 @@ impl JsonDb {
 
     fn import_queue_len(&self) -> usize {
         self.data.import_queue.len()
+    }
+
+    fn import_queue_snapshot(&self) -> Vec<EventRecord> {
+        self.data.import_queue.clone()
+    }
+
+    fn clear_import_queue(&mut self) {
+        self.data.import_queue.clear();
+        let _ = self.save();
     }
 
     fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize> {
