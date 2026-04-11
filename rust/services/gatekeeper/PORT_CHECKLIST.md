@@ -41,11 +41,11 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 
 ## Signature and proof verification
 
-- [ ] Port `verifyProofFormat`.
-- [ ] Port `verifyCreateOperation`.
-- [ ] Port `verifyUpdateOperation`.
-- [ ] Match secp256k1 key and signature handling exactly.
-- [ ] Add valid and invalid proof test vectors shared with the TypeScript implementation.
+- [x] Port `verifyProofFormat`.
+- [x] Port `verifyCreateOperation`.
+- [x] Port `verifyUpdateOperation`.
+- [x] Match secp256k1 key and signature handling exactly.
+- [x] Add valid and invalid proof test vectors shared with the TypeScript implementation.
 
 ## Storage layer
 
@@ -68,7 +68,7 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [x] Support local `versionTime`.
 - [x] Support local `versionSequence`.
 - [x] Support local `confirm`.
-- [ ] Support `verify`.
+- [x] Support `verify`.
 - [x] Match local deactivation and delete semantics.
 - [x] Match local canonicalId/versionId/versionSequence metadata behavior.
 
@@ -77,15 +77,15 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [x] Port `updateDID` through native `/api/v1/did` event append handling.
 - [x] Port `deleteDID` through native `/api/v1/did` event append handling.
 - [x] Enforce `previd` semantics.
-- [ ] Preserve idempotency and duplicate-event behavior.
-- [ ] Ensure asset/controller update validation matches TypeScript behavior.
+- [x] Preserve idempotency and duplicate-event behavior.
+- [x] Ensure asset/controller update validation matches TypeScript behavior.
 
 ## DID listing and export/import
 
 - [x] Implement native `POST /api/v1/dids` and `POST /api/v1/dids/` basic listing.
 - [x] Match `updatedAfter` filtering.
 - [x] Match `updatedBefore` filtering.
-- [ ] Match local `resolve`, `confirm`, and `verify` options in DID listing.
+- [x] Match local `resolve`, `confirm`, and `verify` options in DID listing.
 - [x] Port `exportDID`.
 - [x] Port `exportDIDs`.
 - [x] Port `importDIDs`.
@@ -93,7 +93,7 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 
 ## Event import and processing
 
-- [ ] Port `verifyOperation`.
+- [x] Port `verifyOperation`.
 - [x] Port `importEvent`.
 - [x] Port `importEvents`.
 - [x] Port `importBatch`.
@@ -185,4 +185,32 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 
 - [x] Phase 1: full create/update/delete event chains and local DID resolution parity.
 - [x] Phase 2: import/export, event processing, queue, and block behavior.
-- [ ] Phase 3: search/query, maintenance loops, backend parity, and final container cutover.
+- [x] Phase 3: search/query and maintenance-loop foundations.
+- [x] Phase 4: signature/proof verification parity and DID verification semantics.
+- [ ] Phase 5: storage/backend parity, compatibility fixtures, and exact metrics/error matching.
+- [ ] Phase 6: deployment cutover, dependent-service validation, and default-image promotion.
+
+## Remaining work by phase
+
+### Phase 4
+
+- Phase 4 implementation is complete; remaining parity automation now rolls into Phase 5.
+
+### Phase 5
+
+- Finish the remaining `Compatibility target`, `Parity fixtures`, and `Domain types` items.
+- Port the remaining storage trait/backend work:
+  - Rust storage trait equivalent to `GatekeeperDb`
+  - JSON-cache decision
+  - Redis backend
+  - SQLite backend
+  - MongoDB backend
+  - DID suffix keying semantics verification
+- Add search/query parity tests.
+- Finish exact admin/error and metrics parity.
+- Decide memory stats compatibility behavior.
+
+### Phase 6
+
+- Finish the remaining `Docker and deployment` items.
+- Finish all `Final cutover` items.

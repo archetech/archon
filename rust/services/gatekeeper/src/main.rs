@@ -9,6 +9,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use async_recursion::async_recursion;
 use axum::{
     body::{to_bytes, Body},
     extract::{Path, Query, Request, State},
@@ -17,8 +18,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use bytes::Bytes;
 use cid::Cid;
+use k256::ecdsa::{signature::hazmat::PrehashVerifier, Signature as K256Signature, VerifyingKey};
 use multihash_codetable::{Code, MultihashDigest};
 use prometheus::{
     Encoder, Gauge, GaugeVec, HistogramOpts, HistogramVec, IntCounterVec, Registry, TextEncoder,
@@ -431,14 +434,17 @@ async fn list_dids(State(state): State<AppState>, Json(payload): Json<Value>) ->
                 .collect::<Vec<_>>()
         });
 
-    let store = state.store.lock().await;
-    let dids = store.list_dids(&state.config.did_prefix, requested.as_deref());
+    let dids = {
+        let store = state.store.lock().await;
+        store.list_dids(&state.config.did_prefix, requested.as_deref())
+    };
 
     if resolve || updated_after.is_some() || updated_before.is_some() {
         let mut docs = Vec::new();
         let mut filtered_dids = Vec::new();
         for did in dids {
-            let Ok(doc) = store.resolve_doc(&state.config, &did, resolve_options.clone()) else {
+            let doc = resolve_local_doc_async(&state, &did, resolve_options.clone()).await;
+            let Ok(doc) = doc else {
                 continue;
             };
 
@@ -989,12 +995,9 @@ async fn resolve_did(
         verify: query.get("verify").map(|value| value == "true").unwrap_or(false),
     };
 
-    {
-        let store = state.store.lock().await;
-        if let Ok(doc) = store.resolve_doc(&state.config, &did, resolve_options) {
-            record_metrics(&state, "GET", "/did/:did", 200, start.elapsed().as_secs_f64());
-            return Json(doc).into_response();
-        }
+    if let Ok(doc) = resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
+        record_metrics(&state, "GET", "/did/:did", 200, start.elapsed().as_secs_f64());
+        return Json(doc).into_response();
     }
 
     if state.config.fallback_url.trim().is_empty() {
@@ -1054,11 +1057,228 @@ async fn resolve_did(
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
+#[async_recursion]
+async fn resolve_local_doc_async(state: &AppState, did: &str, options: ResolveOptions) -> Result<Value> {
+    if !options.verify {
+        let store = state.store.lock().await;
+        return store.resolve_doc(&state.config, did, options);
+    }
+
+    let events = {
+        let store = state.store.lock().await;
+        store.get_events(did)
+    };
+    if events.is_empty() {
+        anyhow::bail!("did not found");
+    }
+
+    let anchor = events.first().context("did has no events")?;
+    let anchor_operation = &anchor.operation;
+    if anchor_operation.get("type").and_then(Value::as_str) != Some("create") {
+        anyhow::bail!("first operation must be create");
+    }
+
+    let registration = anchor_operation
+        .get("registration")
+        .and_then(Value::as_object)
+        .context("missing registration")?;
+    let did_type = registration
+        .get("type")
+        .and_then(Value::as_str)
+        .context("missing registration.type")?;
+    let created = anchor_operation
+        .get("created")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    let initial_document = match did_type {
+        "agent" => {
+            let public_jwk = anchor_operation.get("publicJwk").cloned().unwrap_or_else(|| json!({}));
+            json!({
+                "@context": ["https://www.w3.org/ns/did/v1"],
+                "id": did,
+                "verificationMethod": [{
+                    "id": "#key-1",
+                    "controller": did,
+                    "type": "EcdsaSecp256k1VerificationKey2019",
+                    "publicKeyJwk": public_jwk
+                }],
+                "authentication": ["#key-1"],
+                "assertionMethod": ["#key-1"]
+            })
+        }
+        "asset" => json!({
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": did,
+            "controller": anchor_operation.get("controller").cloned().unwrap_or(Value::Null)
+        }),
+        _ => anyhow::bail!("unsupported registration.type"),
+    };
+
+    let canonical_id = anchor_operation
+        .get("registration")
+        .and_then(|v| v.get("prefix"))
+        .and_then(Value::as_str)
+        .map(|_| did.to_string());
+
+    let mut resolved = ResolvedDoc {
+        did_document: initial_document,
+        did_document_data: anchor_operation.get("data").cloned().unwrap_or_else(|| json!({})),
+        did_document_registration: {
+            let mut value = Value::Object(registration.clone());
+            if value.get("created").is_none() {
+                value["created"] = Value::String(created.clone());
+            }
+            value
+        },
+        created: created.clone(),
+        updated: None,
+        deleted: None,
+        version_id: anchor
+            .opid
+            .clone()
+            .unwrap_or_else(|| generate_json_cid(anchor_operation).unwrap_or_default()),
+        version_sequence: 1,
+        confirmed: true,
+        canonical_id,
+        deactivated: false,
+    };
+
+    let anchor_valid = verify_create_operation_impl(state, anchor_operation).await?;
+    if !anchor_valid {
+        anyhow::bail!("Invalid operation: proof");
+    }
+
+    for event in events.iter().skip(1) {
+        let operation = &event.operation;
+        let operation_time = event.time.clone();
+
+        if let Some(version_time) = options.version_time.as_ref() {
+            if operation_time > *version_time {
+                break;
+            }
+        }
+        if let Some(version_sequence) = options.version_sequence {
+            if resolved.version_sequence == version_sequence {
+                break;
+            }
+        }
+
+        resolved.confirmed = resolved.confirmed
+            && resolved
+                .did_document_registration
+                .get("registry")
+                .and_then(Value::as_str)
+                .map(|registry| registry == event.registry)
+                .unwrap_or(false);
+        if options.confirm && !resolved.confirmed {
+            break;
+        }
+
+        let current_doc = json!({
+            "didDocument": resolved.did_document,
+            "didDocumentMetadata": {
+                "created": resolved.created,
+                "updated": resolved.updated,
+                "deleted": resolved.deleted,
+                "canonicalId": resolved.canonical_id,
+                "versionId": resolved.version_id,
+                "versionSequence": resolved.version_sequence.to_string(),
+                "confirmed": resolved.confirmed,
+                "deactivated": resolved.deactivated
+            },
+            "didDocumentData": resolved.did_document_data,
+            "didDocumentRegistration": resolved.did_document_registration
+        });
+
+        let valid = verify_update_operation_impl(state, operation, &current_doc).await?;
+        if !valid {
+            anyhow::bail!("Invalid operation: proof");
+        }
+        if operation.get("previd").and_then(Value::as_str) != Some(resolved.version_id.as_str()) {
+            anyhow::bail!("Invalid operation: previd");
+        }
+
+        match operation.get("type").and_then(Value::as_str) {
+            Some("update") => {
+                resolved.version_sequence += 1;
+                resolved.version_id = event
+                    .opid
+                    .clone()
+                    .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
+                resolved.updated = Some(operation_time);
+                if let Some(next_doc) = operation.get("doc") {
+                    if let Some(doc) = next_doc.get("didDocument") {
+                        resolved.did_document = doc.clone();
+                    }
+                    if let Some(data) = next_doc.get("didDocumentData") {
+                        resolved.did_document_data = data.clone();
+                    }
+                    if let Some(registration) = next_doc.get("didDocumentRegistration") {
+                        resolved.did_document_registration = registration.clone();
+                    }
+                }
+                resolved.deactivated = false;
+            }
+            Some("delete") => {
+                resolved.version_sequence += 1;
+                resolved.version_id = event
+                    .opid
+                    .clone()
+                    .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
+                resolved.deleted = Some(operation_time.clone());
+                resolved.updated = Some(operation_time);
+                resolved.did_document = json!({ "id": did });
+                resolved.did_document_data = json!({});
+                resolved.deactivated = true;
+            }
+            _ => {}
+        }
+    }
+
+    let mut metadata = json!({
+        "created": resolved.created,
+        "versionId": resolved.version_id,
+        "versionSequence": resolved.version_sequence.to_string(),
+        "confirmed": resolved.confirmed
+    });
+    if let Some(updated) = resolved.updated.clone() {
+        metadata["updated"] = Value::String(updated);
+    }
+    if let Some(deleted) = resolved.deleted.clone() {
+        metadata["deleted"] = Value::String(deleted);
+    }
+    if resolved.deactivated {
+        metadata["deactivated"] = Value::Bool(true);
+    }
+    if let Some(canonical_id) = resolved.canonical_id.clone() {
+        metadata["canonicalId"] = Value::String(canonical_id);
+    }
+
+    Ok(json!({
+        "didDocument": resolved.did_document,
+        "didDocumentMetadata": metadata,
+        "didDocumentData": resolved.did_document_data,
+        "didDocumentRegistration": resolved.did_document_registration,
+        "didResolutionMetadata": {
+            "retrieved": chrono_like_now()
+        }
+    }))
+}
+
 async fn handle_did_operation(state: &AppState, payload: &Value) -> Result<Value, String> {
     let op_type = payload
         .get("type")
         .and_then(Value::as_str)
         .ok_or_else(|| "missing operation.type".to_string())?;
+
+    let valid = verify_operation_impl(state, payload)
+        .await
+        .map_err(|error| error.to_string())?;
+    if !valid {
+        return Err("Invalid operation: proof".to_string());
+    }
 
     let did = match op_type {
         "create" => generate_did_from_operation(&state.config, payload).map_err(|error| error.to_string())?,
@@ -1600,6 +1820,327 @@ fn verify_event_shape(event: &Value) -> bool {
     }
 }
 
+fn verify_did_format(did: &str) -> bool {
+    did.starts_with("did:")
+}
+
+fn verify_date_format(time: Option<&str>) -> bool {
+    time.and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+        .is_some()
+}
+
+fn verify_proof_format(proof: Option<&Value>) -> bool {
+    let Some(proof) = proof else {
+        return false;
+    };
+    if proof.get("type").and_then(Value::as_str) != Some("EcdsaSecp256k1Signature2019") {
+        return false;
+    }
+    if !verify_date_format(proof.get("created").and_then(Value::as_str)) {
+        return false;
+    }
+    if !matches!(
+        proof.get("proofPurpose").and_then(Value::as_str),
+        Some("assertionMethod" | "authentication")
+    ) {
+        return false;
+    }
+    let Some(verification_method) = proof.get("verificationMethod").and_then(Value::as_str) else {
+        return false;
+    };
+    if !verification_method.contains('#') {
+        return false;
+    }
+    let did = verification_method.split('#').next().unwrap_or_default();
+    if !did.is_empty() && !verify_did_format(did) {
+        return false;
+    }
+    proof.get("proofValue").and_then(Value::as_str).is_some()
+}
+
+fn value_without_proof(value: &Value) -> Value {
+    let mut copy = value.clone();
+    if let Some(object) = copy.as_object_mut() {
+        object.remove("proof");
+    }
+    copy
+}
+
+fn base64url_to_bytes(value: &str) -> Result<Vec<u8>> {
+    URL_SAFE_NO_PAD
+        .decode(value)
+        .with_context(|| "invalid base64url")
+}
+
+fn public_jwk_to_sec1_bytes(public_jwk: &Value) -> Result<Vec<u8>> {
+    if public_jwk.get("kty").and_then(Value::as_str) != Some("EC") {
+        anyhow::bail!("Invalid operation: publicJwk");
+    }
+    if public_jwk.get("crv").and_then(Value::as_str) != Some("secp256k1") {
+        anyhow::bail!("Invalid operation: publicJwk");
+    }
+
+    let x_bytes = base64url_to_bytes(
+        public_jwk
+            .get("x")
+            .and_then(Value::as_str)
+            .context("Invalid operation: publicJwk")?,
+    )?;
+    let y_bytes = base64url_to_bytes(
+        public_jwk
+            .get("y")
+            .and_then(Value::as_str)
+            .context("Invalid operation: publicJwk")?,
+    )?;
+
+    if x_bytes.len() != 32 || y_bytes.len() != 32 {
+        anyhow::bail!("Invalid operation: publicJwk");
+    }
+
+    let prefix = if y_bytes.last().copied().unwrap_or_default() % 2 == 0 {
+        0x02
+    } else {
+        0x03
+    };
+
+    let mut compressed = Vec::with_capacity(33);
+    compressed.push(prefix);
+    compressed.extend_from_slice(&x_bytes);
+    Ok(compressed)
+}
+
+fn verify_sig(msg_hash_hex: &str, proof_value: &str, public_jwk: &Value) -> Result<bool> {
+    let msg_hash = hex_to_bytes(msg_hash_hex)?;
+    let sig_bytes = base64url_to_bytes(proof_value)?;
+    let compressed_key = public_jwk_to_sec1_bytes(public_jwk)?;
+    let verifying_key = VerifyingKey::from_sec1_bytes(&compressed_key)
+        .with_context(|| "Invalid operation: publicJwk")?;
+    let signature = K256Signature::from_slice(&sig_bytes).with_context(|| "Invalid operation: proof")?;
+    Ok(verifying_key.verify_prehash(&msg_hash, &signature).is_ok())
+}
+
+fn hex_to_bytes(value: &str) -> Result<Vec<u8>> {
+    if value.len() % 2 != 0 {
+        anyhow::bail!("invalid hex");
+    }
+    (0..value.len())
+        .step_by(2)
+        .map(|index| u8::from_str_radix(&value[index..index + 2], 16).with_context(|| "invalid hex"))
+        .collect()
+}
+
+fn bytes_to_hex(bytes: &[u8]) -> String {
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        encoded.push_str(&format!("{byte:02x}"));
+    }
+    encoded
+}
+
+#[async_recursion]
+async fn verify_create_operation_impl(state: &AppState, operation: &Value) -> Result<bool> {
+    if operation.is_null() {
+        anyhow::bail!("Invalid operation: missing");
+    }
+    if operation.to_string().len() > 64 * 1024 {
+        anyhow::bail!("Invalid operation: size");
+    }
+    if operation.get("type").and_then(Value::as_str) != Some("create") {
+        anyhow::bail!(
+            "Invalid operation: type={}",
+            operation.get("type").and_then(Value::as_str).unwrap_or("unknown")
+        );
+    }
+    if !verify_date_format(operation.get("created").and_then(Value::as_str)) {
+        anyhow::bail!(
+            "Invalid operation: created={}",
+            operation.get("created").and_then(Value::as_str).unwrap_or_default()
+        );
+    }
+
+    let registration = operation
+        .get("registration")
+        .context("Invalid operation: registration")?;
+    let version = registration
+        .get("version")
+        .and_then(Value::as_i64)
+        .ok_or_else(|| anyhow::anyhow!("Invalid operation: registration.version=null"))?;
+    if version != 1 {
+        anyhow::bail!("Invalid operation: registration.version={version}");
+    }
+    let reg_type = registration
+        .get("type")
+        .and_then(Value::as_str)
+        .context("Invalid operation: registration.type")?;
+    if !matches!(reg_type, "agent" | "asset") {
+        anyhow::bail!("Invalid operation: registration.type={reg_type}");
+    }
+    let registry = registration
+        .get("registry")
+        .and_then(Value::as_str)
+        .context("Invalid operation: registration.registry")?;
+    if !is_valid_registry(registry) {
+        anyhow::bail!("Invalid operation: registration.registry={registry}");
+    }
+    if !verify_proof_format(operation.get("proof")) {
+        anyhow::bail!("Invalid operation: proof");
+    }
+
+    let proof = operation.get("proof").context("Invalid operation: proof")?;
+    if reg_type == "agent" && proof.get("verificationMethod").and_then(Value::as_str) != Some("#key-1") {
+        anyhow::bail!("Invalid operation: proof.verificationMethod must be #key-1 for agent create");
+    }
+    if let Some(valid_until) = registration.get("validUntil").and_then(Value::as_str) {
+        if !verify_date_format(Some(valid_until)) {
+            anyhow::bail!("Invalid operation: registration.validUntil={valid_until}");
+        }
+    }
+
+    let operation_copy = value_without_proof(operation);
+    let msg_hash = generate_message_hash(&operation_copy)?;
+    let proof_value = proof
+        .get("proofValue")
+        .and_then(Value::as_str)
+        .context("Invalid operation: proof")?;
+
+    if reg_type == "agent" {
+        let public_jwk = operation
+            .get("publicJwk")
+            .context("Invalid operation: publicJwk")?;
+        return verify_sig(&msg_hash, proof_value, public_jwk);
+    }
+
+    let controller_did = proof
+        .get("verificationMethod")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .split('#')
+        .next()
+        .unwrap_or_default()
+        .to_string();
+    if operation.get("controller").and_then(Value::as_str) != Some(controller_did.as_str()) {
+        anyhow::bail!("Invalid operation: signer is not controller");
+    }
+
+    let controller_doc = resolve_local_doc_async(
+        state,
+        &controller_did,
+        ResolveOptions {
+            confirm: true,
+            version_time: proof.get("created").and_then(Value::as_str).map(ToString::to_string),
+            ..ResolveOptions::default()
+        },
+    )
+    .await?;
+
+    if controller_doc
+        .get("didDocumentRegistration")
+        .and_then(|value| value.get("registry"))
+        .and_then(Value::as_str)
+        == Some("local")
+        && registry != "local"
+    {
+        anyhow::bail!("Invalid operation: non-local registry={registry}");
+    }
+
+    let public_jwk = controller_doc
+        .get("didDocument")
+        .and_then(|value| value.get("verificationMethod"))
+        .and_then(Value::as_array)
+        .and_then(|items| items.first())
+        .and_then(|value| value.get("publicKeyJwk"))
+        .context("Invalid operation: didDocument missing verificationMethod")?;
+
+    verify_sig(&msg_hash, proof_value, public_jwk)
+}
+
+#[async_recursion]
+async fn verify_update_operation_impl(state: &AppState, operation: &Value, doc: &Value) -> Result<bool> {
+    if operation.to_string().len() > 64 * 1024 {
+        anyhow::bail!("Invalid operation: size");
+    }
+    if !verify_proof_format(operation.get("proof")) {
+        anyhow::bail!("Invalid operation: proof");
+    }
+    if doc.get("didDocument").is_none() {
+        anyhow::bail!("Invalid operation: doc.didDocument");
+    }
+    if doc
+        .get("didDocumentMetadata")
+        .and_then(|value| value.get("deactivated"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        anyhow::bail!("Invalid operation: DID deactivated");
+    }
+
+    if let Some(controller_did) = doc
+        .get("didDocument")
+        .and_then(|value| value.get("controller"))
+        .and_then(Value::as_str)
+    {
+        let controller_doc = resolve_local_doc_async(
+            state,
+            controller_did,
+            ResolveOptions {
+                confirm: true,
+                version_time: operation
+                    .get("proof")
+                    .and_then(|value| value.get("created"))
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string),
+                ..ResolveOptions::default()
+            },
+        )
+        .await?;
+        return verify_update_operation_impl(state, operation, &controller_doc).await;
+    }
+
+    if doc
+        .get("didDocument")
+        .and_then(|value| value.get("verificationMethod"))
+        .is_none()
+    {
+        anyhow::bail!("Invalid operation: doc.didDocument.verificationMethod");
+    }
+
+    let proof = operation.get("proof").context("Invalid operation: proof")?;
+    let msg_hash = generate_message_hash(&value_without_proof(operation))?;
+    let public_jwk = doc
+        .get("didDocument")
+        .and_then(|value| value.get("verificationMethod"))
+        .and_then(Value::as_array)
+        .and_then(|items| items.first())
+        .and_then(|value| value.get("publicKeyJwk"))
+        .context("Invalid operation: didDocument missing verificationMethod")?;
+    let proof_value = proof
+        .get("proofValue")
+        .and_then(Value::as_str)
+        .context("Invalid operation: proof")?;
+    verify_sig(&msg_hash, proof_value, public_jwk)
+}
+
+async fn verify_operation_impl(state: &AppState, operation: &Value) -> Result<bool> {
+    match operation.get("type").and_then(Value::as_str) {
+        Some("create") => verify_create_operation_impl(state, operation).await,
+        Some("update" | "delete") => {
+            let did = operation
+                .get("did")
+                .and_then(Value::as_str)
+                .context("Invalid operation: missing operation.did")?;
+            let doc = resolve_local_doc_async(state, did, ResolveOptions::default()).await?;
+            verify_update_operation_impl(state, operation, &doc).await
+        }
+        _ => Ok(false),
+    }
+}
+
+fn generate_message_hash(value: &Value) -> Result<String> {
+    let canonical = canonical_json(value);
+    let hash = Code::Sha2_256.digest(canonical.as_bytes());
+    Ok(bytes_to_hex(hash.digest()))
+}
+
 async fn import_batch_impl(state: &AppState, batch: &[Value]) -> ImportBatchResult {
     let mut queued = 0;
     let mut rejected = 0;
@@ -1762,6 +2303,14 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
             .and_then(Value::as_str)
             .is_none()
     {
+        return ImportStatus::Rejected;
+    }
+
+    let verified = match verify_operation_impl(state, &event.operation).await {
+        Ok(verified) => verified,
+        Err(_) => return ImportStatus::Deferred,
+    };
+    if !verified {
         return ImportStatus::Rejected;
     }
 
@@ -1990,17 +2539,15 @@ async fn verify_db_impl(state: &AppState, _chatty: bool) -> VerifyDbResult {
             continue;
         }
 
-        let doc = {
-            let store = state.store.lock().await;
-            store.resolve_doc(
-                &state.config,
-                &did,
-                ResolveOptions {
-                    verify: true,
-                    ..ResolveOptions::default()
-                },
-            )
-        };
+        let doc = resolve_local_doc_async(
+            state,
+            &did,
+            ResolveOptions {
+                verify: true,
+                ..ResolveOptions::default()
+            },
+        )
+        .await;
 
         let Ok(doc) = doc else {
             invalid += 1;
