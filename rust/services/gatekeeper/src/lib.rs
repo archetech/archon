@@ -27,9 +27,7 @@ use mongodb::{
     bson::{doc, Document},
     sync::Client as MongoClient,
 };
-use prometheus::{
-    Encoder, Gauge, GaugeVec, HistogramOpts, HistogramVec, IntCounterVec, Registry, TextEncoder,
-};
+use prometheus::{Encoder, TextEncoder};
 use redis::Commands;
 use reqwest::Client;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -40,8 +38,10 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 
 mod config;
+mod metrics;
 
 use config::Config;
+use metrics::{normalize_path, record_metrics, Metrics};
 
 #[derive(Clone)]
 struct AppState {
@@ -54,18 +54,6 @@ struct AppState {
     supported_registries: Arc<Mutex<Vec<String>>>,
     processing_events: Arc<Mutex<bool>>,
     started_at: Instant,
-}
-
-struct Metrics {
-    registry: Registry,
-    http_requests_total: IntCounterVec,
-    http_request_duration_seconds: HistogramVec,
-    did_operations_total: IntCounterVec,
-    events_queue_size: GaugeVec,
-    gatekeeper_dids_total: Gauge,
-    gatekeeper_dids_by_type: GaugeVec,
-    gatekeeper_dids_by_registry: GaugeVec,
-    service_version_info: GaugeVec,
 }
 
 #[derive(Serialize)]
@@ -2918,147 +2906,9 @@ fn extract_ipfs_hash(body: &str) -> Option<String> {
     None
 }
 
-fn record_metrics(state: &AppState, method: &str, route: &str, status: u16, duration_seconds: f64) {
-    let normalized = normalize_path(route);
-    let status_string = status.to_string();
-    state
-        .metrics
-        .http_requests_total
-        .with_label_values(&[method, &normalized, &status_string])
-        .inc();
-    state
-        .metrics
-        .http_request_duration_seconds
-        .with_label_values(&[method, &normalized, &status_string])
-        .observe(duration_seconds);
-}
-
-fn normalize_path(path: &str) -> String {
-    let base_path = path.split('?').next().unwrap_or(path);
-    let segments = base_path.split('/').filter(|segment| !segment.is_empty()).collect::<Vec<_>>();
-
-    if let Some(index) = segments.iter().position(|segment| *segment == "did") {
-        if let Some(value) = segments.get(index + 1) {
-            if value.starts_with("did:") {
-                let mut normalized = segments.clone();
-                normalized[index + 1] = ":did";
-                return format!("/{}", normalized.join("/"));
-            }
-        }
-    }
-
-    if let Some(index) = segments.iter().position(|segment| *segment == "block") {
-        if segments.get(index + 2) == Some(&"latest") {
-            let mut normalized = segments.clone();
-            if let Some(value) = normalized.get_mut(index + 1) {
-                *value = ":registry";
-            }
-            return format!("/{}", normalized.join("/"));
-        }
-        if segments.get(index + 1).is_some() {
-            let mut normalized = segments.clone();
-            normalized[index + 1] = ":registry";
-            return format!("/{}", normalized.join("/"));
-        }
-    }
-
-    if let Some(index) = segments.iter().position(|segment| *segment == "queue") {
-        if segments.get(index + 1).is_some() {
-            let mut normalized = segments.clone();
-            normalized[index + 1] = ":registry";
-            return format!("/{}", normalized.join("/"));
-        }
-    }
-
-    if let Some(index) = segments.iter().position(|segment| *segment == "events") {
-        if segments.get(index + 1).is_some() {
-            let mut normalized = segments.clone();
-            normalized[index + 1] = ":registry";
-            return format!("/{}", normalized.join("/"));
-        }
-    }
-
-    if let Some(index) = segments.iter().position(|segment| *segment == "dids") {
-        if segments.get(index + 1).is_some() {
-            let mut normalized = segments.clone();
-            normalized[index + 1] = ":prefix";
-            return format!("/{}", normalized.join("/"));
-        }
-    }
-
-    base_path.to_string()
-}
-
 fn init_tracing() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
     tracing_subscriber::fmt().with_env_filter(filter).init();
-}
-
-impl Metrics {
-    fn new(config: &Config) -> Result<Self> {
-        let registry = Registry::new();
-
-        let http_requests_total = IntCounterVec::new(
-            prometheus::Opts::new("http_requests_total", "Total number of HTTP requests"),
-            &["method", "route", "status"],
-        )?;
-        let http_request_duration_seconds = HistogramVec::new(
-            HistogramOpts::new("http_request_duration_seconds", "HTTP request duration in seconds")
-                .buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0]),
-            &["method", "route", "status"],
-        )?;
-        let did_operations_total = IntCounterVec::new(
-            prometheus::Opts::new("did_operations_total", "Total number of DID operations"),
-            &["operation", "registry", "status"],
-        )?;
-        let events_queue_size = GaugeVec::new(
-            prometheus::Opts::new("events_queue_size", "Number of events in the queue"),
-            &["registry"],
-        )?;
-        let gatekeeper_dids_total = Gauge::new("gatekeeper_dids_total", "Total number of DIDs")?;
-        let gatekeeper_dids_by_type = GaugeVec::new(
-            prometheus::Opts::new("gatekeeper_dids_by_type", "Number of DIDs by type"),
-            &["type"],
-        )?;
-        let gatekeeper_dids_by_registry = GaugeVec::new(
-            prometheus::Opts::new("gatekeeper_dids_by_registry", "Number of DIDs by registry"),
-            &["registry"],
-        )?;
-        let service_version_info = GaugeVec::new(
-            prometheus::Opts::new("service_version_info", "Service version information"),
-            &["version", "commit"],
-        )?;
-
-        registry.register(Box::new(http_requests_total.clone()))?;
-        registry.register(Box::new(http_request_duration_seconds.clone()))?;
-        registry.register(Box::new(did_operations_total.clone()))?;
-        registry.register(Box::new(events_queue_size.clone()))?;
-        registry.register(Box::new(gatekeeper_dids_total.clone()))?;
-        registry.register(Box::new(gatekeeper_dids_by_type.clone()))?;
-        registry.register(Box::new(gatekeeper_dids_by_registry.clone()))?;
-        registry.register(Box::new(service_version_info.clone()))?;
-
-        service_version_info
-            .with_label_values(&[&config.version, &config.git_commit])
-            .set(1.0);
-        gatekeeper_dids_total.set(0.0);
-        let _ = did_operations_total;
-        let _ = events_queue_size;
-        let _ = gatekeeper_dids_by_type;
-        let _ = gatekeeper_dids_by_registry;
-
-        Ok(Self {
-            registry,
-            http_requests_total,
-            http_request_duration_seconds,
-            did_operations_total,
-            events_queue_size,
-            gatekeeper_dids_total,
-            gatekeeper_dids_by_type,
-            gatekeeper_dids_by_registry,
-            service_version_info,
-        })
-    }
 }
 
 fn url_encode_component(value: &str) -> String {
