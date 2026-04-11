@@ -3702,7 +3702,8 @@ impl DbBackend {
                 let client = MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
                 let coll = client.database(database).collection::<Document>(collection);
                 let raw = coll
-                    .find_one(doc! { "_id": document_id }, None)
+                    .find_one(doc! { "_id": document_id })
+                    .run()
                     .context("failed to load mongodb state")?
                     .and_then(|doc| doc.get_str("value").ok().map(ToString::to_string));
                 match raw {
@@ -3753,8 +3754,9 @@ impl DbBackend {
                         "_id": document_id,
                         "value": body,
                     },
-                    mongodb::options::ReplaceOptions::builder().upsert(true).build(),
                 )
+                .upsert(true)
+                .run()
                 .context("failed to persist mongodb state")?;
                 Ok(())
             }
