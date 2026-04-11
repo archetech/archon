@@ -66,7 +66,8 @@ readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
 
 function normalizePath(path: string): string {
     return path
-        .replace(/\/did\/did:[^/]+/, '/did/:did')
+        .replace(/\/did\/(?:did:[^/]+|did%3[aA][^/]+)/, '/did/:did')
+        .replace(/\/invoice\/(?:did:[^/]+|did%3[aA][^/]+)/, '/invoice/:did')
         .replace(/\/ipfs\/json\/[^/]+/, '/ipfs/json/:cid')
         .replace(/\/ipfs\/text\/[^/]+/, '/ipfs/text/:cid')
         .replace(/\/ipfs\/data\/[^/]+/, '/ipfs/data/:cid')
