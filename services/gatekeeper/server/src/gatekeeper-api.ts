@@ -79,7 +79,7 @@ function normalizePath(path: string): string {
     const basePath = path.split('?')[0];
     // Normalize known dynamic segments
     return basePath
-        .replace(/\/did\/did:[^/]+/g, '/did/:did')
+        .replace(/\/did\/(?:did:[^/]+|did%3[aA][^/]+)/g, '/did/:did')
         .replace(/\/block\/[^/]+\/latest/g, '/block/:registry/latest')
         .replace(/\/block\/[^/]+/g, '/block/:registry')
         .replace(/\/queue\/[^/]+\/clear/g, '/queue/:registry/clear')

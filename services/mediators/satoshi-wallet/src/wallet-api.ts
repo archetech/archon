@@ -96,6 +96,11 @@ readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
 
 const ARCHON_ADMIN_HEADER = 'x-archon-admin-key';
 
+function normalizePath(path: string): string {
+    return path
+        .replace(/\/wallet\/transaction\/[^/]+/g, '/wallet/transaction/:txid');
+}
+
 function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction) {
     if (!config.adminApiKey) {
         res.status(403).json({ error: 'Admin API key not configured' });
@@ -154,8 +159,9 @@ async function main() {
         const start = process.hrtime.bigint();
         res.on('finish', () => {
             const duration = Number(process.hrtime.bigint() - start) / 1e9;
-            httpRequestsTotal.inc({ method: req.method, route: req.path, status: res.statusCode });
-            httpRequestDuration.observe({ method: req.method, route: req.path }, duration);
+            const route = normalizePath(req.path);
+            httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
+            httpRequestDuration.observe({ method: req.method, route }, duration);
         });
         next();
     });

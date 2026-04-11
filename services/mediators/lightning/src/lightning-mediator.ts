@@ -83,6 +83,13 @@ function getGatekeeper() {
     return gatekeeperPromise;
 }
 
+function normalizePath(path: string): string {
+    return path
+        .replace(/\/lightning\/publish\/(?:did:[^/]+|did%3[aA][^/]+)/g, '/lightning/publish/:did')
+        .replace(/\/l402\/pending\/[^/]+/g, '/l402/pending/:paymentHash')
+        .replace(/\/invoice\/(?:did:[^/]+|did%3[aA][^/]+)/g, '/invoice/:did');
+}
+
 function isPrivateHost(hostname: string): boolean {
     return /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
 }
@@ -177,7 +184,7 @@ async function main(): Promise<void> {
         res.on('finish', () => {
             httpRequestsTotal.inc({
                 method: req.method,
-                route: req.path,
+                route: normalizePath(req.path),
                 status: String(res.statusCode),
             });
         });

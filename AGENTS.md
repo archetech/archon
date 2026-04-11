@@ -29,3 +29,4 @@ These rules apply to coding agents working in this repository.
 - Never run mutating git operations in parallel. Serialize `git add`, `git commit`, `git push`, branch moves, stash operations, and any command that writes to `.git`.
 - Prefer a clean branch cut over moving changes around after the fact.
 - If branch state becomes confusing, stop and cleanly reestablish scope before making more commits.
+- When adding Prometheus HTTP route labels, normalize dynamic path segments like DIDs, hashes, txids, and CIDs before recording metrics so dashboards do not create one time series per identifier.
