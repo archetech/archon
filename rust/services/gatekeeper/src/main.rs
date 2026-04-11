@@ -549,12 +549,8 @@ async fn remove_dids(
     };
 
     if dids.is_empty() {
-        record_metrics(&state, "POST", "/dids/remove", 400, start.elapsed().as_secs_f64());
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "invalid dids payload" })),
-        )
-            .into_response();
+        record_metrics(&state, "POST", "/dids/remove", 500, start.elapsed().as_secs_f64());
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid parameter: dids");
     }
 
     let mut store = state.store.lock().await;
@@ -578,12 +574,8 @@ async fn import_dids(
     let did_batches = match payload.as_array() {
         Some(items) => items,
         None => {
-            record_metrics(&state, "POST", "/dids/import", 400, start.elapsed().as_secs_f64());
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "invalid did import payload" })),
-            )
-                .into_response();
+            record_metrics(&state, "POST", "/dids/import", 500, start.elapsed().as_secs_f64());
+            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "TypeError: dids.flat is not a function");
         }
     };
 
@@ -668,12 +660,8 @@ async fn import_batch(
     let batch = match payload.as_array() {
         Some(items) => items.iter().cloned().collect::<Vec<_>>(),
         None => {
-            record_metrics(&state, "POST", "/batch/import", 400, start.elapsed().as_secs_f64());
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "invalid batch payload" })),
-            )
-                .into_response();
+            record_metrics(&state, "POST", "/batch/import", 500, start.elapsed().as_secs_f64());
+            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid parameter: batch");
         }
     };
 
@@ -696,23 +684,15 @@ async fn import_batch_by_cids(
     let cids = match payload.get("cids").and_then(Value::as_array) {
         Some(items) if !items.is_empty() => items,
         _ => {
-            record_metrics(&state, "POST", "/batch/import/cids", 400, start.elapsed().as_secs_f64());
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "invalid cids payload" })),
-            )
-                .into_response();
+            record_metrics(&state, "POST", "/batch/import/cids", 500, start.elapsed().as_secs_f64());
+            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid parameter: cids");
         }
     };
     let metadata = match payload.get("metadata") {
         Some(value) if value.is_object() => value,
         _ => {
-            record_metrics(&state, "POST", "/batch/import/cids", 400, start.elapsed().as_secs_f64());
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "invalid metadata payload" })),
-            )
-                .into_response();
+            record_metrics(&state, "POST", "/batch/import/cids", 500, start.elapsed().as_secs_f64());
+            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid parameter: metadata");
         }
     };
 
@@ -775,12 +755,11 @@ async fn get_queue(
         return response;
     }
     if !is_valid_registry(&registry) {
-        record_metrics(&state, "GET", "/queue/:registry", 400, start.elapsed().as_secs_f64());
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": format!("invalid registry={registry}") })),
-        )
-            .into_response();
+        record_metrics(&state, "GET", "/queue/:registry", 500, start.elapsed().as_secs_f64());
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Invalid parameter: registry={registry}"),
+        );
     }
 
     {
@@ -807,12 +786,11 @@ async fn clear_queue(
         return response;
     }
     if !is_valid_registry(&registry) {
-        record_metrics(&state, "POST", "/queue/:registry/clear", 400, start.elapsed().as_secs_f64());
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": format!("invalid registry={registry}") })),
-        )
-            .into_response();
+        record_metrics(&state, "POST", "/queue/:registry/clear", 500, start.elapsed().as_secs_f64());
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Invalid parameter: registry={registry}"),
+        );
     }
 
     let events = payload.as_array().cloned().unwrap_or_default();
@@ -933,12 +911,11 @@ async fn query_docs(State(state): State<AppState>, Json(payload): Json<Value>) -
 async fn get_latest_block(State(state): State<AppState>, Path(registry): Path<String>) -> Response {
     let start = Instant::now();
     if !is_valid_registry(&registry) {
-        record_metrics(&state, "GET", "/block/:registry/latest", 400, start.elapsed().as_secs_f64());
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": format!("invalid registry={registry}") })),
-        )
-            .into_response();
+        record_metrics(&state, "GET", "/block/:registry/latest", 500, start.elapsed().as_secs_f64());
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Invalid parameter: registry={registry}"),
+        );
     }
 
     let store = state.store.lock().await;
@@ -953,12 +930,11 @@ async fn get_block_by_id(
 ) -> Response {
     let start = Instant::now();
     if !is_valid_registry(&registry) {
-        record_metrics(&state, "GET", "/block/:registry/:blockId", 400, start.elapsed().as_secs_f64());
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": format!("invalid registry={registry}") })),
-        )
-            .into_response();
+        record_metrics(&state, "GET", "/block/:registry/:blockId", 500, start.elapsed().as_secs_f64());
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Invalid parameter: registry={registry}"),
+        );
     }
 
     let block_key = block_id.parse::<u64>().ok().map(BlockLookup::Height).unwrap_or(BlockLookup::Hash(block_id));
@@ -979,12 +955,11 @@ async fn add_block(
         return response;
     }
     if !is_valid_registry(&registry) {
-        record_metrics(&state, "POST", "/block/:registry", 400, start.elapsed().as_secs_f64());
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": format!("invalid registry={registry}") })),
-        )
-            .into_response();
+        record_metrics(&state, "POST", "/block/:registry", 500, start.elapsed().as_secs_f64());
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Invalid parameter: registry={registry}"),
+        );
     }
 
     let mut store = state.store.lock().await;
@@ -1543,6 +1518,14 @@ async fn api_not_found(State(state): State<AppState>, request: Request) -> Respo
     let route = normalize_path(request.uri().path());
     record_metrics(&state, request.method().as_str(), &route, 404, 0.0);
     (StatusCode::NOT_FOUND, Json(json!({ "message": "Endpoint not found" }))).into_response()
+}
+
+fn text_error_response(status: StatusCode, message: &str) -> Response {
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .body(Body::from(message.to_string()))
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
 async fn request_body_bytes(request: Request, limit: usize) -> Result<Bytes, Response> {

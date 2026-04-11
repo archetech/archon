@@ -67,5 +67,82 @@
     "expectedStatus": 401,
     "compareMode": "json",
     "requiresAdminKey": true
+  },
+  {
+    "name": "queue-invalid-registry",
+    "method": "GET",
+    "path": "/api/v1/queue/mock",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "headers": {
+      "X-Archon-Admin-Key": "test-admin-key"
+    }
+  },
+  {
+    "name": "queue-clear-invalid-registry",
+    "method": "POST",
+    "path": "/api/v1/queue/mock/clear",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "headers": {
+      "content-type": "application/json",
+      "X-Archon-Admin-Key": "test-admin-key"
+    },
+    "body": []
+  },
+  {
+    "name": "block-invalid-registry-latest",
+    "method": "GET",
+    "path": "/api/v1/block/mock/latest",
+    "expectedStatus": 500,
+    "compareMode": "text"
+  },
+  {
+    "name": "batch-import-invalid-payload",
+    "method": "POST",
+    "path": "/api/v1/batch/import",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "headers": {
+      "content-type": "application/json",
+      "X-Archon-Admin-Key": "test-admin-key"
+    },
+    "body": {}
+  },
+  {
+    "name": "batch-import-cids-missing-cids",
+    "method": "POST",
+    "path": "/api/v1/batch/import/cids",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "headers": {
+      "content-type": "application/json",
+      "X-Archon-Admin-Key": "test-admin-key"
+    },
+    "body": {
+      "metadata": {
+        "registry": "local",
+        "time": "2026-04-11T12:00:00Z",
+        "ordinal": [
+          0
+        ]
+      }
+    }
+  },
+  {
+    "name": "batch-import-cids-missing-metadata",
+    "method": "POST",
+    "path": "/api/v1/batch/import/cids",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "headers": {
+      "content-type": "application/json",
+      "X-Archon-Admin-Key": "test-admin-key"
+    },
+    "body": {
+      "cids": [
+        "bafyreicidplaceholder"
+      ]
+    }
   }
 ]
