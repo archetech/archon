@@ -1,7 +1,9 @@
 use std::{
     collections::HashMap,
     env,
+    fs,
     net::{IpAddr, SocketAddr},
+    path::PathBuf,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -16,13 +18,16 @@ use axum::{
     Json, Router,
 };
 use bytes::Bytes;
+use cid::Cid;
+use multihash_codetable::{Code, MultihashDigest};
 use prometheus::{
     Encoder, Gauge, GaugeVec, HistogramOpts, HistogramVec, IntCounterVec, Registry, TextEncoder,
 };
 use reqwest::Client;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
+use tokio::sync::Mutex;
 use tracing::{error, info};
 
 #[derive(Clone)]
@@ -30,6 +35,7 @@ struct AppState {
     config: Config,
     client: Client,
     metrics: Arc<Metrics>,
+    store: Arc<Mutex<JsonDb>>,
     started_at: Instant,
 }
 
@@ -50,6 +56,7 @@ struct Config {
     port: u16,
     bind_address: IpAddr,
     db: String,
+    data_dir: PathBuf,
     ipfs_url: String,
     did_prefix: String,
     registries: Vec<String>,
@@ -86,6 +93,51 @@ struct VersionPayload {
     commit: String,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+struct EventRecord {
+    registry: String,
+    time: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ordinal: Option<Vec<u32>>,
+    operation: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    opid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    did: Option<String>,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+struct JsonDbFile {
+    dids: HashMap<String, Vec<EventRecord>>,
+}
+
+struct JsonDb {
+    path: PathBuf,
+    data: JsonDbFile,
+}
+
+#[derive(Clone, Default)]
+struct ResolveOptions {
+    version_time: Option<String>,
+    version_sequence: Option<usize>,
+    confirm: bool,
+    verify: bool,
+}
+
+struct ResolvedDoc {
+    did_document: Value,
+    did_document_data: Value,
+    did_document_registration: Value,
+    created: String,
+    updated: Option<String>,
+    deleted: Option<String>,
+    version_id: String,
+    version_sequence: usize,
+    confirmed: bool,
+    canonical_id: Option<String>,
+    deactivated: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
@@ -97,11 +149,13 @@ async fn main() -> Result<()> {
         .timeout(Duration::from_secs(120))
         .build()
         .context("failed to create HTTP client")?;
+    let store = Arc::new(Mutex::new(JsonDb::load(&config)?));
 
     let state = AppState {
         config: config.clone(),
         client,
         metrics,
+        store,
         started_at: Instant::now(),
     };
 
@@ -114,11 +168,11 @@ async fn main() -> Result<()> {
                 .route("/version", get(version))
                 .route("/status", get(status))
                 .route("/registries", get(registries))
-                .route("/did", post(not_implemented))
-                .route("/did/generate", post(not_implemented))
+                .route("/did", post(create_did))
+                .route("/did/generate", post(generate_did))
                 .route("/did/:did", get(resolve_did))
-                .route("/dids", post(not_implemented))
-                .route("/dids/", post(not_implemented))
+                .route("/dids", post(list_dids))
+                .route("/dids/", post(list_dids))
                 .route("/dids/remove", post(not_implemented_admin))
                 .route("/dids/export", post(not_implemented))
                 .route("/dids/import", post(not_implemented_admin))
@@ -203,12 +257,136 @@ async fn registries(State(state): State<AppState>) -> impl IntoResponse {
     Json(state.config.registries.clone())
 }
 
+async fn generate_did(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
+    let start = Instant::now();
+    match generate_did_from_operation(&state.config, &payload) {
+        Ok(did) => {
+            record_metrics(&state, "POST", "/did/generate", 200, start.elapsed().as_secs_f64());
+            Json(json!(did)).into_response()
+        }
+        Err(error) => {
+            record_metrics(&state, "POST", "/did/generate", 400, start.elapsed().as_secs_f64());
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": error.to_string() })),
+            )
+                .into_response()
+        }
+    }
+}
+
+async fn create_did(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
+    let start = Instant::now();
+    let op_type = payload
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown")
+        .to_string();
+    let registry = payload
+        .get("registration")
+        .and_then(|v| v.get("registry"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown")
+        .to_string();
+    let result = handle_did_operation(&state, &payload).await;
+
+    match result {
+        Ok(result_value) => {
+            state
+                .metrics
+                .did_operations_total
+                .with_label_values(&[&op_type, &registry, "success"])
+                .inc();
+            record_metrics(&state, "POST", "/did", 200, start.elapsed().as_secs_f64());
+            Json(result_value).into_response()
+        }
+        Err(error) => {
+            state
+                .metrics
+                .did_operations_total
+                .with_label_values(&[&op_type, &registry, "error"])
+                .inc();
+            let status = if error.contains("missing")
+                || error.contains("invalid")
+                || error.contains("previd")
+                || error.contains("not found")
+                || error.contains("unsupported")
+            {
+                StatusCode::BAD_REQUEST
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            record_metrics(&state, "POST", "/did", status.as_u16(), start.elapsed().as_secs_f64());
+            (
+                status,
+                Json(json!({ "error": error.to_string() })),
+            )
+                .into_response()
+        }
+    }
+}
+
+async fn list_dids(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
+    let start = Instant::now();
+    let resolve = payload.get("resolve").and_then(Value::as_bool).unwrap_or(false);
+    let resolve_options = ResolveOptions {
+        version_time: payload.get("versionTime").and_then(Value::as_str).map(ToString::to_string),
+        version_sequence: payload
+            .get("versionSequence")
+            .and_then(Value::as_u64)
+            .and_then(|value| usize::try_from(value).ok()),
+        confirm: payload.get("confirm").and_then(Value::as_bool).unwrap_or(false),
+        verify: payload.get("verify").and_then(Value::as_bool).unwrap_or(false),
+    };
+    let requested = payload
+        .get("dids")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        });
+
+    let store = state.store.lock().await;
+    let dids = store.list_dids(&state.config.did_prefix, requested.as_deref());
+
+    if resolve {
+        let docs = dids
+            .into_iter()
+            .filter_map(|did| store.resolve_doc(&state.config, &did, resolve_options.clone()).ok())
+            .collect::<Vec<_>>();
+        record_metrics(&state, "POST", "/dids/", 200, start.elapsed().as_secs_f64());
+        Json(json!(docs)).into_response()
+    } else {
+        record_metrics(&state, "POST", "/dids/", 200, start.elapsed().as_secs_f64());
+        Json(json!(dids)).into_response()
+    }
+}
+
 async fn resolve_did(
     State(state): State<AppState>,
     Path(did): Path<String>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     let start = Instant::now();
+    let resolve_options = ResolveOptions {
+        version_time: query.get("versionTime").cloned(),
+        version_sequence: query
+            .get("versionSequence")
+            .and_then(|value| value.parse::<usize>().ok()),
+        confirm: query.get("confirm").map(|value| value == "true").unwrap_or(false),
+        verify: query.get("verify").map(|value| value == "true").unwrap_or(false),
+    };
+
+    {
+        let store = state.store.lock().await;
+        if let Ok(doc) = store.resolve_doc(&state.config, &did, resolve_options) {
+            record_metrics(&state, "GET", "/did/:did", 200, start.elapsed().as_secs_f64());
+            return Json(doc).into_response();
+        }
+    }
 
     if state.config.fallback_url.trim().is_empty() {
         record_metrics(&state, "GET", "/did/:did", 404, start.elapsed().as_secs_f64());
@@ -265,6 +443,54 @@ async fn resolve_did(
     builder
         .body(Body::from(body))
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+}
+
+async fn handle_did_operation(state: &AppState, payload: &Value) -> Result<Value, String> {
+    let op_type = payload
+        .get("type")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "missing operation.type".to_string())?;
+
+    let did = match op_type {
+        "create" => generate_did_from_operation(&state.config, payload).map_err(|error| error.to_string())?,
+        "update" | "delete" => payload
+            .get("did")
+            .and_then(Value::as_str)
+            .map(ToString::to_string)
+            .ok_or_else(|| "missing operation.did".to_string())?,
+        _ => return Err(format!("unsupported operation.type={op_type}")),
+    };
+
+    let event_time = payload
+        .get("proof")
+        .and_then(|value| value.get("created"))
+        .and_then(Value::as_str)
+        .or_else(|| payload.get("created").and_then(Value::as_str))
+        .unwrap_or("")
+        .to_string();
+
+    let opid = generate_json_cid(payload).map_err(|error| error.to_string())?;
+    let event = EventRecord {
+        registry: "local".to_string(),
+        time: event_time,
+        ordinal: Some(vec![0]),
+        operation: payload.clone(),
+        opid: Some(opid),
+        did: Some(did.clone()),
+    };
+
+    let mut store = state.store.lock().await;
+    match op_type {
+        "create" => store
+            .add_create_event(&did, event)
+            .map(Value::String)
+            .map_err(|error| error.to_string()),
+        "update" | "delete" => store
+            .add_followup_event(&did, event)
+            .map(Value::Bool)
+            .map_err(|error| error.to_string()),
+        _ => Err(format!("unsupported operation.type={op_type}")),
+    }
 }
 
 async fn ipfs_add_json(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
@@ -659,6 +885,7 @@ impl Config {
             port: env_parse("ARCHON_GATEKEEPER_PORT", 4224)?,
             bind_address: env_parse("ARCHON_BIND_ADDRESS", IpAddr::from([0, 0, 0, 0]))?,
             db: env::var("ARCHON_GATEKEEPER_DB").unwrap_or_else(|_| "redis".to_string()),
+            data_dir: PathBuf::from(env::var("ARCHON_DATA_DIR").unwrap_or_else(|_| "data".to_string())),
             ipfs_url: env::var("ARCHON_IPFS_URL").unwrap_or_else(|_| "http://localhost:5001/api/v0".to_string()),
             did_prefix: env::var("ARCHON_GATEKEEPER_DID_PREFIX").unwrap_or_else(|_| "did:cid".to_string()),
             registries: env::var("ARCHON_GATEKEEPER_REGISTRIES")
@@ -725,4 +952,350 @@ fn url_encode_component(value: &str) -> String {
         }
     }
     encoded
+}
+
+fn generate_did_from_operation(config: &Config, operation: &Value) -> Result<String> {
+    let cid = generate_json_cid(operation)?;
+    let prefix = operation
+        .get("registration")
+        .and_then(|v| v.get("prefix"))
+        .and_then(Value::as_str)
+        .unwrap_or(&config.did_prefix);
+    Ok(format!("{prefix}:{cid}"))
+}
+
+fn generate_json_cid(value: &Value) -> Result<String> {
+    let canonical = canonical_json(value);
+    let hash = Code::Sha2_256.digest(canonical.as_bytes());
+    let cid = Cid::new_v1(0x0200, hash);
+    Ok(cid.to_string())
+}
+
+fn canonical_json(value: &Value) -> String {
+    match value {
+        Value::Null => "null".to_string(),
+        Value::Bool(boolean) => boolean.to_string(),
+        Value::Number(number) => number.to_string(),
+        Value::String(string) => serde_json::to_string(string).unwrap_or_else(|_| "\"\"".to_string()),
+        Value::Array(items) => {
+            let joined = items.iter().map(canonical_json).collect::<Vec<_>>().join(",");
+            format!("[{joined}]")
+        }
+        Value::Object(map) => {
+            let mut entries = map.iter().collect::<Vec<_>>();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            let joined = entries
+                .into_iter()
+                .map(|(key, value)| {
+                    format!(
+                        "{}:{}",
+                        serde_json::to_string(key).unwrap_or_else(|_| "\"\"".to_string()),
+                        canonical_json(value)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{{{joined}}}")
+        }
+    }
+}
+
+impl JsonDb {
+    fn load(config: &Config) -> Result<Self> {
+        let path = config.data_dir.join("archon.json");
+        let data = match fs::read_to_string(&path) {
+            Ok(raw) => serde_json::from_str::<JsonDbFile>(&raw).unwrap_or_default(),
+            Err(_) => JsonDbFile::default(),
+        };
+
+        Ok(Self { path, data })
+    }
+
+    fn save(&self) -> Result<()> {
+        if let Some(parent) = self.path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create {}", parent.display()))?;
+        }
+
+        let body = serde_json::to_string_pretty(&self.data).context("failed to encode db")?;
+        fs::write(&self.path, body).with_context(|| format!("failed to write {}", self.path.display()))
+    }
+
+    fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?
+            .to_string();
+
+        let events = self.data.dids.entry(suffix).or_default();
+        if events.is_empty() {
+            events.push(event);
+            self.save()?;
+        }
+        Ok(did.to_string())
+    }
+
+    fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> {
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?
+            .to_string();
+
+        let latest = self.resolve_doc(
+            &Config {
+                port: 0,
+                bind_address: IpAddr::from([0, 0, 0, 0]),
+                db: String::new(),
+                data_dir: PathBuf::new(),
+                ipfs_url: String::new(),
+                did_prefix: String::new(),
+                registries: vec![],
+                json_limit: 0,
+                upload_limit: 0,
+                gc_interval_minutes: 0,
+                status_interval_minutes: 0,
+                admin_api_key: String::new(),
+                fallback_url: String::new(),
+                fallback_timeout_ms: 0,
+                git_commit: String::new(),
+                version: String::new(),
+            },
+            did,
+            ResolveOptions::default(),
+        )?;
+
+        let events = self
+            .data
+            .dids
+            .get_mut(&suffix)
+            .context("did not found")?;
+
+        if events.is_empty() {
+            anyhow::bail!("did not found");
+        }
+
+        let previd = event
+            .operation
+            .get("previd")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow::anyhow!("missing operation.previd"))?;
+        let current_version_id = latest
+            .get("didDocumentMetadata")
+            .and_then(|value| value.get("versionId"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow::anyhow!("missing current versionId"))?;
+
+        if previd != current_version_id {
+            anyhow::bail!("invalid previd");
+        }
+
+        events.push(event);
+        self.save()?;
+        Ok(true)
+    }
+
+    fn list_dids(&self, prefix: &str, requested: Option<&[String]>) -> Vec<String> {
+        match requested {
+            Some(items) => items.to_vec(),
+            None => {
+                let mut keys = self.data.dids.keys().cloned().collect::<Vec<_>>();
+                keys.sort();
+                keys.into_iter().map(|suffix| format!("{prefix}:{suffix}")).collect()
+            }
+        }
+    }
+
+    fn resolve_doc(&self, _config: &Config, did: &str, options: ResolveOptions) -> Result<Value> {
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?;
+        let events = self
+            .data
+            .dids
+            .get(suffix)
+            .context("did not found")?;
+        let anchor = events.first().context("did has no events")?;
+        let anchor_operation = &anchor.operation;
+
+        if anchor_operation.get("type").and_then(Value::as_str) != Some("create") {
+            anyhow::bail!("first operation must be create");
+        }
+
+        let registration = anchor_operation
+            .get("registration")
+            .and_then(Value::as_object)
+            .context("missing registration")?;
+        let did_type = registration
+            .get("type")
+            .and_then(Value::as_str)
+            .context("missing registration.type")?;
+        let created = anchor_operation
+            .get("created")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+
+        let initial_document = match did_type {
+            "agent" => {
+                let public_jwk = anchor_operation.get("publicJwk").cloned().unwrap_or_else(|| json!({}));
+                json!({
+                    "@context": ["https://www.w3.org/ns/did/v1"],
+                    "id": did,
+                    "verificationMethod": [{
+                        "id": "#key-1",
+                        "controller": did,
+                        "type": "EcdsaSecp256k1VerificationKey2019",
+                        "publicKeyJwk": public_jwk
+                    }],
+                    "authentication": ["#key-1"],
+                    "assertionMethod": ["#key-1"]
+                })
+            }
+            "asset" => {
+                json!({
+                    "@context": ["https://www.w3.org/ns/did/v1"],
+                    "id": did,
+                    "controller": anchor_operation.get("controller").cloned().unwrap_or(Value::Null)
+                })
+            }
+            _ => anyhow::bail!("unsupported registration.type"),
+        };
+
+        let canonical_id = anchor_operation
+            .get("registration")
+            .and_then(|v| v.get("prefix"))
+            .and_then(Value::as_str)
+            .map(|_| did.to_string());
+
+        let mut state = ResolvedDoc {
+            did_document: initial_document,
+            did_document_data: anchor_operation.get("data").cloned().unwrap_or_else(|| json!({})),
+            did_document_registration: {
+                let mut value = Value::Object(registration.clone());
+                if value.get("created").is_none() {
+                    value["created"] = Value::String(created.to_string());
+                }
+                value
+            },
+            created: created.to_string(),
+            updated: None,
+            deleted: None,
+            version_id: anchor
+                .opid
+                .clone()
+                .unwrap_or_else(|| generate_json_cid(anchor_operation).unwrap_or_default()),
+            version_sequence: 1,
+            confirmed: true,
+            canonical_id,
+            deactivated: false,
+        };
+
+        for event in events.iter().skip(1) {
+            let operation = &event.operation;
+            let operation_time = event.time.clone();
+
+            if let Some(version_time) = options.version_time.as_ref() {
+                if operation_time > *version_time {
+                    break;
+                }
+            }
+
+            if let Some(version_sequence) = options.version_sequence {
+                if state.version_sequence == version_sequence {
+                    break;
+                }
+            }
+
+            if options.confirm && !state.confirmed {
+                break;
+            }
+
+            if options.verify {
+                // Signature verification is not yet ported; local event-chain semantics still apply.
+            }
+
+            state.confirmed = state.confirmed
+                && state
+                    .did_document_registration
+                    .get("registry")
+                    .and_then(Value::as_str)
+                    .map(|registry| registry == event.registry)
+                    .unwrap_or(false);
+
+            match operation.get("type").and_then(Value::as_str) {
+                Some("update") => {
+                    state.version_sequence += 1;
+                    state.version_id = event
+                        .opid
+                        .clone()
+                        .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
+                    state.updated = Some(operation_time);
+                    if let Some(next_doc) = operation.get("doc") {
+                        if let Some(doc) = next_doc.get("didDocument") {
+                            state.did_document = doc.clone();
+                        }
+                        if let Some(data) = next_doc.get("didDocumentData") {
+                            state.did_document_data = data.clone();
+                        }
+                        if let Some(registration) = next_doc.get("didDocumentRegistration") {
+                            state.did_document_registration = registration.clone();
+                        }
+                    }
+                    state.deactivated = false;
+                }
+                Some("delete") => {
+                    state.version_sequence += 1;
+                    state.version_id = event
+                        .opid
+                        .clone()
+                        .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
+                    state.deleted = Some(operation_time.clone());
+                    state.updated = Some(operation_time);
+                    state.did_document = json!({ "id": did });
+                    state.did_document_data = json!({});
+                    state.deactivated = true;
+                }
+                _ => {}
+            }
+        }
+
+        let mut metadata = json!({
+            "created": state.created,
+            "versionId": state.version_id,
+            "versionSequence": state.version_sequence.to_string(),
+            "confirmed": state.confirmed
+        });
+
+        if let Some(updated) = state.updated.clone() {
+            metadata["updated"] = Value::String(updated);
+        }
+        if let Some(deleted) = state.deleted.clone() {
+            metadata["deleted"] = Value::String(deleted);
+        }
+        if state.deactivated {
+            metadata["deactivated"] = Value::Bool(true);
+        }
+        if let Some(canonical_id) = state.canonical_id.clone() {
+            metadata["canonicalId"] = Value::String(canonical_id);
+        }
+
+        Ok(json!({
+            "didDocument": state.did_document,
+            "didDocumentMetadata": metadata,
+            "didDocumentData": state.did_document_data,
+            "didDocumentRegistration": state.did_document_registration,
+            "didResolutionMetadata": {
+                "retrieved": chrono_like_now()
+            }
+        }))
+    }
+}
+
+fn chrono_like_now() -> String {
+    use std::time::SystemTime;
+    let now = SystemTime::now();
+    let datetime: chrono::DateTime<chrono::Utc> = now.into();
+    datetime.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
