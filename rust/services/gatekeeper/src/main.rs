@@ -112,7 +112,8 @@ struct EventRecord {
     registry: String,
     time: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    ordinal: Option<Vec<u32>>,
+    ordinal: Option<Vec<u64>>,
+    #[serde(default, skip_serializing_if = "Value::is_null")]
     operation: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     opid: Option<String>,
@@ -142,7 +143,7 @@ struct JsonDb {
 enum DbBackend {
     JsonFile { path: PathBuf },
     Sqlite { path: PathBuf },
-    Redis { url: String, key: String },
+    Redis { url: String, namespace: String },
     Mongo {
         url: String,
         database: String,
@@ -1763,7 +1764,7 @@ fn is_valid_registry(registry: &str) -> bool {
     )
 }
 
-fn compare_ordinals(left: Option<&Vec<u32>>, right: Option<&Vec<u32>>) -> std::cmp::Ordering {
+fn compare_ordinals(left: Option<&Vec<u64>>, right: Option<&Vec<u64>>) -> std::cmp::Ordering {
     match (left, right) {
         (Some(left), Some(right)) => {
             for (l, r) in left.iter().zip(right.iter()) {
@@ -2481,7 +2482,6 @@ fn value_to_event_record(value: &Value) -> EventRecord {
                 values
                     .iter()
                     .filter_map(Value::as_u64)
-                    .filter_map(|item| u32::try_from(item).ok())
                     .collect::<Vec<_>>()
             })
         }),
@@ -3628,7 +3628,7 @@ impl DbBackend {
             },
             "redis" => Self::Redis {
                 url: env::var("ARCHON_REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string()),
-                key: "gatekeeper:archon:state".to_string(),
+                namespace: "archon".to_string(),
             },
             "mongodb" => Self::Mongo {
                 url: env::var("ARCHON_MONGODB_URL").unwrap_or_else(|_| "mongodb://localhost:27017".to_string()),
@@ -3659,14 +3659,10 @@ impl DbBackend {
                     None => Ok(JsonDbFile::default()),
                 }
             }
-            Self::Redis { url, key } => {
+            Self::Redis { url, namespace } => {
                 let client = redis::Client::open(url.as_str()).context("failed to open redis client")?;
                 let mut conn = client.get_connection().context("failed to connect to redis")?;
-                let raw: Option<String> = conn.get(key).context("failed to load redis state")?;
-                match raw {
-                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode redis state"),
-                    None => Ok(JsonDbFile::default()),
-                }
+                Self::load_redis_state(&mut conn, namespace)
             }
             Self::Mongo {
                 url,
@@ -3708,10 +3704,10 @@ impl DbBackend {
                 .context("failed to persist sqlite state")?;
                 Ok(())
             }
-            Self::Redis { url, key } => {
+            Self::Redis { url, namespace } => {
                 let client = redis::Client::open(url.as_str()).context("failed to open redis client")?;
                 let mut conn = client.get_connection().context("failed to connect to redis")?;
-                let _: () = conn.set(key, body).context("failed to persist redis state")?;
+                Self::save_redis_state(&mut conn, namespace, data)?;
                 Ok(())
             }
             Self::Mongo {
@@ -3751,6 +3747,187 @@ impl DbBackend {
         )
         .context("failed to initialize sqlite schema")?;
         Ok(conn)
+    }
+
+    fn load_redis_state(
+        conn: &mut redis::Connection,
+        namespace: &str,
+    ) -> Result<JsonDbFile> {
+        let did_keys: Vec<String> = conn
+            .keys(format!("{namespace}/dids/*"))
+            .context("failed to scan redis did keys")?;
+        let op_keys: Vec<String> = conn
+            .keys(format!("{namespace}/ops/*"))
+            .context("failed to scan redis op keys")?;
+        let queue_keys: Vec<String> = conn
+            .keys(format!("{namespace}/registry/*/queue"))
+            .context("failed to scan redis queue keys")?;
+        let block_keys: Vec<String> = conn
+            .keys(format!("{namespace}/registry/*/blocks/*"))
+            .context("failed to scan redis block keys")?;
+
+        let mut data = JsonDbFile::default();
+
+        for key in op_keys {
+            let Some(opid) = key.rsplit('/').next() else {
+                continue;
+            };
+            let raw: Option<String> = conn.get(&key).with_context(|| format!("failed to load redis op {key}"))?;
+            if let Some(raw) = raw {
+                let operation = serde_json::from_str::<Value>(&raw)
+                    .with_context(|| format!("failed to decode redis op {key}"))?;
+                data.ops.insert(opid.to_string(), operation);
+            }
+        }
+
+        for key in did_keys {
+            let Some(suffix) = key.rsplit('/').next() else {
+                continue;
+            };
+            let raw_events: Vec<String> = conn
+                .lrange(&key, 0, -1)
+                .with_context(|| format!("failed to load redis did events {key}"))?;
+            let mut events = Vec::with_capacity(raw_events.len());
+            for raw in raw_events {
+                let mut event = serde_json::from_str::<EventRecord>(&raw)
+                    .with_context(|| format!("failed to decode redis did event {key}"))?;
+                if event.operation.is_null() {
+                    if let Some(opid) = event.opid.as_ref() {
+                        if let Some(operation) = data.ops.get(opid) {
+                            event.operation = operation.clone();
+                        }
+                    }
+                }
+                events.push(event);
+            }
+            data.dids.insert(suffix.to_string(), events);
+        }
+
+        for key in queue_keys {
+            let segments = key.split('/').collect::<Vec<_>>();
+            if segments.len() < 4 {
+                continue;
+            }
+            let registry = segments[2].to_string();
+            let raw_ops: Vec<String> = conn
+                .lrange(&key, 0, -1)
+                .with_context(|| format!("failed to load redis queue {key}"))?;
+            let mut ops = Vec::with_capacity(raw_ops.len());
+            for raw in raw_ops {
+                ops.push(
+                    serde_json::from_str::<Value>(&raw)
+                        .with_context(|| format!("failed to decode redis queue item {key}"))?,
+                );
+            }
+            data.queue.insert(registry, ops);
+        }
+
+        for key in block_keys {
+            let segments = key.split('/').collect::<Vec<_>>();
+            if segments.len() < 5 {
+                continue;
+            }
+            let registry = segments[2].to_string();
+            let hash = segments[4].to_string();
+            let raw: Option<String> = conn
+                .get(&key)
+                .with_context(|| format!("failed to load redis block {key}"))?;
+            if let Some(raw) = raw {
+                let block = serde_json::from_str::<Value>(&raw)
+                    .with_context(|| format!("failed to decode redis block {key}"))?;
+                data.blocks.entry(registry).or_default().insert(hash, block);
+            }
+        }
+
+        let import_queue_key = format!("{namespace}/import_queue");
+        let raw_import_events: Vec<String> = conn
+            .lrange(&import_queue_key, 0, -1)
+            .context("failed to load redis import queue")?;
+        for raw in raw_import_events {
+            data.import_queue.push(
+                serde_json::from_str::<EventRecord>(&raw)
+                    .context("failed to decode redis import queue event")?,
+            );
+        }
+
+        Ok(data)
+    }
+
+    fn save_redis_state(
+        conn: &mut redis::Connection,
+        namespace: &str,
+        data: &JsonDbFile,
+    ) -> Result<()> {
+        let existing_keys: Vec<String> = conn
+            .keys(format!("{namespace}/*"))
+            .context("failed to scan redis namespace for persist")?;
+        if !existing_keys.is_empty() {
+            let _: usize = conn
+                .del(existing_keys)
+                .context("failed to clear redis namespace before persist")?;
+        }
+
+        for (opid, operation) in &data.ops {
+            let key = format!("{namespace}/ops/{opid}");
+            let body = serde_json::to_string(operation).context("failed to encode redis operation")?;
+            let _: () = conn.set(key, body).context("failed to persist redis operation")?;
+        }
+
+        for (suffix, events) in &data.dids {
+            let key = format!("{namespace}/dids/{suffix}");
+            for event in events {
+                let mut stored = serde_json::to_value(event).context("failed to encode redis did event")?;
+                if event.opid.is_some() {
+                    if let Some(object) = stored.as_object_mut() {
+                        object.remove("operation");
+                    }
+                }
+                let body = serde_json::to_string(&stored).context("failed to serialize redis did event")?;
+                let _: usize = conn.rpush(&key, body).context("failed to persist redis did event")?;
+            }
+        }
+
+        for (registry, operations) in &data.queue {
+            let key = format!("{namespace}/registry/{registry}/queue");
+            for operation in operations {
+                let body = serde_json::to_string(operation).context("failed to encode redis queue item")?;
+                let _: usize = conn.rpush(&key, body).context("failed to persist redis queue item")?;
+            }
+        }
+
+        for (registry, blocks) in &data.blocks {
+            let mut max_height: Option<u64> = None;
+            for (hash, block) in blocks {
+                let block_key = format!("{namespace}/registry/{registry}/blocks/{hash}");
+                let body = serde_json::to_string(block).context("failed to encode redis block")?;
+                let _: () = conn.set(&block_key, body).context("failed to persist redis block")?;
+
+                if let Some(height) = block.get("height").and_then(Value::as_u64) {
+                    let height_map_key = format!("{namespace}/registry/{registry}/heightMap");
+                    let _: usize = conn
+                        .hset(&height_map_key, height.to_string(), hash)
+                        .context("failed to persist redis block height map")?;
+                    max_height = Some(max_height.map_or(height, |current| current.max(height)));
+                }
+            }
+
+            if let Some(height) = max_height {
+                let max_height_key = format!("{namespace}/registry/{registry}/maxHeight");
+                let _: () = conn
+                    .set(max_height_key, height.to_string())
+                    .context("failed to persist redis max height")?;
+            }
+        }
+
+        let import_queue_key = format!("{namespace}/import_queue");
+        for event in &data.import_queue {
+            let body = serde_json::to_string(event).context("failed to encode redis import queue event")?;
+            let _: usize = conn
+                .rpush(&import_queue_key, body)
+                .context("failed to persist redis import queue event")?;
+        }
+
+        Ok(())
     }
 }
 
