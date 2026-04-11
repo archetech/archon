@@ -238,6 +238,28 @@ pub async fn run() -> Result<()> {
     init_tracing();
 
     let config = Config::from_env()?;
+    let state = build_state(config.clone())?;
+    let app = build_router(state.clone());
+
+    refresh_metrics_snapshot(&state).await;
+    start_background_tasks(state.clone());
+
+    let listener = TcpListener::bind(SocketAddr::new(config.bind_address, config.port))
+        .await
+        .with_context(|| format!("failed to bind {}:{}", config.bind_address, config.port))?;
+
+    info!(
+        port = config.port,
+        bind_address = %config.bind_address,
+        db = %config.db,
+        "Native Rust Gatekeeper listening"
+    );
+
+    axum::serve(listener, app).await.context("server failed")?;
+    Ok(())
+}
+
+fn build_state(config: Config) -> Result<AppState> {
     let metrics = Arc::new(Metrics::new(&config)?);
     let client = Client::builder()
         .timeout(Duration::from_secs(120))
@@ -245,7 +267,7 @@ pub async fn run() -> Result<()> {
         .context("failed to create HTTP client")?;
     let store = Arc::new(Mutex::new(JsonDb::load(&config)?));
 
-    let state = AppState {
+    Ok(AppState {
         config: config.clone(),
         client,
         metrics,
@@ -255,9 +277,11 @@ pub async fn run() -> Result<()> {
         supported_registries: Arc::new(Mutex::new(config.registries.clone())),
         processing_events: Arc::new(Mutex::new(false)),
         started_at: Instant::now(),
-    };
+    })
+}
 
-    let app = Router::new()
+fn build_router(state: AppState) -> Router {
+    Router::new()
         .route("/metrics", get(get_metrics))
         .nest(
             "/api/v1",
@@ -298,24 +322,7 @@ pub async fn run() -> Result<()> {
         )
         .nest("/api", Router::new().fallback(api_not_found))
         .fallback(not_found)
-        .with_state(state.clone());
-
-    refresh_metrics_snapshot(&state).await;
-    start_background_tasks(state.clone());
-
-    let listener = TcpListener::bind(SocketAddr::new(config.bind_address, config.port))
-        .await
-        .with_context(|| format!("failed to bind {}:{}", config.bind_address, config.port))?;
-
-    info!(
-        port = config.port,
-        bind_address = %config.bind_address,
-        db = %config.db,
-        "Native Rust Gatekeeper listening"
-    );
-
-    axum::serve(listener, app).await.context("server failed")?;
-    Ok(())
+        .with_state(state)
 }
 
 async fn ready(State(state): State<AppState>) -> impl IntoResponse {
