@@ -51,7 +51,7 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 
 - [x] Add a native JSON-backed storage foundation.
 - [ ] Define a Rust storage trait equivalent to `GatekeeperDb`.
-- [ ] Port JSON storage behavior fully, including operations table and queue/block storage.
+- [x] Port JSON storage behavior fully, including operations table and queue/block storage.
 - [ ] Port JSON-cache behavior if still needed.
 - [ ] Port Redis backend.
 - [ ] Port SQLite backend.
@@ -86,37 +86,37 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [ ] Match `updatedAfter` filtering.
 - [ ] Match `updatedBefore` filtering.
 - [ ] Match local `resolve`, `confirm`, and `verify` options in DID listing.
-- [ ] Port `exportDID`.
-- [ ] Port `exportDIDs`.
-- [ ] Port `importDIDs`.
+- [x] Port `exportDID`.
+- [x] Port `exportDIDs`.
+- [x] Port `importDIDs`.
 - [ ] Port `removeDIDs`.
 
 ## Event import and processing
 
 - [ ] Port `verifyOperation`.
-- [ ] Port `importEvent`.
-- [ ] Port `importEvents`.
-- [ ] Port `importBatch`.
-- [ ] Port `importBatchByCids`.
-- [ ] Port `processEvents`.
-- [ ] Preserve added/merged/rejected/deferred behavior.
-- [ ] Preserve reorg handling and ordinal comparison behavior.
+- [x] Port `importEvent`.
+- [x] Port `importEvents`.
+- [x] Port `importBatch`.
+- [x] Port `importBatchByCids`.
+- [x] Port `processEvents`.
+- [x] Preserve added/merged/rejected/deferred behavior.
+- [x] Preserve reorg handling and ordinal comparison behavior.
 
 ## Queue behavior
 
-- [ ] Port `queueOperation`.
-- [ ] Port `getQueue`.
-- [ ] Port `clearQueue`.
-- [ ] Preserve `local` and `hyperswarm` queue behavior.
-- [ ] Preserve max-queue-size effects on supported registries.
+- [x] Port `queueOperation`.
+- [x] Port `getQueue`.
+- [x] Port `clearQueue`.
+- [x] Preserve `local` and `hyperswarm` queue behavior.
+- [x] Preserve max-queue-size effects on supported registries.
 
 ## Block handling
 
-- [ ] Port `addBlock`.
-- [ ] Port `getBlock`.
-- [ ] Preserve latest-block selection behavior.
-- [ ] Preserve hash and numeric-height lookups.
-- [ ] Preserve timestamp metadata generation used by DID resolution.
+- [x] Port `addBlock`.
+- [x] Port `getBlock`.
+- [x] Preserve latest-block selection behavior.
+- [x] Preserve hash and numeric-height lookups.
+- [x] Preserve timestamp metadata generation used by DID resolution.
 
 ## Search and structured query
 
@@ -184,5 +184,5 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 ## Recommended implementation order
 
 - [x] Phase 1: full create/update/delete event chains and local DID resolution parity.
-- [ ] Phase 2: import/export, event processing, queue, and block behavior.
+- [x] Phase 2: import/export, event processing, queue, and block behavior.
 - [ ] Phase 3: search/query, maintenance loops, backend parity, and final container cutover.

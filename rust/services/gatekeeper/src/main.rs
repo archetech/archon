@@ -36,6 +36,9 @@ struct AppState {
     client: Client,
     metrics: Arc<Metrics>,
     store: Arc<Mutex<JsonDb>>,
+    events_seen: Arc<Mutex<HashMap<String, bool>>>,
+    supported_registries: Arc<Mutex<Vec<String>>>,
+    processing_events: Arc<Mutex<bool>>,
     started_at: Instant,
 }
 
@@ -67,6 +70,7 @@ struct Config {
     admin_api_key: String,
     fallback_url: String,
     fallback_timeout_ms: u64,
+    max_queue_size: usize,
     git_commit: String,
     version: String,
 }
@@ -109,6 +113,14 @@ struct EventRecord {
 #[derive(Default, Serialize, Deserialize)]
 struct JsonDbFile {
     dids: HashMap<String, Vec<EventRecord>>,
+    #[serde(default)]
+    import_queue: Vec<EventRecord>,
+    #[serde(default)]
+    queue: HashMap<String, Vec<Value>>,
+    #[serde(default)]
+    blocks: HashMap<String, HashMap<String, Value>>,
+    #[serde(default)]
+    ops: HashMap<String, Value>,
 }
 
 struct JsonDb {
@@ -138,6 +150,42 @@ struct ResolvedDoc {
     deactivated: bool,
 }
 
+#[derive(Serialize)]
+struct ImportBatchResult {
+    queued: usize,
+    processed: usize,
+    rejected: usize,
+    total: usize,
+}
+
+#[derive(Serialize)]
+struct ImportEventsResult {
+    added: usize,
+    merged: usize,
+    rejected: usize,
+}
+
+#[derive(Serialize)]
+struct ProcessEventsResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    busy: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    added: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    merged: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rejected: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pending: Option<usize>,
+}
+
+enum ImportStatus {
+    Added,
+    Merged,
+    Rejected,
+    Deferred,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
@@ -156,6 +204,9 @@ async fn main() -> Result<()> {
         client,
         metrics,
         store,
+        events_seen: Arc::new(Mutex::new(HashMap::new())),
+        supported_registries: Arc::new(Mutex::new(config.registries.clone())),
+        processing_events: Arc::new(Mutex::new(false)),
         started_at: Instant::now(),
     };
 
@@ -174,16 +225,16 @@ async fn main() -> Result<()> {
                 .route("/dids", post(list_dids))
                 .route("/dids/", post(list_dids))
                 .route("/dids/remove", post(not_implemented_admin))
-                .route("/dids/export", post(not_implemented))
-                .route("/dids/import", post(not_implemented_admin))
-                .route("/batch/export", post(not_implemented_admin))
-                .route("/batch/import", post(not_implemented_admin))
-                .route("/batch/import/cids", post(not_implemented_admin))
-                .route("/queue/:registry", get(not_implemented_admin))
-                .route("/queue/:registry/clear", post(not_implemented_admin))
+                .route("/dids/export", post(export_dids))
+                .route("/dids/import", post(import_dids))
+                .route("/batch/export", post(export_batch))
+                .route("/batch/import", post(import_batch))
+                .route("/batch/import/cids", post(import_batch_by_cids))
+                .route("/queue/:registry", get(get_queue))
+                .route("/queue/:registry/clear", post(clear_queue))
                 .route("/db/reset", get(not_implemented_admin))
                 .route("/db/verify", get(not_implemented_admin))
-                .route("/events/process", post(not_implemented_admin))
+                .route("/events/process", post(process_events_route))
                 .route("/ipfs/json", post(ipfs_add_json))
                 .route("/ipfs/json/:cid", get(ipfs_get_json))
                 .route("/ipfs/text", post(ipfs_add_text))
@@ -192,9 +243,9 @@ async fn main() -> Result<()> {
                 .route("/ipfs/data/:cid", get(ipfs_get_data))
                 .route("/ipfs/stream", post(ipfs_add_stream))
                 .route("/ipfs/stream/:cid", get(ipfs_get_stream))
-                .route("/block/:registry/latest", get(not_implemented))
-                .route("/block/:registry/:blockId", get(not_implemented))
-                .route("/block/:registry", post(not_implemented_admin))
+                .route("/block/:registry/latest", get(get_latest_block))
+                .route("/block/:registry/:blockId", get(get_block_by_id))
+                .route("/block/:registry", post(add_block))
                 .route("/search", get(not_implemented))
                 .route("/query", post(not_implemented)),
         )
@@ -254,7 +305,7 @@ async fn status(State(state): State<AppState>) -> impl IntoResponse {
 
 async fn registries(State(state): State<AppState>) -> impl IntoResponse {
     record_metrics(&state, "GET", "/registries", 200, 0.0);
-    Json(state.config.registries.clone())
+    Json(state.supported_registries.lock().await.clone())
 }
 
 async fn generate_did(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
@@ -363,6 +414,360 @@ async fn list_dids(State(state): State<AppState>, Json(payload): Json<Value>) ->
         record_metrics(&state, "POST", "/dids/", 200, start.elapsed().as_secs_f64());
         Json(json!(dids)).into_response()
     }
+}
+
+async fn export_dids(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
+    let start = Instant::now();
+    let requested = payload.get("dids").and_then(Value::as_array).map(|items| {
+        items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+    });
+
+    let store = state.store.lock().await;
+    let dids = store.list_dids(&state.config.did_prefix, requested.as_deref());
+    let batch = dids
+        .iter()
+        .map(|did| store.get_events(did))
+        .collect::<Vec<_>>();
+
+    record_metrics(&state, "POST", "/dids/export", 200, start.elapsed().as_secs_f64());
+    Json(json!(batch)).into_response()
+}
+
+async fn import_dids(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+
+    let did_batches = match payload.as_array() {
+        Some(items) => items,
+        None => {
+            record_metrics(&state, "POST", "/dids/import", 400, start.elapsed().as_secs_f64());
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid did import payload" })),
+            )
+                .into_response();
+        }
+    };
+
+    let flat_batch = did_batches
+        .iter()
+        .filter_map(Value::as_array)
+        .flat_map(|events| events.iter().cloned())
+        .collect::<Vec<_>>();
+
+    let result = import_batch_impl(&state, &flat_batch).await;
+    record_metrics(&state, "POST", "/dids/import", 200, start.elapsed().as_secs_f64());
+    Json(json!(result)).into_response()
+}
+
+async fn export_batch(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+
+    let requested = payload.get("dids").and_then(Value::as_array).map(|items| {
+        items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+    });
+
+    let store = state.store.lock().await;
+    let dids = store.list_dids(&state.config.did_prefix, requested.as_deref());
+    let mut events = Vec::new();
+    for did in dids {
+        let did_events = store.get_events(&did);
+        if let Some(create) = did_events.first() {
+            let registry = create
+                .operation
+                .get("registration")
+                .and_then(|value| value.get("registry"))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            if registry != "local" {
+                events.extend(did_events);
+            }
+        }
+    }
+
+    events.sort_by(|a, b| {
+        let left = a
+            .operation
+            .get("proof")
+            .and_then(|value| value.get("created"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let right = b
+            .operation
+            .get("proof")
+            .and_then(|value| value.get("created"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        left.cmp(right)
+    });
+
+    record_metrics(&state, "POST", "/batch/export", 200, start.elapsed().as_secs_f64());
+    Json(json!(events)).into_response()
+}
+
+async fn import_batch(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+
+    let batch = match payload.as_array() {
+        Some(items) => items.iter().cloned().collect::<Vec<_>>(),
+        None => {
+            record_metrics(&state, "POST", "/batch/import", 400, start.elapsed().as_secs_f64());
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid batch payload" })),
+            )
+                .into_response();
+        }
+    };
+
+    let result = import_batch_impl(&state, &batch).await;
+    record_metrics(&state, "POST", "/batch/import", 200, start.elapsed().as_secs_f64());
+    Json(json!(result)).into_response()
+}
+
+async fn import_batch_by_cids(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+
+    let cids = match payload.get("cids").and_then(Value::as_array) {
+        Some(items) if !items.is_empty() => items,
+        _ => {
+            record_metrics(&state, "POST", "/batch/import/cids", 400, start.elapsed().as_secs_f64());
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid cids payload" })),
+            )
+                .into_response();
+        }
+    };
+    let metadata = match payload.get("metadata") {
+        Some(value) if value.is_object() => value,
+        _ => {
+            record_metrics(&state, "POST", "/batch/import/cids", 400, start.elapsed().as_secs_f64());
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid metadata payload" })),
+            )
+                .into_response();
+        }
+    };
+
+    let mut batch = Vec::new();
+    for (index, cid) in cids.iter().filter_map(Value::as_str).enumerate() {
+        let mut operation = {
+            let store = state.store.lock().await;
+            store.get_operation(cid)
+        };
+
+        if operation.is_none() {
+            operation = fetch_ipfs_json(&state, cid).await;
+            if let Some(op) = operation.as_ref() {
+                let mut store = state.store.lock().await;
+                if let Err(error) = store.add_operation(cid, op.clone()) {
+                    error!("failed to persist imported operation {cid}: {error}");
+                }
+            }
+        }
+
+        if let Some(operation) = operation {
+            let ordinal = metadata
+                .get("ordinal")
+                .and_then(Value::as_array)
+                .map(|items| {
+                    let mut values = items
+                        .iter()
+                        .filter_map(Value::as_u64)
+                        .filter_map(|value| u32::try_from(value).ok())
+                        .collect::<Vec<_>>();
+                    values.push(index as u32);
+                    values
+                })
+                .unwrap_or_else(|| vec![index as u32]);
+
+            batch.push(json!({
+                "registry": metadata.get("registry").cloned().unwrap_or(Value::String("hyperswarm".to_string())),
+                "time": metadata.get("time").cloned().unwrap_or(Value::String(chrono_like_now())),
+                "ordinal": ordinal,
+                "operation": operation,
+                "opid": cid,
+                "registration": metadata.get("registration").cloned().unwrap_or(Value::Null)
+            }));
+        }
+    }
+
+    let result = import_batch_impl(&state, &batch).await;
+    record_metrics(&state, "POST", "/batch/import/cids", 200, start.elapsed().as_secs_f64());
+    Json(json!(result)).into_response()
+}
+
+async fn get_queue(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(registry): Path<String>,
+) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+    if !is_valid_registry(&registry) {
+        record_metrics(&state, "GET", "/queue/:registry", 400, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("invalid registry={registry}") })),
+        )
+            .into_response();
+    }
+
+    {
+        let mut supported = state.supported_registries.lock().await;
+        if !supported.contains(&registry) {
+            supported.push(registry.clone());
+        }
+    }
+
+    let store = state.store.lock().await;
+    let queue = store.get_queue(&registry);
+    record_metrics(&state, "GET", "/queue/:registry", 200, start.elapsed().as_secs_f64());
+    Json(json!(queue)).into_response()
+}
+
+async fn clear_queue(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(registry): Path<String>,
+    Json(payload): Json<Value>,
+) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+    if !is_valid_registry(&registry) {
+        record_metrics(&state, "POST", "/queue/:registry/clear", 400, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("invalid registry={registry}") })),
+        )
+            .into_response();
+    }
+
+    let events = payload.as_array().cloned().unwrap_or_default();
+    let operations = events
+        .into_iter()
+        .filter(|value| value.is_object())
+        .collect::<Vec<_>>();
+
+    let mut store = state.store.lock().await;
+    let ok = store.clear_queue(&registry, &operations).is_ok();
+    record_metrics(&state, "POST", "/queue/:registry/clear", 200, start.elapsed().as_secs_f64());
+    Json(json!(ok)).into_response()
+}
+
+async fn process_events_route(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+
+    let result = process_events_impl(&state).await;
+    record_metrics(&state, "POST", "/events/process", 200, start.elapsed().as_secs_f64());
+    Json(json!(result)).into_response()
+}
+
+async fn get_latest_block(State(state): State<AppState>, Path(registry): Path<String>) -> Response {
+    let start = Instant::now();
+    if !is_valid_registry(&registry) {
+        record_metrics(&state, "GET", "/block/:registry/latest", 400, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("invalid registry={registry}") })),
+        )
+            .into_response();
+    }
+
+    let store = state.store.lock().await;
+    let block = store.get_block(&registry, None);
+    record_metrics(&state, "GET", "/block/:registry/latest", 200, start.elapsed().as_secs_f64());
+    Json(json!(block)).into_response()
+}
+
+async fn get_block_by_id(
+    State(state): State<AppState>,
+    Path((registry, block_id)): Path<(String, String)>,
+) -> Response {
+    let start = Instant::now();
+    if !is_valid_registry(&registry) {
+        record_metrics(&state, "GET", "/block/:registry/:blockId", 400, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("invalid registry={registry}") })),
+        )
+            .into_response();
+    }
+
+    let block_key = block_id.parse::<u64>().ok().map(BlockLookup::Height).unwrap_or(BlockLookup::Hash(block_id));
+    let store = state.store.lock().await;
+    let block = store.get_block(&registry, Some(block_key));
+    record_metrics(&state, "GET", "/block/:registry/:blockId", 200, start.elapsed().as_secs_f64());
+    Json(json!(block)).into_response()
+}
+
+async fn add_block(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(registry): Path<String>,
+    Json(payload): Json<Value>,
+) -> Response {
+    let start = Instant::now();
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+    if !is_valid_registry(&registry) {
+        record_metrics(&state, "POST", "/block/:registry", 400, start.elapsed().as_secs_f64());
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("invalid registry={registry}") })),
+        )
+            .into_response();
+    }
+
+    let mut store = state.store.lock().await;
+    let ok = store.add_block(&registry, payload).is_ok();
+    record_metrics(&state, "POST", "/block/:registry", 200, start.elapsed().as_secs_f64());
+    Json(json!(ok)).into_response()
 }
 
 async fn resolve_did(
@@ -479,18 +884,45 @@ async fn handle_did_operation(state: &AppState, payload: &Value) -> Result<Value
         did: Some(did.clone()),
     };
 
-    let mut store = state.store.lock().await;
-    match op_type {
-        "create" => store
-            .add_create_event(&did, event)
-            .map(Value::String)
-            .map_err(|error| error.to_string()),
-        "update" | "delete" => store
-            .add_followup_event(&did, event)
-            .map(Value::Bool)
-            .map_err(|error| error.to_string()),
-        _ => Err(format!("unsupported operation.type={op_type}")),
+    let queue_registry = if op_type == "create" {
+        payload
+            .get("registration")
+            .and_then(|value| value.get("registry"))
+            .and_then(Value::as_str)
+            .map(ToString::to_string)
+    } else {
+        let store = state.store.lock().await;
+        store
+            .resolve_doc(&state.config, &did, ResolveOptions::default())
+            .ok()
+            .and_then(|doc| {
+                doc.get("didDocumentRegistration")
+                    .and_then(|value| value.get("registry"))
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+    };
+
+    let result = {
+        let mut store = state.store.lock().await;
+        match op_type {
+            "create" => store
+                .add_create_event(&did, event)
+                .map(Value::String)
+                .map_err(|error| error.to_string()),
+            "update" | "delete" => store
+                .add_followup_event(&did, event)
+                .map(Value::Bool)
+                .map_err(|error| error.to_string()),
+            _ => Err(format!("unsupported operation.type={op_type}")),
+        }
+    }?;
+
+    if let Some(registry) = queue_registry {
+        let _ = queue_outbound_operation(state, &registry, payload.clone()).await;
     }
+
+    Ok(result)
 }
 
 async fn ipfs_add_json(State(state): State<AppState>, Json(payload): Json<Value>) -> Response {
@@ -759,6 +1191,457 @@ fn error_json(message: &str) -> Json<Value> {
     Json(json!({ "error": message }))
 }
 
+enum BlockLookup {
+    Height(u64),
+    Hash(String),
+}
+
+async fn queue_outbound_operation(state: &AppState, registry: &str, operation: Value) -> Result<()> {
+    if registry == "local" {
+        return Ok(());
+    }
+
+    let queue_size = {
+        let mut store = state.store.lock().await;
+        let _ = store.queue_operation("hyperswarm", operation.clone())?;
+        if registry != "hyperswarm" {
+            Some(store.queue_operation(registry, operation)?)
+        } else {
+            None
+        }
+    };
+
+    if queue_size.is_some_and(|size| size >= state.config.max_queue_size) {
+        let mut supported = state.supported_registries.lock().await;
+        supported.retain(|item| item != registry);
+    }
+
+    Ok(())
+}
+
+async fn fetch_ipfs_json(state: &AppState, cid: &str) -> Option<Value> {
+    let response = proxy_ipfs_cat_raw(state, cid).await.ok()?;
+    let (_status, body) = response;
+    serde_json::from_slice::<Value>(&body).ok()
+}
+
+fn is_valid_registry(registry: &str) -> bool {
+    matches!(
+        registry,
+        "local" | "hyperswarm" | "BTC:mainnet" | "BTC:testnet4" | "BTC:signet"
+    )
+}
+
+fn compare_ordinals(left: Option<&Vec<u32>>, right: Option<&Vec<u32>>) -> std::cmp::Ordering {
+    match (left, right) {
+        (Some(left), Some(right)) => {
+            for (l, r) in left.iter().zip(right.iter()) {
+                match l.cmp(r) {
+                    std::cmp::Ordering::Equal => continue,
+                    other => return other,
+                }
+            }
+            left.len().cmp(&right.len())
+        }
+        _ => std::cmp::Ordering::Equal,
+    }
+}
+
+fn expected_registry_for_index(events: &[EventRecord], index: usize) -> Option<String> {
+    if events.is_empty() {
+        return None;
+    }
+    if index == 0 {
+        return events[0]
+            .operation
+            .get("registration")
+            .and_then(|value| value.get("registry"))
+            .and_then(Value::as_str)
+            .map(ToString::to_string);
+    }
+
+    let mut registry = events[0]
+        .operation
+        .get("registration")
+        .and_then(|value| value.get("registry"))
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
+
+    for event in events.iter().take(index).skip(1) {
+        if event.operation.get("type").and_then(Value::as_str) == Some("update") {
+            if let Some(next_registry) = event
+                .operation
+                .get("doc")
+                .and_then(|value| value.get("didDocumentRegistration"))
+                .and_then(|value| value.get("registry"))
+                .and_then(Value::as_str)
+            {
+                registry = Some(next_registry.to_string());
+            }
+        }
+    }
+
+    registry
+}
+
+fn event_key(event: &Value) -> Option<String> {
+    let registry = event.get("registry").and_then(Value::as_str)?;
+    let proof_value = event
+        .get("operation")
+        .and_then(|value| value.get("proof"))
+        .and_then(|value| value.get("proofValue"))
+        .and_then(Value::as_str)?;
+    Some(format!("{registry}/{proof_value}"))
+}
+
+fn infer_event_did(config: &Config, event: &Value) -> Result<String> {
+    if let Some(did) = event.get("did").and_then(Value::as_str) {
+        return Ok(did.to_string());
+    }
+
+    let operation = event
+        .get("operation")
+        .context("missing event.operation")?;
+    if let Some(did) = operation.get("did").and_then(Value::as_str) {
+        return Ok(did.to_string());
+    }
+
+    generate_did_from_operation(config, operation)
+}
+
+fn ensure_event_opid(event: &mut Value) -> Result<String> {
+    if let Some(opid) = event.get("opid").and_then(Value::as_str) {
+        return Ok(opid.to_string());
+    }
+
+    let operation = event
+        .get("operation")
+        .context("missing event.operation")?;
+    let opid = generate_json_cid(operation)?;
+    event["opid"] = Value::String(opid.clone());
+    Ok(opid)
+}
+
+fn verify_event_shape(event: &Value) -> bool {
+    let Some(registry) = event.get("registry").and_then(Value::as_str) else {
+        return false;
+    };
+    if !is_valid_registry(registry) {
+        return false;
+    }
+
+    if event.get("time").and_then(Value::as_str).is_none() {
+        return false;
+    }
+
+    let Some(operation) = event.get("operation") else {
+        return false;
+    };
+    let Some(op_type) = operation.get("type").and_then(Value::as_str) else {
+        return false;
+    };
+    match op_type {
+        "create" => {
+            operation.get("created").and_then(Value::as_str).is_some()
+                && operation.get("registration").is_some()
+                && operation
+                    .get("registration")
+                    .and_then(|value| value.get("registry"))
+                    .and_then(Value::as_str)
+                    .map(is_valid_registry)
+                    .unwrap_or(false)
+                && operation
+                    .get("registration")
+                    .and_then(|value| value.get("version"))
+                    .and_then(Value::as_i64)
+                    == Some(1)
+                && matches!(
+                    operation
+                        .get("registration")
+                        .and_then(|value| value.get("type"))
+                        .and_then(Value::as_str),
+                    Some("agent" | "asset")
+                )
+                && operation
+                    .get("proof")
+                    .and_then(|value| value.get("proofValue"))
+                    .and_then(Value::as_str)
+                    .is_some()
+        }
+        "update" => {
+            operation.get("did").and_then(Value::as_str).is_some()
+                && operation
+                    .get("doc")
+                    .map(|doc| {
+                        doc.get("didDocument").is_some()
+                            || doc.get("didDocumentData").is_some()
+                            || doc.get("didDocumentRegistration").is_some()
+                    })
+                    .unwrap_or(false)
+                && operation
+                    .get("proof")
+                    .and_then(|value| value.get("proofValue"))
+                    .and_then(Value::as_str)
+                    .is_some()
+        }
+        "delete" => {
+            operation.get("did").and_then(Value::as_str).is_some()
+                && operation
+                    .get("proof")
+                    .and_then(|value| value.get("proofValue"))
+                    .and_then(Value::as_str)
+                    .is_some()
+        }
+        _ => false,
+    }
+}
+
+async fn import_batch_impl(state: &AppState, batch: &[Value]) -> ImportBatchResult {
+    let mut queued = 0;
+    let mut rejected = 0;
+    let mut processed = 0;
+
+    for event in batch {
+        if !verify_event_shape(event) {
+            rejected += 1;
+            continue;
+        }
+
+        let Some(key) = event_key(event) else {
+            rejected += 1;
+            continue;
+        };
+
+        let mut seen = state.events_seen.lock().await;
+        if seen.contains_key(&key) {
+            processed += 1;
+            continue;
+        }
+        seen.insert(key, true);
+        drop(seen);
+
+        let mut store = state.store.lock().await;
+        store.push_import_event(value_to_event_record(event));
+        queued += 1;
+    }
+
+    ImportBatchResult {
+        queued,
+        processed,
+        rejected,
+        total: state.store.lock().await.import_queue_len(),
+    }
+}
+
+async fn process_events_impl(state: &AppState) -> ProcessEventsResult {
+    {
+        let mut busy = state.processing_events.lock().await;
+        if *busy {
+            return ProcessEventsResult {
+                busy: Some(true),
+                added: None,
+                merged: None,
+                rejected: None,
+                pending: None,
+            };
+        }
+        *busy = true;
+    }
+
+    let mut added = 0;
+    let mut merged = 0;
+    let mut rejected = 0;
+
+    loop {
+        let result = import_events_once(state).await;
+        added += result.added;
+        merged += result.merged;
+        rejected += result.rejected;
+
+        if result.added == 0 && result.merged == 0 {
+            break;
+        }
+    }
+
+    let pending = state.store.lock().await.import_queue_len();
+    *state.processing_events.lock().await = false;
+
+    ProcessEventsResult {
+        busy: None,
+        added: Some(added),
+        merged: Some(merged),
+        rejected: Some(rejected),
+        pending: Some(pending),
+    }
+}
+
+async fn import_events_once(state: &AppState) -> ImportEventsResult {
+    let mut temp_queue = state.store.lock().await.take_import_queue();
+
+    let mut added = 0;
+    let mut merged = 0;
+    let mut rejected = 0;
+
+    for event in temp_queue.drain(..) {
+        match import_event_impl(state, event.clone()).await {
+            ImportStatus::Added => added += 1,
+            ImportStatus::Merged => merged += 1,
+            ImportStatus::Rejected => rejected += 1,
+            ImportStatus::Deferred => {
+                let mut store = state.store.lock().await;
+                store.push_import_event(event);
+            }
+        }
+    }
+
+    ImportEventsResult {
+        added,
+        merged,
+        rejected,
+    }
+}
+
+async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus {
+    let mut event_value = event_record_to_value(&event);
+    let did = match infer_event_did(&state.config, &event_value) {
+        Ok(did) => did,
+        Err(_) => return ImportStatus::Rejected,
+    };
+    event_value["did"] = Value::String(did.clone());
+    let opid = match ensure_event_opid(&mut event_value) {
+        Ok(opid) => opid,
+        Err(_) => return ImportStatus::Rejected,
+    };
+
+    let mut event = value_to_event_record(&event_value);
+    event.did = Some(did.clone());
+    event.opid = Some(opid.clone());
+
+    let mut store = state.store.lock().await;
+    let mut current_events = store.get_events(&did);
+    for current in &mut current_events {
+        if current.opid.is_none() {
+            current.opid = generate_json_cid(&current.operation).ok();
+        }
+    }
+
+    let proof_value = event
+        .operation
+        .get("proof")
+        .and_then(|value| value.get("proofValue"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+
+    if let Some(index) = current_events.iter().position(|item| {
+        item.operation
+            .get("proof")
+            .and_then(|value| value.get("proofValue"))
+            .and_then(Value::as_str)
+            == Some(proof_value)
+    }) {
+        let expected_registry = expected_registry_for_index(&current_events, index);
+        if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) {
+            return ImportStatus::Merged;
+        }
+        if expected_registry.as_deref() == Some(event.registry.as_str()) {
+            current_events[index] = event;
+            let _ = store.set_events(&did, current_events);
+            return ImportStatus::Added;
+        }
+        return ImportStatus::Merged;
+    }
+
+    if !current_events.is_empty()
+        && event
+            .operation
+            .get("previd")
+            .and_then(Value::as_str)
+            .is_none()
+    {
+        return ImportStatus::Rejected;
+    }
+
+    if current_events.is_empty() {
+        return if store.add_create_event(&did, event).is_ok() {
+            ImportStatus::Added
+        } else {
+            ImportStatus::Rejected
+        };
+    }
+
+    let previd = match event.operation.get("previd").and_then(Value::as_str) {
+        Some(value) => value,
+        None => return ImportStatus::Rejected,
+    };
+    let Some(index) = current_events
+        .iter()
+        .position(|item| item.opid.as_deref() == Some(previd))
+    else {
+        return ImportStatus::Deferred;
+    };
+
+    if index == current_events.len() - 1 {
+        return if store.add_followup_event(&did, event).is_ok() {
+            ImportStatus::Added
+        } else {
+            ImportStatus::Rejected
+        };
+    }
+
+    let expected_registry = expected_registry_for_index(&current_events, index + 1);
+    if expected_registry.as_deref() == Some(event.registry.as_str()) {
+        let next_event = &current_events[index + 1];
+        if next_event.registry != event.registry
+            || compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref()).is_lt()
+        {
+            let mut new_sequence = current_events[..=index].to_vec();
+            new_sequence.push(event);
+            let _ = store.set_events(&did, new_sequence);
+            return ImportStatus::Added;
+        }
+    }
+
+    ImportStatus::Rejected
+}
+
+fn value_to_event_record(value: &Value) -> EventRecord {
+    EventRecord {
+        registry: value
+            .get("registry")
+            .and_then(Value::as_str)
+            .unwrap_or("local")
+            .to_string(),
+        time: value
+            .get("time")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        ordinal: value.get("ordinal").and_then(|items| {
+            items.as_array().map(|values| {
+                values
+                    .iter()
+                    .filter_map(Value::as_u64)
+                    .filter_map(|item| u32::try_from(item).ok())
+                    .collect::<Vec<_>>()
+            })
+        }),
+        operation: value.get("operation").cloned().unwrap_or(Value::Null),
+        opid: value.get("opid").and_then(Value::as_str).map(ToString::to_string),
+        did: value.get("did").and_then(Value::as_str).map(ToString::to_string),
+    }
+}
+
+fn event_record_to_value(event: &EventRecord) -> Value {
+    json!({
+        "registry": event.registry,
+        "time": event.time,
+        "ordinal": event.ordinal,
+        "operation": event.operation,
+        "opid": event.opid,
+        "did": event.did
+    })
+}
+
 fn require_admin_key(state: &AppState, headers: &HeaderMap) -> Option<Response> {
     if state.config.admin_api_key.is_empty() {
         return None;
@@ -908,6 +1791,7 @@ impl Config {
             fallback_url: env::var("ARCHON_GATEKEEPER_FALLBACK_URL")
                 .unwrap_or_else(|_| "https://dev.uniresolver.io".to_string()),
             fallback_timeout_ms: env_parse("ARCHON_GATEKEEPER_FALLBACK_TIMEOUT", 5000)?,
+            max_queue_size: 100,
             git_commit: env::var("GIT_COMMIT").unwrap_or_else(|_| "unknown".to_string()).chars().take(7).collect(),
             version: env::var("ARCHON_GATEKEEPER_VERSION").unwrap_or_else(|_| "0.7.0".to_string()),
         })
@@ -1030,6 +1914,9 @@ impl JsonDb {
 
         let events = self.data.dids.entry(suffix).or_default();
         if events.is_empty() {
+            if let (Some(opid), operation) = (event.opid.clone(), event.operation.clone()) {
+                self.data.ops.insert(opid, operation);
+            }
             events.push(event);
             self.save()?;
         }
@@ -1059,6 +1946,7 @@ impl JsonDb {
                 admin_api_key: String::new(),
                 fallback_url: String::new(),
                 fallback_timeout_ms: 0,
+                max_queue_size: 0,
                 git_commit: String::new(),
                 version: String::new(),
             },
@@ -1091,9 +1979,163 @@ impl JsonDb {
             anyhow::bail!("invalid previd");
         }
 
+        if let (Some(opid), operation) = (event.opid.clone(), event.operation.clone()) {
+            self.data.ops.insert(opid, operation);
+        }
         events.push(event);
         self.save()?;
         Ok(true)
+    }
+
+    fn get_events(&self, did: &str) -> Vec<EventRecord> {
+        let suffix = match did.split(':').next_back() {
+            Some(value) => value,
+            None => return Vec::new(),
+        };
+        self.data
+            .dids
+            .get(suffix)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|mut event| {
+                if event.operation.is_null() {
+                    if let Some(opid) = event.opid.as_ref() {
+                        if let Some(operation) = self.data.ops.get(opid) {
+                            event.operation = operation.clone();
+                        }
+                    }
+                }
+                event
+            })
+            .collect()
+    }
+
+    fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?
+            .to_string();
+
+        for event in &events {
+            if let Some(opid) = event.opid.as_ref() {
+                self.data.ops.insert(opid.clone(), event.operation.clone());
+            }
+        }
+        self.data.dids.insert(suffix, events);
+        self.save()
+    }
+
+    fn add_operation(&mut self, opid: &str, operation: Value) -> Result<()> {
+        self.data.ops.insert(opid.to_string(), operation);
+        self.save()
+    }
+
+    fn get_operation(&self, opid: &str) -> Option<Value> {
+        self.data.ops.get(opid).cloned()
+    }
+
+    fn push_import_event(&mut self, event: EventRecord) {
+        self.data.import_queue.push(event);
+        let _ = self.save();
+    }
+
+    fn take_import_queue(&mut self) -> Vec<EventRecord> {
+        let queue = std::mem::take(&mut self.data.import_queue);
+        let _ = self.save();
+        queue
+    }
+
+    fn import_queue_len(&self) -> usize {
+        self.data.import_queue.len()
+    }
+
+    fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize> {
+        let len = {
+            let queue = self.data.queue.entry(registry.to_string()).or_default();
+            queue.push(operation);
+            queue.len()
+        };
+        self.save()?;
+        Ok(len)
+    }
+
+    fn get_queue(&self, registry: &str) -> Vec<Value> {
+        self.data.queue.get(registry).cloned().unwrap_or_default()
+    }
+
+    fn clear_queue(&mut self, registry: &str, operations: &[Value]) -> Result<bool> {
+        let proof_values = operations
+            .iter()
+            .filter_map(|value| {
+                value
+                    .get("proof")
+                    .and_then(|proof| proof.get("proofValue"))
+                    .and_then(Value::as_str)
+            })
+            .collect::<Vec<_>>();
+
+        if let Some(queue) = self.data.queue.get_mut(registry) {
+            queue.retain(|item| {
+                let proof_value = item
+                    .get("proof")
+                    .and_then(|proof| proof.get("proofValue"))
+                    .and_then(Value::as_str);
+                !proof_values.iter().any(|value| Some(*value) == proof_value)
+            });
+        }
+
+        self.save()?;
+        Ok(true)
+    }
+
+    fn add_block(&mut self, registry: &str, mut block: Value) -> Result<bool> {
+        let hash = block
+            .get("hash")
+            .and_then(Value::as_str)
+            .context("missing block.hash")?
+            .to_string();
+
+        if block.get("timeISO").is_none() {
+            if let Some(time) = block.get("time").and_then(Value::as_i64) {
+                let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(time, 0)
+                    .context("invalid block.time")?;
+                block["timeISO"] = Value::String(dt.to_rfc3339());
+            }
+        }
+
+        self.data
+            .blocks
+            .entry(registry.to_string())
+            .or_default()
+            .insert(hash, block);
+        self.save()?;
+        Ok(true)
+    }
+
+    fn get_block(&self, registry: &str, block_id: Option<BlockLookup>) -> Option<Value> {
+        let registry_blocks = self.data.blocks.get(registry)?;
+        if registry_blocks.is_empty() {
+            return None;
+        }
+
+        match block_id {
+            None => registry_blocks
+                .values()
+                .filter_map(|block| {
+                    block
+                        .get("height")
+                        .and_then(Value::as_u64)
+                        .map(|height| (height, block.clone()))
+                })
+                .max_by_key(|(height, _)| *height)
+                .map(|(_, block)| block),
+            Some(BlockLookup::Height(height)) => registry_blocks.values().find_map(|block| {
+                (block.get("height").and_then(Value::as_u64) == Some(height)).then(|| block.clone())
+            }),
+            Some(BlockLookup::Hash(hash)) => registry_blocks.get(&hash).cloned(),
+        }
     }
 
     fn list_dids(&self, prefix: &str, requested: Option<&[String]>) -> Vec<String> {
@@ -1108,15 +2150,11 @@ impl JsonDb {
     }
 
     fn resolve_doc(&self, _config: &Config, did: &str, options: ResolveOptions) -> Result<Value> {
-        let suffix = did
-            .split(':')
-            .next_back()
-            .context("invalid did suffix")?;
-        let events = self
-            .data
-            .dids
-            .get(suffix)
-            .context("did not found")?;
+        let _ = did.split(':').next_back().context("invalid did suffix")?;
+        let events = self.get_events(did);
+        if events.is_empty() {
+            anyhow::bail!("did not found");
+        }
         let anchor = events.first().context("did has no events")?;
         let anchor_operation = &anchor.operation;
 
