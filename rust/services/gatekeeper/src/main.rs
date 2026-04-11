@@ -3084,12 +3084,13 @@ impl Config {
         Ok(Self {
             port: env_parse("ARCHON_GATEKEEPER_PORT", 4224)?,
             bind_address: env_parse("ARCHON_BIND_ADDRESS", IpAddr::from([0, 0, 0, 0]))?,
-            db: env::var("ARCHON_GATEKEEPER_DB").unwrap_or_else(|_| "redis".to_string()),
-            data_dir: PathBuf::from(env::var("ARCHON_DATA_DIR").unwrap_or_else(|_| "data".to_string())),
-            ipfs_url: env::var("ARCHON_IPFS_URL").unwrap_or_else(|_| "http://localhost:5001/api/v0".to_string()),
-            did_prefix: env::var("ARCHON_GATEKEEPER_DID_PREFIX").unwrap_or_else(|_| "did:cid".to_string()),
+            db: env_var_or_default("ARCHON_GATEKEEPER_DB", "redis"),
+            data_dir: PathBuf::from(env_var_or_default("ARCHON_DATA_DIR", "data")),
+            ipfs_url: env_var_or_default("ARCHON_IPFS_URL", "http://localhost:5001/api/v0"),
+            did_prefix: env_var_or_default("ARCHON_GATEKEEPER_DID_PREFIX", "did:cid"),
             registries: env::var("ARCHON_GATEKEEPER_REGISTRIES")
                 .ok()
+                .filter(|value| !value.trim().is_empty())
                 .map(|value| {
                     value
                         .split(',')
@@ -3100,17 +3101,16 @@ impl Config {
                 })
                 .filter(|items| !items.is_empty())
                 .unwrap_or_else(|| vec!["local".to_string(), "hyperswarm".to_string()]),
-            json_limit: parse_size_string(&env::var("ARCHON_GATEKEEPER_JSON_LIMIT").unwrap_or_else(|_| "4mb".to_string()))?,
-            upload_limit: parse_size_string(&env::var("ARCHON_GATEKEEPER_UPLOAD_LIMIT").unwrap_or_else(|_| "10mb".to_string()))?,
+            json_limit: parse_size_string(&env_var_or_default("ARCHON_GATEKEEPER_JSON_LIMIT", "4mb"))?,
+            upload_limit: parse_size_string(&env_var_or_default("ARCHON_GATEKEEPER_UPLOAD_LIMIT", "10mb"))?,
             gc_interval_minutes: env_parse("ARCHON_GATEKEEPER_GC_INTERVAL", 15)?,
             status_interval_minutes: env_parse("ARCHON_GATEKEEPER_STATUS_INTERVAL", 5)?,
             admin_api_key: env::var("ARCHON_ADMIN_API_KEY").unwrap_or_default(),
-            fallback_url: env::var("ARCHON_GATEKEEPER_FALLBACK_URL")
-                .unwrap_or_else(|_| "https://dev.uniresolver.io".to_string()),
+            fallback_url: env_var_or_default("ARCHON_GATEKEEPER_FALLBACK_URL", "https://dev.uniresolver.io"),
             fallback_timeout_ms: env_parse("ARCHON_GATEKEEPER_FALLBACK_TIMEOUT", 5000)?,
             max_queue_size: 100,
             git_commit: env::var("GIT_COMMIT").unwrap_or_else(|_| "unknown".to_string()).chars().take(7).collect(),
-            version: env::var("ARCHON_GATEKEEPER_VERSION").unwrap_or_else(|_| "0.7.0".to_string()),
+            version: env_var_or_default("ARCHON_GATEKEEPER_VERSION", "0.7.0"),
         })
     }
 }
@@ -3121,9 +3121,17 @@ where
     T::Err: std::fmt::Display,
 {
     match env::var(name) {
+        Ok(value) if value.trim().is_empty() => Ok(default),
         Ok(value) => value.parse::<T>().map_err(|error| anyhow::anyhow!("{name}: {error}")),
         Err(_) => Ok(default),
     }
+}
+
+fn env_var_or_default(name: &str, default: &str) -> String {
+    env::var(name)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| default.to_string())
 }
 
 fn parse_size_string(value: &str) -> Result<usize> {
@@ -4149,6 +4157,29 @@ mod tests {
         assert!(compare_ordinals(Some(&vec![1774005006160, 5]), Some(&vec![1774005006160, 6])).is_lt());
         assert!(compare_ordinals(Some(&vec![1774005006161]), Some(&vec![1774005006160, 999])).is_gt());
         assert!(compare_ordinals(Some(&vec![1774005006160, 6]), Some(&vec![1774005006160, 6])).is_eq());
+    }
+
+    #[test]
+    fn env_parse_treats_empty_value_as_default() {
+        unsafe {
+            env::set_var("ARCHON_TEST_EMPTY_PARSE", "");
+        }
+        let parsed = env_parse("ARCHON_TEST_EMPTY_PARSE", 42u64).expect("parse should succeed");
+        assert_eq!(parsed, 42);
+        unsafe {
+            env::remove_var("ARCHON_TEST_EMPTY_PARSE");
+        }
+    }
+
+    #[test]
+    fn env_var_or_default_treats_empty_value_as_default() {
+        unsafe {
+            env::set_var("ARCHON_TEST_EMPTY_STRING", "");
+        }
+        assert_eq!(env_var_or_default("ARCHON_TEST_EMPTY_STRING", "fallback"), "fallback");
+        unsafe {
+            env::remove_var("ARCHON_TEST_EMPTY_STRING");
+        }
     }
 
     #[test]
