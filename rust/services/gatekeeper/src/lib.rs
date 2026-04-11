@@ -39,6 +39,10 @@ use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tracing::{error, info};
 
+mod config;
+
+use config::Config;
+
 #[derive(Clone)]
 struct AppState {
     config: Config,
@@ -62,27 +66,6 @@ struct Metrics {
     gatekeeper_dids_by_type: GaugeVec,
     gatekeeper_dids_by_registry: GaugeVec,
     service_version_info: GaugeVec,
-}
-
-#[derive(Clone)]
-struct Config {
-    port: u16,
-    bind_address: IpAddr,
-    db: String,
-    data_dir: PathBuf,
-    ipfs_url: String,
-    did_prefix: String,
-    registries: Vec<String>,
-    json_limit: usize,
-    upload_limit: usize,
-    gc_interval_minutes: u64,
-    status_interval_minutes: u64,
-    admin_api_key: String,
-    fallback_url: String,
-    fallback_timeout_ms: u64,
-    max_queue_size: usize,
-    git_commit: String,
-    version: String,
 }
 
 #[derive(Serialize)]
@@ -3078,77 +3061,6 @@ impl Metrics {
     }
 }
 
-impl Config {
-    fn from_env() -> Result<Self> {
-        Ok(Self {
-            port: env_parse("ARCHON_GATEKEEPER_PORT", 4224)?,
-            bind_address: env_parse("ARCHON_BIND_ADDRESS", IpAddr::from([0, 0, 0, 0]))?,
-            db: env_var_or_default("ARCHON_GATEKEEPER_DB", "redis"),
-            data_dir: PathBuf::from(env_var_or_default("ARCHON_DATA_DIR", "data")),
-            ipfs_url: env_var_or_default("ARCHON_IPFS_URL", "http://localhost:5001/api/v0"),
-            did_prefix: env_var_or_default("ARCHON_GATEKEEPER_DID_PREFIX", "did:cid"),
-            registries: env::var("ARCHON_GATEKEEPER_REGISTRIES")
-                .ok()
-                .filter(|value| !value.trim().is_empty())
-                .map(|value| {
-                    value
-                        .split(',')
-                        .map(str::trim)
-                        .filter(|item| !item.is_empty())
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                })
-                .filter(|items| !items.is_empty())
-                .unwrap_or_else(|| vec!["local".to_string(), "hyperswarm".to_string()]),
-            json_limit: parse_size_string(&env_var_or_default("ARCHON_GATEKEEPER_JSON_LIMIT", "4mb"))?,
-            upload_limit: parse_size_string(&env_var_or_default("ARCHON_GATEKEEPER_UPLOAD_LIMIT", "10mb"))?,
-            gc_interval_minutes: env_parse("ARCHON_GATEKEEPER_GC_INTERVAL", 15)?,
-            status_interval_minutes: env_parse("ARCHON_GATEKEEPER_STATUS_INTERVAL", 5)?,
-            admin_api_key: env::var("ARCHON_ADMIN_API_KEY").unwrap_or_default(),
-            fallback_url: env_var_or_default("ARCHON_GATEKEEPER_FALLBACK_URL", "https://dev.uniresolver.io"),
-            fallback_timeout_ms: env_parse("ARCHON_GATEKEEPER_FALLBACK_TIMEOUT", 5000)?,
-            max_queue_size: 100,
-            git_commit: env::var("GIT_COMMIT").unwrap_or_else(|_| "unknown".to_string()).chars().take(7).collect(),
-            version: env_var_or_default("ARCHON_GATEKEEPER_VERSION", "0.7.0"),
-        })
-    }
-}
-
-fn env_parse<T>(name: &str, default: T) -> Result<T>
-where
-    T: std::str::FromStr,
-    T::Err: std::fmt::Display,
-{
-    match env::var(name) {
-        Ok(value) if value.trim().is_empty() => Ok(default),
-        Ok(value) => value.parse::<T>().map_err(|error| anyhow::anyhow!("{name}: {error}")),
-        Err(_) => Ok(default),
-    }
-}
-
-fn env_var_or_default(name: &str, default: &str) -> String {
-    env::var(name)
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| default.to_string())
-}
-
-fn parse_size_string(value: &str) -> Result<usize> {
-    let trimmed = value.trim().to_ascii_lowercase();
-    let (number, multiplier) = if let Some(stripped) = trimmed.strip_suffix("mb") {
-        (stripped.trim(), 1024usize * 1024usize)
-    } else if let Some(stripped) = trimmed.strip_suffix("kb") {
-        (stripped.trim(), 1024usize)
-    } else if let Some(stripped) = trimmed.strip_suffix('b') {
-        (stripped.trim(), 1usize)
-    } else {
-        (trimmed.as_str(), 1usize)
-    };
-
-    let parsed = number.parse::<usize>().with_context(|| format!("invalid size `{value}`"))?;
-    Ok(parsed.saturating_mul(multiplier))
-}
-
 fn url_encode_component(value: &str) -> String {
     let mut encoded = String::new();
     for byte in value.bytes() {
@@ -4163,7 +4075,7 @@ mod tests {
         unsafe {
             env::set_var("ARCHON_TEST_EMPTY_PARSE", "");
         }
-        let parsed = env_parse("ARCHON_TEST_EMPTY_PARSE", 42u64).expect("parse should succeed");
+        let parsed = crate::config::env_parse("ARCHON_TEST_EMPTY_PARSE", 42u64).expect("parse should succeed");
         assert_eq!(parsed, 42);
         unsafe {
             env::remove_var("ARCHON_TEST_EMPTY_PARSE");
@@ -4175,7 +4087,7 @@ mod tests {
         unsafe {
             env::set_var("ARCHON_TEST_EMPTY_STRING", "");
         }
-        assert_eq!(env_var_or_default("ARCHON_TEST_EMPTY_STRING", "fallback"), "fallback");
+        assert_eq!(crate::config::env_var_or_default("ARCHON_TEST_EMPTY_STRING", "fallback"), "fallback");
         unsafe {
             env::remove_var("ARCHON_TEST_EMPTY_STRING");
         }
