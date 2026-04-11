@@ -1,0 +1,71 @@
+[
+  {
+    "name": "ready",
+    "method": "GET",
+    "path": "/api/v1/ready",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "version-shape",
+    "method": "GET",
+    "path": "/api/v1/version",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "status-shape",
+    "method": "GET",
+    "path": "/api/v1/status",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "registries",
+    "method": "GET",
+    "path": "/api/v1/registries",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "search-empty",
+    "method": "GET",
+    "path": "/api/v1/search?q=",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "query-bad-request",
+    "method": "POST",
+    "path": "/api/v1/query",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {},
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "api-not-found",
+    "method": "GET",
+    "path": "/api/nope",
+    "expectedStatus": 404,
+    "compareMode": "json"
+  },
+  {
+    "name": "admin-unauthorized-reset",
+    "method": "GET",
+    "path": "/api/v1/db/reset",
+    "expectedStatus": 401,
+    "compareMode": "json",
+    "requiresAdminKey": true
+  },
+  {
+    "name": "admin-unauthorized-verify",
+    "method": "GET",
+    "path": "/api/v1/db/verify",
+    "expectedStatus": 401,
+    "compareMode": "json",
+    "requiresAdminKey": true
+  }
+]

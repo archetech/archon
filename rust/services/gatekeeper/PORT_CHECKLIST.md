@@ -10,26 +10,26 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 
 ## Compatibility target
 
-- [ ] Enumerate every Gatekeeper HTTP route from [services/gatekeeper/server/src/gatekeeper-api.ts](/home/david/archetech/archon/services/gatekeeper/server/src/gatekeeper-api.ts).
-- [ ] Freeze request and response shapes for each route, including error payloads and status codes.
-- [ ] Freeze the env var/runtime contract from [services/gatekeeper/server/src/config.js](/home/david/archetech/archon/services/gatekeeper/server/src/config.js).
-- [ ] Freeze Docker/container compatibility requirements, including port, mounted data path, and healthcheck behavior.
-- [ ] Freeze Prometheus metric names, labels, and route-normalization behavior.
+- [x] Enumerate every Gatekeeper HTTP route from [services/gatekeeper/server/src/gatekeeper-api.ts](/home/david/archetech/archon/services/gatekeeper/server/src/gatekeeper-api.ts).
+- [x] Freeze request and response shapes for each route, including error payloads and status codes.
+- [x] Freeze the env var/runtime contract from [services/gatekeeper/server/src/config.js](/home/david/archetech/archon/services/gatekeeper/server/src/config.js).
+- [x] Freeze Docker/container compatibility requirements, including port, mounted data path, and healthcheck behavior.
+- [x] Freeze Prometheus metric names, labels, and route-normalization behavior.
 
 ## Parity fixtures
 
-- [ ] Add black-box API fixtures that can be run against both the TypeScript and Rust Gatekeeper services.
+- [x] Add black-box API fixtures that can be run against both the TypeScript and Rust Gatekeeper services.
 - [ ] Cover happy-path and failure-path responses for every public endpoint.
 - [ ] Add fixtures for agent DIDs, asset DIDs, ephemeral DIDs, local registries, remote registries, invalid proofs, and fallback resolution.
-- [ ] Snapshot metrics exposition output for parity comparison.
+- [x] Snapshot metrics exposition output for parity comparison.
 
 ## Domain types
 
-- [ ] Port `Operation` and related proof types from [packages/gatekeeper/src/types.ts](/home/david/archetech/archon/packages/gatekeeper/src/types.ts).
-- [ ] Port `GatekeeperEvent`.
-- [ ] Port `DidCidDocument` and nested metadata/registration/document types.
-- [ ] Port `ResolveDIDOptions`.
-- [ ] Port batch, queue, block, and verification result types.
+- [x] Port `Operation` and related proof types from [packages/gatekeeper/src/types.ts](/home/david/archetech/archon/packages/gatekeeper/src/types.ts).
+- [x] Port `GatekeeperEvent`.
+- [x] Port `DidCidDocument` and nested metadata/registration/document types.
+- [x] Port `ResolveDIDOptions`.
+- [x] Port batch, queue, block, and verification result types.
 - [ ] Preserve JSON field names and optionality exactly.
 
 ## Deterministic ID generation
@@ -50,13 +50,13 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 ## Storage layer
 
 - [x] Add a native JSON-backed storage foundation.
-- [ ] Define a Rust storage trait equivalent to `GatekeeperDb`.
+- [x] Define a Rust storage trait equivalent to `GatekeeperDb`.
 - [x] Port JSON storage behavior fully, including operations table and queue/block storage.
-- [ ] Port JSON-cache behavior if still needed.
+- [x] Port JSON-cache behavior if still needed.
 - [ ] Port Redis backend.
 - [ ] Port SQLite backend.
 - [ ] Port MongoDB backend.
-- [ ] Preserve DID suffix keying semantics used by current storage.
+- [x] Preserve DID suffix keying semantics used by current storage.
 
 ## DID core behavior
 
@@ -124,7 +124,7 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [x] Port `searchDocs`.
 - [x] Port `queryDocs`.
 - [x] Port `search`.
-- [ ] Add parity tests for search and query results.
+- [x] Add parity tests for search and query results.
 
 ## IPFS behavior
 
@@ -153,16 +153,16 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 - [x] Add native `X-Archon-Admin-Key` enforcement scaffold.
 - [x] Match production restriction behavior for `/db/reset`.
 - [ ] Match all admin route status codes and error bodies exactly.
-- [ ] Match unhandled `/api` endpoint behavior exactly.
+- [x] Match unhandled `/api` endpoint behavior exactly.
 
 ## Metrics parity
 
 - [x] Add native Prometheus metrics endpoint.
-- [ ] Match all current metric names exactly.
-- [ ] Match current label cardinality and route normalization exactly.
-- [ ] Match DID operation counters exactly.
-- [ ] Match queue and DID gauges exactly.
-- [ ] Match service version gauge semantics exactly.
+- [x] Match all current metric names exactly.
+- [x] Match current label cardinality and route normalization exactly.
+- [x] Match DID operation counters exactly.
+- [x] Match queue and DID gauges exactly.
+- [x] Match service version gauge semantics exactly.
 
 ## Docker and deployment
 
@@ -198,17 +198,14 @@ This checklist tracks the full native Rust port of Gatekeeper with these goals:
 
 ### Phase 5
 
-- Finish the remaining `Compatibility target`, `Parity fixtures`, and `Domain types` items.
-- Port the remaining storage trait/backend work:
-  - Rust storage trait equivalent to `GatekeeperDb`
-  - JSON-cache decision
+- Finish full endpoint-by-endpoint black-box fixture coverage, especially DID/import/export/IPFS fallback cases.
+- Preserve JSON field names and optionality exactly for every response object.
+- Port the remaining backend work:
   - Redis backend
   - SQLite backend
   - MongoDB backend
-  - DID suffix keying semantics verification
-- Add search/query parity tests.
-- Finish exact admin/error and metrics parity.
-- Decide memory stats compatibility behavior.
+- Finish exact admin route status/error matching across every payload validation branch.
+- Decide whether `/status.memoryUsage` should remain zero-filled or be backed by real Rust process metrics.
 
 ### Phase 6
 

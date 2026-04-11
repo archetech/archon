@@ -132,6 +132,29 @@ struct JsonDb {
     data: JsonDbFile,
 }
 
+trait GatekeeperDb {
+    fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String>;
+    fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool>;
+    fn get_events(&self, did: &str) -> Vec<EventRecord>;
+    fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()>;
+    fn delete_events(&mut self, did: &str) -> Result<()>;
+    fn reset_db(&mut self) -> Result<()>;
+    fn add_operation(&mut self, opid: &str, operation: Value) -> Result<()>;
+    fn get_operation(&self, opid: &str) -> Option<Value>;
+    fn push_import_event(&mut self, event: EventRecord);
+    fn take_import_queue(&mut self) -> Vec<EventRecord>;
+    fn import_queue_len(&self) -> usize;
+    fn import_queue_snapshot(&self) -> Vec<EventRecord>;
+    fn clear_import_queue(&mut self);
+    fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize>;
+    fn get_queue(&self, registry: &str) -> Vec<Value>;
+    fn clear_queue(&mut self, registry: &str, operations: &[Value]) -> Result<bool>;
+    fn add_block(&mut self, registry: &str, block: Value) -> Result<bool>;
+    fn get_block(&self, registry: &str, block_id: Option<BlockLookup>) -> Option<Value>;
+    fn list_dids(&self, prefix: &str, requested: Option<&[String]>) -> Vec<String>;
+    fn resolve_doc(&self, config: &Config, did: &str, options: ResolveOptions) -> Result<Value>;
+}
+
 #[derive(Clone, Default)]
 struct ResolveOptions {
     version_time: Option<String>,
@@ -281,6 +304,7 @@ async fn main() -> Result<()> {
                 .route("/search", get(search_docs))
                 .route("/query", post(query_docs)),
         )
+        .nest("/api", Router::new().fallback(api_not_found))
         .fallback(not_found)
         .with_state(state.clone());
 
@@ -389,16 +413,7 @@ async fn create_did(State(state): State<AppState>, Json(payload): Json<Value>) -
                 .did_operations_total
                 .with_label_values(&[&op_type, &registry, "error"])
                 .inc();
-            let status = if error.contains("missing")
-                || error.contains("invalid")
-                || error.contains("previd")
-                || error.contains("not found")
-                || error.contains("unsupported")
-            {
-                StatusCode::BAD_REQUEST
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            };
+            let status = StatusCode::INTERNAL_SERVER_ERROR;
             record_metrics(&state, "POST", "/did", status.as_u16(), start.elapsed().as_secs_f64());
             (
                 status,
@@ -1519,6 +1534,12 @@ async fn not_implemented_admin(State(state): State<AppState>, headers: HeaderMap
 }
 
 async fn not_found(State(state): State<AppState>, request: Request) -> Response {
+    let route = normalize_path(request.uri().path());
+    record_metrics(&state, request.method().as_str(), &route, 404, 0.0);
+    (StatusCode::NOT_FOUND, Json(json!({ "message": "Endpoint not found" }))).into_response()
+}
+
+async fn api_not_found(State(state): State<AppState>, request: Request) -> Response {
     let route = normalize_path(request.uri().path());
     record_metrics(&state, request.method().as_str(), &route, 404, 0.0);
     (StatusCode::NOT_FOUND, Json(json!({ "message": "Endpoint not found" }))).into_response()
@@ -2804,30 +2825,57 @@ fn record_metrics(state: &AppState, method: &str, route: &str, status: u16, dura
 
 fn normalize_path(path: &str) -> String {
     let base_path = path.split('?').next().unwrap_or(path);
-    if base_path.contains("/did/did:") {
-        return base_path.replace("/did/did:", "/did/:did");
-    }
-
     let segments = base_path.split('/').filter(|segment| !segment.is_empty()).collect::<Vec<_>>();
-    if segments.len() >= 3 && segments[0] == "api" && segments[1] == "v1" {
-        match segments[2] {
-            "block" if segments.len() >= 4 => {
-                if segments.get(4) == Some(&"latest") {
-                    return "/api/v1/block/:registry/latest".to_string();
-                }
-                return "/api/v1/block/:registry".to_string();
+
+    if let Some(index) = segments.iter().position(|segment| *segment == "did") {
+        if let Some(value) = segments.get(index + 1) {
+            if value.starts_with("did:") {
+                let mut normalized = segments.clone();
+                normalized[index + 1] = ":did";
+                return format!("/{}", normalized.join("/"));
             }
-            "queue" if segments.len() >= 4 => {
-                if segments.get(4) == Some(&"clear") {
-                    return "/api/v1/queue/:registry/clear".to_string();
-                }
-                return "/api/v1/queue/:registry".to_string();
-            }
-            "events" if segments.len() >= 4 => return "/api/v1/events/:registry".to_string(),
-            "dids" if segments.len() >= 4 => return "/api/v1/dids/:prefix".to_string(),
-            _ => {}
         }
     }
+
+    if let Some(index) = segments.iter().position(|segment| *segment == "block") {
+        if segments.get(index + 2) == Some(&"latest") {
+            let mut normalized = segments.clone();
+            if let Some(value) = normalized.get_mut(index + 1) {
+                *value = ":registry";
+            }
+            return format!("/{}", normalized.join("/"));
+        }
+        if segments.get(index + 1).is_some() {
+            let mut normalized = segments.clone();
+            normalized[index + 1] = ":registry";
+            return format!("/{}", normalized.join("/"));
+        }
+    }
+
+    if let Some(index) = segments.iter().position(|segment| *segment == "queue") {
+        if segments.get(index + 1).is_some() {
+            let mut normalized = segments.clone();
+            normalized[index + 1] = ":registry";
+            return format!("/{}", normalized.join("/"));
+        }
+    }
+
+    if let Some(index) = segments.iter().position(|segment| *segment == "events") {
+        if segments.get(index + 1).is_some() {
+            let mut normalized = segments.clone();
+            normalized[index + 1] = ":registry";
+            return format!("/{}", normalized.join("/"));
+        }
+    }
+
+    if let Some(index) = segments.iter().position(|segment| *segment == "dids") {
+        if segments.get(index + 1).is_some() {
+            let mut normalized = segments.clone();
+            normalized[index + 1] = ":prefix";
+            return format!("/{}", normalized.join("/"));
+        }
+    }
+
     base_path.to_string()
 }
 
@@ -3493,6 +3541,88 @@ impl JsonDb {
                 "retrieved": chrono_like_now()
             }
         }))
+    }
+}
+
+impl GatekeeperDb for JsonDb {
+    fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
+        JsonDb::add_create_event(self, did, event)
+    }
+
+    fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> {
+        JsonDb::add_followup_event(self, did, event)
+    }
+
+    fn get_events(&self, did: &str) -> Vec<EventRecord> {
+        JsonDb::get_events(self, did)
+    }
+
+    fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
+        JsonDb::set_events(self, did, events)
+    }
+
+    fn delete_events(&mut self, did: &str) -> Result<()> {
+        JsonDb::delete_events(self, did)
+    }
+
+    fn reset_db(&mut self) -> Result<()> {
+        JsonDb::reset_db(self)
+    }
+
+    fn add_operation(&mut self, opid: &str, operation: Value) -> Result<()> {
+        JsonDb::add_operation(self, opid, operation)
+    }
+
+    fn get_operation(&self, opid: &str) -> Option<Value> {
+        JsonDb::get_operation(self, opid)
+    }
+
+    fn push_import_event(&mut self, event: EventRecord) {
+        JsonDb::push_import_event(self, event)
+    }
+
+    fn take_import_queue(&mut self) -> Vec<EventRecord> {
+        JsonDb::take_import_queue(self)
+    }
+
+    fn import_queue_len(&self) -> usize {
+        JsonDb::import_queue_len(self)
+    }
+
+    fn import_queue_snapshot(&self) -> Vec<EventRecord> {
+        JsonDb::import_queue_snapshot(self)
+    }
+
+    fn clear_import_queue(&mut self) {
+        JsonDb::clear_import_queue(self)
+    }
+
+    fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize> {
+        JsonDb::queue_operation(self, registry, operation)
+    }
+
+    fn get_queue(&self, registry: &str) -> Vec<Value> {
+        JsonDb::get_queue(self, registry)
+    }
+
+    fn clear_queue(&mut self, registry: &str, operations: &[Value]) -> Result<bool> {
+        JsonDb::clear_queue(self, registry, operations)
+    }
+
+    fn add_block(&mut self, registry: &str, block: Value) -> Result<bool> {
+        JsonDb::add_block(self, registry, block)
+    }
+
+    fn get_block(&self, registry: &str, block_id: Option<BlockLookup>) -> Option<Value> {
+        JsonDb::get_block(self, registry, block_id)
+    }
+
+    fn list_dids(&self, prefix: &str, requested: Option<&[String]>) -> Vec<String> {
+        JsonDb::list_dids(self, prefix, requested)
+    }
+
+    fn resolve_doc(&self, config: &Config, did: &str, options: ResolveOptions) -> Result<Value> {
+        JsonDb::resolve_doc(self, config, did, options)
     }
 }
 
