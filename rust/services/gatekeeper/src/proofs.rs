@@ -13,9 +13,7 @@ pub(crate) fn infer_event_did(config: &Config, event: &Value) -> Result<String> 
         return Ok(did.to_string());
     }
 
-    let operation = event
-        .get("operation")
-        .context("missing event.operation")?;
+    let operation = event.get("operation").context("missing event.operation")?;
     if let Some(did) = operation.get("did").and_then(Value::as_str) {
         return Ok(did.to_string());
     }
@@ -28,9 +26,7 @@ pub(crate) fn ensure_event_opid(event: &mut Value) -> Result<String> {
         return Ok(opid.to_string());
     }
 
-    let operation = event
-        .get("operation")
-        .context("missing event.operation")?;
+    let operation = event.get("operation").context("missing event.operation")?;
     let opid = generate_json_cid(operation)?;
     event["opid"] = Value::String(opid.clone());
     Ok(opid)
@@ -205,7 +201,8 @@ fn verify_sig(msg_hash_hex: &str, proof_value: &str, public_jwk: &Value) -> Resu
     let compressed_key = public_jwk_to_sec1_bytes(public_jwk)?;
     let verifying_key = VerifyingKey::from_sec1_bytes(&compressed_key)
         .with_context(|| "Invalid operation: publicJwk")?;
-    let signature = K256Signature::from_slice(&sig_bytes).with_context(|| "Invalid operation: proof")?;
+    let signature =
+        K256Signature::from_slice(&sig_bytes).with_context(|| "Invalid operation: proof")?;
     Ok(verifying_key.verify_prehash(&msg_hash, &signature).is_ok())
 }
 
@@ -215,7 +212,9 @@ fn hex_to_bytes(value: &str) -> Result<Vec<u8>> {
     }
     (0..value.len())
         .step_by(2)
-        .map(|index| u8::from_str_radix(&value[index..index + 2], 16).with_context(|| "invalid hex"))
+        .map(|index| {
+            u8::from_str_radix(&value[index..index + 2], 16).with_context(|| "invalid hex")
+        })
         .collect()
 }
 
@@ -228,7 +227,10 @@ fn bytes_to_hex(bytes: &[u8]) -> String {
 }
 
 #[async_recursion]
-pub(crate) async fn verify_create_operation_impl(state: &AppState, operation: &Value) -> Result<bool> {
+pub(crate) async fn verify_create_operation_impl(
+    state: &AppState,
+    operation: &Value,
+) -> Result<bool> {
     if operation.is_null() {
         anyhow::bail!("Invalid operation: missing");
     }
@@ -238,13 +240,19 @@ pub(crate) async fn verify_create_operation_impl(state: &AppState, operation: &V
     if operation.get("type").and_then(Value::as_str) != Some("create") {
         anyhow::bail!(
             "Invalid operation: type={}",
-            operation.get("type").and_then(Value::as_str).unwrap_or("unknown")
+            operation
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown")
         );
     }
     if !verify_date_format(operation.get("created").and_then(Value::as_str)) {
         anyhow::bail!(
             "Invalid operation: created={}",
-            operation.get("created").and_then(Value::as_str).unwrap_or_default()
+            operation
+                .get("created")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
         );
     }
 
@@ -277,8 +285,12 @@ pub(crate) async fn verify_create_operation_impl(state: &AppState, operation: &V
     }
 
     let proof = operation.get("proof").context("Invalid operation: proof")?;
-    if reg_type == "agent" && proof.get("verificationMethod").and_then(Value::as_str) != Some("#key-1") {
-        anyhow::bail!("Invalid operation: proof.verificationMethod must be #key-1 for agent create");
+    if reg_type == "agent"
+        && proof.get("verificationMethod").and_then(Value::as_str) != Some("#key-1")
+    {
+        anyhow::bail!(
+            "Invalid operation: proof.verificationMethod must be #key-1 for agent create"
+        );
     }
     if let Some(valid_until) = registration.get("validUntil").and_then(Value::as_str) {
         if !verify_date_format(Some(valid_until)) {
@@ -317,7 +329,10 @@ pub(crate) async fn verify_create_operation_impl(state: &AppState, operation: &V
         &controller_did,
         ResolveOptions {
             confirm: true,
-            version_time: proof.get("created").and_then(Value::as_str).map(ToString::to_string),
+            version_time: proof
+                .get("created")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
             ..ResolveOptions::default()
         },
     )
@@ -457,9 +472,15 @@ pub(crate) fn canonical_json(value: &Value) -> String {
         Value::Null => "null".to_string(),
         Value::Bool(boolean) => boolean.to_string(),
         Value::Number(number) => number.to_string(),
-        Value::String(string) => serde_json::to_string(string).unwrap_or_else(|_| "\"\"".to_string()),
+        Value::String(string) => {
+            serde_json::to_string(string).unwrap_or_else(|_| "\"\"".to_string())
+        }
         Value::Array(items) => {
-            let joined = items.iter().map(canonical_json).collect::<Vec<_>>().join(",");
+            let joined = items
+                .iter()
+                .map(canonical_json)
+                .collect::<Vec<_>>()
+                .join(",");
             format!("[{joined}]")
         }
         Value::Object(map) => {

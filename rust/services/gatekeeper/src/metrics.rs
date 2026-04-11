@@ -1,7 +1,5 @@
 use anyhow::Result;
-use prometheus::{
-    Gauge, GaugeVec, HistogramOpts, HistogramVec, IntCounterVec, Registry,
-};
+use prometheus::{Gauge, GaugeVec, HistogramOpts, HistogramVec, IntCounterVec, Registry};
 
 use crate::{config::Config, AppState};
 
@@ -40,7 +38,10 @@ pub(crate) fn record_metrics(
 
 pub(crate) fn normalize_path(path: &str) -> String {
     let base_path = path.split('?').next().unwrap_or(path);
-    let segments = base_path.split('/').filter(|segment| !segment.is_empty()).collect::<Vec<_>>();
+    let segments = base_path
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>();
 
     if let Some(index) = segments.iter().position(|segment| *segment == "did") {
         if let Some(value) = segments.get(index + 1) {
@@ -103,8 +104,11 @@ impl Metrics {
             &["method", "route", "status"],
         )?;
         let http_request_duration_seconds = HistogramVec::new(
-            HistogramOpts::new("http_request_duration_seconds", "HTTP request duration in seconds")
-                .buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0]),
+            HistogramOpts::new(
+                "http_request_duration_seconds",
+                "HTTP request duration in seconds",
+            )
+            .buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0]),
             &["method", "route", "status"],
         )?;
         let did_operations_total = IntCounterVec::new(

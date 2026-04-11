@@ -63,7 +63,12 @@ pub async fn spawn_mongodb(mongo_url: &str) -> Result<TestService> {
 
 pub async fn spawn_redis(redis_url: &str) -> Result<TestService> {
     let temp_dir = tempfile::tempdir().context("failed to create temp dir")?;
-    spawn_service("redis", temp_dir, &[("ARCHON_REDIS_URL", redis_url.to_string())]).await
+    spawn_service(
+        "redis",
+        temp_dir,
+        &[("ARCHON_REDIS_URL", redis_url.to_string())],
+    )
+    .await
 }
 
 pub async fn spawn_service(
@@ -159,13 +164,17 @@ pub async fn respawn_service(
 }
 
 pub fn deterministic_vectors() -> Value {
-    serde_json::from_str(include_str!("../../../../../tests/gatekeeper/deterministic-vectors.json"))
-        .expect("deterministic vectors should decode")
+    serde_json::from_str(include_str!(
+        "../../../../../tests/gatekeeper/deterministic-vectors.json"
+    ))
+    .expect("deterministic vectors should decode")
 }
 
 pub fn proof_vectors() -> Value {
-    serde_json::from_str(include_str!("../../../../../tests/gatekeeper/proof-vectors.json"))
-        .expect("proof vectors should decode")
+    serde_json::from_str(include_str!(
+        "../../../../../tests/gatekeeper/proof-vectors.json"
+    ))
+    .expect("proof vectors should decode")
 }
 
 pub fn create_event_from_operation(operation: Value, registry: &str, ordinal: &[u64]) -> Value {

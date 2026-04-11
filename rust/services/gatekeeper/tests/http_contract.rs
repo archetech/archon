@@ -38,7 +38,11 @@ async fn http_contract_covers_ready_version_status_admin_and_metrics() -> Result
         .await?;
     assert!(response.status().is_success());
     let registries = response.json::<Value>().await?;
-    assert!(registries.as_array().unwrap().iter().any(|value| value == "local"));
+    assert!(registries
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|value| value == "local"));
 
     let response = service
         .client
@@ -46,7 +50,10 @@ async fn http_contract_covers_ready_version_status_admin_and_metrics() -> Result
         .send()
         .await?;
     assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
-    assert_eq!(response.json::<Value>().await?["message"], "Endpoint not found");
+    assert_eq!(
+        response.json::<Value>().await?["message"],
+        "Endpoint not found"
+    );
 
     let response = service
         .client
@@ -78,7 +85,11 @@ async fn http_contract_covers_ready_version_status_admin_and_metrics() -> Result
     assert_eq!(doc["didDocumentMetadata"]["confirmed"], true);
 
     let response = service
-        .admin(service.client.get(format!("{}/queue/hyperswarm", service.base_url)))
+        .admin(
+            service
+                .client
+                .get(format!("{}/queue/hyperswarm", service.base_url)),
+        )
         .send()
         .await?;
     assert!(response.status().is_success());

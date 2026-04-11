@@ -2,10 +2,11 @@ use anyhow::Result;
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::store::compare_ordinals;
 use crate::{
-    compare_ordinals, ensure_event_opid, expected_registry_for_index, generate_did_from_operation,
-    generate_json_cid, infer_event_did, refresh_metrics_snapshot, resolve_local_doc_async, verify_event_shape,
-    verify_operation_impl, AppState, EventRecord, GatekeeperDb, ResolveOptions,
+    ensure_event_opid, event_record_to_value, expected_registry_for_index,
+    generate_did_from_operation, generate_json_cid, infer_event_did, value_to_event_record,
+    verify_event_shape, verify_operation_impl, AppState, EventRecord, GatekeeperDb, ResolveOptions,
 };
 
 #[derive(Serialize)]
@@ -44,7 +45,10 @@ pub(crate) enum ImportStatus {
     Deferred,
 }
 
-pub(crate) async fn handle_did_operation(state: &AppState, payload: &Value) -> Result<Value, String> {
+pub(crate) async fn handle_did_operation(
+    state: &AppState,
+    payload: &Value,
+) -> Result<Value, String> {
     let op_type = payload
         .get("type")
         .and_then(Value::as_str)
@@ -58,7 +62,8 @@ pub(crate) async fn handle_did_operation(state: &AppState, payload: &Value) -> R
     }
 
     let did = match op_type {
-        "create" => generate_did_from_operation(&state.config, payload).map_err(|error| error.to_string())?,
+        "create" => generate_did_from_operation(&state.config, payload)
+            .map_err(|error| error.to_string())?,
         "update" | "delete" => payload
             .get("did")
             .and_then(Value::as_str)
@@ -126,7 +131,11 @@ pub(crate) async fn handle_did_operation(state: &AppState, payload: &Value) -> R
     Ok(result)
 }
 
-pub(crate) async fn queue_outbound_operation(state: &AppState, registry: &str, operation: Value) -> Result<()> {
+pub(crate) async fn queue_outbound_operation(
+    state: &AppState,
+    registry: &str,
+    operation: Value,
+) -> Result<()> {
     if registry == "local" {
         return Ok(());
     }
@@ -184,7 +193,7 @@ pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> Impo
         drop(seen);
 
         let mut store = state.store.lock().await;
-        store.push_import_event(crate::value_to_event_record(event));
+        store.push_import_event(value_to_event_record(event));
         queued += 1;
     }
 
@@ -265,7 +274,7 @@ async fn import_events_once(state: &AppState) -> ImportEventsResult {
 }
 
 async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus {
-    let mut event_value = crate::event_record_to_value(&event);
+    let mut event_value = event_record_to_value(&event);
     let did = match infer_event_did(&state.config, &event_value) {
         Ok(did) => did,
         Err(_) => return ImportStatus::Rejected,
@@ -276,7 +285,7 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
         Err(_) => return ImportStatus::Rejected,
     };
 
-    let mut event = crate::value_to_event_record(&event_value);
+    let mut event = value_to_event_record(&event_value);
     event.did = Some(did.clone());
     event.opid = Some(opid.clone());
 
@@ -318,7 +327,13 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
         return ImportStatus::Merged;
     }
 
-    if !current_events.is_empty() && event.operation.get("previd").and_then(Value::as_str).is_none() {
+    if !current_events.is_empty()
+        && event
+            .operation
+            .get("previd")
+            .and_then(Value::as_str)
+            .is_none()
+    {
         return ImportStatus::Rejected;
     }
 
@@ -343,7 +358,10 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
         Some(value) => value,
         None => return ImportStatus::Rejected,
     };
-    let Some(index) = current_events.iter().position(|item| item.opid.as_deref() == Some(previd)) else {
+    let Some(index) = current_events
+        .iter()
+        .position(|item| item.opid.as_deref() == Some(previd))
+    else {
         return ImportStatus::Deferred;
     };
 

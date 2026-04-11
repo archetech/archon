@@ -58,7 +58,10 @@ async fn event_processing_drains_valid_events_and_requeues_deferred_ones() -> Re
         .send()
         .await?;
     assert!(response.status().is_success());
-    assert_eq!(response.json::<Value>().await?["didDocument"]["id"], expected_did);
+    assert_eq!(
+        response.json::<Value>().await?["didDocument"]["id"],
+        expected_did
+    );
 
     let response = service
         .admin(service.client.get(format!("{}/status", service.base_url)))

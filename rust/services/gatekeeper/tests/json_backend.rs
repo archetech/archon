@@ -22,7 +22,10 @@ async fn json_backend_persists_create_and_status_across_restart() -> Result<()> 
         .send()
         .await?;
     assert!(response.status().is_success());
-    assert_eq!(response.json::<Value>().await?, Value::String(expected_did.to_string()));
+    assert_eq!(
+        response.json::<Value>().await?,
+        Value::String(expected_did.to_string())
+    );
 
     let response = service
         .client

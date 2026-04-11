@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    env, fs,
-    net::IpAddr,
-    path::PathBuf,
-};
+use std::{collections::HashMap, env, fs, net::IpAddr, path::PathBuf};
 
 use anyhow::{Context, Result};
 use mongodb::{
@@ -53,9 +48,16 @@ pub(crate) struct JsonDb {
 
 #[derive(Clone)]
 pub(crate) enum DbBackend {
-    JsonFile { path: PathBuf },
-    Sqlite { path: PathBuf },
-    Redis { url: String, namespace: String },
+    JsonFile {
+        path: PathBuf,
+    },
+    Sqlite {
+        path: PathBuf,
+    },
+    Redis {
+        url: String,
+        namespace: String,
+    },
     Mongo {
         url: String,
         database: String,
@@ -114,7 +116,10 @@ pub(crate) enum BlockLookup {
     Hash(String),
 }
 
-pub(crate) fn compare_ordinals(left: Option<&Vec<u64>>, right: Option<&Vec<u64>>) -> std::cmp::Ordering {
+pub(crate) fn compare_ordinals(
+    left: Option<&Vec<u64>>,
+    right: Option<&Vec<u64>>,
+) -> std::cmp::Ordering {
     match (left, right) {
         (Some(left), Some(right)) => {
             for (l, r) in left.iter().zip(right.iter()) {
@@ -179,11 +184,19 @@ pub(crate) fn value_to_event_record(value: &Value) -> EventRecord {
             .unwrap_or("")
             .to_string(),
         ordinal: value.get("ordinal").and_then(|items| {
-            items.as_array().map(|values| values.iter().filter_map(Value::as_u64).collect::<Vec<_>>())
+            items
+                .as_array()
+                .map(|values| values.iter().filter_map(Value::as_u64).collect::<Vec<_>>())
         }),
         operation: value.get("operation").cloned().unwrap_or(Value::Null),
-        opid: value.get("opid").and_then(Value::as_str).map(ToString::to_string),
-        did: value.get("did").and_then(Value::as_str).map(ToString::to_string),
+        opid: value
+            .get("opid")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        did: value
+            .get("did")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
     }
 }
 
@@ -209,7 +222,8 @@ pub(crate) fn redis_event_to_stored_value(event: &EventRecord) -> Value {
 }
 
 pub(crate) fn hydrate_redis_event(raw: &str, ops: &HashMap<String, Value>) -> Result<EventRecord> {
-    let mut event = serde_json::from_str::<EventRecord>(raw).context("failed to decode redis did event")?;
+    let mut event =
+        serde_json::from_str::<EventRecord>(raw).context("failed to decode redis did event")?;
     if event.operation.is_null() {
         if let Some(opid) = event.opid.as_ref() {
             if let Some(operation) = ops.get(opid) {
@@ -239,7 +253,11 @@ impl JsonDb {
     }
 
     fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
-        let suffix = did.split(':').next_back().context("invalid did suffix")?.to_string();
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?
+            .to_string();
         let events = self.data.dids.entry(suffix).or_default();
         if events.is_empty() {
             if let (Some(opid), operation) = (event.opid.clone(), event.operation.clone()) {
@@ -252,7 +270,11 @@ impl JsonDb {
     }
 
     fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> {
-        let suffix = did.split(':').next_back().context("invalid did suffix")?.to_string();
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?
+            .to_string();
 
         let latest = self.resolve_doc(
             &Config {
@@ -331,7 +353,11 @@ impl JsonDb {
     }
 
     fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
-        let suffix = did.split(':').next_back().context("invalid did suffix")?.to_string();
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?
+            .to_string();
         for event in &events {
             if let Some(opid) = event.opid.as_ref() {
                 self.data.ops.insert(opid.clone(), event.operation.clone());
@@ -342,7 +368,11 @@ impl JsonDb {
     }
 
     fn delete_events(&mut self, did: &str) -> Result<()> {
-        let suffix = did.split(':').next_back().context("invalid did suffix")?.to_string();
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?
+            .to_string();
         self.data.dids.remove(&suffix);
         self.save()
     }
@@ -403,7 +433,8 @@ impl JsonDb {
         let proof_values = operations
             .iter()
             .filter_map(|value| {
-                value.get("proof")
+                value
+                    .get("proof")
                     .and_then(|proof| proof.get("proofValue"))
                     .and_then(Value::as_str)
             })
@@ -449,7 +480,10 @@ impl JsonDb {
             None => registry_blocks
                 .values()
                 .filter_map(|block| {
-                    block.get("height").and_then(Value::as_u64).map(|height| (height, block.clone()))
+                    block
+                        .get("height")
+                        .and_then(Value::as_u64)
+                        .map(|height| (height, block.clone()))
                 })
                 .max_by_key(|(height, _)| *height)
                 .map(|(_, block)| block),
@@ -466,7 +500,9 @@ impl JsonDb {
             None => {
                 let mut keys = self.data.dids.keys().cloned().collect::<Vec<_>>();
                 keys.sort();
-                keys.into_iter().map(|suffix| format!("{prefix}:{suffix}")).collect()
+                keys.into_iter()
+                    .map(|suffix| format!("{prefix}:{suffix}"))
+                    .collect()
             }
         }
     }
@@ -492,11 +528,17 @@ impl JsonDb {
             .get("type")
             .and_then(Value::as_str)
             .context("missing registration.type")?;
-        let created = anchor_operation.get("created").and_then(Value::as_str).unwrap_or("");
+        let created = anchor_operation
+            .get("created")
+            .and_then(Value::as_str)
+            .unwrap_or("");
 
         let initial_document = match did_type {
             "agent" => {
-                let public_jwk = anchor_operation.get("publicJwk").cloned().unwrap_or_else(|| json!({}));
+                let public_jwk = anchor_operation
+                    .get("publicJwk")
+                    .cloned()
+                    .unwrap_or_else(|| json!({}));
                 json!({
                     "@context": ["https://www.w3.org/ns/did/v1"],
                     "id": did,
@@ -528,7 +570,10 @@ impl JsonDb {
 
         let mut state = ResolvedDoc {
             did_document: initial_document,
-            did_document_data: anchor_operation.get("data").cloned().unwrap_or_else(|| json!({})),
+            did_document_data: anchor_operation
+                .get("data")
+                .cloned()
+                .unwrap_or_else(|| json!({})),
             did_document_registration: Value::Object(registration.clone()),
             created: created.to_string(),
             updated: None,
@@ -651,11 +696,13 @@ impl DbBackend {
                 path: config.data_dir.join("archon.sqlite"),
             },
             "redis" => Self::Redis {
-                url: env::var("ARCHON_REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string()),
+                url: env::var("ARCHON_REDIS_URL")
+                    .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
                 namespace: "archon".to_string(),
             },
             "mongodb" => Self::Mongo {
-                url: env::var("ARCHON_MONGODB_URL").unwrap_or_else(|_| "mongodb://localhost:27017".to_string()),
+                url: env::var("ARCHON_MONGODB_URL")
+                    .unwrap_or_else(|_| "mongodb://localhost:27017".to_string()),
                 database: "archon".to_string(),
                 collection: "gatekeeper_state".to_string(),
                 document_id: STATE_KEY.to_string(),
@@ -669,27 +716,41 @@ impl DbBackend {
     fn load_state(&self) -> Result<JsonDbFile> {
         match self {
             Self::JsonFile { path } => match fs::read_to_string(path) {
-                Ok(raw) => serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode json db"),
+                Ok(raw) => {
+                    serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode json db")
+                }
                 Err(_) => Ok(JsonDbFile::default()),
             },
             Self::Sqlite { path } => {
                 let conn = Self::open_sqlite(path)?;
                 let raw = conn
-                    .query_row("SELECT value FROM kv WHERE key = ?1", [STATE_KEY], |row| row.get::<_, String>(0))
+                    .query_row("SELECT value FROM kv WHERE key = ?1", [STATE_KEY], |row| {
+                        row.get::<_, String>(0)
+                    })
                     .optional()
                     .context("failed to load sqlite state")?;
                 match raw {
-                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode sqlite state"),
+                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw)
+                        .context("failed to decode sqlite state"),
                     None => Ok(JsonDbFile::default()),
                 }
             }
             Self::Redis { url, namespace } => {
-                let client = redis::Client::open(url.as_str()).context("failed to open redis client")?;
-                let mut conn = client.get_connection().context("failed to connect to redis")?;
+                let client =
+                    redis::Client::open(url.as_str()).context("failed to open redis client")?;
+                let mut conn = client
+                    .get_connection()
+                    .context("failed to connect to redis")?;
                 Self::load_redis_state(&mut conn, namespace)
             }
-            Self::Mongo { url, database, collection, document_id } => {
-                let client = MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
+            Self::Mongo {
+                url,
+                database,
+                collection,
+                document_id,
+            } => {
+                let client =
+                    MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
                 let coll = client.database(database).collection::<Document>(collection);
                 let raw = coll
                     .find_one(doc! { "_id": document_id })
@@ -697,7 +758,8 @@ impl DbBackend {
                     .context("failed to load mongodb state")?
                     .and_then(|doc| doc.get_str("value").ok().map(ToString::to_string));
                 match raw {
-                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode mongodb state"),
+                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw)
+                        .context("failed to decode mongodb state"),
                     None => Ok(JsonDbFile::default()),
                 }
             }
@@ -725,13 +787,22 @@ impl DbBackend {
                 Ok(())
             }
             Self::Redis { url, namespace } => {
-                let client = redis::Client::open(url.as_str()).context("failed to open redis client")?;
-                let mut conn = client.get_connection().context("failed to connect to redis")?;
+                let client =
+                    redis::Client::open(url.as_str()).context("failed to open redis client")?;
+                let mut conn = client
+                    .get_connection()
+                    .context("failed to connect to redis")?;
                 Self::save_redis_state(&mut conn, namespace, data)?;
                 Ok(())
             }
-            Self::Mongo { url, database, collection, document_id } => {
-                let client = MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
+            Self::Mongo {
+                url,
+                database,
+                collection,
+                document_id,
+            } => {
+                let client =
+                    MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
                 let coll = client.database(database).collection::<Document>(collection);
                 coll.replace_one(
                     doc! { "_id": document_id },
@@ -750,7 +821,8 @@ impl DbBackend {
             fs::create_dir_all(parent)
                 .with_context(|| format!("failed to create {}", parent.display()))?;
         }
-        let conn = Connection::open(path).with_context(|| format!("failed to open sqlite db {}", path.display()))?;
+        let conn = Connection::open(path)
+            .with_context(|| format!("failed to open sqlite db {}", path.display()))?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS kv (
                 key TEXT PRIMARY KEY,
@@ -763,8 +835,12 @@ impl DbBackend {
     }
 
     fn load_redis_state(conn: &mut redis::Connection, namespace: &str) -> Result<JsonDbFile> {
-        let did_keys: Vec<String> = conn.keys(format!("{namespace}/dids/*")).context("failed to scan redis did keys")?;
-        let op_keys: Vec<String> = conn.keys(format!("{namespace}/ops/*")).context("failed to scan redis op keys")?;
+        let did_keys: Vec<String> = conn
+            .keys(format!("{namespace}/dids/*"))
+            .context("failed to scan redis did keys")?;
+        let op_keys: Vec<String> = conn
+            .keys(format!("{namespace}/ops/*"))
+            .context("failed to scan redis op keys")?;
         let queue_keys: Vec<String> = conn
             .keys(format!("{namespace}/registry/*/queue"))
             .context("failed to scan redis queue keys")?;
@@ -775,8 +851,12 @@ impl DbBackend {
         let mut data = JsonDbFile::default();
 
         for key in op_keys {
-            let Some(opid) = key.rsplit('/').next() else { continue; };
-            let raw: Option<String> = conn.get(&key).with_context(|| format!("failed to load redis op {key}"))?;
+            let Some(opid) = key.rsplit('/').next() else {
+                continue;
+            };
+            let raw: Option<String> = conn
+                .get(&key)
+                .with_context(|| format!("failed to load redis op {key}"))?;
             if let Some(raw) = raw {
                 let operation = serde_json::from_str::<Value>(&raw)
                     .with_context(|| format!("failed to decode redis op {key}"))?;
@@ -785,7 +865,9 @@ impl DbBackend {
         }
 
         for key in did_keys {
-            let Some(suffix) = key.rsplit('/').next() else { continue; };
+            let Some(suffix) = key.rsplit('/').next() else {
+                continue;
+            };
             let raw_events: Vec<String> = conn
                 .lrange(&key, 0, -1)
                 .with_context(|| format!("failed to load redis did events {key}"))?;
@@ -824,7 +906,9 @@ impl DbBackend {
             }
             let registry = segments[2].to_string();
             let hash = segments[4].to_string();
-            let raw: Option<String> = conn.get(&key).with_context(|| format!("failed to load redis block {key}"))?;
+            let raw: Option<String> = conn
+                .get(&key)
+                .with_context(|| format!("failed to load redis block {key}"))?;
             if let Some(raw) = raw {
                 let block = serde_json::from_str::<Value>(&raw)
                     .with_context(|| format!("failed to decode redis block {key}"))?;
@@ -846,34 +930,49 @@ impl DbBackend {
         Ok(data)
     }
 
-    fn save_redis_state(conn: &mut redis::Connection, namespace: &str, data: &JsonDbFile) -> Result<()> {
+    fn save_redis_state(
+        conn: &mut redis::Connection,
+        namespace: &str,
+        data: &JsonDbFile,
+    ) -> Result<()> {
         let existing_keys: Vec<String> = conn
             .keys(format!("{namespace}/*"))
             .context("failed to scan redis namespace for persist")?;
         if !existing_keys.is_empty() {
-            let _: usize = conn.del(existing_keys).context("failed to clear redis namespace before persist")?;
+            let _: usize = conn
+                .del(existing_keys)
+                .context("failed to clear redis namespace before persist")?;
         }
 
         for (opid, operation) in &data.ops {
             let key = format!("{namespace}/ops/{opid}");
-            let body = serde_json::to_string(operation).context("failed to encode redis operation")?;
-            let _: () = conn.set(key, body).context("failed to persist redis operation")?;
+            let body =
+                serde_json::to_string(operation).context("failed to encode redis operation")?;
+            let _: () = conn
+                .set(key, body)
+                .context("failed to persist redis operation")?;
         }
 
         for (suffix, events) in &data.dids {
             let key = format!("{namespace}/dids/{suffix}");
             for event in events {
                 let stored = redis_event_to_stored_value(event);
-                let body = serde_json::to_string(&stored).context("failed to serialize redis did event")?;
-                let _: usize = conn.rpush(&key, body).context("failed to persist redis did event")?;
+                let body = serde_json::to_string(&stored)
+                    .context("failed to serialize redis did event")?;
+                let _: usize = conn
+                    .rpush(&key, body)
+                    .context("failed to persist redis did event")?;
             }
         }
 
         for (registry, operations) in &data.queue {
             let key = format!("{namespace}/registry/{registry}/queue");
             for operation in operations {
-                let body = serde_json::to_string(operation).context("failed to encode redis queue item")?;
-                let _: usize = conn.rpush(&key, body).context("failed to persist redis queue item")?;
+                let body = serde_json::to_string(operation)
+                    .context("failed to encode redis queue item")?;
+                let _: usize = conn
+                    .rpush(&key, body)
+                    .context("failed to persist redis queue item")?;
             }
         }
 
@@ -882,7 +981,9 @@ impl DbBackend {
             for (hash, block) in blocks {
                 let block_key = format!("{namespace}/registry/{registry}/blocks/{hash}");
                 let body = serde_json::to_string(block).context("failed to encode redis block")?;
-                let _: () = conn.set(&block_key, body).context("failed to persist redis block")?;
+                let _: () = conn
+                    .set(&block_key, body)
+                    .context("failed to persist redis block")?;
 
                 if let Some(height) = block.get("height").and_then(Value::as_u64) {
                     let height_map_key = format!("{namespace}/registry/{registry}/heightMap");
@@ -903,7 +1004,8 @@ impl DbBackend {
 
         let import_queue_key = format!("{namespace}/import_queue");
         for event in &data.import_queue {
-            let body = serde_json::to_string(event).context("failed to encode redis import queue event")?;
+            let body = serde_json::to_string(event)
+                .context("failed to encode redis import queue event")?;
             let _: usize = conn
                 .rpush(&import_queue_key, body)
                 .context("failed to persist redis import queue event")?;
@@ -914,24 +1016,64 @@ impl DbBackend {
 }
 
 impl GatekeeperDb for JsonDb {
-    fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> { JsonDb::add_create_event(self, did, event) }
-    fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> { JsonDb::add_followup_event(self, did, event) }
-    fn get_events(&self, did: &str) -> Vec<EventRecord> { JsonDb::get_events(self, did) }
-    fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> { JsonDb::set_events(self, did, events) }
-    fn delete_events(&mut self, did: &str) -> Result<()> { JsonDb::delete_events(self, did) }
-    fn reset_db(&mut self) -> Result<()> { JsonDb::reset_db(self) }
-    fn add_operation(&mut self, opid: &str, operation: Value) -> Result<()> { JsonDb::add_operation(self, opid, operation) }
-    fn get_operation(&self, opid: &str) -> Option<Value> { JsonDb::get_operation(self, opid) }
-    fn push_import_event(&mut self, event: EventRecord) { JsonDb::push_import_event(self, event) }
-    fn take_import_queue(&mut self) -> Vec<EventRecord> { JsonDb::take_import_queue(self) }
-    fn import_queue_len(&self) -> usize { JsonDb::import_queue_len(self) }
-    fn import_queue_snapshot(&self) -> Vec<EventRecord> { JsonDb::import_queue_snapshot(self) }
-    fn clear_import_queue(&mut self) { JsonDb::clear_import_queue(self) }
-    fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize> { JsonDb::queue_operation(self, registry, operation) }
-    fn get_queue(&self, registry: &str) -> Vec<Value> { JsonDb::get_queue(self, registry) }
-    fn clear_queue(&mut self, registry: &str, operations: &[Value]) -> Result<bool> { JsonDb::clear_queue(self, registry, operations) }
-    fn add_block(&mut self, registry: &str, block: Value) -> Result<bool> { JsonDb::add_block(self, registry, block) }
-    fn get_block(&self, registry: &str, block_id: Option<BlockLookup>) -> Option<Value> { JsonDb::get_block(self, registry, block_id) }
-    fn list_dids(&self, prefix: &str, requested: Option<&[String]>) -> Vec<String> { JsonDb::list_dids(self, prefix, requested) }
-    fn resolve_doc(&self, config: &Config, did: &str, options: ResolveOptions) -> Result<Value> { JsonDb::resolve_doc(self, config, did, options) }
+    fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
+        JsonDb::add_create_event(self, did, event)
+    }
+    fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> {
+        JsonDb::add_followup_event(self, did, event)
+    }
+    fn get_events(&self, did: &str) -> Vec<EventRecord> {
+        JsonDb::get_events(self, did)
+    }
+    fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
+        JsonDb::set_events(self, did, events)
+    }
+    fn delete_events(&mut self, did: &str) -> Result<()> {
+        JsonDb::delete_events(self, did)
+    }
+    fn reset_db(&mut self) -> Result<()> {
+        JsonDb::reset_db(self)
+    }
+    fn add_operation(&mut self, opid: &str, operation: Value) -> Result<()> {
+        JsonDb::add_operation(self, opid, operation)
+    }
+    fn get_operation(&self, opid: &str) -> Option<Value> {
+        JsonDb::get_operation(self, opid)
+    }
+    fn push_import_event(&mut self, event: EventRecord) {
+        JsonDb::push_import_event(self, event)
+    }
+    fn take_import_queue(&mut self) -> Vec<EventRecord> {
+        JsonDb::take_import_queue(self)
+    }
+    fn import_queue_len(&self) -> usize {
+        JsonDb::import_queue_len(self)
+    }
+    fn import_queue_snapshot(&self) -> Vec<EventRecord> {
+        JsonDb::import_queue_snapshot(self)
+    }
+    fn clear_import_queue(&mut self) {
+        JsonDb::clear_import_queue(self)
+    }
+    fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize> {
+        JsonDb::queue_operation(self, registry, operation)
+    }
+    fn get_queue(&self, registry: &str) -> Vec<Value> {
+        JsonDb::get_queue(self, registry)
+    }
+    fn clear_queue(&mut self, registry: &str, operations: &[Value]) -> Result<bool> {
+        JsonDb::clear_queue(self, registry, operations)
+    }
+    fn add_block(&mut self, registry: &str, block: Value) -> Result<bool> {
+        JsonDb::add_block(self, registry, block)
+    }
+    fn get_block(&self, registry: &str, block_id: Option<BlockLookup>) -> Option<Value> {
+        JsonDb::get_block(self, registry, block_id)
+    }
+    fn list_dids(&self, prefix: &str, requested: Option<&[String]>) -> Vec<String> {
+        JsonDb::list_dids(self, prefix, requested)
+    }
+    fn resolve_doc(&self, config: &Config, did: &str, options: ResolveOptions) -> Result<Value> {
+        JsonDb::resolve_doc(self, config, did, options)
+    }
 }

@@ -6,9 +6,10 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tracing::info;
 
+use crate::store::ResolvedDoc;
 use crate::{
-    chrono_like_now, generate_json_cid, verify_create_operation_impl, verify_update_operation_impl, AppState,
-    EventRecord, GatekeeperDb, ResolveOptions, ResolvedDoc,
+    chrono_like_now, generate_json_cid, verify_create_operation_impl, verify_update_operation_impl,
+    AppState, EventRecord, GatekeeperDb, ResolveOptions,
 };
 
 #[derive(Clone, Serialize, Default)]
@@ -24,9 +25,13 @@ pub(crate) struct CheckDidsByType {
 #[derive(Clone, Serialize, Default)]
 pub(crate) struct CheckDidsResult {
     pub(crate) total: usize,
+    #[serde(rename = "byType")]
     pub(crate) byType: CheckDidsByType,
+    #[serde(rename = "byRegistry")]
     pub(crate) byRegistry: HashMap<String, usize>,
+    #[serde(rename = "byVersion")]
     pub(crate) byVersion: HashMap<String, usize>,
+    #[serde(rename = "eventsQueue")]
     pub(crate) eventsQueue: Vec<EventRecord>,
 }
 
@@ -79,7 +84,10 @@ pub(crate) async fn resolve_local_doc_async(
 
     let initial_document = match did_type {
         "agent" => {
-            let public_jwk = anchor_operation.get("publicJwk").cloned().unwrap_or_else(|| json!({}));
+            let public_jwk = anchor_operation
+                .get("publicJwk")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
             json!({
                 "@context": ["https://www.w3.org/ns/did/v1"],
                 "id": did,
@@ -109,7 +117,10 @@ pub(crate) async fn resolve_local_doc_async(
 
     let mut resolved = ResolvedDoc {
         did_document: initial_document,
-        did_document_data: anchor_operation.get("data").cloned().unwrap_or_else(|| json!({})),
+        did_document_data: anchor_operation
+            .get("data")
+            .cloned()
+            .unwrap_or_else(|| json!({})),
         did_document_registration: Value::Object(registration.clone()),
         created: created.clone(),
         updated: None,
@@ -273,7 +284,10 @@ pub(crate) async fn update_metrics_from_check(state: &AppState, did_check: &Chec
             .set(count as f64);
     }
 
-    state.metrics.gatekeeper_dids_total.set(did_check.total as f64);
+    state
+        .metrics
+        .gatekeeper_dids_total
+        .set(did_check.total as f64);
     state.metrics.gatekeeper_dids_by_type.reset();
     for (ty, count) in [
         ("agents", did_check.byType.agents),
@@ -462,7 +476,10 @@ pub(crate) async fn search_docs_impl(state: &AppState, q: &str) -> Vec<String> {
         let Ok(doc) = doc else {
             continue;
         };
-        let data = doc.get("didDocumentData").cloned().unwrap_or_else(|| json!({}));
+        let data = doc
+            .get("didDocumentData")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
         if data.to_string().contains(q) {
             result.push(did);
         }
@@ -479,7 +496,10 @@ pub(crate) async fn query_docs_impl(state: &AppState, where_clause: &Value) -> R
     let Some((raw_path, cond)) = where_clause.as_object().and_then(|map| map.iter().next()) else {
         return Ok(Vec::new());
     };
-    let list = cond.get("$in").and_then(Value::as_array).context("Only {$in:[...]} supported")?;
+    let list = cond
+        .get("$in")
+        .and_then(Value::as_array)
+        .context("Only {$in:[...]} supported")?;
 
     let mut result = Vec::new();
     for did in dids {
@@ -490,7 +510,10 @@ pub(crate) async fn query_docs_impl(state: &AppState, where_clause: &Value) -> R
         let Ok(doc) = doc else {
             continue;
         };
-        let data = doc.get("didDocumentData").cloned().unwrap_or_else(|| json!({}));
+        let data = doc
+            .get("didDocumentData")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
         if query_match(&data, raw_path, list) {
             result.push(did);
         }
@@ -520,7 +543,10 @@ fn query_match(root: &Value, raw_path: &str, list: &[Value]) -> bool {
     if let Some(base_path) = raw_path.strip_suffix(".*") {
         return json_path_get(root, base_path)
             .and_then(Value::as_object)
-            .map(|obj| obj.keys().any(|key| list.contains(&Value::String(key.clone()))))
+            .map(|obj| {
+                obj.keys()
+                    .any(|key| list.contains(&Value::String(key.clone())))
+            })
             .unwrap_or(false);
     }
 
@@ -535,7 +561,9 @@ fn query_match(root: &Value, raw_path: &str, list: &[Value]) -> bool {
             .unwrap_or(false);
     }
 
-    json_path_get(root, raw_path).map(|value| list.contains(value)).unwrap_or(false)
+    json_path_get(root, raw_path)
+        .map(|value| list.contains(value))
+        .unwrap_or(false)
 }
 
 fn json_path_get<'a>(root: &'a Value, path: &str) -> Option<&'a Value> {
@@ -584,7 +612,10 @@ pub(crate) fn start_background_tasks(state: AppState) {
             let mut interval = tokio::time::interval(Duration::from_secs(interval_minutes * 60));
             loop {
                 let result = verify_db_impl(&gc_state, false).await;
-                info!("DID garbage collection: {}", serde_json::to_string(&result).unwrap_or_default());
+                info!(
+                    "DID garbage collection: {}",
+                    serde_json::to_string(&result).unwrap_or_default()
+                );
                 refresh_metrics_snapshot(&gc_state).await;
                 interval.tick().await;
             }

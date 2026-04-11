@@ -22,10 +22,17 @@ async fn sqlite_backend_persists_queue_and_blocks_across_restart() -> Result<()>
         .send()
         .await?;
     assert!(response.status().is_success());
-    assert_eq!(response.json::<Value>().await?, Value::String(expected_did.to_string()));
+    assert_eq!(
+        response.json::<Value>().await?,
+        Value::String(expected_did.to_string())
+    );
 
     let response = service
-        .admin(service.client.get(format!("{}/queue/hyperswarm", service.base_url)))
+        .admin(
+            service
+                .client
+                .get(format!("{}/queue/hyperswarm", service.base_url)),
+        )
         .send()
         .await?;
     assert!(response.status().is_success());
@@ -63,7 +70,11 @@ async fn sqlite_backend_persists_queue_and_blocks_across_restart() -> Result<()>
     let service = respawn_service("sqlite", &data_dir, &[]).await?;
 
     let response = service
-        .admin(service.client.get(format!("{}/queue/hyperswarm", service.base_url)))
+        .admin(
+            service
+                .client
+                .get(format!("{}/queue/hyperswarm", service.base_url)),
+        )
         .send()
         .await?;
     assert!(response.status().is_success());

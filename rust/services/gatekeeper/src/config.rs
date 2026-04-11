@@ -45,15 +45,28 @@ impl Config {
                 })
                 .filter(|items| !items.is_empty())
                 .unwrap_or_else(|| vec!["local".to_string(), "hyperswarm".to_string()]),
-            json_limit: parse_size_string(&env_var_or_default("ARCHON_GATEKEEPER_JSON_LIMIT", "4mb"))?,
-            upload_limit: parse_size_string(&env_var_or_default("ARCHON_GATEKEEPER_UPLOAD_LIMIT", "10mb"))?,
+            json_limit: parse_size_string(&env_var_or_default(
+                "ARCHON_GATEKEEPER_JSON_LIMIT",
+                "4mb",
+            ))?,
+            upload_limit: parse_size_string(&env_var_or_default(
+                "ARCHON_GATEKEEPER_UPLOAD_LIMIT",
+                "10mb",
+            ))?,
             gc_interval_minutes: env_parse("ARCHON_GATEKEEPER_GC_INTERVAL", 15)?,
             status_interval_minutes: env_parse("ARCHON_GATEKEEPER_STATUS_INTERVAL", 5)?,
             admin_api_key: env::var("ARCHON_ADMIN_API_KEY").unwrap_or_default(),
-            fallback_url: env_var_or_default("ARCHON_GATEKEEPER_FALLBACK_URL", "https://dev.uniresolver.io"),
+            fallback_url: env_var_or_default(
+                "ARCHON_GATEKEEPER_FALLBACK_URL",
+                "https://dev.uniresolver.io",
+            ),
             fallback_timeout_ms: env_parse("ARCHON_GATEKEEPER_FALLBACK_TIMEOUT", 5000)?,
             max_queue_size: 100,
-            git_commit: env::var("GIT_COMMIT").unwrap_or_else(|_| "unknown".to_string()).chars().take(7).collect(),
+            git_commit: env::var("GIT_COMMIT")
+                .unwrap_or_else(|_| "unknown".to_string())
+                .chars()
+                .take(7)
+                .collect(),
             version: env_var_or_default("ARCHON_GATEKEEPER_VERSION", "0.7.0"),
         })
     }
@@ -66,7 +79,9 @@ where
 {
     match env::var(name) {
         Ok(value) if value.trim().is_empty() => Ok(default),
-        Ok(value) => value.parse::<T>().map_err(|error| anyhow::anyhow!("{name}: {error}")),
+        Ok(value) => value
+            .parse::<T>()
+            .map_err(|error| anyhow::anyhow!("{name}: {error}")),
         Err(_) => Ok(default),
     }
 }
@@ -90,6 +105,8 @@ pub(crate) fn parse_size_string(value: &str) -> Result<usize> {
         (trimmed.as_str(), 1usize)
     };
 
-    let parsed = number.parse::<usize>().with_context(|| format!("invalid size `{value}`"))?;
+    let parsed = number
+        .parse::<usize>()
+        .with_context(|| format!("invalid size `{value}`"))?;
     Ok(parsed.saturating_mul(multiplier))
 }
