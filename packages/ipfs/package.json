@@ -77,7 +77,7 @@
     "@didcid/common": "^0.1.9",
     "@helia/json": "^4.0.3",
     "@helia/unixfs": "^5.0.0",
-    "axios": "^1.14.0",
+    "axios": "^1.15.0",
     "blockstore-fs": "^2.0.2",
     "helia": "^5.3.0",
     "ip": "^2.0.1",

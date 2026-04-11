@@ -144,7 +144,7 @@
     "@didcid/cipher": "^0.2.7",
     "@didcid/common": "^0.1.9",
     "@didcid/gatekeeper": "^0.4.7",
-    "axios": "^1.14.0",
+    "axios": "^1.15.0",
     "commander": "^11.1.0",
     "dotenv": "^16.4.5",
     "file-type": "^21.3.2",
