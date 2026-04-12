@@ -97,6 +97,7 @@ mod tests {
             client: Client::builder().build().expect("client should build"),
             metrics: Arc::new(Metrics::new(&config).expect("metrics should build")),
             store: Arc::new(Mutex::new(db)),
+            import_queue: Arc::new(Mutex::new(Vec::new())),
             events_seen: Arc::new(Mutex::new(HashMap::new())),
             verified_dids: Arc::new(Mutex::new(HashMap::new())),
             supported_registries: Arc::new(Mutex::new(config.registries.clone())),
@@ -967,7 +968,8 @@ mod tests {
                 did: Some(did_invalid.to_string()),
             }],
         );
-        db.push_import_event(EventRecord {
+        let (state, _state_dir) = make_state(db);
+        state.import_queue.lock().await.push(EventRecord {
             registry: "hyperswarm".to_string(),
             time: "2026-04-11T12:10:00Z".to_string(),
             ordinal: Some(vec![5]),
@@ -975,8 +977,6 @@ mod tests {
             opid: Some("queued".to_string()),
             did: Some("did:cid:queued".to_string()),
         });
-
-        let (state, _state_dir) = make_state(db);
         let result = check_dids_impl(&state, None, false).await;
 
         assert_eq!(result.total, 3);
@@ -1051,7 +1051,8 @@ mod tests {
                 did: Some(invalid_did.to_string()),
             }],
         );
-        db.push_import_event(EventRecord {
+        let (state, _state_dir) = make_state(db);
+        state.import_queue.lock().await.push(EventRecord {
             registry: "local".to_string(),
             time: "2026-04-11T12:10:00Z".to_string(),
             ordinal: Some(vec![1]),
@@ -1059,8 +1060,6 @@ mod tests {
             opid: Some("queued".to_string()),
             did: Some("did:cid:queued".to_string()),
         });
-
-        let (state, _state_dir) = make_state(db);
         let result = verify_db_impl(&state, false).await;
         assert_eq!(result.total, 3);
         assert_eq!(result.verified, 1);
@@ -1070,8 +1069,8 @@ mod tests {
         let store = state.store.lock().await;
         assert!(store.get_events(expired_did).is_empty());
         assert!(store.get_events(invalid_did).is_empty());
-        assert_eq!(store.import_queue_len(), 0);
         drop(store);
+        assert_eq!(state.import_queue.lock().await.len(), 0);
 
         let cached = verify_db_impl(&state, false).await;
         assert_eq!(cached.total, 1);

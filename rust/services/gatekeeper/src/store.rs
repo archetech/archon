@@ -31,8 +31,6 @@ pub(crate) struct EventRecord {
 #[derive(Default, Serialize, Deserialize)]
 pub(crate) struct JsonDbFile {
     pub(crate) dids: HashMap<String, Vec<EventRecord>>,
-    #[serde(skip, default)]
-    pub(crate) import_queue: Vec<EventRecord>,
     #[serde(default)]
     pub(crate) queue: HashMap<String, Vec<Value>>,
     #[serde(default)]
@@ -74,11 +72,6 @@ pub(crate) trait GatekeeperDb {
     fn reset_db(&mut self) -> Result<()>;
     fn add_operation(&mut self, opid: &str, operation: Value) -> Result<()>;
     fn get_operation(&self, opid: &str) -> Option<Value>;
-    fn push_import_event(&mut self, event: EventRecord);
-    fn take_import_queue(&mut self) -> Vec<EventRecord>;
-    fn import_queue_len(&self) -> usize;
-    fn import_queue_snapshot(&self) -> Vec<EventRecord>;
-    fn clear_import_queue(&mut self);
     fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize>;
     fn get_queue(&self, registry: &str) -> Vec<Value>;
     fn clear_queue(&mut self, registry: &str, operations: &[Value]) -> Result<bool>;
@@ -1018,26 +1011,6 @@ impl JsonDb {
         }
 
         self.data.ops.get(opid).cloned()
-    }
-
-    fn push_import_event(&mut self, event: EventRecord) {
-        self.data.import_queue.push(event);
-    }
-
-    fn take_import_queue(&mut self) -> Vec<EventRecord> {
-        std::mem::take(&mut self.data.import_queue)
-    }
-
-    fn import_queue_len(&self) -> usize {
-        self.data.import_queue.len()
-    }
-
-    fn import_queue_snapshot(&self) -> Vec<EventRecord> {
-        self.data.import_queue.clone()
-    }
-
-    fn clear_import_queue(&mut self) {
-        self.data.import_queue.clear();
     }
 
     fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize> {
@@ -2040,21 +2013,6 @@ impl GatekeeperDb for JsonDb {
     }
     fn get_operation(&self, opid: &str) -> Option<Value> {
         JsonDb::get_operation(self, opid)
-    }
-    fn push_import_event(&mut self, event: EventRecord) {
-        JsonDb::push_import_event(self, event)
-    }
-    fn take_import_queue(&mut self) -> Vec<EventRecord> {
-        JsonDb::take_import_queue(self)
-    }
-    fn import_queue_len(&self) -> usize {
-        JsonDb::import_queue_len(self)
-    }
-    fn import_queue_snapshot(&self) -> Vec<EventRecord> {
-        JsonDb::import_queue_snapshot(self)
-    }
-    fn clear_import_queue(&mut self) {
-        JsonDb::clear_import_queue(self)
     }
     fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize> {
         JsonDb::queue_operation(self, registry, operation)

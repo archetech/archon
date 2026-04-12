@@ -320,6 +320,11 @@ pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> Impo
     let mut processed = 0;
     let trace = import_trace_enabled();
 
+    // Validate and decode every event outside the mutex critical section so
+    // shape checks and JSON cloning don't serialize behind the store lock.
+    // TS runs this in a single-threaded JS loop with zero contention; batching
+    // the lock acquisition here keeps parity with that cost model.
+    let mut accepted: Vec<(String, EventRecord)> = Vec::with_capacity(batch.len());
     for event in batch {
         if !verify_event_shape(event) {
             if trace {
@@ -337,30 +342,35 @@ pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> Impo
             continue;
         };
 
-        let mut seen = state.events_seen.lock().await;
-        if seen.contains_key(&key) {
-            if trace {
-                info!("import_batch skipped previously seen key={key} {}", summarize_value_event(event));
-            }
-            processed += 1;
-            continue;
-        }
-        seen.insert(key.clone(), true);
-        drop(seen);
-
-        let mut store = state.store.lock().await;
-        store.push_import_event(value_to_event_record(event));
-        if trace {
-            info!("import_batch queued key={key} {}", summarize_value_event(event));
-        }
-        queued += 1;
+        accepted.push((key, value_to_event_record(event)));
     }
+
+    let total = {
+        let mut seen = state.events_seen.lock().await;
+        let mut queue = state.import_queue.lock().await;
+        for (key, record) in accepted {
+            if seen.contains_key(&key) {
+                if trace {
+                    info!("import_batch skipped previously seen key={key}");
+                }
+                processed += 1;
+                continue;
+            }
+            if trace {
+                info!("import_batch queued key={key}");
+            }
+            seen.insert(key, true);
+            queue.push(record);
+            queued += 1;
+        }
+        queue.len()
+    };
 
     ImportBatchResult {
         queued,
         processed,
         rejected,
-        total: state.store.lock().await.import_queue_len(),
+        total,
     }
 }
 
@@ -395,7 +405,7 @@ pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult
         }
     }
 
-    let pending = state.store.lock().await.import_queue_len();
+    let pending = state.import_queue.lock().await.len();
     *state.processing_events.lock().await = false;
 
     let response = ProcessEventsResult {
@@ -413,7 +423,7 @@ pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult
 }
 
 async fn import_events_once(state: &AppState) -> ImportEventsResult {
-    let mut temp_queue = state.store.lock().await.take_import_queue();
+    let mut temp_queue = std::mem::take(&mut *state.import_queue.lock().await);
     let total = temp_queue.len();
 
     let mut added = 0;
@@ -445,8 +455,7 @@ async fn import_events_once(state: &AppState) -> ImportEventsResult {
                 "rejected"
             }
             ImportStatus::Deferred => {
-                let mut store = state.store.lock().await;
-                store.push_import_event(event);
+                state.import_queue.lock().await.push(event);
                 info!("import {}/{}: deferred event for {}", index + 1, total, did);
                 "deferred"
             }

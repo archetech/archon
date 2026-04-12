@@ -50,7 +50,7 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
     let Some(operation) = event.get("operation") else {
         return false;
     };
-    if operation.to_string().len() > 64 * 1024 {
+    if exceeds_json_size(operation, 64 * 1024) {
         return false;
     }
     if !verify_proof_format(operation.get("proof")) {
@@ -129,6 +129,33 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
 
 fn verify_did_format(did: &str) -> bool {
     did.starts_with("did:")
+}
+
+fn exceeds_json_size(value: &Value, limit: usize) -> bool {
+    struct LimitWriter {
+        count: usize,
+        limit: usize,
+    }
+
+    impl std::io::Write for LimitWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.count = self.count.saturating_add(buf.len());
+            if self.count > self.limit {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "json size limit exceeded",
+                ));
+            }
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut writer = LimitWriter { count: 0, limit };
+    serde_json::to_writer(&mut writer, value).is_err()
 }
 
 fn verify_date_format(time: Option<&str>) -> bool {
@@ -255,7 +282,7 @@ pub(crate) async fn verify_create_operation_impl(
     if operation.is_null() {
         anyhow::bail!("Invalid operation: missing");
     }
-    if operation.to_string().len() > 64 * 1024 {
+    if exceeds_json_size(operation, 64 * 1024) {
         anyhow::bail!("Invalid operation: size");
     }
     if operation.get("type").and_then(Value::as_str) != Some("create") {
@@ -386,7 +413,7 @@ pub(crate) async fn verify_update_operation_impl(
     operation: &Value,
     doc: &Value,
 ) -> Result<bool> {
-    if operation.to_string().len() > 64 * 1024 {
+    if exceeds_json_size(operation, 64 * 1024) {
         anyhow::bail!("Invalid operation: size");
     }
     if !verify_proof_format(operation.get("proof")) {

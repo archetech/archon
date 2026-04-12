@@ -472,7 +472,7 @@ pub(crate) async fn check_dids_impl(
         }
     }
 
-    let events_queue = state.store.lock().await.import_queue_snapshot();
+    let events_queue = state.import_queue.lock().await.clone();
 
     CheckDidsResult {
         total: dids.len(),
@@ -535,10 +535,7 @@ pub(crate) async fn verify_db_impl(state: &AppState, _chatty: bool) -> VerifyDbR
         }
     }
 
-    {
-        let mut store = state.store.lock().await;
-        store.clear_import_queue();
-    }
+    state.import_queue.lock().await.clear();
 
     VerifyDbResult {
         total,

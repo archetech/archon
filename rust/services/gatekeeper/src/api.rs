@@ -842,6 +842,7 @@ pub(crate) async fn db_reset(State(state): State<AppState>, headers: HeaderMap) 
     };
     state.events_seen.lock().await.clear();
     state.verified_dids.lock().await.clear();
+    state.import_queue.lock().await.clear();
     clear_search_index(&state).await;
     refresh_metrics_snapshot(&state).await;
     record_metrics(

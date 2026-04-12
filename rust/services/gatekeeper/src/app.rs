@@ -29,7 +29,7 @@ use crate::{
         remove_dids, resolve_did, search_docs, status, version,
     },
     build_search_index, log_status_snapshot, refresh_metrics_snapshot, start_background_tasks,
-    CheckDidsResult, Config, JsonDb, Metrics, SearchIndex,
+    CheckDidsResult, Config, EventRecord, JsonDb, Metrics, SearchIndex,
 };
 
 #[derive(Clone)]
@@ -38,6 +38,7 @@ pub(crate) struct AppState {
     pub(crate) client: Client,
     pub(crate) metrics: Arc<Metrics>,
     pub(crate) store: Arc<Mutex<JsonDb>>,
+    pub(crate) import_queue: Arc<Mutex<Vec<EventRecord>>>,
     pub(crate) events_seen: Arc<Mutex<HashMap<String, bool>>>,
     pub(crate) verified_dids: Arc<Mutex<HashMap<String, bool>>>,
     pub(crate) supported_registries: Arc<Mutex<Vec<String>>>,
@@ -147,6 +148,7 @@ fn build_state(config: Config) -> Result<AppState> {
         client,
         metrics,
         store,
+        import_queue: Arc::new(Mutex::new(Vec::new())),
         events_seen: Arc::new(Mutex::new(HashMap::new())),
         verified_dids: Arc::new(Mutex::new(HashMap::new())),
         supported_registries: Arc::new(Mutex::new(config.registries.clone())),
