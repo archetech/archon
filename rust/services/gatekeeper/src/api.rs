@@ -867,7 +867,7 @@ pub(crate) async fn db_verify(State(state): State<AppState>, headers: HeaderMap)
         return response;
     }
 
-    let result = verify_db_impl(&state, false).await;
+    let result = verify_db_impl(&state, true).await;
     build_search_index(&state).await;
     record_metrics(
         &state,
@@ -923,6 +923,7 @@ pub(crate) async fn query_docs(
             Json(json!(result)).into_response()
         }
         Err(error) => {
+            error!("/api/v1/query error: {error}");
             record_metrics(&state, "POST", "/query", 500, start.elapsed().as_secs_f64());
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -1485,8 +1486,11 @@ pub(crate) async fn get_metrics(State(state): State<AppState>) -> Response {
 }
 
 pub(crate) async fn not_found(State(state): State<AppState>, request: Request) -> Response {
-    let route = normalize_path(request.uri().path());
-    record_metrics(&state, request.method().as_str(), &route, 404, 0.0);
+    let method = request.method().clone();
+    let path = request.uri().path().to_string();
+    let route = normalize_path(&path);
+    tracing::warn!("Warning: Unhandled endpoint - {} {}", method, path);
+    record_metrics(&state, method.as_str(), &route, 404, 0.0);
     (
         StatusCode::NOT_FOUND,
         Json(json!({ "message": "Endpoint not found" })),
@@ -1495,8 +1499,11 @@ pub(crate) async fn not_found(State(state): State<AppState>, request: Request) -
 }
 
 pub(crate) async fn api_not_found(State(state): State<AppState>, request: Request) -> Response {
-    let route = normalize_path(request.uri().path());
-    record_metrics(&state, request.method().as_str(), &route, 404, 0.0);
+    let method = request.method().clone();
+    let path = request.uri().path().to_string();
+    let route = normalize_path(&path);
+    tracing::warn!("Warning: Unhandled API endpoint - {} {}", method, path);
+    record_metrics(&state, method.as_str(), &route, 404, 0.0);
     (
         StatusCode::NOT_FOUND,
         Json(json!({ "message": "Endpoint not found" })),
@@ -1505,6 +1512,13 @@ pub(crate) async fn api_not_found(State(state): State<AppState>, request: Reques
 }
 
 fn text_error_response(status: StatusCode, message: &str) -> Response {
+    // Mirror TS's `console.error(error)` on 5xx and `console.warn` on 4xx so
+    // the container log always shows what a caller saw as an error response.
+    if status.is_server_error() {
+        error!("{} {}", status.as_u16(), message);
+    } else if status.is_client_error() {
+        tracing::warn!("{} {}", status.as_u16(), message);
+    }
     Response::builder()
         .status(status)
         .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")

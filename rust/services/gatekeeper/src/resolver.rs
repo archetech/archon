@@ -483,7 +483,8 @@ pub(crate) async fn check_dids_impl(
     }
 }
 
-pub(crate) async fn verify_db_impl(state: &AppState, _chatty: bool) -> VerifyDbResult {
+pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbResult {
+    let started = std::time::Instant::now();
     let dids = {
         let store = state.store.lock().await;
         store.list_dids(&state.config.did_prefix, None)
@@ -492,8 +493,10 @@ pub(crate) async fn verify_db_impl(state: &AppState, _chatty: bool) -> VerifyDbR
     let mut expired = 0;
     let mut invalid = 0;
     let mut verified = state.verified_dids.lock().await.len();
+    let mut n = 0usize;
 
     for did in dids {
+        n += 1;
         if state.verified_dids.lock().await.contains_key(&did) {
             continue;
         }
@@ -509,6 +512,9 @@ pub(crate) async fn verify_db_impl(state: &AppState, _chatty: bool) -> VerifyDbR
         .await;
 
         let Ok(doc) = doc else {
+            if chatty {
+                info!("removing {}/{} {} invalid", n, total, did);
+            }
             invalid += 1;
             let mut store = state.store.lock().await;
             let _ = store.delete_events(&did);
@@ -523,19 +529,43 @@ pub(crate) async fn verify_db_impl(state: &AppState, _chatty: bool) -> VerifyDbR
 
         if let Some(valid_until) = valid_until {
             if valid_until < chrono_like_now() {
+                if chatty {
+                    info!("removing {}/{} {} expired", n, total, did);
+                }
                 expired += 1;
                 let mut store = state.store.lock().await;
                 let _ = store.delete_events(&did);
             } else {
+                if chatty {
+                    let minutes_left = chrono::DateTime::parse_from_rfc3339(&valid_until)
+                        .ok()
+                        .map(|expiry| {
+                            let now = chrono::Utc::now();
+                            let delta = expiry.with_timezone(&chrono::Utc) - now;
+                            (delta.num_seconds() as f64 / 60.0).round() as i64
+                        })
+                        .unwrap_or_default();
+                    info!(
+                        "expiring {}/{} {} in {} minutes",
+                        n, total, did, minutes_left
+                    );
+                }
                 verified += 1;
             }
         } else {
+            if chatty {
+                info!("verifying {}/{} {} OK", n, total, did);
+            }
             state.verified_dids.lock().await.insert(did, true);
             verified += 1;
         }
     }
 
     state.import_queue.lock().await.clear();
+
+    if chatty {
+        info!("verifyDb: {}ms", started.elapsed().as_millis());
+    }
 
     VerifyDbResult {
         total,
@@ -577,10 +607,11 @@ pub(crate) fn start_background_tasks(state: AppState) {
             let interval = Duration::from_secs(interval_minutes * 60);
             tokio::time::sleep(interval).await;
             loop {
-                let result = verify_db_impl(&gc_state, false).await;
+                let result = verify_db_impl(&gc_state, true).await;
                 info!(
-                    "DID garbage collection: {}",
-                    serde_json::to_string(&result).unwrap_or_default()
+                    "DID garbage collection: {} waiting {} minutes...",
+                    serde_json::to_string(&result).unwrap_or_default(),
+                    interval_minutes
                 );
                 refresh_metrics_snapshot(&gc_state).await;
                 tokio::time::sleep(interval).await;
