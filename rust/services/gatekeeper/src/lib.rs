@@ -432,7 +432,38 @@ mod tests {
                     "type": "agent",
                     "registry": "local"
                 },
+                "publicJwk": {
+                    "kty": "EC",
+                    "crv": "secp256k1",
+                    "x": "TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao",
+                    "y": "OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE"
+                },
                 "proof": {
+                    "type": "EcdsaSecp256k1Signature2019",
+                    "created": "2026-04-11T12:00:00Z",
+                    "verificationMethod": "#key-1",
+                    "proofPurpose": "authentication",
+                    "proofValue": "sig"
+                }
+            }
+        });
+        let valid_asset_create = json!({
+            "registry": "hyperswarm",
+            "time": "2026-04-11T12:00:00Z",
+            "operation": {
+                "type": "create",
+                "created": "2026-04-11T12:00:00Z",
+                "registration": {
+                    "version": 1,
+                    "type": "asset",
+                    "registry": "hyperswarm"
+                },
+                "controller": "did:cid:bagaaieratestcontroller",
+                "proof": {
+                    "type": "EcdsaSecp256k1Signature2019",
+                    "created": "2026-04-11T12:00:00Z",
+                    "verificationMethod": "did:cid:bagaaieratestcontroller#key-1",
+                    "proofPurpose": "authentication",
                     "proofValue": "sig"
                 }
             }
@@ -449,6 +480,10 @@ mod tests {
                     }
                 },
                 "proof": {
+                    "type": "EcdsaSecp256k1Signature2019",
+                    "created": "2026-04-11T12:05:00Z",
+                    "verificationMethod": "did:cid:bagaaieratestdid#key-1",
+                    "proofPurpose": "authentication",
                     "proofValue": "sig"
                 }
             }
@@ -460,12 +495,17 @@ mod tests {
                 "type": "delete",
                 "did": "did:cid:bagaaieratestdid",
                 "proof": {
+                    "type": "EcdsaSecp256k1Signature2019",
+                    "created": "2026-04-11T12:10:00Z",
+                    "verificationMethod": "did:cid:bagaaieratestdid#key-1",
+                    "proofPurpose": "authentication",
                     "proofValue": "sig"
                 }
             }
         });
 
         assert!(verify_event_shape(&valid_create));
+        assert!(verify_event_shape(&valid_asset_create));
         assert!(verify_event_shape(&valid_update));
         assert!(verify_event_shape(&valid_delete));
 
@@ -477,6 +517,10 @@ mod tests {
         missing_time.as_object_mut().unwrap().remove("time");
         assert!(!verify_event_shape(&missing_time));
 
+        let mut invalid_time = valid_create.clone();
+        invalid_time["time"] = Value::String("not-a-date".to_string());
+        assert!(!verify_event_shape(&invalid_time));
+
         let mut invalid_version = valid_create.clone();
         invalid_version["operation"]["registration"]["version"] = Value::Number(2.into());
         assert!(!verify_event_shape(&invalid_version));
@@ -485,9 +529,31 @@ mod tests {
         invalid_type["operation"]["registration"]["type"] = Value::String("other".to_string());
         assert!(!verify_event_shape(&invalid_type));
 
+        let mut invalid_proof = valid_create.clone();
+        invalid_proof["operation"]["proof"]["verificationMethod"] =
+            Value::String("not-a-did".to_string());
+        assert!(!verify_event_shape(&invalid_proof));
+
+        let mut agent_missing_key = valid_create.clone();
+        agent_missing_key["operation"]
+            .as_object_mut()
+            .unwrap()
+            .remove("publicJwk");
+        assert!(!verify_event_shape(&agent_missing_key));
+
+        let mut asset_wrong_signer = valid_asset_create.clone();
+        asset_wrong_signer["operation"]["proof"]["verificationMethod"] =
+            Value::String("did:cid:bagaaieradifferent#key-1".to_string());
+        assert!(!verify_event_shape(&asset_wrong_signer));
+
         let mut update_missing_doc = valid_update.clone();
         update_missing_doc["operation"].as_object_mut().unwrap().remove("doc");
         assert!(!verify_event_shape(&update_missing_doc));
+
+        let mut update_mismatched_doc_id = valid_update.clone();
+        update_mismatched_doc_id["operation"]["doc"]["didDocument"] =
+            json!({ "id": "did:cid:bagaaieradifferent" });
+        assert!(!verify_event_shape(&update_mismatched_doc_id));
 
         let mut delete_missing_did = valid_delete.clone();
         delete_missing_did["operation"]

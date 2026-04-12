@@ -40,13 +40,22 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
         return false;
     }
 
-    if event.get("time").and_then(Value::as_str).is_none() {
+    let Some(event_time) = event.get("time").and_then(Value::as_str) else {
+        return false;
+    };
+    if !verify_date_format(Some(event_time)) {
         return false;
     }
 
     let Some(operation) = event.get("operation") else {
         return false;
     };
+    if operation.to_string().len() > 64 * 1024 {
+        return false;
+    }
+    if !verify_proof_format(operation.get("proof")) {
+        return false;
+    }
     let Some(op_type) = operation.get("type").and_then(Value::as_str) else {
         return false;
     };
@@ -72,35 +81,47 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
                         .and_then(Value::as_str),
                     Some("agent" | "asset")
                 )
-                && operation
-                    .get("proof")
-                    .and_then(|value| value.get("proofValue"))
+                && match operation
+                    .get("registration")
+                    .and_then(|value| value.get("type"))
                     .and_then(Value::as_str)
-                    .is_some()
+                {
+                    Some("agent") => operation.get("publicJwk").is_some(),
+                    Some("asset") => {
+                        let controller = operation.get("controller").and_then(Value::as_str);
+                        let signer = operation
+                            .get("proof")
+                            .and_then(|value| value.get("verificationMethod"))
+                            .and_then(Value::as_str)
+                            .and_then(|verification_method| verification_method.split('#').next());
+                        controller.is_some() && controller == signer
+                    }
+                    _ => false,
+                }
         }
         "update" => {
             operation.get("did").and_then(Value::as_str).is_some()
                 && operation
                     .get("doc")
                     .map(|doc| {
-                        doc.get("didDocument").is_some()
+                        let has_doc_payload = doc.get("didDocument").is_some()
                             || doc.get("didDocumentData").is_some()
-                            || doc.get("didDocumentRegistration").is_some()
+                            || doc.get("didDocumentRegistration").is_some();
+                        let id_matches = match (
+                            doc.get("didDocument")
+                                .and_then(|value| value.get("id"))
+                                .and_then(Value::as_str),
+                            operation.get("did").and_then(Value::as_str),
+                        ) {
+                            (Some(doc_id), Some(operation_did)) => doc_id == operation_did,
+                            _ => true,
+                        };
+                        has_doc_payload && id_matches
                     })
                     .unwrap_or(false)
-                && operation
-                    .get("proof")
-                    .and_then(|value| value.get("proofValue"))
-                    .and_then(Value::as_str)
-                    .is_some()
         }
         "delete" => {
             operation.get("did").and_then(Value::as_str).is_some()
-                && operation
-                    .get("proof")
-                    .and_then(|value| value.get("proofValue"))
-                    .and_then(Value::as_str)
-                    .is_some()
         }
         _ => false,
     }

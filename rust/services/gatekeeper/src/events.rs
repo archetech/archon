@@ -1,6 +1,9 @@
+use std::env;
+
 use anyhow::Result;
 use serde::Serialize;
 use serde_json::Value;
+use tracing::{info, warn};
 
 use crate::store::compare_ordinals;
 use crate::{
@@ -45,6 +48,80 @@ pub(crate) enum ImportStatus {
     Deferred,
 }
 
+fn import_trace_enabled() -> bool {
+    matches!(
+        env::var("ARCHON_GATEKEEPER_IMPORT_TRACE").ok().as_deref(),
+        Some("1" | "true" | "TRUE" | "yes" | "YES")
+    )
+}
+
+fn summarize_value_event(event: &Value) -> String {
+    let registry = event
+        .get("registry")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let did = event.get("did").and_then(Value::as_str).unwrap_or("-");
+    let op_type = event
+        .get("operation")
+        .and_then(|value| value.get("type"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let opid = event.get("opid").and_then(Value::as_str).unwrap_or("-");
+    let previd = event
+        .get("operation")
+        .and_then(|value| value.get("previd"))
+        .and_then(Value::as_str)
+        .unwrap_or("-");
+    let ordinal = event
+        .get("ordinal")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_u64)
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+                .join(".")
+        })
+        .unwrap_or_else(|| "-".to_string());
+    format!(
+        "registry={registry} did={did} type={op_type} opid={opid} previd={previd} ordinal={ordinal}"
+    )
+}
+
+fn summarize_record_event(event: &EventRecord) -> String {
+    let op_type = event
+        .operation
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let previd = event
+        .operation
+        .get("previd")
+        .and_then(Value::as_str)
+        .unwrap_or("-");
+    let ordinal = event
+        .ordinal
+        .as_ref()
+        .map(|items| {
+            items
+                .iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+                .join(".")
+        })
+        .unwrap_or_else(|| "-".to_string());
+    format!(
+        "registry={} did={} type={} opid={} previd={} ordinal={}",
+        event.registry,
+        event.did.as_deref().unwrap_or("-"),
+        op_type,
+        event.opid.as_deref().unwrap_or("-"),
+        previd,
+        ordinal
+    )
+}
+
 pub(crate) async fn handle_did_operation(
     state: &AppState,
     payload: &Value,
@@ -71,6 +148,54 @@ pub(crate) async fn handle_did_operation(
             .ok_or_else(|| "missing operation.did".to_string())?,
         _ => return Err(format!("unsupported operation.type={op_type}")),
     };
+
+    let supported_registries = state.supported_registries.lock().await.clone();
+    if op_type == "create" {
+        let registry = payload
+            .get("registration")
+            .and_then(|value| value.get("registry"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| "missing operation.registration.registry".to_string())?;
+        if !supported_registries.iter().any(|item| item == registry) {
+            return Err(format!("Invalid operation: registry {registry} not supported"));
+        }
+    } else {
+        let current_registry = {
+            let store = state.store.lock().await;
+            store
+                .resolve_doc(&state.config, &did, ResolveOptions::default())
+                .ok()
+                .and_then(|doc| {
+                    doc.get("didDocumentRegistration")
+                        .and_then(|value| value.get("registry"))
+                        .and_then(Value::as_str)
+                        .map(ToString::to_string)
+                })
+        };
+
+        let current_registry = current_registry
+            .ok_or_else(|| "Invalid operation: registry missing".to_string())?;
+        if !supported_registries.iter().any(|item| item == &current_registry) {
+            return Err(format!(
+                "Invalid operation: registry {current_registry} not supported"
+            ));
+        }
+
+        let new_registry = payload
+            .get("doc")
+            .and_then(|value| value.get("didDocumentRegistration"))
+            .and_then(|value| value.get("registry"))
+            .and_then(Value::as_str);
+        if let Some(new_registry) = new_registry {
+            if new_registry != current_registry
+                && !supported_registries.iter().any(|item| item == new_registry)
+            {
+                return Err(format!(
+                    "Invalid operation: registry {new_registry} not supported"
+                ));
+            }
+        }
+    }
 
     let event_time = payload
         .get("proof")
@@ -172,28 +297,41 @@ pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> Impo
     let mut queued = 0;
     let mut rejected = 0;
     let mut processed = 0;
+    let trace = import_trace_enabled();
 
     for event in batch {
         if !verify_event_shape(event) {
+            if trace {
+                warn!("import_batch rejected malformed event {}", summarize_value_event(event));
+            }
             rejected += 1;
             continue;
         }
 
         let Some(key) = event_key(event) else {
+            if trace {
+                warn!("import_batch rejected event without key {}", summarize_value_event(event));
+            }
             rejected += 1;
             continue;
         };
 
         let mut seen = state.events_seen.lock().await;
         if seen.contains_key(&key) {
+            if trace {
+                info!("import_batch skipped previously seen key={key} {}", summarize_value_event(event));
+            }
             processed += 1;
             continue;
         }
-        seen.insert(key, true);
+        seen.insert(key.clone(), true);
         drop(seen);
 
         let mut store = state.store.lock().await;
         store.push_import_event(value_to_event_record(event));
+        if trace {
+            info!("import_batch queued key={key} {}", summarize_value_event(event));
+        }
         queued += 1;
     }
 
@@ -253,16 +391,35 @@ async fn import_events_once(state: &AppState) -> ImportEventsResult {
     let mut added = 0;
     let mut merged = 0;
     let mut rejected = 0;
+    let trace = import_trace_enabled();
 
     for event in temp_queue.drain(..) {
-        match import_event_impl(state, event.clone()).await {
-            ImportStatus::Added => added += 1,
-            ImportStatus::Merged => merged += 1,
-            ImportStatus::Rejected => rejected += 1,
+        let summary = if trace {
+            Some(summarize_record_event(&event))
+        } else {
+            None
+        };
+        let outcome = match import_event_impl(state, event.clone()).await {
+            ImportStatus::Added => {
+                added += 1;
+                "added"
+            }
+            ImportStatus::Merged => {
+                merged += 1;
+                "merged"
+            }
+            ImportStatus::Rejected => {
+                rejected += 1;
+                "rejected"
+            }
             ImportStatus::Deferred => {
                 let mut store = state.store.lock().await;
                 store.push_import_event(event);
+                "deferred"
             }
+        };
+        if let Some(summary) = summary.as_deref() {
+            info!("process_events outcome={} {}", outcome, summary);
         }
     }
 
@@ -274,15 +431,34 @@ async fn import_events_once(state: &AppState) -> ImportEventsResult {
 }
 
 async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus {
+    let trace = import_trace_enabled();
     let mut event_value = event_record_to_value(&event);
     let did = match infer_event_did(&state.config, &event_value) {
         Ok(did) => did,
-        Err(_) => return ImportStatus::Rejected,
+        Err(error) => {
+            if trace {
+                warn!(
+                    "process_events rejected reason=infer_event_did error={} {}",
+                    error,
+                    summarize_record_event(&event)
+                );
+            }
+            return ImportStatus::Rejected;
+        }
     };
     event_value["did"] = Value::String(did.clone());
     let opid = match ensure_event_opid(&mut event_value) {
         Ok(opid) => opid,
-        Err(_) => return ImportStatus::Rejected,
+        Err(error) => {
+            if trace {
+                warn!(
+                    "process_events rejected reason=ensure_event_opid error={} {}",
+                    error,
+                    summarize_value_event(&event_value)
+                );
+            }
+            return ImportStatus::Rejected;
+        }
     };
 
     let mut event = value_to_event_record(&event_value);
@@ -316,13 +492,39 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
     }) {
         let expected_registry = expected_registry_for_index(&current_events, index);
         if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) {
+            if trace {
+                info!(
+                    "process_events merged reason=duplicate_already_confirmed current_registry={} expected_registry={} {}",
+                    current_events[index].registry,
+                    expected_registry.as_deref().unwrap_or("-"),
+                    summarize_record_event(&event)
+                );
+            }
             return ImportStatus::Merged;
         }
         if expected_registry.as_deref() == Some(event.registry.as_str()) {
             current_events[index] = event;
             let mut store = state.store.lock().await;
             let _ = store.set_events(&did, current_events);
+            if trace {
+                info!(
+                    "process_events added reason=replace_with_expected_registry expected_registry={} did={} opid={}",
+                    expected_registry.as_deref().unwrap_or("-"),
+                    did,
+                    opid
+                );
+            }
             return ImportStatus::Added;
+        }
+        if trace {
+            info!(
+                "process_events merged reason=duplicate_unexpected_registry current_registry={} event_registry={} expected_registry={} did={} opid={}",
+                current_events[index].registry,
+                event.registry,
+                expected_registry.as_deref().unwrap_or("-"),
+                did,
+                opid
+            );
         }
         return ImportStatus::Merged;
     }
@@ -334,42 +536,104 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
             .and_then(Value::as_str)
             .is_none()
     {
+        if trace {
+            warn!(
+                "process_events rejected reason=missing_previd did={} opid={} current_events={}",
+                did,
+                opid,
+                current_events.len()
+            );
+        }
         return ImportStatus::Rejected;
     }
 
     let verified = match verify_operation_impl(state, &event.operation).await {
         Ok(verified) => verified,
-        Err(_) => return ImportStatus::Deferred,
+        Err(error) => {
+            if trace {
+                info!(
+                    "process_events deferred reason=verify_error error={} did={} opid={} current_events={}",
+                    error,
+                    did,
+                    opid,
+                    current_events.len()
+                );
+            }
+            return ImportStatus::Deferred;
+        }
     };
     if !verified {
+        if trace {
+            warn!(
+                "process_events rejected reason=verify_false did={} opid={} current_events={}",
+                did,
+                opid,
+                current_events.len()
+            );
+        }
         return ImportStatus::Rejected;
     }
 
     if current_events.is_empty() {
         let mut store = state.store.lock().await;
         return if store.add_create_event(&did, event).is_ok() {
+            if trace {
+                info!("process_events added reason=create did={} opid={}", did, opid);
+            }
             ImportStatus::Added
         } else {
+            if trace {
+                warn!(
+                    "process_events rejected reason=create_store_error did={} opid={}",
+                    did,
+                    opid
+                );
+            }
             ImportStatus::Rejected
         };
     }
 
     let previd = match event.operation.get("previd").and_then(Value::as_str) {
-        Some(value) => value,
+        Some(value) => value.to_string(),
         None => return ImportStatus::Rejected,
     };
     let Some(index) = current_events
         .iter()
-        .position(|item| item.opid.as_deref() == Some(previd))
+        .position(|item| item.opid.as_deref() == Some(previd.as_str()))
     else {
+        if trace {
+            info!(
+                "process_events deferred reason=unknown_previd did={} opid={} previd={} current_events={}",
+                did,
+                opid,
+                previd,
+                current_events.len()
+            );
+        }
         return ImportStatus::Deferred;
     };
 
     if index == current_events.len() - 1 {
         let mut store = state.store.lock().await;
         return if store.add_followup_event(&did, event).is_ok() {
+            if trace {
+                info!(
+                    "process_events added reason=append_followup did={} opid={} previd={}",
+                    did,
+                    opid,
+                    previd
+                );
+            }
             ImportStatus::Added
         } else {
+            if trace {
+                warn!(
+                    "process_events rejected reason=append_followup_store_error did={} opid={} previd={}",
+                    did,
+                    opid,
+                    previd
+                );
+            }
             ImportStatus::Rejected
         };
     }
@@ -384,9 +648,31 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
             new_sequence.push(event);
             let mut store = state.store.lock().await;
             let _ = store.set_events(&did, new_sequence);
+            if trace {
+                info!(
+                    "process_events added reason=insert_reorg did={} opid={} previd={} next_registry={} expected_registry={}",
+                    did,
+                    opid,
+                    previd,
+                    next_event.registry,
+                    expected_registry.as_deref().unwrap_or("-")
+                );
+            }
             return ImportStatus::Added;
         }
     }
 
+    if trace {
+        warn!(
+            "process_events rejected reason=duplicate_or_unexpected_branch did={} opid={} previd={} index={} current_events={} expected_registry={} event_registry={}",
+            did,
+            opid,
+            previd,
+            index,
+            current_events.len(),
+            expected_registry.as_deref().unwrap_or("-"),
+            event.registry
+        );
+    }
     ImportStatus::Rejected
 }

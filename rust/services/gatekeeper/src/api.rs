@@ -100,6 +100,24 @@ fn current_memory_usage() -> MemoryUsage {
     }
 }
 
+fn parse_optional_json_body(body: Bytes) -> Result<Value, String> {
+    if body.is_empty() {
+        return Ok(json!({}));
+    }
+
+    serde_json::from_slice::<Value>(&body).map_err(|error| format!("Error: Invalid JSON body: {error}"))
+}
+
+fn did_resolution_error_doc(error: &str) -> Value {
+    json!({
+        "didResolutionMetadata": {
+            "error": error
+        },
+        "didDocument": {},
+        "didDocumentMetadata": {}
+    })
+}
+
 pub(crate) async fn registries(State(state): State<AppState>) -> impl IntoResponse {
     record_metrics(&state, "GET", "/registries", 200, 0.0);
     Json(state.supported_registries.lock().await.clone())
@@ -188,9 +206,22 @@ pub(crate) async fn create_did(
 
 pub(crate) async fn list_dids(
     State(state): State<AppState>,
-    Json(payload): Json<Value>,
+    body: Bytes,
 ) -> Response {
     let start = Instant::now();
+    let payload = match parse_optional_json_body(body) {
+        Ok(payload) => payload,
+        Err(error) => {
+            record_metrics(
+                &state,
+                "POST",
+                "/dids/",
+                400,
+                start.elapsed().as_secs_f64(),
+            );
+            return text_error_response(StatusCode::BAD_REQUEST, &error);
+        }
+    };
     let resolve = payload
         .get("resolve")
         .and_then(Value::as_bool)
@@ -285,9 +316,22 @@ pub(crate) async fn list_dids(
 
 pub(crate) async fn export_dids(
     State(state): State<AppState>,
-    Json(payload): Json<Value>,
+    body: Bytes,
 ) -> Response {
     let start = Instant::now();
+    let payload = match parse_optional_json_body(body) {
+        Ok(payload) => payload,
+        Err(error) => {
+            record_metrics(
+                &state,
+                "POST",
+                "/dids/export",
+                400,
+                start.elapsed().as_secs_f64(),
+            );
+            return text_error_response(StatusCode::BAD_REQUEST, &error);
+        }
+    };
     let requested = payload.get("dids").and_then(Value::as_array).map(|items| {
         items
             .iter()
@@ -418,12 +462,25 @@ pub(crate) async fn import_dids(
 pub(crate) async fn export_batch(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(payload): Json<Value>,
+    body: Bytes,
 ) -> Response {
     let start = Instant::now();
     if let Some(response) = require_admin_key(&state, &headers) {
         return response;
     }
+    let payload = match parse_optional_json_body(body) {
+        Ok(payload) => payload,
+        Err(error) => {
+            record_metrics(
+                &state,
+                "POST",
+                "/batch/export",
+                400,
+                start.elapsed().as_secs_f64(),
+            );
+            return text_error_response(StatusCode::BAD_REQUEST, &error);
+        }
+    };
 
     let requested = payload.get("dids").and_then(Value::as_array).map(|items| {
         items
@@ -957,7 +1014,8 @@ pub(crate) async fn resolve_did(
             .unwrap_or(false),
     };
 
-    if let Ok(doc) = resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
+    let local_result = resolve_local_doc_async(&state, &did, resolve_options.clone()).await;
+    if let Ok(doc) = local_result {
         record_metrics(
             &state,
             "GET",
@@ -968,7 +1026,28 @@ pub(crate) async fn resolve_did(
         return Json(doc).into_response();
     }
 
+    let local_error_doc = if !did.starts_with("did:") {
+        Some(did_resolution_error_doc("invalidDid"))
+    } else {
+        let store = state.store.lock().await;
+        if store.get_events(&did).is_empty() {
+            Some(did_resolution_error_doc("notFound"))
+        } else {
+            None
+        }
+    };
+
     if state.config.fallback_url.trim().is_empty() {
+        if let Some(doc) = local_error_doc.clone() {
+            record_metrics(
+                &state,
+                "GET",
+                "/did/:did",
+                200,
+                start.elapsed().as_secs_f64(),
+            );
+            return Json(doc).into_response();
+        }
         record_metrics(
             &state,
             "GET",
@@ -1009,6 +1088,16 @@ pub(crate) async fn resolve_did(
         Ok(response) => response,
         Err(error) => {
             error!("resolve DID fallback failed: {error}");
+            if let Some(doc) = local_error_doc.clone() {
+                record_metrics(
+                    &state,
+                    "GET",
+                    "/did/:did",
+                    200,
+                    start.elapsed().as_secs_f64(),
+                );
+                return Json(doc).into_response();
+            }
             record_metrics(
                 &state,
                 "GET",
@@ -1045,13 +1134,20 @@ pub(crate) async fn resolve_did(
     };
 
     let status_code = status.as_u16();
-    record_metrics(
-        &state,
-        "GET",
-        "/did/:did",
-        status_code,
-        start.elapsed().as_secs_f64(),
-    );
+    if !status.is_success() {
+        if let Some(doc) = local_error_doc.clone() {
+            record_metrics(
+                &state,
+                "GET",
+                "/did/:did",
+                200,
+                start.elapsed().as_secs_f64(),
+            );
+            return Json(doc).into_response();
+        }
+    }
+
+    record_metrics(&state, "GET", "/did/:did", status_code, start.elapsed().as_secs_f64());
 
     let mut builder = Response::builder().status(status);
     builder = builder.header(header::CONTENT_TYPE, "application/json");
