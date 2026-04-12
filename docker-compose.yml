@@ -1,9 +1,9 @@
 include:
-  # Gatekeeper implementation. Defaults to the TypeScript service; override
-  # with ARCHON_GATEKEEPER_COMPOSE_FILE=docker-compose.gatekeeper-rust.yml (or pass
-  # `rust` to ./start-node-ci) to run the Rust port. Each flavor file carries
-  # the full gatekeeper service definition.
-  - ${ARCHON_GATEKEEPER_COMPOSE_FILE:-docker-compose.gatekeeper-ts.yml}
+  # Gatekeeper implementation. Set ARCHON_GATEKEEPER_FLAVOR=rust (or ts) in
+  # .env to choose, or export it before `docker compose up`. Defaults to the
+  # TypeScript service. Each flavor file carries the full gatekeeper service
+  # definition.
+  - docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR:-ts}.yml
   - docker-compose.btc-mainnet.yml
   - docker-compose.btc-signet.yml
   - docker-compose.lightning.yml
@@ -56,9 +56,8 @@ services:
       start_period: 20s
 
   # The `gatekeeper` service is pulled in via the `include:` at the top of
-  # this file. The default is docker-compose.gatekeeper-ts.yml; set
-  # ARCHON_GATEKEEPER_COMPOSE_FILE=docker-compose.gatekeeper-rust.yml to run
-  # the Rust port instead.
+  # this file. ARCHON_GATEKEEPER_FLAVOR (ts | rust) selects which flavor
+  # file is loaded; default is ts.
 
   keymaster:
     build:

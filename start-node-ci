@@ -2,23 +2,19 @@
 set -e
 source .env
 
-# Optional second arg selects the gatekeeper implementation by pointing the
-# docker-compose.yml `include:` at the matching flavor file.
-FLAVOR="${2:-rust}"
-case "$FLAVOR" in
-  rust)
-    export ARCHON_GATEKEEPER_COMPOSE_FILE="docker-compose.gatekeeper-rust.yml"
-    ;;
-  typescript|ts)
-    export ARCHON_GATEKEEPER_COMPOSE_FILE="docker-compose.gatekeeper-ts.yml"
-    ;;
+# Optional second arg selects the gatekeeper implementation. Accepts the same
+# values as ARCHON_GATEKEEPER_FLAVOR (ts | rust). If unset, falls back to the
+# value already in the environment (e.g. from .env) or "ts".
+case "${2:-${ARCHON_GATEKEEPER_FLAVOR:-ts}}" in
+  rust)            export ARCHON_GATEKEEPER_FLAVOR="rust" ;;
+  ts|typescript)   export ARCHON_GATEKEEPER_FLAVOR="ts" ;;
   *)
-    echo "Unknown gatekeeper flavor: $FLAVOR (expected: rust | typescript)"
+    echo "Unknown gatekeeper flavor: ${2:-$ARCHON_GATEKEEPER_FLAVOR} (expected: ts | rust)"
     exit 1
     ;;
 esac
 
-echo "Using gatekeeper flavor: $FLAVOR ($ARCHON_GATEKEEPER_COMPOSE_FILE)"
+echo "Using gatekeeper flavor: $ARCHON_GATEKEEPER_FLAVOR"
 
 export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
