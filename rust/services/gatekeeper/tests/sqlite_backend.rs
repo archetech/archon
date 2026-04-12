@@ -58,13 +58,21 @@ async fn sqlite_backend_persists_queue_and_blocks_across_restart() -> Result<()>
     assert!(response.status().is_success());
     assert_eq!(response.json::<Value>().await?, Value::Bool(true));
 
+    let expected_block = json!({
+        "registry": "hyperswarm",
+        "hash": "sqlite-test-block",
+        "height": 17,
+        "time": "",
+        "txns": 0,
+    });
+
     let response = service
         .client
         .get(format!("{}/block/hyperswarm/latest", service.base_url))
         .send()
         .await?;
     assert!(response.status().is_success());
-    assert_eq!(response.json::<Value>().await?, block);
+    assert_eq!(response.json::<Value>().await?, expected_block);
     drop(service);
 
     let service = respawn_service("sqlite", &data_dir, &[]).await?;
@@ -87,7 +95,7 @@ async fn sqlite_backend_persists_queue_and_blocks_across_restart() -> Result<()>
         .send()
         .await?;
     assert!(response.status().is_success());
-    assert_eq!(response.json::<Value>().await?, block);
+    assert_eq!(response.json::<Value>().await?, expected_block);
 
     Ok(())
 }

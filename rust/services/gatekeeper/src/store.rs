@@ -2,8 +2,10 @@ use std::{collections::HashMap, env, fs, net::IpAddr, path::PathBuf, sync::Mutex
 
 use anyhow::{Context, Result};
 use mongodb::{
-    bson::{doc, Document},
+    bson::{self, doc, Bson, Document},
+    options::IndexOptions,
     sync::Client as MongoClient,
+    IndexModel,
 };
 use redis::Commands;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -11,8 +13,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{config::Config, generate_json_cid};
-
-const STATE_KEY: &str = "jsondb";
 
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct EventRecord {
@@ -62,8 +62,6 @@ pub(crate) enum DbBackend {
     Mongo {
         url: String,
         database: String,
-        collection: String,
-        document_id: String,
     },
 }
 
@@ -222,19 +220,6 @@ pub(crate) fn redis_event_to_stored_value(event: &EventRecord) -> Value {
     stored
 }
 
-pub(crate) fn hydrate_redis_event(raw: &str, ops: &HashMap<String, Value>) -> Result<EventRecord> {
-    let mut event =
-        serde_json::from_str::<EventRecord>(raw).context("failed to decode redis did event")?;
-    if event.operation.is_null() {
-        if let Some(opid) = event.opid.as_ref() {
-            if let Some(operation) = ops.get(opid) {
-                event.operation = operation.clone();
-            }
-        }
-    }
-    Ok(event)
-}
-
 pub(crate) fn chrono_like_now() -> String {
     use std::time::SystemTime;
     let now = SystemTime::now();
@@ -243,6 +228,13 @@ pub(crate) fn chrono_like_now() -> String {
 }
 
 impl JsonDb {
+    fn did_suffix(did: &str) -> Result<String> {
+        did.split(':')
+            .next_back()
+            .map(ToString::to_string)
+            .context("invalid did suffix")
+    }
+
     fn redis_did_key(namespace: &str, did: &str) -> Result<String> {
         let suffix = did.split(':').next_back().context("invalid did suffix")?;
         Ok(format!("{namespace}/dids/{suffix}"))
@@ -308,6 +300,29 @@ impl JsonDb {
         self.backend.save_state(&self.data)
     }
 
+    fn mongo_client(&self) -> Result<MongoClient> {
+        let DbBackend::Mongo { url, .. } = &self.backend else {
+            anyhow::bail!("backend is not mongodb");
+        };
+        MongoClient::with_uri_str(url).context("failed to connect to mongodb")
+    }
+
+    fn mongo_database_name(&self) -> Result<&str> {
+        let DbBackend::Mongo { database, .. } = &self.backend else {
+            anyhow::bail!("backend is not mongodb");
+        };
+        Ok(database.as_str())
+    }
+
+    fn event_to_mongo_bson(event: &EventRecord) -> Result<Bson> {
+        let stored = redis_event_to_stored_value(event);
+        bson::to_bson(&stored).context("failed to encode mongo event")
+    }
+
+    fn value_from_bson(bson: &Bson) -> Result<Value> {
+        bson::from_bson::<Value>(bson.clone()).context("failed to decode bson value")
+    }
+
     fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
         if matches!(self.backend, DbBackend::Redis { .. }) {
             if !self.get_events(did).is_empty() {
@@ -335,11 +350,21 @@ impl JsonDb {
             return Ok(did.to_string());
         }
 
-        let suffix = did
-            .split(':')
-            .next_back()
-            .context("invalid did suffix")?
-            .to_string();
+        if matches!(self.backend, DbBackend::Sqlite { .. } | DbBackend::Mongo { .. }) {
+            if !self.get_events(did).is_empty() {
+                return Ok(did.to_string());
+            }
+
+            let mut events = self.get_events(did);
+            if let (Some(opid), operation) = (event.opid.clone(), event.operation.clone()) {
+                self.add_operation(&opid, operation)?;
+            }
+            events.push(event);
+            self.set_events(did, events)?;
+            return Ok(did.to_string());
+        }
+
+        let suffix = Self::did_suffix(did)?;
         let was_empty = self
             .data
             .dids
@@ -430,11 +455,60 @@ impl JsonDb {
             return Ok(true);
         }
 
-        let suffix = did
-            .split(':')
-            .next_back()
-            .context("invalid did suffix")?
-            .to_string();
+        if matches!(self.backend, DbBackend::Sqlite { .. } | DbBackend::Mongo { .. }) {
+            let latest = self.resolve_doc(
+                &Config {
+                    port: 0,
+                    bind_address: IpAddr::from([0, 0, 0, 0]),
+                    db: String::new(),
+                    data_dir: PathBuf::new(),
+                    ipfs_url: String::new(),
+                    did_prefix: String::new(),
+                    registries: vec![],
+                    json_limit: 0,
+                    upload_limit: 0,
+                    gc_interval_minutes: 0,
+                    status_interval_minutes: 0,
+                    admin_api_key: String::new(),
+                    fallback_url: String::new(),
+                    fallback_timeout_ms: 0,
+                    max_queue_size: 0,
+                    git_commit: String::new(),
+                    version: String::new(),
+                },
+                did,
+                ResolveOptions::default(),
+            )?;
+
+            let mut events = self.get_events(did);
+            if events.is_empty() {
+                anyhow::bail!("did not found");
+            }
+
+            let previd = event
+                .operation
+                .get("previd")
+                .and_then(Value::as_str)
+                .ok_or_else(|| anyhow::anyhow!("missing operation.previd"))?;
+            let current_version_id = latest
+                .get("didDocumentMetadata")
+                .and_then(|value| value.get("versionId"))
+                .and_then(Value::as_str)
+                .ok_or_else(|| anyhow::anyhow!("missing current versionId"))?;
+
+            if previd != current_version_id {
+                anyhow::bail!("invalid previd");
+            }
+
+            if let (Some(opid), operation) = (event.opid.clone(), event.operation.clone()) {
+                self.add_operation(&opid, operation)?;
+            }
+            events.push(event);
+            self.set_events(did, events)?;
+            return Ok(true);
+        }
+
+        let suffix = Self::did_suffix(did)?;
 
         let latest = self.resolve_doc(
             &Config {
@@ -520,6 +594,86 @@ impl JsonDb {
                 .unwrap_or_default();
         }
 
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let id = match Self::did_suffix(did) {
+                Ok(id) => id,
+                Err(_) => return Vec::new(),
+            };
+            let conn = match DbBackend::open_sqlite(path) {
+                Ok(conn) => conn,
+                Err(_) => return Vec::new(),
+            };
+            let raw = match conn.query_row(
+                "SELECT events FROM dids WHERE id = ?1",
+                [id.as_str()],
+                |row| row.get::<_, String>(0),
+            ).optional() {
+                Ok(raw) => raw,
+                Err(_) => return Vec::new(),
+            };
+            let Some(raw) = raw else {
+                return Vec::new();
+            };
+            let stored = match serde_json::from_str::<Vec<EventRecord>>(&raw) {
+                Ok(stored) => stored,
+                Err(_) => return Vec::new(),
+            };
+            return stored
+                .into_iter()
+                .map(|mut event| {
+                    if event.operation.is_null() {
+                        if let Some(opid) = event.opid.as_ref() {
+                            if let Some(operation) = self.get_operation(opid) {
+                                event.operation = operation;
+                            }
+                        }
+                    }
+                    event
+                })
+                .collect();
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let id = match Self::did_suffix(did) {
+                Ok(id) => id,
+                Err(_) => return Vec::new(),
+            };
+            let client = match self.mongo_client() {
+                Ok(client) => client,
+                Err(_) => return Vec::new(),
+            };
+            let database = match self.mongo_database_name() {
+                Ok(database) => database,
+                Err(_) => return Vec::new(),
+            };
+            let coll = client.database(database).collection::<Document>("dids");
+            let row = match coll.find_one(doc! { "id": &id }).run() {
+                Ok(row) => row,
+                Err(_) => return Vec::new(),
+            };
+            let Some(row) = row else {
+                return Vec::new();
+            };
+            let events = match row.get_array("events") {
+                Ok(events) => events.clone(),
+                Err(_) => return Vec::new(),
+            };
+            return events
+                .into_iter()
+                .filter_map(|item| {
+                    let mut event = bson::from_bson::<EventRecord>(item).ok()?;
+                    if event.operation.is_null() {
+                        if let Some(opid) = event.opid.as_ref() {
+                            if let Some(operation) = self.get_operation(opid) {
+                                event.operation = operation;
+                            }
+                        }
+                    }
+                    Some(event)
+                })
+                .collect();
+        }
+
         let suffix = match did.split(':').next_back() {
             Some(value) => value,
             None => return Vec::new(),
@@ -570,11 +724,52 @@ impl JsonDb {
             });
         }
 
-        let suffix = did
-            .split(':')
-            .next_back()
-            .context("invalid did suffix")?
-            .to_string();
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let id = Self::did_suffix(did)?;
+            let conn = DbBackend::open_sqlite(path)?;
+            let mut stripped_events = Vec::with_capacity(events.len());
+            for event in &events {
+                if let Some(opid) = event.opid.as_ref() {
+                    self.add_operation(opid, event.operation.clone())?;
+                }
+                let stored = redis_event_to_stored_value(event);
+                stripped_events.push(
+                    serde_json::from_value::<EventRecord>(stored)
+                        .context("failed to encode sqlite did event")?,
+                );
+            }
+            conn.execute(
+                "INSERT INTO dids(id, events) VALUES (?1, ?2)
+                 ON CONFLICT(id) DO UPDATE SET events = excluded.events",
+                params![id, serde_json::to_string(&stripped_events)?],
+            )
+            .context("failed to persist sqlite did events")?;
+            return Ok(());
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let id = Self::did_suffix(did)?;
+            let client = self.mongo_client()?;
+            let database = self.mongo_database_name()?.to_string();
+            let coll = client.database(&database).collection::<Document>("dids");
+            let mut encoded = Vec::with_capacity(events.len());
+            for event in &events {
+                if let Some(opid) = event.opid.as_ref() {
+                    self.add_operation(opid, event.operation.clone())?;
+                }
+                encoded.push(Self::event_to_mongo_bson(event)?);
+            }
+            coll.update_one(
+                doc! { "id": &id },
+                doc! { "$set": { "id": &id, "events": encoded } },
+            )
+            .upsert(true)
+            .run()
+            .context("failed to persist mongodb did events")?;
+            return Ok(());
+        }
+
+        let suffix = Self::did_suffix(did)?;
         for event in &events {
             if let Some(opid) = event.opid.as_ref() {
                 self.data.ops.insert(opid.clone(), event.operation.clone());
@@ -596,11 +791,28 @@ impl JsonDb {
             });
         }
 
-        let suffix = did
-            .split(':')
-            .next_back()
-            .context("invalid did suffix")?
-            .to_string();
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let id = Self::did_suffix(did)?;
+            let conn = DbBackend::open_sqlite(path)?;
+            conn.execute("DELETE FROM dids WHERE id = ?1", [id])
+                .context("failed to delete sqlite did events")?;
+            return Ok(());
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let id = Self::did_suffix(did)?;
+            let client = self.mongo_client()?;
+            let database = self.mongo_database_name()?.to_string();
+            client
+                .database(&database)
+                .collection::<Document>("dids")
+                .delete_one(doc! { "id": &id })
+                .run()
+                .context("failed to delete mongodb did events")?;
+            return Ok(());
+        }
+
+        let suffix = Self::did_suffix(did)?;
         self.data.dids.remove(&suffix);
         self.save()
     }
@@ -632,6 +844,38 @@ impl JsonDb {
             });
         }
 
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path)?;
+            conn.execute("DELETE FROM dids", [])
+                .context("failed to clear sqlite dids")?;
+            conn.execute("DELETE FROM queue", [])
+                .context("failed to clear sqlite queue")?;
+            conn.execute("DELETE FROM blocks", [])
+                .context("failed to clear sqlite blocks")?;
+            conn.execute("DELETE FROM operations", [])
+                .context("failed to clear sqlite operations")?;
+            return Ok(());
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = self.mongo_client()?;
+            let database = self.mongo_database_name()?.to_string();
+            let db = client.database(&database);
+            db.collection::<Document>("dids")
+                .delete_many(doc! {})
+                .run()
+                .context("failed to clear mongodb dids")?;
+            db.collection::<Document>("queue")
+                .delete_many(doc! {})
+                .run()
+                .context("failed to clear mongodb queue")?;
+            db.collection::<Document>("operations")
+                .delete_many(doc! {})
+                .run()
+                .context("failed to clear mongodb operations")?;
+            return Ok(());
+        }
+
         self.data = JsonDbFile::default();
         self.save()
     }
@@ -647,6 +891,30 @@ impl JsonDb {
                     .context("failed to persist redis operation")?;
                 Ok(())
             });
+        }
+
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path)?;
+            conn.execute(
+                "INSERT INTO operations(opid, operation) VALUES (?1, ?2)
+                 ON CONFLICT(opid) DO UPDATE SET operation = excluded.operation",
+                params![opid, serde_json::to_string(&operation)?],
+            )
+            .context("failed to persist sqlite operation")?;
+            return Ok(());
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = self.mongo_client()?;
+            let database = self.mongo_database_name()?.to_string();
+            let coll = client.database(&database).collection::<Document>("operations");
+            let mut op_doc = bson::to_document(&operation).context("failed to encode mongodb operation")?;
+            op_doc.insert("opid", opid);
+            coll.update_one(doc! { "opid": opid }, doc! { "$set": op_doc })
+                .upsert(true)
+                .run()
+                .context("failed to persist mongodb operation")?;
+            return Ok(());
         }
 
         self.data.ops.insert(opid.to_string(), operation.clone());
@@ -669,6 +937,32 @@ impl JsonDb {
                 })
                 .ok()
                 .flatten();
+        }
+
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path).ok()?;
+            let raw = conn
+                .query_row(
+                    "SELECT operation FROM operations WHERE opid = ?1",
+                    [opid],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .ok()??;
+            return serde_json::from_str(&raw).ok();
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = self.mongo_client().ok()?;
+            let database = self.mongo_database_name().ok()?.to_string();
+            let doc = client
+                .database(&database)
+                .collection::<Document>("operations")
+                .find_one(doc! { "opid": opid })
+                .projection(doc! { "_id": 0, "opid": 0 })
+                .run()
+                .ok()??;
+            return bson::from_document::<Value>(doc).ok();
         }
 
         self.data.ops.get(opid).cloned()
@@ -707,6 +1001,48 @@ impl JsonDb {
             });
         }
 
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path)?;
+            let raw = conn
+                .query_row("SELECT ops FROM queue WHERE id = ?1", [registry], |row| {
+                    row.get::<_, String>(0)
+                })
+                .optional()
+                .context("failed to load sqlite queue")?;
+            let mut ops = raw
+                .and_then(|raw| serde_json::from_str::<Vec<Value>>(&raw).ok())
+                .unwrap_or_default();
+            ops.push(operation);
+            conn.execute(
+                "INSERT INTO queue(id, ops) VALUES (?1, ?2)
+                 ON CONFLICT(id) DO UPDATE SET ops = excluded.ops",
+                params![registry, serde_json::to_string(&ops)?],
+            )
+            .context("failed to persist sqlite queue")?;
+            return Ok(ops.len());
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = self.mongo_client()?;
+            let database = self.mongo_database_name()?.to_string();
+            let coll = client.database(&database).collection::<Document>("queue");
+            let result = coll
+                .find_one_and_update(
+                    doc! { "id": registry },
+                    doc! { "$push": { "ops": bson::to_bson(&operation).context("failed to encode mongodb queue item")? } },
+                )
+                .upsert(true)
+                .return_document(mongodb::options::ReturnDocument::After)
+                .run()
+                .context("failed to persist mongodb queue")?;
+            let len = result
+                .as_ref()
+                .and_then(|doc| doc.get_array("ops").ok())
+                .map(|ops| ops.len())
+                .unwrap_or(0);
+            return Ok(len);
+        }
+
         let len = {
             let queue = self.data.queue.entry(registry.to_string()).or_default();
             queue.push(operation.clone());
@@ -731,6 +1067,57 @@ impl JsonDb {
                                 .context("failed to decode redis queue item")
                         })
                         .collect::<Result<Vec<_>>>()
+                })
+                .unwrap_or_default();
+        }
+
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = match DbBackend::open_sqlite(path) {
+                Ok(conn) => conn,
+                Err(_) => return Vec::new(),
+            };
+            let raw = match conn
+                .query_row("SELECT ops FROM queue WHERE id = ?1", [registry], |row| {
+                    row.get::<_, String>(0)
+                })
+                .optional()
+            {
+                Ok(raw) => raw,
+                Err(_) => return Vec::new(),
+            };
+            return raw
+                .and_then(|raw| serde_json::from_str::<Vec<Value>>(&raw).ok())
+                .unwrap_or_default();
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = match self.mongo_client() {
+                Ok(client) => client,
+                Err(_) => return Vec::new(),
+            };
+            let database = match self.mongo_database_name() {
+                Ok(database) => database.to_string(),
+                Err(_) => return Vec::new(),
+            };
+            let row = match client
+                .database(&database)
+                .collection::<Document>("queue")
+                .find_one(doc! { "id": registry })
+                .run()
+            {
+                Ok(row) => row,
+                Err(_) => return Vec::new(),
+            };
+            let Some(row) = row else {
+                return Vec::new();
+            };
+            return row
+                .get_array("ops")
+                .ok()
+                .map(|ops| {
+                    ops.iter()
+                        .filter_map(|item| Self::value_from_bson(item).ok())
+                        .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
         }
@@ -789,6 +1176,40 @@ impl JsonDb {
             });
         }
 
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path)?;
+            let mut queue = self.get_queue(registry);
+            queue.retain(|item| {
+                let proof_value = item
+                    .get("proof")
+                    .and_then(|proof| proof.get("proofValue"))
+                    .and_then(Value::as_str);
+                !proof_values.iter().any(|value| Some(*value) == proof_value)
+            });
+            conn.execute(
+                "INSERT INTO queue(id, ops) VALUES (?1, ?2)
+                 ON CONFLICT(id) DO UPDATE SET ops = excluded.ops",
+                params![registry, serde_json::to_string(&queue)?],
+            )
+            .context("failed to persist sqlite cleared queue")?;
+            return Ok(true);
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = self.mongo_client()?;
+            let database = self.mongo_database_name()?.to_string();
+            client
+                .database(&database)
+                .collection::<Document>("queue")
+                .update_one(
+                    doc! { "id": registry },
+                    doc! { "$pull": { "ops": { "proof.proofValue": { "$in": bson::to_bson(&proof_values)? } } } },
+                )
+                .run()
+                .context("failed to clear mongodb queue entries")?;
+            return Ok(true);
+        }
+
         if let Some(queue) = self.data.queue.get_mut(registry) {
             queue.retain(|item| {
                 let proof_value = item
@@ -837,6 +1258,38 @@ impl JsonDb {
                 }
                 Ok(true)
             });
+        }
+
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO blocks (registry, hash, height, time, txns) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    registry,
+                    hash,
+                    block.get("height").and_then(Value::as_u64).unwrap_or(0) as i64,
+                    block.get("time").and_then(Value::as_str).unwrap_or_default(),
+                    0_i64
+                ],
+            )
+            .context("failed to persist sqlite block")?;
+            return Ok(true);
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = self.mongo_client()?;
+            let database = self.mongo_database_name()?.to_string();
+            let coll = client.database(&database).collection::<Document>("blocks");
+            let mut block_doc = bson::to_document(&block).context("failed to encode mongodb block")?;
+            block_doc.insert("registry", registry);
+            coll.update_one(
+                doc! { "registry": registry, "hash": &hash },
+                doc! { "$set": block_doc },
+            )
+            .upsert(true)
+            .run()
+            .context("failed to persist mongodb block")?;
+            return Ok(true);
         }
 
         self.data
@@ -888,6 +1341,55 @@ impl JsonDb {
                 .flatten();
         }
 
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path).ok()?;
+            let query = match block_id {
+                None => ("SELECT registry, hash, height, time, txns FROM blocks WHERE registry = ?1 ORDER BY height DESC LIMIT 1", vec![registry.to_string()]),
+                Some(BlockLookup::Height(height)) => ("SELECT registry, hash, height, time, txns FROM blocks WHERE registry = ?1 AND height = ?2", vec![registry.to_string(), height.to_string()]),
+                Some(BlockLookup::Hash(hash)) => ("SELECT registry, hash, height, time, txns FROM blocks WHERE registry = ?1 AND hash = ?2", vec![registry.to_string(), hash]),
+            };
+            let mut stmt = conn.prepare(query.0).ok()?;
+            let row = stmt
+                .query_row(rusqlite::params_from_iter(query.1.iter()), |row: &rusqlite::Row<'_>| {
+                    Ok(json!({
+                        "registry": row.get::<_, String>(0)?,
+                        "hash": row.get::<_, String>(1)?,
+                        "height": row.get::<_, i64>(2)?,
+                        "time": row.get::<_, String>(3)?,
+                        "txns": row.get::<_, i64>(4)?,
+                    }))
+                })
+                .optional()
+                .ok()?;
+            return row;
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = self.mongo_client().ok()?;
+            let database = self.mongo_database_name().ok()?.to_string();
+            let coll = client.database(&database).collection::<Document>("blocks");
+            let result = match block_id {
+                None => coll
+                    .find(doc! { "registry": registry })
+                    .sort(doc! { "height": -1 })
+                    .limit(1)
+                    .run()
+                    .ok()
+                    .and_then(|mut cursor| cursor.next().transpose().ok().flatten()),
+                Some(BlockLookup::Height(height)) => coll
+                    .find_one(doc! { "registry": registry, "height": height as i64 })
+                    .run()
+                    .ok()
+                    .flatten(),
+                Some(BlockLookup::Hash(hash)) => coll
+                    .find_one(doc! { "registry": registry, "hash": hash })
+                    .run()
+                    .ok()
+                    .flatten(),
+            }?;
+            return bson::from_document::<Value>(result).ok();
+        }
+
         let registry_blocks = self.data.blocks.get(registry)?;
         if registry_blocks.is_empty() {
             return None;
@@ -932,6 +1434,58 @@ impl JsonDb {
                         .collect::<Vec<_>>())
                 })
                 .unwrap_or_default();
+        }
+
+        if let Some(items) = requested {
+            return items.to_vec();
+        }
+
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = match DbBackend::open_sqlite(path) {
+                Ok(conn) => conn,
+                Err(_) => return Vec::new(),
+            };
+            let mut stmt = match conn.prepare("SELECT id FROM dids ORDER BY id") {
+                Ok(stmt) => stmt,
+                Err(_) => return Vec::new(),
+            };
+            let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
+                Ok(rows) => rows,
+                Err(_) => return Vec::new(),
+            };
+            return rows
+                .filter_map(|row| row.ok())
+                .map(|suffix| format!("{prefix}:{suffix}"))
+                .collect();
+        }
+
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = match self.mongo_client() {
+                Ok(client) => client,
+                Err(_) => return Vec::new(),
+            };
+            let database = match self.mongo_database_name() {
+                Ok(database) => database.to_string(),
+                Err(_) => return Vec::new(),
+            };
+            let rows = match client
+                .database(&database)
+                .collection::<Document>("dids")
+                .find(doc! {})
+                .run()
+            {
+                Ok(rows) => rows,
+                Err(_) => return Vec::new(),
+            };
+            let mut ids = rows
+                .filter_map(|row| row.ok())
+                .filter_map(|row| row.get_str("id").ok().map(ToString::to_string))
+                .collect::<Vec<_>>();
+            ids.sort();
+            return ids
+                .into_iter()
+                .map(|suffix| format!("{prefix}:{suffix}"))
+                .collect();
         }
 
         match requested {
@@ -1143,8 +1697,6 @@ impl DbBackend {
                 url: env::var("ARCHON_MONGODB_URL")
                     .unwrap_or_else(|_| "mongodb://localhost:27017".to_string()),
                 database: "archon".to_string(),
-                collection: "gatekeeper_state".to_string(),
-                document_id: STATE_KEY.to_string(),
             },
             _ => Self::JsonFile {
                 path: config.data_dir.join("archon.json"),
@@ -1161,39 +1713,45 @@ impl DbBackend {
                 Err(_) => Ok(JsonDbFile::default()),
             },
             Self::Sqlite { path } => {
-                let conn = Self::open_sqlite(path)?;
-                let raw = conn
-                    .query_row("SELECT value FROM kv WHERE key = ?1", [STATE_KEY], |row| {
-                        row.get::<_, String>(0)
-                    })
-                    .optional()
-                    .context("failed to load sqlite state")?;
-                match raw {
-                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw)
-                        .context("failed to decode sqlite state"),
-                    None => Ok(JsonDbFile::default()),
-                }
+                let _ = Self::open_sqlite(path)?;
+                Ok(JsonDbFile::default())
             }
             Self::Redis { .. } => Ok(JsonDbFile::default()),
-            Self::Mongo {
-                url,
-                database,
-                collection,
-                document_id,
-            } => {
+            Self::Mongo { url, database, .. } => {
                 let client =
                     MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
-                let coll = client.database(database).collection::<Document>(collection);
-                let raw = coll
-                    .find_one(doc! { "_id": document_id })
+                let db = client.database(database);
+                db.collection::<Document>("dids")
+                    .create_index(IndexModel::builder().keys(doc! { "id": 1 }).build())
                     .run()
-                    .context("failed to load mongodb state")?
-                    .and_then(|doc| doc.get_str("value").ok().map(ToString::to_string));
-                match raw {
-                    Some(raw) => serde_json::from_str::<JsonDbFile>(&raw)
-                        .context("failed to decode mongodb state"),
-                    None => Ok(JsonDbFile::default()),
-                }
+                    .context("failed to initialize mongodb did index")?;
+                db.collection::<Document>("blocks")
+                    .create_index(
+                        IndexModel::builder()
+                            .keys(doc! { "registry": 1, "height": -1 })
+                            .build(),
+                    )
+                    .run()
+                    .context("failed to initialize mongodb block height index")?;
+                db.collection::<Document>("blocks")
+                    .create_index(
+                        IndexModel::builder()
+                            .keys(doc! { "registry": 1, "hash": 1 })
+                            .options(IndexOptions::builder().unique(Some(true)).build())
+                            .build(),
+                    )
+                    .run()
+                    .context("failed to initialize mongodb block hash index")?;
+                db.collection::<Document>("operations")
+                    .create_index(
+                        IndexModel::builder()
+                            .keys(doc! { "opid": 1 })
+                            .options(IndexOptions::builder().unique(Some(true)).build())
+                            .build(),
+                    )
+                    .run()
+                    .context("failed to initialize mongodb op index")?;
+                Ok(JsonDbFile::default())
             }
         }
     }
@@ -1209,14 +1767,9 @@ impl DbBackend {
                 fs::write(path, body).with_context(|| format!("failed to write {}", path.display()))
             }
             Self::Sqlite { path } => {
-                let conn = Self::open_sqlite(path)?;
-                conn.execute(
-                    "INSERT INTO kv (key, value) VALUES (?1, ?2)
-                     ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                    params![STATE_KEY, body],
-                )
-                .context("failed to persist sqlite state")?;
-                Ok(())
+                let _ = Self::open_sqlite(path)?;
+                let _ = body;
+                anyhow::bail!("sqlite snapshot persistence is disabled; use direct table operations")
             }
             Self::Redis { url, namespace } => {
                 let client =
@@ -1233,23 +1786,12 @@ impl DbBackend {
                     "full redis snapshot persistence is disabled for safety; refusing to rewrite namespace `{namespace}` containing {keyspace_size} keys"
                 )
             }
-            Self::Mongo {
-                url,
-                database,
-                collection,
-                document_id,
-            } => {
+            Self::Mongo { url, database, .. } => {
                 let client =
                     MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
-                let coll = client.database(database).collection::<Document>(collection);
-                coll.replace_one(
-                    doc! { "_id": document_id },
-                    doc! { "_id": document_id, "value": body },
-                )
-                .upsert(true)
-                .run()
-                .context("failed to persist mongodb state")?;
-                Ok(())
+                let _ = client.database(database);
+                let _ = body;
+                anyhow::bail!("mongodb snapshot persistence is disabled; use direct collection operations")
             }
         }
     }
@@ -1262,13 +1804,46 @@ impl DbBackend {
         let conn = Connection::open(path)
             .with_context(|| format!("failed to open sqlite db {}", path.display()))?;
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS kv (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
+            "CREATE TABLE IF NOT EXISTS dids (
+                id TEXT PRIMARY KEY,
+                events TEXT NOT NULL
             )",
             [],
         )
-        .context("failed to initialize sqlite schema")?;
+        .context("failed to initialize sqlite did schema")?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS queue (
+                id TEXT PRIMARY KEY,
+                ops TEXT NOT NULL
+            )",
+            [],
+        )
+        .context("failed to initialize sqlite queue schema")?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS blocks (
+                registry TEXT NOT NULL,
+                hash TEXT NOT NULL,
+                height INTEGER NOT NULL,
+                time TEXT NOT NULL,
+                txns INTEGER NOT NULL,
+                PRIMARY KEY (registry, hash)
+            )",
+            [],
+        )
+        .context("failed to initialize sqlite blocks schema")?;
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_registry_height ON blocks (registry, height)",
+            [],
+        )
+        .context("failed to initialize sqlite block height index")?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS operations (
+                opid TEXT PRIMARY KEY,
+                operation TEXT NOT NULL
+            )",
+            [],
+        )
+        .context("failed to initialize sqlite operations schema")?;
         Ok(conn)
     }
 
