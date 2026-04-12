@@ -6,8 +6,14 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use k256::{
+    ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey},
+    SecretKey,
+};
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 pub const ADMIN_KEY: &str = "test-admin-key";
@@ -229,4 +235,152 @@ pub fn did_suffix(did: &str) -> &str {
 
 pub fn path_buf(path: impl AsRef<Path>) -> PathBuf {
     path.as_ref().to_path_buf()
+}
+
+fn canonical_json(value: &Value) -> String {
+    match value {
+        Value::Null => "null".to_string(),
+        Value::Bool(boolean) => boolean.to_string(),
+        Value::Number(number) => number.to_string(),
+        Value::String(string) => serde_json::to_string(string).unwrap_or_else(|_| "\"\"".to_string()),
+        Value::Array(items) => {
+            let joined = items
+                .iter()
+                .map(canonical_json)
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("[{joined}]")
+        }
+        Value::Object(map) => {
+            let mut entries = map.iter().collect::<Vec<_>>();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            let joined = entries
+                .into_iter()
+                .map(|(key, value)| {
+                    format!(
+                        "{}:{}",
+                        serde_json::to_string(key).unwrap_or_else(|_| "\"\"".to_string()),
+                        canonical_json(value)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{{{joined}}}")
+        }
+    }
+}
+
+fn signing_key(seed: u8) -> SigningKey {
+    let bytes = [seed; 32];
+    let secret = SecretKey::from_slice(&bytes).expect("seed should create valid secret key");
+    SigningKey::from(secret)
+}
+
+fn public_jwk(seed: u8) -> Value {
+    let signing_key = signing_key(seed);
+    let verifying_key = signing_key.verifying_key();
+    let point = verifying_key.to_encoded_point(false);
+    let x = point.x().expect("x should exist");
+    let y = point.y().expect("y should exist");
+
+    json!({
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": URL_SAFE_NO_PAD.encode(x),
+        "y": URL_SAFE_NO_PAD.encode(y)
+    })
+}
+
+fn sign_operation(seed: u8, operation: &Value, verification_method: &str, created: &str) -> Value {
+    let mut unsigned = operation.clone();
+    unsigned
+        .as_object_mut()
+        .expect("operation should be an object")
+        .remove("proof");
+    let canonical = canonical_json(&unsigned);
+    let hash = Sha256::digest(canonical.as_bytes());
+    let signature: Signature = signing_key(seed)
+        .sign_prehash(hash.as_ref())
+        .expect("signing should succeed");
+
+    let mut signed = unsigned;
+    signed["proof"] = json!({
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": created,
+        "verificationMethod": verification_method,
+        "proofPurpose": "authentication",
+        "proofValue": URL_SAFE_NO_PAD.encode(signature.to_bytes())
+    });
+    signed
+}
+
+pub fn create_agent_operation(seed: u8, created: &str, registry: &str) -> Value {
+    let operation = json!({
+        "type": "create",
+        "created": created,
+        "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": registry
+        },
+        "publicJwk": public_jwk(seed)
+    });
+    sign_operation(seed, &operation, "#key-1", created)
+}
+
+pub fn create_asset_operation(
+    seed: u8,
+    controller_did: &str,
+    created: &str,
+    registry: &str,
+    data: Value,
+) -> Value {
+    let operation = json!({
+        "type": "create",
+        "created": created,
+        "registration": {
+            "version": 1,
+            "type": "asset",
+            "registry": registry
+        },
+        "controller": controller_did,
+        "data": data
+    });
+    sign_operation(seed, &operation, &format!("{controller_did}#key-1"), created)
+}
+
+pub fn create_update_operation(
+    seed: u8,
+    did: &str,
+    previd: Option<&str>,
+    created: &str,
+    doc: Value,
+) -> Value {
+    let mut operation = json!({
+        "type": "update",
+        "did": did,
+        "doc": doc
+    });
+    if let Some(previd) = previd {
+        operation["previd"] = Value::String(previd.to_string());
+    }
+    sign_operation(seed, &operation, &format!("{did}#key-1"), created)
+}
+
+pub fn create_delete_operation(seed: u8, did: &str, previd: &str, created: &str) -> Value {
+    let operation = json!({
+        "type": "delete",
+        "did": did,
+        "previd": previd
+    });
+    sign_operation(seed, &operation, &format!("{did}#key-1"), created)
+}
+
+pub fn make_event(registry: &str, time: &str, ordinal: &[u64], operation: Value) -> Value {
+    json!({
+        "registry": registry,
+        "time": time,
+        "ordinal": ordinal,
+        "operation": operation
+    })
 }
