@@ -2,15 +2,15 @@
 set -e
 source .env
 
-# Optional second arg selects the gatekeeper implementation.
-# Defaults to "rust" since that's what the base docker-compose.yml builds.
+# Optional second arg selects the gatekeeper implementation by pointing the
+# docker-compose.yml `include:` at the matching flavor file.
 FLAVOR="${2:-rust}"
 case "$FLAVOR" in
   rust)
-    export COMPOSE_FILE="docker-compose.yml"
+    export GATEKEEPER_COMPOSE_FILE="docker-compose.gatekeeper-rust.yml"
     ;;
   typescript|ts)
-    export COMPOSE_FILE="docker-compose.yml:docker-compose.typescript-gatekeeper.yml"
+    export GATEKEEPER_COMPOSE_FILE="docker-compose.gatekeeper-ts.yml"
     ;;
   *)
     echo "Unknown gatekeeper flavor: $FLAVOR (expected: rust | typescript)"
@@ -18,7 +18,7 @@ case "$FLAVOR" in
     ;;
 esac
 
-echo "Using gatekeeper flavor: $FLAVOR"
+echo "Using gatekeeper flavor: $FLAVOR ($GATEKEEPER_COMPOSE_FILE)"
 
 export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 

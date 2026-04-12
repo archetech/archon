@@ -1,4 +1,9 @@
 include:
+  # Gatekeeper implementation. Defaults to the TypeScript service; override
+  # with GATEKEEPER_COMPOSE_FILE=docker-compose.gatekeeper-rust.yml (or pass
+  # `rust` to ./start-node-ci) to run the Rust port. Each flavor file carries
+  # the full gatekeeper service definition.
+  - ${GATEKEEPER_COMPOSE_FILE:-docker-compose.gatekeeper-ts.yml}
   - docker-compose.btc-mainnet.yml
   - docker-compose.btc-signet.yml
   - docker-compose.lightning.yml
@@ -50,46 +55,10 @@ services:
       retries: 10
       start_period: 20s
 
-  gatekeeper:
-    build:
-      context: .
-      dockerfile: Dockerfile.gatekeeper-rust
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/gatekeeper
-    environment:
-      - ARCHON_GATEKEEPER_PORT=4224
-      - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
-      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
-      - ARCHON_GATEKEEPER_DB=${ARCHON_GATEKEEPER_DB}
-      - ARCHON_GATEKEEPER_DID_PREFIX=${ARCHON_GATEKEEPER_DID_PREFIX}
-      - ARCHON_GATEKEEPER_REGISTRIES=${ARCHON_GATEKEEPER_REGISTRIES}
-      - ARCHON_GATEKEEPER_GC_INTERVAL=${ARCHON_GATEKEEPER_GC_INTERVAL}
-      - ARCHON_GATEKEEPER_STATUS_INTERVAL=${ARCHON_GATEKEEPER_STATUS_INTERVAL}
-      - ARCHON_GATEKEEPER_UPLOAD_LIMIT=${ARCHON_GATEKEEPER_UPLOAD_LIMIT}
-      - ARCHON_GATEKEEPER_FALLBACK_URL=${ARCHON_GATEKEEPER_FALLBACK_URL}
-      - ARCHON_GATEKEEPER_FALLBACK_TIMEOUT=${ARCHON_GATEKEEPER_FALLBACK_TIMEOUT}
-      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
-      - ARCHON_REDIS_URL=redis://redis:6379
-      - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
-    volumes:
-      - ./data:/app/gatekeeper/data
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    ports:
-      - ${ARCHON_GATEKEEPER_PORT}:4224
-    healthcheck:
-      test: ["CMD-SHELL", "test \"$(wget -qO- http://127.0.0.1:4224/api/v1/ready)\" = \"true\""]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-      start_period: 20s
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      ipfs:
-        condition: service_healthy
+  # The `gatekeeper` service is assembled entirely from the includes at the top
+  # of this file: docker-compose.gatekeeper-base.yml provides the shared body,
+  # and the active flavor file (TS by default, Rust via GATEKEEPER_COMPOSE_FILE)
+  # provides `build` and `image`.
 
   keymaster:
     build:

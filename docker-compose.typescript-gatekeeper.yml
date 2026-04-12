@@ -1,8 +1,0 @@
-services:
-  gatekeeper:
-    build:
-      context: .
-      dockerfile: Dockerfile.gatekeeper
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/gatekeeper-typescript
