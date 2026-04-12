@@ -5,6 +5,7 @@ use serde_json::Value;
 #[derive(Default)]
 pub(crate) struct SearchIndex {
     docs: HashMap<String, serde_json::Map<String, Value>>,
+    order: Vec<String>,
 }
 
 impl SearchIndex {
@@ -14,15 +15,21 @@ impl SearchIndex {
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_default();
+        if !self.docs.contains_key(did) {
+            self.order.push(did.to_string());
+        }
         self.docs.insert(did.to_string(), data);
     }
 
     pub(crate) fn delete(&mut self, did: &str) {
-        self.docs.remove(did);
+        if self.docs.remove(did).is_some() {
+            self.order.retain(|entry| entry != did);
+        }
     }
 
     pub(crate) fn clear(&mut self) {
         self.docs.clear();
+        self.order.clear();
     }
 
     pub(crate) fn size(&self) -> usize {
@@ -31,7 +38,10 @@ impl SearchIndex {
 
     pub(crate) fn search_docs(&self, q: &str) -> Vec<String> {
         let mut out = Vec::new();
-        for (did, doc) in &self.docs {
+        for did in &self.order {
+            let Some(doc) = self.docs.get(did) else {
+                continue;
+            };
             if serde_json::to_string(doc)
                 .map(|value| value.contains(q))
                 .unwrap_or(false)
@@ -39,7 +49,6 @@ impl SearchIndex {
                 out.push(did.clone());
             }
         }
-        out.sort();
         out
     }
 
@@ -53,12 +62,14 @@ impl SearchIndex {
             .ok_or_else(|| anyhow::anyhow!("Only {{$in:[...]}} supported"))?;
 
         let mut result = Vec::new();
-        for (did, doc) in &self.docs {
+        for did in &self.order {
+            let Some(doc) = self.docs.get(did) else {
+                continue;
+            };
             if query_match(&Value::Object(doc.clone()), raw_path, list) {
                 result.push(did.clone());
             }
         }
-        result.sort();
         Ok(result)
     }
 }

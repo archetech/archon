@@ -108,6 +108,7 @@ pub(crate) struct ResolvedDoc {
     pub(crate) confirmed: bool,
     pub(crate) canonical_id: Option<String>,
     pub(crate) deactivated: bool,
+    pub(crate) timestamp: Option<Value>,
 }
 
 pub(crate) enum BlockLookup {
@@ -234,6 +235,14 @@ pub(crate) fn hydrate_redis_event(
         }
     }
     Ok(event)
+}
+
+fn encode_json_db_with_indent(data: &JsonDbFile) -> Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+    let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+    serde::Serialize::serialize(data, &mut ser).context("failed to encode db")?;
+    Ok(buf)
 }
 
 pub(crate) fn chrono_like_now() -> String {
@@ -1315,14 +1324,24 @@ impl JsonDb {
 
         if let DbBackend::Sqlite { path } = &self.backend {
             let conn = DbBackend::open_sqlite(path)?;
+            let time_value = match block.get("time") {
+                Some(Value::String(value)) => value.clone(),
+                Some(Value::Number(value)) => value.to_string(),
+                _ => String::new(),
+            };
+            let txns = block
+                .get("txns")
+                .and_then(Value::as_i64)
+                .or_else(|| block.get("txns").and_then(Value::as_u64).map(|value| value as i64))
+                .unwrap_or(0);
             conn.execute(
                 "INSERT OR REPLACE INTO blocks (registry, hash, height, time, txns) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![
                     registry,
                     hash,
                     block.get("height").and_then(Value::as_u64).unwrap_or(0) as i64,
-                    block.get("time").and_then(Value::as_str).unwrap_or_default(),
-                    0_i64
+                    time_value,
+                    txns
                 ],
             )
             .context("failed to persist sqlite block")?;
@@ -1553,6 +1572,73 @@ impl JsonDb {
         }
     }
 
+    pub(crate) fn block_timestamp_bounds(&self, registry: &str, event: &EventRecord) -> (Option<Value>, Option<Value>) {
+        let lower = event
+            .operation
+            .get("blockid")
+            .and_then(Value::as_str)
+            .and_then(|hash| self.get_block(registry, Some(BlockLookup::Hash(hash.to_string()))))
+            .map(|block| json!({
+                "time": block.get("time").cloned().unwrap_or(Value::Null),
+                "timeISO": block.get("time")
+                    .and_then(Value::as_u64)
+                    .and_then(|time| chrono::DateTime::<chrono::Utc>::from_timestamp(time as i64, 0))
+                    .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+                "blockid": block.get("hash").cloned().unwrap_or(Value::Null),
+                "height": block.get("height").cloned().unwrap_or(Value::Null)
+            }));
+
+        let registration = event
+            .operation
+            .get("registration")
+            .cloned()
+            .or_else(|| {
+                // registration may be attached at the event level for batch-imported events
+                None
+            });
+        let upper = registration.as_ref().and_then(|reg| {
+            let height = reg.get("height").and_then(Value::as_u64)?;
+            let block = self.get_block(registry, Some(BlockLookup::Height(height)))?;
+            Some(json!({
+                "time": block.get("time").cloned().unwrap_or(Value::Null),
+                "timeISO": block.get("time")
+                    .and_then(Value::as_u64)
+                    .and_then(|time| chrono::DateTime::<chrono::Utc>::from_timestamp(time as i64, 0))
+                    .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+                "blockid": block.get("hash").cloned().unwrap_or(Value::Null),
+                "height": block.get("height").cloned().unwrap_or(Value::Null),
+                "txid": reg.get("txid").cloned().unwrap_or(Value::Null),
+                "txidx": reg.get("index").cloned().unwrap_or(Value::Null),
+                "batchid": reg.get("batch").cloned().unwrap_or(Value::Null),
+                "opidx": reg.get("opidx").cloned().unwrap_or(Value::Null)
+            }))
+        });
+
+        (lower, upper)
+    }
+
+    pub(crate) fn build_timestamp(
+        &self,
+        registry: &str,
+        version_id: &str,
+        event: &EventRecord,
+    ) -> Option<Value> {
+        let (lower, upper) = self.block_timestamp_bounds(registry, event);
+        if lower.is_none() && upper.is_none() {
+            return None;
+        }
+        Some(json!({
+            "chain": registry,
+            "opid": version_id,
+            "lowerBound": lower.unwrap_or(Value::Null),
+            "upperBound": upper.unwrap_or(Value::Null)
+        }))
+    }
+
     fn resolve_doc(&self, _config: &Config, did: &str, options: ResolveOptions) -> Result<Value> {
         let _ = did.split(':').next_back().context("invalid did suffix")?;
         let events = self.get_events(did);
@@ -1632,7 +1718,17 @@ impl JsonDb {
             confirmed: true,
             canonical_id,
             deactivated: false,
+            timestamp: None,
         };
+
+        let anchor_registry = state
+            .did_document_registration
+            .get("registry")
+            .and_then(Value::as_str)
+            .map(ToString::to_string);
+        if let Some(registry) = anchor_registry.as_deref() {
+            state.timestamp = self.build_timestamp(registry, &state.version_id, anchor);
+        }
 
         for event in events.iter().skip(1) {
             let operation = &event.operation;
@@ -1665,6 +1761,12 @@ impl JsonDb {
                     .and_then(Value::as_str)
                     .map(|registry| registry == event.registry)
                     .unwrap_or(false);
+
+            let registry_for_timestamp = state
+                .did_document_registration
+                .get("registry")
+                .and_then(Value::as_str)
+                .map(ToString::to_string);
 
             match operation.get("type").and_then(Value::as_str) {
                 Some("update") => {
@@ -1701,6 +1803,15 @@ impl JsonDb {
                 }
                 _ => {}
             }
+
+            if let Some(registry) = registry_for_timestamp.as_deref() {
+                state.timestamp = self.build_timestamp(registry, &state.version_id, event);
+            }
+        }
+
+        if let Some(registration) = state.did_document_registration.as_object_mut() {
+            registration.remove("opid");
+            registration.remove("registration");
         }
 
         let mut metadata = json!({
@@ -1722,6 +1833,9 @@ impl JsonDb {
         if let Some(canonical_id) = state.canonical_id.clone() {
             metadata["canonicalId"] = Value::String(canonical_id);
         }
+        if let Some(timestamp) = state.timestamp.clone() {
+            metadata["timestamp"] = timestamp;
+        }
 
         Ok(json!({
             "didDocument": state.did_document,
@@ -1739,7 +1853,7 @@ impl DbBackend {
     fn from_config(config: &Config) -> Self {
         match config.db.as_str() {
             "sqlite" => Self::Sqlite {
-                path: config.data_dir.join("archon.sqlite"),
+                path: config.data_dir.join("archon.db"),
             },
             "redis" => Self::Redis {
                 url: env::var("ARCHON_REDIS_URL")
@@ -1810,18 +1924,18 @@ impl DbBackend {
     }
 
     fn save_state(&self, data: &JsonDbFile) -> Result<()> {
-        let body = serde_json::to_string_pretty(data).context("failed to encode db")?;
         match self {
             Self::JsonFile { path } => {
                 if let Some(parent) = path.parent() {
                     fs::create_dir_all(parent)
                         .with_context(|| format!("failed to create {}", parent.display()))?;
                 }
+                let body = encode_json_db_with_indent(data)?;
                 fs::write(path, body).with_context(|| format!("failed to write {}", path.display()))
             }
             Self::Sqlite { path } => {
                 let _ = Self::open_sqlite(path)?;
-                let _ = body;
+                let _ = data;
                 anyhow::bail!("sqlite snapshot persistence is disabled; use direct table operations")
             }
             Self::Redis { url, namespace } => {
@@ -1843,7 +1957,7 @@ impl DbBackend {
                 let client =
                     MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
                 let _ = client.database(database);
-                let _ = body;
+                let _ = data;
                 anyhow::bail!("mongodb snapshot persistence is disabled; use direct collection operations")
             }
         }

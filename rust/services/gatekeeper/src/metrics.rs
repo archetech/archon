@@ -22,7 +22,8 @@ pub(crate) fn record_metrics(
     status: u16,
     duration_seconds: f64,
 ) {
-    let normalized = normalize_path(route);
+    let qualified = qualify_route(route);
+    let normalized = normalize_path(&qualified);
     let status_string = status.to_string();
     state
         .metrics
@@ -34,6 +35,16 @@ pub(crate) fn record_metrics(
         .http_request_duration_seconds
         .with_label_values(&[method, &normalized, &status_string])
         .observe(duration_seconds);
+}
+
+fn qualify_route(route: &str) -> String {
+    if route.starts_with("/api/") || route == "/metrics" {
+        return route.to_string();
+    }
+    if route.starts_with('/') {
+        return format!("/api/v1{route}");
+    }
+    format!("/api/v1/{route}")
 }
 
 pub(crate) fn normalize_path(path: &str) -> String {

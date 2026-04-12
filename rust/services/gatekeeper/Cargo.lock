@@ -50,7 +50,7 @@ dependencies = [
 
 [[package]]
 name = "archon-rust-gatekeeper"
-version = "0.1.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -74,6 +74,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tower",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2829,6 +2830,7 @@ dependencies = [
  "futures-util",
  "http",
  "http-body",
+ "http-body-util",
  "iri-string",
  "pin-project-lite",
  "tower",

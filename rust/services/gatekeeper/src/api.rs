@@ -556,8 +556,8 @@ pub(crate) async fn import_batch(
     }
 
     let batch = match payload.as_array() {
-        Some(items) => items.iter().cloned().collect::<Vec<_>>(),
-        None => {
+        Some(items) if !items.is_empty() => items.iter().cloned().collect::<Vec<_>>(),
+        _ => {
             record_metrics(
                 &state,
                 "POST",
@@ -626,6 +626,31 @@ pub(crate) async fn import_batch_by_cids(
             );
         }
     };
+    let has_registry = metadata
+        .get("registry")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.is_empty());
+    let has_time = metadata
+        .get("time")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.is_empty());
+    let has_ordinal = metadata
+        .get("ordinal")
+        .and_then(Value::as_array)
+        .is_some();
+    if !has_registry || !has_time || !has_ordinal {
+        record_metrics(
+            &state,
+            "POST",
+            "/batch/import/cids",
+            500,
+            start.elapsed().as_secs_f64(),
+        );
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error: Invalid parameter: metadata",
+        );
+    }
 
     let mut batch = Vec::new();
     for (index, cid) in cids.iter().filter_map(Value::as_str).enumerate() {
@@ -754,9 +779,11 @@ pub(crate) async fn clear_queue(
         .filter(|value| value.is_object())
         .collect::<Vec<_>>();
 
-    let mut store = state.store.lock().await;
-    let ok = store.clear_queue(&registry, &operations).is_ok();
-    drop(store);
+    let remaining = {
+        let mut store = state.store.lock().await;
+        let _ = store.clear_queue(&registry, &operations);
+        store.get_queue(&registry)
+    };
     refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
@@ -765,7 +792,7 @@ pub(crate) async fn clear_queue(
         200,
         start.elapsed().as_secs_f64(),
     );
-    Json(json!(ok)).into_response()
+    Json(json!(remaining)).into_response()
 }
 
 pub(crate) async fn process_events_route(
@@ -1026,146 +1053,72 @@ pub(crate) async fn resolve_did(
             .unwrap_or(false),
     };
 
-    let local_result = resolve_local_doc_async(&state, &did, resolve_options.clone()).await;
-    if let Ok(doc) = local_result {
-        record_metrics(
-            &state,
-            "GET",
-            "/did/:did",
-            200,
-            start.elapsed().as_secs_f64(),
-        );
-        return Json(doc).into_response();
-    }
-
-    let local_error_doc = if !did.starts_with("did:") {
-        Some(did_resolution_error_doc("invalidDid"))
-    } else {
-        let store = state.store.lock().await;
-        if store.get_events(&did).is_empty() {
-            Some(did_resolution_error_doc("notFound"))
-        } else {
-            None
+    let local_doc = match resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
+        Ok(doc) => doc,
+        Err(_) => {
+            let error_kind = if !did.starts_with("did:") {
+                "invalidDid"
+            } else {
+                "notFound"
+            };
+            did_resolution_error_doc(error_kind)
         }
     };
 
-    if state.config.fallback_url.trim().is_empty() {
-        if let Some(doc) = local_error_doc.clone() {
-            record_metrics(
-                &state,
-                "GET",
-                "/did/:did",
-                200,
-                start.elapsed().as_secs_f64(),
-            );
-            return Json(doc).into_response();
-        }
-        record_metrics(
-            &state,
-            "GET",
-            "/did/:did",
-            404,
-            start.elapsed().as_secs_f64(),
+    let has_resolver_error = local_doc
+        .get("didResolutionMetadata")
+        .and_then(|value| value.get("error"))
+        .is_some();
+
+    if has_resolver_error && !state.config.fallback_url.trim().is_empty() {
+        let url = format!(
+            "{}/1.0/identifiers/{}",
+            state.config.fallback_url.trim_end_matches('/'),
+            url_encode_component(&did)
         );
-        return (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "DID not found" })),
-        )
-            .into_response();
-    }
 
-    let mut url = format!(
-        "{}/1.0/identifiers/{}",
-        state.config.fallback_url.trim_end_matches('/'),
-        url_encode_component(&did)
-    );
-
-    if !query.is_empty() {
-        let mut params: Vec<String> = query
-            .into_iter()
-            .map(|(k, v)| format!("{}={}", url_encode_component(&k), url_encode_component(&v)))
-            .collect();
-        params.sort();
-        url.push('?');
-        url.push_str(&params.join("&"));
-    }
-
-    let response = match state
-        .client
-        .get(url)
-        .timeout(Duration::from_millis(state.config.fallback_timeout_ms))
-        .send()
-        .await
-    {
-        Ok(response) => response,
-        Err(error) => {
-            error!("resolve DID fallback failed: {error}");
-            if let Some(doc) = local_error_doc.clone() {
-                record_metrics(
-                    &state,
-                    "GET",
-                    "/did/:did",
-                    200,
-                    start.elapsed().as_secs_f64(),
-                );
-                return Json(doc).into_response();
+        match state
+            .client
+            .get(url)
+            .timeout(Duration::from_millis(state.config.fallback_timeout_ms))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => match response.bytes().await {
+                Ok(body) => match serde_json::from_slice::<Value>(&body) {
+                    Ok(resolved) => {
+                        record_metrics(
+                            &state,
+                            "GET",
+                            "/did/:did",
+                            200,
+                            start.elapsed().as_secs_f64(),
+                        );
+                        return Json(resolved).into_response();
+                    }
+                    Err(error) => {
+                        error!("resolve DID fallback body parse failed: {error}");
+                    }
+                },
+                Err(error) => {
+                    error!("resolve DID fallback body read failed: {error}");
+                }
+            },
+            Ok(_) => {}
+            Err(error) => {
+                error!("resolve DID fallback failed: {error}");
             }
-            record_metrics(
-                &state,
-                "GET",
-                "/did/:did",
-                404,
-                start.elapsed().as_secs_f64(),
-            );
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({ "error": "DID not found" })),
-            )
-                .into_response();
-        }
-    };
-
-    let status = response.status();
-    let body = match response.bytes().await {
-        Ok(body) => body,
-        Err(error) => {
-            error!("resolve DID body read failed: {error}");
-            record_metrics(
-                &state,
-                "GET",
-                "/did/:did",
-                502,
-                start.elapsed().as_secs_f64(),
-            );
-            return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "error": "failed to read DID response" })),
-            )
-                .into_response();
-        }
-    };
-
-    let status_code = status.as_u16();
-    if !status.is_success() {
-        if let Some(doc) = local_error_doc.clone() {
-            record_metrics(
-                &state,
-                "GET",
-                "/did/:did",
-                200,
-                start.elapsed().as_secs_f64(),
-            );
-            return Json(doc).into_response();
         }
     }
 
-    record_metrics(&state, "GET", "/did/:did", status_code, start.elapsed().as_secs_f64());
-
-    let mut builder = Response::builder().status(status);
-    builder = builder.header(header::CONTENT_TYPE, "application/json");
-    builder
-        .body(Body::from(body))
-        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+    record_metrics(
+        &state,
+        "GET",
+        "/did/:did",
+        200,
+        start.elapsed().as_secs_f64(),
+    );
+    Json(local_doc).into_response()
 }
 
 pub(crate) async fn ipfs_add_json(

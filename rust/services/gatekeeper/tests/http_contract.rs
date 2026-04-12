@@ -110,8 +110,8 @@ async fn http_contract_covers_ready_version_status_admin_and_metrics() -> Result
         .await?;
     assert!(response.status().is_success());
     let metrics = response.text().await?;
-    assert!(metrics.contains("route=\"/did/:did\""));
-    assert!(metrics.contains("route=\"/queue/:registry\""));
+    assert!(metrics.contains("route=\"/api/v1/did/:did\""));
+    assert!(metrics.contains("route=\"/api/v1/queue/:registry\""));
 
     Ok(())
 }

@@ -67,7 +67,7 @@ impl Config {
                 .chars()
                 .take(7)
                 .collect(),
-            version: env_var_or_default("ARCHON_GATEKEEPER_VERSION", "0.7.0"),
+            version: env_var_or_default("ARCHON_GATEKEEPER_VERSION", env!("CARGO_PKG_VERSION")),
         })
     }
 }

@@ -133,7 +133,21 @@ pub(crate) async fn resolve_local_doc_async(
         confirmed: true,
         canonical_id,
         deactivated: false,
+        timestamp: None,
     };
+
+    let anchor_registry = resolved
+        .did_document_registration
+        .get("registry")
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
+    if let Some(registry) = anchor_registry.as_deref() {
+        resolved.timestamp = state
+            .store
+            .lock()
+            .await
+            .build_timestamp(registry, &resolved.version_id, anchor);
+    }
 
     let anchor_valid = verify_create_operation_impl(state, anchor_operation).await?;
     if !anchor_valid {
@@ -190,6 +204,12 @@ pub(crate) async fn resolve_local_doc_async(
             anyhow::bail!("Invalid operation: previd");
         }
 
+        let registry_for_timestamp = resolved
+            .did_document_registration
+            .get("registry")
+            .and_then(Value::as_str)
+            .map(ToString::to_string);
+
         match operation.get("type").and_then(Value::as_str) {
             Some("update") => {
                 resolved.version_sequence += 1;
@@ -225,6 +245,19 @@ pub(crate) async fn resolve_local_doc_async(
             }
             _ => {}
         }
+
+        if let Some(registry) = registry_for_timestamp.as_deref() {
+            resolved.timestamp = state
+                .store
+                .lock()
+                .await
+                .build_timestamp(registry, &resolved.version_id, event);
+        }
+    }
+
+    if let Some(registration) = resolved.did_document_registration.as_object_mut() {
+        registration.remove("opid");
+        registration.remove("registration");
     }
 
     let mut metadata = json!({
@@ -244,6 +277,9 @@ pub(crate) async fn resolve_local_doc_async(
     }
     if let Some(canonical_id) = resolved.canonical_id.clone() {
         metadata["canonicalId"] = Value::String(canonical_id);
+    }
+    if let Some(timestamp) = resolved.timestamp.clone() {
+        metadata["timestamp"] = timestamp;
     }
 
     Ok(json!({

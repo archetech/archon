@@ -10,11 +10,13 @@ use std::{
 
 use anyhow::{Context, Result};
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{get, post},
     Router,
 };
 use reqwest::Client;
-use tokio::{net::TcpListener, sync::Mutex};
+use tokio::{net::TcpListener, signal, sync::Mutex};
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
 use crate::{
@@ -102,8 +104,34 @@ pub async fn run() -> Result<()> {
     }
 
     state.ready.store(true, Ordering::Relaxed);
-    axum::serve(listener, app).await.context("server failed")?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .context("server failed")?;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = signal::ctrl_c().await;
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        if let Ok(mut sig) = signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            sig.recv().await;
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    info!("shutdown signal received, draining in-flight requests");
 }
 
 fn build_state(config: Config) -> Result<AppState> {
@@ -132,6 +160,15 @@ fn build_state(config: Config) -> Result<AppState> {
 }
 
 fn build_router(state: AppState) -> Router {
+    let json_limit = state.config.json_limit;
+    let upload_limit = state.config.upload_limit;
+    let body_limit = json_limit.max(upload_limit);
+
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route("/metrics", get(get_metrics))
         .nest(
@@ -169,10 +206,12 @@ fn build_router(state: AppState) -> Router {
                 .route("/block/:registry/:blockId", get(get_block_by_id))
                 .route("/block/:registry", post(add_block))
                 .route("/search", get(search_docs))
-                .route("/query", post(query_docs)),
+                .route("/query", post(query_docs))
+                .layer(DefaultBodyLimit::max(body_limit)),
         )
         .nest("/api", Router::new().fallback(api_not_found))
         .fallback(not_found)
+        .layer(cors)
         .with_state(state)
 }
 
