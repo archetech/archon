@@ -1,7 +1,10 @@
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 
@@ -36,6 +39,7 @@ pub(crate) struct AppState {
     pub(crate) verified_dids: Arc<Mutex<HashMap<String, bool>>>,
     pub(crate) supported_registries: Arc<Mutex<Vec<String>>>,
     pub(crate) processing_events: Arc<Mutex<bool>>,
+    pub(crate) ready: Arc<AtomicBool>,
     pub(crate) started_at: Instant,
 }
 
@@ -61,6 +65,7 @@ pub async fn run() -> Result<()> {
         "Native Rust Gatekeeper listening"
     );
 
+    state.ready.store(true, Ordering::Relaxed);
     axum::serve(listener, app).await.context("server failed")?;
     Ok(())
 }
@@ -82,6 +87,7 @@ fn build_state(config: Config) -> Result<AppState> {
         verified_dids: Arc::new(Mutex::new(HashMap::new())),
         supported_registries: Arc::new(Mutex::new(config.registries.clone())),
         processing_events: Arc::new(Mutex::new(false)),
+        ready: Arc::new(AtomicBool::new(false)),
         started_at: Instant::now(),
     })
 }

@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     env, fs,
+    sync::atomic::Ordering,
     time::{Duration, Instant},
 };
 
@@ -54,7 +55,7 @@ struct VersionPayload {
 
 pub(crate) async fn ready(State(state): State<AppState>) -> impl IntoResponse {
     record_metrics(&state, "GET", "/ready", 200, 0.0);
-    Json(true)
+    Json(state.ready.load(Ordering::Relaxed))
 }
 
 pub(crate) async fn version(State(state): State<AppState>) -> impl IntoResponse {

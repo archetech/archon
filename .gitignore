@@ -15,3 +15,4 @@ dids.db-journal
 
 
 **/.npmrc
+rust/services/gatekeeper/target/
