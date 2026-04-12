@@ -1,5 +1,5 @@
 # Full Rust gatekeeper service definition. Pulled into docker-compose.yml via
-# the `include:` directive when GATEKEEPER_COMPOSE_FILE is set to this file.
+# the `include:` directive when ARCHON_GATEKEEPER_COMPOSE_FILE is set to this file.
 # Keep in sync with docker-compose.gatekeeper-ts.yml whenever non-build
 # env/ports/healthcheck fields change.
 services:

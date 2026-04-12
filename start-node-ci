@@ -7,10 +7,10 @@ source .env
 FLAVOR="${2:-rust}"
 case "$FLAVOR" in
   rust)
-    export GATEKEEPER_COMPOSE_FILE="docker-compose.gatekeeper-rust.yml"
+    export ARCHON_GATEKEEPER_COMPOSE_FILE="docker-compose.gatekeeper-rust.yml"
     ;;
   typescript|ts)
-    export GATEKEEPER_COMPOSE_FILE="docker-compose.gatekeeper-ts.yml"
+    export ARCHON_GATEKEEPER_COMPOSE_FILE="docker-compose.gatekeeper-ts.yml"
     ;;
   *)
     echo "Unknown gatekeeper flavor: $FLAVOR (expected: rust | typescript)"
@@ -18,7 +18,7 @@ case "$FLAVOR" in
     ;;
 esac
 
-echo "Using gatekeeper flavor: $FLAVOR ($GATEKEEPER_COMPOSE_FILE)"
+echo "Using gatekeeper flavor: $FLAVOR ($ARCHON_GATEKEEPER_COMPOSE_FILE)"
 
 export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
