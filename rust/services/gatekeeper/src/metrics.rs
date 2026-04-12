@@ -143,6 +143,15 @@ impl Metrics {
             &["version", "commit"],
         )?;
 
+        // Emit standard process_* metrics (process_resident_memory_bytes,
+        // process_start_time_seconds, etc.) so existing Grafana panels for
+        // uptime + RSS memory keep working when the Rust gatekeeper replaces
+        // the TypeScript one. Only available on Linux; no-op otherwise.
+        #[cfg(target_os = "linux")]
+        registry.register(Box::new(
+            prometheus::process_collector::ProcessCollector::for_self(),
+        ))?;
+
         registry.register(Box::new(http_requests_total.clone()))?;
         registry.register(Box::new(http_request_duration_seconds.clone()))?;
         registry.register(Box::new(did_operations_total.clone()))?;
