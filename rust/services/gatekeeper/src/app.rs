@@ -257,5 +257,13 @@ async fn log_http(request: Request, next: Next) -> Response {
 fn init_tracing() {
     let filter =
         tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+    // Match the TypeScript gatekeeper's log shape: plain messages, no
+    // timestamp/level/target preamble. `docker compose logs` already prefixes
+    // each line with the container name (and can add a timestamp via `-t`).
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .without_time()
+        .with_level(false)
+        .with_target(false)
+        .init();
 }
