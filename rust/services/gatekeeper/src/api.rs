@@ -1340,23 +1340,69 @@ pub(crate) async fn ipfs_get_data(
 
 pub(crate) async fn ipfs_add_stream(State(state): State<AppState>, request: Request) -> Response {
     let start = Instant::now();
-    let body = match request_body_bytes(request, state.config.upload_limit).await {
-        Ok(bytes) => bytes,
-        Err(response) => return response,
+    let (_parts, body) = request.into_parts();
+    let body_stream = body.into_data_stream();
+    let reqwest_body = reqwest::Body::wrap_stream(body_stream);
+    let form = reqwest::multipart::Form::new()
+        .part("file", reqwest::multipart::Part::stream(reqwest_body));
+
+    let url = format!("{}/add", state.config.ipfs_url.trim_end_matches('/'));
+    let response = state
+        .client
+        .post(url)
+        .query(&[("pin", "true"), ("cid-version", "1")])
+        .multipart(form)
+        .send()
+        .await;
+
+    let response = match response {
+        Ok(response) => response,
+        Err(error) => {
+            error!("ipfs stream upload failed: {error}");
+            record_metrics(
+                &state,
+                "POST",
+                "/ipfs/stream",
+                502,
+                start.elapsed().as_secs_f64(),
+            );
+            return (StatusCode::BAD_GATEWAY, error_json("IPFS add failed")).into_response();
+        }
     };
 
-    proxy_ipfs_add(
+    let status = response.status();
+    let body = match response.text().await {
+        Ok(body) => body,
+        Err(error) => {
+            error!("ipfs stream upload body read failed: {error}");
+            record_metrics(
+                &state,
+                "POST",
+                "/ipfs/stream",
+                502,
+                start.elapsed().as_secs_f64(),
+            );
+            return (
+                StatusCode::BAD_GATEWAY,
+                error_json("IPFS add response failed"),
+            )
+                .into_response();
+        }
+    };
+
+    let cid = extract_ipfs_hash(&body).unwrap_or(body.trim().to_string());
+    record_metrics(
         &state,
-        vec![
-            ("pin".to_string(), "true".to_string()),
-            ("cid-version".to_string(), "1".to_string()),
-        ],
-        reqwest::multipart::Form::new()
-            .part("file", reqwest::multipart::Part::bytes(body.to_vec())),
+        "POST",
         "/ipfs/stream",
-        start,
-    )
-    .await
+        status.as_u16(),
+        start.elapsed().as_secs_f64(),
+    );
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .body(Body::from(cid))
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
 pub(crate) async fn ipfs_get_stream(
@@ -1365,13 +1411,29 @@ pub(crate) async fn ipfs_get_stream(
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     let start = Instant::now();
-    let response = proxy_ipfs_cat_raw(&state, &cid).await;
-
-    let (status, body) = match response {
-        Ok(value) => value,
-        Err(response) => return response,
+    let url = format!("{}/cat", state.config.ipfs_url.trim_end_matches('/'));
+    let response = match state
+        .client
+        .post(url)
+        .query(&[("arg", cid.as_str())])
+        .send()
+        .await
+    {
+        Ok(response) => response,
+        Err(error) => {
+            error!("ipfs stream cat request failed: {error}");
+            record_metrics(
+                &state,
+                "GET",
+                "/ipfs/stream/:cid",
+                502,
+                start.elapsed().as_secs_f64(),
+            );
+            return (StatusCode::BAD_GATEWAY, error_json("IPFS cat failed")).into_response();
+        }
     };
 
+    let status = response.status();
     let content_type = query
         .get("type")
         .cloned()
@@ -1395,8 +1457,9 @@ pub(crate) async fn ipfs_get_stream(
         start.elapsed().as_secs_f64(),
     );
 
+    let stream = response.bytes_stream();
     builder
-        .body(Body::from(body))
+        .body(Body::from_stream(stream))
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 

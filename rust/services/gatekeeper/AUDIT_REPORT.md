@@ -169,14 +169,14 @@ different — not a contract item.
   dance against the configured `ipfs_url`. This should produce identical CIDs
   for identical content but has not been confirmed against all payload sizes /
   types (see [PORT_CHECKLIST.md:135-137](PORT_CHECKLIST.md#L135-L137)).
-- **`/ipfs/stream` is buffered, not streamed.** [api.rs:1388-1407](src/api.rs#L1388-L1407)
-  reads the entire request body into memory up to `upload_limit` (10 MB), then
-  posts it as a single multipart part. TS used an async iterable pipe. Large
-  payloads that previously streamed successfully may now hit the upload limit.
-- **GET `/ipfs/stream/:cid`** buffers the IPFS `cat` response fully into bytes
-  before building a single-body response ([api.rs:1409-1448](src/api.rs#L1409-L1448)).
-  TS wrote each chunk via `res.write` as it arrived. Memory and time-to-first-
-  byte behaviour will change for large retrievals.
+- **`/ipfs/stream` POST streams the axum request body straight into the Kubo
+  multipart part** via `reqwest::Body::wrap_stream` and is mounted on a router
+  layer with `DefaultBodyLimit::disable()` so the payload is unbounded — matches
+  the TS behaviour of piping `req` directly into the IPFS client with no server
+  cap.
+- **GET `/ipfs/stream/:cid`** builds the response body via
+  `axum::body::Body::from_stream(response.bytes_stream())`, so chunks hit the
+  client as Kubo produces them — matching TS `res.write(chunk)` streaming.
 - **`Content-Type` on GET `/ipfs/data/:cid`** is always
   `application/octet-stream` in both implementations. OK.
 - **Filename sanitation.** Rust strips `"` out of the `filename` query param
@@ -564,8 +564,7 @@ Gaps: see SQLite filename (§4.1) and CORS (§1.2).
 8. **Populate `didDocumentMetadata.timestamp`** from the block store during
    resolve — BTC/signet/testnet consumers depend on it.
 9. **Stop forwarding query params to the universal resolver fallback.**
-10. **Stream IPFS uploads and downloads** instead of buffering into memory.
-11. **Preserve insertion order in `searchDocs` and `queryDocs` results**, or
+10. **Preserve insertion order in `searchDocs` and `queryDocs` results**, or
     add a stable tie‑breaker TS already has.
 12. **Write the real `txns` value into the SQLite `blocks.txns` column.**
 13. **Use a persistent Mongo/SQLite connection** (pool or long‑lived) to
