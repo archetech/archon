@@ -32,7 +32,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dockerfile: Dockerfile.gatekeeper
+          - dockerfile: Dockerfile.gatekeeper-ts
             image: gatekeeper
           - dockerfile: Dockerfile.keymaster
             image: keymaster

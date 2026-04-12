@@ -1,0 +1,35 @@
+[package]
+name = "archon-rust-gatekeeper"
+version = "0.7.0"
+edition = "2021"
+license = "MIT"
+description = "Native Rust Gatekeeper service for Archon"
+
+[dependencies]
+anyhow = "1.0"
+async-recursion = "1.1"
+axum = { version = "0.7", features = ["http1", "json", "tokio", "multipart"] }
+base64 = "0.22"
+bytes = "1.8"
+cid = "0.11"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+dotenvy = "0.15"
+futures-util = "0.3"
+k256 = { version = "0.13", features = ["ecdsa"] }
+mongodb = { version = "3.5.2", default-features = false, features = ["sync", "rustls-tls", "dns-resolver", "compat-3-0-0"] }
+multihash-codetable = { version = "0.1", features = ["sha2"] }
+prometheus = { version = "0.13", features = ["process"] }
+redis = "0.27"
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.42", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "limit"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[dev-dependencies]
+sha2 = "0.10"
+tempfile = "3"

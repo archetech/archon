@@ -1,4 +1,9 @@
 include:
+  # Gatekeeper implementation. Set ARCHON_GATEKEEPER_FLAVOR=rust (or ts) in
+  # .env to choose, or export it before `docker compose up`. Defaults to the
+  # TypeScript service. Each flavor file carries the full gatekeeper service
+  # definition.
+  - docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR:-ts}.yml
   - docker-compose.btc-mainnet.yml
   - docker-compose.btc-signet.yml
   - docker-compose.lightning.yml
@@ -43,47 +48,16 @@ services:
     volumes:
       - ./data/ipfs:/data/ipfs
       - ./share:/export/share
-
-  gatekeeper:
-    build:
-      context: .
-      dockerfile: Dockerfile.gatekeeper
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/gatekeeper
-    environment:
-      - ARCHON_GATEKEEPER_PORT=4224
-      - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
-      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
-      - ARCHON_GATEKEEPER_DB=${ARCHON_GATEKEEPER_DB}
-      - ARCHON_GATEKEEPER_DID_PREFIX=${ARCHON_GATEKEEPER_DID_PREFIX}
-      - ARCHON_GATEKEEPER_REGISTRIES=${ARCHON_GATEKEEPER_REGISTRIES}
-      - ARCHON_GATEKEEPER_GC_INTERVAL=${ARCHON_GATEKEEPER_GC_INTERVAL}
-      - ARCHON_GATEKEEPER_STATUS_INTERVAL=${ARCHON_GATEKEEPER_STATUS_INTERVAL}
-      - ARCHON_GATEKEEPER_UPLOAD_LIMIT=${ARCHON_GATEKEEPER_UPLOAD_LIMIT}
-      - ARCHON_GATEKEEPER_FALLBACK_URL=${ARCHON_GATEKEEPER_FALLBACK_URL}
-      - ARCHON_GATEKEEPER_FALLBACK_TIMEOUT=${ARCHON_GATEKEEPER_FALLBACK_TIMEOUT}
-      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
-      - ARCHON_REDIS_URL=redis://redis:6379
-      - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
-    volumes:
-      - ./data:/app/gatekeeper/data
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    ports:
-      - ${ARCHON_GATEKEEPER_PORT}:4224
     healthcheck:
-      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4224/api/v1/ready',res=>{let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.exit(res.statusCode===200&&(body.trim()==='true'||body.includes('\"ready\":true'))?0:1));});req.on('error',()=>process.exit(1));"]
-      interval: 10s
+      test: ["CMD-SHELL", "wget --post-data='' -qO- http://127.0.0.1:5001/api/v0/version >/dev/null"]
+      interval: 30s
       timeout: 5s
-      retries: 6
+      retries: 10
       start_period: 20s
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      ipfs:
-        condition: service_healthy
+
+  # The `gatekeeper` service is pulled in via the `include:` at the top of
+  # this file. ARCHON_GATEKEEPER_FLAVOR (ts | rust) selects which flavor
+  # file is loaded; default is ts.
 
   keymaster:
     build:

@@ -1,0 +1,21 @@
+{
+  "requiredMetricNames": [
+    "http_requests_total",
+    "http_request_duration_seconds",
+    "did_operations_total",
+    "events_queue_size",
+    "gatekeeper_dids_total",
+    "gatekeeper_dids_by_type",
+    "gatekeeper_dids_by_registry",
+    "service_version_info"
+  ],
+  "requiredNormalizedRoutes": [
+    "/did/:did",
+    "/block/:registry/latest",
+    "/block/:registry/:blockId",
+    "/queue/:registry/clear",
+    "/queue/:registry",
+    "/events/:registry",
+    "/dids/"
+  ]
+}

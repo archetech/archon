@@ -1,0 +1,244 @@
+{
+  "agentCreateValid": {
+    "operation": {
+      "type": "create",
+      "created": "2026-04-11T12:00:00Z",
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao",
+        "y": "OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE"
+      },
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "local"
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-04-11T12:00:00Z",
+        "proofPurpose": "assertionMethod",
+        "verificationMethod": "#key-1",
+        "proofValue": "94Uctck5HwNrWXRX9N2b0Yxr9RYJ3pLB5jhKOC_YRH8TqJiaKLygxWDNhavVWmYzGBedR9s0-6w1jeROgqxoYg"
+      }
+    },
+    "expected": true
+  },
+  "agentCreateInvalidProof": {
+    "operation": {
+      "type": "create",
+      "created": "2026-04-11T12:00:00Z",
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao",
+        "y": "OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE"
+      },
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "local"
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-04-11T12:00:00Z",
+        "proofPurpose": "assertionMethod",
+        "verificationMethod": "#key-1",
+        "proofValue": "94Uctck5HwNrWXRX9N2b0Yxr9RYJ3pLB5jhKOC_YRH8TqJiaKLygxWDNhavVWmYzGBedR9s0-6w1jeROgqxoYA"
+      }
+    },
+    "expected": false
+  },
+  "agentUpdateValid": {
+    "operation": {
+      "type": "update",
+      "did": "did:test:phase4-vector",
+      "previd": "bafyphase4vectorprev",
+      "doc": {
+        "didDocument": {
+          "@context": [
+            "https://www.w3.org/ns/did/v1"
+          ],
+          "id": "did:test:phase4-vector",
+          "verificationMethod": [
+            {
+              "id": "#key-1",
+              "controller": "did:test:phase4-vector",
+              "type": "EcdsaSecp256k1VerificationKey2019",
+              "publicKeyJwk": {
+                "kty": "EC",
+                "crv": "secp256k1",
+                "x": "TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao",
+                "y": "OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE"
+              }
+            }
+          ],
+          "authentication": [
+            "#key-1"
+          ],
+          "assertionMethod": [
+            "#key-1"
+          ],
+          "service": [
+            {
+              "id": "#profile",
+              "type": "LinkedDomains",
+              "serviceEndpoint": "https://example.com/profile"
+            }
+          ]
+        },
+        "didDocumentData": {
+          "displayName": "Phase 4 Vector"
+        },
+        "didDocumentRegistration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "local"
+        }
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-04-11T12:05:00Z",
+        "proofPurpose": "authentication",
+        "verificationMethod": "did:test:phase4-vector#key-1",
+        "proofValue": "fTTUDBHHHMZBjKSEKEFTSt14Nr75HBC6axlq2W7QHUIS6fagc_duLiG525YBpncVpIm4URwujwfhp3Em-1yfnA"
+      }
+    },
+    "doc": {
+      "didDocument": {
+        "@context": [
+          "https://www.w3.org/ns/did/v1"
+        ],
+        "id": "did:test:phase4-vector",
+        "verificationMethod": [
+          {
+            "id": "#key-1",
+            "controller": "did:test:phase4-vector",
+            "type": "EcdsaSecp256k1VerificationKey2019",
+            "publicKeyJwk": {
+              "kty": "EC",
+              "crv": "secp256k1",
+              "x": "TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao",
+              "y": "OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE"
+            }
+          }
+        ],
+        "authentication": [
+          "#key-1"
+        ],
+        "assertionMethod": [
+          "#key-1"
+        ]
+      },
+      "didDocumentMetadata": {
+        "created": "2026-04-11T12:00:00Z",
+        "versionId": "bafyphase4vectorprev",
+        "versionSequence": "1",
+        "confirmed": true
+      },
+      "didDocumentData": {},
+      "didDocumentRegistration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "local"
+      }
+    },
+    "expected": true
+  },
+  "agentUpdateInvalidProof": {
+    "operation": {
+      "type": "update",
+      "did": "did:test:phase4-vector",
+      "previd": "bafyphase4vectorprev",
+      "doc": {
+        "didDocument": {
+          "@context": [
+            "https://www.w3.org/ns/did/v1"
+          ],
+          "id": "did:test:phase4-vector",
+          "verificationMethod": [
+            {
+              "id": "#key-1",
+              "controller": "did:test:phase4-vector",
+              "type": "EcdsaSecp256k1VerificationKey2019",
+              "publicKeyJwk": {
+                "kty": "EC",
+                "crv": "secp256k1",
+                "x": "TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao",
+                "y": "OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE"
+              }
+            }
+          ],
+          "authentication": [
+            "#key-1"
+          ],
+          "assertionMethod": [
+            "#key-1"
+          ],
+          "service": [
+            {
+              "id": "#profile",
+              "type": "LinkedDomains",
+              "serviceEndpoint": "https://example.com/profile"
+            }
+          ]
+        },
+        "didDocumentData": {
+          "displayName": "Phase 4 Vector"
+        },
+        "didDocumentRegistration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "local"
+        }
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-04-11T12:05:00Z",
+        "proofPurpose": "authentication",
+        "verificationMethod": "did:test:phase4-vector#key-1",
+        "proofValue": "fTTUDBHHHMZBjKSEKEFTSt14Nr75HBC6axlq2W7QHUIS6fagc_duLiG525YBpncVpIm4URwujwfhp3Em-1yfnB"
+      }
+    },
+    "doc": {
+      "didDocument": {
+        "@context": [
+          "https://www.w3.org/ns/did/v1"
+        ],
+        "id": "did:test:phase4-vector",
+        "verificationMethod": [
+          {
+            "id": "#key-1",
+            "controller": "did:test:phase4-vector",
+            "type": "EcdsaSecp256k1VerificationKey2019",
+            "publicKeyJwk": {
+              "kty": "EC",
+              "crv": "secp256k1",
+              "x": "TzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao",
+              "y": "OFtrG46tgJymdFTZaD_PK6A0Vtb-LEq-Kwfw-9uy8cE"
+            }
+          }
+        ],
+        "authentication": [
+          "#key-1"
+        ],
+        "assertionMethod": [
+          "#key-1"
+        ]
+      },
+      "didDocumentMetadata": {
+        "created": "2026-04-11T12:00:00Z",
+        "versionId": "bafyphase4vectorprev",
+        "versionSequence": "1",
+        "confirmed": true
+      },
+      "didDocumentData": {},
+      "didDocumentRegistration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "local"
+      }
+    },
+    "expected": false
+  }
+}

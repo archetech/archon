@@ -1,0 +1,144 @@
+[
+  {
+    "name": "ready",
+    "method": "GET",
+    "path": "/api/v1/ready",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "version-shape",
+    "method": "GET",
+    "path": "/api/v1/version",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "status-shape",
+    "method": "GET",
+    "path": "/api/v1/status",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "registries",
+    "method": "GET",
+    "path": "/api/v1/registries",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "search-empty",
+    "method": "GET",
+    "path": "/api/v1/search?q=",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "query-bad-request",
+    "method": "POST",
+    "path": "/api/v1/query",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {},
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "api-not-found",
+    "method": "GET",
+    "path": "/api/nope",
+    "expectedStatus": 404,
+    "compareMode": "json"
+  },
+  {
+    "name": "admin-unauthorized-reset",
+    "method": "GET",
+    "path": "/api/v1/db/reset",
+    "expectedStatus": 401,
+    "compareMode": "json"
+  },
+  {
+    "name": "admin-unauthorized-verify",
+    "method": "GET",
+    "path": "/api/v1/db/verify",
+    "expectedStatus": 401,
+    "compareMode": "json"
+  },
+  {
+    "name": "queue-invalid-registry",
+    "method": "GET",
+    "path": "/api/v1/queue/mock",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "requiresAdminKey": true
+  },
+  {
+    "name": "queue-clear-invalid-registry",
+    "method": "POST",
+    "path": "/api/v1/queue/mock/clear",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "requiresAdminKey": true,
+    "body": []
+  },
+  {
+    "name": "block-invalid-registry-latest",
+    "method": "GET",
+    "path": "/api/v1/block/mock/latest",
+    "expectedStatus": 500,
+    "compareMode": "text"
+  },
+  {
+    "name": "batch-import-invalid-payload",
+    "method": "POST",
+    "path": "/api/v1/batch/import",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "requiresAdminKey": true,
+    "body": {}
+  },
+  {
+    "name": "batch-import-cids-missing-cids",
+    "method": "POST",
+    "path": "/api/v1/batch/import/cids",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "requiresAdminKey": true,
+    "body": {
+      "metadata": {
+        "registry": "local",
+        "time": "2026-04-11T12:00:00Z",
+        "ordinal": [
+          0
+        ]
+      }
+    }
+  },
+  {
+    "name": "batch-import-cids-missing-metadata",
+    "method": "POST",
+    "path": "/api/v1/batch/import/cids",
+    "expectedStatus": 500,
+    "compareMode": "text",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "requiresAdminKey": true,
+    "body": {
+      "cids": [
+        "bafyreicidplaceholder"
+      ]
+    }
+  }
+]
