@@ -26,7 +26,8 @@ use crate::{
         ipfs_get_text, list_dids, not_found, process_events_route, query_docs, ready, registries,
         remove_dids, resolve_did, search_docs, status, version,
     },
-    log_status_snapshot, refresh_metrics_snapshot, start_background_tasks, Config, JsonDb, Metrics,
+    build_search_index, log_status_snapshot, refresh_metrics_snapshot, start_background_tasks,
+    CheckDidsResult, Config, JsonDb, Metrics, SearchIndex,
 };
 
 #[derive(Clone)]
@@ -38,6 +39,9 @@ pub(crate) struct AppState {
     pub(crate) events_seen: Arc<Mutex<HashMap<String, bool>>>,
     pub(crate) verified_dids: Arc<Mutex<HashMap<String, bool>>>,
     pub(crate) supported_registries: Arc<Mutex<Vec<String>>>,
+    pub(crate) did_locks: Arc<Mutex<HashMap<String, Arc<Mutex<()>>>>>,
+    pub(crate) status_snapshot: Arc<Mutex<Option<CheckDidsResult>>>,
+    pub(crate) search_index: Arc<Mutex<SearchIndex>>,
     pub(crate) processing_events: Arc<Mutex<bool>>,
     pub(crate) ready: Arc<AtomicBool>,
     pub(crate) started_at: Instant,
@@ -59,6 +63,7 @@ pub async fn run() -> Result<()> {
     log_status_snapshot(&state).await;
 
     info!("Initializing search index...");
+    build_search_index(&state).await;
 
     if config.status_interval_minutes > 0 {
         info!(
@@ -117,6 +122,9 @@ fn build_state(config: Config) -> Result<AppState> {
         events_seen: Arc::new(Mutex::new(HashMap::new())),
         verified_dids: Arc::new(Mutex::new(HashMap::new())),
         supported_registries: Arc::new(Mutex::new(config.registries.clone())),
+        did_locks: Arc::new(Mutex::new(HashMap::new())),
+        status_snapshot: Arc::new(Mutex::new(None)),
+        search_index: Arc::new(Mutex::new(SearchIndex::default())),
         processing_events: Arc::new(Mutex::new(false)),
         ready: Arc::new(AtomicBool::new(false)),
         started_at: Instant::now(),

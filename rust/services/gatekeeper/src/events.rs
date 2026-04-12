@@ -9,7 +9,8 @@ use crate::store::compare_ordinals;
 use crate::{
     ensure_event_opid, event_record_to_value, expected_registry_for_index,
     generate_did_from_operation, generate_json_cid, infer_event_did, value_to_event_record,
-    verify_event_shape, verify_operation_impl, AppState, EventRecord, GatekeeperDb, ResolveOptions,
+    update_search_doc, verify_event_shape, verify_operation_impl, AppState, EventRecord,
+    GatekeeperDb, ResolveOptions,
 };
 
 #[derive(Serialize)]
@@ -234,7 +235,7 @@ pub(crate) async fn handle_did_operation(
             })
     };
 
-    let result = {
+    let result = with_did_lock(state, &did, || async {
         let mut store = state.store.lock().await;
         match op_type {
             "create" => store
@@ -247,13 +248,33 @@ pub(crate) async fn handle_did_operation(
                 .map_err(|error| error.to_string()),
             _ => Err(format!("unsupported operation.type={op_type}")),
         }
-    }?;
+    })
+    .await?;
 
     if let Some(registry) = queue_registry {
         let _ = queue_outbound_operation(state, &registry, payload.clone()).await;
     }
+    update_search_doc(state, &did).await;
 
     Ok(result)
+}
+
+async fn did_lock(state: &AppState, did: &str) -> std::sync::Arc<tokio::sync::Mutex<()>> {
+    let mut locks = state.did_locks.lock().await;
+    locks
+        .entry(did.to_string())
+        .or_insert_with(|| std::sync::Arc::new(tokio::sync::Mutex::new(())))
+        .clone()
+}
+
+async fn with_did_lock<F, Fut, T>(state: &AppState, did: &str, f: F) -> T
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = T>,
+{
+    let lock = did_lock(state, did).await;
+    let _guard = lock.lock().await;
+    f().await
 }
 
 pub(crate) async fn queue_outbound_operation(
@@ -406,13 +427,7 @@ async fn import_events_once(state: &AppState) -> ImportEventsResult {
         } else {
             None
         };
-        let did = event.did.clone().unwrap_or_else(|| {
-            event.operation
-                .get("did")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .to_string()
-        });
+        let did = event_log_did(&state.config, &event);
         let outcome = match import_event_impl(state, event.clone()).await {
             ImportStatus::Added => {
                 added += 1;
@@ -446,6 +461,22 @@ async fn import_events_once(state: &AppState) -> ImportEventsResult {
         merged,
         rejected,
     }
+}
+
+fn event_log_did(config: &crate::Config, event: &EventRecord) -> String {
+    if let Some(did) = event.did.as_ref().filter(|did| !did.is_empty()) {
+        return did.clone();
+    }
+    if let Some(did) = event
+        .operation
+        .get("did")
+        .and_then(Value::as_str)
+        .filter(|did| !did.is_empty())
+    {
+        return did.to_string();
+    }
+
+    infer_event_did(config, &event_record_to_value(event)).unwrap_or_default()
 }
 
 async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus {
@@ -483,214 +514,232 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
     event.did = Some(did.clone());
     event.opid = Some(opid.clone());
 
-    let mut current_events = {
-        let store = state.store.lock().await;
-        let mut events = store.get_events(&did);
-        for current in &mut events {
-            if current.opid.is_none() {
-                current.opid = generate_json_cid(&current.operation).ok();
+    let result = with_did_lock(state, &did, || async {
+        let mut current_events = {
+            let store = state.store.lock().await;
+            let mut events = store.get_events(&did);
+            for current in &mut events {
+                if current.opid.is_none() {
+                    current.opid = generate_json_cid(&current.operation).ok();
+                }
             }
-        }
-        events
-    };
+            events
+        };
 
-    let proof_value = event
-        .operation
-        .get("proof")
-        .and_then(|value| value.get("proofValue"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
-
-    if let Some(index) = current_events.iter().position(|item| {
-        item.operation
+        let proof_value = event
+            .operation
             .get("proof")
             .and_then(|value| value.get("proofValue"))
             .and_then(Value::as_str)
-            == Some(proof_value)
-    }) {
-        let expected_registry = expected_registry_for_index(&current_events, index);
-        if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) {
-            if trace {
-                info!(
-                    "process_events merged reason=duplicate_already_confirmed current_registry={} expected_registry={} {}",
-                    current_events[index].registry,
-                    expected_registry.as_deref().unwrap_or("-"),
-                    summarize_record_event(&event)
-                );
+            .unwrap_or("");
+
+        if let Some(index) = current_events.iter().position(|item| {
+            item.operation
+                .get("proof")
+                .and_then(|value| value.get("proofValue"))
+                .and_then(Value::as_str)
+                == Some(proof_value)
+        }) {
+            let expected_registry = expected_registry_for_index(&current_events, index);
+            if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) {
+                if trace {
+                    info!(
+                        "process_events merged reason=duplicate_already_confirmed current_registry={} expected_registry={} {}",
+                        current_events[index].registry,
+                        expected_registry.as_deref().unwrap_or("-"),
+                        summarize_record_event(&event)
+                    );
+                }
+                return ImportStatus::Merged;
             }
-            return ImportStatus::Merged;
-        }
-        if expected_registry.as_deref() == Some(event.registry.as_str()) {
-            current_events[index] = event;
-            let mut store = state.store.lock().await;
-            let _ = store.set_events(&did, current_events);
+            if expected_registry.as_deref() == Some(event.registry.as_str()) {
+                current_events[index] = event.clone();
+                {
+                    let mut store = state.store.lock().await;
+                    let _ = store.set_events(&did, current_events);
+                }
+                update_search_doc(state, &did).await;
+                if trace {
+                    info!(
+                        "process_events added reason=replace_with_expected_registry expected_registry={} did={} opid={}",
+                        expected_registry.as_deref().unwrap_or("-"),
+                        did,
+                        opid
+                    );
+                }
+                return ImportStatus::Added;
+            }
             if trace {
                 info!(
-                    "process_events added reason=replace_with_expected_registry expected_registry={} did={} opid={}",
+                    "process_events merged reason=duplicate_unexpected_registry current_registry={} event_registry={} expected_registry={} did={} opid={}",
+                    current_events[index].registry,
+                    event.registry,
                     expected_registry.as_deref().unwrap_or("-"),
                     did,
                     opid
                 );
             }
-            return ImportStatus::Added;
+            return ImportStatus::Merged;
         }
-        if trace {
-            info!(
-                "process_events merged reason=duplicate_unexpected_registry current_registry={} event_registry={} expected_registry={} did={} opid={}",
-                current_events[index].registry,
-                event.registry,
-                expected_registry.as_deref().unwrap_or("-"),
-                did,
-                opid
-            );
-        }
-        return ImportStatus::Merged;
-    }
 
-    if !current_events.is_empty()
-        && event
-            .operation
-            .get("previd")
-            .and_then(Value::as_str)
-            .is_none()
-    {
-        if trace {
-            warn!(
-                "process_events rejected reason=missing_previd did={} opid={} current_events={}",
-                did,
-                opid,
-                current_events.len()
-            );
-        }
-        return ImportStatus::Rejected;
-    }
-
-    let verified = match verify_operation_impl(state, &event.operation).await {
-        Ok(verified) => verified,
-        Err(error) => {
+        if !current_events.is_empty()
+            && event
+                .operation
+                .get("previd")
+                .and_then(Value::as_str)
+                .is_none()
+        {
             if trace {
-                info!(
-                    "process_events deferred reason=verify_error error={} did={} opid={} current_events={}",
-                    error,
+                warn!(
+                    "process_events rejected reason=missing_previd did={} opid={} current_events={}",
                     did,
                     opid,
                     current_events.len()
                 );
             }
-            return ImportStatus::Deferred;
+            return ImportStatus::Rejected;
         }
-    };
-    if !verified {
-        if trace {
-            warn!(
-                "process_events rejected reason=verify_false did={} opid={} current_events={}",
-                did,
-                opid,
-                current_events.len()
-            );
-        }
-        return ImportStatus::Rejected;
-    }
 
-    if current_events.is_empty() {
-        let mut store = state.store.lock().await;
-        return if store.add_create_event(&did, event).is_ok() {
-            if trace {
-                info!("process_events added reason=create did={} opid={}", did, opid);
+        let verified = match verify_operation_impl(state, &event.operation).await {
+            Ok(verified) => verified,
+            Err(error) => {
+                if trace {
+                    info!(
+                        "process_events deferred reason=verify_error error={} did={} opid={} current_events={}",
+                        error,
+                        did,
+                        opid,
+                        current_events.len()
+                    );
+                }
+                return ImportStatus::Deferred;
             }
-            ImportStatus::Added
-        } else {
+        };
+        if !verified {
             if trace {
                 warn!(
-                    "process_events rejected reason=create_store_error did={} opid={}",
+                    "process_events rejected reason=verify_false did={} opid={} current_events={}",
                     did,
-                    opid
+                    opid,
+                    current_events.len()
                 );
             }
-            ImportStatus::Rejected
-        };
-    }
-
-    let previd = match event.operation.get("previd").and_then(Value::as_str) {
-        Some(value) => value.to_string(),
-        None => return ImportStatus::Rejected,
-    };
-    let Some(index) = current_events
-        .iter()
-        .position(|item| item.opid.as_deref() == Some(previd.as_str()))
-    else {
-        if trace {
-            info!(
-                "process_events deferred reason=unknown_previd did={} opid={} previd={} current_events={}",
-                did,
-                opid,
-                previd,
-                current_events.len()
-            );
+            return ImportStatus::Rejected;
         }
-        return ImportStatus::Deferred;
-    };
 
-    if index == current_events.len() - 1 {
-        let mut store = state.store.lock().await;
-        return if store.add_followup_event(&did, event).is_ok() {
-            if trace {
-                info!(
-                    "process_events added reason=append_followup did={} opid={} previd={}",
-                    did,
-                    opid,
-                    previd
-                );
-            }
-            ImportStatus::Added
-        } else {
-            if trace {
-                warn!(
-                    "process_events rejected reason=append_followup_store_error did={} opid={} previd={}",
-                    did,
-                    opid,
-                    previd
-                );
-            }
-            ImportStatus::Rejected
+        if current_events.is_empty() {
+            let added = {
+                let mut store = state.store.lock().await;
+                store.add_create_event(&did, event.clone()).is_ok()
+            };
+            return if added {
+                update_search_doc(state, &did).await;
+                if trace {
+                    info!("process_events added reason=create did={} opid={}", did, opid);
+                }
+                ImportStatus::Added
+            } else {
+                if trace {
+                    warn!(
+                        "process_events rejected reason=create_store_error did={} opid={}",
+                        did,
+                        opid
+                    );
+                }
+                ImportStatus::Rejected
+            };
+        }
+
+        let previd = match event.operation.get("previd").and_then(Value::as_str) {
+            Some(value) => value.to_string(),
+            None => return ImportStatus::Rejected,
         };
-    }
-
-    let expected_registry = expected_registry_for_index(&current_events, index + 1);
-    if expected_registry.as_deref() == Some(event.registry.as_str()) {
-        let next_event = &current_events[index + 1];
-        if next_event.registry != event.registry
-            || compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref()).is_lt()
-        {
-            let mut new_sequence = current_events[..=index].to_vec();
-            new_sequence.push(event);
-            let mut store = state.store.lock().await;
-            let _ = store.set_events(&did, new_sequence);
+        let Some(index) = current_events
+            .iter()
+            .position(|item| item.opid.as_deref() == Some(previd.as_str()))
+        else {
             if trace {
                 info!(
-                    "process_events added reason=insert_reorg did={} opid={} previd={} next_registry={} expected_registry={}",
+                    "process_events deferred reason=unknown_previd did={} opid={} previd={} current_events={}",
                     did,
                     opid,
                     previd,
-                    next_event.registry,
-                    expected_registry.as_deref().unwrap_or("-")
+                    current_events.len()
                 );
             }
-            return ImportStatus::Added;
-        }
-    }
+            return ImportStatus::Deferred;
+        };
 
-    if trace {
-        warn!(
-            "process_events rejected reason=duplicate_or_unexpected_branch did={} opid={} previd={} index={} current_events={} expected_registry={} event_registry={}",
-            did,
-            opid,
-            previd,
-            index,
-            current_events.len(),
-            expected_registry.as_deref().unwrap_or("-"),
-            event.registry
-        );
-    }
-    ImportStatus::Rejected
+        if index == current_events.len() - 1 {
+            let added = {
+                let mut store = state.store.lock().await;
+                store.add_followup_event(&did, event.clone()).is_ok()
+            };
+            return if added {
+                update_search_doc(state, &did).await;
+                if trace {
+                    info!(
+                        "process_events added reason=append_followup did={} opid={} previd={}",
+                        did,
+                        opid,
+                        previd
+                    );
+                }
+                ImportStatus::Added
+            } else {
+                if trace {
+                    warn!(
+                        "process_events rejected reason=append_followup_store_error did={} opid={} previd={}",
+                        did,
+                        opid,
+                        previd
+                    );
+                }
+                ImportStatus::Rejected
+            };
+        }
+
+        let expected_registry = expected_registry_for_index(&current_events, index + 1);
+        if expected_registry.as_deref() == Some(event.registry.as_str()) {
+            let next_event = &current_events[index + 1];
+            if next_event.registry != event.registry
+                || compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref()).is_lt()
+            {
+                let mut new_sequence = current_events[..=index].to_vec();
+                new_sequence.push(event.clone());
+                {
+                    let mut store = state.store.lock().await;
+                    let _ = store.set_events(&did, new_sequence);
+                }
+                update_search_doc(state, &did).await;
+                if trace {
+                    info!(
+                        "process_events added reason=insert_reorg did={} opid={} previd={} next_registry={} expected_registry={}",
+                        did,
+                        opid,
+                        previd,
+                        next_event.registry,
+                        expected_registry.as_deref().unwrap_or("-")
+                    );
+                }
+                return ImportStatus::Added;
+            }
+        }
+
+        if trace {
+            warn!(
+                "process_events rejected reason=duplicate_or_unexpected_branch did={} opid={} previd={} index={} current_events={} expected_registry={} event_registry={}",
+                did,
+                opid,
+                previd,
+                index,
+                current_events.len(),
+                expected_registry.as_deref().unwrap_or("-"),
+                event.registry
+            );
+        }
+        ImportStatus::Rejected
+    })
+    .await;
+    result
 }

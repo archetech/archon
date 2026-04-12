@@ -5,6 +5,7 @@ mod events;
 mod metrics;
 mod proofs;
 mod resolver;
+mod search_index;
 mod store;
 
 pub use app::run;
@@ -20,9 +21,12 @@ pub(crate) use proofs::{
     verify_update_operation_impl,
 };
 pub(crate) use resolver::{
-    check_dids_impl, log_status_snapshot, query_docs_impl, refresh_metrics_snapshot, resolve_local_doc_async,
-    search_docs_impl, start_background_tasks, update_metrics_from_check, verify_db_impl,
+    build_search_index, check_dids_impl, clear_search_index, delete_search_doc, log_status_snapshot,
+    query_docs_impl, refresh_metrics_snapshot, resolve_local_doc_async, search_docs_impl,
+    start_background_tasks, update_search_doc, verify_db_impl,
+    CheckDidsResult,
 };
+pub(crate) use search_index::SearchIndex;
 pub(crate) use store::{
     chrono_like_now, event_record_to_value, expected_registry_for_index, value_to_event_record,
     BlockLookup, EventRecord, GatekeeperDb, JsonDb, ResolveOptions,
@@ -96,6 +100,9 @@ mod tests {
             events_seen: Arc::new(Mutex::new(HashMap::new())),
             verified_dids: Arc::new(Mutex::new(HashMap::new())),
             supported_registries: Arc::new(Mutex::new(config.registries.clone())),
+            did_locks: Arc::new(Mutex::new(HashMap::new())),
+            status_snapshot: Arc::new(Mutex::new(None)),
+            search_index: Arc::new(Mutex::new(SearchIndex::default())),
             processing_events: Arc::new(Mutex::new(false)),
             ready: Arc::new(AtomicBool::new(false)),
             started_at: Instant::now(),

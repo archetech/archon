@@ -259,7 +259,58 @@ pub(crate) async fn resolve_local_doc_async(
 
 pub(crate) async fn refresh_metrics_snapshot(state: &AppState) {
     let did_check = check_dids_impl(state, None, false).await;
+    *state.status_snapshot.lock().await = Some(did_check.clone());
     update_metrics_from_check(state, &did_check).await;
+}
+
+pub(crate) async fn build_search_index(state: &AppState) {
+    let dids = {
+        let store = state.store.lock().await;
+        store.list_dids(&state.config.did_prefix, None)
+    };
+
+    let mut next_index = crate::SearchIndex::default();
+    for did in dids {
+        if let Ok(doc) = resolve_local_doc_async(state, &did, ResolveOptions::default()).await {
+            next_index.store(&did, &doc);
+        }
+    }
+
+    let size = next_index.size();
+    *state.search_index.lock().await = next_index;
+    info!("Search index initialized with {} DIDs", size);
+}
+
+pub(crate) async fn update_search_doc(state: &AppState, did: &str) {
+    if let Ok(doc) = resolve_local_doc_async(state, did, ResolveOptions::default()).await {
+        state.search_index.lock().await.store(did, &doc);
+    } else {
+        state.search_index.lock().await.delete(did);
+    }
+}
+
+pub(crate) async fn delete_search_doc(state: &AppState, did: &str) {
+    state.search_index.lock().await.delete(did);
+}
+
+pub(crate) async fn clear_search_index(state: &AppState) {
+    state.search_index.lock().await.clear();
+}
+
+async fn ensure_search_index_ready(state: &AppState) {
+    let has_index = state.search_index.lock().await.size() > 0;
+    if has_index {
+        return;
+    }
+
+    let has_dids = {
+        let store = state.store.lock().await;
+        !store.list_dids(&state.config.did_prefix, None).is_empty()
+    };
+
+    if has_dids {
+        build_search_index(state).await;
+    }
 }
 
 pub(crate) async fn update_metrics_from_check(state: &AppState, did_check: &CheckDidsResult) {
@@ -462,132 +513,13 @@ pub(crate) async fn verify_db_impl(state: &AppState, _chatty: bool) -> VerifyDbR
 }
 
 pub(crate) async fn search_docs_impl(state: &AppState, q: &str) -> Vec<String> {
-    let dids = {
-        let store = state.store.lock().await;
-        store.list_dids(&state.config.did_prefix, None)
-    };
-
-    let mut result = Vec::new();
-    for did in dids {
-        let doc = {
-            let store = state.store.lock().await;
-            store.resolve_doc(&state.config, &did, ResolveOptions::default())
-        };
-        let Ok(doc) = doc else {
-            continue;
-        };
-        let data = doc
-            .get("didDocumentData")
-            .cloned()
-            .unwrap_or_else(|| json!({}));
-        if data.to_string().contains(q) {
-            result.push(did);
-        }
-    }
-    result
+    ensure_search_index_ready(state).await;
+    state.search_index.lock().await.search_docs(q)
 }
 
 pub(crate) async fn query_docs_impl(state: &AppState, where_clause: &Value) -> Result<Vec<String>> {
-    let dids = {
-        let store = state.store.lock().await;
-        store.list_dids(&state.config.did_prefix, None)
-    };
-
-    let Some((raw_path, cond)) = where_clause.as_object().and_then(|map| map.iter().next()) else {
-        return Ok(Vec::new());
-    };
-    let list = cond
-        .get("$in")
-        .and_then(Value::as_array)
-        .context("Only {$in:[...]} supported")?;
-
-    let mut result = Vec::new();
-    for did in dids {
-        let doc = {
-            let store = state.store.lock().await;
-            store.resolve_doc(&state.config, &did, ResolveOptions::default())
-        };
-        let Ok(doc) = doc else {
-            continue;
-        };
-        let data = doc
-            .get("didDocumentData")
-            .cloned()
-            .unwrap_or_else(|| json!({}));
-        if query_match(&data, raw_path, list) {
-            result.push(did);
-        }
-    }
-    Ok(result)
-}
-
-fn query_match(root: &Value, raw_path: &str, list: &[Value]) -> bool {
-    if let Some(base_path) = raw_path.strip_suffix("[*]") {
-        return json_path_get(root, base_path)
-            .and_then(Value::as_array)
-            .map(|arr| arr.iter().any(|value| list.contains(value)))
-            .unwrap_or(false);
-    }
-
-    if let Some((prefix, suffix)) = raw_path.split_once("[*].") {
-        return json_path_get(root, prefix)
-            .and_then(Value::as_array)
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|item| json_path_get(item, suffix))
-                    .any(|value| list.contains(value))
-            })
-            .unwrap_or(false);
-    }
-
-    if let Some(base_path) = raw_path.strip_suffix(".*") {
-        return json_path_get(root, base_path)
-            .and_then(Value::as_object)
-            .map(|obj| {
-                obj.keys()
-                    .any(|key| list.contains(&Value::String(key.clone())))
-            })
-            .unwrap_or(false);
-    }
-
-    if let Some((prefix, suffix)) = raw_path.split_once(".*.") {
-        return json_path_get(root, prefix)
-            .and_then(Value::as_object)
-            .map(|obj| {
-                obj.values()
-                    .filter_map(|item| json_path_get(item, suffix))
-                    .any(|value| list.contains(value))
-            })
-            .unwrap_or(false);
-    }
-
-    json_path_get(root, raw_path)
-        .map(|value| list.contains(value))
-        .unwrap_or(false)
-}
-
-fn json_path_get<'a>(root: &'a Value, path: &str) -> Option<&'a Value> {
-    if path.is_empty() {
-        return Some(root);
-    }
-
-    let clean = path
-        .strip_prefix("$.")
-        .or_else(|| path.strip_prefix('$'))
-        .unwrap_or(path);
-    if clean.is_empty() {
-        return Some(root);
-    }
-
-    let mut current = root;
-    for raw_part in clean.split('.') {
-        if let Ok(index) = raw_part.parse::<usize>() {
-            current = current.as_array()?.get(index)?;
-        } else {
-            current = current.get(raw_part)?;
-        }
-    }
-    Some(current)
+    ensure_search_index_ready(state).await;
+    state.search_index.lock().await.query_docs(where_clause)
 }
 
 pub(crate) fn start_background_tasks(state: AppState) {
@@ -625,10 +557,16 @@ pub(crate) fn start_background_tasks(state: AppState) {
 }
 
 pub(crate) async fn log_status_snapshot(state: &AppState) {
-    let started = std::time::Instant::now();
-    let status = check_dids_impl(state, None, false).await;
-    let elapsed_ms = started.elapsed().as_millis();
-    info!("checkDIDs: {}ms", elapsed_ms);
+    let status = if let Some(snapshot) = state.status_snapshot.lock().await.clone() {
+        snapshot
+    } else {
+        let started = std::time::Instant::now();
+        let status = check_dids_impl(state, None, false).await;
+        let elapsed_ms = started.elapsed().as_millis();
+        info!("checkDIDs: {}ms", elapsed_ms);
+        *state.status_snapshot.lock().await = Some(status.clone());
+        status
+    };
     info!("Status -----------------------------");
     info!("DID Database ({}):", state.config.db);
     info!("  Total: {}", status.total);

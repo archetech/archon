@@ -20,10 +20,11 @@ use serde_json::{json, Value};
 use tracing::error;
 
 use crate::{
-    check_dids_impl, chrono_like_now, generate_did_from_operation, handle_did_operation,
-    import_batch_impl, normalize_path, process_events_impl, query_docs_impl, record_metrics,
-    refresh_metrics_snapshot, resolve_local_doc_async, search_docs_impl, update_metrics_from_check,
-    verify_db_impl, AppState, BlockLookup, GatekeeperDb, ResolveOptions,
+    build_search_index, chrono_like_now, clear_search_index, delete_search_doc,
+    generate_did_from_operation, handle_did_operation, import_batch_impl, normalize_path,
+    process_events_impl, query_docs_impl, record_metrics, refresh_metrics_snapshot,
+    resolve_local_doc_async, search_docs_impl, verify_db_impl, AppState, BlockLookup,
+    GatekeeperDb, ResolveOptions,
 };
 
 #[derive(Serialize)]
@@ -67,8 +68,15 @@ pub(crate) async fn version(State(state): State<AppState>) -> impl IntoResponse 
 }
 
 pub(crate) async fn status(State(state): State<AppState>) -> impl IntoResponse {
-    let dids = check_dids_impl(&state, None, false).await;
-    update_metrics_from_check(&state, &dids).await;
+    if state.status_snapshot.lock().await.is_none() {
+        refresh_metrics_snapshot(&state).await;
+    }
+    let dids = state
+        .status_snapshot
+        .lock()
+        .await
+        .clone()
+        .unwrap_or_default();
     let payload = StatusPayload {
         uptime_seconds: state.started_at.elapsed().as_secs(),
         dids: serde_json::to_value(dids).unwrap_or_else(|_| json!({})),
@@ -403,6 +411,9 @@ pub(crate) async fn remove_dids(
     let mut store = state.store.lock().await;
     let ok = dids.iter().all(|did| store.delete_events(did).is_ok());
     drop(store);
+    for did in &dids {
+        delete_search_doc(&state, did).await;
+    }
     refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
@@ -804,7 +815,7 @@ pub(crate) async fn db_reset(State(state): State<AppState>, headers: HeaderMap) 
     };
     state.events_seen.lock().await.clear();
     state.verified_dids.lock().await.clear();
-    *state.supported_registries.lock().await = state.config.registries.clone();
+    clear_search_index(&state).await;
     refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
@@ -823,6 +834,7 @@ pub(crate) async fn db_verify(State(state): State<AppState>, headers: HeaderMap)
     }
 
     let result = verify_db_impl(&state, false).await;
+    build_search_index(&state).await;
     refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
