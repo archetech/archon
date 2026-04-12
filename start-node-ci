@@ -2,6 +2,24 @@
 set -e
 source .env
 
+# Optional second arg selects the gatekeeper implementation.
+# Defaults to "rust" since that's what the base docker-compose.yml builds.
+FLAVOR="${2:-rust}"
+case "$FLAVOR" in
+  rust)
+    export COMPOSE_FILE="docker-compose.yml"
+    ;;
+  typescript|ts)
+    export COMPOSE_FILE="docker-compose.yml:docker-compose.typescript-gatekeeper.yml"
+    ;;
+  *)
+    echo "Unknown gatekeeper flavor: $FLAVOR (expected: rust | typescript)"
+    exit 1
+    ;;
+esac
+
+echo "Using gatekeeper flavor: $FLAVOR"
+
 export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 echo $ARCHON_GATEKEEPER_URL
