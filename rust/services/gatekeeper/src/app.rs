@@ -10,18 +10,16 @@ use std::{
 
 use anyhow::{Context, Result};
 use axum::{
-    extract::DefaultBodyLimit,
+    extract::{DefaultBodyLimit, Request},
+    middleware::{self, Next},
+    response::Response,
     routing::{get, post},
     Router,
 };
 use reqwest::Client;
 use tokio::{net::TcpListener, signal, sync::Mutex};
-use tower_http::{
-    cors::{Any, CorsLayer},
-    trace::{DefaultOnFailure, DefaultOnResponse, TraceLayer},
-    LatencyUnit,
-};
-use tracing::{info, warn, Level};
+use tower_http::cors::{Any, CorsLayer};
+use tracing::{info, warn};
 
 use crate::{
     api::{
@@ -217,31 +215,37 @@ fn build_router(state: AppState) -> Router {
         .route("/query", post(query_docs))
         .layer(DefaultBodyLimit::max(body_limit));
 
-    // Emit an info line for every HTTP request and response, matching the
-    // morgan/pinoHttp coverage in the TypeScript gatekeeper. Without this,
-    // endpoints like GET /did/:did resolve silently.
-    let trace = TraceLayer::new_for_http()
-        .on_response(
-            DefaultOnResponse::new()
-                .level(Level::INFO)
-                .latency_unit(LatencyUnit::Millis),
-        )
-        .on_failure(DefaultOnFailure::new().level(Level::ERROR));
-
     Router::new()
         .route("/metrics", get(get_metrics))
         .nest("/api/v1", streaming.merge(bounded))
         .nest("/api", Router::new().fallback(api_not_found))
         .fallback(not_found)
-        .layer(trace)
+        .layer(middleware::from_fn(log_http))
         .layer(cors)
         .with_state(state)
 }
 
+// Emit one info line per request with method, path, query, status, and
+// latency. Mirrors morgan/pinoHttp coverage in the TypeScript gatekeeper
+// so endpoints like GET /did/:did show up in the container log.
+async fn log_http(request: Request, next: Next) -> Response {
+    let method = request.method().clone();
+    let path = request.uri().path().to_string();
+    let query = request
+        .uri()
+        .query()
+        .map(|q| format!("?{q}"))
+        .unwrap_or_default();
+    let started = Instant::now();
+    let response = next.run(request).await;
+    let status = response.status().as_u16();
+    let elapsed_ms = started.elapsed().as_millis();
+    info!("{} {}{} {} ({}ms)", method, path, query, status, elapsed_ms);
+    response
+}
+
 fn init_tracing() {
-    // Default filter: info for us, info for tower_http's request spans so the
-    // TraceLayer actually emits. RUST_LOG always takes precedence.
-    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| "info,tower_http=info,axum::rejection=trace".into());
+    let filter =
+        tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
     tracing_subscriber::fmt().with_env_filter(filter).init();
 }
