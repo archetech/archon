@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, fs, net::IpAddr, path::PathBuf};
+use std::{collections::HashMap, env, fs, net::IpAddr, path::PathBuf, sync::Mutex as StdMutex};
 
 use anyhow::{Context, Result};
 use mongodb::{
@@ -44,6 +44,7 @@ pub(crate) struct JsonDbFile {
 pub(crate) struct JsonDb {
     pub(crate) backend: DbBackend,
     pub(crate) data: JsonDbFile,
+    pub(crate) redis_connection: Option<StdMutex<redis::Connection>>,
 }
 
 #[derive(Clone)]
@@ -271,20 +272,36 @@ impl JsonDb {
         &self,
         f: impl FnOnce(&mut redis::Connection, &str) -> Result<T>,
     ) -> Result<T> {
-        let DbBackend::Redis { url, namespace } = &self.backend else {
+        let DbBackend::Redis { namespace, .. } = &self.backend else {
             anyhow::bail!("backend is not redis");
         };
-        let client = redis::Client::open(url.as_str()).context("failed to open redis client")?;
-        let mut conn = client
-            .get_connection()
-            .context("failed to connect to redis")?;
+        let mutex = self
+            .redis_connection
+            .as_ref()
+            .context("redis connection not initialized")?;
+        let mut conn = mutex.lock().map_err(|_| anyhow::anyhow!("redis connection poisoned"))?;
         f(&mut conn, namespace)
     }
 
     pub(crate) fn load(config: &Config) -> Result<Self> {
         let backend = DbBackend::from_config(config);
         let data = backend.load_state()?;
-        Ok(Self { backend, data })
+        let redis_connection = match &backend {
+            DbBackend::Redis { url, .. } => {
+                let client =
+                    redis::Client::open(url.as_str()).context("failed to open redis client")?;
+                let conn = client
+                    .get_connection()
+                    .context("failed to connect to redis")?;
+                Some(StdMutex::new(conn))
+            }
+            _ => None,
+        };
+        Ok(Self {
+            backend,
+            data,
+            redis_connection,
+        })
     }
 
     fn save(&self) -> Result<()> {
@@ -292,6 +309,32 @@ impl JsonDb {
     }
 
     fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            if !self.get_events(did).is_empty() {
+                return Ok(did.to_string());
+            }
+
+            self.with_redis_connection(|conn, namespace| {
+                if let Some(opid) = event.opid.as_ref() {
+                    let op_key = Self::redis_operation_key(namespace, opid);
+                    let body = serde_json::to_string(&event.operation)
+                        .context("failed to encode redis operation")?;
+                    let _: () = conn
+                        .set(op_key, body)
+                        .context("failed to persist redis operation")?;
+                }
+                let did_key = Self::redis_did_key(namespace, did)?;
+                let stored = redis_event_to_stored_value(&event);
+                let body = serde_json::to_string(&stored)
+                    .context("failed to serialize redis did event")?;
+                let _: usize = conn
+                    .rpush(&did_key, body)
+                    .context("failed to persist redis did event")?;
+                Ok(())
+            })?;
+            return Ok(did.to_string());
+        }
+
         let suffix = did
             .split(':')
             .next_back()
@@ -316,33 +359,77 @@ impl JsonDb {
             .or_default()
             .push(event.clone());
 
-        match &self.backend {
-            DbBackend::Redis { .. } => {
-                self.with_redis_connection(|conn, namespace| {
-                    if let Some(opid) = event.opid.as_ref() {
-                        let op_key = Self::redis_operation_key(namespace, opid);
-                        let body = serde_json::to_string(&event.operation)
-                            .context("failed to encode redis operation")?;
-                        let _: () = conn
-                            .set(op_key, body)
-                            .context("failed to persist redis operation")?;
-                    }
-                    let did_key = Self::redis_did_key(namespace, did)?;
-                    let stored = redis_event_to_stored_value(&event);
-                    let body = serde_json::to_string(&stored)
-                        .context("failed to serialize redis did event")?;
-                    let _: usize = conn
-                        .rpush(&did_key, body)
-                        .context("failed to persist redis did event")?;
-                    Ok(())
-                })?;
-            }
-            _ => self.save()?,
-        }
+        self.save()?;
         Ok(did.to_string())
     }
 
     fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            let latest = self.resolve_doc(
+                &Config {
+                    port: 0,
+                    bind_address: IpAddr::from([0, 0, 0, 0]),
+                    db: String::new(),
+                    data_dir: PathBuf::new(),
+                    ipfs_url: String::new(),
+                    did_prefix: String::new(),
+                    registries: vec![],
+                    json_limit: 0,
+                    upload_limit: 0,
+                    gc_interval_minutes: 0,
+                    status_interval_minutes: 0,
+                    admin_api_key: String::new(),
+                    fallback_url: String::new(),
+                    fallback_timeout_ms: 0,
+                    max_queue_size: 0,
+                    git_commit: String::new(),
+                    version: String::new(),
+                },
+                did,
+                ResolveOptions::default(),
+            )?;
+
+            let current_events = self.get_events(did);
+            if current_events.is_empty() {
+                anyhow::bail!("did not found");
+            }
+
+            let previd = event
+                .operation
+                .get("previd")
+                .and_then(Value::as_str)
+                .ok_or_else(|| anyhow::anyhow!("missing operation.previd"))?;
+            let current_version_id = latest
+                .get("didDocumentMetadata")
+                .and_then(|value| value.get("versionId"))
+                .and_then(Value::as_str)
+                .ok_or_else(|| anyhow::anyhow!("missing current versionId"))?;
+
+            if previd != current_version_id {
+                anyhow::bail!("invalid previd");
+            }
+
+            self.with_redis_connection(|conn, namespace| {
+                if let Some(opid) = event.opid.as_ref() {
+                    let op_key = Self::redis_operation_key(namespace, opid);
+                    let body = serde_json::to_string(&event.operation)
+                        .context("failed to encode redis operation")?;
+                    let _: () = conn
+                        .set(op_key, body)
+                        .context("failed to persist redis operation")?;
+                }
+                let did_key = Self::redis_did_key(namespace, did)?;
+                let stored = redis_event_to_stored_value(&event);
+                let body = serde_json::to_string(&stored)
+                    .context("failed to serialize redis did event")?;
+                let _: usize = conn
+                    .rpush(&did_key, body)
+                    .context("failed to persist redis did event")?;
+                Ok(())
+            })?;
+            return Ok(true);
+        }
+
         let suffix = did
             .split(':')
             .next_back()
@@ -398,33 +485,41 @@ impl JsonDb {
         }
         events.push(event.clone());
 
-        match &self.backend {
-            DbBackend::Redis { .. } => {
-                self.with_redis_connection(|conn, namespace| {
-                    if let Some(opid) = event.opid.as_ref() {
-                        let op_key = Self::redis_operation_key(namespace, opid);
-                        let body = serde_json::to_string(&event.operation)
-                            .context("failed to encode redis operation")?;
-                        let _: () = conn
-                            .set(op_key, body)
-                            .context("failed to persist redis operation")?;
-                    }
-                    let did_key = Self::redis_did_key(namespace, did)?;
-                    let stored = redis_event_to_stored_value(&event);
-                    let body = serde_json::to_string(&stored)
-                        .context("failed to serialize redis did event")?;
-                    let _: usize = conn
-                        .rpush(&did_key, body)
-                        .context("failed to persist redis did event")?;
-                    Ok(())
-                })?;
-            }
-            _ => self.save()?,
-        }
+        self.save()?;
         Ok(true)
     }
 
     fn get_events(&self, did: &str) -> Vec<EventRecord> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self
+                .with_redis_connection(|conn, namespace| {
+                    let key = Self::redis_did_key(namespace, did)?;
+                    let raw_events: Vec<String> = conn
+                        .lrange(&key, 0, -1)
+                        .context("failed to load redis did events")?;
+                    let mut events = Vec::with_capacity(raw_events.len());
+                    for raw in raw_events {
+                        let mut event = serde_json::from_str::<EventRecord>(&raw)
+                            .context("failed to decode redis did event")?;
+                        if event.operation.is_null() {
+                            if let Some(opid) = event.opid.as_ref() {
+                                let op_key = Self::redis_operation_key(namespace, opid);
+                                let raw_operation: Option<String> = conn
+                                    .get(&op_key)
+                                    .context("failed to load redis operation")?;
+                                if let Some(raw_operation) = raw_operation {
+                                    event.operation = serde_json::from_str::<Value>(&raw_operation)
+                                        .context("failed to decode redis operation")?;
+                                }
+                            }
+                        }
+                        events.push(event);
+                    }
+                    Ok(events)
+                })
+                .unwrap_or_default();
+        }
+
         let suffix = match did.split(':').next_back() {
             Some(value) => value,
             None => return Vec::new(),
@@ -449,20 +544,8 @@ impl JsonDb {
     }
 
     fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
-        let suffix = did
-            .split(':')
-            .next_back()
-            .context("invalid did suffix")?
-            .to_string();
-        for event in &events {
-            if let Some(opid) = event.opid.as_ref() {
-                self.data.ops.insert(opid.clone(), event.operation.clone());
-            }
-        }
-        self.data.dids.insert(suffix, events.clone());
-
-        match &self.backend {
-            DbBackend::Redis { .. } => self.with_redis_connection(|conn, namespace| {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
                 let did_key = Self::redis_did_key(namespace, did)?;
                 let _: usize = conn
                     .del(&did_key)
@@ -484,34 +567,47 @@ impl JsonDb {
                         .context("failed to persist redis did event")?;
                 }
                 Ok(())
-            }),
-            _ => self.save(),
+            });
         }
+
+        let suffix = did
+            .split(':')
+            .next_back()
+            .context("invalid did suffix")?
+            .to_string();
+        for event in &events {
+            if let Some(opid) = event.opid.as_ref() {
+                self.data.ops.insert(opid.clone(), event.operation.clone());
+            }
+        }
+        self.data.dids.insert(suffix, events.clone());
+
+        self.save()
     }
 
     fn delete_events(&mut self, did: &str) -> Result<()> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
+                let did_key = Self::redis_did_key(namespace, did)?;
+                let _: usize = conn
+                    .del(&did_key)
+                    .context("failed to delete redis did events")?;
+                Ok(())
+            });
+        }
+
         let suffix = did
             .split(':')
             .next_back()
             .context("invalid did suffix")?
             .to_string();
         self.data.dids.remove(&suffix);
-        match &self.backend {
-            DbBackend::Redis { .. } => self.with_redis_connection(|conn, namespace| {
-                let did_key = Self::redis_did_key(namespace, did)?;
-                let _: usize = conn
-                    .del(&did_key)
-                    .context("failed to delete redis did events")?;
-                Ok(())
-            }),
-            _ => self.save(),
-        }
+        self.save()
     }
 
     fn reset_db(&mut self) -> Result<()> {
-        self.data = JsonDbFile::default();
-        match &self.backend {
-            DbBackend::Redis { .. } => self.with_redis_connection(|conn, namespace| {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
                 let mut cursor = 0_u64;
                 loop {
                     let (next_cursor, keys): (u64, Vec<String>) = redis::cmd("SCAN")
@@ -533,15 +629,16 @@ impl JsonDb {
                     cursor = next_cursor;
                 }
                 Ok(())
-            }),
-            _ => self.save(),
+            });
         }
+
+        self.data = JsonDbFile::default();
+        self.save()
     }
 
     fn add_operation(&mut self, opid: &str, operation: Value) -> Result<()> {
-        self.data.ops.insert(opid.to_string(), operation.clone());
-        match &self.backend {
-            DbBackend::Redis { .. } => self.with_redis_connection(|conn, namespace| {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
                 let key = Self::redis_operation_key(namespace, opid);
                 let body = serde_json::to_string(&operation)
                     .context("failed to encode redis operation")?;
@@ -549,24 +646,40 @@ impl JsonDb {
                     .set(key, body)
                     .context("failed to persist redis operation")?;
                 Ok(())
-            }),
-            _ => self.save(),
+            });
         }
+
+        self.data.ops.insert(opid.to_string(), operation.clone());
+        self.save()
     }
 
     fn get_operation(&self, opid: &str) -> Option<Value> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self
+                .with_redis_connection(|conn, namespace| {
+                    let key = Self::redis_operation_key(namespace, opid);
+                    let raw: Option<String> = conn
+                        .get(&key)
+                        .context("failed to load redis operation")?;
+                    raw.map(|raw| {
+                        serde_json::from_str::<Value>(&raw)
+                            .context("failed to decode redis operation")
+                    })
+                    .transpose()
+                })
+                .ok()
+                .flatten();
+        }
+
         self.data.ops.get(opid).cloned()
     }
 
     fn push_import_event(&mut self, event: EventRecord) {
         self.data.import_queue.push(event);
-        let _ = self.save();
     }
 
     fn take_import_queue(&mut self) -> Vec<EventRecord> {
-        let queue = std::mem::take(&mut self.data.import_queue);
-        let _ = self.save();
-        queue
+        std::mem::take(&mut self.data.import_queue)
     }
 
     fn import_queue_len(&self) -> usize {
@@ -579,17 +692,11 @@ impl JsonDb {
 
     fn clear_import_queue(&mut self) {
         self.data.import_queue.clear();
-        let _ = self.save();
     }
 
     fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize> {
-        let len = {
-            let queue = self.data.queue.entry(registry.to_string()).or_default();
-            queue.push(operation.clone());
-            queue.len()
-        };
-        match &self.backend {
-            DbBackend::Redis { .. } => self.with_redis_connection(|conn, namespace| {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
                 let key = Self::redis_queue_key(namespace, registry);
                 let body = serde_json::to_string(&operation)
                     .context("failed to encode redis queue item")?;
@@ -597,15 +704,37 @@ impl JsonDb {
                     .rpush(&key, body)
                     .context("failed to persist redis queue item")?;
                 Ok(len)
-            }),
-            _ => {
-                self.save()?;
-                Ok(len)
-            }
+            });
         }
+
+        let len = {
+            let queue = self.data.queue.entry(registry.to_string()).or_default();
+            queue.push(operation.clone());
+            queue.len()
+        };
+        self.save()?;
+        Ok(len)
     }
 
     fn get_queue(&self, registry: &str) -> Vec<Value> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self
+                .with_redis_connection(|conn, namespace| {
+                    let key = Self::redis_queue_key(namespace, registry);
+                    let raw_ops: Vec<String> = conn
+                        .lrange(&key, 0, -1)
+                        .context("failed to load redis queue")?;
+                    raw_ops
+                        .into_iter()
+                        .map(|raw| {
+                            serde_json::from_str::<Value>(&raw)
+                                .context("failed to decode redis queue item")
+                        })
+                        .collect::<Result<Vec<_>>>()
+                })
+                .unwrap_or_default();
+        }
+
         self.data.queue.get(registry).cloned().unwrap_or_default()
     }
 
@@ -620,18 +749,8 @@ impl JsonDb {
             })
             .collect::<Vec<_>>();
 
-        if let Some(queue) = self.data.queue.get_mut(registry) {
-            queue.retain(|item| {
-                let proof_value = item
-                    .get("proof")
-                    .and_then(|proof| proof.get("proofValue"))
-                    .and_then(Value::as_str);
-                !proof_values.iter().any(|value| Some(*value) == proof_value)
-            });
-        }
-
-        match &self.backend {
-            DbBackend::Redis { .. } => self.with_redis_connection(|conn, namespace| {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
                 let key = Self::redis_queue_key(namespace, registry);
                 let script = r#"
                     local key = KEYS[1]
@@ -667,12 +786,21 @@ impl JsonDb {
                     .query(conn)
                     .context("failed to clear redis queue entries")?;
                 Ok(true)
-            }),
-            _ => {
-                self.save()?;
-                Ok(true)
-            }
+            });
         }
+
+        if let Some(queue) = self.data.queue.get_mut(registry) {
+            queue.retain(|item| {
+                let proof_value = item
+                    .get("proof")
+                    .and_then(|proof| proof.get("proofValue"))
+                    .and_then(Value::as_str);
+                !proof_values.iter().any(|value| Some(*value) == proof_value)
+            });
+        }
+
+        self.save()?;
+        Ok(true)
     }
 
     fn add_block(&mut self, registry: &str, block: Value) -> Result<bool> {
@@ -682,13 +810,8 @@ impl JsonDb {
             .context("missing block.hash")?
             .to_string();
 
-        self.data
-            .blocks
-            .entry(registry.to_string())
-            .or_default()
-            .insert(hash.clone(), block.clone());
-        match &self.backend {
-            DbBackend::Redis { .. } => self.with_redis_connection(|conn, namespace| {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
                 let block_key = Self::redis_block_key(namespace, registry, &hash);
                 let body = serde_json::to_string(&block).context("failed to encode redis block")?;
                 let _: () = conn
@@ -713,15 +836,58 @@ impl JsonDb {
                         .context("failed to persist redis max height")?;
                 }
                 Ok(true)
-            }),
-            _ => {
-                self.save()?;
-                Ok(true)
-            }
+            });
         }
+
+        self.data
+            .blocks
+            .entry(registry.to_string())
+            .or_default()
+            .insert(hash.clone(), block.clone());
+        self.save()?;
+        Ok(true)
     }
 
     fn get_block(&self, registry: &str, block_id: Option<BlockLookup>) -> Option<Value> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self
+                .with_redis_connection(|conn, namespace| {
+                    let block_hash = match block_id {
+                        None => {
+                            let max_height_str: Option<String> = conn
+                                .get(Self::redis_max_height_key(namespace, registry))
+                                .context("failed to load redis max height")?;
+                            let Some(max_height_str) = max_height_str else {
+                                return Ok(None);
+                            };
+                            conn.hget(
+                                Self::redis_height_map_key(namespace, registry),
+                                max_height_str,
+                            )
+                            .context("failed to load redis latest block hash")?
+                        }
+                        Some(BlockLookup::Height(height)) => conn
+                            .hget(Self::redis_height_map_key(namespace, registry), height.to_string())
+                            .context("failed to load redis block hash by height")?,
+                        Some(BlockLookup::Hash(hash)) => Some(hash),
+                    };
+
+                    let Some(block_hash) = block_hash else {
+                        return Ok(None);
+                    };
+
+                    let raw: Option<String> = conn
+                        .get(Self::redis_block_key(namespace, registry, &block_hash))
+                        .context("failed to load redis block")?;
+                    raw.map(|raw| {
+                        serde_json::from_str::<Value>(&raw).context("failed to decode redis block")
+                    })
+                    .transpose()
+                })
+                .ok()
+                .flatten();
+        }
+
         let registry_blocks = self.data.blocks.get(registry)?;
         if registry_blocks.is_empty() {
             return None;
@@ -746,6 +912,28 @@ impl JsonDb {
     }
 
     fn list_dids(&self, prefix: &str, requested: Option<&[String]>) -> Vec<String> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            if let Some(items) = requested {
+                return items.to_vec();
+            }
+
+            return self
+                .with_redis_connection(|conn, namespace| {
+                    let mut suffixes = conn
+                        .keys::<_, Vec<String>>(format!("{namespace}/dids/*"))
+                        .context("failed to scan redis did keys")?
+                        .into_iter()
+                        .filter_map(|key| key.rsplit('/').next().map(ToString::to_string))
+                        .collect::<Vec<_>>();
+                    suffixes.sort();
+                    Ok(suffixes
+                        .into_iter()
+                        .map(|suffix| format!("{prefix}:{suffix}"))
+                        .collect::<Vec<_>>())
+                })
+                .unwrap_or_default();
+        }
+
         match requested {
             Some(items) => items.to_vec(),
             None => {
@@ -986,14 +1174,7 @@ impl DbBackend {
                     None => Ok(JsonDbFile::default()),
                 }
             }
-            Self::Redis { url, namespace } => {
-                let client =
-                    redis::Client::open(url.as_str()).context("failed to open redis client")?;
-                let mut conn = client
-                    .get_connection()
-                    .context("failed to connect to redis")?;
-                Self::load_redis_state(&mut conn, namespace)
-            }
+            Self::Redis { .. } => Ok(JsonDbFile::default()),
             Self::Mongo {
                 url,
                 database,
@@ -1043,8 +1224,14 @@ impl DbBackend {
                 let mut conn = client
                     .get_connection()
                     .context("failed to connect to redis")?;
-                Self::save_redis_state(&mut conn, namespace, data)?;
-                Ok(())
+                let keyspace_size = conn
+                    .keys::<_, Vec<String>>(format!("{namespace}/*"))
+                    .context("failed to scan redis namespace for guardrail")?
+                    .len();
+                let _ = data;
+                anyhow::bail!(
+                    "full redis snapshot persistence is disabled for safety; refusing to rewrite namespace `{namespace}` containing {keyspace_size} keys"
+                )
             }
             Self::Mongo {
                 url,
@@ -1085,164 +1272,6 @@ impl DbBackend {
         Ok(conn)
     }
 
-    fn load_redis_state(conn: &mut redis::Connection, namespace: &str) -> Result<JsonDbFile> {
-        let did_keys: Vec<String> = conn
-            .keys(format!("{namespace}/dids/*"))
-            .context("failed to scan redis did keys")?;
-        let op_keys: Vec<String> = conn
-            .keys(format!("{namespace}/ops/*"))
-            .context("failed to scan redis op keys")?;
-        let queue_keys: Vec<String> = conn
-            .keys(format!("{namespace}/registry/*/queue"))
-            .context("failed to scan redis queue keys")?;
-        let block_keys: Vec<String> = conn
-            .keys(format!("{namespace}/registry/*/blocks/*"))
-            .context("failed to scan redis block keys")?;
-
-        let mut data = JsonDbFile::default();
-
-        for key in op_keys {
-            let Some(opid) = key.rsplit('/').next() else {
-                continue;
-            };
-            let raw: Option<String> = conn
-                .get(&key)
-                .with_context(|| format!("failed to load redis op {key}"))?;
-            if let Some(raw) = raw {
-                let operation = serde_json::from_str::<Value>(&raw)
-                    .with_context(|| format!("failed to decode redis op {key}"))?;
-                data.ops.insert(opid.to_string(), operation);
-            }
-        }
-
-        for key in did_keys {
-            let Some(suffix) = key.rsplit('/').next() else {
-                continue;
-            };
-            let raw_events: Vec<String> = conn
-                .lrange(&key, 0, -1)
-                .with_context(|| format!("failed to load redis did events {key}"))?;
-            let mut events = Vec::with_capacity(raw_events.len());
-            for raw in raw_events {
-                let event = hydrate_redis_event(&raw, &data.ops)
-                    .with_context(|| format!("failed to decode redis did event {key}"))?;
-                events.push(event);
-            }
-            data.dids.insert(suffix.to_string(), events);
-        }
-
-        for key in queue_keys {
-            let segments = key.split('/').collect::<Vec<_>>();
-            if segments.len() < 4 {
-                continue;
-            }
-            let registry = segments[2].to_string();
-            let raw_ops: Vec<String> = conn
-                .lrange(&key, 0, -1)
-                .with_context(|| format!("failed to load redis queue {key}"))?;
-            let mut ops = Vec::with_capacity(raw_ops.len());
-            for raw in raw_ops {
-                ops.push(
-                    serde_json::from_str::<Value>(&raw)
-                        .with_context(|| format!("failed to decode redis queue item {key}"))?,
-                );
-            }
-            data.queue.insert(registry, ops);
-        }
-
-        for key in block_keys {
-            let segments = key.split('/').collect::<Vec<_>>();
-            if segments.len() < 5 {
-                continue;
-            }
-            let registry = segments[2].to_string();
-            let hash = segments[4].to_string();
-            let raw: Option<String> = conn
-                .get(&key)
-                .with_context(|| format!("failed to load redis block {key}"))?;
-            if let Some(raw) = raw {
-                let block = serde_json::from_str::<Value>(&raw)
-                    .with_context(|| format!("failed to decode redis block {key}"))?;
-                data.blocks.entry(registry).or_default().insert(hash, block);
-            }
-        }
-
-        Ok(data)
-    }
-
-    fn save_redis_state(
-        conn: &mut redis::Connection,
-        namespace: &str,
-        data: &JsonDbFile,
-    ) -> Result<()> {
-        let existing_keys: Vec<String> = conn
-            .keys(format!("{namespace}/*"))
-            .context("failed to scan redis namespace for persist")?;
-        if !existing_keys.is_empty() {
-            let _: usize = conn
-                .del(existing_keys)
-                .context("failed to clear redis namespace before persist")?;
-        }
-
-        for (opid, operation) in &data.ops {
-            let key = format!("{namespace}/ops/{opid}");
-            let body =
-                serde_json::to_string(operation).context("failed to encode redis operation")?;
-            let _: () = conn
-                .set(key, body)
-                .context("failed to persist redis operation")?;
-        }
-
-        for (suffix, events) in &data.dids {
-            let key = format!("{namespace}/dids/{suffix}");
-            for event in events {
-                let stored = redis_event_to_stored_value(event);
-                let body = serde_json::to_string(&stored)
-                    .context("failed to serialize redis did event")?;
-                let _: usize = conn
-                    .rpush(&key, body)
-                    .context("failed to persist redis did event")?;
-            }
-        }
-
-        for (registry, operations) in &data.queue {
-            let key = format!("{namespace}/registry/{registry}/queue");
-            for operation in operations {
-                let body = serde_json::to_string(operation)
-                    .context("failed to encode redis queue item")?;
-                let _: usize = conn
-                    .rpush(&key, body)
-                    .context("failed to persist redis queue item")?;
-            }
-        }
-
-        for (registry, blocks) in &data.blocks {
-            let mut max_height: Option<u64> = None;
-            for (hash, block) in blocks {
-                let block_key = format!("{namespace}/registry/{registry}/blocks/{hash}");
-                let body = serde_json::to_string(block).context("failed to encode redis block")?;
-                let _: () = conn
-                    .set(&block_key, body)
-                    .context("failed to persist redis block")?;
-
-                if let Some(height) = block.get("height").and_then(Value::as_u64) {
-                    let height_map_key = format!("{namespace}/registry/{registry}/heightMap");
-                    let _: usize = conn
-                        .hset(&height_map_key, height.to_string(), hash)
-                        .context("failed to persist redis block height map")?;
-                    max_height = Some(max_height.map_or(height, |current| current.max(height)));
-                }
-            }
-
-            if let Some(height) = max_height {
-                let max_height_key = format!("{namespace}/registry/{registry}/maxHeight");
-                let _: () = conn
-                    .set(max_height_key, height.to_string())
-                    .context("failed to persist redis max height")?;
-            }
-        }
-        Ok(())
-    }
 }
 
 impl GatekeeperDb for JsonDb {

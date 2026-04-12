@@ -99,3 +99,68 @@ async fn redis_compat_loads_typescript_keys_and_persists_back_same_schema() -> R
 
     Ok(())
 }
+
+#[tokio::test]
+async fn redis_import_queue_does_not_rewrite_existing_did_namespace() -> Result<()> {
+    let Some(redis_url) = std::env::var("ARCHON_TEST_REDIS_URL").ok() else {
+        eprintln!("skipping redis compatibility test; set ARCHON_TEST_REDIS_URL");
+        return Ok(());
+    };
+
+    let vectors = deterministic_vectors();
+    let did = vectors["hyperswarmAgent"]["did"].as_str().unwrap();
+    let suffix = did_suffix(did);
+    let operation = vectors["hyperswarmAgent"]["operation"].clone();
+    let opid = vectors["hyperswarmAgent"]["cid"].as_str().unwrap();
+
+    let client = redis::Client::open(redis_url.as_str())?;
+    let mut conn = client.get_connection()?;
+    let _: () = redis::cmd("FLUSHDB").query(&mut conn)?;
+
+    let op_key = format!("archon/ops/{opid}");
+    let did_key = format!("archon/dids/{suffix}");
+    let _: () = conn.set(&op_key, serde_json::to_string(&operation)?)?;
+    let _: usize = conn.rpush(
+        &did_key,
+        serde_json::to_string(&json!({
+            "registry": "hyperswarm",
+            "time": operation["created"],
+            "ordinal": [1774005006160u64, 6],
+            "did": did,
+            "opid": opid
+        }))?,
+    )?;
+
+    let service = spawn_redis(&redis_url).await?;
+
+    let imported = service
+        .admin(
+            service
+                .client
+                .post(format!("{}/batch/import", service.base_url)),
+        )
+        .json(&json!([{
+            "registry": "hyperswarm",
+            "time": "2026-04-12T01:56:36.000Z",
+            "ordinal": [1775958996000u64, 0],
+            "operation": operation
+        }]))
+        .send()
+        .await?;
+    assert!(imported.status().is_success());
+
+    let response = service
+        .client
+        .get(format!("{}/status", service.base_url))
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    let status = response.json::<Value>().await?;
+    assert_eq!(status["dids"]["total"], 1);
+    assert_eq!(status["dids"]["eventsQueue"].as_array().unwrap().len(), 1);
+
+    let raw_events: Vec<String> = conn.lrange(&did_key, 0, -1)?;
+    assert_eq!(raw_events.len(), 1);
+
+    Ok(())
+}

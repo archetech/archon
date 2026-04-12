@@ -76,6 +76,7 @@ mod tests {
                 path: temp_dir.path().join("gatekeeper-test.json"),
             },
             data: JsonDbFile::default(),
+            redis_connection: None,
         };
         (db, temp_dir)
     }
@@ -371,6 +372,7 @@ mod tests {
                 path: PathBuf::from("/tmp/archon-rust-gatekeeper-test-unused.json"),
             },
             data: JsonDbFile::default(),
+            redis_connection: None,
         };
         db.data.dids.insert(
             "bagaaieratestdid".to_string(),
