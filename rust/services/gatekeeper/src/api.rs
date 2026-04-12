@@ -77,9 +77,21 @@ pub(crate) async fn status(State(state): State<AppState>) -> impl IntoResponse {
         .await
         .clone()
         .unwrap_or_default();
+    // DID counts are populated periodically by the status/gc loops (matching
+    // TS, which only refreshes didCheck every statusInterval minutes), but
+    // eventsQueue should always reflect the live in-memory queue so callers
+    // don't see stale "0 pending" right after an import.
+    let mut dids_value = serde_json::to_value(dids).unwrap_or_else(|_| json!({}));
+    if let Some(object) = dids_value.as_object_mut() {
+        let live_queue = state.import_queue.lock().await.clone();
+        object.insert(
+            "eventsQueue".to_string(),
+            serde_json::to_value(live_queue).unwrap_or_else(|_| json!([])),
+        );
+    }
     let payload = StatusPayload {
         uptime_seconds: state.started_at.elapsed().as_secs(),
-        dids: serde_json::to_value(dids).unwrap_or_else(|_| json!({})),
+        dids: dids_value,
         memory_usage: current_memory_usage(),
     };
 
@@ -459,7 +471,6 @@ pub(crate) async fn import_dids(
         .collect::<Vec<_>>();
 
     let result = import_batch_impl(&state, &flat_batch).await;
-    refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
         "POST",
@@ -573,7 +584,6 @@ pub(crate) async fn import_batch(
     };
 
     let result = import_batch_impl(&state, &batch).await;
-    refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
         "POST",
@@ -696,7 +706,6 @@ pub(crate) async fn import_batch_by_cids(
     }
 
     let result = import_batch_impl(&state, &batch).await;
-    refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
         "POST",
@@ -784,7 +793,6 @@ pub(crate) async fn clear_queue(
         let _ = store.clear_queue(&registry, &operations);
         store.get_queue(&registry)
     };
-    refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
         "POST",
@@ -805,7 +813,6 @@ pub(crate) async fn process_events_route(
     }
 
     let result = process_events_impl(&state).await;
-    refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
         "POST",
@@ -844,7 +851,6 @@ pub(crate) async fn db_reset(State(state): State<AppState>, headers: HeaderMap) 
     state.verified_dids.lock().await.clear();
     state.import_queue.lock().await.clear();
     clear_search_index(&state).await;
-    refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
         "GET",
@@ -863,7 +869,6 @@ pub(crate) async fn db_verify(State(state): State<AppState>, headers: HeaderMap)
 
     let result = verify_db_impl(&state, false).await;
     build_search_index(&state).await;
-    refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
         "GET",
@@ -1022,7 +1027,6 @@ pub(crate) async fn add_block(
     let mut store = state.store.lock().await;
     let ok = store.add_block(&registry, payload).is_ok();
     drop(store);
-    refresh_metrics_snapshot(&state).await;
     record_metrics(
         &state,
         "POST",
