@@ -377,3 +377,123 @@ async fn sync_import_from_native_registry_confirms_latest_version() -> Result<()
 
     Ok(())
 }
+
+#[tokio::test]
+async fn sync_import_batch_without_event_dids_processes_cleanly() -> Result<()> {
+    let service = spawn_json().await?;
+
+    let agent_did = create_did(
+        &service,
+        create_agent_operation(7, "2026-04-11T12:00:00Z", "hyperswarm"),
+    )
+    .await?;
+    let mut agent_doc = resolve_did(&service, &agent_did).await?;
+    agent_doc["didDocumentData"] = json!({ "version": 2 });
+    let previd = agent_doc["didDocumentMetadata"]["versionId"]
+        .as_str()
+        .map(ToString::to_string);
+    let update = create_update_operation(
+        7,
+        &agent_did,
+        previd.as_deref(),
+        "2026-04-11T12:01:00Z",
+        agent_doc,
+    );
+    let response = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&update)
+        .send()
+        .await?;
+    assert!(response.status().is_success(), "local update should succeed");
+
+    let asset_did = create_did(
+        &service,
+        create_asset_operation(
+            7,
+            &agent_did,
+            "2026-04-11T12:02:00Z",
+            "hyperswarm",
+            json!({ "asset": 1 }),
+        ),
+    )
+    .await?;
+
+    let mut batch = export_all_events(&service).await?;
+    batch.sort_by(|a, b| a["time"].as_str().cmp(&b["time"].as_str()));
+    for event in &mut batch {
+        event.as_object_mut().unwrap().remove("did");
+        event["registry"] = Value::String("hyperswarm".to_string());
+    }
+
+    admin_get(&service, "db/reset").await?;
+    let imported = admin_post(&service, "batch/import", json!(batch)).await?;
+    assert_eq!(imported["queued"], 3);
+    assert_eq!(imported["rejected"], 0);
+
+    let processed = admin_post(&service, "events/process", json!(null)).await?;
+    assert_eq!(processed["added"], 3);
+    assert_eq!(processed["rejected"], 0);
+    assert_eq!(processed["pending"], 0);
+
+    let agent_doc = resolve_did(&service, &agent_did).await?;
+    let asset_doc = resolve_did(&service, &asset_did).await?;
+    assert_eq!(agent_doc["didDocumentMetadata"]["versionSequence"], "2");
+    assert_eq!(agent_doc["didDocumentMetadata"]["confirmed"], true);
+    assert_eq!(asset_doc["didDocumentMetadata"]["versionSequence"], "1");
+    assert_eq!(asset_doc["didDocumentMetadata"]["confirmed"], true);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn sync_processing_handles_large_linear_update_chain_without_pending() -> Result<()> {
+    let service = spawn_json().await?;
+
+    let agent_did = create_did(
+        &service,
+        create_agent_operation(7, "2026-04-11T12:00:00Z", "local"),
+    )
+    .await?;
+
+    let mut current_doc = resolve_did(&service, &agent_did).await?;
+    for i in 0..10 {
+        current_doc["didDocumentData"] = json!({ "version": i + 2 });
+        let previd = current_doc["didDocumentMetadata"]["versionId"]
+            .as_str()
+            .map(ToString::to_string);
+        let created = format!("2026-04-11T12:{:02}:00Z", i + 1);
+        let update = create_update_operation(
+            7,
+            &agent_did,
+            previd.as_deref(),
+            &created,
+            current_doc.clone(),
+        );
+        let response = service
+            .client
+            .post(format!("{}/did", service.base_url))
+            .json(&update)
+            .send()
+            .await?;
+        assert!(response.status().is_success(), "chain update {i} should succeed");
+        current_doc = resolve_did(&service, &agent_did).await?;
+    }
+
+    let events = export_did(&service, &agent_did).await?;
+    admin_get(&service, "db/reset").await?;
+
+    let imported = admin_post(&service, "batch/import", json!(events)).await?;
+    assert_eq!(imported["queued"], 11);
+    assert_eq!(imported["rejected"], 0);
+
+    let processed = admin_post(&service, "events/process", json!(null)).await?;
+    assert_eq!(processed["added"], 11);
+    assert_eq!(processed["rejected"], 0);
+    assert_eq!(processed["pending"], 0);
+
+    let resolved = resolve_did(&service, &agent_did).await?;
+    assert_eq!(resolved["didDocumentMetadata"]["versionSequence"], "11");
+
+    Ok(())
+}

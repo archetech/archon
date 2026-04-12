@@ -20,7 +20,7 @@ pub(crate) use proofs::{
     verify_update_operation_impl,
 };
 pub(crate) use resolver::{
-    check_dids_impl, query_docs_impl, refresh_metrics_snapshot, resolve_local_doc_async,
+    check_dids_impl, log_status_snapshot, query_docs_impl, refresh_metrics_snapshot, resolve_local_doc_async,
     search_docs_impl, start_background_tasks, update_metrics_from_check, verify_db_impl,
 };
 pub(crate) use store::{

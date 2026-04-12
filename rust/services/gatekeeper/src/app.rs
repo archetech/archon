@@ -26,7 +26,7 @@ use crate::{
         ipfs_get_text, list_dids, not_found, process_events_route, query_docs, ready, registries,
         remove_dids, resolve_did, search_docs, status, version,
     },
-    refresh_metrics_snapshot, start_background_tasks, Config, JsonDb, Metrics,
+    log_status_snapshot, refresh_metrics_snapshot, start_background_tasks, Config, JsonDb, Metrics,
 };
 
 #[derive(Clone)]
@@ -52,6 +52,7 @@ pub async fn run() -> Result<()> {
     let app = build_router(state.clone());
 
     refresh_metrics_snapshot(&state).await;
+    log_status_snapshot(&state).await;
     start_background_tasks(state.clone());
 
     let listener = TcpListener::bind(SocketAddr::new(config.bind_address, config.port))

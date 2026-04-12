@@ -595,11 +595,12 @@ pub(crate) fn start_background_tasks(state: AppState) {
         let interval_minutes = state.config.status_interval_minutes;
         let status_state = state.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(interval_minutes * 60));
+            let interval = Duration::from_secs(interval_minutes * 60);
+            tokio::time::sleep(interval).await;
             loop {
-                interval.tick().await;
                 refresh_metrics_snapshot(&status_state).await;
                 log_status_snapshot(&status_state).await;
+                tokio::time::sleep(interval).await;
             }
         });
     }
@@ -608,8 +609,8 @@ pub(crate) fn start_background_tasks(state: AppState) {
         let interval_minutes = state.config.gc_interval_minutes;
         let gc_state = state.clone();
         tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(interval_minutes * 60)).await;
-            let mut interval = tokio::time::interval(Duration::from_secs(interval_minutes * 60));
+            let interval = Duration::from_secs(interval_minutes * 60);
+            tokio::time::sleep(interval).await;
             loop {
                 let result = verify_db_impl(&gc_state, false).await;
                 info!(
@@ -617,7 +618,7 @@ pub(crate) fn start_background_tasks(state: AppState) {
                     serde_json::to_string(&result).unwrap_or_default()
                 );
                 refresh_metrics_snapshot(&gc_state).await;
-                interval.tick().await;
+                tokio::time::sleep(interval).await;
             }
         });
     }

@@ -220,6 +220,22 @@ pub(crate) fn redis_event_to_stored_value(event: &EventRecord) -> Value {
     stored
 }
 
+pub(crate) fn hydrate_redis_event(
+    raw: &str,
+    ops: &HashMap<String, Value>,
+) -> Result<EventRecord> {
+    let mut event =
+        serde_json::from_str::<EventRecord>(raw).context("failed to decode redis did event")?;
+    if event.operation.is_null() {
+        if let Some(opid) = event.opid.as_ref() {
+            if let Some(operation) = ops.get(opid) {
+                event.operation = operation.clone();
+            }
+        }
+    }
+    Ok(event)
+}
+
 pub(crate) fn chrono_like_now() -> String {
     use std::time::SystemTime;
     let now = SystemTime::now();
@@ -572,21 +588,28 @@ impl JsonDb {
                         .lrange(&key, 0, -1)
                         .context("failed to load redis did events")?;
                     let mut events = Vec::with_capacity(raw_events.len());
+                    let mut ops = HashMap::new();
                     for raw in raw_events {
-                        let mut event = serde_json::from_str::<EventRecord>(&raw)
+                        let parsed = serde_json::from_str::<EventRecord>(&raw)
                             .context("failed to decode redis did event")?;
-                        if event.operation.is_null() {
-                            if let Some(opid) = event.opid.as_ref() {
-                                let op_key = Self::redis_operation_key(namespace, opid);
-                                let raw_operation: Option<String> = conn
-                                    .get(&op_key)
-                                    .context("failed to load redis operation")?;
-                                if let Some(raw_operation) = raw_operation {
-                                    event.operation = serde_json::from_str::<Value>(&raw_operation)
-                                        .context("failed to decode redis operation")?;
+                        if let Some(opid) = parsed.opid.as_ref() {
+                            if !ops.contains_key(opid) {
+                                if parsed.operation.is_null() {
+                                    let op_key = Self::redis_operation_key(namespace, opid);
+                                    let raw_operation: Option<String> = conn
+                                        .get(&op_key)
+                                        .context("failed to load redis operation")?;
+                                    if let Some(raw_operation) = raw_operation {
+                                        let operation = serde_json::from_str::<Value>(&raw_operation)
+                                            .context("failed to decode redis operation")?;
+                                        ops.insert(opid.clone(), operation);
+                                    }
+                                } else {
+                                    ops.insert(opid.clone(), parsed.operation.clone());
                                 }
                             }
                         }
+                        let event = hydrate_redis_event(&raw, &ops)?;
                         events.push(event);
                     }
                     Ok(events)
