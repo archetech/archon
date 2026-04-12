@@ -15,7 +15,7 @@ use axum::{
 };
 use reqwest::Client;
 use tokio::{net::TcpListener, sync::Mutex};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     api::{
@@ -48,23 +48,53 @@ pub async fn run() -> Result<()> {
     init_tracing();
 
     let config = Config::from_env()?;
+    info!(
+        "Starting Archon Gatekeeper v{} ({}) with a db ({}) check...",
+        config.version, config.git_commit, config.db
+    );
     let state = build_state(config.clone())?;
     let app = build_router(state.clone());
 
     refresh_metrics_snapshot(&state).await;
     log_status_snapshot(&state).await;
+
+    info!("Initializing search index...");
+
+    if config.status_interval_minutes > 0 {
+        info!(
+            "Starting status update every {} minutes",
+            config.status_interval_minutes
+        );
+    } else {
+        info!("Status update disabled");
+    }
+
+    if config.gc_interval_minutes > 0 {
+        info!(
+            "Starting DID garbage collection in {} minutes",
+            config.gc_interval_minutes
+        );
+    } else {
+        info!("DID garbage collection disabled");
+    }
+
+    let did_prefix = serde_json::to_string(&config.did_prefix).unwrap_or_else(|_| "\"\"".to_string());
+    let registries = serde_json::to_string(&config.registries).unwrap_or_else(|_| "[]".to_string());
+    info!("DID prefix: {did_prefix}");
+    info!("Supported registries: {registries}");
+
     start_background_tasks(state.clone());
 
     let listener = TcpListener::bind(SocketAddr::new(config.bind_address, config.port))
         .await
         .with_context(|| format!("failed to bind {}:{}", config.bind_address, config.port))?;
 
-    info!(
-        port = config.port,
-        bind_address = %config.bind_address,
-        db = %config.db,
-        "Native Rust Gatekeeper listening"
-    );
+    info!("Server is running on {}:{}", config.bind_address, config.port);
+    if config.admin_api_key.is_empty() {
+        warn!("Warning: ARCHON_ADMIN_API_KEY is not set - admin routes are unprotected");
+    } else {
+        info!("Admin API key protection is ENABLED");
+    }
 
     state.ready.store(true, Ordering::Relaxed);
     axum::serve(listener, app).await.context("server failed")?;

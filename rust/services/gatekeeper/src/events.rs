@@ -347,6 +347,7 @@ pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult
     {
         let mut busy = state.processing_events.lock().await;
         if *busy {
+            info!("processEvents: {}", serde_json::json!({ "busy": true }));
             return ProcessEventsResult {
                 busy: Some(true),
                 added: None,
@@ -376,45 +377,62 @@ pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult
     let pending = state.store.lock().await.import_queue_len();
     *state.processing_events.lock().await = false;
 
-    ProcessEventsResult {
+    let response = ProcessEventsResult {
         busy: None,
         added: Some(added),
         merged: Some(merged),
         rejected: Some(rejected),
         pending: Some(pending),
-    }
+    };
+    info!(
+        "processEvents: {}",
+        serde_json::to_string(&response).unwrap_or_else(|_| "{}".to_string())
+    );
+    response
 }
 
 async fn import_events_once(state: &AppState) -> ImportEventsResult {
     let mut temp_queue = state.store.lock().await.take_import_queue();
+    let total = temp_queue.len();
 
     let mut added = 0;
     let mut merged = 0;
     let mut rejected = 0;
     let trace = import_trace_enabled();
 
-    for event in temp_queue.drain(..) {
+    for (index, event) in temp_queue.drain(..).enumerate() {
         let summary = if trace {
             Some(summarize_record_event(&event))
         } else {
             None
         };
+        let did = event.did.clone().unwrap_or_else(|| {
+            event.operation
+                .get("did")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string()
+        });
         let outcome = match import_event_impl(state, event.clone()).await {
             ImportStatus::Added => {
                 added += 1;
+                info!("import {}/{}: added event for {}", index + 1, total, did);
                 "added"
             }
             ImportStatus::Merged => {
                 merged += 1;
+                info!("import {}/{}: merged event for {}", index + 1, total, did);
                 "merged"
             }
             ImportStatus::Rejected => {
                 rejected += 1;
+                info!("import {}/{}: rejected event for {}", index + 1, total, did);
                 "rejected"
             }
             ImportStatus::Deferred => {
                 let mut store = state.store.lock().await;
                 store.push_import_event(event);
+                info!("import {}/{}: deferred event for {}", index + 1, total, did);
                 "deferred"
             }
         };

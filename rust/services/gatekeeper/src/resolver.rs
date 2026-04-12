@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, fs, time::Duration};
 
 use anyhow::{Context, Result};
 use async_recursion::async_recursion;
@@ -625,14 +625,156 @@ pub(crate) fn start_background_tasks(state: AppState) {
 }
 
 pub(crate) async fn log_status_snapshot(state: &AppState) {
+    let started = std::time::Instant::now();
     let status = check_dids_impl(state, None, false).await;
+    let elapsed_ms = started.elapsed().as_millis();
+    info!("checkDIDs: {}ms", elapsed_ms);
+    info!("Status -----------------------------");
+    info!("DID Database ({}):", state.config.db);
+    info!("  Total: {}", status.total);
+
+    if status.total > 0 {
+        info!("  By type:");
+        info!("    Agents: {}", status.byType.agents);
+        info!("    Assets: {}", status.byType.assets);
+        info!("    Confirmed: {}", status.byType.confirmed);
+        info!("    Unconfirmed: {}", status.byType.unconfirmed);
+        info!("    Ephemeral: {}", status.byType.ephemeral);
+        info!("    Invalid: {}", status.byType.invalid);
+
+        info!("  By registry:");
+        let mut registries = status.byRegistry.keys().cloned().collect::<Vec<_>>();
+        registries.sort();
+        for registry in registries {
+            let count = status.byRegistry.get(&registry).copied().unwrap_or_default();
+            info!("    {}: {}", registry, count);
+        }
+
+        info!("  By version:");
+        let mut counted = 0usize;
+        for version in 1..=5 {
+            let key = version.to_string();
+            let count = status.byVersion.get(&key).copied().unwrap_or_default();
+            counted += count;
+            info!("    {}: {}", version, count);
+        }
+        info!("    6+: {}", status.total.saturating_sub(counted));
+    }
+
+    info!("Events Queue: {} pending", status.eventsQueue.len());
+
+    let memory = current_memory_usage();
+    info!("Memory Usage Report:");
     info!(
-        total = status.total,
-        agents = status.byType.agents,
-        assets = status.byType.assets,
-        confirmed = status.byType.confirmed,
-        unconfirmed = status.byType.unconfirmed,
-        pending_events = status.eventsQueue.len(),
-        "Gatekeeper status snapshot"
+        "  RSS: {} (Resident Set Size - total memory allocated for the process)",
+        format_bytes(memory.rss)
     );
+    info!("  Heap Total: {} (Total heap allocated)", format_bytes(memory.heap_total));
+    info!("  Heap Used: {} (Heap actually used)", format_bytes(memory.heap_used));
+    info!(
+        "  External: {} (Memory used by C++ objects bound to JavaScript)",
+        format_bytes(memory.external)
+    );
+    info!(
+        "  Array Buffers: {} (Memory used by ArrayBuffer and SharedArrayBuffer)",
+        format_bytes(memory.array_buffers)
+    );
+
+    let uptime_seconds = state.started_at.elapsed().as_secs();
+    info!(
+        "Uptime: {}s ({})",
+        uptime_seconds,
+        format_duration(uptime_seconds)
+    );
+    info!("------------------------------------");
+}
+
+#[derive(Default)]
+struct MemoryUsage {
+    rss: u64,
+    heap_total: u64,
+    heap_used: u64,
+    external: u64,
+    array_buffers: u64,
+}
+
+fn current_memory_usage() -> MemoryUsage {
+    let rss = fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|contents| {
+            contents.lines().find_map(|line| {
+                let value = line.strip_prefix("VmRSS:")?.trim();
+                let kilobytes = value.split_whitespace().next()?.parse::<u64>().ok()?;
+                Some(kilobytes.saturating_mul(1024))
+            })
+        })
+        .unwrap_or(0);
+
+    MemoryUsage {
+        rss,
+        heap_total: 0,
+        heap_used: 0,
+        external: 0,
+        array_buffers: 0,
+    }
+}
+
+fn format_duration(mut seconds: u64) -> String {
+    let sec_per_min = 60;
+    let sec_per_hour = sec_per_min * 60;
+    let sec_per_day = sec_per_hour * 24;
+
+    let days = seconds / sec_per_day;
+    seconds %= sec_per_day;
+
+    let hours = seconds / sec_per_hour;
+    seconds %= sec_per_hour;
+
+    let minutes = seconds / sec_per_min;
+    seconds %= sec_per_min;
+
+    let mut parts = Vec::new();
+    if days > 0 {
+        parts.push(if days == 1 {
+            "1 day".to_string()
+        } else {
+            format!("{days} days")
+        });
+    }
+    if hours > 0 {
+        parts.push(if hours == 1 {
+            "1 hour".to_string()
+        } else {
+            format!("{hours} hours")
+        });
+    }
+    if minutes > 0 {
+        parts.push(if minutes == 1 {
+            "1 minute".to_string()
+        } else {
+            format!("{minutes} minutes")
+        });
+    }
+    parts.push(if seconds == 1 {
+        "1 second".to_string()
+    } else {
+        format!("{seconds} seconds")
+    });
+    parts.join(", ")
+}
+
+fn format_bytes(bytes: u64) -> String {
+    let sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    if bytes == 0 {
+        return "0 Byte".to_string();
+    }
+
+    let mut size = bytes as f64;
+    let mut index = 0usize;
+    while size >= 1024.0 && index < sizes.len() - 1 {
+        size /= 1024.0;
+        index += 1;
+    }
+
+    format!("{size:.2} {}", sizes[index])
 }
