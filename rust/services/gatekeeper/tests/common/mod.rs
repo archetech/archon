@@ -1,3 +1,8 @@
+// Cargo compiles each integration test as its own binary; dead-code analysis
+// runs per-binary, so helpers consumed by a subset of tests look unused in the
+// others. Silence the noise at module level.
+#![allow(dead_code)]
+
 use std::{
     net::TcpListener,
     path::{Path, PathBuf},

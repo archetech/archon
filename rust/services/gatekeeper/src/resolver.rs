@@ -26,13 +26,13 @@ pub(crate) struct CheckDidsByType {
 pub(crate) struct CheckDidsResult {
     pub(crate) total: usize,
     #[serde(rename = "byType")]
-    pub(crate) byType: CheckDidsByType,
+    pub(crate) by_type: CheckDidsByType,
     #[serde(rename = "byRegistry")]
-    pub(crate) byRegistry: HashMap<String, usize>,
+    pub(crate) by_registry: HashMap<String, usize>,
     #[serde(rename = "byVersion")]
-    pub(crate) byVersion: HashMap<String, usize>,
+    pub(crate) by_version: HashMap<String, usize>,
     #[serde(rename = "eventsQueue")]
-    pub(crate) eventsQueue: Vec<EventRecord>,
+    pub(crate) events_queue: Vec<EventRecord>,
 }
 
 #[derive(Serialize, Default)]
@@ -352,7 +352,7 @@ async fn ensure_search_index_ready(state: &AppState) {
 pub(crate) async fn update_metrics_from_check(state: &AppState, did_check: &CheckDidsResult) {
     state.metrics.events_queue_size.reset();
     let mut queue_by_registry: HashMap<String, usize> = HashMap::new();
-    for event in &did_check.eventsQueue {
+    for event in &did_check.events_queue {
         let registry = if event.registry.is_empty() {
             "unknown".to_string()
         } else {
@@ -377,12 +377,12 @@ pub(crate) async fn update_metrics_from_check(state: &AppState, did_check: &Chec
         .set(did_check.total as f64);
     state.metrics.gatekeeper_dids_by_type.reset();
     for (ty, count) in [
-        ("agents", did_check.byType.agents),
-        ("assets", did_check.byType.assets),
-        ("confirmed", did_check.byType.confirmed),
-        ("unconfirmed", did_check.byType.unconfirmed),
-        ("ephemeral", did_check.byType.ephemeral),
-        ("invalid", did_check.byType.invalid),
+        ("agents", did_check.by_type.agents),
+        ("assets", did_check.by_type.assets),
+        ("confirmed", did_check.by_type.confirmed),
+        ("unconfirmed", did_check.by_type.unconfirmed),
+        ("ephemeral", did_check.by_type.ephemeral),
+        ("invalid", did_check.by_type.invalid),
     ] {
         state
             .metrics
@@ -392,7 +392,7 @@ pub(crate) async fn update_metrics_from_check(state: &AppState, did_check: &Chec
     }
 
     state.metrics.gatekeeper_dids_by_registry.reset();
-    for (registry, count) in &did_check.byRegistry {
+    for (registry, count) in &did_check.by_registry {
         state
             .metrics
             .gatekeeper_dids_by_registry
@@ -476,10 +476,10 @@ pub(crate) async fn check_dids_impl(
 
     CheckDidsResult {
         total: dids.len(),
-        byType: by_type,
-        byRegistry: by_registry,
-        byVersion: by_version,
-        eventsQueue: events_queue,
+        by_type,
+        by_registry,
+        by_version,
+        events_queue,
     }
 }
 
@@ -637,18 +637,18 @@ pub(crate) async fn log_status_snapshot(state: &AppState) {
 
     if status.total > 0 {
         info!("  By type:");
-        info!("    Agents: {}", status.byType.agents);
-        info!("    Assets: {}", status.byType.assets);
-        info!("    Confirmed: {}", status.byType.confirmed);
-        info!("    Unconfirmed: {}", status.byType.unconfirmed);
-        info!("    Ephemeral: {}", status.byType.ephemeral);
-        info!("    Invalid: {}", status.byType.invalid);
+        info!("    Agents: {}", status.by_type.agents);
+        info!("    Assets: {}", status.by_type.assets);
+        info!("    Confirmed: {}", status.by_type.confirmed);
+        info!("    Unconfirmed: {}", status.by_type.unconfirmed);
+        info!("    Ephemeral: {}", status.by_type.ephemeral);
+        info!("    Invalid: {}", status.by_type.invalid);
 
         info!("  By registry:");
-        let mut registries = status.byRegistry.keys().cloned().collect::<Vec<_>>();
+        let mut registries = status.by_registry.keys().cloned().collect::<Vec<_>>();
         registries.sort();
         for registry in registries {
-            let count = status.byRegistry.get(&registry).copied().unwrap_or_default();
+            let count = status.by_registry.get(&registry).copied().unwrap_or_default();
             info!("    {}: {}", registry, count);
         }
 
@@ -656,14 +656,14 @@ pub(crate) async fn log_status_snapshot(state: &AppState) {
         let mut counted = 0usize;
         for version in 1..=5 {
             let key = version.to_string();
-            let count = status.byVersion.get(&key).copied().unwrap_or_default();
+            let count = status.by_version.get(&key).copied().unwrap_or_default();
             counted += count;
             info!("    {}: {}", version, count);
         }
         info!("    6+: {}", status.total.saturating_sub(counted));
     }
 
-    info!("Events Queue: {} pending", status.eventsQueue.len());
+    info!("Events Queue: {} pending", status.events_queue.len());
 
     let memory = current_memory_usage();
     info!("Memory Usage Report:");

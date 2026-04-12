@@ -21,11 +21,13 @@ pub(crate) use proofs::{
     verify_update_operation_impl,
 };
 pub(crate) use resolver::{
-    build_search_index, check_dids_impl, clear_search_index, delete_search_doc, log_status_snapshot,
+    build_search_index, clear_search_index, delete_search_doc, log_status_snapshot,
     query_docs_impl, refresh_metrics_snapshot, resolve_local_doc_async, search_docs_impl,
     start_background_tasks, update_search_doc, verify_db_impl,
     CheckDidsResult,
 };
+#[cfg(test)]
+pub(crate) use resolver::check_dids_impl;
 pub(crate) use search_index::SearchIndex;
 pub(crate) use store::{
     chrono_like_now, event_record_to_value, expected_registry_for_index, value_to_event_record,
@@ -736,7 +738,7 @@ mod tests {
             .expect("queue should accept second");
         db.queue_operation("hyperswarm", third.clone())
             .expect("queue should accept third");
-        db.clear_queue("hyperswarm", &[second.clone()])
+        db.clear_queue("hyperswarm", std::slice::from_ref(&second))
             .expect("clear queue should succeed");
         assert_eq!(db.get_queue("hyperswarm"), vec![first, third]);
 
@@ -980,16 +982,16 @@ mod tests {
         let result = check_dids_impl(&state, None, false).await;
 
         assert_eq!(result.total, 3);
-        assert_eq!(result.byType.agents, 1);
-        assert_eq!(result.byType.assets, 1);
-        assert_eq!(result.byType.unconfirmed, 1);
-        assert_eq!(result.byType.confirmed, 1);
-        assert_eq!(result.byType.ephemeral, 1);
-        assert_eq!(result.byType.invalid, 1);
-        assert_eq!(result.byRegistry.get("local"), Some(&2));
-        assert_eq!(result.byVersion.get("1"), Some(&1));
-        assert_eq!(result.byVersion.get("2"), Some(&1));
-        assert_eq!(result.eventsQueue.len(), 1);
+        assert_eq!(result.by_type.agents, 1);
+        assert_eq!(result.by_type.assets, 1);
+        assert_eq!(result.by_type.unconfirmed, 1);
+        assert_eq!(result.by_type.confirmed, 1);
+        assert_eq!(result.by_type.ephemeral, 1);
+        assert_eq!(result.by_type.invalid, 1);
+        assert_eq!(result.by_registry.get("local"), Some(&2));
+        assert_eq!(result.by_version.get("1"), Some(&1));
+        assert_eq!(result.by_version.get("2"), Some(&1));
+        assert_eq!(result.events_queue.len(), 1);
     }
 
     #[tokio::test]

@@ -141,10 +141,7 @@ fn exceeds_json_size(value: &Value, limit: usize) -> bool {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
             self.count = self.count.saturating_add(buf.len());
             if self.count > self.limit {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "json size limit exceeded",
-                ));
+                return Err(std::io::Error::other("json size limit exceeded"));
             }
             Ok(buf.len())
         }
@@ -255,7 +252,7 @@ fn verify_sig(msg_hash_hex: &str, proof_value: &str, public_jwk: &Value) -> Resu
 }
 
 fn hex_to_bytes(value: &str) -> Result<Vec<u8>> {
-    if value.len() % 2 != 0 {
+    if !value.len().is_multiple_of(2) {
         anyhow::bail!("invalid hex");
     }
     (0..value.len())

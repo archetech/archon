@@ -41,14 +41,14 @@ async fn redis_compat_loads_typescript_keys_and_persists_back_same_schema() -> R
             "opid": opid
         }))?,
     )?;
-    let _: usize = conn.rpush(&queue_key, serde_json::to_string(&operation)?)?;
+    let _: usize = conn.rpush(queue_key, serde_json::to_string(&operation)?)?;
     let block = json!({
         "hash": "test-hash",
         "height": 22,
         "registry": "hyperswarm",
         "entries": [did]
     });
-    let _: () = conn.set(&block_key, serde_json::to_string(&block)?)?;
+    let _: () = conn.set(block_key, serde_json::to_string(&block)?)?;
     let _: usize = conn.hset(height_map_key, "22", "test-hash")?;
     let _: () = conn.set(max_height_key, "22")?;
 

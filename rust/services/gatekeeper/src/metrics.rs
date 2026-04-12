@@ -12,7 +12,6 @@ pub(crate) struct Metrics {
     pub(crate) gatekeeper_dids_total: Gauge,
     pub(crate) gatekeeper_dids_by_type: GaugeVec,
     pub(crate) gatekeeper_dids_by_registry: GaugeVec,
-    service_version_info: GaugeVec,
 }
 
 pub(crate) fn record_metrics(
@@ -167,7 +166,6 @@ impl Metrics {
             gatekeeper_dids_total,
             gatekeeper_dids_by_type,
             gatekeeper_dids_by_registry,
-            service_version_info,
         })
     }
 }

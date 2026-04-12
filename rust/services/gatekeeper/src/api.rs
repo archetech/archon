@@ -567,7 +567,7 @@ pub(crate) async fn import_batch(
     }
 
     let batch = match payload.as_array() {
-        Some(items) if !items.is_empty() => items.iter().cloned().collect::<Vec<_>>(),
+        Some(items) if !items.is_empty() => items.to_vec(),
         _ => {
             record_metrics(
                 &state,
