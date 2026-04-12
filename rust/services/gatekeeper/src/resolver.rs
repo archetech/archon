@@ -59,7 +59,7 @@ pub(crate) async fn resolve_local_doc_async(
         store.get_events(did)
     };
     if events.is_empty() {
-        anyhow::bail!("did not found");
+        anyhow::bail!("DID not found");
     }
 
     let anchor = events.first().context("did has no events")?;

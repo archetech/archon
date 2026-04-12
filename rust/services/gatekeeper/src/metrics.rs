@@ -157,10 +157,6 @@ impl Metrics {
             .with_label_values(&[&config.version, &config.git_commit])
             .set(1.0);
         gatekeeper_dids_total.set(0.0);
-        let _ = did_operations_total;
-        let _ = events_queue_size;
-        let _ = gatekeeper_dids_by_type;
-        let _ = gatekeeper_dids_by_registry;
 
         Ok(Self {
             registry,

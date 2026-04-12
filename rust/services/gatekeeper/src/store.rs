@@ -434,7 +434,7 @@ impl JsonDb {
 
             let current_events = self.get_events(did);
             if current_events.is_empty() {
-                anyhow::bail!("did not found");
+                anyhow::bail!("DID not found");
             }
 
             let previd = event
@@ -500,7 +500,7 @@ impl JsonDb {
 
             let mut events = self.get_events(did);
             if events.is_empty() {
-                anyhow::bail!("did not found");
+                anyhow::bail!("DID not found");
             }
 
             let previd = event
@@ -552,9 +552,9 @@ impl JsonDb {
             ResolveOptions::default(),
         )?;
 
-        let events = self.data.dids.get_mut(&suffix).context("did not found")?;
+        let events = self.data.dids.get_mut(&suffix).context("DID not found")?;
         if events.is_empty() {
-            anyhow::bail!("did not found");
+            anyhow::bail!("DID not found");
         }
 
         let previd = event
@@ -1616,7 +1616,7 @@ impl JsonDb {
         let _ = did.split(':').next_back().context("invalid did suffix")?;
         let events = self.get_events(did);
         if events.is_empty() {
-            anyhow::bail!("did not found");
+            anyhow::bail!("DID not found");
         }
         let anchor = events.first().context("did has no events")?;
         let anchor_operation = &anchor.operation;

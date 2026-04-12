@@ -166,21 +166,33 @@ fn build_state(config: Config) -> Result<AppState> {
 fn build_router(state: AppState) -> Router {
     let json_limit = state.config.json_limit;
     let upload_limit = state.config.upload_limit;
-    let body_limit = json_limit.max(upload_limit);
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // /ipfs/stream uploads are unbounded in the TS implementation — the body is
-    // piped straight into Kubo. Mount it on a separate router with the limit
-    // disabled so large uploads don't get 413'd.
+    // TS applies three different body size policies:
+    //   - express.json({ limit: jsonLimit }) globally (4 MB default)
+    //   - express.text/raw({ limit: uploadLimit }) scoped to /ipfs/text and
+    //     /ipfs/data (10 MB default)
+    //   - nothing on /ipfs/stream — the request body is piped straight into
+    //     Kubo with no server-side cap
+    // Mirror that by mounting three routers with their own DefaultBodyLimit.
+
+    // /ipfs/stream POST: unbounded so large uploads don't get 413'd.
     let streaming = Router::new()
         .route("/ipfs/stream", post(ipfs_add_stream))
         .layer(DefaultBodyLimit::disable());
 
-    let bounded = Router::new()
+    // /ipfs/text and /ipfs/data POST: raw/text bodies up to uploadLimit.
+    let upload = Router::new()
+        .route("/ipfs/text", post(ipfs_add_text))
+        .route("/ipfs/data", post(ipfs_add_data))
+        .layer(DefaultBodyLimit::max(upload_limit));
+
+    // Everything else: JSON bodies bounded by jsonLimit.
+    let json = Router::new()
         .route("/ready", get(ready))
         .route("/version", get(version))
         .route("/status", get(status))
@@ -203,9 +215,7 @@ fn build_router(state: AppState) -> Router {
         .route("/events/process", post(process_events_route))
         .route("/ipfs/json", post(ipfs_add_json))
         .route("/ipfs/json/:cid", get(ipfs_get_json))
-        .route("/ipfs/text", post(ipfs_add_text))
         .route("/ipfs/text/:cid", get(ipfs_get_text))
-        .route("/ipfs/data", post(ipfs_add_data))
         .route("/ipfs/data/:cid", get(ipfs_get_data))
         .route("/ipfs/stream/:cid", get(ipfs_get_stream))
         .route("/block/:registry/latest", get(get_latest_block))
@@ -213,11 +223,11 @@ fn build_router(state: AppState) -> Router {
         .route("/block/:registry", post(add_block))
         .route("/search", get(search_docs))
         .route("/query", post(query_docs))
-        .layer(DefaultBodyLimit::max(body_limit));
+        .layer(DefaultBodyLimit::max(json_limit));
 
     Router::new()
         .route("/metrics", get(get_metrics))
-        .nest("/api/v1", streaming.merge(bounded))
+        .nest("/api/v1", streaming.merge(upload).merge(json))
         .nest("/api", Router::new().fallback(api_not_found))
         .fallback(not_found)
         .layer(middleware::from_fn(log_http))
