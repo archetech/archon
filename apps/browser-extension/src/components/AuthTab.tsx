@@ -1,14 +1,24 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-    Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-    MenuItem, Select, TextField, Typography
+    Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+    Divider, MenuItem, Paper, Select, TextField, Typography
 } from "@mui/material";
+import { CheckCircle, Login, Warning } from "@mui/icons-material";
 import axios from "axios";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useAuthContext } from "../contexts/AuthContext";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
+
+interface AutoLoginState {
+    responseDID: string;
+    callbackUrl: string;
+    fulfilled: number;
+    requested: number;
+    match: boolean;
+    credentials: { vc: string; vp: string }[];
+}
 
 function AuthTab() {
     const { keymaster } = useWalletContext();
@@ -24,6 +34,8 @@ function AuthTab() {
         setCallback,
         disableSendResponse,
         setDisableSendResponse,
+        pendingAutoResponse,
+        setPendingAutoResponse,
     } = useAuthContext();
     const { openBrowserWindow } = useUIContext();
     const { schemaList, agentList } = useVariablesContext();
@@ -31,6 +43,77 @@ function AuthTab() {
     const [challengeCredentials, setChallengeCredentials] = useState<{ schema: string; issuer: string }[]>([]);
     const [challengeSchemaSelection, setChallengeSchemaSelection] = useState<string>("");
     const [challengeIssuerSelection, setChallengeIssuerSelection] = useState<string>("");
+    const [autoLogin, setAutoLogin] = useState<AutoLoginState | null>(null);
+    const [autoLoginLoading, setAutoLoginLoading] = useState(false);
+    const [autoLoginSent, setAutoLoginSent] = useState(false);
+
+    useEffect(() => {
+        if (pendingAutoResponse && challenge && keymaster) {
+            setPendingAutoResponse(false);
+            handleAutoResponse(challenge);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingAutoResponse, challenge, keymaster]);
+
+    async function handleAutoResponse(challengeDID: string) {
+        if (!keymaster) return;
+
+        setAutoLoginLoading(true);
+        setAutoLogin(null);
+        setAutoLoginSent(false);
+
+        try {
+            const asset = await keymaster.resolveAsset(challengeDID);
+            const challengeData = (asset as { challenge: { callback?: string; credentials?: { schema: string; issuers?: string[] }[] } }).challenge;
+            const callbackUrl = challengeData?.callback || "";
+
+            const responseDID = await keymaster.createResponse(challengeDID, { retries: 10 });
+            await setResponse(responseDID);
+
+            const decrypted = await keymaster.decryptJSON(responseDID) as {
+                response: { challenge: string; credentials: { vc: string; vp: string }[]; requested: number; fulfilled: number; match: boolean }
+            };
+            const responseData = decrypted.response;
+
+            setAutoLogin({
+                responseDID,
+                callbackUrl,
+                fulfilled: responseData.fulfilled,
+                requested: responseData.requested,
+                match: responseData.match,
+                credentials: responseData.credentials,
+            });
+
+            await setCallback(callbackUrl);
+            if (callbackUrl) {
+                await setDisableSendResponse(false);
+            }
+        } catch (error: any) {
+            setError(error);
+        } finally {
+            setAutoLoginLoading(false);
+        }
+    }
+
+    async function autoLoginSend() {
+        if (!autoLogin?.callbackUrl) return;
+        try {
+            await setDisableSendResponse(true);
+            await axios.post(autoLogin.callbackUrl, { response });
+            setAutoLoginSent(true);
+            setSuccess("Response sent successfully");
+            await setCallback("");
+        } catch (error: any) {
+            await setDisableSendResponse(false);
+            setError(error);
+        }
+    }
+
+    function dismissAutoLogin() {
+        setAutoLogin(null);
+        setAutoLoginLoading(false);
+        setAutoLoginSent(false);
+    }
 
     function openChallengeDialog() {
         setChallengeCredentials([]);
@@ -173,7 +256,112 @@ function AuthTab() {
 
     return (
         <Box>
-            <Box className="flex-box mt-2">
+            {autoLoginLoading && (
+                <Paper elevation={2} sx={{ p: 3, m: 2, textAlign: 'center' }}>
+                    <CircularProgress size={40} />
+                    <Typography sx={{ mt: 2 }}>Processing challenge...</Typography>
+                </Paper>
+            )}
+
+            {autoLogin && !autoLoginLoading && (
+                <Paper elevation={2} sx={{ p: 3, m: 2 }}>
+                    <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Login /> Login Request
+                    </Typography>
+
+                    <Divider sx={{ mb: 2 }} />
+
+                    {autoLogin.callbackUrl && (
+                        <Box sx={{ mb: 2 }}>
+                            <Typography variant="body2" color="text.secondary">
+                                Destination
+                            </Typography>
+                            <Typography variant="body1" sx={{ wordBreak: 'break-all' }}>
+                                {autoLogin.callbackUrl}
+                            </Typography>
+                        </Box>
+                    )}
+
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                            Credentials
+                        </Typography>
+                        {autoLogin.requested === 0 ? (
+                            <Typography variant="body1">
+                                Identity verification only (no credentials requested)
+                            </Typography>
+                        ) : (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                {autoLogin.match ? (
+                                    <Chip
+                                        icon={<CheckCircle />}
+                                        label={`${autoLogin.fulfilled} of ${autoLogin.requested} credential(s) matched`}
+                                        color="success"
+                                        size="small"
+                                    />
+                                ) : (
+                                    <Chip
+                                        icon={<Warning />}
+                                        label={`${autoLogin.fulfilled} of ${autoLogin.requested} credential(s) matched`}
+                                        color="warning"
+                                        size="small"
+                                    />
+                                )}
+                            </Box>
+                        )}
+                    </Box>
+
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                            Response
+                        </Typography>
+                        <Typography variant="body2" sx={{ wordBreak: 'break-all', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                            {autoLogin.responseDID}
+                        </Typography>
+                    </Box>
+
+                    <Divider sx={{ mb: 2 }} />
+
+                    {autoLoginSent ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CheckCircle color="success" />
+                            <Typography color="success.main">Response sent</Typography>
+                            <Button
+                                variant="outlined"
+                                onClick={dismissAutoLogin}
+                                sx={{ ml: 'auto' }}
+                            >
+                                Done
+                            </Button>
+                        </Box>
+                    ) : (
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            {autoLogin.callbackUrl && (
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={autoLoginSend}
+                                    disabled={disableSendResponse}
+                                    startIcon={<Login />}
+                                    size="large"
+                                >
+                                    Login
+                                </Button>
+                            )}
+                            <Button
+                                variant="outlined"
+                                onClick={dismissAutoLogin}
+                            >
+                                Cancel
+                            </Button>
+                        </Box>
+                    )}
+                </Paper>
+            )}
+
+            {!autoLogin && !autoLoginLoading && (
+                <>
+                    <Box className="flex-box mt-2">
                 <TextField
                     label="Challenge"
                     variant="outlined"
@@ -337,6 +525,8 @@ function AuthTab() {
                     </Button>
                 </DialogActions>
             </Dialog>
+                </>
+            )}
         </Box>
     );
 }
