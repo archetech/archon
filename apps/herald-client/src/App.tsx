@@ -1122,7 +1122,20 @@ function ViewMember() {
 
     return (
         <div className="App">
-            <Header title={`${name}@${serviceDomain}`} />
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 3 }}>
+                <Avatar
+                    src={`${api.defaults.baseURL}/name/${name}/avatar`}
+                    alt={name}
+                    sx={{ width: 64, height: 64, fontSize: '1.75rem' }}
+                >
+                    {name?.[0]?.toUpperCase()}
+                </Avatar>
+                <Link to="/" style={{ textDecoration: 'none' }}>
+                    <Typography variant="h3" component="h1" sx={{ fontWeight: 700, color: '#1a1a1a' }}>
+                        {name}@{serviceDomain}
+                    </Typography>
+                </Link>
+            </Box>
 
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
                 <Box sx={{
@@ -1135,13 +1148,6 @@ function ViewMember() {
                 }}>
                     {memberData?.didDocument?.id && aliasWalletUrl && (
                         <Box>
-                            <Avatar
-                                src={`${api.defaults.baseURL}/name/${name}/avatar`}
-                                alt={name}
-                                sx={{ width: 96, height: 96, mx: 'auto', mb: 2, fontSize: '2.5rem' }}
-                            >
-                                {name?.[0]?.toUpperCase()}
-                            </Avatar>
                             <a href={aliasWalletUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
                                 <QRCodeSVG value={aliasWalletUrl} />
                             </a>
