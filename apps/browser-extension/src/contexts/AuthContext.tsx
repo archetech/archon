@@ -12,6 +12,8 @@ interface AuthContextValue {
     setDisableSendResponse: (value: boolean) => Promise<void>;
     challenge: string;
     setChallenge: (value: string) => Promise<void>;
+    pendingAutoResponse: boolean;
+    setPendingAutoResponse: (value: boolean) => void;
     refreshAuthStored: (state: Record<string, any>) => Promise<void>;
 }
 
@@ -23,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [challenge, setChallengeState] = useState<string>("");
     const [response, setResponseState] = useState<string>("");
     const [disableSendResponse, setDisableSendResponseState] = useState<boolean>(true);
+    const [pendingAutoResponse, setPendingAutoResponse] = useState<boolean>(false);
     const { storeState } = useVariablesContext();
 
     async function setCallback(value: string) {
@@ -83,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDisableSendResponse,
         challenge,
         setChallenge,
+        pendingAutoResponse,
+        setPendingAutoResponse,
         refreshAuthStored,
     }
 

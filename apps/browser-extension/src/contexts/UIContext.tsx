@@ -111,6 +111,7 @@ export function UIProvider(
         setCallback,
         setChallenge,
         setDisableSendResponse,
+        setPendingAutoResponse,
         refreshAuthStored,
     } = useAuthContext();
     const {
@@ -355,6 +356,7 @@ export function UIProvider(
                 await setResponse("");
                 await setCallback("");
                 await setDisableSendResponse(true);
+                setPendingAutoResponse(true);
             })();
 
             // Prevent challenge repopulating after clear on ID change
