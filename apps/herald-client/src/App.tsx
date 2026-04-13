@@ -7,7 +7,7 @@ import {
     Routes,
     Route,
 } from "react-router-dom";
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
 import { Table, TableBody, TableRow, TableCell } from '@mui/material';
 import axios from 'axios';
 import { format, differenceInDays } from 'date-fns';
@@ -65,7 +65,7 @@ function buildWalletUrl(walletUrl: string, params: Record<string, string>) {
     }
 }
 
-function Header({ title, showTagline = false } : { title: string, showTagline?: boolean }) {
+function Header({ title, showTagline = false }: { title: string, showTagline?: boolean }) {
     return (
         <Box
             sx={{
@@ -568,7 +568,16 @@ function ViewMembers() {
                                 onClick={() => navigate(`/profile/${entry.did}`)}
                             >
                                 <TableCell sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#2c3e50' }}>
-                                    {entry.name}@{serviceDomain}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                        <Avatar
+                                            src={`${api.defaults.baseURL}/name/${entry.name}/avatar`}
+                                            alt={entry.name}
+                                            sx={{ width: 36, height: 36 }}
+                                        >
+                                            {entry.name[0]?.toUpperCase()}
+                                        </Avatar>
+                                        {entry.name}@{serviceDomain}
+                                    </Box>
                                 </TableCell>
                                 <TableCell sx={{ color: '#666', fontFamily: 'monospace', fontSize: '0.85rem' }}>
                                     {entry.did.substring(0, 20)}...{entry.did.substring(entry.did.length - 8)}
@@ -825,7 +834,7 @@ function ViewProfile() {
                                                 onClick={checkName}
                                                 disabled={!newName.trim() || newName === currentName}
                                             >
-                                            Check
+                                                Check
                                             </Button>
                                             <Button
                                                 variant="outlined"
@@ -833,7 +842,7 @@ function ViewProfile() {
                                                 onClick={saveName}
                                                 disabled={newName === currentName}
                                             >
-                                            Save
+                                                Save
                                             </Button>
                                             {currentName && (
                                                 <Button
@@ -841,7 +850,7 @@ function ViewProfile() {
                                                     color="error"
                                                     onClick={deleteName}
                                                 >
-                                                Delete
+                                                    Delete
                                                 </Button>
                                             )}
                                         </Box>
@@ -861,7 +870,7 @@ function ViewProfile() {
                 </Table>
                 <Box sx={{ mt: 3 }}>
                     <Button component={Link} to="/" variant="outlined">
-                    ← Back to Home
+                        ← Back to Home
                     </Button>
                 </Box>
             </Box>
