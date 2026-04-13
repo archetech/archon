@@ -393,185 +393,185 @@ function AuthTab() {
             {!autoLogin && !autoLoginLoading && (
                 <>
                     <Box className="flex-box mt-2">
-                <TextField
-                    label="Challenge"
-                    variant="outlined"
-                    value={challenge}
-                    onChange={(e) => setChallenge(e.target.value.trim())}
-                    size="small"
-                    className="text-field top"
-                    slotProps={{
-                        htmlInput: {
-                            maxLength: 80,
-                        },
-                        input: {
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <Tooltip title="Scan QR" placement="top">
-                                        <span>
-                                            <IconButton
-                                                edge="end"
-                                                onClick={scanChallengeQR}
-                                            >
-                                                <CameraAlt />
-                                            </IconButton>
-                                        </span>
-                                    </Tooltip>
-                                </InputAdornment>
-                            ),
-                        }
-                    }}
-                />
-            </Box>
-
-            <Box className="flex-box">
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={openChallengeDialog}
-                    className="button large bottom"
-                >
-                    New...
-                </Button>
-
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => resolveChallenge(challenge)}
-                    className="button large bottom"
-                    disabled={!challenge || challenge === authDID}
-                >
-                    Resolve
-                </Button>
-
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={createResponse}
-                    className="button large bottom"
-                    disabled={!challenge}
-                >
-                    Respond
-                </Button>
-
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={clearChallenge}
-                    className="button large bottom"
-                    disabled={!challenge}
-                >
-                    Clear
-                </Button>
-            </Box>
-
-            <Box className="flex-box mt-2">
-                <TextField
-                    label="Response"
-                    variant="outlined"
-                    value={response}
-                    onChange={(e) => setResponse(e.target.value.trim())}
-                    size="small"
-                    className="text-field top"
-                />
-            </Box>
-
-            <Box className="flex-box">
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => decryptResponse(response)}
-                    className="button large bottom"
-                    disabled={!response || response === authDID}
-                >
-                    Decrypt
-                </Button>
-
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={verifyResponse}
-                    className="button large bottom"
-                    disabled={!response}
-                >
-                    Verify
-                </Button>
-
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={sendResponse}
-                    className="button large bottom"
-                    disabled={disableSendResponse}
-                >
-                    Send
-                </Button>
-
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={clearResponse}
-                    className="button large bottom"
-                    disabled={!response}
-                >
-                    Clear
-                </Button>
-            </Box>
-
-            <Dialog open={showChallengeDialog} onClose={closeChallengeDialog}>
-                <DialogTitle>New Challenge</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" sx={{ mb: 2 }}>
-                        Add credential requirements. Leave empty for an open challenge.
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
-                        <Select
-                            value={challengeSchemaSelection}
-                            onChange={(e) => setChallengeSchemaSelection(e.target.value)}
-                            displayEmpty
+                        <TextField
+                            label="Challenge"
+                            variant="outlined"
+                            value={challenge}
+                            onChange={(e) => setChallenge(e.target.value.trim())}
                             size="small"
-                            sx={{ minWidth: 180 }}
+                            className="text-field top"
+                            slotProps={{
+                                htmlInput: {
+                                    maxLength: 80,
+                                },
+                                input: {
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <Tooltip title="Scan QR" placement="top">
+                                                <span>
+                                                    <IconButton
+                                                        edge="end"
+                                                        onClick={scanChallengeQR}
+                                                    >
+                                                        <CameraAlt />
+                                                    </IconButton>
+                                                </span>
+                                            </Tooltip>
+                                        </InputAdornment>
+                                    ),
+                                }
+                            }}
+                        />
+                    </Box>
+
+                    <Box className="flex-box">
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={openChallengeDialog}
+                            className="button large bottom"
                         >
-                            <MenuItem value="" disabled>Schema</MenuItem>
-                            {schemaList.map((s: string) => (
-                                <MenuItem key={s} value={s}>{s}</MenuItem>
-                            ))}
-                        </Select>
-                        <Select
-                            value={challengeIssuerSelection}
-                            onChange={(e) => setChallengeIssuerSelection(e.target.value)}
-                            displayEmpty
-                            size="small"
-                            sx={{ minWidth: 180 }}
+                            New...
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => resolveChallenge(challenge)}
+                            className="button large bottom"
+                            disabled={!challenge || challenge === authDID}
                         >
-                            <MenuItem value="">Any issuer</MenuItem>
-                            {agentList.map((s: string) => (
-                                <MenuItem key={s} value={s}>{s}</MenuItem>
-                            ))}
-                        </Select>
-                        <Button variant="contained" size="small" onClick={addChallengeCredential} disabled={!challengeSchemaSelection}>
-                            Add
+                            Resolve
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={createResponse}
+                            className="button large bottom"
+                            disabled={!challenge}
+                        >
+                            Respond
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={clearChallenge}
+                            className="button large bottom"
+                            disabled={!challenge}
+                        >
+                            Clear
                         </Button>
                     </Box>
-                    {challengeCredentials.length > 0 &&
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {challengeCredentials.map((cred, i) => (
-                                <Chip
-                                    key={i}
-                                    label={cred.issuer ? `${cred.schema} (${cred.issuer})` : cred.schema}
-                                    onDelete={() => removeChallengeCredential(i)}
-                                />
-                            ))}
-                        </Box>
-                    }
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={closeChallengeDialog}>Cancel</Button>
-                    <Button variant="contained" onClick={newChallenge}>
-                        Create
-                    </Button>
-                </DialogActions>
-            </Dialog>
+
+                    <Box className="flex-box mt-2">
+                        <TextField
+                            label="Response"
+                            variant="outlined"
+                            value={response}
+                            onChange={(e) => setResponse(e.target.value.trim())}
+                            size="small"
+                            className="text-field top"
+                        />
+                    </Box>
+
+                    <Box className="flex-box">
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => decryptResponse(response)}
+                            className="button large bottom"
+                            disabled={!response || response === authDID}
+                        >
+                            Decrypt
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={verifyResponse}
+                            className="button large bottom"
+                            disabled={!response}
+                        >
+                            Verify
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={sendResponse}
+                            className="button large bottom"
+                            disabled={disableSendResponse}
+                        >
+                            Send
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={clearResponse}
+                            className="button large bottom"
+                            disabled={!response}
+                        >
+                            Clear
+                        </Button>
+                    </Box>
+
+                    <Dialog open={showChallengeDialog} onClose={closeChallengeDialog}>
+                        <DialogTitle>New Challenge</DialogTitle>
+                        <DialogContent>
+                            <Typography variant="body2" sx={{ mb: 2 }}>
+                                Add credential requirements. Leave empty for an open challenge.
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
+                                <Select
+                                    value={challengeSchemaSelection}
+                                    onChange={(e) => setChallengeSchemaSelection(e.target.value)}
+                                    displayEmpty
+                                    size="small"
+                                    sx={{ minWidth: 180 }}
+                                >
+                                    <MenuItem value="" disabled>Schema</MenuItem>
+                                    {schemaList.map((s: string) => (
+                                        <MenuItem key={s} value={s}>{s}</MenuItem>
+                                    ))}
+                                </Select>
+                                <Select
+                                    value={challengeIssuerSelection}
+                                    onChange={(e) => setChallengeIssuerSelection(e.target.value)}
+                                    displayEmpty
+                                    size="small"
+                                    sx={{ minWidth: 180 }}
+                                >
+                                    <MenuItem value="">Any issuer</MenuItem>
+                                    {agentList.map((s: string) => (
+                                        <MenuItem key={s} value={s}>{s}</MenuItem>
+                                    ))}
+                                </Select>
+                                <Button variant="contained" size="small" onClick={addChallengeCredential} disabled={!challengeSchemaSelection}>
+                                    Add
+                                </Button>
+                            </Box>
+                            {challengeCredentials.length > 0 &&
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                    {challengeCredentials.map((cred, i) => (
+                                        <Chip
+                                            key={i}
+                                            label={cred.issuer ? `${cred.schema} (${cred.issuer})` : cred.schema}
+                                            onDelete={() => removeChallengeCredential(i)}
+                                        />
+                                    ))}
+                                </Box>
+                            }
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={closeChallengeDialog}>Cancel</Button>
+                            <Button variant="contained" onClick={newChallenge}>
+                                Create
+                            </Button>
+                        </DialogActions>
+                    </Dialog>
                 </>
             )}
         </Box>
