@@ -98,9 +98,7 @@ function AuthTab() {
             });
 
             setCallback(callbackUrl);
-            if (callbackUrl) {
-                setDisableSendResponse(false);
-            }
+            setDisableSendResponse(!callbackUrl);
         } catch (error: any) {
             setError(error);
         } finally {
@@ -109,10 +107,10 @@ function AuthTab() {
     }
 
     async function autoLoginSend() {
-        if (!autoLogin?.callbackUrl) return;
+        if (!autoLogin?.callbackUrl || !autoLogin.responseDID) return;
         try {
             setDisableSendResponse(true);
-            await axios.post(autoLogin.callbackUrl, { response });
+            await axios.post(autoLogin.callbackUrl, { response: autoLogin.responseDID });
             setAutoLoginSent(true);
             setSuccess("Response sent successfully");
             setCallback("");
