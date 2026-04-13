@@ -1135,6 +1135,13 @@ function ViewMember() {
                 }}>
                     {memberData?.didDocument?.id && aliasWalletUrl && (
                         <Box>
+                            <Avatar
+                                src={`${api.defaults.baseURL}/name/${name}/avatar`}
+                                alt={name}
+                                sx={{ width: 96, height: 96, mx: 'auto', mb: 2, fontSize: '2.5rem' }}
+                            >
+                                {name?.[0]?.toUpperCase()}
+                            </Avatar>
                             <a href={aliasWalletUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
                                 <QRCodeSVG value={aliasWalletUrl} />
                             </a>
