@@ -1325,6 +1325,7 @@ async function pollDmailForEmail(): Promise<void> {
                 senderName,
                 senderDid: mapping.recipientDid,
                 dmailDid,
+                fromEmail: `${senderName}@${SERVICE_DOMAIN}`,
             });
 
             // Mark as read so we don't forward again
