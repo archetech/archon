@@ -70,93 +70,117 @@ Herald needs a background loop that periodically calls `refreshNotices()` to dis
 - Inspect `to` and `cc` for email addresses (vs. DIDs)
 - Queue email delivery for email recipients
 
-### 2. SMTP Send
+### 2. Mailgun Integration (Send + Receive)
 
-Herald sends outbound email. Options:
+**Decision:** Use [Mailgun](https://www.mailgun.com/) for both outbound sending and inbound receiving. The free tier provides 100 emails/day, 1 custom sending domain, and 1 inbound route — sufficient for development and early production. Upgrade to Basic ($15/mo, 10K emails/mo) when volume warrants.
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| **Self-hosted SMTP** (nodemailer + direct send) | No third-party dependency, full control | Deliverability challenges (reputation, IP warming, spam filters) |
-| **Transactional email API** (Postmark, Mailgun, SES) | High deliverability, bounce handling built-in | Third-party dependency, cost, API keys |
-| **Local MTA relay** (Postfix as smarthost) | Familiar ops pattern | More infrastructure to maintain |
+**Why Mailgun over alternatives:**
 
-**Open question:** Which approach? Self-hosted may be fine for low volume initially, with a migration path to a transactional provider.
+- Inbound routing with wildcard pattern matching (`reply+*@domain`) — ideal for the reply-token scheme
+- Both send and receive in one provider — single integration, single set of credentials
+- Developer-focused REST API with official Node.js SDK (`mailgun.js`)
+- Handles deliverability (shared IP pool, SPF/DKIM/DMARC), bounce classification, and spam filtering
+- Free tier is generous enough to prove the feature before committing spend
 
-### 3. Inbound Email Handler
+**Outbound setup:**
 
-Herald needs to receive email replies. Options:
+- Configure `archon.social` (or operator's domain) as a custom sending domain in Mailgun
+- Add DNS records: SPF TXT, DKIM TXT, DMARC TXT (Mailgun provides these)
+- Send via Mailgun REST API (`POST /messages`) from Herald
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| **MX + SMTP server** (`smtp-server` npm) | Self-contained, no third-party | Must handle TLS, spam, connection management |
-| **Inbound webhook** (Mailgun/Postmark inbound routing) | Managed, reliable, spam filtering included | Third-party dependency, webhook security |
-| **IMAP poll** (fetch from a mailbox) | Simple, works with any mail provider | Latency (polling interval), credential management |
+**Inbound setup:**
 
-**Open question:** Same trade-off as outbound. A lightweight `smtp-server` keeps it self-contained.
+- Add MX records pointing to Mailgun's inbound servers (`mxa.mailgun.org`, `mxb.mailgun.org`)
+- Create one inbound route: `match_recipient("reply+*@archon.social")` → `forward("https://archon.social/api/inbound-email")`
+- Herald exposes a webhook endpoint that receives parsed email as JSON (from, to, subject, body-plain, attachments, DKIM/SPF results)
+- Validate Mailgun's webhook signature on every request
 
-### 4. Reply Token Mapping
+**Environment variables:**
 
-When sending outbound email, Herald generates a unique token per conversation and sets `Reply-To: reply+<token>@archon.social`. Herald maintains a lookup:
+```
+MAILGUN_API_KEY=key-xxx
+MAILGUN_DOMAIN=archon.social
+MAILGUN_WEBHOOK_SIGNING_KEY=xxx
+```
+
+### 3. Reply Token Mapping
+
+When sending outbound email, Herald generates a unique token per conversation and sets `Reply-To: reply+<token>@archon.social`. Herald maintains a lookup in its existing data store:
 
 ```
 token → { originalDmailDid, senderDid, emailRecipient, createdAt }
 ```
 
-**Open question:** Storage backend? Herald already uses a JSON/DB store for its name registry. Same store, or separate?
+Tokens should expire after a configurable TTL (default: 30 days). Expired tokens result in a bounce reply to the email sender.
 
-### 5. Email Address Detection
+### 4. Email Address Detection
 
-The dmail `to`/`cc` fields currently contain DIDs. The bridge needs to distinguish:
+The dmail `to`/`cc` fields currently contain DIDs. The bridge needs to distinguish email addresses from DIDs. Use the `mailto:` URI scheme to avoid ambiguity with Herald names (which also use `name@domain` format):
 
 - `did:mdip:...` → deliver as dmail (existing behavior)
-- `user@domain.com` → deliver as email (bridge behavior)
+- `mailto:bob@gmail.com` → deliver as email (bridge behavior)
 
-**Open question:** Should email addresses be allowed directly in the `to`/`cc` arrays, or wrapped in a URI scheme like `mailto:bob@gmail.com`? Using `mailto:` is more explicit and avoids ambiguity with Herald names (which are also `name@domain`).
+Herald strips the `mailto:` prefix when constructing the email `To:` header.
 
-### 6. Sender Identity in Email
+### 5. Sender Identity in Email
 
-The `From:` address for outbound email should use the sender's Herald name:
+The `From:` address uses the sender's Herald name on the bridging Herald instance:
 
 ```
 From: Alice <alice@archon.social>
 ```
 
-**Open question:** What if the sender doesn't have a Herald name on the sending Herald instance? Fall back to a generic address like `dmail-user@archon.social`? Or require a Herald name to use the bridge?
+**Requirement:** The sender must have a registered Herald name on the CC'd Herald instance to use the bridge. This is a reasonable constraint — users already register a name to use Herald, and it provides a meaningful sender identity. Without a name, Herald rejects the bridge request (the dmail is still delivered to DID recipients normally; only the email leg fails).
 
-### 7. Spam / Abuse Prevention
+### 6. Spam / Abuse Prevention
 
-- **Outbound rate limiting:** Cap emails per user per time window to prevent Herald from becoming a spam relay
-- **Inbound filtering:** Basic spam checks on incoming email before creating dmails (SPF/DKIM validation, content heuristics, or delegated to a provider)
-- **Unsolicited inbound:** Should Herald accept email from anyone, or only replies to existing conversations?
+**Outbound:**
 
-**Open question:** For phase 1, limit inbound to replies only (token-gated)? Or allow unsolicited inbound to any registered Herald user?
+- Rate limit outbound emails per sender DID: 20 emails/hour, 100/day (configurable)
+- Herald logs all bridge sends (sender DID, recipient email, timestamp) for audit, without logging message content
 
-## Open Questions Summary
+**Inbound (phase 1):**
 
-| # | Question | Options | Leaning |
-|---|----------|---------|---------|
-| 1 | SMTP send approach | Self-hosted / Transactional API / MTA relay | ? |
-| 2 | Inbound email approach | SMTP server / Webhook / IMAP | ? |
-| 3 | Reply token storage | Same Herald store / Separate DB | ? |
-| 4 | Email address format in dmail | Raw `user@domain` / `mailto:` URI | ? |
-| 5 | Sender identity without Herald name | Generic from-address / Require Herald name | ? |
-| 6 | Unsolicited inbound email | Phase 1 replies only / Allow all | ? |
-| 7 | Multiple Herald instances | Which one bridges? The CC'd one | CC'd one |
+- Accept only token-gated replies (`reply+<token>@archon.social`). Emails to any other address are silently dropped
+- Validate Mailgun's SPF/DKIM results on every inbound webhook before creating a dmail
+- Strip HTML and limit body size (e.g., 64KB) to prevent oversized dmails
+
+**Inbound (phase 2):**
+
+- Accept unsolicited email to `name@archon.social` for registered Herald users
+- Add a second Mailgun route: `match_recipient("*@archon.social")` as a catch-all
+- Apply stricter filtering: require SPF pass, DKIM pass, and basic content heuristics
+
+## Decisions Summary
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Email provider | Mailgun (free tier → Basic as needed) |
+| 2 | Send approach | Mailgun REST API |
+| 3 | Receive approach | Mailgun inbound routing → Herald webhook |
+| 4 | Reply token storage | Herald's existing data store, 30-day TTL |
+| 5 | Email address format in dmail | `mailto:` URI scheme |
+| 6 | Sender identity | Require Herald name; no name = no bridge |
+| 7 | Unsolicited inbound | Phase 1: replies only (token-gated) |
+| 8 | Multiple Herald instances | The CC'd instance acts as courier |
 
 ## Phasing
 
-### Phase 1 — Outbound Only + Reply
+### Phase 1 — Outbound + Reply
 
 - Herald poll loop for notice discovery
-- SMTP send for email recipients
-- Reply token generation
-- Inbound reply handling (token-gated)
-- Email address detection in `to`/`cc`
+- Mailgun outbound send for `mailto:` recipients
+- Reply token generation and storage
+- Inbound reply webhook (`/api/inbound-email`)
+- Email address detection (`mailto:` prefix) in `to`/`cc`
+- Rate limiting and audit logging
+- DNS setup: SPF, DKIM, DMARC, MX records
 
 ### Phase 2 — Unsolicited Inbound
 
 - Accept email to `name@archon.social` from anyone
-- Spam filtering
+- Catch-all Mailgun route
+- Stricter spam filtering (SPF/DKIM required)
 - Bounce/unsubscribe handling
 
 ### Phase 3 — Rich Content

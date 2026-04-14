@@ -20,9 +20,12 @@ import { DbJson } from './db/json.js';
 import { DbRedis } from './db/redis.js';
 import { DbSqlite } from './db/sqlite.js';
 import { createOAuthRoutes } from './oauth/index.js';
+import { EmailBridge } from './email-bridge.js';
+import multer from 'multer';
 
 let keymaster: Keymaster | KeymasterClient;
 let db: DatabaseInterface;
+let emailBridge: EmailBridge | null = null;
 
 dotenv.config();
 
@@ -43,6 +46,9 @@ const DEFAULT_MEMBERSHIP_SCHEMA_DID = 'did:cid:bagaaieravnv5onsflewvrz6urhwfjixf
 const MEMBERSHIP_SCHEMA_DID = process.env.ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID || DEFAULT_MEMBERSHIP_SCHEMA_DID;
 const TOR_PROXY = process.env.ARCHON_HERALD_TOR_PROXY || '';
 const ADMIN_API_KEY = process.env.ARCHON_ADMIN_API_KEY || process.env.ARCHON_HERALD_ADMIN_API_KEY || '';
+const SENDGRID_API_KEY = process.env.ARCHON_HERALD_SENDGRID_API_KEY || '';
+const SENDGRID_FROM_EMAIL = process.env.ARCHON_HERALD_SENDGRID_FROM_EMAIL || `dmail@${SERVICE_DOMAIN}`;
+const SENDGRID_PARSE_DOMAIN = process.env.ARCHON_HERALD_SENDGRID_PARSE_DOMAIN || `parse.${SERVICE_DOMAIN}`;
 const SESSION_SECRET_PLACEHOLDERS = new Set(['change-me', 'change-me-to-a-random-string']);
 
 if (!SESSION_SECRET) {
@@ -453,6 +459,106 @@ app.get('/api/challenge', async (req: Request, res: Response) => {
     } catch (error) {
         console.log(error);
         res.status(500).send(String(error));
+    }
+});
+
+// Email bridge: inbound email webhook (SendGrid Inbound Parse)
+const inboundEmailUpload = multer();
+app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, res: Response) => {
+    try {
+        if (!emailBridge?.isConfigured()) {
+            res.status(404).json({ error: 'Email bridge not configured' });
+            return;
+        }
+
+        const email = emailBridge.parseInboundEmail(req.body);
+        if (!email) {
+            console.warn('Inbound email missing required fields');
+            res.status(400).json({ error: 'Missing from or to fields' });
+            return;
+        }
+
+        const spamScore = parseFloat(email.spam_score || '0');
+        if (spamScore > 5) {
+            console.warn(`Inbound email rejected: spam score ${spamScore} from ${email.from}`);
+            res.status(200).json({ ok: true, action: 'spam-rejected' });
+            return;
+        }
+
+        const token = emailBridge.extractReplyToken(email.to);
+        if (!token) {
+            console.warn(`Inbound email with no reply token from ${email.from} to ${email.to}`);
+            res.status(200).json({ ok: true, action: 'no-token-ignored' });
+            return;
+        }
+
+        const tokenData = emailBridge.lookupToken(token);
+        if (!tokenData) {
+            console.warn(`Inbound email with expired/unknown token from ${email.from}`);
+            res.status(200).json({ ok: true, action: 'token-expired' });
+            return;
+        }
+
+        // Create a dmail from Herald's service DID to the original sender
+        await keymaster.setCurrentId(SERVICE_NAME);
+        const dmailMessage = {
+            to: [tokenData.senderDid],
+            cc: [] as string[],
+            subject: email.subject,
+            body: email.text || '(no text content)',
+            reference: tokenData.originalDmailDid,
+        };
+        const dmailDid = await keymaster.createDmail(dmailMessage, { registry: 'hyperswarm' });
+        const noticeDid = await keymaster.sendDmail(dmailDid);
+
+        console.log(`Inbound email from ${email.from} → dmail ${dmailDid} to ${tokenData.senderDid} (notice: ${noticeDid})`);
+        res.status(200).json({ ok: true, action: 'delivered', dmailDid });
+    } catch (error) {
+        console.error('Error processing inbound email:', error);
+        res.status(200).json({ ok: true, action: 'error' });
+    }
+});
+
+// Email bridge: send email (authenticated)
+app.post('/api/send-email', async (req: Request, res: Response) => {
+    try {
+        if (!emailBridge?.isConfigured()) {
+            res.status(404).json({ error: 'Email bridge not configured' });
+            return;
+        }
+
+        const senderDid = await verifyBearerToken(req);
+        if (!senderDid) {
+            res.status(401).json({ error: 'Authentication required' });
+            return;
+        }
+
+        const user = await db.getUser(senderDid);
+        if (!user?.name) {
+            res.status(403).json({ error: 'Herald name required to send email' });
+            return;
+        }
+
+        const { to, subject, body, dmailDid } = req.body;
+        if (!to || !subject || !body || !dmailDid) {
+            res.status(400).json({ error: 'Missing required fields: to, subject, body, dmailDid' });
+            return;
+        }
+
+        const result = await emailBridge.sendEmail({
+            to,
+            subject,
+            body,
+            senderName: user.name,
+            senderDid,
+            dmailDid,
+        });
+
+        console.log(`Email sent by ${user.name} (${senderDid}) to ${to}`);
+        res.json({ ok: true, token: result.token });
+    } catch (error) {
+        console.error('Error sending email:', error);
+        res.status(500).json({ error: 'Failed to send email' });
     }
 });
 
@@ -1218,6 +1324,22 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
 
     await initServiceIdentity();
     await ensureIpnsKeyExists();
+
+    // Initialize email bridge if SendGrid is configured
+    if (SENDGRID_API_KEY) {
+        emailBridge = new EmailBridge({
+            sendgridApiKey: SENDGRID_API_KEY,
+            domain: SERVICE_DOMAIN,
+            parseDomain: SENDGRID_PARSE_DOMAIN,
+            fromEmail: SENDGRID_FROM_EMAIL,
+            fromName: SERVICE_NAME,
+            dataDir: DATA_DIR,
+        });
+        console.log(`${SERVICE_NAME} email bridge enabled (from: ${SENDGRID_FROM_EMAIL}, parse: ${SENDGRID_PARSE_DOMAIN})`);
+    } else {
+        console.log(`${SERVICE_NAME} email bridge disabled (ARCHON_HERALD_SENDGRID_API_KEY not set)`);
+    }
+
     console.log(`${SERVICE_NAME} using wallet at ${WALLET_URL}`);
     console.log(`${SERVICE_NAME} listening on port ${HOST_PORT}`);
 });
