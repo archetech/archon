@@ -1,19 +1,8 @@
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
 import sgMail from '@sendgrid/mail';
+import { DatabaseInterface, ReplyToken, EmailMapping } from './db/interfaces.js';
 
-interface ReplyToken {
-    originalDmailDid: string;
-    senderDid: string;
-    senderName: string;
-    emailRecipient: string;
-    createdAt: string;
-}
-
-interface ReplyTokenStore {
-    tokens: Record<string, ReplyToken>;
-}
+export type { ReplyToken, EmailMapping };
 
 interface InboundEmail {
     from: string;
@@ -35,59 +24,21 @@ interface EmailBridgeConfig {
     parseDomain: string;
     fromEmail: string;
     fromName: string;
-    dataDir: string;
 }
 
 export class EmailBridge {
     private config: EmailBridgeConfig;
-    private tokenStorePath: string;
-    private tokenStore: ReplyTokenStore = { tokens: {} };
+    private db: DatabaseInterface;
     private tokenTTLMs = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-    constructor(config: EmailBridgeConfig) {
+    constructor(config: EmailBridgeConfig, db: DatabaseInterface) {
         this.config = config;
-        this.tokenStorePath = path.join(config.dataDir, 'reply-tokens.json');
+        this.db = db;
         sgMail.setApiKey(config.sendgridApiKey);
-        this.loadTokens();
-    }
-
-    private loadTokens(): void {
-        try {
-            if (fs.existsSync(this.tokenStorePath)) {
-                const data = fs.readFileSync(this.tokenStorePath, 'utf-8');
-                this.tokenStore = JSON.parse(data);
-            }
-        } catch (err) {
-            console.error('Failed to load reply tokens:', err);
-            this.tokenStore = { tokens: {} };
-        }
-    }
-
-    private saveTokens(): void {
-        try {
-            fs.writeFileSync(this.tokenStorePath, JSON.stringify(this.tokenStore, null, 2));
-        } catch (err) {
-            console.error('Failed to save reply tokens:', err);
-        }
     }
 
     private generateToken(): string {
         return crypto.randomBytes(16).toString('hex');
-    }
-
-    private cleanExpiredTokens(): void {
-        const now = Date.now();
-        let cleaned = 0;
-        for (const [token, data] of Object.entries(this.tokenStore.tokens)) {
-            if (now - new Date(data.createdAt).getTime() > this.tokenTTLMs) {
-                delete this.tokenStore.tokens[token];
-                cleaned++;
-            }
-        }
-        if (cleaned > 0) {
-            this.saveTokens();
-            console.log(`Cleaned ${cleaned} expired reply tokens`);
-        }
     }
 
     async sendEmail(params: {
@@ -100,14 +51,14 @@ export class EmailBridge {
     }): Promise<{ token: string }> {
         const token = this.generateToken();
 
-        this.tokenStore.tokens[token] = {
+        await this.db.setReplyToken(token, {
+            token,
             originalDmailDid: params.dmailDid,
             senderDid: params.senderDid,
             senderName: params.senderName,
             emailRecipient: params.to,
             createdAt: new Date().toISOString(),
-        };
-        this.saveTokens();
+        });
 
         const replyTo = `reply+${token}@${this.config.parseDomain}`;
 
@@ -127,6 +78,10 @@ export class EmailBridge {
 
         await sgMail.send(msg);
         console.log(`Email sent to ${params.to} from ${params.senderName} (token: ${token.slice(0, 8)}...)`);
+
+        // Clean up expired tokens periodically
+        const cleaned = await this.db.deleteExpiredReplyTokens(this.tokenTTLMs);
+        if (cleaned > 0) console.log(`Cleaned ${cleaned} expired reply tokens`);
 
         return { token };
     }
@@ -174,9 +129,34 @@ export class EmailBridge {
         return localPart;
     }
 
-    lookupToken(token: string): ReplyToken | null {
-        this.cleanExpiredTokens();
-        return this.tokenStore.tokens[token] || null;
+    async lookupToken(token: string): Promise<ReplyToken | null> {
+        await this.db.deleteExpiredReplyTokens(this.tokenTTLMs);
+        return this.db.getReplyToken(token);
+    }
+
+    async storeEmailMapping(dmailDid: string, emailAddress: string, recipientDid: string): Promise<void> {
+        await this.db.setEmailMapping(dmailDid, {
+            dmailDid,
+            emailAddress,
+            recipientDid,
+            createdAt: new Date().toISOString(),
+        });
+    }
+
+    async lookupEmailMapping(dmailDid: string): Promise<EmailMapping | null> {
+        return this.db.getEmailMapping(dmailDid);
+    }
+
+    get parseDomain(): string {
+        return this.config.parseDomain;
+    }
+
+    get fromEmail(): string {
+        return this.config.fromEmail;
+    }
+
+    get fromName(): string {
+        return this.config.fromName;
     }
 
     isConfigured(): boolean {

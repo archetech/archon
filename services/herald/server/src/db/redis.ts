@@ -1,5 +1,5 @@
 import { Redis } from 'ioredis';
-import { DatabaseInterface, User } from './interfaces.js';
+import { DatabaseInterface, User, ReplyToken, EmailMapping } from './interfaces.js';
 
 const REDIS_NOT_STARTED_ERROR = 'Redis not started. Call init() first.';
 
@@ -19,6 +19,14 @@ export class DbRedis implements DatabaseInterface {
 
     private get namesKey(): string {
         return `${this.namespace}:names`;
+    }
+
+    private get replyTokensKey(): string {
+        return `${this.namespace}:replyTokens`;
+    }
+
+    private get emailMappingsKey(): string {
+        return `${this.namespace}:emailMappings`;
     }
 
     async init(): Promise<void> {
@@ -104,5 +112,44 @@ export class DbRedis implements DatabaseInterface {
 
         const did = await this.redis.hget(this.namesKey, name.trim().toLowerCase());
         return did || null;
+    }
+
+    async setReplyToken(token: string, data: ReplyToken): Promise<void> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        await this.redis.hset(this.replyTokensKey, token, JSON.stringify(data));
+    }
+
+    async getReplyToken(token: string): Promise<ReplyToken | null> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        const payload = await this.redis.hget(this.replyTokensKey, token);
+        return payload ? JSON.parse(payload) as ReplyToken : null;
+    }
+
+    async deleteExpiredReplyTokens(maxAgeMs: number): Promise<number> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        const all = await this.redis.hgetall(this.replyTokensKey);
+        const now = Date.now();
+        let cleaned = 0;
+        const pipeline = this.redis.pipeline();
+        for (const [token, payload] of Object.entries(all)) {
+            const data = JSON.parse(payload) as ReplyToken;
+            if (now - new Date(data.createdAt).getTime() > maxAgeMs) {
+                pipeline.hdel(this.replyTokensKey, token);
+                cleaned++;
+            }
+        }
+        if (cleaned > 0) await pipeline.exec();
+        return cleaned;
+    }
+
+    async setEmailMapping(dmailDid: string, mapping: EmailMapping): Promise<void> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        await this.redis.hset(this.emailMappingsKey, dmailDid, JSON.stringify(mapping));
+    }
+
+    async getEmailMapping(dmailDid: string): Promise<EmailMapping | null> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        const payload = await this.redis.hget(this.emailMappingsKey, dmailDid);
+        return payload ? JSON.parse(payload) as EmailMapping : null;
     }
 }

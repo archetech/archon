@@ -487,7 +487,7 @@ app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, r
 
         const token = emailBridge.extractReplyToken(email.to);
         if (token) {
-            const tokenData = emailBridge.lookupToken(token);
+            const tokenData = await emailBridge.lookupToken(token);
             if (!tokenData) {
                 console.warn(`Inbound email with expired/unknown token from ${email.from}`);
                 res.status(200).json({ ok: true, action: 'token-expired' });
@@ -507,6 +507,7 @@ app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, r
             const dmailDid = await keymaster.createDmail(dmailMessage, { registry: 'hyperswarm' });
             const noticeDid = await keymaster.sendDmail(dmailDid);
 
+            await emailBridge.storeEmailMapping(dmailDid, replyFromEmail, tokenData.senderDid);
             console.log(`Inbound email from ${email.from} → dmail ${dmailDid} to ${tokenData.senderDid} (notice: ${noticeDid})`);
             res.status(200).json({ ok: true, action: 'delivered', dmailDid });
             return;
@@ -539,6 +540,7 @@ app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, r
         const dmailDid = await keymaster.createDmail(dmailMessage, { registry: 'hyperswarm' });
         const noticeDid = await keymaster.sendDmail(dmailDid);
 
+        await emailBridge.storeEmailMapping(dmailDid, senderEmail, recipientDid);
         console.log(`Inbound email from ${email.from} → dmail ${dmailDid} to ${recipientName} (${recipientDid}) (notice: ${noticeDid})`);
         res.status(200).json({ ok: true, action: 'delivered', dmailDid });
     } catch (error) {
@@ -1289,6 +1291,52 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled rejection at:', promise, 'reason:', reason);
 });
 
+const DMAIL_POLL_INTERVAL_MS = 60_000; // 1 minute
+
+async function pollDmailForEmail(): Promise<void> {
+    if (!emailBridge?.isConfigured()) return;
+
+    try {
+        await keymaster.setCurrentId(SERVICE_NAME);
+        await keymaster.refreshNotices();
+
+        const dmails = await keymaster.listDmail();
+        for (const [dmailDid, item] of Object.entries(dmails)) {
+            if (!item.tags.includes('unread')) continue;
+            if (!item.message.reference) continue;
+
+            const mapping = await emailBridge.lookupEmailMapping(item.message.reference);
+            if (!mapping) continue;
+
+            // This dmail is a reply to an email-bridged message — forward it
+            const senderName = typeof item.sender === 'string' ? item.sender : 'Unknown';
+            await emailBridge.sendEmail({
+                to: mapping.emailAddress,
+                subject: item.message.subject,
+                body: item.message.body,
+                senderName,
+                senderDid: mapping.recipientDid,
+                dmailDid,
+            });
+
+            // Mark as read so we don't forward again
+            await keymaster.fileDmail(dmailDid, ['inbox']);
+            console.log(`Forwarded dmail ${dmailDid} from ${senderName} to ${mapping.emailAddress}`);
+        }
+    } catch (error) {
+        console.error('Dmail poll error:', error);
+    }
+}
+
+function startDmailPollLoop(): void {
+    console.log(`${SERVICE_NAME} dmail poll loop started (interval: ${DMAIL_POLL_INTERVAL_MS / 1000}s)`);
+    // Initial poll after a short delay to let startup finish
+    setTimeout(() => {
+        pollDmailForEmail();
+        setInterval(pollDmailForEmail, DMAIL_POLL_INTERVAL_MS);
+    }, 5000);
+}
+
 app.listen(HOST_PORT, '0.0.0.0', async () => {
     if (HERALD_DATABASE_TYPE === 'sqlite') {
         db = new DbSqlite(path.join(DATA_DIR, 'db.sqlite'));
@@ -1361,9 +1409,9 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             parseDomain: SENDGRID_PARSE_DOMAIN,
             fromEmail: SENDGRID_FROM_EMAIL,
             fromName: SERVICE_NAME,
-            dataDir: DATA_DIR,
-        });
+        }, db);
         console.log(`${SERVICE_NAME} email bridge enabled (from: ${SENDGRID_FROM_EMAIL}, parse: ${SENDGRID_PARSE_DOMAIN})`);
+        startDmailPollLoop();
     } else {
         console.log(`${SERVICE_NAME} email bridge disabled (ARCHON_HERALD_SENDGRID_API_KEY not set)`);
     }

@@ -8,8 +8,26 @@ export interface User {
     [key: string]: any;
 }
 
+export interface ReplyToken {
+    token: string;
+    originalDmailDid: string;
+    senderDid: string;
+    senderName: string;
+    emailRecipient: string;
+    createdAt: string;
+}
+
+export interface EmailMapping {
+    dmailDid: string;
+    emailAddress: string;
+    recipientDid: string;
+    createdAt: string;
+}
+
 export interface DatabaseStructure {
     users?: Record<string, User>;
+    replyTokens?: Record<string, ReplyToken>;
+    emailMappings?: Record<string, EmailMapping>;
 }
 
 export interface DatabaseInterface {
@@ -20,4 +38,11 @@ export interface DatabaseInterface {
     deleteUser(did: string): Promise<boolean>;
     listUsers(): Promise<Record<string, User>>;
     findDidByName(name: string): Promise<string | null>;
+
+    // Email bridge
+    setReplyToken(token: string, data: ReplyToken): Promise<void>;
+    getReplyToken(token: string): Promise<ReplyToken | null>;
+    deleteExpiredReplyTokens(maxAgeMs: number): Promise<number>;
+    setEmailMapping(dmailDid: string, mapping: EmailMapping): Promise<void>;
+    getEmailMapping(dmailDid: string): Promise<EmailMapping | null>;
 }
