@@ -104,6 +104,14 @@ async function initServiceIdentity(): Promise<void> {
 
     await keymaster.setCurrentId(SERVICE_NAME);
 
+    // Publish the service name as a DID property so it's discoverable
+    const docs = await keymaster.resolveDID(SERVICE_NAME);
+    const currentName = (docs.didDocumentData as any)?.name;
+    if (currentName !== SERVICE_NAME) {
+        await keymaster.mergeData(SERVICE_NAME, { name: SERVICE_NAME });
+        console.log(`Published name property: ${SERVICE_NAME}`);
+    }
+
     if (!OWNER_DID) {
         console.warn('Warning: ARCHON_HERALD_OWNER_DID not set — no user will have owner access');
     } else {
