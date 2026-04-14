@@ -156,6 +156,18 @@ export class EmailBridge {
         return match ? match[1] : null;
     }
 
+    extractRecipientName(toAddress: string): string | null {
+        // Extract local part from "Name <user@domain>" or "user@domain"
+        const emailMatch = toAddress.match(/<?\s*([^@<\s]+)@/);
+        if (!emailMatch) return null;
+        const localPart = emailMatch[1].toLowerCase();
+        // Ignore reply+ addresses and common system addresses
+        if (localPart.startsWith('reply+') || ['postmaster', 'abuse', 'noreply', 'mailer-daemon'].includes(localPart)) {
+            return null;
+        }
+        return localPart;
+    }
+
     lookupToken(token: string): ReplyToken | null {
         this.cleanExpiredTokens();
         return this.tokenStore.tokens[token] || null;

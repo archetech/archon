@@ -486,32 +486,58 @@ app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, r
         }
 
         const token = emailBridge.extractReplyToken(email.to);
-        if (!token) {
-            console.warn(`Inbound email with no reply token from ${email.from} to ${email.to}`);
-            res.status(200).json({ ok: true, action: 'no-token-ignored' });
+        if (token) {
+            const tokenData = emailBridge.lookupToken(token);
+            if (!tokenData) {
+                console.warn(`Inbound email with expired/unknown token from ${email.from}`);
+                res.status(200).json({ ok: true, action: 'token-expired' });
+                return;
+            }
+
+            // Reply to an outbound email: create dmail to original sender
+            await keymaster.setCurrentId(SERVICE_NAME);
+            const dmailMessage = {
+                to: [tokenData.senderDid],
+                cc: [] as string[],
+                subject: email.subject,
+                body: email.text || '(no text content)',
+                reference: tokenData.originalDmailDid,
+            };
+            const dmailDid = await keymaster.createDmail(dmailMessage, { registry: 'hyperswarm' });
+            const noticeDid = await keymaster.sendDmail(dmailDid);
+
+            console.log(`Inbound email from ${email.from} → dmail ${dmailDid} to ${tokenData.senderDid} (notice: ${noticeDid})`);
+            res.status(200).json({ ok: true, action: 'delivered', dmailDid });
             return;
         }
 
-        const tokenData = emailBridge.lookupToken(token);
-        if (!tokenData) {
-            console.warn(`Inbound email with expired/unknown token from ${email.from}`);
-            res.status(200).json({ ok: true, action: 'token-expired' });
+        // No reply token — try to resolve recipient as a Herald name
+        const recipientName = emailBridge.extractRecipientName(email.to);
+        if (!recipientName) {
+            console.warn(`Inbound email with no recognizable recipient from ${email.from} to ${email.to}`);
+            res.status(200).json({ ok: true, action: 'no-recipient-ignored' });
             return;
         }
 
-        // Create a dmail from Herald's service DID to the original sender
+        const recipientDid = await db.findDidByName(recipientName);
+        if (!recipientDid) {
+            console.warn(`Inbound email to unknown Herald name "${recipientName}" from ${email.from}`);
+            res.status(200).json({ ok: true, action: 'unknown-name-ignored' });
+            return;
+        }
+
+        // Unsolicited inbound: create dmail from Herald to the named recipient
         await keymaster.setCurrentId(SERVICE_NAME);
         const dmailMessage = {
-            to: [tokenData.senderDid],
+            to: [recipientDid],
             cc: [] as string[],
             subject: email.subject,
             body: email.text || '(no text content)',
-            reference: tokenData.originalDmailDid,
         };
         const dmailDid = await keymaster.createDmail(dmailMessage, { registry: 'hyperswarm' });
         const noticeDid = await keymaster.sendDmail(dmailDid);
 
-        console.log(`Inbound email from ${email.from} → dmail ${dmailDid} to ${tokenData.senderDid} (notice: ${noticeDid})`);
+        console.log(`Inbound email from ${email.from} → dmail ${dmailDid} to ${recipientName} (${recipientDid}) (notice: ${noticeDid})`);
         res.status(200).json({ ok: true, action: 'delivered', dmailDid });
     } catch (error) {
         console.error('Error processing inbound email:', error);
