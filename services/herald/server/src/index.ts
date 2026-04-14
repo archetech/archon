@@ -1046,7 +1046,7 @@ app.get('/api/credential', isAuthenticated, async (req: Request, res: Response) 
         }
 
         if (!user.credentialDid) {
-            res.json({ 
+            res.json({
                 hasCredential: false,
                 name: user.name || null,
                 message: 'No credential issued yet'
@@ -1316,7 +1316,7 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             cipher,
             passphrase,
         });
-        
+
         // Load existing wallet (decrypt and restore IDs/aliases)
         await keymaster.loadWallet();
         console.log(`${SERVICE_NAME} using gatekeeper at ${GATEKEEPER_URL}`);
