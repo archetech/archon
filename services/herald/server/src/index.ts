@@ -1319,10 +1319,23 @@ async function pollDmailForEmail(): Promise<void> {
             // This dmail is a reply to an email-bridged message — forward it
             const rawSender = typeof item.sender === 'string' ? item.sender : 'Unknown';
             const isDid = rawSender.startsWith('did:');
-            const senderName = isDid ? 'dmail-user' : rawSender;
-            const fromEmail = isDid
-                ? emailBridge.fromEmail
-                : `${senderName}@${SERVICE_DOMAIN}`;
+            let senderName: string;
+            let fromEmail: string;
+
+            if (isDid) {
+                // Try to resolve DID to a Herald name via our DB
+                const senderUser = await db.getUser(rawSender);
+                if (senderUser?.name) {
+                    senderName = senderUser.name;
+                    fromEmail = `${senderName}@${SERVICE_DOMAIN}`;
+                } else {
+                    senderName = 'dmail-user';
+                    fromEmail = emailBridge.fromEmail;
+                }
+            } else {
+                senderName = rawSender;
+                fromEmail = `${senderName}@${SERVICE_DOMAIN}`;
+            }
             await emailBridge.sendEmail({
                 to: mapping.emailAddress,
                 subject: item.message.subject,
