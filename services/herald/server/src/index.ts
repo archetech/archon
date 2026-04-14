@@ -1317,7 +1317,12 @@ async function pollDmailForEmail(): Promise<void> {
             if (!mapping) continue;
 
             // This dmail is a reply to an email-bridged message — forward it
-            const senderName = typeof item.sender === 'string' ? item.sender : 'Unknown';
+            const rawSender = typeof item.sender === 'string' ? item.sender : 'Unknown';
+            const isDid = rawSender.startsWith('did:');
+            const senderName = isDid ? 'dmail-user' : rawSender;
+            const fromEmail = isDid
+                ? emailBridge.fromEmail
+                : `${senderName}@${SERVICE_DOMAIN}`;
             await emailBridge.sendEmail({
                 to: mapping.emailAddress,
                 subject: item.message.subject,
@@ -1325,7 +1330,7 @@ async function pollDmailForEmail(): Promise<void> {
                 senderName,
                 senderDid: mapping.recipientDid,
                 dmailDid,
-                fromEmail: `${senderName}@${SERVICE_DOMAIN}`,
+                fromEmail,
             });
 
             // Mark as read so we don't forward again
