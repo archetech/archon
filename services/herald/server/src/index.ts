@@ -495,11 +495,12 @@ app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, r
             }
 
             // Reply to an outbound email: create dmail to original sender
+            const replyFromEmail = emailBridge.extractEmailAddress(email.from) || email.from;
             await keymaster.setCurrentId(SERVICE_NAME);
             const dmailMessage = {
                 to: [tokenData.senderDid],
                 cc: [] as string[],
-                subject: email.subject,
+                subject: `[email from ${replyFromEmail}] ${email.subject}`,
                 body: email.text || '(no text content)',
                 reference: tokenData.originalDmailDid,
             };
@@ -527,11 +528,12 @@ app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, r
         }
 
         // Unsolicited inbound: create dmail from Herald to the named recipient
+        const senderEmail = emailBridge.extractEmailAddress(email.from) || email.from;
         await keymaster.setCurrentId(SERVICE_NAME);
         const dmailMessage = {
             to: [recipientDid],
             cc: [] as string[],
-            subject: email.subject,
+            subject: `[email from ${senderEmail}] ${email.subject}`,
             body: email.text || '(no text content)',
         };
         const dmailDid = await keymaster.createDmail(dmailMessage, { registry: 'hyperswarm' });

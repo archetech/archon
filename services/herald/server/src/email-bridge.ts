@@ -156,6 +156,12 @@ export class EmailBridge {
         return match ? match[1] : null;
     }
 
+    extractEmailAddress(headerValue: string): string | null {
+        // Extract bare email from "Name <user@domain>" or "user@domain"
+        const match = headerValue.match(/<\s*([^>\s]+@[^>\s]+)\s*>/) || headerValue.match(/([^\s<]+@[^\s>,]+)/);
+        return match ? match[1].toLowerCase() : null;
+    }
+
     extractRecipientName(toAddress: string): string | null {
         // Extract local part from "Name <user@domain>" or "user@domain"
         const emailMatch = toAddress.match(/<?\s*([^@<\s]+)@/);
