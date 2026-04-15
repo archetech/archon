@@ -1352,7 +1352,7 @@ async function pollDmailForEmail(): Promise<void> {
             }
 
             // Path 2: Compose new email via "[email to addr] subject" convention
-            if (serviceDID && item.message.to.includes(serviceDID)) {
+            if (serviceDID && (item.message.to.includes(serviceDID) || item.message.cc.includes(serviceDID))) {
                 const emailToMatch = item.message.subject.match(/^\[email to ([^\]]+)\]\s*(.*)/i);
                 if (emailToMatch) {
                     const toEmail = emailToMatch[1].trim();
