@@ -482,12 +482,10 @@ app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, r
         }
 
         // Verify webhook authenticity via query parameter token
-        if (WEBHOOK_SECRET) {
-            if (req.query.secret !== WEBHOOK_SECRET) {
-                console.warn('Inbound email webhook rejected: invalid or missing secret');
-                res.status(401).json({ error: 'Unauthorized' });
-                return;
-            }
+        if (WEBHOOK_SECRET && req.query.secret !== WEBHOOK_SECRET) {
+            console.warn('Inbound email webhook rejected: invalid or missing secret');
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
         }
 
         const email = emailBridge.parseInboundEmail(req.body);
