@@ -24,55 +24,11 @@ updates:
     directories:
       - "/"
       - "/demo/commonjs-demo"
-    schedule:
-      interval: "monthly"
-      day: "monday"
-      time: "05:00"
-      timezone: "America/Toronto"
-    open-pull-requests-limit: 1
-    labels:
-      - "dependencies"
-      - "javascript"
-    commit-message:
-      prefix: "deps"
-    groups:
-      shared-minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-        group-by: "dependency-name"
-
-  - package-ecosystem: "npm"
-    directories:
       - "/apps/browser-extension"
       - "/apps/gatekeeper-client"
       - "/apps/herald-client"
       - "/apps/keymaster-client"
       - "/apps/react-wallet"
-    schedule:
-      interval: "monthly"
-      day: "monday"
-      time: "05:00"
-      timezone: "America/Toronto"
-    open-pull-requests-limit: 1
-    labels:
-      - "dependencies"
-      - "javascript"
-    commit-message:
-      prefix: "deps"
-    groups:
-      frontend-minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-        group-by: "dependency-name"
-
-  - package-ecosystem: "npm"
-    directories:
       - "/services/drawbridge/server"
       - "/services/explorer"
       - "/services/gatekeeper/server"
@@ -94,10 +50,9 @@ updates:
     commit-message:
       prefix: "deps"
     groups:
-      backend-minor-and-patch:
+      npm_and_yarn:
         patterns:
           - "*"
         update-types:
           - "minor"
           - "patch"
-        group-by: "dependency-name"
