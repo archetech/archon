@@ -87,13 +87,19 @@ Tokens expire after 30 days (configurable).
 
 ### Webhook Security
 
-The inbound email endpoint supports basic auth via `ARCHON_HERALD_WEBHOOK_SECRET`. When set, the operator configures the SendGrid Inbound Parse URL with the secret embedded:
+The inbound email endpoint supports basic auth via `ARCHON_HERALD_WEBHOOK_SECRET`. To enable it:
+
+1. Generate a random secret (e.g., `openssl rand -hex 32`)
+2. Set `ARCHON_HERALD_WEBHOOK_SECRET=<your-secret>` in Herald's environment
+3. In the SendGrid Inbound Parse settings, set the destination URL to:
 
 ```
-https://user:SECRET@host/names/api/inbound-email
+https://user:<your-secret>@herald.example.com/names/api/inbound-email
 ```
 
-Requests without valid credentials are rejected with 401.
+Replace `<your-secret>` with the same value in both places. The `user` part can be any string (it is ignored). SendGrid will include the credentials as a `Basic` auth header on every POST, and Herald will verify them.
+
+Requests without valid credentials are rejected with 401. If `ARCHON_HERALD_WEBHOOK_SECRET` is not set, auth is not enforced (development only).
 
 ### Subject Conventions
 
@@ -118,7 +124,7 @@ The sender's Herald name is resolved from their DID via the Herald user database
 ARCHON_HERALD_SENDGRID_API_KEY=SG.xxx          # SendGrid API key (omit to disable bridge)
 ARCHON_HERALD_SENDGRID_FROM_EMAIL=dmail@domain  # default from address
 ARCHON_HERALD_SENDGRID_PARSE_DOMAIN=parse.domain # inbound parse subdomain
-ARCHON_HERALD_WEBHOOK_SECRET=xxx                # basic auth secret for inbound webhook
+ARCHON_HERALD_WEBHOOK_SECRET=<your-secret>      # basic auth secret for inbound webhook (same value goes in the SendGrid Parse URL)
 ARCHON_HERALD_DOMAIN=domain                     # Herald's domain (used for from addresses)
 ```
 
