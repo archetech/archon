@@ -481,14 +481,10 @@ app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, r
             return;
         }
 
-        // Verify webhook authenticity via basic auth (password = WEBHOOK_SECRET)
+        // Verify webhook authenticity via query parameter token
         if (WEBHOOK_SECRET) {
-            const authHeader = req.headers.authorization || '';
-            const match = authHeader.match(/^Basic\s+(.+)$/i);
-            const credentials = match ? Buffer.from(match[1], 'base64').toString() : '';
-            const password = credentials.split(':').slice(1).join(':');
-            if (password !== WEBHOOK_SECRET) {
-                console.warn('Inbound email webhook rejected: invalid credentials');
+            if (req.query.secret !== WEBHOOK_SECRET) {
+                console.warn('Inbound email webhook rejected: invalid or missing secret');
                 res.status(401).json({ error: 'Unauthorized' });
                 return;
             }
