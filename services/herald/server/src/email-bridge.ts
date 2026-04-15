@@ -1,6 +1,6 @@
 import crypto from 'crypto';
-import sgMail from '@sendgrid/mail';
 import { DatabaseInterface, ReplyToken, EmailMapping } from './db/interfaces.js';
+import { EmailServiceInterface } from './email/interfaces.js';
 
 export type { ReplyToken, EmailMapping };
 
@@ -19,7 +19,6 @@ interface InboundEmail {
 }
 
 interface EmailBridgeConfig {
-    sendgridApiKey: string;
     domain: string;
     parseDomain: string;
     fromEmail: string;
@@ -29,12 +28,13 @@ interface EmailBridgeConfig {
 export class EmailBridge {
     private config: EmailBridgeConfig;
     private db: DatabaseInterface;
+    private emailService: EmailServiceInterface;
     private tokenTTLMs = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-    constructor(config: EmailBridgeConfig, db: DatabaseInterface) {
+    constructor(config: EmailBridgeConfig, db: DatabaseInterface, emailService: EmailServiceInterface) {
         this.config = config;
         this.db = db;
-        sgMail.setApiKey(config.sendgridApiKey);
+        this.emailService = emailService;
     }
 
     private generateToken(): string {
@@ -63,7 +63,7 @@ export class EmailBridge {
 
         const replyTo = `reply+${token}@${this.config.parseDomain}`;
 
-        const msg = {
+        await this.emailService.sendMail({
             to: params.to,
             from: {
                 email: params.fromEmail || this.config.fromEmail,
@@ -75,9 +75,7 @@ export class EmailBridge {
             },
             subject: params.subject,
             text: params.body,
-        };
-
-        await sgMail.send(msg);
+        });
         console.log(`Email sent to ${params.to} from ${params.senderName} (token: ${token.slice(0, 8)}...)`);
 
         // Clean up expired tokens periodically
@@ -161,6 +159,6 @@ export class EmailBridge {
     }
 
     isConfigured(): boolean {
-        return !!this.config.sendgridApiKey;
+        return this.emailService.isConfigured();
     }
 }

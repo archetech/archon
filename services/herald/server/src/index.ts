@@ -21,6 +21,7 @@ import { DbRedis } from './db/redis.js';
 import { DbSqlite } from './db/sqlite.js';
 import { createOAuthRoutes } from './oauth/index.js';
 import { EmailBridge } from './email-bridge.js';
+import { SendGridEmailService } from './email/sendgrid.js';
 import multer from 'multer';
 
 let keymaster: Keymaster | KeymasterClient;
@@ -1453,13 +1454,13 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
 
     // Initialize email bridge if SendGrid is configured
     if (SENDGRID_API_KEY) {
+        const emailService = new SendGridEmailService(SENDGRID_API_KEY);
         emailBridge = new EmailBridge({
-            sendgridApiKey: SENDGRID_API_KEY,
             domain: SERVICE_DOMAIN,
             parseDomain: SENDGRID_PARSE_DOMAIN,
             fromEmail: SENDGRID_FROM_EMAIL,
             fromName: SERVICE_NAME,
-        }, db);
+        }, db, emailService);
         console.log(`${SERVICE_NAME} email bridge enabled (from: ${SENDGRID_FROM_EMAIL}, parse: ${SENDGRID_PARSE_DOMAIN})`);
         startDmailPollLoop();
     } else {
