@@ -48,6 +48,7 @@ export class EmailBridge {
         senderName: string;
         senderDid: string;
         dmailDid: string;
+        fromEmail?: string;
     }): Promise<{ token: string }> {
         const token = this.generateToken();
 
@@ -65,7 +66,7 @@ export class EmailBridge {
         await this.emailService.sendMail({
             to: params.to,
             from: {
-                email: this.config.fromEmail,
+                email: params.fromEmail || this.config.fromEmail,
                 name: `${params.senderName} via ${this.config.fromName}`,
             },
             replyTo: {
