@@ -1311,19 +1311,14 @@ async function pollDmailForEmail(): Promise<void> {
         const dmails = await keymaster.listDmail();
         for (const [dmailDid, item] of Object.entries(dmails)) {
             if (!item.tags.includes('unread')) continue;
-            if (!item.message.reference) continue;
 
-            const mapping = await emailBridge.lookupEmailMapping(item.message.reference);
-            if (!mapping) continue;
-
-            // This dmail is a reply to an email-bridged message — forward it
+            // Resolve sender info (shared by both paths)
             const rawSender = typeof item.sender === 'string' ? item.sender : 'Unknown';
             const isDid = rawSender.startsWith('did:');
             let senderName: string;
             let fromEmail: string;
 
             if (isDid) {
-                // Try to resolve DID to a Herald name via our DB
                 const senderUser = await db.getUser(rawSender);
                 if (senderUser?.name) {
                     senderName = senderUser.name;
@@ -1336,19 +1331,47 @@ async function pollDmailForEmail(): Promise<void> {
                 senderName = rawSender;
                 fromEmail = `${senderName}@${SERVICE_DOMAIN}`;
             }
-            await emailBridge.sendEmail({
-                to: mapping.emailAddress,
-                subject: item.message.subject,
-                body: item.message.body,
-                senderName,
-                senderDid: mapping.recipientDid,
-                dmailDid,
-                fromEmail,
-            });
 
-            // Mark as read so we don't forward again
-            await keymaster.fileDmail(dmailDid, ['inbox']);
-            console.log(`Forwarded dmail ${dmailDid} from ${senderName} to ${mapping.emailAddress}`);
+            // Path 1: Reply to a bridged email (has reference matching a stored mapping)
+            if (item.message.reference) {
+                const mapping = await emailBridge.lookupEmailMapping(item.message.reference);
+                if (mapping) {
+                    await emailBridge.sendEmail({
+                        to: mapping.emailAddress,
+                        subject: item.message.subject,
+                        body: item.message.body,
+                        senderName,
+                        senderDid: mapping.recipientDid,
+                        dmailDid,
+                        fromEmail,
+                    });
+                    await keymaster.fileDmail(dmailDid, ['inbox']);
+                    console.log(`Forwarded reply dmail ${dmailDid} from ${senderName} to ${mapping.emailAddress}`);
+                    continue;
+                }
+            }
+
+            // Path 2: Compose new email via "[email to addr] subject" convention
+            if (item.message.to.includes(SERVICE_NAME)) {
+                const emailToMatch = item.message.subject.match(/^\[email to ([^\]]+)\]\s*(.*)/i);
+                if (emailToMatch) {
+                    const toEmail = emailToMatch[1].trim();
+                    const realSubject = emailToMatch[2] || '(no subject)';
+
+                    await emailBridge.sendEmail({
+                        to: toEmail,
+                        subject: realSubject,
+                        body: item.message.body,
+                        senderName,
+                        senderDid: rawSender,
+                        dmailDid,
+                        fromEmail,
+                    });
+                    await keymaster.fileDmail(dmailDid, ['inbox']);
+                    console.log(`Composed email from ${senderName} to ${toEmail}: ${realSubject}`);
+                    continue;
+                }
+            }
         }
     } catch (error) {
         console.error('Dmail poll error:', error);
