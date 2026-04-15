@@ -8,183 +8,143 @@ Enable dmail users to send messages to email recipients and receive email replie
 
 ## Core Concept: Herald as Trusted Courier
 
-Users already trust their Herald instance with their name, identity credentials, and Lightning address resolution. The bridge extends this trust to message routing. The user CC's the Herald agent DID on any dmail that contains email recipients. Herald, now a vault member with decryption access, extracts the message and delivers it as email.
+Users already trust their Herald instance with their name, identity credentials, and Lightning address resolution. The bridge extends this trust to message routing. Herald discovers dmails addressed to it, extracts the message, and delivers it as email.
 
 ### Why Herald
 
-- Already owns the domain and DNS (e.g., `archon.social`)
+- Already owns the domain and DNS (e.g., `4tress.org`)
 - Already has a service DID with a persistent keypair
 - Already has a trust relationship with users (challenge-response auth, credential issuance)
 - Already resolves user identities (`name@domain` → DID)
 - No new service to deploy or trust
 
-### Opt-in Per Message
-
-Adding Herald to CC is a deliberate act. Only messages explicitly routed through Herald are decryptable by Herald. Pure dmail-to-dmail stays end-to-end encrypted.
-
 ## How It Works
 
-### Outbound: Dmail → Email
+### Outbound: Compose Email from Dmail
 
-1. User composes a dmail with one or more email addresses in `to` (e.g., `bob@gmail.com`)
-2. User adds the Herald agent DID to `cc`
-3. `createDmail()` adds both `to` and `cc` as vault members — Herald gets a decryption key
-4. `sendDmail()` creates a notice; Herald discovers it via `refreshNotices()`
-5. Herald decrypts the dmail, identifies email recipients, renders the body as plaintext
-6. Herald sends the email from `username@archon.social` with a reply-to of `reply+<token>@archon.social`
+1. User composes a dmail addressed to the Herald agent (in `to` or `cc`) with subject `[email to bob@gmail.com] Hello Bob`
+2. Herald discovers it via `refreshNotices()` in the poll loop
+3. Herald parses the email address and real subject from the `[email to ...]` prefix
+4. Herald sends the email from `username@domain` with a reply-to of `reply+<token>@parse.domain`
+5. The reply token is stored so future replies can be threaded back
 
-### Inbound: Email Reply → Dmail
+### Outbound: Reply Forwarding (Dmail → Email)
 
-1. Email recipient replies to `reply+<token>@archon.social`
-2. Herald's inbound mail handler receives the reply
+1. An inbound email created a dmail with a stored email mapping (keyed by dmail DID)
+2. User replies to that dmail (setting `reference` to the original dmail DID)
+3. Herald's poll loop discovers the reply, matches the `reference` against stored mappings
+4. Herald forwards the reply as email to the original email sender
+
+### Inbound: Email Reply → Dmail (Token-Gated)
+
+1. Email recipient replies to `reply+<token>@parse.domain`
+2. Herald's webhook receives the reply via SendGrid Inbound Parse
 3. Herald looks up the token to find the original dmail DID and sender DID
-4. Herald creates a new dmail (as the Herald agent DID) addressed to the original sender, with `reference` set to the original dmail DID for threading
-5. Herald sends the dmail via `sendDmail()`; original sender discovers it via `refreshNotices()`
+4. Herald creates a new dmail addressed to the original sender, with `reference` set for threading
+5. Subject is prefixed with `[email from sender@example.com]` for identification
 
 ### Inbound: Unsolicited Email → Dmail
 
-1. External sender emails `alice@archon.social`
-2. Herald resolves `alice` to a DID via its name registry
-3. Herald creates a dmail addressed to Alice's DID
-4. Alice discovers it via `refreshNotices()`
+1. External sender emails `alice@domain`
+2. Herald resolves `alice` to a DID via its user database
+3. Herald creates a dmail addressed to Alice's DID with subject `[email from sender@example.com] Original subject`
+4. An email mapping is stored so Alice's reply can be forwarded back
 
-## What Exists Today
+## Architecture
 
-| Component | Status |
-|-----------|--------|
-| Herald service DID | ✅ Created on startup, persists in wallet |
-| CC grants vault membership + decryption | ✅ `addVaultMember()` called for CC recipients |
-| Notice discovery (`refreshNotices()`) | ✅ Works for any DID |
-| `DmailMessage.reference` for threading | ✅ Exists |
-| Herald name → DID resolution | ✅ Via `.well-known/names` |
-| `encryptForSender` (sender retains access) | ✅ Exists |
-| DNS / domain ownership | ✅ Herald already owns the domain |
+### Email Service Abstraction
 
-## What Needs to Be Built
+The email sending layer is abstracted behind `EmailServiceInterface`:
 
-### 1. Dmail Poll Loop in Herald
-
-Herald needs a background loop that periodically calls `refreshNotices()` to discover dmails where it's a CC'd vault member. On discovery:
-
-- Decrypt the dmail
-- Inspect `to` and `cc` for email addresses (vs. DIDs)
-- Queue email delivery for email recipients
-
-### 2. Mailgun Integration (Send + Receive)
-
-**Decision:** Use [Mailgun](https://www.mailgun.com/) for both outbound sending and inbound receiving. The free tier provides 100 emails/day, 1 custom sending domain, and 1 inbound route — sufficient for development and early production. Upgrade to Basic ($15/mo, 10K emails/mo) when volume warrants.
-
-**Why Mailgun over alternatives:**
-
-- Inbound routing with wildcard pattern matching (`reply+*@domain`) — ideal for the reply-token scheme
-- Both send and receive in one provider — single integration, single set of credentials
-- Developer-focused REST API with official Node.js SDK (`mailgun.js`)
-- Handles deliverability (shared IP pool, SPF/DKIM/DMARC), bounce classification, and spam filtering
-- Free tier is generous enough to prove the feature before committing spend
-
-**Outbound setup:**
-
-- Configure `archon.social` (or operator's domain) as a custom sending domain in Mailgun
-- Add DNS records: SPF TXT, DKIM TXT, DMARC TXT (Mailgun provides these)
-- Send via Mailgun REST API (`POST /messages`) from Herald
-
-**Inbound setup:**
-
-- Add MX records pointing to Mailgun's inbound servers (`mxa.mailgun.org`, `mxb.mailgun.org`)
-- Create one inbound route: `match_recipient("reply+*@archon.social")` → `forward("https://archon.social/api/inbound-email")`
-- Herald exposes a webhook endpoint that receives parsed email as JSON (from, to, subject, body-plain, attachments, DKIM/SPF results)
-- Validate Mailgun's webhook signature on every request
-
-**Environment variables:**
-
-```
-MAILGUN_API_KEY=key-xxx
-MAILGUN_DOMAIN=archon.social
-MAILGUN_WEBHOOK_SIGNING_KEY=xxx
+```typescript
+interface EmailServiceInterface {
+    sendMail(params: SendMailParams): Promise<void>;
+    isConfigured(): boolean;
+}
 ```
 
-### 3. Reply Token Mapping
+`SendGridEmailService` is the current implementation. Additional providers (Mailgun, SES, etc.) can be added by implementing this interface.
 
-When sending outbound email, Herald generates a unique token per conversation and sets `Reply-To: reply+<token>@archon.social`. Herald maintains a lookup in its existing data store:
+### Storage
+
+Reply tokens and email mappings are stored in Herald's existing database (JSON, SQLite, or Redis), not in separate files:
+
+- **Reply tokens:** `token → { originalDmailDid, senderDid, senderName, emailRecipient, createdAt }`
+- **Email mappings:** `dmailDid → { emailAddress, recipientDid, createdAt }`
+
+Tokens expire after 30 days (configurable).
+
+### SendGrid Integration
+
+**Outbound:** SendGrid Mail Send API via `@sendgrid/mail`.
+
+**Inbound:** SendGrid Inbound Parse webhook at `/api/inbound-email`.
+
+**DNS setup:**
+- Domain authentication: SPF, DKIM, DMARC records on the sending domain
+- Inbound Parse: MX record on the parse subdomain (e.g., `parse.4tress.org`) pointing to `mx.sendgrid.net`
+- Unsolicited inbound: MX record on the root domain pointing to `mx.sendgrid.net`
+
+### Webhook Security
+
+The inbound email endpoint supports basic auth via `ARCHON_HERALD_WEBHOOK_SECRET`. When set, the operator configures the SendGrid Inbound Parse URL with the secret embedded:
 
 ```
-token → { originalDmailDid, senderDid, emailRecipient, createdAt }
+https://user:SECRET@host/names/api/inbound-email
 ```
 
-Tokens should expire after a configurable TTL (default: 30 days). Expired tokens result in a bounce reply to the email sender.
+Requests without valid credentials are rejected with 401.
 
-### 4. Email Address Detection
+### Subject Conventions
 
-The dmail `to`/`cc` fields currently contain DIDs. The bridge needs to distinguish email addresses from DIDs. Use the `mailto:` URI scheme to avoid ambiguity with Herald names (which also use `name@domain` format):
+Email addresses are encoded in dmail subjects to bridge between the two systems:
 
-- `did:mdip:...` → deliver as dmail (existing behavior)
-- `mailto:bob@gmail.com` → deliver as email (bridge behavior)
+- **Inbound** (email → dmail): `[email from sender@example.com] Original subject`
+- **Outbound compose** (dmail → email): `[email to recipient@example.com] Subject line`
 
-Herald strips the `mailto:` prefix when constructing the email `To:` header.
+### Sender Identity
 
-### 5. Sender Identity in Email
-
-The `From:` address uses the sender's Herald name on the bridging Herald instance:
+The `From:` address uses the sender's Herald name:
 
 ```
-From: Alice <alice@archon.social>
+From: alice via 4tress <alice@4tress.org>
 ```
 
-**Requirement:** The sender must have a registered Herald name on the CC'd Herald instance to use the bridge. This is a reasonable constraint — users already register a name to use Herald, and it provides a meaningful sender identity. Without a name, Herald rejects the bridge request (the dmail is still delivered to DID recipients normally; only the email leg fails).
+The sender's Herald name is resolved from their DID via the Herald user database. If no name is found, the fallback is `dmail-user` with the default `dmail@domain` address.
 
-### 6. Spam / Abuse Prevention
+## Environment Variables
 
-**Outbound:**
+```
+ARCHON_HERALD_SENDGRID_API_KEY=SG.xxx          # SendGrid API key (omit to disable bridge)
+ARCHON_HERALD_SENDGRID_FROM_EMAIL=dmail@domain  # default from address
+ARCHON_HERALD_SENDGRID_PARSE_DOMAIN=parse.domain # inbound parse subdomain
+ARCHON_HERALD_WEBHOOK_SECRET=xxx                # basic auth secret for inbound webhook
+ARCHON_HERALD_DOMAIN=domain                     # Herald's domain (used for from addresses)
+```
 
-- Rate limit outbound emails per sender DID: 20 emails/hour, 100/day (configurable)
-- Herald logs all bridge sends (sender DID, recipient email, timestamp) for audit, without logging message content
+## Spam Prevention
 
-**Inbound (phase 1):**
-
-- Accept only token-gated replies (`reply+<token>@archon.social`). Emails to any other address are silently dropped
-- Validate Mailgun's SPF/DKIM results on every inbound webhook before creating a dmail
-- Strip HTML and limit body size (e.g., 64KB) to prevent oversized dmails
-
-**Inbound (phase 2):**
-
-- Accept unsolicited email to `name@archon.social` for registered Herald users
-- Add a second Mailgun route: `match_recipient("*@archon.social")` as a catch-all
-- Apply stricter filtering: require SPF pass, DKIM pass, and basic content heuristics
-
-## Decisions Summary
-
-| # | Question | Decision |
-|---|----------|----------|
-| 1 | Email provider | Mailgun (free tier → Basic as needed) |
-| 2 | Send approach | Mailgun REST API |
-| 3 | Receive approach | Mailgun inbound routing → Herald webhook |
-| 4 | Reply token storage | Herald's existing data store, 30-day TTL |
-| 5 | Email address format in dmail | `mailto:` URI scheme |
-| 6 | Sender identity | Require Herald name; no name = no bridge |
-| 7 | Unsolicited inbound | Phase 1: replies only (token-gated) |
-| 8 | Multiple Herald instances | The CC'd instance acts as courier |
+- Inbound spam score check: emails with score > 5 are silently rejected
+- Token-gated replies: only emails to `reply+<token>@parse.domain` with valid tokens create threaded dmails
+- Unsolicited inbound: only emails to registered Herald names are accepted; unknown names are ignored
+- Webhook auth: prevents forged webhook calls
 
 ## Phasing
 
-### Phase 1 — Outbound + Reply
+### Phase 1 — Complete ✅
 
-- Herald poll loop for notice discovery
-- Mailgun outbound send for `mailto:` recipients
-- Reply token generation and storage
-- Inbound reply webhook (`/api/inbound-email`)
-- Email address detection (`mailto:` prefix) in `to`/`cc`
-- Rate limiting and audit logging
-- DNS setup: SPF, DKIM, DMARC, MX records
+- Outbound email send (dmail → email) via poll loop
+- Inbound reply webhook (`/api/inbound-email`) with token-gated threading
+- Unsolicited inbound email to `name@domain`
+- Compose new email from dmail via `[email to ...]` subject convention
+- Reply token and email mapping storage in Herald's DB (JSON/SQLite/Redis)
+- Email service abstraction (`EmailServiceInterface`)
+- Webhook basic auth
 
-### Phase 2 — Unsolicited Inbound
-
-- Accept email to `name@archon.social` from anyone
-- Catch-all Mailgun route
-- Stricter spam filtering (SPF/DKIM required)
-- Bounce/unsubscribe handling
-
-### Phase 3 — Rich Content
+### Phase 2 — Future
 
 - HTML email rendering
 - Dmail attachment → email attachment bridging
 - Email attachment → dmail attachment bridging
+- Rate limiting per sender DID
+- Bounce/unsubscribe handling

@@ -50,6 +50,7 @@ const ADMIN_API_KEY = process.env.ARCHON_ADMIN_API_KEY || process.env.ARCHON_HER
 const SENDGRID_API_KEY = process.env.ARCHON_HERALD_SENDGRID_API_KEY || '';
 const SENDGRID_FROM_EMAIL = process.env.ARCHON_HERALD_SENDGRID_FROM_EMAIL || `dmail@${SERVICE_DOMAIN}`;
 const SENDGRID_PARSE_DOMAIN = process.env.ARCHON_HERALD_SENDGRID_PARSE_DOMAIN || `parse.${SERVICE_DOMAIN}`;
+const WEBHOOK_SECRET = process.env.ARCHON_HERALD_WEBHOOK_SECRET || '';
 const SESSION_SECRET_PLACEHOLDERS = new Set(['change-me', 'change-me-to-a-random-string']);
 
 if (!SESSION_SECRET) {
@@ -478,6 +479,19 @@ app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, r
         if (!emailBridge?.isConfigured()) {
             res.status(404).json({ error: 'Email bridge not configured' });
             return;
+        }
+
+        // Verify webhook authenticity via basic auth (password = WEBHOOK_SECRET)
+        if (WEBHOOK_SECRET) {
+            const authHeader = req.headers.authorization || '';
+            const match = authHeader.match(/^Basic\s+(.+)$/i);
+            const credentials = match ? Buffer.from(match[1], 'base64').toString() : '';
+            const password = credentials.split(':').slice(1).join(':');
+            if (password !== WEBHOOK_SECRET) {
+                console.warn('Inbound email webhook rejected: invalid credentials');
+                res.status(401).json({ error: 'Unauthorized' });
+                return;
+            }
         }
 
         const email = emailBridge.parseInboundEmail(req.body);
@@ -1379,12 +1393,25 @@ async function pollDmailForEmail(): Promise<void> {
     }
 }
 
+let dmailPollInFlight = false;
+
 function startDmailPollLoop(): void {
     console.log(`${SERVICE_NAME} dmail poll loop started (interval: ${DMAIL_POLL_INTERVAL_MS / 1000}s)`);
+
+    const runPoll = async () => {
+        if (dmailPollInFlight) return;
+        dmailPollInFlight = true;
+        try {
+            await pollDmailForEmail();
+        } finally {
+            dmailPollInFlight = false;
+        }
+    };
+
     // Initial poll after a short delay to let startup finish
     setTimeout(() => {
-        pollDmailForEmail();
-        setInterval(pollDmailForEmail, DMAIL_POLL_INTERVAL_MS);
+        runPoll();
+        setInterval(runPoll, DMAIL_POLL_INTERVAL_MS);
     }, 5000);
 }
 
