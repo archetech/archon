@@ -15,7 +15,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
-    "ioredis": "^5.4.1",
+    "ioredis": "^5.10.1",
     "macaroons.js": "^0.3.8",
     "morgan": "^1.10.0",
     "pino": "^9.14.0",

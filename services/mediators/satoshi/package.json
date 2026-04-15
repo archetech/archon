@@ -12,11 +12,11 @@
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.13.6",
+    "axios": "^1.15.0",
     "bitcoin-core": "^5.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.22.1",
-    "ioredis": "^5.5.0",
+    "ioredis": "^5.10.1",
     "mongodb": "^6.13.0",
     "morgan": "^1.10.0",
     "prom-client": "^15.1.3",

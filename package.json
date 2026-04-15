@@ -23,14 +23,14 @@
   "license": "ISC",
   "dependencies": {
     "commander": "^11.1.0",
-    "sharp": "^0.33.5",
+    "sharp": "^0.34.5",
     "uuid": "^11.0.2"
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
-    "@types/chrome": "^0.0.309",
+    "@types/chrome": "^0.1.40",
     "@types/hdkey": "^2.1.0",
     "@types/jest": "^29.5.14",
     "@types/mock-fs": "^4.13.4",

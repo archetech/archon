@@ -15,12 +15,12 @@
     "axios": "^1.15.0",
     "buffer": "^6.0.3",
     "qrcode.react": "^4.2.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "react-dropzone": "^14.2.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.1",
-    "vite": "^8.0.5"
+    "vite": "^8.0.8"
   }
 }
