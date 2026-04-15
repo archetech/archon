@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { DatabaseInterface, User } from './interfaces.js';
+import { DatabaseInterface, User, ReplyToken, EmailMapping } from './interfaces.js';
 
 export class DbSqlite implements DatabaseInterface {
     private db: Database.Database;
@@ -26,6 +26,27 @@ export class DbSqlite implements DatabaseInterface {
         this.db.exec(createUserTable);
         this.ensureColumn('credentialDid', 'TEXT');
         this.ensureColumn('credentialIssuedAt', 'TEXT');
+
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS reply_tokens (
+                token TEXT PRIMARY KEY,
+                originalDmailDid TEXT NOT NULL,
+                senderDid TEXT NOT NULL,
+                senderName TEXT NOT NULL,
+                emailRecipient TEXT NOT NULL,
+                createdAt TEXT NOT NULL
+            );
+        `);
+
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS email_mappings (
+                dmailDid TEXT PRIMARY KEY,
+                emailAddress TEXT NOT NULL,
+                recipientDid TEXT NOT NULL,
+                createdAt TEXT NOT NULL
+            );
+        `);
+
         console.log('SQLite database initialised.');
     }
 
@@ -97,5 +118,35 @@ export class DbSqlite implements DatabaseInterface {
         catch (error) {
             console.error('SQLite close failed:', error);
         }
+    }
+
+    async setReplyToken(token: string, data: ReplyToken): Promise<void> {
+        this.db.prepare(`
+            INSERT OR REPLACE INTO reply_tokens (token, originalDmailDid, senderDid, senderName, emailRecipient, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `).run(token, data.originalDmailDid, data.senderDid, data.senderName, data.emailRecipient, data.createdAt);
+    }
+
+    async getReplyToken(token: string): Promise<ReplyToken | null> {
+        const row = this.db.prepare('SELECT * FROM reply_tokens WHERE token = ?').get(token) as ReplyToken | undefined;
+        return row || null;
+    }
+
+    async deleteExpiredReplyTokens(maxAgeMs: number): Promise<number> {
+        const cutoff = new Date(Date.now() - maxAgeMs).toISOString();
+        const result = this.db.prepare('DELETE FROM reply_tokens WHERE createdAt < ?').run(cutoff);
+        return result.changes;
+    }
+
+    async setEmailMapping(dmailDid: string, mapping: EmailMapping): Promise<void> {
+        this.db.prepare(`
+            INSERT OR REPLACE INTO email_mappings (dmailDid, emailAddress, recipientDid, createdAt)
+            VALUES (?, ?, ?, ?)
+        `).run(dmailDid, mapping.emailAddress, mapping.recipientDid, mapping.createdAt);
+    }
+
+    async getEmailMapping(dmailDid: string): Promise<EmailMapping | null> {
+        const row = this.db.prepare('SELECT * FROM email_mappings WHERE dmailDid = ?').get(dmailDid) as EmailMapping | undefined;
+        return row || null;
     }
 }

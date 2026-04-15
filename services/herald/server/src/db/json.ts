@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { DatabaseInterface, DatabaseStructure, User } from './interfaces.js';
+import { DatabaseInterface, DatabaseStructure, User, ReplyToken, EmailMapping } from './interfaces.js';
 
 export class DbJson implements DatabaseInterface {
     private readonly dbPath: string;
@@ -75,5 +75,48 @@ export class DbJson implements DatabaseInterface {
         }
 
         return null;
+    }
+
+    async setReplyToken(token: string, data: ReplyToken): Promise<void> {
+        const db = this.loadDb();
+        if (!db.replyTokens) {
+            db.replyTokens = {};
+        }
+        db.replyTokens[token] = data;
+        this.writeDb(db);
+    }
+
+    async getReplyToken(token: string): Promise<ReplyToken | null> {
+        const db = this.loadDb();
+        return db.replyTokens?.[token] || null;
+    }
+
+    async deleteExpiredReplyTokens(maxAgeMs: number): Promise<number> {
+        const db = this.loadDb();
+        if (!db.replyTokens) return 0;
+        const now = Date.now();
+        let cleaned = 0;
+        for (const [token, data] of Object.entries(db.replyTokens)) {
+            if (now - new Date(data.createdAt).getTime() > maxAgeMs) {
+                delete db.replyTokens[token];
+                cleaned++;
+            }
+        }
+        if (cleaned > 0) this.writeDb(db);
+        return cleaned;
+    }
+
+    async setEmailMapping(dmailDid: string, mapping: EmailMapping): Promise<void> {
+        const db = this.loadDb();
+        if (!db.emailMappings) {
+            db.emailMappings = {};
+        }
+        db.emailMappings[dmailDid] = mapping;
+        this.writeDb(db);
+    }
+
+    async getEmailMapping(dmailDid: string): Promise<EmailMapping | null> {
+        const db = this.loadDb();
+        return db.emailMappings?.[dmailDid] || null;
     }
 }

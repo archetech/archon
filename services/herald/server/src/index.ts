@@ -20,9 +20,13 @@ import { DbJson } from './db/json.js';
 import { DbRedis } from './db/redis.js';
 import { DbSqlite } from './db/sqlite.js';
 import { createOAuthRoutes } from './oauth/index.js';
+import { EmailBridge } from './email-bridge.js';
+import { SendGridEmailService } from './email/sendgrid.js';
+import multer from 'multer';
 
 let keymaster: Keymaster | KeymasterClient;
 let db: DatabaseInterface;
+let emailBridge: EmailBridge | null = null;
 
 dotenv.config();
 
@@ -43,6 +47,10 @@ const DEFAULT_MEMBERSHIP_SCHEMA_DID = 'did:cid:bagaaieravnv5onsflewvrz6urhwfjixf
 const MEMBERSHIP_SCHEMA_DID = process.env.ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID || DEFAULT_MEMBERSHIP_SCHEMA_DID;
 const TOR_PROXY = process.env.ARCHON_HERALD_TOR_PROXY || '';
 const ADMIN_API_KEY = process.env.ARCHON_ADMIN_API_KEY || process.env.ARCHON_HERALD_ADMIN_API_KEY || '';
+const SENDGRID_API_KEY = process.env.ARCHON_HERALD_SENDGRID_API_KEY || '';
+const SENDGRID_FROM_EMAIL = process.env.ARCHON_HERALD_SENDGRID_FROM_EMAIL || `dmail@${SERVICE_DOMAIN}`;
+const SENDGRID_PARSE_DOMAIN = process.env.ARCHON_HERALD_SENDGRID_PARSE_DOMAIN || `parse.${SERVICE_DOMAIN}`;
+const WEBHOOK_SECRET = process.env.ARCHON_HERALD_WEBHOOK_SECRET || '';
 const SESSION_SECRET_PLACEHOLDERS = new Set(['change-me', 'change-me-to-a-random-string']);
 
 if (!SESSION_SECRET) {
@@ -97,6 +105,14 @@ async function initServiceIdentity(): Promise<void> {
     }
 
     await keymaster.setCurrentId(SERVICE_NAME);
+
+    // Publish the service name as a DID property so it's discoverable
+    const docs = await keymaster.resolveDID(SERVICE_NAME);
+    const currentName = (docs.didDocumentData as any)?.name;
+    if (currentName !== SERVICE_NAME) {
+        await keymaster.mergeData(SERVICE_NAME, { name: SERVICE_NAME });
+        console.log(`Published name property: ${SERVICE_NAME}`);
+    }
 
     if (!OWNER_DID) {
         console.warn('Warning: ARCHON_HERALD_OWNER_DID not set — no user will have owner access');
@@ -453,6 +469,143 @@ app.get('/api/challenge', async (req: Request, res: Response) => {
     } catch (error) {
         console.log(error);
         res.status(500).send(String(error));
+    }
+});
+
+// Email bridge: inbound email webhook (SendGrid Inbound Parse)
+const inboundEmailUpload = multer();
+app.post('/api/inbound-email', inboundEmailUpload.none(), async (req: Request, res: Response) => {
+    try {
+        if (!emailBridge?.isConfigured()) {
+            res.status(404).json({ error: 'Email bridge not configured' });
+            return;
+        }
+
+        // Verify webhook authenticity via query parameter token
+        if (WEBHOOK_SECRET && req.query.secret !== WEBHOOK_SECRET) {
+            console.warn('Inbound email webhook rejected: invalid or missing secret');
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const email = emailBridge.parseInboundEmail(req.body);
+        if (!email) {
+            console.warn('Inbound email missing required fields');
+            res.status(400).json({ error: 'Missing from or to fields' });
+            return;
+        }
+
+        const spamScore = parseFloat(email.spam_score || '0');
+        if (spamScore > 5) {
+            console.warn(`Inbound email rejected: spam score ${spamScore} from ${email.from}`);
+            res.status(200).json({ ok: true, action: 'spam-rejected' });
+            return;
+        }
+
+        const token = emailBridge.extractReplyToken(email.to);
+        if (token) {
+            const tokenData = await emailBridge.lookupToken(token);
+            if (!tokenData) {
+                console.warn(`Inbound email with expired/unknown token from ${email.from}`);
+                res.status(200).json({ ok: true, action: 'token-expired' });
+                return;
+            }
+
+            // Reply to an outbound email: create dmail to original sender
+            const replyFromEmail = emailBridge.extractEmailAddress(email.from) || email.from;
+            await keymaster.setCurrentId(SERVICE_NAME);
+            const dmailMessage = {
+                to: [tokenData.senderDid],
+                cc: [] as string[],
+                subject: `[email from ${replyFromEmail}] ${email.subject}`,
+                body: email.text || '(no text content)',
+                reference: tokenData.originalDmailDid,
+            };
+            const dmailDid = await keymaster.createDmail(dmailMessage, { registry: 'hyperswarm' });
+            const noticeDid = await keymaster.sendDmail(dmailDid);
+
+            await emailBridge.storeEmailMapping(dmailDid, replyFromEmail, tokenData.senderDid);
+            console.log(`Inbound email from ${email.from} → dmail ${dmailDid} to ${tokenData.senderDid} (notice: ${noticeDid})`);
+            res.status(200).json({ ok: true, action: 'delivered', dmailDid });
+            return;
+        }
+
+        // No reply token — try to resolve recipient as a Herald name
+        const recipientName = emailBridge.extractRecipientName(email.to);
+        if (!recipientName) {
+            console.warn(`Inbound email with no recognizable recipient from ${email.from} to ${email.to}`);
+            res.status(200).json({ ok: true, action: 'no-recipient-ignored' });
+            return;
+        }
+
+        const recipientDid = await db.findDidByName(recipientName);
+        if (!recipientDid) {
+            console.warn(`Inbound email to unknown Herald name "${recipientName}" from ${email.from}`);
+            res.status(200).json({ ok: true, action: 'unknown-name-ignored' });
+            return;
+        }
+
+        // Unsolicited inbound: create dmail from Herald to the named recipient
+        const senderEmail = emailBridge.extractEmailAddress(email.from) || email.from;
+        await keymaster.setCurrentId(SERVICE_NAME);
+        const dmailMessage = {
+            to: [recipientDid],
+            cc: [] as string[],
+            subject: `[email from ${senderEmail}] ${email.subject}`,
+            body: email.text || '(no text content)',
+        };
+        const dmailDid = await keymaster.createDmail(dmailMessage, { registry: 'hyperswarm' });
+        const noticeDid = await keymaster.sendDmail(dmailDid);
+
+        await emailBridge.storeEmailMapping(dmailDid, senderEmail, recipientDid);
+        console.log(`Inbound email from ${email.from} → dmail ${dmailDid} to ${recipientName} (${recipientDid}) (notice: ${noticeDid})`);
+        res.status(200).json({ ok: true, action: 'delivered', dmailDid });
+    } catch (error) {
+        console.error('Error processing inbound email:', error);
+        res.status(200).json({ ok: true, action: 'error' });
+    }
+});
+
+// Email bridge: send email (authenticated)
+app.post('/api/send-email', async (req: Request, res: Response) => {
+    try {
+        if (!emailBridge?.isConfigured()) {
+            res.status(404).json({ error: 'Email bridge not configured' });
+            return;
+        }
+
+        const senderDid = await verifyBearerToken(req);
+        if (!senderDid) {
+            res.status(401).json({ error: 'Authentication required' });
+            return;
+        }
+
+        const user = await db.getUser(senderDid);
+        if (!user?.name) {
+            res.status(403).json({ error: 'Herald name required to send email' });
+            return;
+        }
+
+        const { to, subject, body, dmailDid } = req.body;
+        if (!to || !subject || !body || !dmailDid) {
+            res.status(400).json({ error: 'Missing required fields: to, subject, body, dmailDid' });
+            return;
+        }
+
+        const result = await emailBridge.sendEmail({
+            to,
+            subject,
+            body,
+            senderName: user.name,
+            senderDid,
+            dmailDid,
+        });
+
+        console.log(`Email sent by ${user.name} (${senderDid}) to ${to}`);
+        res.json({ ok: true, token: result.token });
+    } catch (error) {
+        console.error('Error sending email:', error);
+        res.status(500).json({ error: 'Failed to send email' });
     }
 });
 
@@ -940,7 +1093,7 @@ app.get('/api/credential', isAuthenticated, async (req: Request, res: Response) 
         }
 
         if (!user.credentialDid) {
-            res.json({ 
+            res.json({
                 hasCredential: false,
                 name: user.name || null,
                 message: 'No credential issued yet'
@@ -1155,6 +1308,107 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled rejection at:', promise, 'reason:', reason);
 });
 
+const DMAIL_POLL_INTERVAL_MS = 60_000; // 1 minute
+
+async function pollDmailForEmail(): Promise<void> {
+    if (!emailBridge?.isConfigured()) return;
+
+    try {
+        await keymaster.setCurrentId(SERVICE_NAME);
+        await keymaster.refreshNotices();
+
+        const dmails = await keymaster.listDmail();
+        for (const [dmailDid, item] of Object.entries(dmails)) {
+            if (!item.tags.includes('unread')) continue;
+
+            // Resolve sender info (shared by both paths)
+            const rawSender = typeof item.sender === 'string' ? item.sender : 'Unknown';
+            const isDid = rawSender.startsWith('did:');
+            let senderName: string;
+            let fromEmail: string;
+
+            if (isDid) {
+                const senderUser = await db.getUser(rawSender);
+                if (senderUser?.name) {
+                    senderName = senderUser.name;
+                    fromEmail = `${senderName}@${SERVICE_DOMAIN}`;
+                } else {
+                    senderName = 'dmail-user';
+                    fromEmail = SENDGRID_FROM_EMAIL;
+                }
+            } else {
+                senderName = rawSender;
+                fromEmail = `${senderName}@${SERVICE_DOMAIN}`;
+            }
+
+            // Path 1: Reply to a bridged email (has reference matching a stored mapping)
+            if (item.message.reference) {
+                const mapping = await emailBridge.lookupEmailMapping(item.message.reference);
+                if (mapping) {
+                    await emailBridge.sendEmail({
+                        to: mapping.emailAddress,
+                        subject: item.message.subject,
+                        body: item.message.body,
+                        senderName,
+                        senderDid: mapping.recipientDid,
+                        dmailDid,
+                        fromEmail,
+                    });
+                    await keymaster.fileDmail(dmailDid, ['inbox']);
+                    console.log(`Forwarded reply dmail ${dmailDid} from ${senderName} to ${mapping.emailAddress}`);
+                    continue;
+                }
+            }
+
+            // Path 2: Compose new email via "[email to addr] subject" convention
+            if (serviceDID && (item.message.to.includes(serviceDID) || item.message.cc.includes(serviceDID))) {
+                const emailToMatch = item.message.subject.match(/^\[email to ([^\]]+)\]\s*(.*)/i);
+                if (emailToMatch) {
+                    const toEmail = emailToMatch[1].trim();
+                    const realSubject = emailToMatch[2] || '(no subject)';
+
+                    await emailBridge.sendEmail({
+                        to: toEmail,
+                        subject: realSubject,
+                        body: item.message.body,
+                        senderName,
+                        senderDid: rawSender,
+                        dmailDid,
+                        fromEmail,
+                    });
+                    await keymaster.fileDmail(dmailDid, ['inbox']);
+                    console.log(`Composed email from ${senderName} to ${toEmail}: ${realSubject}`);
+                    continue;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Dmail poll error:', error);
+    }
+}
+
+let dmailPollInFlight = false;
+
+function startDmailPollLoop(): void {
+    console.log(`${SERVICE_NAME} dmail poll loop started (interval: ${DMAIL_POLL_INTERVAL_MS / 1000}s)`);
+
+    const runPoll = async () => {
+        if (dmailPollInFlight) return;
+        dmailPollInFlight = true;
+        try {
+            await pollDmailForEmail();
+        } finally {
+            dmailPollInFlight = false;
+        }
+    };
+
+    // Initial poll after a short delay to let startup finish
+    setTimeout(() => {
+        runPoll();
+        setInterval(runPoll, DMAIL_POLL_INTERVAL_MS);
+    }, 5000);
+}
+
 app.listen(HOST_PORT, '0.0.0.0', async () => {
     if (HERALD_DATABASE_TYPE === 'sqlite') {
         db = new DbSqlite(path.join(DATA_DIR, 'db.sqlite'));
@@ -1210,7 +1464,7 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             cipher,
             passphrase,
         });
-        
+
         // Load existing wallet (decrypt and restore IDs/aliases)
         await keymaster.loadWallet();
         console.log(`${SERVICE_NAME} using gatekeeper at ${GATEKEEPER_URL}`);
@@ -1218,6 +1472,22 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
 
     await initServiceIdentity();
     await ensureIpnsKeyExists();
+
+    // Initialize email bridge if SendGrid is configured
+    if (SENDGRID_API_KEY) {
+        const emailService = new SendGridEmailService(SENDGRID_API_KEY);
+        emailBridge = new EmailBridge({
+            domain: SERVICE_DOMAIN,
+            parseDomain: SENDGRID_PARSE_DOMAIN,
+            fromEmail: SENDGRID_FROM_EMAIL,
+            fromName: SERVICE_NAME,
+        }, db, emailService);
+        console.log(`${SERVICE_NAME} email bridge enabled (from: ${SENDGRID_FROM_EMAIL}, parse: ${SENDGRID_PARSE_DOMAIN})`);
+        startDmailPollLoop();
+    } else {
+        console.log(`${SERVICE_NAME} email bridge disabled (ARCHON_HERALD_SENDGRID_API_KEY not set)`);
+    }
+
     console.log(`${SERVICE_NAME} using wallet at ${WALLET_URL}`);
     console.log(`${SERVICE_NAME} listening on port ${HOST_PORT}`);
 });

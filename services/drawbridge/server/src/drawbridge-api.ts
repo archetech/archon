@@ -266,9 +266,15 @@ async function main() {
     app.use(express.text({ limit: '10mb' }));
     // Skip body buffering for streaming routes — they read req directly
     const rawParser = express.raw({ type: 'application/octet-stream', limit: '10mb' });
+    // Capture multipart form data as raw bytes for proxy passthrough (e.g., SendGrid webhook)
+    const multipartRawParser = express.raw({ type: 'multipart/*', limit: '10mb' });
     app.use((req, res, next) => {
         if (req.path === '/api/v1/ipfs/stream' && req.method === 'POST') {
             return next();
+        }
+        const contentType = req.headers['content-type'] || '';
+        if (contentType.startsWith('multipart/')) {
+            return multipartRawParser(req, res, next);
         }
         rawParser(req, res, next);
     });
