@@ -1325,20 +1325,12 @@ async function pollDmailForEmail(): Promise<void> {
             const rawSender = typeof item.sender === 'string' ? item.sender : 'Unknown';
             const isDid = rawSender.startsWith('did:');
             let senderName: string;
-            let fromEmail: string;
 
             if (isDid) {
                 const senderUser = await db.getUser(rawSender);
-                if (senderUser?.name) {
-                    senderName = senderUser.name;
-                    fromEmail = `${senderName}@${SERVICE_DOMAIN}`;
-                } else {
-                    senderName = 'dmail-user';
-                    fromEmail = emailBridge.fromEmail;
-                }
+                senderName = senderUser?.name || 'dmail-user';
             } else {
                 senderName = rawSender;
-                fromEmail = `${senderName}@${SERVICE_DOMAIN}`;
             }
 
             // Path 1: Reply to a bridged email (has reference matching a stored mapping)
@@ -1352,7 +1344,6 @@ async function pollDmailForEmail(): Promise<void> {
                         senderName,
                         senderDid: mapping.recipientDid,
                         dmailDid,
-                        fromEmail,
                     });
                     await keymaster.fileDmail(dmailDid, ['inbox']);
                     console.log(`Forwarded reply dmail ${dmailDid} from ${senderName} to ${mapping.emailAddress}`);
@@ -1374,7 +1365,6 @@ async function pollDmailForEmail(): Promise<void> {
                         senderName,
                         senderDid: rawSender,
                         dmailDid,
-                        fromEmail,
                     });
                     await keymaster.fileDmail(dmailDid, ['inbox']);
                     console.log(`Composed email from ${senderName} to ${toEmail}: ${realSubject}`);
