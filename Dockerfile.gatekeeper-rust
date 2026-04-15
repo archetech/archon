@@ -2,6 +2,7 @@ FROM rust:1.90-bullseye AS builder
 
 WORKDIR /build
 COPY rust/services/gatekeeper/Cargo.toml ./Cargo.toml
+COPY rust/services/gatekeeper/Cargo.lock ./Cargo.lock
 COPY rust/services/gatekeeper/src ./src
 RUN cargo build --release
 
