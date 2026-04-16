@@ -151,6 +151,7 @@ pub(crate) async fn handle_did_operation(
     };
 
     let supported_registries = state.supported_registries.lock().await.clone();
+    let mut resolved_registry: Option<String> = None;
     if op_type == "create" {
         let registry = payload
             .get("registration")
@@ -196,6 +197,8 @@ pub(crate) async fn handle_did_operation(
                 ));
             }
         }
+
+        resolved_registry = Some(current_registry);
     }
 
     let event_time = payload
@@ -223,16 +226,7 @@ pub(crate) async fn handle_did_operation(
             .and_then(Value::as_str)
             .map(ToString::to_string)
     } else {
-        let store = state.store.lock().await;
-        store
-            .resolve_doc(&state.config, &did, ResolveOptions::default())
-            .ok()
-            .and_then(|doc| {
-                doc.get("didDocumentRegistration")
-                    .and_then(|value| value.get("registry"))
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
+        resolved_registry
     };
 
     let result = with_did_lock(state, &did, || async {
@@ -254,6 +248,10 @@ pub(crate) async fn handle_did_operation(
     if let Some(registry) = queue_registry {
         let _ = queue_outbound_operation(state, &registry, payload.clone()).await;
     }
+    // Invalidate the cached status snapshot so the next /status request
+    // recomputes DID counts lazily instead of doing a full database scan
+    // on every write (which was the dominant cost for dmail creation).
+    *state.status_snapshot.lock().await = None;
     update_search_doc(state, &did).await;
 
     Ok(result)
