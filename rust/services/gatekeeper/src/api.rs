@@ -201,7 +201,6 @@ pub(crate) async fn create_did(
                 .did_operations_total
                 .with_label_values(&[&op_type, &registry, "success"])
                 .inc();
-            refresh_metrics_snapshot(&state).await;
             record_metrics(&state, "POST", "/did", 200, start.elapsed().as_secs_f64());
             Json(result_value).into_response()
         }
@@ -426,7 +425,7 @@ pub(crate) async fn remove_dids(
     for did in &dids {
         delete_search_doc(&state, did).await;
     }
-    refresh_metrics_snapshot(&state).await;
+    *state.status_snapshot.lock().await = None;
     record_metrics(
         &state,
         "POST",
