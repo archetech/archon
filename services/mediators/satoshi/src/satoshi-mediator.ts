@@ -854,9 +854,9 @@ async function syncBlocks(): Promise<void> {
 
         for (let height = currentMax; height <= blockCount; height++) {
             const blockHash = await btcClient.getBlockHash(height);
-            const block = await btcClient.getBlock(blockHash) as Block;
+            const header = await btcClient.getBlockHeader(blockHash) as BlockHeader;
             console.log(`${height}/${blockCount} blocks (${(100 * height / blockCount).toFixed(2)}%)`);
-            await addBlock(height, blockHash, block.time);
+            await addBlock(height, blockHash, header.time!);
         }
     } catch (error) {
         console.error(`Error syncing blocks:`, error);
