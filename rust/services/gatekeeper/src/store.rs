@@ -1581,21 +1581,21 @@ impl JsonDb {
         let upper = registration.as_ref().and_then(|reg| {
             let height = reg.get("height").and_then(Value::as_u64)?;
             let block = self.get_block(registry, Some(BlockLookup::Height(height)))?;
-            Some(json!({
-                "time": block.get("time").cloned().unwrap_or(Value::Null),
-                "timeISO": block.get("time")
-                    .and_then(Value::as_u64)
-                    .and_then(|time| chrono::DateTime::<chrono::Utc>::from_timestamp(time as i64, 0))
-                    .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
-                    .map(Value::String)
-                    .unwrap_or(Value::Null),
-                "blockid": block.get("hash").cloned().unwrap_or(Value::Null),
-                "height": block.get("height").cloned().unwrap_or(Value::Null),
-                "txid": reg.get("txid").cloned().unwrap_or(Value::Null),
-                "txidx": reg.get("index").cloned().unwrap_or(Value::Null),
-                "batchid": reg.get("batch").cloned().unwrap_or(Value::Null),
-                "opidx": reg.get("opidx").cloned().unwrap_or(Value::Null)
-            }))
+            let mut obj = serde_json::Map::new();
+            obj.insert("time".to_string(), block.get("time").cloned().unwrap_or(Value::Null));
+            obj.insert("timeISO".to_string(), block.get("time")
+                .and_then(Value::as_u64)
+                .and_then(|time| chrono::DateTime::<chrono::Utc>::from_timestamp(time as i64, 0))
+                .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+                .map(Value::String)
+                .unwrap_or(Value::Null));
+            obj.insert("blockid".to_string(), block.get("hash").cloned().unwrap_or(Value::Null));
+            obj.insert("height".to_string(), block.get("height").cloned().unwrap_or(Value::Null));
+            if let Some(v) = reg.get("txid") { obj.insert("txid".to_string(), v.clone()); }
+            if let Some(v) = reg.get("index") { obj.insert("txidx".to_string(), v.clone()); }
+            if let Some(v) = reg.get("batch") { obj.insert("batchid".to_string(), v.clone()); }
+            if let Some(v) = reg.get("opidx") { obj.insert("opidx".to_string(), v.clone()); }
+            Some(Value::Object(obj))
         });
 
         (lower, upper)

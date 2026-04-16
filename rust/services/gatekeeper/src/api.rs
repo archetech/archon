@@ -693,13 +693,18 @@ pub(crate) async fn import_batch_by_cids(
                 })
                 .unwrap_or_else(|| vec![index as u32]);
 
+            let mut reg = metadata.get("registration").cloned().unwrap_or(Value::Null);
+            if let Some(obj) = reg.as_object_mut() {
+                obj.insert("opidx".to_string(), Value::from(index));
+            }
+
             batch.push(json!({
                 "registry": metadata.get("registry").cloned().unwrap_or(Value::String("hyperswarm".to_string())),
                 "time": metadata.get("time").cloned().unwrap_or(Value::String(chrono_like_now())),
                 "ordinal": ordinal,
                 "operation": operation,
                 "opid": cid,
-                "registration": metadata.get("registration").cloned().unwrap_or(Value::Null)
+                "registration": reg
             }));
         }
     }
