@@ -26,6 +26,8 @@ pub(crate) struct EventRecord {
     pub(crate) opid: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) did: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) registration: Option<Value>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -190,18 +192,23 @@ pub(crate) fn value_to_event_record(value: &Value) -> EventRecord {
             .get("did")
             .and_then(Value::as_str)
             .map(ToString::to_string),
+        registration: value.get("registration").cloned().filter(|v| !v.is_null()),
     }
 }
 
 pub(crate) fn event_record_to_value(event: &EventRecord) -> Value {
-    json!({
+    let mut val = json!({
         "registry": event.registry,
         "time": event.time,
         "ordinal": event.ordinal,
         "operation": event.operation,
         "opid": event.opid,
         "did": event.did
-    })
+    });
+    if let Some(reg) = &event.registration {
+        val["registration"] = reg.clone();
+    }
+    val
 }
 
 pub(crate) fn redis_event_to_stored_value(event: &EventRecord) -> Value {
@@ -1569,7 +1576,7 @@ impl JsonDb {
             .cloned()
             .or_else(|| {
                 // registration may be attached at the event level for batch-imported events
-                None
+                event.registration.clone()
             });
         let upper = registration.as_ref().and_then(|reg| {
             let height = reg.get("height").and_then(Value::as_u64)?;

@@ -217,6 +217,7 @@ pub(crate) async fn handle_did_operation(
         operation: payload.clone(),
         opid: Some(opid),
         did: Some(did.clone()),
+        registration: None,
     };
 
     let queue_registry = if op_type == "create" {
