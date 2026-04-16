@@ -297,14 +297,9 @@ async function resolveAvatarImage(name: string): Promise<{
     if (!avatarDid) return null;
 
     const image = await keymaster.getImage(avatarDid);
-    const rawData = image?.file?.data;
-    const data = Buffer.isBuffer(rawData)
-        ? rawData
-        : rawData && typeof rawData === 'object' && (rawData as any).type === 'Buffer' && Array.isArray((rawData as any).data)
-            ? Buffer.from((rawData as any).data)
-            : null;
+    const data = image?.file?.data ?? null;
 
-    if (!data || !image?.file?.type || !image.image) {
+    if (!data || !Buffer.isBuffer(data) || !image?.file?.type || !image.image) {
         return null;
     }
 
