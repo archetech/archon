@@ -1351,11 +1351,29 @@ export default class KeymasterClient implements KeymasterInterface {
 
     async getImage(id: string): Promise<ImageFileAsset | null> {
         try {
-            const response = await this.axios.get(`${this.API}/images/${id}`);
-            return response.data;
+            const response = await this.axios.get(`${this.API}/images/${id}`, {
+                responseType: 'arraybuffer',
+                headers: { 'Accept': 'application/octet-stream' }
+            });
+            const metadata = JSON.parse(response.headers['x-metadata']);
+            return {
+                file: {
+                    ...metadata.file,
+                    data: Buffer.from(response.data),
+                },
+                image: metadata.image,
+            };
         }
         catch (error) {
-            throwError(error);
+            const axiosError = error as AxiosError;
+            if (axiosError.response?.status === 404) {
+                return null;
+            }
+            if (axiosError.response?.data instanceof Uint8Array) {
+                const textDecoder = new TextDecoder();
+                axiosError.response.data = JSON.parse(textDecoder.decode(axiosError.response.data));
+            }
+            throwError(axiosError);
         }
     }
 
@@ -1449,11 +1467,26 @@ export default class KeymasterClient implements KeymasterInterface {
 
     async getFile(id: string): Promise<FileAsset | null> {
         try {
-            const response = await this.axios.get(`${this.API}/files/${id}`);
-            return response.data.file;
+            const response = await this.axios.get(`${this.API}/files/${id}`, {
+                responseType: 'arraybuffer',
+                headers: { 'Accept': 'application/octet-stream' }
+            });
+            const metadata = JSON.parse(response.headers['x-metadata']);
+            return {
+                ...metadata,
+                data: Buffer.from(response.data),
+            };
         }
         catch (error) {
-            throwError(error);
+            const axiosError = error as AxiosError;
+            if (axiosError.response?.status === 404) {
+                return null;
+            }
+            if (axiosError.response?.data instanceof Uint8Array) {
+                const textDecoder = new TextDecoder();
+                axiosError.response.data = JSON.parse(textDecoder.decode(axiosError.response.data));
+            }
+            throwError(axiosError);
         }
     }
 

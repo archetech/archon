@@ -5984,7 +5984,19 @@ v1router.put('/images/:id', express.raw({ type: 'application/octet-stream', limi
 v1router.get('/images/:id', async (req, res) => {
     try {
         const imageAsset = await keymaster.getImage(req.params.id);
-        res.json(imageAsset);
+
+        if (req.get('Accept') === 'application/octet-stream') {
+            if (!imageAsset?.file?.data) {
+                res.status(404).send({ error: 'Image not found' });
+                return;
+            }
+            const { data, ...fileMeta } = imageAsset.file;
+            res.set('Content-Type', 'application/octet-stream');
+            res.set('X-Metadata', JSON.stringify({ file: fileMeta, image: imageAsset.image }));
+            res.send(data);
+        } else {
+            res.json(imageAsset);
+        }
     } catch (error: any) {
         res.status(404).send({ error: error.toString() });
     }
@@ -6214,7 +6226,19 @@ v1router.put('/files/:id', async (req, res) => {
 v1router.get('/files/:id', async (req, res) => {
     try {
         const file = await keymaster.getFile(req.params.id);
-        res.json({ file });
+
+        if (req.get('Accept') === 'application/octet-stream') {
+            if (!file?.data) {
+                res.status(404).send({ error: 'File not found' });
+                return;
+            }
+            const { data, ...fileMeta } = file;
+            res.set('Content-Type', 'application/octet-stream');
+            res.set('X-Metadata', JSON.stringify(fileMeta));
+            res.send(data);
+        } else {
+            res.json({ file });
+        }
     } catch (error: any) {
         res.status(404).send({ error: error.toString() });
     }

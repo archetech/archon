@@ -3274,26 +3274,36 @@ describe('updateImage', () => {
 
 describe('getImage', () => {
     const mockImageId = 'image1';
-    const mockImageAsset = {
-        file: { cid: 'mockCID', filename: 'image', type: 'image/png', bytes: 392 },
+    const mockImageData = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    const mockMetadata = {
+        file: { cid: 'mockCID', filename: 'image', type: 'image/png', bytes: 4 },
         image: { width: 100, height: 100 },
     };
 
     it('should get image', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.images}/${mockImageId}`)
-            .reply(200, mockImageAsset);
+            .reply(200, mockImageData, {
+                'Content-Type': 'application/octet-stream',
+                'X-Metadata': JSON.stringify(mockMetadata),
+            });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
         const result = await keymaster.getImage(mockImageId);
 
-        expect(result).toStrictEqual(mockImageAsset);
+        expect(result).toEqual({
+            file: {
+                ...mockMetadata.file,
+                data: mockImageData,
+            },
+            image: mockMetadata.image,
+        });
     });
 
     it('should throw exception on getImage server error', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.images}/${mockImageId}`)
-            .reply(500, ServerError);
+            .reply(500, JSON.stringify(ServerError));
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
@@ -3464,23 +3474,30 @@ describe('updateFileStream', () => {
 
 describe('getFile', () => {
     const mockFileId = 'file1';
-    const mockFile = { cid: 'mockCID', bytes: 12345, type: 'pdf' };
+    const mockFileData = Buffer.from('hello world');
+    const mockFileMeta = { cid: 'mockCID', bytes: 11, type: 'text/plain', filename: 'test.txt' };
 
     it('should get file', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.files}/${mockFileId}`)
-            .reply(200, { file: mockFile });
+            .reply(200, mockFileData, {
+                'Content-Type': 'application/octet-stream',
+                'X-Metadata': JSON.stringify(mockFileMeta),
+            });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
         const result = await keymaster.getFile(mockFileId);
 
-        expect(result).toStrictEqual(mockFile);
+        expect(result).toEqual({
+            ...mockFileMeta,
+            data: mockFileData,
+        });
     });
 
     it('should throw exception on getFile server error', async () => {
         nock(KeymasterURL)
             .get(`${Endpoints.files}/${mockFileId}`)
-            .reply(500, ServerError);
+            .reply(500, JSON.stringify(ServerError));
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
