@@ -26,9 +26,14 @@ export async function admin(...args: string[]): Promise<string> {
 }
 
 /**
- * Reset the DB and optionally flush Redis (controlled by CLI_TEST_CLEANUP env var).
+ * Reset the DB and optionally flush Redis.
+ * Only runs when CLI_TEST_CLEANUP is set (CI sets this automatically).
+ * Skipped in dev environments to avoid wiping real data.
  */
 export async function resetAll(): Promise<void> {
+    if (!process.env.CLI_TEST_CLEANUP) {
+        return;
+    }
     await admin('reset-db');
     if (process.env.CLI_TEST_CLEANUP === 'redis') {
         await exec('docker', ['compose', 'exec', '-T', 'redis', 'redis-cli', 'flushall']);
@@ -46,11 +51,19 @@ export function parseDid(output: string): string {
 
 /**
  * Create a fresh wallet and ID. Optionally add an alias.
+ * WARNING: This overwrites the current wallet. Only safe in CI
+ * (where CLI_TEST_CLEANUP is set) or with a disposable wallet.
  */
 export async function freshWalletWithId(
     idName: string,
     alias?: string,
 ): Promise<string> {
+    if (!process.env.CLI_TEST_CLEANUP) {
+        throw new Error(
+            'freshWalletWithId would overwrite your wallet. ' +
+            'Set CLI_TEST_CLEANUP=yes to confirm this is a disposable environment.'
+        );
+    }
     await archon('new-wallet');
     const output = await archon('create-id', '-r', 'local', idName);
     const did = parseDid(output);
