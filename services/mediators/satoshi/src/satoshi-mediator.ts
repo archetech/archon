@@ -1,4 +1,4 @@
-import BtcClient, {Block, BlockVerbose, BlockHeader, MempoolEntry} from 'bitcoin-core';
+import BtcClient, { Block, BlockVerbose, BlockHeader, MempoolEntry } from 'bitcoin-core';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import KeymasterClient from '@didcid/keymaster/client';
@@ -388,7 +388,7 @@ async function scanBlocks(): Promise<void> {
     let start = await resolveScanStart(blockCount);
 
     for (let height = start; height <= blockCount; height++) {
-        console.log(`${height}/${blockCount} blocks (${(100 * height / blockCount).toFixed(2)}%)`);
+        console.log(`${height}/${blockCount} blocks (${formatSyncProgress(height, blockCount)}%)`);
         await fetchBlock(height, blockCount);
         blockCount = await btcClient.getBlockCount();
     }
@@ -595,7 +595,7 @@ async function getHybridFeeRateSatPerVb(): Promise<number> {
     return Math.max(localSatPerVb, oracleSatPerVb ?? 0);
 }
 
-async function getEntryFromMempool(txids: string[]): Promise<{ entry: MempoolEntry, txid: string }>  {
+async function getEntryFromMempool(txids: string[]): Promise<{ entry: MempoolEntry, txid: string }> {
     if (!txids.length) {
         throw new Error('RBF: empty array');
     }
@@ -844,18 +844,48 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
     await gatekeeper.addBlock(REGISTRY, { hash, height, time });
 }
 
+function formatSyncProgress(height: number, blockCount: number): string {
+    const totalBlocks = Math.max(1, blockCount - config.startBlock + 1);
+    const completedBlocks = Math.min(totalBlocks, Math.max(0, height - config.startBlock + 1));
+
+    return (100 * completedBlocks / totalBlocks).toFixed(2);
+}
+
 async function syncBlocks(): Promise<void> {
     try {
-        const latest = await gatekeeper.getBlock(REGISTRY);
-        const currentMax = Math.max(latest?.height ?? 0, config.startBlock);
         const blockCount = await btcClient.getBlockCount();
+        const latest = await gatekeeper.getBlock(REGISTRY);
 
         console.log(`current block height: ${blockCount}`);
 
-        for (let height = currentMax; height <= blockCount; height++) {
+        if (config.startBlock > blockCount) {
+            console.log(`Skipping ${REGISTRY} sync because start block ${config.startBlock} is ahead of current chain height ${blockCount}`);
+            return;
+        }
+
+        const startBlock = latest
+            ? await gatekeeper.getBlock(REGISTRY, config.startBlock)
+            : null;
+
+        let startHeight = config.startBlock;
+
+        if (!latest) {
+            console.log(`No ${REGISTRY} blocks found in gatekeeper; syncing from configured start block ${config.startBlock}`);
+        } else if (!startBlock) {
+            console.log(`Gatekeeper ${REGISTRY} is missing configured start block ${config.startBlock}; resyncing from configured start block`);
+        } else {
+            startHeight = Math.max(latest.height + 1, config.startBlock);
+        }
+
+        if (startHeight > blockCount) {
+            console.log(`Gatekeeper ${REGISTRY} blocks are already synced through height ${latest!.height}`);
+            return;
+        }
+
+        for (let height = startHeight; height <= blockCount; height++) {
             const blockHash = await btcClient.getBlockHash(height);
             const header = await btcClient.getBlockHeader(blockHash) as BlockHeader;
-            console.log(`${height}/${blockCount} blocks (${(100 * height / blockCount).toFixed(2)}%)`);
+            console.log(`${height}/${blockCount} blocks (${formatSyncProgress(height, blockCount)}%)`);
             await addBlock(height, blockHash, header.time!);
         }
     } catch (error) {
