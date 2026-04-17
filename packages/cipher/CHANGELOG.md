@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.8](https://github.com/archetech/archon/compare/@didcid/cipher@0.1.3...@didcid/cipher@0.2.8) (2026-04-17)
+
+
+### Bug Fixes
+
+* Incorrect passphrase on react-wallet ([#97](https://github.com/archetech/archon/issues/97)) ([5ce0523](https://github.com/archetech/archon/commit/5ce05238ecb2dd6e5a4a647ab0429a9cf9bdb6a4))
+
+
+### Features
+
+* Add nostr support ([#133](https://github.com/archetech/archon/issues/133)) ([3591d62](https://github.com/archetech/archon/commit/3591d6281bf29c5e98e761e7ad56a7abf78a4106)), closes [#87](https://github.com/archetech/archon/issues/87)
+* Adopt W3C JWE standard for encryption ([#90](https://github.com/archetech/archon/issues/90)) ([2321ca7](https://github.com/archetech/archon/commit/2321ca7fd6e074bac1f4b8fa7c12e58d4b45b181))
+* Store imported nostr nsec in wallet ([#397](https://github.com/archetech/archon/issues/397)) ([7a0a919](https://github.com/archetech/archon/commit/7a0a919f34ba9161dce25eaa528dccf3443840a4))
+
+
+
+
+
 ## [0.2.7](https://github.com/archetech/archon/compare/@didcid/cipher@0.1.3...@didcid/cipher@0.2.7) (2026-04-06)
 
 
