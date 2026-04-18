@@ -1,6 +1,6 @@
 {
   "name": "archon-browser-extension",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Archon Browser Extension",
   "main": "index.js",
   "scripts": {
