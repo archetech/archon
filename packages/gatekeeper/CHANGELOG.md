@@ -3,6 +3,38 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.8](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.2.0...@didcid/gatekeeper@0.4.8) (2026-04-17)
+
+
+### Bug Fixes
+
+* Better error message for missing wallet ([#53](https://github.com/archetech/archon/issues/53)) ([1a8dad0](https://github.com/archetech/archon/commit/1a8dad05a8a1eafb5d89e88224b913657d1f0530))
+* getVaultItem failed for small vault items ([#45](https://github.com/archetech/archon/issues/45)) ([a6fdd52](https://github.com/archetech/archon/commit/a6fdd5233ae2013879b28252d322e392211a59c2))
+* Show failed lightning payments ([#376](https://github.com/archetech/archon/issues/376)) ([7d3b24f](https://github.com/archetech/archon/commit/7d3b24faff2cf8a1800143079a3367f2cf1e873e))
+
+
+### Features
+
+* Add ARCHON_ADMIN_API_KEY support to CLI docker container ([#128](https://github.com/archetech/archon/issues/128)) ([#131](https://github.com/archetech/archon/issues/131)) ([8526717](https://github.com/archetech/archon/commit/8526717c50b6fb71b3812fe9cd7867051d134c53))
+* Add change-registry command to change a DID's registry ([#194](https://github.com/archetech/archon/issues/194)) ([0d258de](https://github.com/archetech/archon/commit/0d258def464394a9c49b6d07f7681c35cfda5721)), closes [#153](https://github.com/archetech/archon/issues/153)
+* Add decodeLightningInvoice to Keymaster ([#146](https://github.com/archetech/archon/issues/146)) ([2ed4139](https://github.com/archetech/archon/commit/2ed4139f3ae548b21ca509877f3b05d3ce68f1b6)), closes [#145](https://github.com/archetech/archon/issues/145)
+* Add getVersion() to KeymasterClient ([#219](https://github.com/archetech/archon/issues/219)) ([f06d89c](https://github.com/archetech/archon/commit/f06d89c8047d60c00611eef4b2a577b54ca6d6a6)), closes [#205](https://github.com/archetech/archon/issues/205)
+* Add Lightning tab to web clients ([#148](https://github.com/archetech/archon/issues/148)) ([73ed52e](https://github.com/archetech/archon/commit/73ed52ea0da92b391fa53a92ba2c671f91912bbd)), closes [#147](https://github.com/archetech/archon/issues/147) [#147](https://github.com/archetech/archon/issues/147) [#147](https://github.com/archetech/archon/issues/147) [#147](https://github.com/archetech/archon/issues/147)
+* Add Lightning wallet support via LNbits integration ([#136](https://github.com/archetech/archon/issues/136)) ([#140](https://github.com/archetech/archon/issues/140)) ([4d99d5a](https://github.com/archetech/archon/commit/4d99d5ab8da20897e5aecf8557b271c3b1779d45))
+* Add Lightning Zap tab and Publish toggle to web clients ([#161](https://github.com/archetech/archon/issues/161)) ([6357451](https://github.com/archetech/archon/commit/6357451083f464120b01348c889deb5c80bed05f)), closes [#159](https://github.com/archetech/archon/issues/159)
+* Added update-credential to agent CLI ([#66](https://github.com/archetech/archon/issues/66)) ([002fce1](https://github.com/archetech/archon/commit/002fce1dcf2edb8c621eb77501cdf0abeed90484))
+* Adds CLI to keymaster package ([#39](https://github.com/archetech/archon/issues/39)) ([894ce73](https://github.com/archetech/archon/commit/894ce732f5beaca37bb90ace6b760b8e80aba3e9))
+* Adds get-property command to CLI ([#73](https://github.com/archetech/archon/issues/73)) ([310d7fe](https://github.com/archetech/archon/commit/310d7fe5d95976b8ca37ec12b7d6dc16cc52f65a))
+* Display Lightning payment history ([#164](https://github.com/archetech/archon/issues/164)) ([#165](https://github.com/archetech/archon/issues/165)) ([c8ec283](https://github.com/archetech/archon/commit/c8ec2835b0cde542c71e02fdb7fc55c3d46a81d1))
+* Lightning zap — send sats to a DID ([#155](https://github.com/archetech/archon/issues/155)) ([39d7ee3](https://github.com/archetech/archon/commit/39d7ee3242973ace494e45f636ca12fe78d911ab)), closes [#154](https://github.com/archetech/archon/issues/154)
+* move lightning payment filtering to client with full state display ([#237](https://github.com/archetech/archon/issues/237)) ([0eee4c0](https://github.com/archetech/archon/commit/0eee4c0987513d689a2a4eec3b7b088556be53b2)), closes [#236](https://github.com/archetech/archon/issues/236)
+* stream large file uploads/downloads for multi-GB video support ([#238](https://github.com/archetech/archon/issues/238)) ([eca94a0](https://github.com/archetech/archon/commit/eca94a06c041849a181a5a072728b9fe0c22bfae)), closes [#208](https://github.com/archetech/archon/issues/208)
+* Support mainnet registries ([#34](https://github.com/archetech/archon/issues/34)) ([a206c9e](https://github.com/archetech/archon/commit/a206c9e24f29fabec45f3cb239b8ba88f0525e6d))
+
+
+
+
+
 ## [0.4.7](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.2.0...@didcid/gatekeeper@0.4.7) (2026-04-06)
 
 
