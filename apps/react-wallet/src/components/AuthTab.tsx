@@ -9,7 +9,8 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "../contexts/VariablesProvider";
-import { scanQrCode } from "../utils/utils";
+import { scanQrCodeRaw } from "../utils/utils";
+import { dispatchDeepLink } from "../utils/deepLinkQueue";
 
 interface AutoLoginState {
     responseDID: string;
@@ -274,13 +275,13 @@ function AuthTab() {
     }
 
     async function scanChallengeQR() {
-        const qr = await scanQrCode();
+        const qr = await scanQrCodeRaw();
         if (!qr) {
             setError("Failed to scan QR code");
             return;
         }
 
-        setChallenge(qr);
+        dispatchDeepLink(qr);
     }
 
     return (

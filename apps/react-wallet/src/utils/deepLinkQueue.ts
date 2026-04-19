@@ -9,3 +9,8 @@ export function takeDeepLink(): string | null {
     pendingUrl = null;
     return url;
 }
+
+export function dispatchDeepLink(url: string) {
+    queueDeepLink(url);
+    window.dispatchEvent(new Event('archon:deepLinkQueued'));
+}

@@ -125,6 +125,29 @@ export async function scanQrCode() {
     return null;
 }
 
+export async function scanQrCodeRaw(): Promise<string | null> {
+    try {
+        const perm = await BarcodeScanner.requestPermissions();
+        if (perm.camera !== 'granted') {
+            return null;
+        }
+
+        const ready = await ensureGoogleModuleReady();
+        if (!ready) {
+            return null;
+        }
+
+        const { barcodes } = await BarcodeScanner.scan();
+
+        for (const b of barcodes) {
+            if (extractDid(b.rawValue)) {
+                return b.rawValue;
+            }
+        }
+    } catch {}
+    return null;
+}
+
 export async function scanAliasQrCode(): Promise<{ alias: string; did: string } | null> {
     try {
         const perm = await BarcodeScanner.requestPermissions();
