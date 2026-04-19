@@ -5,7 +5,7 @@ import { ContextProviders } from "./contexts/ContextProviders";
 import "./extension.css";
 import "./utils/polyfills";
 import { App } from '@capacitor/app';
-import { queueDeepLink } from './utils/deepLinkQueue';
+import { dispatchDeepLink } from './utils/deepLinkQueue';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { Capacitor } from '@capacitor/core';
 
@@ -51,11 +51,6 @@ function getPendingWalletAction(): PendingWalletAction | null {
     }
 
     return null;
-}
-
-function queueAndDispatch(url: string) {
-    queueDeepLink(url);
-    window.dispatchEvent(new Event('archon:deepLinkQueued'));
 }
 
 function isMobileBrowser() {
@@ -155,7 +150,7 @@ async function handleWalletUrl(): Promise<WalletUrlResult> {
 
         fallbackTimer = window.setTimeout(() => {
             if (document.visibilityState === 'visible') {
-                queueAndDispatch(action.deepLinkUrl);
+                dispatchDeepLink(action.deepLinkUrl);
             }
             cleanup();
         }, 1200);
@@ -171,18 +166,18 @@ async function handleWalletUrl(): Promise<WalletUrlResult> {
         return { status: 'fallback', action };
     }
 
-    queueAndDispatch(action.deepLinkUrl);
+    dispatchDeepLink(action.deepLinkUrl);
     return { status: 'fallback', action };
 }
 
 App.addListener('appUrlOpen', ({ url }) => {
-    queueAndDispatch(url);
+    dispatchDeepLink(url);
 });
 
 (async () => {
     const launch = await App.getLaunchUrl();
     if (launch?.url) {
-        queueAndDispatch(launch.url);
+        dispatchDeepLink(launch.url);
     }
 })();
 
@@ -206,7 +201,7 @@ const BrowserUI = () => {
 
     if (handoffResult.status === 'extension-handoff') {
         const openWebWallet = () => {
-            queueAndDispatch(handoffResult.action.deepLinkUrl);
+            dispatchDeepLink(handoffResult.action.deepLinkUrl);
             setHandoffResult({ status: 'fallback', action: handoffResult.action });
         };
 
