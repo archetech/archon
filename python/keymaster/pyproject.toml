@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "archon-keymaster"
+version = "0.1.0"
+description = "Reusable Python Keymaster core library for Archon"
+readme = "README.md"
+dependencies = [
+  "httpx==0.28.1",
+  "mnemonic==0.21",
+  "bip-utils==2.9.3",
+  "cryptography==44.0.2",
+  "jcs==0.2.1"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["keymaster*"]

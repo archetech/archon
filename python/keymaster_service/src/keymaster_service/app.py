@@ -10,7 +10,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .config import load_settings
 from .gatekeeper_client import GatekeeperClient
-from .service import KeymasterService, KeymasterServiceError
+from .runtime import KeymasterService, KeymasterServiceError
 from .wallet_store import JsonWalletStore
 
 

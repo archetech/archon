@@ -8,14 +8,11 @@ version = "0.1.0"
 description = "Native Python Keymaster service for Archon"
 readme = "README.md"
 dependencies = [
+  "archon-keymaster==0.1.0",
   "fastapi==0.115.12",
   "uvicorn[standard]==0.34.2",
-  "httpx==0.28.1",
   "prometheus-client==0.21.1",
-  "mnemonic==0.21",
-  "bip-utils==2.9.3",
-  "cryptography==44.0.2",
-  "jcs==0.2.1"
+  "httpx==0.28.1"
 ]
 
 [project.scripts]
@@ -23,3 +20,4 @@ keymaster-service = "keymaster_service.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["keymaster_service*"]

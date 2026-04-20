@@ -4,10 +4,10 @@ import asyncio
 from copy import deepcopy
 import json
 import logging
-from typing import Any
+from typing import Any, Protocol
 
-from .config import Settings
 from .crypto import (
+    b64url,
     decrypt_message,
     decrypt_with_passphrase,
     derive_private_key_bytes,
@@ -19,11 +19,8 @@ from .crypto import (
     private_key_to_jwk_pair,
     sign_hash,
     ub64url,
-    b64url,
     verify_sig,
 )
-from .gatekeeper_client import GatekeeperClient
-from .wallet_store import JsonWalletStore
 
 
 LOGGER = logging.getLogger(__name__)
@@ -36,57 +33,47 @@ DEFAULT_SCHEMA = {
 }
 
 
-class KeymasterServiceError(Exception):
+class KeymasterError(Exception):
     pass
 
 
-class UnknownIDError(KeymasterServiceError):
+class UnknownIDError(KeymasterError):
     pass
 
 
-class KeymasterService:
-    def __init__(self, settings: Settings, gatekeeper: GatekeeperClient, wallet_store: JsonWalletStore):
-        self.settings = settings
+class GatekeeperProtocol(Protocol):
+    async def list_registries(self) -> list[str]: ...
+    async def create_did(self, operation: dict[str, Any]) -> str: ...
+    async def resolve_did(self, did: str, options: dict[str, Any] | None = None) -> dict[str, Any]: ...
+    async def update_did(self, operation: dict[str, Any]) -> bool: ...
+    async def delete_did(self, operation: dict[str, Any]) -> bool: ...
+    async def get_block(self, registry: str, block: str | None = None) -> dict[str, Any] | None: ...
+
+
+class WalletStoreProtocol(Protocol):
+    def save_wallet(self, wallet: dict[str, Any], overwrite: bool = False) -> bool: ...
+    def load_wallet(self) -> dict[str, Any] | None: ...
+
+
+class Keymaster:
+    def __init__(
+        self,
+        gatekeeper: GatekeeperProtocol,
+        wallet_store: WalletStoreProtocol,
+        passphrase: str,
+        default_registry: str = "hyperswarm",
+        ephemeral_registry: str = "hyperswarm",
+        max_alias_length: int = 32,
+    ):
         self.gatekeeper = gatekeeper
         self.wallet_store = wallet_store
-        self.default_registry = settings.default_registry or "hyperswarm"
-        self.ephemeral_registry = "hyperswarm"
-        self.max_alias_length = 32
+        self.passphrase = passphrase
+        self.default_registry = default_registry or "hyperswarm"
+        self.ephemeral_registry = ephemeral_registry
+        self.max_alias_length = max_alias_length
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache = None
         self._lock = asyncio.Lock()
-        self.server_ready = False
-
-    async def startup(self) -> None:
-        if self.settings.keymaster_db != "json":
-            raise KeymasterServiceError(f"Unsupported ARCHON_KEYMASTER_DB for Python service: {self.settings.keymaster_db}")
-
-        await self.gatekeeper.connect(wait_until_ready=True, interval_seconds=5)
-        await self.load_wallet()
-        try:
-            await self.wait_for_node_id()
-            self.server_ready = True
-        except Exception:
-            LOGGER.exception("Failed to wait for node ID")
-
-    async def shutdown(self) -> None:
-        await self.gatekeeper.close()
-
-    async def wait_for_node_id(self) -> None:
-        if not self.settings.node_id:
-            raise KeymasterServiceError("ARCHON_NODE_ID is not set in the configuration.")
-
-        ids = await self.list_ids()
-        if self.settings.node_id not in ids:
-            await self.create_id(self.settings.node_id)
-            LOGGER.info("Created node ID '%s'", self.settings.node_id)
-
-        while True:
-            try:
-                await self.resolve_did(self.settings.node_id)
-                return
-            except Exception:
-                await asyncio.sleep(10)
 
     def _upgrade_wallet(self, wallet: dict[str, Any]) -> dict[str, Any]:
         upgraded = deepcopy(wallet)
@@ -128,18 +115,18 @@ class KeymasterService:
         try:
             self._root_cache = hd_root_from_mnemonic(mnemonic)
         except Exception as exc:
-            raise KeymasterServiceError("Invalid parameter: mnemonic") from exc
+            raise KeymasterError("Invalid parameter: mnemonic") from exc
 
         wallet = {
             "version": 2,
-            "seed": {"mnemonicEnc": encrypt_with_passphrase(mnemonic, self.settings.passphrase)},
+            "seed": {"mnemonicEnc": encrypt_with_passphrase(mnemonic, self.passphrase)},
             "counter": 0,
             "ids": {},
             "aliases": {},
         }
         ok = await self.save_wallet(wallet, overwrite=overwrite)
         if not ok:
-            raise KeymasterServiceError("save wallet failed")
+            raise KeymasterError("save wallet failed")
         return wallet
 
     async def decrypt_wallet(self, stored: dict[str, Any]) -> dict[str, Any]:
@@ -147,7 +134,7 @@ class KeymasterService:
             return self._upgrade_wallet(stored)
 
         seed = stored.get("seed", {})
-        mnemonic = decrypt_with_passphrase(seed["mnemonicEnc"], self.settings.passphrase)
+        mnemonic = decrypt_with_passphrase(seed["mnemonicEnc"], self.passphrase)
         self._root_cache = hd_root_from_mnemonic(mnemonic)
         root_pair = await self.hd_key_pair()
         plaintext = decrypt_message(root_pair["privateJwk"], stored["enc"])
@@ -162,14 +149,14 @@ class KeymasterService:
 
     async def decrypt_mnemonic(self) -> str:
         wallet = await self.load_wallet()
-        return decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.settings.passphrase)
+        return decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
 
     async def _root_node(self, wallet: dict[str, Any] | None = None):
         if self._root_cache is not None:
             return self._root_cache
         if wallet is None:
             wallet = await self.load_wallet()
-        mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.settings.passphrase)
+        mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
         self._root_cache = hd_root_from_mnemonic(mnemonic)
         return self._root_cache
 
@@ -187,12 +174,12 @@ class KeymasterService:
 
     def validate_alias(self, alias: str, wallet: dict[str, Any], label: str = "name") -> str:
         if not isinstance(alias, str) or not alias.strip():
-            raise KeymasterServiceError(f"Invalid parameter: {label} must be a non-empty string")
+            raise KeymasterError(f"Invalid parameter: {label} must be a non-empty string")
         alias = alias.strip()
         if len(alias) > self.max_alias_length:
-            raise KeymasterServiceError(f"Invalid parameter: {label} too long")
+            raise KeymasterError(f"Invalid parameter: {label} too long")
         if alias in wallet.get("aliases", {}) or alias in wallet.get("ids", {}):
-            raise KeymasterServiceError(f"Invalid parameter: {label} already used")
+            raise KeymasterError(f"Invalid parameter: {label} already used")
         return alias
 
     async def fetch_id_info(self, identifier: str | None = None, wallet: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -211,7 +198,7 @@ class KeymasterService:
         else:
             current = wallet.get("current")
             if not current:
-                raise KeymasterServiceError("No current ID")
+                raise KeymasterError("No current ID")
             id_info = wallet["ids"].get(current)
 
         if not id_info:
@@ -243,7 +230,7 @@ class KeymasterService:
         docs = await self.gatekeeper.resolve_did(actual_did, options)
         metadata = docs.get("didResolutionMetadata") or {}
         if metadata.get("error"):
-            raise KeymasterServiceError(metadata["error"])
+            raise KeymasterError(metadata["error"])
         did_metadata = docs.setdefault("didDocumentMetadata", {})
         controller = docs.get("didDocument", {}).get("controller") or docs.get("didDocument", {}).get("id")
         did_metadata["isOwned"] = await self.id_in_wallet(controller)
@@ -370,7 +357,7 @@ class KeymasterService:
         id_info = await self.fetch_id_info(controller)
         keypair = await self.fetch_key_pair(controller)
         if not keypair:
-            raise KeymasterServiceError("addProof: no keypair")
+            raise KeymasterError("addProof: no keypair")
         doc = await self.resolve_did(id_info["did"], {"confirm": "true"})
         verification_methods = doc.get("didDocument", {}).get("verificationMethod") or []
         key_fragment = verification_methods[0].get("id", "#key-1") if verification_methods else "#key-1"
@@ -522,7 +509,7 @@ class KeymasterService:
         deleted = 0
         await self.resolve_seed_bank()
 
-        for name, info in wallet["ids"].items():
+        for info in wallet["ids"].values():
             try:
                 doc = await self.resolve_did(info["did"])
                 if doc.get("didDocumentMetadata", {}).get("deactivated"):
@@ -531,8 +518,7 @@ class KeymasterService:
                 invalid += 1
             checked += 1
 
-        for alias, did in wallet.get("aliases", {}).items():
-            _ = alias
+        for did in wallet.get("aliases", {}).values():
             try:
                 doc = await self.resolve_did(did)
                 if doc.get("didDocumentMetadata", {}).get("deactivated"):
@@ -554,7 +540,7 @@ class KeymasterService:
                 try:
                     doc = await self.resolve_did(wallet["ids"][name]["did"])
                     if doc.get("didDocumentMetadata", {}).get("deactivated"):
-                        raise KeymasterServiceError("deactivated")
+                        raise KeymasterError("deactivated")
                 except Exception:
                     del wallet["ids"][name]
                     ids_removed += 1
@@ -567,7 +553,7 @@ class KeymasterService:
                         try:
                             doc = await self.resolve_did(did)
                             if doc.get("didDocumentMetadata", {}).get("deactivated"):
-                                raise KeymasterServiceError("deactivated")
+                                raise KeymasterError("deactivated")
                             kept.append(did)
                         except Exception:
                             if field == "owned":
@@ -581,7 +567,7 @@ class KeymasterService:
                 try:
                     doc = await self.resolve_did(did)
                     if doc.get("didDocumentMetadata", {}).get("deactivated"):
-                        raise KeymasterServiceError("deactivated")
+                        raise KeymasterError("deactivated")
                 except Exception:
                     del wallet["aliases"][alias]
                     aliases_removed += 1
@@ -620,7 +606,7 @@ class KeymasterService:
         keypair = await self.hd_key_pair()
         did = doc.get("didDocument", {}).get("id")
         if not did:
-            raise KeymasterServiceError("seed bank missing DID")
+            raise KeymasterError("seed bank missing DID")
         current = await self.gatekeeper.resolve_did(did)
         payload = {
             "type": "update",
@@ -679,18 +665,18 @@ class KeymasterService:
             seed_bank = await self.resolve_seed_bank()
             did = (seed_bank.get("didDocumentData") or {}).get("wallet")
             if not did:
-                raise KeymasterServiceError("No backup DID found")
+                raise KeymasterError("No backup DID found")
 
         keypair = await self.hd_key_pair()
         data = await self.resolve_asset(did)
         backup = data.get("backup")
         if not isinstance(backup, str):
-            raise KeymasterServiceError("Asset \"backup\" is missing or not a string")
+            raise KeymasterError("Asset \"backup\" is missing or not a string")
 
         wallet = json.loads(decrypt_message(keypair["privateJwk"], backup))
         if isinstance(wallet, dict) and wallet.get("seed", {}).get("mnemonicEnc"):
             mnemonic = await self.decrypt_mnemonic()
-            wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, self.settings.passphrase)
+            wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, self.passphrase)
 
         async with self._lock:
             upgraded = self._upgrade_wallet(wallet)
@@ -701,14 +687,14 @@ class KeymasterService:
         wallet = await self.load_wallet()
         name = identifier or wallet.get("current")
         if not name:
-            raise KeymasterServiceError("Invalid parameter: no current ID")
+            raise KeymasterError("Invalid parameter: no current ID")
         id_info = await self.fetch_id_info(name, wallet)
         keypair = await self.hd_key_pair(wallet)
         backup = encrypt_message(keypair["publicJwk"], json.dumps({"name": name, "id": id_info}, separators=(",", ":")))
         doc = await self.resolve_did(id_info["did"])
         registry = doc.get("didDocumentRegistration", {}).get("registry")
         if not registry:
-            raise KeymasterServiceError("no registry found for agent DID")
+            raise KeymasterError("no registry found for agent DID")
         backup_store_did = await self.create_asset({"backup": backup}, {"registry": registry, "controller": name})
         current_data = doc.get("didDocumentData") or {}
         updated_data = {**current_data, "backupStore": backup_store_did}
@@ -719,16 +705,16 @@ class KeymasterService:
         doc = await self.resolve_did(did)
         backup_store_did = (doc.get("didDocumentData") or {}).get("backupStore")
         if not backup_store_did:
-            raise KeymasterServiceError("backup not found in backupStore")
+            raise KeymasterError("backup not found in backupStore")
         backup_store = await self.resolve_asset(backup_store_did)
         backup = backup_store.get("backup")
         if not isinstance(backup, str):
-            raise KeymasterServiceError("backup not found in backupStore")
+            raise KeymasterError("backup not found in backupStore")
         data = json.loads(decrypt_message(keypair["privateJwk"], backup))
         async with self._lock:
             wallet = await self.load_wallet()
             if data["name"] in wallet["ids"]:
-                raise KeymasterServiceError(f"{data['name']} already exists in wallet")
+                raise KeymasterError(f"{data['name']} already exists in wallet")
             wallet["ids"][data["name"]] = data["id"]
             wallet["current"] = data["name"]
             wallet["counter"] += 1
@@ -740,7 +726,7 @@ class KeymasterService:
             wallet = await self.load_wallet()
             current_name = wallet.get("current")
             if not current_name:
-                raise KeymasterServiceError("No current ID")
+                raise KeymasterError("No current ID")
             id_info = wallet["ids"][current_name]
             next_index = id_info.get("index", 0) + 1
             keypair = await self.derive_key_pair(id_info["account"], next_index, wallet)
@@ -748,7 +734,7 @@ class KeymasterService:
             did_document = doc.get("didDocument") or {}
             verification_methods = did_document.get("verificationMethod") or []
             if not verification_methods:
-                raise KeymasterServiceError("DID Document missing verificationMethod")
+                raise KeymasterError("DID Document missing verificationMethod")
             updated_method = dict(verification_methods[0])
             updated_method["id"] = f"#key-{next_index + 1}"
             updated_method["publicKeyJwk"] = keypair["publicJwk"]
@@ -767,7 +753,7 @@ class KeymasterService:
     async def get_public_key_jwk(self, doc: dict[str, Any]) -> dict[str, str]:
         methods = doc.get("didDocument", {}).get("verificationMethod") or []
         if not methods or not methods[0].get("publicKeyJwk"):
-            raise KeymasterServiceError("The DID document does not contain any verification methods.")
+            raise KeymasterError("The DID document does not contain any verification methods.")
         return methods[0]["publicKeyJwk"]
 
     async def encrypt_message(self, message: str, receiver: str, options: dict[str, Any] | None = None) -> str:
@@ -776,7 +762,7 @@ class KeymasterService:
         include_hash = options.get("includeHash", False)
         sender_keypair = await self.fetch_key_pair()
         if not sender_keypair:
-            raise KeymasterServiceError("No valid sender keypair")
+            raise KeymasterError("No valid sender keypair")
         receiver_doc = await self.resolve_did(receiver, {"confirm": "true"})
         receiver_public_jwk = await self.get_public_key_jwk(receiver_doc)
         encrypted = {
@@ -792,16 +778,16 @@ class KeymasterService:
         msg_doc = await self.resolve_did(did)
         encrypted = (msg_doc.get("didDocumentData") or {}).get("encrypted") or (msg_doc.get("didDocumentData") or {})
         if not encrypted or "cipher_receiver" not in encrypted:
-            raise KeymasterServiceError("Invalid parameter: did not encrypted")
+            raise KeymasterError("Invalid parameter: did not encrypted")
         sender = encrypted.get("sender") or msg_doc.get("didDocument", {}).get("controller")
         created = encrypted.get("created") or msg_doc.get("didDocumentMetadata", {}).get("created")
         if not sender:
-            raise KeymasterServiceError("Sender DID could not be determined from message or DID document")
+            raise KeymasterError("Sender DID could not be determined from message or DID document")
         sender_doc = await self.resolve_did(sender, {"confirm": "true", "versionTime": created} if created else {"confirm": "true"})
         sender_public_jwk = await self.get_public_key_jwk(sender_doc)
         ciphertext = encrypted.get("cipher_sender") if sender == id_info["did"] and encrypted.get("cipher_sender") else encrypted.get("cipher_receiver")
         if not isinstance(ciphertext, str) or not ciphertext:
-            raise KeymasterServiceError("Encrypted payload is missing ciphertext")
+            raise KeymasterError("Encrypted payload is missing ciphertext")
         root = await self._root_node(wallet)
         index = id_info.get("index", 0)
         while index >= 0:
@@ -812,7 +798,7 @@ class KeymasterService:
                 return decrypt_message(keypair["privateJwk"], ciphertext)
             except Exception:
                 index -= 1
-        raise KeymasterServiceError("ID can't decrypt ciphertext")
+        raise KeymasterError("ID can't decrypt ciphertext")
 
     async def encrypt_json(self, value: Any, receiver: str, options: dict[str, Any] | None = None) -> str:
         return await self.encrypt_message(json.dumps(value, separators=(",", ":")), receiver, options or {})
@@ -823,7 +809,7 @@ class KeymasterService:
     async def create_schema(self, schema: Any | None = None, options: dict[str, Any] | None = None) -> str:
         schema = DEFAULT_SCHEMA if schema is None else schema
         if not self.validate_schema(schema):
-            raise KeymasterServiceError("Invalid parameter: schema")
+            raise KeymasterError("Invalid parameter: schema")
         return await self.create_asset({"schema": schema}, options or {})
 
     def validate_schema(self, schema: Any) -> bool:
@@ -835,7 +821,7 @@ class KeymasterService:
 
     def generate_schema_template(self, schema: Any) -> dict[str, Any]:
         if not isinstance(schema, dict) or "$schema" not in schema or "properties" not in schema:
-            raise KeymasterServiceError("Invalid parameter: schema")
+            raise KeymasterError("Invalid parameter: schema")
         return {key: "TBD" for key in schema["properties"].keys()}
 
     async def get_schema(self, identifier: str) -> Any:
@@ -846,7 +832,7 @@ class KeymasterService:
 
     async def set_schema(self, identifier: str, schema: Any) -> bool:
         if not self.validate_schema(schema):
-            raise KeymasterServiceError("Invalid parameter: schema")
+            raise KeymasterError("Invalid parameter: schema")
         return await self.merge_data(identifier, {"schema": schema})
 
     async def test_schema(self, identifier: str) -> bool:
@@ -865,7 +851,7 @@ class KeymasterService:
 
     async def create_template(self, schema_id: str) -> dict[str, Any]:
         if not await self.test_schema(schema_id):
-            raise KeymasterServiceError("Invalid parameter: schemaId")
+            raise KeymasterError("Invalid parameter: schemaId")
         schema_did = await self.lookup_did(schema_id)
         template = self.generate_schema_template(await self.get_schema(schema_did))
         template["$schema"] = schema_did
@@ -904,15 +890,15 @@ class KeymasterService:
         group_did = await self.lookup_did(group_id)
         member_did = await self.lookup_did(member_id)
         if group_did == member_did:
-            raise KeymasterServiceError("Invalid parameter: can't add a group to itself")
+            raise KeymasterError("Invalid parameter: can't add a group to itself")
         await self.resolve_did(member_did)
         group = await self.get_group(group_id)
         if not group:
-            raise KeymasterServiceError("Invalid parameter: groupId")
+            raise KeymasterError("Invalid parameter: groupId")
         if member_did in group["members"]:
             return True
         if await self.test_group(member_id, group_id):
-            raise KeymasterServiceError("Invalid parameter: can't create mutual membership")
+            raise KeymasterError("Invalid parameter: can't create mutual membership")
         members = list(dict.fromkeys(group["members"] + [member_did]))
         return await self.merge_data(group_did, {"group": {"version": 2, "members": members}})
 
@@ -922,7 +908,7 @@ class KeymasterService:
         await self.resolve_did(member_did)
         group = await self.get_group(group_did)
         if not group:
-            raise KeymasterServiceError("Invalid parameter: groupId")
+            raise KeymasterError("Invalid parameter: groupId")
         members = [did for did in group["members"] if did != member_did]
         return await self.merge_data(group_did, {"group": {"version": 2, "members": members}})
 
@@ -948,7 +934,7 @@ class KeymasterService:
         challenge = challenge_asset.get("challenge") or {}
         requestor = doc.get("didDocument", {}).get("controller")
         if not requestor:
-            raise KeymasterServiceError("Invalid parameter: requestor undefined")
+            raise KeymasterError("Invalid parameter: requestor undefined")
 
         requested = len(challenge.get("credentials", []))
         response = {
@@ -965,7 +951,7 @@ class KeymasterService:
         response_doc = await self.resolve_did(response_did)
         wrapper = await self.decrypt_json(response_did)
         if not isinstance(wrapper, dict) or "response" not in wrapper:
-            raise KeymasterServiceError("Invalid parameter: responseDID not a valid challenge response")
+            raise KeymasterError("Invalid parameter: responseDID not a valid challenge response")
         response = wrapper["response"]
         challenge_asset = await self.resolve_asset(response["challenge"])
         challenge = challenge_asset.get("challenge") or {}

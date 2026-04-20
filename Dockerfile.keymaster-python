@@ -10,9 +10,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+COPY python/keymaster /app/keymaster
 COPY python/keymaster_service /app/keymaster_service
 
 RUN python -m pip install --upgrade pip \
+    && pip install /app/keymaster \
     && pip install /app/keymaster_service
 
 WORKDIR /app/keymaster
