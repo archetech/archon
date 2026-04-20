@@ -1,0 +1,8 @@
+services:
+  keymaster:
+    build:
+      context: .
+      dockerfile: Dockerfile.keymaster-python
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/keymaster-python
