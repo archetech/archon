@@ -10,8 +10,8 @@ from bip_utils import Bip32Secp256k1, Bip39SeedGenerator
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-import jcs
 from mnemonic import Mnemonic
+import rfc8785
 
 
 ENC_ITER_DEFAULT = 100_000
@@ -98,7 +98,7 @@ def convert_jwk_to_compressed_bytes(jwk: dict[str, str]) -> bytes:
 
 
 def canonicalize_json(value: Any) -> bytes:
-    canonical = jcs.canonicalize(value)
+    canonical = rfc8785.dumps(value)
     if isinstance(canonical, bytes):
         return canonical
     return canonical.encode("utf-8")
