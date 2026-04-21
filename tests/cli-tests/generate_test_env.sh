@@ -8,8 +8,6 @@ cd "$(git rev-parse --show-toplevel)"
 touch .env
 
 ENV_FILE=".env"
-ARCHON_UID_VALUE="$(id -u)"
-ARCHON_GID_VALUE="$(id -g)"
 
 echo "Generating .env file at project root..."
 
@@ -17,8 +15,8 @@ cat > "$ENV_FILE" <<EOL
 # Auto-generated .env file
 
 # General
-ARCHON_UID=${ARCHON_UID_VALUE}
-ARCHON_GID=${ARCHON_GID_VALUE}
+ARCHON_UID=1000
+ARCHON_GID=1000
 ARCHON_NODE_NAME=archon-quality
 ARCHON_NODE_ID=archon-quality
 ARCHON_PROTOCOL=/ARCHON/test

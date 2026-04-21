@@ -33,4 +33,3 @@ These rules apply to coding agents working in this repository.
 - Nostr event IDs in Python parity code must use compact JSON serialization (`separators=(",", ":")`) to match the TypeScript `JSON.stringify` hashing/signing contract.
 - Python Lightning invoice parity should only surface `expiry` and `expires` when the BOLT11 invoice actually includes an expiry tag; the `bolt11` library exposes a default expiry even when the tag is absent.
 - Python keymaster flavor runs in CLI CI must force `ARCHON_KEYMASTER_DB=json`; the generated CLI test `.env` still defaults keymaster DB to `redis` for the TypeScript service.
-- Any generated `.env` used with bind-mounted service data must derive `ARCHON_UID` and `ARCHON_GID` from the current host user (`id -u` / `id -g`); hardcoding `1000:1000` breaks Python keymaster JSON wallet writes on CI runners and non-1000 hosts.

@@ -60,8 +60,8 @@ An Archon node includes several interoperating microservices. If you follow the 
 Customize your node in the archon/.env file. Environment variables are documented for each service in the READMEs linked in the Overview above.
 
 ```
-ARCHON_UID=$(id -u)                                    # Docker host UID
-ARCHON_GID=$(id -g)                                    # Docker host GID
+ARCHON_UID=1000                                        # Docker host UID
+ARCHON_GID=1002                                        # Docker host GID
 ARCHON_NODE_NAME=anon                                  # Hyperswarm node name
 ARCHON_NODE_ID=anon                                    # Node Keymaster DID name
 ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,BTC:testnet4,BTC:signet      # Supported DID Registries
