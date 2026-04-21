@@ -37,8 +37,7 @@ def apply_content_length(options: dict[str, Any], request: Request) -> dict[str,
 
 def parse_resolve_options(request: Request) -> dict[str, Any]:
     options: dict[str, Any] = {}
-    for key in ("versionTime", "versionSequence"):
-        value = request.query_params.get(key)
+    for key, value in request.query_params.items():
         if isinstance(value, str) and value:
             options[key] = value
     return options
@@ -112,7 +111,7 @@ async def login(body: dict[str, Any]) -> dict[str, str]:
     return {"adminApiKey": settings.admin_api_key or ""}
 
 
-@public_api.get("/registries")
+@protected_api.get("/registries")
 async def registries() -> dict[str, list[str]]:
     return {"registries": await service.list_registries()}
 
@@ -213,8 +212,8 @@ async def backup_id(identifier: str) -> dict[str, bool]:
 
 
 @protected_api.post("/ids/{identifier}/recover")
-async def recover_id(identifier: str, body: dict[str, Any]) -> dict[str, str]:
-    return {"recovered": await service.recover_id(body.get("did") or identifier)}
+async def recover_id(identifier: str, body: dict[str, Any] | None = None) -> dict[str, str]:
+    return {"recovered": await service.recover_id((body or {}).get("did") or identifier)}
 
 
 @protected_api.get("/aliases")
@@ -349,8 +348,7 @@ async def get_lightning_payments(body: dict[str, Any]) -> dict[str, Any]:
 
 @protected_api.get("/did/{identifier}")
 async def resolve_did(identifier: str, request: Request) -> dict[str, Any]:
-    options = {key: value for key, value in request.query_params.items()}
-    return {"docs": await service.resolve_did(identifier, options or None)}
+    return {"docs": await service.resolve_did(identifier, parse_resolve_options(request) or None)}
 
 
 @protected_api.put("/did/{identifier}")
@@ -444,8 +442,8 @@ async def create_asset(body: dict[str, Any]) -> dict[str, str]:
 
 
 @protected_api.get("/assets/{identifier}")
-async def get_asset(identifier: str) -> dict[str, Any]:
-    return {"asset": await service.resolve_asset(identifier)}
+async def get_asset(identifier: str, request: Request) -> dict[str, Any]:
+    return {"asset": await service.resolve_asset(identifier, parse_resolve_options(request))}
 
 
 @protected_api.put("/assets/{identifier}")
@@ -529,19 +527,30 @@ async def test_file(identifier: str) -> dict[str, bool]:
     return {"test": await service.test_file(identifier)}
 
 
+@protected_api.get("/ipfs/data/{cid}")
+async def get_ipfs_data(cid: str) -> Response:
+    try:
+        data = await service.get_data(cid)
+        if data is None:
+            raise FileNotFoundError("Not Found")
+        return Response(content=data, media_type="application/octet-stream")
+    except Exception as exc:
+        return PlainTextResponse(str(exc), media_type="text/plain", status_code=404)
+
+
 @protected_api.post("/vaults")
 async def create_vault(body: dict[str, Any]) -> dict[str, str]:
     return {"did": await service.create_vault(body.get("options") or {})}
 
 
 @protected_api.get("/vaults/{identifier}")
-async def get_vault(identifier: str) -> dict[str, Any]:
-    return {"vault": await service.get_vault(identifier)}
+async def get_vault(identifier: str, request: Request) -> dict[str, Any]:
+    return {"vault": await service.get_vault(identifier, parse_resolve_options(request))}
 
 
 @protected_api.post("/vaults/{identifier}/test")
-async def test_vault(identifier: str) -> dict[str, bool]:
-    return {"test": await service.test_vault(identifier)}
+async def test_vault(identifier: str, body: dict[str, Any] | None = None) -> dict[str, bool]:
+    return {"test": await service.test_vault(identifier, (body or {}).get("options") or {})}
 
 
 @protected_api.post("/vaults/{identifier}/members")
@@ -571,13 +580,13 @@ async def remove_vault_item(identifier: str, name: str) -> dict[str, bool]:
 
 
 @protected_api.get("/vaults/{identifier}/items")
-async def list_vault_items(identifier: str) -> dict[str, Any]:
-    return {"items": await service.list_vault_items(identifier)}
+async def list_vault_items(identifier: str, request: Request) -> dict[str, Any]:
+    return {"items": await service.list_vault_items(identifier, parse_resolve_options(request))}
 
 
 @protected_api.get("/vaults/{identifier}/items/{name}")
-async def get_vault_item(identifier: str, name: str) -> Response:
-    item = await service.get_vault_item(identifier, name)
+async def get_vault_item(identifier: str, name: str, request: Request) -> Response:
+    item = await service.get_vault_item(identifier, name, parse_resolve_options(request))
     return Response(content=item or b"", media_type="application/octet-stream")
 
 

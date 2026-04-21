@@ -32,6 +32,9 @@ class KeymasterService:
     def __getattr__(self, name: str) -> Any:
         return getattr(self.keymaster, name)
 
+    async def get_data(self, cid: str) -> bytes | None:
+        return await self.gatekeeper.get_data(cid)
+
     async def startup(self) -> None:
         if self.settings.keymaster_db != "json":
             raise KeymasterServiceError(

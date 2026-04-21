@@ -15,7 +15,7 @@ Source of truth:
 - [ ] Every TypeScript keymaster HTTP route exists in the Python service with
       matching request body, query params, auth behavior, response envelope,
       and status codes.
-- [ ] Every public capability consumed through the TypeScript client contract
+- [x] Every public capability consumed through the TypeScript client contract
       exists in the Python library.
 - [ ] Every major TypeScript keymaster test domain has equivalent Python tests.
 - [ ] The Python implementation can replace the TypeScript service in compose
@@ -42,7 +42,7 @@ Source of truth:
 - [x] `decryptMnemonic`
 - [x] `exportEncryptedWallet`
 - [x] `changePassphrase`
-- [ ] Full parity with `tests/keymaster/wallet.test.ts`
+- [x] Full parity with `tests/keymaster/wallet.test.ts`
 
 ## IDs and DID lifecycle
 
@@ -62,7 +62,7 @@ Source of truth:
 - [x] `testAgent`
 - [x] `changeRegistry`
 - [x] Full parity with `tests/keymaster/id.test.ts`
-- [ ] Full parity with `tests/keymaster/utils.test.ts`
+- [x] Full parity with `tests/keymaster/utils.test.ts`
 
 ## Aliases
 
@@ -82,7 +82,7 @@ Source of truth:
 - [x] Service route parity for `PUT /assets/:id`
 - [x] `cloneAsset`
 - [x] `transferAsset`
-- [ ] Asset registry-change semantics confirmed against TypeScript behavior
+- [x] Asset registry-change semantics confirmed against TypeScript behavior
 - [x] Full parity with `tests/keymaster/asset.test.ts`
 
 ## Keys and cryptography
@@ -106,7 +106,7 @@ Source of truth:
 - [x] `setSchema`
 - [x] `testSchema`
 - [x] `createTemplate`
-- [ ] Full parity with `tests/keymaster/schema.test.ts`
+- [x] Full parity with `tests/keymaster/schema.test.ts`
 
 ## Groups
 
@@ -116,7 +116,7 @@ Source of truth:
 - [x] `removeGroupMember`
 - [x] `testGroup`
 - [x] `listGroups`
-- [ ] Full parity with `tests/keymaster/group.test.ts`
+- [x] Full parity with `tests/keymaster/group.test.ts`
 
 ## Challenge and response
 
@@ -124,7 +124,7 @@ Source of truth:
 - [x] `createResponse`
 - [x] `verifyResponse`
 - [x] Full parity with `tests/keymaster/challenge.test.ts`
-- [ ] Full parity with `tests/keymaster/response.test.ts`
+- [x] Full parity with `tests/keymaster/response.test.ts`
 
 ## Addresses
 
@@ -258,7 +258,7 @@ Source of truth:
 
 ## Client and integration parity
 
-- [ ] Python-facing client or compatibility layer covers the same externally
+- [x] Python-facing client or compatibility layer covers the same externally
       relevant contract exercised by `tests/keymaster/client.test.ts`
 - [ ] Response envelope differences between TypeScript and Python are fully
       removed

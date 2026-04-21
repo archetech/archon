@@ -1,6 +1,9 @@
 import os
 import requests
 import json
+import sys
+import time
+from urllib.parse import urlencode
 
 _base_url = os.environ.get("ARCHON_KEYMASTER_URL", "http://localhost:4226")
 _keymaster_api = _base_url + "/api/v1"
@@ -14,13 +17,21 @@ class KeymasterError(Exception):
     """An error occurred while communicating with the Keymaster API."""
 
 
+def add_custom_header(header: str, value: str):
+    _session.headers[header] = value
+
+
+def remove_custom_header(header: str):
+    _session.headers.pop(header, None)
+
+
 def set_api_key(api_key: str):
     global _admin_api_key
     _admin_api_key = api_key
     if api_key:
-        _session.headers["Authorization"] = f"Bearer {api_key}"
+        add_custom_header("Authorization", f"Bearer {api_key}")
     else:
-        _session.headers.pop("Authorization", None)
+        remove_custom_header("Authorization")
 
 
 def proxy_request(method, url, **kwargs):
@@ -51,6 +62,81 @@ def set_url(new_url: str):
     global _base_url, _keymaster_api
     _base_url = new_url
     _keymaster_api = _base_url + "/api/v1"
+
+
+def connect(options=None):
+    if options is None:
+        options = {}
+
+    url = options.get("url")
+    if url:
+        set_url(url)
+
+    api_key = options.get("apiKey") or options.get("api_key")
+    if api_key:
+        set_api_key(api_key)
+
+    if options.get("waitUntilReady") or options.get("wait_until_ready"):
+        wait_until_ready(
+            interval_seconds=options.get("intervalSeconds", options.get("interval_seconds", 5)),
+            chatty=options.get("chatty", False),
+            become_chatty_after=options.get("becomeChattyAfter", options.get("become_chatty_after", 0)),
+            max_retries=options.get("maxRetries", options.get("max_retries", 0)),
+        )
+
+
+def create(options=None):
+    connect(options)
+    return sys.modules[__name__]
+
+
+def wait_until_ready(interval_seconds=5, chatty=False, become_chatty_after=0, max_retries=0):
+    ready = False
+    retries = 0
+
+    if chatty:
+        print(f"Connecting to Keymaster at {_keymaster_api}")
+
+    while not ready:
+        ready = is_ready()
+        if ready:
+            break
+
+        retries += 1
+        if max_retries > 0 and retries > max_retries:
+            return
+
+        if not chatty and become_chatty_after > 0 and retries > become_chatty_after:
+            print(f"Connecting to Keymaster at {_keymaster_api}")
+            chatty = True
+
+        if chatty:
+            print("Waiting for Keymaster to be ready...")
+        time.sleep(interval_seconds)
+
+    if chatty:
+        print("Keymaster service is ready!")
+
+
+def _query_string(params=None):
+    if not params:
+        return ""
+
+    encoded = {}
+    for key, value in params.items():
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            encoded[key] = "true" if value else "false"
+        else:
+            encoded[key] = str(value)
+    if not encoded:
+        return ""
+    return f"?{urlencode(encoded)}"
+
+
+def _with_query(url, params=None):
+    return f"{url}{_query_string(params)}"
 
 
 def get_version():
@@ -92,6 +178,15 @@ def remove_id(identifier):
 def rename_id(identifier, name):
     response = proxy_request(
         "POST", f"{_keymaster_api}/ids/{identifier}/rename", json={"name": name}
+    )
+    return response["ok"]
+
+
+def change_registry(identifier, registry):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/ids/{identifier}/change-registry",
+        json={"registry": registry},
     )
     return response["ok"]
 
@@ -195,13 +290,13 @@ def list_registries():
     return response["registries"]
 
 
-def resolve_did(name):
-    response = proxy_request("GET", f"{_keymaster_api}/did/{name}")
+def resolve_did(name, options=None):
+    response = proxy_request("GET", _with_query(f"{_keymaster_api}/did/{name}", options))
     return response["docs"]
 
 
-def resolve_asset(name):
-    response = proxy_request("GET", f"{_keymaster_api}/assets/{name}")
+def resolve_asset(name, options=None):
+    response = proxy_request("GET", _with_query(f"{_keymaster_api}/assets/{name}", options))
     return response["asset"]
 
 
@@ -403,6 +498,44 @@ def get_alias(alias):
 
 def remove_alias(alias):
     response = proxy_request("DELETE", f"{_keymaster_api}/aliases/{alias}")
+    return response["ok"]
+
+
+def list_addresses():
+    response = proxy_request("GET", f"{_keymaster_api}/addresses")
+    return response["addresses"]
+
+
+def get_address(domain):
+    response = proxy_request("GET", f"{_keymaster_api}/addresses/{domain}")
+    return response["address"]
+
+
+def import_address(domain):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/addresses/import",
+        json={"domain": domain},
+    )
+    return response["addresses"]
+
+
+def check_address(address):
+    return proxy_request("GET", f"{_keymaster_api}/addresses/check/{address}")
+
+
+def add_address(address):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/addresses",
+        json={"address": address},
+    )
+    return response["ok"]
+
+
+def remove_address(address):
+    safe = requests.utils.quote(str(address), safe="")
+    response = proxy_request("DELETE", f"{_keymaster_api}/addresses/{safe}")
     return response["ok"]
 
 
@@ -636,8 +769,8 @@ def import_dmail(did):
     return response["ok"]
 
 
-def get_dmail_message(identifier):
-    response = proxy_request("GET", f"{_keymaster_api}/dmail/{identifier}")
+def get_dmail_message(identifier, options=None):
+    response = proxy_request("GET", _with_query(f"{_keymaster_api}/dmail/{identifier}", options))
     return response["message"]
 
 
@@ -669,8 +802,11 @@ def file_dmail(identifier, tags):
     return response["ok"]
 
 
-def list_dmail_attachments(identifier):
-    response = proxy_request("GET", f"{_keymaster_api}/dmail/{identifier}/attachments")
+def list_dmail_attachments(identifier, options=None):
+    response = proxy_request(
+        "GET",
+        _with_query(f"{_keymaster_api}/dmail/{identifier}/attachments", options),
+    )
     return response["attachments"]
 
 
@@ -712,7 +848,11 @@ def get_dmail_attachment(identifier, name):
     try:
         resp.raise_for_status()
     except requests.HTTPError:
+        if resp.status_code == 404:
+            return None
         raise KeymasterError(f"Error {resp.status_code}: {resp.text}")
+    if not resp.content:
+        return None
     return resp.content
 
 
@@ -752,13 +892,17 @@ def create_vault(options=None):
     return response["did"]
 
 
-def get_vault(identifier):
-    response = proxy_request("GET", f"{_keymaster_api}/vaults/{identifier}")
+def get_vault(identifier, options=None):
+    response = proxy_request("GET", _with_query(f"{_keymaster_api}/vaults/{identifier}", options))
     return response["vault"]
 
 
-def test_vault(identifier):
-    response = proxy_request("POST", f"{_keymaster_api}/vaults/{identifier}/test")
+def test_vault(identifier, options=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/vaults/{identifier}/test",
+        json={"options": options},
+    )
     return response["test"]
 
 
@@ -815,19 +959,23 @@ def remove_vault_item(vault_id, name):
     return response["ok"]
 
 
-def list_vault_items(vault_id):
-    response = proxy_request("GET", f"{_keymaster_api}/vaults/{vault_id}/items")
+def list_vault_items(vault_id, options=None):
+    response = proxy_request("GET", _with_query(f"{_keymaster_api}/vaults/{vault_id}/items", options))
     return response["items"]
 
 
-def get_vault_item(vault_id, name):
+def get_vault_item(vault_id, name, options=None):
     safe = requests.utils.quote(str(name), safe="")
-    url = f"{_keymaster_api}/vaults/{vault_id}/items/{safe}"
+    url = _with_query(f"{_keymaster_api}/vaults/{vault_id}/items/{safe}", options)
     resp = _session.get(url)
     try:
         resp.raise_for_status()
     except requests.HTTPError:
+        if resp.status_code == 404:
+            return None
         raise KeymasterError(f"Error {resp.status_code}: {resp.text}")
+    if not resp.content:
+        return None
     return resp.content
 
 
@@ -871,8 +1019,24 @@ def update_image(identifier, data, options=None):
 
 
 def get_image(identifier):
-    response = proxy_request("GET", f"{_keymaster_api}/images/{identifier}")
-    return response
+    resp = _session.get(
+        f"{_keymaster_api}/images/{identifier}",
+        headers={"Accept": "application/octet-stream"},
+    )
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError:
+        if resp.status_code == 404:
+            return None
+        raise KeymasterError(f"Error {resp.status_code}: {resp.text}")
+    metadata = json.loads(resp.headers.get("X-Metadata", "{}"))
+    return {
+        "file": {
+            **metadata.get("file", {}),
+            "data": resp.content,
+        },
+        "image": metadata.get("image"),
+    }
 
 
 def test_image(identifier):
@@ -894,6 +1058,10 @@ def create_file(data, options=None):
     return resp.json()["did"]
 
 
+def create_file_stream(data, options=None):
+    return create_file(data, options)
+
+
 def update_file(identifier, data, options=None):
     if options is None:
         options = {}
@@ -908,9 +1076,26 @@ def update_file(identifier, data, options=None):
     return resp.json()["ok"]
 
 
+def update_file_stream(identifier, data, options=None):
+    return update_file(identifier, data, options)
+
+
 def get_file(identifier):
-    response = proxy_request("GET", f"{_keymaster_api}/files/{identifier}")
-    return response["file"]
+    resp = _session.get(
+        f"{_keymaster_api}/files/{identifier}",
+        headers={"Accept": "application/octet-stream"},
+    )
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError:
+        if resp.status_code == 404:
+            return None
+        raise KeymasterError(f"Error {resp.status_code}: {resp.text}")
+    metadata = json.loads(resp.headers.get("X-Metadata", "{}"))
+    return {
+        **metadata,
+        "data": resp.content,
+    }
 
 
 def test_file(identifier):
@@ -1043,6 +1228,15 @@ def add_nostr(id=None):
         "POST",
         f"{_keymaster_api}/nostr",
         json={"id": id},
+    )
+    return response
+
+
+def import_nostr(nsec, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/nostr/import",
+        json={"nsec": nsec, "id": id},
     )
     return response
 

@@ -14,7 +14,20 @@ case "${2:-${ARCHON_GATEKEEPER_FLAVOR:-ts}}" in
     ;;
 esac
 
+# Optional third arg selects the keymaster implementation. Accepts the same
+# values as ARCHON_KEYMASTER_FLAVOR (ts | py). If unset, falls back to the
+# value already in the environment (e.g. from .env) or "ts".
+case "${3:-${ARCHON_KEYMASTER_FLAVOR:-ts}}" in
+  py|python)       export ARCHON_KEYMASTER_FLAVOR="py" ;;
+  ts|typescript)   export ARCHON_KEYMASTER_FLAVOR="ts" ;;
+  *)
+    echo "Unknown keymaster flavor: ${3:-$ARCHON_KEYMASTER_FLAVOR} (expected: ts | py)"
+    exit 1
+    ;;
+esac
+
 echo "Using gatekeeper flavor: $ARCHON_GATEKEEPER_FLAVOR"
+echo "Using keymaster flavor: $ARCHON_KEYMASTER_FLAVOR"
 
 export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 

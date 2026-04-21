@@ -11,6 +11,7 @@ from typing import Any, Protocol, cast
 
 import httpx
 from bolt11 import decode as decode_bolt11
+from cryptography.exceptions import InvalidTag
 
 from .crypto import (
     b64url,
@@ -127,12 +128,22 @@ class Keymaster:
         self._lock = asyncio.Lock()
 
     def _upgrade_wallet(self, wallet: dict[str, Any]) -> dict[str, Any]:
+        version = wallet.get("version")
+        if version not in (None, 1, 2):
+            raise KeymasterError("Unsupported wallet version.")
+
         upgraded = deepcopy(wallet)
-        upgraded.setdefault("version", 2)
+        upgraded["version"] = 2
         upgraded.setdefault("seed", {})
+        if "mnemonicEnc" not in upgraded["seed"]:
+            raise KeymasterError("Unsupported wallet version.")
         upgraded.setdefault("counter", 0)
         upgraded.setdefault("ids", {})
-        upgraded.setdefault("aliases", {})
+        aliases = dict(upgraded.get("aliases") or {})
+        legacy_names = upgraded.pop("names", None)
+        if isinstance(legacy_names, dict):
+            aliases.update(legacy_names)
+        upgraded["aliases"] = aliases
         return upgraded
 
     async def _save_loaded_wallet(self, wallet: dict[str, Any], overwrite: bool = True) -> bool:
@@ -185,10 +196,16 @@ class Keymaster:
             return self._upgrade_wallet(stored)
 
         seed = stored.get("seed", {})
-        mnemonic = decrypt_with_passphrase(seed["mnemonicEnc"], self.passphrase)
+        try:
+            mnemonic = decrypt_with_passphrase(seed["mnemonicEnc"], self.passphrase)
+        except InvalidTag as exc:
+            raise KeymasterError("Incorrect passphrase.") from exc
         self._root_cache = hd_root_from_mnemonic(mnemonic)
         root_pair = await self.hd_key_pair()
-        plaintext = decrypt_message(root_pair["privateJwk"], stored["enc"])
+        try:
+            plaintext = decrypt_message(root_pair["privateJwk"], stored["enc"])
+        except InvalidTag as exc:
+            raise KeymasterError("Incorrect passphrase.") from exc
         rest = json.loads(plaintext)
         return {"version": stored.get("version", 2), "seed": seed, **rest}
 
@@ -1802,6 +1819,17 @@ class Keymaster:
                 invalid += 1
             checked += 1
 
+        for id_info in wallet["ids"].values():
+            for field in ("owned", "held"):
+                for did in id_info.get(field, []):
+                    try:
+                        doc = await self.resolve_did(did)
+                        if doc.get("didDocumentMetadata", {}).get("deactivated"):
+                            deleted += 1
+                    except Exception:
+                        invalid += 1
+                    checked += 1
+
         return {"checked": checked, "invalid": invalid, "deleted": deleted}
 
     async def fix_wallet(self) -> dict[str, int]:
@@ -1881,7 +1909,7 @@ class Keymaster:
         keypair = await self.hd_key_pair()
         did = doc.get("didDocument", {}).get("id")
         if not did:
-            raise KeymasterError("seed bank missing DID")
+            raise KeymasterError("Invalid parameter: seed bank missing DID")
         current = await self.gatekeeper.resolve_did(did)
         payload = {
             "type": "update",
@@ -1936,17 +1964,21 @@ class Keymaster:
         return backup_did
 
     async def recover_wallet(self, did: str | None = None) -> dict[str, Any]:
+        current_wallet = await self.load_wallet()
         if not did:
             seed_bank = await self.resolve_seed_bank()
             did = (seed_bank.get("didDocumentData") or {}).get("wallet")
             if not did:
-                raise KeymasterError("No backup DID found")
+                return current_wallet
 
         keypair = await self.hd_key_pair()
-        data = await self.resolve_asset(did)
+        try:
+            data = await self.resolve_asset(did)
+        except Exception:
+            return current_wallet
         backup = data.get("backup")
         if not isinstance(backup, str):
-            raise KeymasterError("Asset \"backup\" is missing or not a string")
+            return current_wallet
 
         wallet = json.loads(decrypt_message(keypair["privateJwk"], backup))
         if isinstance(wallet, dict) and wallet.get("seed", {}).get("mnemonicEnc"):
@@ -2588,6 +2620,17 @@ class Keymaster:
             and isinstance(value.get("credentialSubject"), dict)
         )
 
+    def credential_matches_request(self, credential: dict[str, Any], request: dict[str, Any]) -> bool:
+        schema_id = credential.get("credentialSchema", {}).get("id")
+        if request.get("schema") and schema_id != request.get("schema"):
+            return False
+
+        issuers = request.get("issuers")
+        if isinstance(issuers, list) and issuers and credential.get("issuer") not in issuers:
+            return False
+
+        return True
+
     async def bind_credential(
         self,
         subject_id: str,
@@ -3165,18 +3208,43 @@ class Keymaster:
 
         doc = await self.resolve_did(challenge_did)
         challenge_asset = await self.resolve_asset(challenge_did)
+        if "challenge" not in challenge_asset or not isinstance(challenge_asset.get("challenge"), dict):
+            raise KeymasterError("Invalid parameter: challengeDID")
         challenge = challenge_asset.get("challenge") or {}
         requestor = doc.get("didDocument", {}).get("controller")
         if not requestor:
             raise KeymasterError("Invalid parameter: requestor undefined")
 
-        requested = len(challenge.get("credentials", []))
+        requests = challenge.get("credentials", []) if isinstance(challenge.get("credentials"), list) else []
+        held_credentials = await self.list_credentials()
+        matched_credentials = []
+        used_credentials: set[str] = set()
+
+        for request in requests:
+            if not isinstance(request, dict):
+                continue
+
+            for credential_did in held_credentials:
+                if credential_did in used_credentials:
+                    continue
+
+                try:
+                    credential = await self.get_credential(credential_did)
+                except Exception:
+                    credential = None
+
+                if credential and self.credential_matches_request(credential, request):
+                    matched_credentials.append({"vc": credential_did, "vp": credential})
+                    used_credentials.add(credential_did)
+                    break
+
+        requested = len(requests)
         response = {
             "challenge": challenge_did,
-            "credentials": [],
+            "credentials": matched_credentials,
             "requested": requested,
-            "fulfilled": 0,
-            "match": requested == 0,
+            "fulfilled": len(matched_credentials),
+            "match": requested == len(matched_credentials),
         }
         return await self.encrypt_json({"response": response}, requestor, options)
 
@@ -3186,10 +3254,45 @@ class Keymaster:
         wrapper = await self.decrypt_json(response_did)
         if not isinstance(wrapper, dict) or "response" not in wrapper:
             raise KeymasterError("Invalid parameter: responseDID not a valid challenge response")
-        response = wrapper["response"]
+        response = deepcopy(wrapper["response"])
         challenge_asset = await self.resolve_asset(response["challenge"])
         challenge = challenge_asset.get("challenge") or {}
-        response["vps"] = []
-        response["match"] = len(response.get("credentials", [])) == len(challenge.get("credentials", []))
+        requests = challenge.get("credentials", []) if isinstance(challenge.get("credentials"), list) else []
+        matched_vps = []
+        satisfied = [False] * len(requests)
+
+        for entry in response.get("credentials", []):
+            if not isinstance(entry, dict) or not isinstance(entry.get("vc"), str):
+                continue
+
+            try:
+                credential_doc = await self.resolve_did(entry["vc"])
+                if credential_doc.get("didDocumentMetadata", {}).get("deactivated"):
+                    continue
+            except Exception:
+                continue
+
+            credential = entry.get("vp") if isinstance(entry.get("vp"), dict) else None
+            if not credential:
+                try:
+                    credential = await self.get_credential(entry["vc"])
+                except Exception:
+                    credential = None
+
+            if not credential:
+                continue
+
+            for index, request in enumerate(requests):
+                if satisfied[index] or not isinstance(request, dict):
+                    continue
+                if self.credential_matches_request(credential, request):
+                    matched_vps.append({"vc": entry["vc"], "vp": credential})
+                    satisfied[index] = True
+                    break
+
+        response["vps"] = matched_vps
+        response["requested"] = len(requests)
+        response["fulfilled"] = len(matched_vps)
+        response["match"] = len(matched_vps) == len(requests)
         response["responder"] = response_doc.get("didDocument", {}).get("controller")
         return response
