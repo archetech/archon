@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import json
 import logging
 from typing import Any
 
@@ -353,6 +354,59 @@ async def transfer_asset(identifier: str, body: dict[str, Any]) -> dict[str, boo
 @protected_api.post("/assets/{identifier}/clone")
 async def clone_asset(identifier: str, body: dict[str, Any]) -> dict[str, str]:
     return {"did": await service.clone_asset(identifier, body.get("options") or {})}
+
+
+@protected_api.post("/vaults")
+async def create_vault(body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.create_vault(body.get("options") or {})}
+
+
+@protected_api.get("/vaults/{identifier}")
+async def get_vault(identifier: str) -> dict[str, Any]:
+    return {"vault": await service.get_vault(identifier)}
+
+
+@protected_api.post("/vaults/{identifier}/test")
+async def test_vault(identifier: str) -> dict[str, bool]:
+    return {"test": await service.test_vault(identifier)}
+
+
+@protected_api.post("/vaults/{identifier}/members")
+async def add_vault_member(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.add_vault_member(identifier, body["memberId"])}
+
+
+@protected_api.delete("/vaults/{identifier}/members/{member}")
+async def remove_vault_member(identifier: str, member: str) -> dict[str, bool]:
+    return {"ok": await service.remove_vault_member(identifier, member)}
+
+
+@protected_api.get("/vaults/{identifier}/members")
+async def list_vault_members(identifier: str) -> dict[str, Any]:
+    return {"members": await service.list_vault_members(identifier)}
+
+
+@protected_api.post("/vaults/{identifier}/items")
+async def add_vault_item(identifier: str, request: Request, body: bytes) -> dict[str, bool]:
+    options_header = request.headers.get("x-options") or "{}"
+    options = json.loads(options_header) if options_header else {}
+    return {"ok": await service.add_vault_item(identifier, options["name"], body)}
+
+
+@protected_api.delete("/vaults/{identifier}/items/{name}")
+async def remove_vault_item(identifier: str, name: str) -> dict[str, bool]:
+    return {"ok": await service.remove_vault_item(identifier, name)}
+
+
+@protected_api.get("/vaults/{identifier}/items")
+async def list_vault_items(identifier: str) -> dict[str, Any]:
+    return {"items": await service.list_vault_items(identifier)}
+
+
+@protected_api.get("/vaults/{identifier}/items/{name}")
+async def get_vault_item(identifier: str, name: str) -> Response:
+    item = await service.get_vault_item(identifier, name)
+    return Response(content=item or b"", media_type="application/octet-stream")
 
 
 @protected_api.post("/notices")

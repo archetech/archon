@@ -65,3 +65,17 @@ class GatekeeperClient:
         response = await self._client.post("/query", json=query)
         response.raise_for_status()
         return response.json()
+
+    async def add_text(self, text: str) -> str:
+        response = await self._client.post(
+            "/ipfs/text",
+            content=text,
+            headers={"Content-Type": "text/plain"},
+        )
+        response.raise_for_status()
+        return response.text
+
+    async def get_text(self, cid: str) -> str | None:
+        response = await self._client.get(f"/ipfs/text/{cid}")
+        response.raise_for_status()
+        return response.text

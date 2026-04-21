@@ -195,17 +195,17 @@ Source of truth:
 
 ## Vaults
 
-- [ ] `createVault`
-- [ ] `getVault`
-- [ ] `testVault`
-- [ ] `addVaultMember`
-- [ ] `removeVaultMember`
-- [ ] `listVaultMembers`
-- [ ] `addVaultItem`
-- [ ] `removeVaultItem`
-- [ ] `listVaultItems`
-- [ ] `getVaultItem`
-- [ ] Service route parity for `/vault*`
+- [x] `createVault`
+- [x] `getVault`
+- [x] `testVault`
+- [x] `addVaultMember`
+- [x] `removeVaultMember`
+- [x] `listVaultMembers`
+- [x] `addVaultItem`
+- [x] `removeVaultItem`
+- [x] `listVaultItems`
+- [x] `getVaultItem`
+- [x] Service route parity for `/vaults*`
 - [ ] Full parity with `tests/keymaster/vault.test.ts`
 
 ## Dmail and notices
@@ -275,7 +275,7 @@ Source of truth:
 - [ ] Implement addresses
 - [ ] Implement files and images
 - [ ] Implement polls
-- [ ] Implement vaults
+- [x] Implement vaults
 - [ ] Implement dmail and notices
 - [ ] Implement Nostr
 - [ ] Implement Lightning

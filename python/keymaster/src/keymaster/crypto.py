@@ -77,6 +77,12 @@ def private_key_to_jwk_pair(private_key_bytes: bytes) -> dict[str, dict[str, str
     return {"publicJwk": public_jwk, "privateJwk": private_jwk}
 
 
+def generate_jwk_pair() -> dict[str, dict[str, str]]:
+    private_key = ec.generate_private_key(ec.SECP256K1())
+    private_value = private_key.private_numbers().private_value.to_bytes(32, "big")
+    return private_key_to_jwk_pair(private_value)
+
+
 def jwk_to_public_key(jwk: dict[str, str]) -> ec.EllipticCurvePublicKey:
     public_numbers = ec.EllipticCurvePublicNumbers(
         int.from_bytes(ub64url(jwk["x"]), "big"),
@@ -219,3 +225,11 @@ def encrypt_message(recipient_pub_jwk: dict[str, str], message: str) -> str:
 
 def decrypt_message(recipient_priv_jwk: dict[str, str], ciphertext: str) -> str:
     return parse_jwe_compact(recipient_priv_jwk, ciphertext).decode("utf-8")
+
+
+def encrypt_bytes(recipient_pub_jwk: dict[str, str], payload: bytes) -> str:
+    return build_jwe_compact(recipient_pub_jwk, payload)
+
+
+def decrypt_bytes(recipient_priv_jwk: dict[str, str], ciphertext: str) -> bytes:
+    return parse_jwe_compact(recipient_priv_jwk, ciphertext)

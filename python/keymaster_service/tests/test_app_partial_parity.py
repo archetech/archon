@@ -76,7 +76,9 @@ def _install_fastapi_stubs() -> None:
         return value
 
     class Response:
-        pass
+        def __init__(self, content=None, media_type: str | None = None):
+            self.content = content
+            self.media_type = media_type
 
     class JSONResponse(Response):
         def __init__(self, status_code: int = 200, content=None):
@@ -170,6 +172,46 @@ class StubService:
     async def clone_asset(self, identifier: str, options):
         self.calls.append(("clone_asset", identifier, options))
         return "did:test:clone"
+
+    async def create_vault(self, options):
+        self.calls.append(("create_vault", options))
+        return "did:test:vault"
+
+    async def get_vault(self, identifier: str):
+        self.calls.append(("get_vault", identifier))
+        return {"version": 1, "keys": {}, "items": "enc", "publicJwk": {"kty": "EC"}}
+
+    async def test_vault(self, identifier: str) -> bool:
+        self.calls.append(("test_vault", identifier))
+        return True
+
+    async def add_vault_member(self, identifier: str, member_id: str) -> bool:
+        self.calls.append(("add_vault_member", identifier, member_id))
+        return True
+
+    async def remove_vault_member(self, identifier: str, member: str) -> bool:
+        self.calls.append(("remove_vault_member", identifier, member))
+        return True
+
+    async def list_vault_members(self, identifier: str):
+        self.calls.append(("list_vault_members", identifier))
+        return {"did:test:alice": {"added": "2026-04-04T13:00:00.000Z"}}
+
+    async def add_vault_item(self, identifier: str, name: str, body: bytes) -> bool:
+        self.calls.append(("add_vault_item", identifier, name, body))
+        return True
+
+    async def remove_vault_item(self, identifier: str, name: str) -> bool:
+        self.calls.append(("remove_vault_item", identifier, name))
+        return True
+
+    async def list_vault_items(self, identifier: str):
+        self.calls.append(("list_vault_items", identifier))
+        return {"doc.txt": {"cid": "cid-1", "bytes": 3}}
+
+    async def get_vault_item(self, identifier: str, name: str):
+        self.calls.append(("get_vault_item", identifier, name))
+        return b"abc"
 
     async def create_notice(self, message, options):
         self.calls.append(("create_notice", message, options))
@@ -373,4 +415,43 @@ def test_notice_handlers(stub_service: StubService):
         ("create_notice", {"to": ["did:test:alice"], "dids": ["did:test:credential"]}, {"registry": "hyperswarm"}),
         ("refresh_notices",),
         ("update_notice", "did:test:notice", {"to": ["did:test:alice"], "dids": ["did:test:credential", "did:test:credential-2"]}),
+    ]
+
+
+def test_vault_handlers(stub_service: StubService):
+    request = app_module.Request(headers={"x-options": '{"name":"doc.txt"}'})
+
+    created = run(app_module.create_vault({"options": {"secretMembers": True}}))
+    fetched = run(app_module.get_vault("did:test:vault"))
+    tested = run(app_module.test_vault("did:test:vault"))
+    added_member = run(app_module.add_vault_member("did:test:vault", {"memberId": "did:test:alice"}))
+    listed_members = run(app_module.list_vault_members("did:test:vault"))
+    removed_member = run(app_module.remove_vault_member("did:test:vault", "did:test:alice"))
+    added_item = run(app_module.add_vault_item("did:test:vault", request, b"abc"))
+    listed_items = run(app_module.list_vault_items("did:test:vault"))
+    fetched_item = run(app_module.get_vault_item("did:test:vault", "doc.txt"))
+    removed_item = run(app_module.remove_vault_item("did:test:vault", "doc.txt"))
+
+    assert created == {"did": "did:test:vault"}
+    assert fetched == {"vault": {"version": 1, "keys": {}, "items": "enc", "publicJwk": {"kty": "EC"}}}
+    assert tested == {"test": True}
+    assert added_member == {"ok": True}
+    assert listed_members == {"members": {"did:test:alice": {"added": "2026-04-04T13:00:00.000Z"}}}
+    assert removed_member == {"ok": True}
+    assert added_item == {"ok": True}
+    assert listed_items == {"items": {"doc.txt": {"cid": "cid-1", "bytes": 3}}}
+    assert fetched_item.content == b"abc"
+    assert fetched_item.media_type == "application/octet-stream"
+    assert removed_item == {"ok": True}
+    assert stub_service.calls == [
+        ("create_vault", {"secretMembers": True}),
+        ("get_vault", "did:test:vault"),
+        ("test_vault", "did:test:vault"),
+        ("add_vault_member", "did:test:vault", "did:test:alice"),
+        ("list_vault_members", "did:test:vault"),
+        ("remove_vault_member", "did:test:vault", "did:test:alice"),
+        ("add_vault_item", "did:test:vault", "doc.txt", b"abc"),
+        ("list_vault_items", "did:test:vault"),
+        ("get_vault_item", "did:test:vault", "doc.txt"),
+        ("remove_vault_item", "did:test:vault", "doc.txt"),
     ]

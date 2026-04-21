@@ -4,19 +4,24 @@ import asyncio
 from copy import deepcopy
 import json
 import logging
+import os
 from typing import Any, Protocol
 
 import httpx
 
 from .crypto import (
     b64url,
+    decrypt_bytes,
     decrypt_message,
     decrypt_with_passphrase,
     derive_private_key_bytes,
+    encrypt_bytes,
     encrypt_message,
     encrypt_with_passphrase,
+    generate_jwk_pair,
     generate_mnemonic,
     hash_json,
+    hash_message,
     hd_root_from_mnemonic,
     private_key_to_jwk_pair,
     sign_hash,
@@ -58,6 +63,8 @@ class GatekeeperProtocol(Protocol):
     async def delete_did(self, operation: dict[str, Any]) -> bool: ...
     async def get_block(self, registry: str, block: str | None = None) -> dict[str, Any] | None: ...
     async def search(self, query: dict[str, Any]) -> list[str]: ...
+    async def add_text(self, text: str) -> str: ...
+    async def get_text(self, cid: str) -> str | None: ...
 
 
 class WalletStoreProtocol(Protocol):
@@ -81,6 +88,7 @@ class Keymaster:
         self.default_registry = default_registry or "hyperswarm"
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
+        self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache = None
         self._lock = asyncio.Lock()
@@ -203,13 +211,15 @@ class Keymaster:
     def did_match(self, did1: str, did2: str) -> bool:
         return did1.split(":")[-1] == did2.split(":")[-1]
 
-    def validate_alias(self, alias: str, wallet: dict[str, Any], label: str = "name") -> str:
+    def validate_alias(self, alias: str, wallet: dict[str, Any] | None = None, label: str = "name") -> str:
         if not isinstance(alias, str) or not alias.strip():
             raise KeymasterError(f"Invalid parameter: {label} must be a non-empty string")
         alias = alias.strip()
         if len(alias) > self.max_alias_length:
             raise KeymasterError(f"Invalid parameter: {label} too long")
-        if alias in wallet.get("aliases", {}) or alias in wallet.get("ids", {}):
+        if any(not char.isprintable() for char in alias):
+            raise KeymasterError(f"Invalid parameter: {label} contains unprintable characters")
+        if wallet and (alias in wallet.get("aliases", {}) or alias in wallet.get("ids", {})):
             raise KeymasterError(f"Invalid parameter: {label} already used")
         return alias
 
@@ -641,6 +651,290 @@ class Keymaster:
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
         return await self.derive_key_pair(id_info["account"], id_info.get("index", 0), wallet)
+
+    async def decrypt_with_derived_keys(
+        self,
+        wallet: dict[str, Any],
+        id_info: dict[str, Any],
+        ciphertext: str,
+    ) -> str:
+        root = await self._root_node(wallet)
+        index = id_info.get("index", 0)
+
+        while index >= 0:
+            path = f"m/44'/0'/{id_info['account']}'/0/{index}"
+            keypair = private_key_to_jwk_pair(derive_private_key_bytes(root, path))
+            try:
+                return decrypt_message(keypair["privateJwk"], ciphertext)
+            except Exception:
+                index -= 1
+
+        raise KeymasterError("ID can't decrypt ciphertext")
+
+    def generate_salted_id(self, vault: dict[str, Any], member_did: str) -> str:
+        if not vault.get("version"):
+            return hash_message(f"{vault['salt']}{member_did}")
+
+        suffix = member_did.split(":")[-1]
+        return hash_message(f"{vault['salt']}{suffix}")
+
+    def generate_ballot_key(self, vault: dict[str, Any], member_did: str) -> str:
+        return self.generate_salted_id(vault, member_did)[: self.max_alias_length]
+
+    async def decrypt_vault(self, vault: dict[str, Any]) -> dict[str, Any]:
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(None, wallet)
+        my_member_id = self.generate_salted_id(vault, id_info["did"])
+        my_vault_key = vault.get("keys", {}).get(my_member_id)
+
+        if not my_vault_key:
+            raise KeymasterError("No access to vault")
+
+        private_jwk = json.loads(await self.decrypt_with_derived_keys(wallet, id_info, my_vault_key))
+
+        config: dict[str, Any] = {}
+        is_owner = False
+        try:
+            config = json.loads(await self.decrypt_with_derived_keys(wallet, id_info, vault["config"]))
+            is_owner = True
+        except Exception:
+            pass
+
+        members: dict[str, Any] = {}
+        if config.get("secretMembers"):
+            try:
+                members = json.loads(await self.decrypt_with_derived_keys(wallet, id_info, vault["members"]))
+            except Exception:
+                pass
+        else:
+            try:
+                members = json.loads(decrypt_message(private_jwk, vault["members"]))
+            except Exception:
+                pass
+
+        items = json.loads(decrypt_message(private_jwk, vault["items"]))
+        return {
+            "isOwner": is_owner,
+            "privateJwk": private_jwk,
+            "config": config,
+            "members": members,
+            "items": items,
+        }
+
+    async def check_vault_owner(self, vault_id: str) -> str:
+        id_info = await self.fetch_id_info()
+        vault_doc = await self.resolve_did(vault_id)
+        controller = vault_doc.get("didDocument", {}).get("controller")
+
+        if controller != id_info["did"]:
+            raise KeymasterError("Only vault owner can modify the vault")
+
+        return controller
+
+    async def add_member_key(self, vault: dict[str, Any], member_did: str, private_jwk: dict[str, str]) -> None:
+        member_doc = await self.resolve_did(member_did, {"confirm": True})
+        member_public_jwk = await self.get_public_key_jwk(member_doc)
+        member_key = encrypt_message(member_public_jwk, json.dumps(private_jwk, separators=(",", ":")))
+        member_key_id = self.generate_salted_id(vault, member_did)
+        vault.setdefault("keys", {})[member_key_id] = member_key
+
+    async def check_vault_version(self, vault_id: str, vault: dict[str, Any]) -> None:
+        if vault.get("version") == 1:
+            return
+
+        if not vault.get("version"):
+            id_info = await self.fetch_id_info()
+            decrypted = await self.decrypt_vault(vault)
+
+            vault["version"] = 1
+            vault["keys"] = {}
+
+            await self.add_member_key(vault, id_info["did"], decrypted["privateJwk"])
+
+            for member_did in decrypted["members"].keys():
+                await self.add_member_key(vault, member_did, decrypted["privateJwk"])
+
+            await self.merge_data(vault_id, {"vault": vault})
+            return
+
+        raise KeymasterError("Unsupported vault version")
+
+    def get_agent_did(self, doc: dict[str, Any]) -> str:
+        if doc.get("didDocumentRegistration", {}).get("type") != "agent":
+            raise KeymasterError("Document is not an agent")
+
+        did = doc.get("didDocument", {}).get("id")
+        if not did:
+            raise KeymasterError("Agent document does not have a DID")
+
+        return did
+
+    def get_mime_type(self, buffer: bytes) -> str:
+        signatures = {
+            b"\x89PNG\r\n\x1a\n": "image/png",
+            b"\xff\xd8\xff": "image/jpeg",
+            b"GIF87a": "image/gif",
+            b"GIF89a": "image/gif",
+        }
+        for signature, mime in signatures.items():
+            if buffer.startswith(signature):
+                return mime
+
+        if len(buffer) >= 12 and buffer[:4] == b"RIFF" and buffer[8:12] == b"WEBP":
+            return "image/webp"
+
+        try:
+            text = buffer.decode("utf-8")
+        except UnicodeDecodeError:
+            return "application/octet-stream"
+
+        try:
+            json.loads(text)
+            return "application/json"
+        except Exception:
+            pass
+
+        if all(character.isprintable() or character in "\t\n\r" for character in text):
+            return "text/plain"
+
+        return "application/octet-stream"
+
+    async def create_vault(self, options: dict[str, Any] | None = None) -> str:
+        options = deepcopy(options or {})
+        id_info = await self.fetch_id_info()
+        id_keypair = await self.fetch_key_pair()
+        if not id_keypair:
+            raise KeymasterError("No valid sender keypair")
+        version = 1 if "version" not in options else (1 if options.get("version") == 1 else None)
+        vault_keypair = generate_jwk_pair()
+        public_jwk = id_keypair["publicJwk"] if options.get("secretMembers") else vault_keypair["publicJwk"]
+        vault = {
+            "version": version,
+            "publicJwk": vault_keypair["publicJwk"],
+            "salt": b64url(os.urandom(16)),
+            "config": encrypt_message(id_keypair["publicJwk"], json.dumps(options, separators=(",", ":"))),
+            "members": encrypt_message(public_jwk, json.dumps({}, separators=(",", ":"))),
+            "keys": {},
+            "items": encrypt_message(vault_keypair["publicJwk"], json.dumps({}, separators=(",", ":"))),
+            "sha256": hash_json({}),
+        }
+
+        await self.add_member_key(vault, id_info["did"], vault_keypair["privateJwk"])
+        return await self.create_asset({"vault": vault}, options)
+
+    async def get_vault(self, vault_id: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        asset = await self.resolve_asset(vault_id, options)
+        if not isinstance(asset, dict) or not isinstance(asset.get("vault"), dict):
+            raise KeymasterError("Invalid parameter: vaultId")
+        return asset["vault"]
+
+    async def test_vault(self, identifier: str, options: dict[str, Any] | None = None) -> bool:
+        try:
+            vault = await self.get_vault(identifier, options)
+            return vault is not None
+        except Exception:
+            return False
+
+    async def add_vault_member(self, vault_id: str, member_id: str) -> bool:
+        owner = await self.check_vault_owner(vault_id)
+
+        id_keypair = await self.fetch_key_pair()
+        if not id_keypair:
+            raise KeymasterError("No valid sender keypair")
+        vault = await self.get_vault(vault_id)
+        decrypted = await self.decrypt_vault(vault)
+        member_doc = await self.resolve_did(member_id, {"confirm": True})
+        member_did = self.get_agent_did(member_doc)
+
+        if owner == member_did:
+            return False
+
+        decrypted["members"][member_did] = {"added": __import__("datetime").datetime.utcnow().isoformat() + "Z"}
+        public_jwk = id_keypair["publicJwk"] if decrypted["config"].get("secretMembers") else vault["publicJwk"]
+        vault["members"] = encrypt_message(public_jwk, json.dumps(decrypted["members"], separators=(",", ":")))
+
+        await self.add_member_key(vault, member_did, decrypted["privateJwk"])
+        return await self.merge_data(vault_id, {"vault": vault})
+
+    async def remove_vault_member(self, vault_id: str, member_id: str) -> bool:
+        owner = await self.check_vault_owner(vault_id)
+
+        id_keypair = await self.fetch_key_pair()
+        if not id_keypair:
+            raise KeymasterError("No valid sender keypair")
+        vault = await self.get_vault(vault_id)
+        decrypted = await self.decrypt_vault(vault)
+        member_doc = await self.resolve_did(member_id, {"confirm": True})
+        member_did = self.get_agent_did(member_doc)
+
+        if owner == member_did:
+            return False
+
+        decrypted["members"].pop(member_did, None)
+        public_jwk = id_keypair["publicJwk"] if decrypted["config"].get("secretMembers") else vault["publicJwk"]
+        vault["members"] = encrypt_message(public_jwk, json.dumps(decrypted["members"], separators=(",", ":")))
+        vault.setdefault("keys", {}).pop(self.generate_salted_id(vault, member_did), None)
+        return await self.merge_data(vault_id, {"vault": vault})
+
+    async def list_vault_members(self, vault_id: str) -> dict[str, Any]:
+        vault = await self.get_vault(vault_id)
+        decrypted = await self.decrypt_vault(vault)
+
+        if decrypted["isOwner"]:
+            await self.check_vault_version(vault_id, vault)
+
+        return decrypted["members"]
+
+    async def add_vault_item(self, vault_id: str, name: str, buffer: bytes) -> bool:
+        await self.check_vault_owner(vault_id)
+
+        vault = await self.get_vault(vault_id)
+        decrypted = await self.decrypt_vault(vault)
+        valid_name = self.validate_alias(name)
+        encrypted_data = encrypt_bytes(vault["publicJwk"], buffer)
+        cid = await self.gatekeeper.add_text(encrypted_data)
+        item = {
+            "cid": cid,
+            "sha256": hash_message(buffer),
+            "bytes": len(buffer),
+            "type": self.get_mime_type(buffer),
+            "added": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+        }
+        if len(encrypted_data) < self.max_data_length:
+            item["data"] = encrypted_data
+
+        decrypted["items"][valid_name] = item
+        vault["items"] = encrypt_message(vault["publicJwk"], json.dumps(decrypted["items"], separators=(",", ":")))
+        vault["sha256"] = hash_json(decrypted["items"])
+        return await self.merge_data(vault_id, {"vault": vault})
+
+    async def remove_vault_item(self, vault_id: str, name: str) -> bool:
+        await self.check_vault_owner(vault_id)
+
+        vault = await self.get_vault(vault_id)
+        decrypted = await self.decrypt_vault(vault)
+        decrypted["items"].pop(name, None)
+        vault["items"] = encrypt_message(vault["publicJwk"], json.dumps(decrypted["items"], separators=(",", ":")))
+        vault["sha256"] = hash_json(decrypted["items"])
+        return await self.merge_data(vault_id, {"vault": vault})
+
+    async def list_vault_items(self, vault_id: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        vault = await self.get_vault(vault_id, options)
+        decrypted = await self.decrypt_vault(vault)
+        return decrypted["items"]
+
+    async def get_vault_item(self, vault_id: str, name: str, options: dict[str, Any] | None = None) -> bytes | None:
+        vault = await self.get_vault(vault_id, options)
+        decrypted = await self.decrypt_vault(vault)
+        item = decrypted["items"].get(name)
+        if not item:
+            return None
+
+        encrypted_data = item.get("data") or await self.gatekeeper.get_text(item["cid"])
+        if not encrypted_data:
+            raise KeymasterError(f"Failed to retrieve data for item '{name}' (CID: {item['cid']})")
+
+        return decrypt_bytes(decrypted["privateJwk"], encrypted_data)
 
     async def add_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
         id_info = await self.fetch_id_info(controller)
