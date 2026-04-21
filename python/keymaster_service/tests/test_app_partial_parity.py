@@ -107,6 +107,7 @@ def _install_fastapi_stubs() -> None:
 _install_fastapi_stubs()
 
 app_module = importlib.import_module("keymaster_service.app")
+service_module = importlib.import_module("keymaster_service.service")
 
 
 def run(coro):
@@ -247,6 +248,11 @@ def test_wallet_passphrase_handler(stub_service: StubService):
 
     assert result == {"ok": True}
     assert stub_service.calls == [("change_passphrase", "new-passphrase")]
+
+
+def test_service_module_exports_singleton():
+    assert hasattr(service_module, "service")
+    assert hasattr(service_module, "settings")
 
 
 def test_change_registry_handler(stub_service: StubService):

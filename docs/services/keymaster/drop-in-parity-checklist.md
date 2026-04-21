@@ -27,7 +27,7 @@ Source of truth:
 - [x] Python keymaster service is a thin HTTP wrapper over the library.
 - [x] Docker and compose support switching between TypeScript and Python
       keymaster implementations.
-- [ ] Docker smoke tests confirm the currently documented Python runtime
+- [x] Docker smoke tests confirm the currently documented Python runtime
       import path and service entrypoint.
 
 ## Wallet

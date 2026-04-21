@@ -8,17 +8,12 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from .config import load_settings
-from .gatekeeper_client import GatekeeperClient
-from .runtime import KeymasterService, KeymasterServiceError
-from .wallet_store import JsonWalletStore
+from .runtime import KeymasterServiceError
+from .service import service, settings
 
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-
-settings = load_settings()
-service = KeymasterService(settings, GatekeeperClient(settings.gatekeeper_url), JsonWalletStore(data_folder=settings.data_dir))
 
 
 @asynccontextmanager
