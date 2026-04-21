@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterable
 from copy import deepcopy
 import json
 import logging
 import os
-from typing import Any, Protocol
+import struct
+from typing import Any, Protocol, cast
 
 import httpx
 
@@ -68,6 +70,8 @@ class GatekeeperProtocol(Protocol):
     async def delete_did(self, operation: dict[str, Any]) -> bool: ...
     async def get_block(self, registry: str, block: str | None = None) -> dict[str, Any] | None: ...
     async def search(self, query: dict[str, Any]) -> list[str]: ...
+    async def add_data(self, data: bytes) -> str: ...
+    async def get_data(self, cid: str) -> bytes | None: ...
     async def add_text(self, text: str) -> str: ...
     async def get_text(self, cid: str) -> str | None: ...
 
@@ -803,6 +807,254 @@ class Keymaster:
             return "text/plain"
 
         return "application/octet-stream"
+
+    def _parse_jpeg_size(self, buffer: bytes) -> tuple[int, int] | None:
+        if len(buffer) < 4 or buffer[:2] != b"\xff\xd8":
+            return None
+
+        markers = {
+            0xC0,
+            0xC1,
+            0xC2,
+            0xC3,
+            0xC5,
+            0xC6,
+            0xC7,
+            0xC9,
+            0xCA,
+            0xCB,
+            0xCD,
+            0xCE,
+            0xCF,
+        }
+        index = 2
+        while index + 1 < len(buffer):
+            if buffer[index] != 0xFF:
+                index += 1
+                continue
+
+            while index < len(buffer) and buffer[index] == 0xFF:
+                index += 1
+            if index >= len(buffer):
+                return None
+
+            marker = buffer[index]
+            index += 1
+
+            if marker in {0xD8, 0xD9}:
+                continue
+            if marker == 0xDA:
+                return None
+            if index + 2 > len(buffer):
+                return None
+
+            segment_length = int.from_bytes(buffer[index:index + 2], "big")
+            if segment_length < 2 or index + segment_length > len(buffer):
+                return None
+
+            if marker in markers:
+                if index + 7 > len(buffer):
+                    return None
+                height = int.from_bytes(buffer[index + 3:index + 5], "big")
+                width = int.from_bytes(buffer[index + 5:index + 7], "big")
+                return width, height
+
+            index += segment_length
+
+        return None
+
+    def _parse_webp_size(self, buffer: bytes) -> tuple[int, int] | None:
+        if len(buffer) < 30 or buffer[:4] != b"RIFF" or buffer[8:12] != b"WEBP":
+            return None
+
+        chunk = buffer[12:16]
+        if chunk == b"VP8X" and len(buffer) >= 30:
+            width = int.from_bytes(buffer[24:27], "little") + 1
+            height = int.from_bytes(buffer[27:30], "little") + 1
+            return width, height
+
+        if chunk == b"VP8 " and len(buffer) >= 30:
+            width = struct.unpack("<H", buffer[26:28])[0] & 0x3FFF
+            height = struct.unpack("<H", buffer[28:30])[0] & 0x3FFF
+            return width, height
+
+        if chunk == b"VP8L" and len(buffer) >= 25:
+            bits = int.from_bytes(buffer[21:25], "little")
+            width = (bits & 0x3FFF) + 1
+            height = ((bits >> 14) & 0x3FFF) + 1
+            return width, height
+
+        return None
+
+    def parse_image_metadata(self, buffer: bytes) -> tuple[str, int, int]:
+        if len(buffer) >= 24 and buffer.startswith(b"\x89PNG\r\n\x1a\n"):
+            width = int.from_bytes(buffer[16:20], "big")
+            height = int.from_bytes(buffer[20:24], "big")
+            return "png", width, height
+
+        if len(buffer) >= 10 and buffer[:6] in {b"GIF87a", b"GIF89a"}:
+            width = int.from_bytes(buffer[6:8], "little")
+            height = int.from_bytes(buffer[8:10], "little")
+            return "gif", width, height
+
+        jpeg_size = self._parse_jpeg_size(buffer)
+        if jpeg_size:
+            return "jpg", jpeg_size[0], jpeg_size[1]
+
+        webp_size = self._parse_webp_size(buffer)
+        if webp_size:
+            return "webp", webp_size[0], webp_size[1]
+
+        raise KeymasterError("Invalid parameter: buffer")
+
+    async def generate_image_asset(self, filename: str, buffer: bytes) -> dict[str, Any]:
+        image_type, width, height = self.parse_image_metadata(buffer)
+        cid = await self.gatekeeper.add_data(buffer)
+        return {
+            "file": {
+                "cid": cid,
+                "filename": filename,
+                "type": f"image/{image_type}",
+                "bytes": len(buffer),
+            },
+            "image": {
+                "width": width,
+                "height": height,
+            },
+        }
+
+    async def create_image(self, buffer: bytes, options: dict[str, Any] | None = None) -> str:
+        options = deepcopy(options or {})
+        filename = options.get("filename") or "image"
+        asset = await self.generate_image_asset(filename, buffer)
+        return await self.create_asset(asset, options)
+
+    async def update_image(self, identifier: str, buffer: bytes, options: dict[str, Any] | None = None) -> bool:
+        options = deepcopy(options or {})
+        filename = options.get("filename") or "image"
+        asset = await self.generate_image_asset(filename, buffer)
+        return await self.merge_data(identifier, asset)
+
+    async def get_image(self, identifier: str) -> dict[str, Any] | None:
+        asset = await self.resolve_asset(identifier)
+        if not isinstance(asset, dict):
+            return None
+
+        file = asset.get("file")
+        image = asset.get("image")
+        if not isinstance(file, dict) or not file.get("cid") or not isinstance(image, dict):
+            return None
+
+        data = await self.gatekeeper.get_data(file["cid"])
+        file_asset = deepcopy(file)
+        if data is not None:
+            file_asset["data"] = data
+
+        return {
+            "file": file_asset,
+            "image": deepcopy(image),
+        }
+
+    async def test_image(self, identifier: str) -> bool:
+        try:
+            return await self.get_image(identifier) is not None
+        except Exception:
+            return False
+
+    async def generate_file_asset(self, filename: str, buffer: bytes) -> dict[str, Any]:
+        cid = await self.gatekeeper.add_data(buffer)
+        return {
+            "cid": cid,
+            "filename": filename,
+            "type": self.get_mime_type(buffer),
+            "bytes": len(buffer),
+        }
+
+    async def create_file(self, buffer: bytes, options: dict[str, Any] | None = None) -> str:
+        options = deepcopy(options or {})
+        filename = options.get("filename") or "file"
+        file_asset = await self.generate_file_asset(filename, buffer)
+        return await self.create_asset({"file": file_asset}, options)
+
+    async def update_file(self, identifier: str, buffer: bytes, options: dict[str, Any] | None = None) -> bool:
+        options = deepcopy(options or {})
+        filename = options.get("filename") or "file"
+        file_asset = await self.generate_file_asset(filename, buffer)
+        return await self.merge_data(identifier, {"file": file_asset})
+
+    async def collect_stream_bytes(self, stream: bytes | bytearray | AsyncIterable[bytes]) -> bytes:
+        if isinstance(stream, (bytes, bytearray)):
+            return bytes(stream)
+
+        stream_iterable = cast(AsyncIterable[bytes], stream)
+        chunks: list[bytes] = []
+        async for chunk in stream_iterable:
+            chunk_bytes = bytes(chunk)
+            if chunk_bytes:
+                chunks.append(chunk_bytes)
+        return b"".join(chunks)
+
+    async def generate_file_asset_from_stream(
+        self,
+        filename: str,
+        stream: bytes | bytearray | AsyncIterable[bytes],
+        content_type: str,
+        bytes_count: int,
+    ) -> dict[str, Any]:
+        buffer = await self.collect_stream_bytes(stream)
+        cid = await self.gatekeeper.add_data(buffer)
+        return {
+            "cid": cid,
+            "filename": filename,
+            "type": content_type,
+            "bytes": bytes_count if bytes_count else len(buffer),
+        }
+
+    async def create_file_stream(
+        self,
+        stream: bytes | bytearray | AsyncIterable[bytes],
+        options: dict[str, Any] | None = None,
+    ) -> str:
+        options = deepcopy(options or {})
+        filename = options.get("filename") or "file"
+        content_type = options.get("contentType") or "application/octet-stream"
+        bytes_count = int(options.get("bytes") or 0)
+        file_asset = await self.generate_file_asset_from_stream(filename, stream, content_type, bytes_count)
+        return await self.create_asset({"file": file_asset}, options)
+
+    async def update_file_stream(
+        self,
+        identifier: str,
+        stream: bytes | bytearray | AsyncIterable[bytes],
+        options: dict[str, Any] | None = None,
+    ) -> bool:
+        options = deepcopy(options or {})
+        filename = options.get("filename") or "file"
+        content_type = options.get("contentType") or "application/octet-stream"
+        bytes_count = int(options.get("bytes") or 0)
+        file_asset = await self.generate_file_asset_from_stream(filename, stream, content_type, bytes_count)
+        return await self.merge_data(identifier, {"file": file_asset})
+
+    async def get_file(self, identifier: str) -> dict[str, Any] | None:
+        asset = await self.resolve_asset(identifier)
+        if not isinstance(asset, dict):
+            return None
+
+        file = asset.get("file")
+        if not isinstance(file, dict) or not file.get("cid"):
+            return None
+
+        data = await self.gatekeeper.get_data(file["cid"])
+        file_asset = deepcopy(file)
+        if data is not None:
+            file_asset["data"] = data
+        return file_asset
+
+    async def test_file(self, identifier: str) -> bool:
+        try:
+            return await self.get_file(identifier) is not None
+        except Exception:
+            return False
 
     async def create_vault(self, options: dict[str, Any] | None = None) -> str:
         options = deepcopy(options or {})

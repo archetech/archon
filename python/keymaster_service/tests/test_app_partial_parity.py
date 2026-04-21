@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import json
 from pathlib import Path
 import sys
 import types
@@ -29,9 +30,13 @@ def _install_fastapi_stubs() -> None:
             self.detail = detail
 
     class Request:
-        def __init__(self, query_params=None, headers=None):
+        def __init__(self, query_params=None, headers=None, body: bytes = b""):
             self.query_params = query_params or {}
             self.headers = headers or {}
+            self._body = body
+
+        async def body(self):
+            return self._body
 
     class APIRouter:
         def __init__(self, *args, **kwargs):
@@ -44,7 +49,7 @@ def _install_fastapi_stubs() -> None:
 
             return decorate
 
-        get = post = put = delete = _decorator
+        get = post = put = delete = api_route = _decorator
 
     class FastAPI:
         def __init__(self, *args, **kwargs):
@@ -76,19 +81,19 @@ def _install_fastapi_stubs() -> None:
         return value
 
     class Response:
-        def __init__(self, content=None, media_type: str | None = None):
+        def __init__(self, content=None, media_type: str | None = None, headers=None, status_code: int = 200):
             self.content = content
             self.media_type = media_type
+            self.headers = headers or {}
+            self.status_code = status_code
 
     class JSONResponse(Response):
         def __init__(self, status_code: int = 200, content=None):
-            self.status_code = status_code
-            self.content = content
+            super().__init__(content=content, status_code=status_code)
 
     class PlainTextResponse(Response):
         def __init__(self, content: str = "", media_type: str | None = None):
-            self.content = content
-            self.media_type = media_type
+            super().__init__(content=content, media_type=media_type)
 
     fastapi.APIRouter = APIRouter
     fastapi.Depends = Depends
@@ -176,6 +181,56 @@ class StubService:
     async def create_vault(self, options):
         self.calls.append(("create_vault", options))
         return "did:test:vault"
+
+    async def create_image(self, data: bytes, options):
+        self.calls.append(("create_image", data, options))
+        return "did:test:image"
+
+    async def update_image(self, identifier: str, data: bytes, options):
+        self.calls.append(("update_image", identifier, data, options))
+        return True
+
+    async def get_image(self, identifier: str):
+        self.calls.append(("get_image", identifier))
+        return {
+            "file": {
+                "cid": "cid-image",
+                "filename": "image.png",
+                "type": "image/png",
+                "bytes": 68,
+                "data": b"png-bytes",
+            },
+            "image": {
+                "width": 1,
+                "height": 1,
+            },
+        }
+
+    async def test_image(self, identifier: str) -> bool:
+        self.calls.append(("test_image", identifier))
+        return True
+
+    async def create_file_stream(self, data: bytes, options):
+        self.calls.append(("create_file_stream", data, options))
+        return "did:test:file"
+
+    async def update_file_stream(self, identifier: str, data: bytes, options):
+        self.calls.append(("update_file_stream", identifier, data, options))
+        return True
+
+    async def get_file(self, identifier: str):
+        self.calls.append(("get_file", identifier))
+        return {
+            "cid": "cid-file",
+            "filename": "doc.txt",
+            "type": "text/plain",
+            "bytes": 3,
+            "data": b"abc",
+        }
+
+    async def test_file(self, identifier: str) -> bool:
+        self.calls.append(("test_file", identifier))
+        return True
 
     async def poll_template(self):
         self.calls.append(("poll_template",))
@@ -545,6 +600,66 @@ def test_vault_handlers(stub_service: StubService):
         ("list_vault_items", "did:test:vault"),
         ("get_vault_item", "did:test:vault", "doc.txt"),
         ("remove_vault_item", "did:test:vault", "doc.txt"),
+    ]
+
+
+def test_file_and_image_handlers(stub_service: StubService):
+    image_request = app_module.Request(headers={"x-options": '{"filename":"image.png"}'}, body=b"png-bytes")
+    file_request = app_module.Request(
+        headers={"x-options": '{"filename":"doc.txt","contentType":"text/plain"}', "content-length": "3"},
+        body=b"abc",
+    )
+
+    created_image = run(app_module.create_image(image_request))
+    updated_image = run(app_module.update_image("did:test:image", image_request))
+    fetched_image = run(app_module.get_image("did:test:image", app_module.Request(headers={})))
+    fetched_image_binary = run(
+        app_module.get_image("did:test:image", app_module.Request(headers={"accept": "application/octet-stream"}))
+    )
+    tested_image = run(app_module.test_image("did:test:image"))
+
+    created_file = run(app_module.create_file(file_request))
+    updated_file = run(app_module.update_file("did:test:file", file_request))
+    fetched_file = run(app_module.get_file("did:test:file", app_module.Request(headers={})))
+    fetched_file_binary = run(
+        app_module.get_file("did:test:file", app_module.Request(headers={"accept": "application/octet-stream"}))
+    )
+    tested_file = run(app_module.test_file("did:test:file"))
+
+    assert created_image == {"did": "did:test:image"}
+    assert updated_image == {"ok": True}
+    assert fetched_image["image"]["image"] == {"width": 1, "height": 1}
+    assert fetched_image_binary.content == b"png-bytes"
+    assert fetched_image_binary.media_type == "application/octet-stream"
+    assert json.loads(fetched_image_binary.headers["X-Metadata"]) == {
+        "file": {"cid": "cid-image", "filename": "image.png", "type": "image/png", "bytes": 68},
+        "image": {"width": 1, "height": 1},
+    }
+    assert tested_image == {"test": True}
+
+    assert created_file == {"did": "did:test:file"}
+    assert updated_file == {"ok": True}
+    assert fetched_file == {"file": {"cid": "cid-file", "filename": "doc.txt", "type": "text/plain", "bytes": 3, "data": b"abc"}}
+    assert fetched_file_binary.content == b"abc"
+    assert fetched_file_binary.media_type == "application/octet-stream"
+    assert json.loads(fetched_file_binary.headers["X-Metadata"]) == {
+        "cid": "cid-file",
+        "filename": "doc.txt",
+        "type": "text/plain",
+        "bytes": 3,
+    }
+    assert tested_file == {"test": True}
+    assert stub_service.calls == [
+        ("create_image", b"png-bytes", {"filename": "image.png"}),
+        ("update_image", "did:test:image", b"png-bytes", {"filename": "image.png"}),
+        ("get_image", "did:test:image"),
+        ("get_image", "did:test:image"),
+        ("test_image", "did:test:image"),
+        ("create_file_stream", b"abc", {"filename": "doc.txt", "contentType": "text/plain", "bytes": 3}),
+        ("update_file_stream", "did:test:file", b"abc", {"filename": "doc.txt", "contentType": "text/plain", "bytes": 3}),
+        ("get_file", "did:test:file"),
+        ("get_file", "did:test:file"),
+        ("test_file", "did:test:file"),
     ]
 
 

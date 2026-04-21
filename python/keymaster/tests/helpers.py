@@ -49,6 +49,7 @@ class FakeGatekeeper:
     def __init__(self, registries: list[str] | None = None) -> None:
         self.registries = registries or ["local", "hyperswarm", "BTC:signet"]
         self.docs: dict[str, dict[str, Any]] = {}
+        self.data_blobs: dict[str, bytes] = {}
         self.text_blobs: dict[str, str] = {}
         self._counter = 0
         self._operation_dids: dict[str, str] = {}
@@ -180,6 +181,14 @@ class FakeGatekeeper:
                 matches.append(did)
 
         return matches
+
+    async def add_data(self, data: bytes) -> str:
+        cid = hashlib.sha256(data).hexdigest()
+        self.data_blobs[cid] = bytes(data)
+        return cid
+
+    async def get_data(self, cid: str) -> bytes | None:
+        return self.data_blobs.get(cid)
 
     async def add_text(self, text: str) -> str:
         cid = hashlib.sha256(text.encode("utf-8")).hexdigest()

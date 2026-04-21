@@ -17,6 +17,24 @@ logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 
 
+def parse_options_header(request: Request) -> dict[str, Any]:
+    options_header = request.headers.get("x-options") or "{}"
+    return json.loads(options_header) if options_header else {}
+
+
+def apply_content_length(options: dict[str, Any], request: Request) -> dict[str, Any]:
+    if options.get("bytes"):
+        return options
+    content_length = request.headers.get("content-length")
+    if not isinstance(content_length, str):
+        return options
+
+    parsed_bytes = int(content_length)
+    if parsed_bytes >= 0:
+        options["bytes"] = parsed_bytes
+    return options
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     LOGGER.info("Keymaster server v%s (%s) running on %s:%s", settings.service_version, settings.git_commit, settings.bind_address, settings.keymaster_port)
@@ -356,6 +374,72 @@ async def clone_asset(identifier: str, body: dict[str, Any]) -> dict[str, str]:
     return {"did": await service.clone_asset(identifier, body.get("options") or {})}
 
 
+@protected_api.post("/images")
+async def create_image(request: Request) -> dict[str, str]:
+    return {"did": await service.create_image(await request.body(), parse_options_header(request))}
+
+
+@protected_api.put("/images/{identifier}")
+async def update_image(identifier: str, request: Request) -> dict[str, bool]:
+    return {"ok": await service.update_image(identifier, await request.body(), parse_options_header(request))}
+
+
+@protected_api.get("/images/{identifier}")
+async def get_image(identifier: str, request: Request) -> Any:
+    image_asset = await service.get_image(identifier)
+    accept = request.headers.get("accept")
+    if accept == "application/octet-stream":
+        if not image_asset or not image_asset.get("file", {}).get("data"):
+            return JSONResponse(status_code=404, content={"error": "Image not found"})
+        file_asset = dict(image_asset["file"])
+        data = file_asset.pop("data")
+        return Response(
+            content=data,
+            media_type="application/octet-stream",
+            headers={"X-Metadata": json.dumps({"file": file_asset, "image": image_asset["image"]})},
+        )
+    return {"image": image_asset}
+
+
+@protected_api.post("/images/{identifier}/test")
+async def test_image(identifier: str) -> dict[str, bool]:
+    return {"test": await service.test_image(identifier)}
+
+
+@protected_api.post("/files")
+async def create_file(request: Request) -> dict[str, str]:
+    options = apply_content_length(parse_options_header(request), request)
+    return {"did": await service.create_file_stream(await request.body(), options)}
+
+
+@protected_api.put("/files/{identifier}")
+async def update_file(identifier: str, request: Request) -> dict[str, bool]:
+    options = apply_content_length(parse_options_header(request), request)
+    return {"ok": await service.update_file_stream(identifier, await request.body(), options)}
+
+
+@protected_api.get("/files/{identifier}")
+async def get_file(identifier: str, request: Request) -> Any:
+    file_asset = await service.get_file(identifier)
+    accept = request.headers.get("accept")
+    if accept == "application/octet-stream":
+        if not file_asset or file_asset.get("data") is None:
+            return JSONResponse(status_code=404, content={"error": "File not found"})
+        file_response = dict(file_asset)
+        data = file_response.pop("data")
+        return Response(
+            content=data,
+            media_type="application/octet-stream",
+            headers={"X-Metadata": json.dumps(file_response)},
+        )
+    return {"file": file_asset}
+
+
+@protected_api.post("/files/{identifier}/test")
+async def test_file(identifier: str) -> dict[str, bool]:
+    return {"test": await service.test_file(identifier)}
+
+
 @protected_api.post("/vaults")
 async def create_vault(body: dict[str, Any]) -> dict[str, str]:
     return {"did": await service.create_vault(body.get("options") or {})}
@@ -388,8 +472,7 @@ async def list_vault_members(identifier: str) -> dict[str, Any]:
 
 @protected_api.post("/vaults/{identifier}/items")
 async def add_vault_item(identifier: str, request: Request, body: bytes) -> dict[str, bool]:
-    options_header = request.headers.get("x-options") or "{}"
-    options = json.loads(options_header) if options_header else {}
+    options = parse_options_header(request)
     return {"ok": await service.add_vault_item(identifier, options["name"], body)}
 
 

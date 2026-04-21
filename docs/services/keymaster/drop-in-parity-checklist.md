@@ -178,20 +178,20 @@ Source of truth:
 
 ## Files and images
 
-- [ ] `createImage`
-- [ ] `updateImage`
-- [ ] `getImage`
-- [ ] `testImage`
-- [ ] `createFile`
-- [ ] `createFileStream`
-- [ ] `updateFile`
-- [ ] `updateFileStream`
-- [ ] `getFile`
-- [ ] `testFile`
-- [ ] Service route parity for image endpoints
-- [ ] Service route parity for file endpoints
-- [ ] Full parity with `tests/keymaster/image.test.ts`
-- [ ] Full parity with `tests/keymaster/file.test.ts`
+- [x] `createImage`
+- [x] `updateImage`
+- [x] `getImage`
+- [x] `testImage`
+- [x] `createFile`
+- [x] `createFileStream`
+- [x] `updateFile`
+- [x] `updateFileStream`
+- [x] `getFile`
+- [x] `testFile`
+- [x] Service route parity for image endpoints
+- [x] Service route parity for file endpoints
+- [x] Full parity with `tests/keymaster/image.test.ts`
+- [x] Full parity with `tests/keymaster/file.test.ts`
 
 ## Vaults
 
@@ -273,7 +273,7 @@ Source of truth:
       ID registry changes, asset route parity, asset clone and transfer
 - [ ] Implement credentials
 - [ ] Implement addresses
-- [ ] Implement files and images
+- [x] Implement files and images
 - [x] Implement polls
 - [x] Implement vaults
 - [ ] Implement dmail and notices

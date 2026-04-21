@@ -66,6 +66,20 @@ class GatekeeperClient:
         response.raise_for_status()
         return response.json()
 
+    async def add_data(self, data: bytes) -> str:
+        response = await self._client.post(
+            "/ipfs/data",
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+        )
+        response.raise_for_status()
+        return response.text
+
+    async def get_data(self, cid: str) -> bytes | None:
+        response = await self._client.get(f"/ipfs/data/{cid}")
+        response.raise_for_status()
+        return response.content
+
     async def add_text(self, text: str) -> str:
         response = await self._client.post(
             "/ipfs/text",
