@@ -124,6 +124,11 @@ def sign_hash(msg_hash: str, private_jwk: dict[str, str]) -> str:
     private_key = jwk_to_private_key(private_jwk)
     der = private_key.sign(bytes.fromhex(msg_hash), ec.ECDSA(utils.Prehashed(hashes.SHA256())))
     r, s = utils.decode_dss_signature(der)
+    # Normalize to low-S form to match @noble/secp256k1 (which verifies with lowS: true by default).
+    # secp256k1 curve order n.
+    n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+    if s > n // 2:
+        s = n - s
     return (r.to_bytes(32, "big") + s.to_bytes(32, "big")).hex()
 
 
