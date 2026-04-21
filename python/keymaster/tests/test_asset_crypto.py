@@ -24,6 +24,46 @@ def test_merge_data_updates_asset_document_data(testbed):
     assert run(testbed.keymaster.resolve_asset(did)) == {"name": "asset", "count": 3}
 
 
+def test_clone_asset_creates_new_asset_with_cloned_reference(testbed):
+    run(testbed.keymaster.create_id("Alice"))
+    did = run(testbed.keymaster.create_asset({"name": "asset"}))
+
+    clone_did = run(testbed.keymaster.clone_asset(did))
+    assert clone_did != did
+    assert run(testbed.keymaster.resolve_asset(clone_did)) == {"name": "asset", "cloned": did}
+
+
+def test_transfer_asset_moves_ownership_between_ids(testbed):
+    alice = run(testbed.keymaster.create_id("Alice"))
+    run(testbed.keymaster.create_id("Bob"))
+    did = run(testbed.keymaster.create_asset({"name": "asset"}))
+
+    assert run(testbed.keymaster.transfer_asset(did, alice)) is True
+    docs = run(testbed.keymaster.resolve_did(did))
+    assert docs["didDocument"]["controller"] == alice
+    assert run(testbed.keymaster.list_assets("Alice")) == [did]
+    assert run(testbed.keymaster.list_assets("Bob")) == []
+
+
+def test_transfer_asset_rejects_non_asset_or_non_agent_controller(testbed):
+    bob = run(testbed.keymaster.create_id("Bob"))
+    did = run(testbed.keymaster.create_asset({"name": "asset"}))
+
+    with pytest.raises(KeymasterError, match="Invalid parameter: id"):
+        run(testbed.keymaster.transfer_asset(bob, bob))
+
+    with pytest.raises(KeymasterError, match="Invalid parameter: controller"):
+        run(testbed.keymaster.transfer_asset(did, did))
+
+
+def test_change_registry_updates_asset_registration(testbed):
+    run(testbed.keymaster.create_id("Alice"))
+    did = run(testbed.keymaster.create_asset({"name": "asset"}, {"registry": "local"}))
+
+    assert run(testbed.keymaster.change_registry(did, "hyperswarm")) is True
+    assert run(testbed.keymaster.resolve_did(did))["didDocumentRegistration"]["registry"] == "hyperswarm"
+
+
 def test_add_proof_and_verify_proof_round_trip(testbed):
     run(testbed.keymaster.create_id("Alice"))
     payload = {"hello": "world"}

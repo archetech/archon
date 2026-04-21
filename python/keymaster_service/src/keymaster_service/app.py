@@ -134,9 +134,14 @@ async def wallet_mnemonic() -> dict[str, str]:
     return {"mnemonic": await service.decrypt_mnemonic()}
 
 
+@protected_api.post("/wallet/passphrase")
+async def wallet_passphrase(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.change_passphrase(body["passphrase"])}
+
+
 @protected_api.get("/export/wallet/encrypted")
 async def export_wallet_encrypted() -> dict[str, Any]:
-    return {"wallet": await service.encrypt_wallet_for_storage(await service.load_wallet())}
+    return {"wallet": await service.export_encrypted_wallet()}
 
 
 @protected_api.get("/ids/current")
@@ -174,6 +179,11 @@ async def rename_id(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
     return {"ok": await service.rename_id(identifier, body["name"])}
 
 
+@protected_api.post("/ids/{identifier}/change-registry")
+async def change_registry(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.change_registry(identifier, body["registry"])}
+
+
 @protected_api.post("/ids/{identifier}/backup")
 async def backup_id(identifier: str) -> dict[str, bool]:
     return {"ok": await service.backup_id(identifier)}
@@ -204,6 +214,36 @@ async def remove_alias(alias: str) -> dict[str, bool]:
     return {"ok": await service.remove_alias(alias)}
 
 
+@protected_api.get("/addresses")
+async def list_addresses() -> dict[str, Any]:
+    return {"addresses": await service.list_addresses()}
+
+
+@protected_api.get("/addresses/{domain}")
+async def get_address(domain: str) -> dict[str, Any]:
+    return {"address": await service.get_address(domain)}
+
+
+@protected_api.post("/addresses/import")
+async def import_address(body: dict[str, Any]) -> dict[str, Any]:
+    return {"addresses": await service.import_address(body["domain"])}
+
+
+@protected_api.get("/addresses/check/{address}")
+async def check_address(address: str) -> dict[str, Any]:
+    return await service.check_address(address)
+
+
+@protected_api.post("/addresses")
+async def add_address(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.add_address(body["address"])}
+
+
+@protected_api.delete("/addresses/{address}")
+async def remove_address(address: str) -> dict[str, bool]:
+    return {"ok": await service.remove_address(address)}
+
+
 @protected_api.get("/did/{identifier}")
 async def resolve_did(identifier: str, request: Request) -> dict[str, Any]:
     options = {key: value for key, value in request.query_params.items()}
@@ -225,14 +265,114 @@ async def test_agent(identifier: str) -> dict[str, bool]:
     return {"test": await service.test_agent(identifier)}
 
 
+@protected_api.post("/credentials/bind")
+async def bind_credential(body: dict[str, Any]) -> dict[str, Any]:
+    return {"credential": await service.bind_credential(body["subject"], body.get("options") or {})}
+
+
+@protected_api.get("/credentials/held")
+async def list_credentials() -> dict[str, Any]:
+    return {"held": await service.list_credentials()}
+
+
+@protected_api.post("/credentials/held")
+async def accept_credential(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.accept_credential(body["did"])}
+
+
+@protected_api.get("/credentials/held/{identifier}")
+async def get_credential(identifier: str) -> dict[str, Any]:
+    return {"credential": await service.get_credential(identifier)}
+
+
+@protected_api.delete("/credentials/held/{identifier}")
+async def remove_credential(identifier: str) -> dict[str, bool]:
+    return {"ok": await service.remove_credential(identifier)}
+
+
+@protected_api.post("/credentials/held/{identifier}/publish")
+async def publish_credential(identifier: str, body: dict[str, Any]) -> dict[str, Any]:
+    return {"ok": await service.publish_credential(identifier, body.get("options") or {})}
+
+
+@protected_api.post("/credentials/held/{identifier}/unpublish")
+async def unpublish_credential(identifier: str) -> dict[str, Any]:
+    return {"ok": await service.unpublish_credential(identifier)}
+
+
+@protected_api.get("/credentials/issued")
+async def list_issued() -> dict[str, Any]:
+    return {"issued": await service.list_issued()}
+
+
+@protected_api.post("/credentials/issued")
+async def issue_credential(body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.issue_credential(body.get("credential"), body.get("options") or {})}
+
+
+@protected_api.get("/credentials/issued/{identifier}")
+async def get_issued_credential(identifier: str) -> dict[str, Any]:
+    return {"credential": await service.get_credential(identifier)}
+
+
+@protected_api.post("/credentials/issued/{identifier}/send")
+async def send_credential(identifier: str, body: dict[str, Any]) -> dict[str, Any]:
+    return {"did": await service.send_credential(identifier, body.get("options") or {})}
+
+
+@protected_api.post("/credentials/issued/{identifier}")
+async def update_credential(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.update_credential(identifier, body["credential"])}
+
+
+@protected_api.delete("/credentials/issued/{identifier}")
+async def revoke_credential(identifier: str) -> dict[str, bool]:
+    return {"ok": await service.revoke_credential(identifier)}
+
+
 @protected_api.get("/assets")
 async def list_assets(owner: str | None = None) -> dict[str, Any]:
     return {"assets": await service.list_assets(owner)}
 
 
+@protected_api.post("/assets")
+async def create_asset(body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.create_asset(body["data"], body.get("options") or {})}
+
+
 @protected_api.get("/assets/{identifier}")
 async def get_asset(identifier: str) -> dict[str, Any]:
     return {"asset": await service.resolve_asset(identifier)}
+
+
+@protected_api.put("/assets/{identifier}")
+async def update_asset(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.merge_data(identifier, body["data"])}
+
+
+@protected_api.post("/assets/{identifier}/transfer")
+async def transfer_asset(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.transfer_asset(identifier, body["controller"])}
+
+
+@protected_api.post("/assets/{identifier}/clone")
+async def clone_asset(identifier: str, body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.clone_asset(identifier, body.get("options") or {})}
+
+
+@protected_api.post("/notices")
+async def create_notice(body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.create_notice(body["message"], body.get("options") or {})}
+
+
+@protected_api.post("/notices/refresh")
+async def refresh_notices() -> dict[str, bool]:
+    return {"ok": await service.refresh_notices()}
+
+
+@protected_api.put("/notices/{identifier}")
+async def update_notice(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.update_notice(identifier, body["message"])}
 
 
 @protected_api.post("/keys/encrypt/message")

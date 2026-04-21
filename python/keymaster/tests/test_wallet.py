@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from keymaster import KeymasterError
+from keymaster import Keymaster, KeymasterError
 
 from .helpers import run
 
@@ -68,3 +68,34 @@ def test_backup_wallet_updates_seed_bank_reference(testbed):
     seed_bank = run(testbed.keymaster.resolve_seed_bank())
 
     assert (seed_bank.get("didDocumentData") or {}).get("wallet") == backup_did
+
+
+def test_change_passphrase_reencrypts_wallet_and_preserves_mnemonic(testbed):
+    did = run(testbed.keymaster.create_id("Bob"))
+    mnemonic_before = run(testbed.keymaster.decrypt_mnemonic())
+
+    assert run(testbed.keymaster.change_passphrase("new-passphrase")) is True
+
+    wallet_after = run(testbed.keymaster.load_wallet())
+    assert wallet_after["ids"]["Bob"]["did"] == did
+    assert run(testbed.keymaster.decrypt_mnemonic()) == mnemonic_before
+
+
+def test_change_passphrase_allows_reload_with_new_passphrase(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.change_passphrase("new-passphrase"))
+
+    km2 = Keymaster(
+        gatekeeper=testbed.gatekeeper,
+        wallet_store=testbed.wallet_store,
+        passphrase="new-passphrase",
+    )
+    loaded = run(km2.load_wallet())
+    assert "Bob" in loaded["ids"]
+
+
+def test_change_passphrase_rejects_empty_passphrase(testbed):
+    run(testbed.keymaster.load_wallet())
+
+    with pytest.raises(KeymasterError, match="Invalid parameter: newPassphrase"):
+        run(testbed.keymaster.change_passphrase(""))

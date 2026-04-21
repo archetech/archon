@@ -6,6 +6,8 @@ import json
 import logging
 from typing import Any, Protocol
 
+import httpx
+
 from .crypto import (
     b64url,
     decrypt_message,
@@ -33,6 +35,13 @@ DEFAULT_SCHEMA = {
 }
 
 
+class NoticeTags:
+    DMAIL = "dmail"
+    POLL = "poll"
+    BALLOT = "ballot"
+    CREDENTIAL = "credential"
+
+
 class KeymasterError(Exception):
     pass
 
@@ -48,6 +57,7 @@ class GatekeeperProtocol(Protocol):
     async def update_did(self, operation: dict[str, Any]) -> bool: ...
     async def delete_did(self, operation: dict[str, Any]) -> bool: ...
     async def get_block(self, registry: str, block: str | None = None) -> dict[str, Any] | None: ...
+    async def search(self, query: dict[str, Any]) -> list[str]: ...
 
 
 class WalletStoreProtocol(Protocol):
@@ -150,6 +160,27 @@ class Keymaster:
     async def decrypt_mnemonic(self) -> str:
         wallet = await self.load_wallet()
         return decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
+
+    async def change_passphrase(self, new_passphrase: str) -> bool:
+        if not isinstance(new_passphrase, str) or not new_passphrase:
+            raise KeymasterError("Invalid parameter: newPassphrase")
+
+        wallet = await self.load_wallet()
+        mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
+        wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, new_passphrase)
+
+        self.passphrase = new_passphrase
+        self._root_cache = hd_root_from_mnemonic(mnemonic)
+        self._wallet_cache = wallet
+
+        encrypted = await self.encrypt_wallet_for_storage(wallet)
+        ok = self.wallet_store.save_wallet(encrypted, overwrite=True)
+        if not ok:
+            raise KeymasterError("Failed to save wallet with new passphrase")
+        return True
+
+    async def export_encrypted_wallet(self) -> dict[str, Any]:
+        return await self.encrypt_wallet_for_storage(await self.load_wallet())
 
     async def _root_node(self, wallet: dict[str, Any] | None = None):
         if self._root_cache is not None:
@@ -348,6 +379,264 @@ class Keymaster:
             await self._save_loaded_wallet(wallet, overwrite=True)
         return True
 
+    def normalize_address_domain(self, domain: str) -> str:
+        if not isinstance(domain, str) or not domain.strip():
+            raise KeymasterError("Invalid parameter: domain")
+
+        trimmed = domain.strip().lower()
+        try:
+            candidate = trimmed if "://" in trimmed else f"https://{trimmed}"
+            url = __import__("urllib.parse").parse.urlparse(candidate)
+            if not url.netloc:
+                raise ValueError("missing hostname")
+            return url.netloc.lower()
+        except Exception as exc:
+            raise KeymasterError("Invalid parameter: domain") from exc
+
+    def parse_address(self, address: str) -> dict[str, str]:
+        if not isinstance(address, str) or not address.strip():
+            raise KeymasterError("Invalid parameter: address")
+
+        trimmed = address.strip().lower()
+        parts = trimmed.split("@")
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            raise KeymasterError("Invalid parameter: address")
+
+        name, domain_text = parts
+        domain = self.normalize_address_domain(domain_text)
+        return {"address": f"{name}@{domain}", "name": name, "domain": domain}
+
+    async def _http_request(
+        self,
+        method: str,
+        url: str,
+        headers: dict[str, str] | None = None,
+        json_body: Any | None = None,
+    ):
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            return await client.request(method, url, headers=headers, json=json_body)
+
+    async def get_response_data(self, response: Any) -> Any:
+        try:
+            return response.json()
+        except Exception:
+            return None
+
+    async def get_response_error(self, response: Any, fallback: str) -> str:
+        data = await self.get_response_data(response)
+        if isinstance(data, dict) and isinstance(data.get("message"), str):
+            return data["message"]
+        if isinstance(data, dict) and isinstance(data.get("error"), str):
+            return data["error"]
+        return fallback
+
+    def address_api_endpoints(self, domain: str, path: str) -> list[str]:
+        return [f"https://{domain}/names/api/{path}", f"https://{domain}/api/{path}"]
+
+    async def fetch_address_api_response(
+        self,
+        domain: str,
+        path: str,
+        method: str,
+        headers: dict[str, str] | None,
+        json_body: Any | None,
+        fallback: str,
+    ) -> Any:
+        last_response = None
+        saw_network_error = False
+
+        for endpoint in self.address_api_endpoints(domain, path):
+            try:
+                response = await self._http_request(method, endpoint, headers=headers, json_body=json_body)
+                if 200 <= response.status_code < 300:
+                    return response
+                last_response = response
+            except Exception:
+                saw_network_error = True
+
+        if last_response is not None:
+            raise KeymasterError(await self.get_response_error(last_response, fallback))
+        if saw_network_error:
+            raise KeymasterError(fallback)
+        raise KeymasterError(fallback)
+
+    async def create_address_bearer_token(self, domain: str) -> str:
+        last_error = "Failed to fetch address challenge"
+
+        for endpoint in self.address_api_endpoints(domain, "challenge"):
+            try:
+                response = await self._http_request("GET", endpoint)
+                if not (200 <= response.status_code < 300):
+                    last_error = await self.get_response_error(response, last_error)
+                    continue
+
+                data = await self.get_response_data(response)
+                if not isinstance(data, dict) or not isinstance(data.get("challenge"), str):
+                    last_error = "Invalid address challenge"
+                    continue
+
+                return await self.create_response(data["challenge"], {"retries": 5, "delay": 1000})
+            except Exception:
+                last_error = "Failed to fetch address challenge"
+
+        raise KeymasterError(last_error)
+
+    def collect_addresses(self, id_info: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+        addresses = {}
+        for domain, info in (id_info or {}).get("addresses", {}).items():
+            addresses[f"{info['name']}@{domain}"] = {"added": info["added"]}
+        return addresses
+
+    async def list_addresses(self) -> dict[str, dict[str, Any]]:
+        wallet = await self.load_wallet()
+        current = wallet.get("current")
+        if not current:
+            return {}
+        return self.collect_addresses(wallet["ids"].get(current))
+
+    async def get_address(self, domain: str) -> dict[str, Any] | None:
+        normalized_domain = self.normalize_address_domain(domain)
+        id_info = await self.fetch_id_info()
+        stored = id_info.get("addresses", {}).get(normalized_domain)
+        if not stored:
+            return None
+        return {
+            "domain": normalized_domain,
+            "name": stored["name"],
+            "address": f"{stored['name']}@{normalized_domain}",
+            "added": stored["added"],
+        }
+
+    async def import_address(self, domain: str) -> dict[str, dict[str, Any]]:
+        normalized_domain = self.normalize_address_domain(domain)
+        current = await self.fetch_id_info()
+        response = await self._http_request("GET", f"https://{normalized_domain}/.well-known/names")
+        if not (200 <= response.status_code < 300):
+            raise KeymasterError(await self.get_response_error(response, "Failed to import addresses"))
+
+        data = await self.get_response_data(response)
+        names = data.get("names") if isinstance(data, dict) else {}
+        if not isinstance(names, dict):
+            names = {}
+        imported = {}
+        added = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+
+        async with self._lock:
+            wallet = await self.load_wallet()
+            id_info = wallet["ids"][wallet["current"]]
+            id_info.setdefault("addresses", {})
+            for name, did in names.items():
+                if did != current["did"]:
+                    continue
+                address = f"{str(name).lower()}@{normalized_domain}"
+                id_info["addresses"][normalized_domain] = {"name": str(name).lower(), "added": added}
+                imported[address] = {"added": added}
+            await self._save_loaded_wallet(wallet, overwrite=True)
+
+        return imported
+
+    async def check_address(self, address: str) -> dict[str, Any]:
+        parsed = self.parse_address(address)
+        try:
+            response = await self._http_request(
+                "GET", f"https://{parsed['domain']}/.well-known/names/{__import__('urllib.parse').parse.quote(parsed['name'])}"
+            )
+        except Exception:
+            return {
+                "address": parsed["address"],
+                "status": "unreachable",
+                "available": False,
+                "did": None,
+            }
+
+        if response.status_code == 404:
+            content_type = response.headers.get("content-type", "")
+            data = await self.get_response_data(response) if "application/json" in content_type else None
+            if isinstance(data, dict) and data.get("error") == "Name not found":
+                return {
+                    "address": parsed["address"],
+                    "status": "available",
+                    "available": True,
+                    "did": None,
+                }
+            return {
+                "address": parsed["address"],
+                "status": "unsupported",
+                "available": False,
+                "did": None,
+            }
+
+        if not (200 <= response.status_code < 300):
+            raise KeymasterError(await self.get_response_error(response, "Failed to check address"))
+
+        data = await self.get_response_data(response)
+        if not isinstance(data, dict) or not isinstance(data.get("did"), str):
+            return {
+                "address": parsed["address"],
+                "status": "unsupported",
+                "available": False,
+                "did": None,
+            }
+
+        return {
+            "address": parsed["address"],
+            "status": "claimed",
+            "available": False,
+            "did": data["did"],
+        }
+
+    async def add_address(self, address: str) -> bool:
+        parsed = self.parse_address(address)
+        bearer_token = await self.create_address_bearer_token(parsed["domain"])
+        await self.fetch_address_api_response(
+            parsed["domain"],
+            "name",
+            "PUT",
+            {"Authorization": f"Bearer {bearer_token}", "Content-Type": "application/json"},
+            {"name": parsed["name"]},
+            "Failed to add address",
+        )
+
+        async with self._lock:
+            wallet = await self.load_wallet()
+            id_info = wallet["ids"][wallet["current"]]
+            id_info.setdefault("addresses", {})
+            id_info["addresses"][parsed["domain"]] = {
+                "name": parsed["name"],
+                "added": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            }
+            await self._save_loaded_wallet(wallet, overwrite=True)
+
+        return True
+
+    async def remove_address(self, address: str) -> bool:
+        parsed = self.parse_address(address)
+        id_info = await self.fetch_id_info()
+        stored = id_info.get("addresses", {}).get(parsed["domain"])
+        if not stored or stored.get("name") != parsed["name"]:
+            raise KeymasterError("Invalid parameter: address")
+
+        bearer_token = await self.create_address_bearer_token(parsed["domain"])
+        await self.fetch_address_api_response(
+            parsed["domain"],
+            "name",
+            "DELETE",
+            {"Authorization": f"Bearer {bearer_token}"},
+            None,
+            "Failed to remove address",
+        )
+
+        async with self._lock:
+            wallet = await self.load_wallet()
+            current = wallet["ids"][wallet["current"]]
+            addresses = current.get("addresses", {})
+            current_stored = addresses.get(parsed["domain"])
+            if current_stored and current_stored.get("name") == parsed["name"]:
+                del addresses[parsed["domain"]]
+            await self._save_loaded_wallet(wallet, overwrite=True)
+
+        return True
+
     async def fetch_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]] | None:
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
@@ -430,6 +719,29 @@ class Keymaster:
             await self.remove_from_owned(did, current["didDocument"]["controller"])
         return ok
 
+    async def change_registry(self, identifier: str, registry: str) -> bool:
+        if not isinstance(registry, str) or not registry:
+            raise KeymasterError("Invalid parameter: registry")
+
+        if registry not in await self.list_registries():
+            raise KeymasterError(f"Registry not supported: {registry}")
+
+        did = await self.lookup_did(identifier)
+        current = await self.resolve_did(did)
+        current_registration = current.get("didDocumentRegistration") or {}
+        if registry == current_registration.get("registry"):
+            return True
+
+        return await self.update_did(
+            did,
+            {
+                "didDocumentRegistration": {
+                    **current_registration,
+                    "registry": registry,
+                }
+            },
+        )
+
     async def add_to_owned(self, did: str, owner: str | None = None) -> bool:
         async with self._lock:
             wallet = await self.load_wallet()
@@ -451,6 +763,35 @@ class Keymaster:
             id_info["owned"] = [item for item in id_info["owned"] if item != did]
             await self._save_loaded_wallet(wallet, overwrite=True)
         return True
+
+    async def add_to_held(self, did: str) -> bool:
+        async with self._lock:
+            wallet = await self.load_wallet()
+            current = wallet.get("current")
+            if not current:
+                raise KeymasterError("No current ID")
+            id_info = wallet["ids"][current]
+            held = set(id_info.get("held", []))
+            held.add(did)
+            id_info["held"] = list(held)
+            await self._save_loaded_wallet(wallet, overwrite=True)
+        return True
+
+    async def remove_from_held(self, did: str) -> bool:
+        changed = False
+        async with self._lock:
+            wallet = await self.load_wallet()
+            current = wallet.get("current")
+            if not current:
+                raise KeymasterError("No current ID")
+            id_info = wallet["ids"][current]
+            held = set(id_info.get("held", []))
+            if did in held:
+                held.remove(did)
+                changed = True
+                id_info["held"] = list(held)
+                await self._save_loaded_wallet(wallet, overwrite=True)
+        return changed
 
     async def list_assets(self, owner: str | None = None) -> list[str]:
         id_info = await self.fetch_id_info(owner)
@@ -483,6 +824,18 @@ class Keymaster:
             await self.add_alias(alias, did)
         return did
 
+    async def clone_asset(self, identifier: str, options: dict[str, Any] | None = None) -> str:
+        asset_doc = await self.resolve_did(identifier)
+        if asset_doc.get("didDocumentRegistration", {}).get("type") != "asset":
+            raise KeymasterError("Invalid parameter: id")
+
+        asset_data = asset_doc.get("didDocumentData") or {}
+        if not isinstance(asset_data, dict):
+            raise KeymasterError("Invalid parameter: id")
+
+        clone_data = {**asset_data, "cloned": asset_doc.get("didDocument", {}).get("id")}
+        return await self.create_asset(clone_data, options or {})
+
     async def resolve_asset(self, did: str, options: dict[str, Any] | None = None) -> Any:
         doc = await self.resolve_did(did, options)
         if doc.get("didDocumentMetadata", {}).get("deactivated"):
@@ -494,6 +847,34 @@ class Keymaster:
         updated = {**current, **data}
         updated = {key: value for key, value in updated.items() if value is not None}
         return await self.update_did(did, {"didDocumentData": updated})
+
+    async def transfer_asset(self, identifier: str, controller: str) -> bool:
+        asset_doc = await self.resolve_did(identifier)
+        if asset_doc.get("didDocumentRegistration", {}).get("type") != "asset":
+            raise KeymasterError("Invalid parameter: id")
+
+        current_controller = asset_doc.get("didDocument", {}).get("controller")
+        if current_controller == controller:
+            return True
+
+        agent_doc = await self.resolve_did(controller)
+        if agent_doc.get("didDocumentRegistration", {}).get("type") != "agent":
+            raise KeymasterError("Invalid parameter: controller")
+
+        asset_did = asset_doc.get("didDocument", {}).get("id")
+        updated_did_document = {
+            **(asset_doc.get("didDocument") or {}),
+            "controller": agent_doc.get("didDocument", {}).get("id"),
+        }
+
+        ok = await self.update_did(identifier, {"didDocument": updated_did_document})
+        if ok and asset_did and current_controller:
+            await self.remove_from_owned(asset_did, current_controller)
+            try:
+                await self.add_to_owned(asset_did, controller)
+            except Exception:
+                pass
+        return ok
 
     async def test_agent(self, identifier: str) -> bool:
         try:
@@ -921,6 +1302,371 @@ class Keymaster:
 
     async def create_challenge(self, challenge: dict[str, Any] | None = None, options: dict[str, Any] | None = None) -> str:
         return await self.create_asset({"challenge": challenge or {}}, options or {})
+
+    def is_managed_did(self, value: str) -> bool:
+        return isinstance(value, str) and value.startswith("did:")
+
+    def is_verifiable_credential(self, value: Any) -> bool:
+        return (
+            isinstance(value, dict)
+            and isinstance(value.get("@context"), list)
+            and isinstance(value.get("type"), list)
+            and isinstance(value.get("issuer"), str)
+            and isinstance(value.get("credentialSubject"), dict)
+        )
+
+    async def bind_credential(
+        self,
+        subject_id: str,
+        options: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        options = options or {}
+        schema = options.get("schema")
+        valid_from = options.get("validFrom") or (__import__("datetime").datetime.utcnow().isoformat() + "Z")
+        valid_until = options.get("validUntil")
+        claims = deepcopy(options.get("claims")) if isinstance(options.get("claims"), dict) else options.get("claims")
+
+        id_info = await self.fetch_id_info()
+        try:
+            subject_uri = await self.lookup_did(subject_id)
+        except Exception:
+            subject_uri = subject_id
+
+        vc = {
+            "@context": [
+                "https://www.w3.org/ns/credentials/v2",
+                "https://www.w3.org/ns/credentials/examples/v2",
+            ],
+            "type": ["VerifiableCredential"],
+            "issuer": id_info["did"],
+            "validFrom": valid_from,
+            "validUntil": valid_until,
+            "credentialSubject": {"id": subject_uri},
+        }
+
+        if schema:
+            schema_did = await self.lookup_did(schema)
+            schema_doc = await self.get_schema(schema_did)
+            if not claims and isinstance(schema_doc, dict):
+                claims = self.generate_schema_template(schema_doc)
+            if isinstance(schema_doc, dict) and isinstance(schema_doc.get("$credentialContext"), list) and schema_doc["$credentialContext"]:
+                vc["@context"] = schema_doc["$credentialContext"]
+            if isinstance(schema_doc, dict) and isinstance(schema_doc.get("$credentialType"), list) and schema_doc["$credentialType"]:
+                vc["type"] = schema_doc["$credentialType"]
+            vc["credentialSchema"] = {"id": schema_did, "type": "JsonSchema"}
+
+        if isinstance(claims, dict) and claims:
+            vc["credentialSubject"] = {"id": subject_uri, **claims}
+
+        return vc
+
+    async def issue_credential(self, credential: dict[str, Any] | None, options: dict[str, Any] | None = None) -> str:
+        options = options or {}
+        id_info = await self.fetch_id_info()
+
+        if options.get("schema") and options.get("subject"):
+            credential = await self.bind_credential(
+                options["subject"],
+                {
+                    "schema": options.get("schema"),
+                    "claims": options.get("claims"),
+                    "validFrom": options.get("validFrom"),
+                    "validUntil": options.get("validUntil"),
+                },
+            )
+
+        if not isinstance(credential, dict) or credential.get("issuer") != id_info["did"]:
+            raise KeymasterError("Invalid parameter: credential.issuer")
+
+        signed = await self.add_proof(credential)
+        subject_id = credential.get("credentialSubject", {}).get("id")
+        if self.is_managed_did(subject_id):
+            return await self.encrypt_json(signed, subject_id, {**options, "includeHash": True})
+        return await self.encrypt_json(signed, id_info["did"], {**options, "includeHash": True, "encryptForSender": False})
+
+    def verify_tag_list(self, tags: list[str]) -> list[str]:
+        if not isinstance(tags, list):
+            raise KeymasterError("Invalid parameter: tags")
+
+        verified: list[str] = []
+        seen: set[str] = set()
+        for tag in tags:
+            if not isinstance(tag, str) or not tag.strip():
+                raise KeymasterError(f"Invalid parameter: Invalid tag: '{tag}'")
+
+            normalized = tag.strip()
+            if normalized not in seen:
+                seen.add(normalized)
+                verified.append(normalized)
+
+        return verified
+
+    async def verify_recipient_list(self, recipients: list[str]) -> list[str]:
+        if not isinstance(recipients, list):
+            raise KeymasterError("Invalid parameter: list")
+
+        verified: list[str] = []
+        for recipient in recipients:
+            if not isinstance(recipient, str):
+                raise KeymasterError(f"Invalid parameter: Invalid recipient type: {type(recipient).__name__}")
+
+            did = await self.lookup_did(recipient)
+            if await self.test_agent(did):
+                verified.append(did)
+                continue
+
+            raise KeymasterError(f"Invalid parameter: Invalid recipient: {recipient}")
+
+        return verified
+
+    async def verify_did_list(self, did_list: list[str]) -> list[str]:
+        if not isinstance(did_list, list):
+            raise KeymasterError("Invalid parameter: didList")
+
+        verified: list[str] = []
+        for item in did_list:
+            did = await self.lookup_did(item) if isinstance(item, str) else item
+            if not self.is_managed_did(did):
+                raise KeymasterError(f"Invalid parameter: Invalid DID: {item}")
+            verified.append(did)
+
+        return verified
+
+    async def verify_notice(self, notice: dict[str, Any]) -> dict[str, Any]:
+        to = notice.get("to")
+        dids = notice.get("dids")
+        if not isinstance(to, list) or not to:
+            raise KeymasterError("Invalid parameter: notice.to")
+        if not isinstance(dids, list) or not dids:
+            raise KeymasterError("Invalid parameter: notice.dids")
+
+        verified_to = await self.verify_recipient_list(to)
+        verified_dids = await self.verify_did_list(dids)
+        return {"to": verified_to, "dids": verified_dids}
+
+    async def create_notice(self, message: dict[str, Any], options: dict[str, Any] | None = None) -> str:
+        notice = await self.verify_notice(message)
+        return await self.create_asset({"notice": notice}, options or {})
+
+    async def update_notice(self, identifier: str, message: dict[str, Any]) -> bool:
+        notice = await self.verify_notice(message)
+        return await self.merge_data(identifier, {"notice": notice})
+
+    async def add_to_notices(self, did: str, tags: list[str]) -> bool:
+        verified_tags = self.verify_tag_list(tags)
+        async with self._lock:
+            wallet = await self.load_wallet()
+            current = wallet.get("current")
+            if not current:
+                raise KeymasterError("No current ID")
+
+            id_info = wallet["ids"][current]
+            notices = id_info.setdefault("notices", {})
+            notices[did] = {"tags": verified_tags}
+            await self._save_loaded_wallet(wallet, overwrite=True)
+        return True
+
+    async def import_notice(self, did: str) -> bool:
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(None, wallet)
+
+        if did in (id_info.get("notices") or {}):
+            return True
+
+        asset = await self.resolve_asset(did)
+        notice = asset.get("notice") if isinstance(asset, dict) else None
+        if not isinstance(notice, dict):
+            return False
+
+        recipients = notice.get("to")
+        if not isinstance(recipients, list) or id_info["did"] not in recipients:
+            return False
+
+        imported = False
+        for notice_did in notice.get("dids") or []:
+            accepted = await self.accept_credential(notice_did)
+            if not accepted:
+                return False
+
+            await self.add_to_notices(did, [NoticeTags.CREDENTIAL])
+            imported = True
+
+        return imported
+
+    async def search_notices(self) -> bool:
+        id_info = await self.fetch_id_info()
+        where = {"notice.to[*]": {"$in": [id_info["did"]]}}
+
+        try:
+            notices = await self.gatekeeper.search({"where": where})
+        except Exception as exc:
+            raise KeymasterError("Failed to search for notices") from exc
+
+        existing = id_info.get("notices") or {}
+        for notice_did in notices or []:
+            if notice_did in existing:
+                continue
+
+            try:
+                await self.import_notice(notice_did)
+            except Exception:
+                continue
+
+        return True
+
+    async def cleanup_notices(self) -> bool:
+        changed = False
+        async with self._lock:
+            wallet = await self.load_wallet()
+            current = wallet.get("current")
+            if not current:
+                raise KeymasterError("No current ID")
+
+            id_info = wallet["ids"][current]
+            notices = id_info.get("notices")
+            if not notices:
+                return True
+
+            for notice_did in list(notices.keys()):
+                try:
+                    asset = await self.resolve_asset(notice_did)
+                    if not isinstance(asset, dict) or not isinstance(asset.get("notice"), dict):
+                        del notices[notice_did]
+                        changed = True
+                except Exception:
+                    del notices[notice_did]
+                    changed = True
+
+            if changed:
+                await self._save_loaded_wallet(wallet, overwrite=True)
+
+        return True
+
+    async def refresh_notices(self) -> bool:
+        await self.search_notices()
+        return await self.cleanup_notices()
+
+    async def send_credential(self, did: str, options: dict[str, Any] | None = None) -> str | None:
+        vc = await self.get_credential(did)
+        if not vc:
+            return None
+        subject_id = vc.get("credentialSubject", {}).get("id")
+        if not self.is_managed_did(subject_id):
+            return None
+        valid_until = (__import__("datetime").datetime.utcnow() + __import__("datetime").timedelta(days=7)).isoformat() + "Z"
+        message = {"to": [subject_id], "dids": [did]}
+        return await self.create_notice(message, {"registry": self.ephemeral_registry, "validUntil": valid_until, **(options or {})})
+
+    async def update_credential(self, did: str, credential: dict[str, Any]) -> bool:
+        did = await self.lookup_did(did)
+        original = await self.decrypt_json(did)
+        if not self.is_verifiable_credential(original):
+            raise KeymasterError("Invalid parameter: did is not a credential")
+        if not isinstance(credential, dict) or not isinstance(credential.get("credentialSubject"), dict) or not credential["credentialSubject"].get("id"):
+            raise KeymasterError("Invalid parameter: credential")
+
+        unsigned = deepcopy(credential)
+        unsigned.pop("proof", None)
+        signed = await self.add_proof(unsigned)
+        message = json.dumps(signed, separators=(",", ":"))
+        sender_keypair = await self.fetch_key_pair()
+        if not sender_keypair:
+            raise KeymasterError("No valid sender keypair")
+
+        holder = credential["credentialSubject"]["id"]
+        msg_hash = __import__("hashlib").sha256(message.encode("utf-8")).hexdigest()
+        if self.is_managed_did(holder):
+            holder_doc = await self.resolve_did(holder, {"confirm": "true"})
+            receive_public_jwk = await self.get_public_key_jwk(holder_doc)
+            encrypted = {
+                "cipher_hash": msg_hash,
+                "cipher_sender": encrypt_message(sender_keypair["publicJwk"], message),
+                "cipher_receiver": encrypt_message(receive_public_jwk, message),
+            }
+        else:
+            encrypted = {
+                "cipher_hash": msg_hash,
+                "cipher_sender": None,
+                "cipher_receiver": encrypt_message(sender_keypair["publicJwk"], message),
+            }
+        return await self.update_did(did, {"didDocumentData": {"encrypted": encrypted}})
+
+    async def revoke_credential(self, credential: str) -> bool:
+        did = await self.lookup_did(credential)
+        return await self.revoke_did(did)
+
+    async def list_issued(self, issuer: str | None = None) -> list[str]:
+        id_info = await self.fetch_id_info(issuer)
+        issued = []
+        for did in id_info.get("owned", []):
+            try:
+                credential = await self.decrypt_json(did)
+                if self.is_verifiable_credential(credential) and credential.get("issuer") == id_info["did"]:
+                    issued.append(did)
+            except Exception:
+                pass
+        return issued
+
+    async def accept_credential(self, did: str) -> bool:
+        try:
+            id_info = await self.fetch_id_info()
+            credential_did = await self.lookup_did(did)
+            vc = await self.decrypt_json(credential_did)
+            if self.is_verifiable_credential(vc) and vc.get("credentialSubject", {}).get("id") != id_info["did"]:
+                return False
+            return await self.add_to_held(credential_did)
+        except Exception:
+            return False
+
+    async def get_credential(self, identifier: str) -> dict[str, Any] | None:
+        did = await self.lookup_did(identifier)
+        vc = await self.decrypt_json(did)
+        if not self.is_verifiable_credential(vc):
+            return None
+        return vc
+
+    async def remove_credential(self, identifier: str) -> bool:
+        did = await self.lookup_did(identifier)
+        return await self.remove_from_held(did)
+
+    async def list_credentials(self, identifier: str | None = None) -> list[str]:
+        id_info = await self.fetch_id_info(identifier)
+        return id_info.get("held", [])
+
+    async def publish_credential(self, did: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        reveal = bool((options or {}).get("reveal", False))
+        id_info = await self.fetch_id_info()
+        credential = await self.lookup_did(did)
+        vc = await self.decrypt_json(credential)
+        if not self.is_verifiable_credential(vc):
+            raise KeymasterError("Invalid parameter: did is not a credential")
+        if vc.get("credentialSubject", {}).get("id") != id_info["did"]:
+            raise KeymasterError("Invalid parameter: only subject can publish a credential")
+
+        doc = await self.resolve_did(id_info["did"])
+        did_document_data = deepcopy(doc.get("didDocumentData") or {})
+        manifest = did_document_data.setdefault("manifest", {})
+        published_vc = deepcopy(vc)
+        if not reveal:
+            published_vc["credentialSubject"] = {"id": published_vc["credentialSubject"]["id"]}
+        manifest[credential] = published_vc
+        ok = await self.update_did(id_info["did"], {"didDocumentData": did_document_data})
+        if not ok:
+            raise KeymasterError("update DID failed")
+        return published_vc
+
+    async def unpublish_credential(self, did: str) -> str:
+        id_info = await self.fetch_id_info()
+        doc = await self.resolve_did(id_info["did"])
+        credential = await self.lookup_did(did)
+        did_document_data = deepcopy(doc.get("didDocumentData") or {})
+        manifest = did_document_data.get("manifest") or {}
+        if credential in manifest:
+            del manifest[credential]
+            did_document_data["manifest"] = manifest
+            await self.update_did(id_info["did"], {"didDocumentData": did_document_data})
+            return f"OK credential {did} removed from manifest"
+        raise KeymasterError("Invalid parameter: did")
 
     async def create_response(self, challenge_did: str, options: dict[str, Any] | None = None) -> str:
         options = dict(options or {})

@@ -161,6 +161,25 @@ class FakeGatekeeper:
         self.docs[did] = current
         return True
 
+    async def search(self, query: dict[str, Any]) -> list[str]:
+        where = query.get("where") or {}
+        clause = where.get("notice.to[*]") or {}
+        recipients = clause.get("$in") or []
+        if not recipients:
+            return []
+
+        matches: list[str] = []
+        for did, doc in self.docs.items():
+            notice = (doc.get("didDocumentData") or {}).get("notice")
+            if not isinstance(notice, dict):
+                continue
+
+            to_list = notice.get("to") or []
+            if any(recipient in to_list for recipient in recipients):
+                matches.append(did)
+
+        return matches
+
 
 @dataclass
 class TestBed:

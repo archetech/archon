@@ -41,7 +41,7 @@ Source of truth:
 - [x] `fixWallet`
 - [x] `decryptMnemonic`
 - [x] `exportEncryptedWallet`
-- [ ] `changePassphrase`
+- [x] `changePassphrase`
 - [ ] Full parity with `tests/keymaster/wallet.test.ts`
 
 ## IDs and DID lifecycle
@@ -60,7 +60,7 @@ Source of truth:
 - [x] `updateDID`
 - [x] `revokeDID`
 - [x] `testAgent`
-- [ ] `changeRegistry`
+- [x] `changeRegistry`
 - [ ] Full parity with `tests/keymaster/id.test.ts`
 - [ ] Full parity with `tests/keymaster/utils.test.ts`
 
@@ -78,10 +78,10 @@ Source of truth:
 - [x] Library support for `listAssets`
 - [x] Library support for `resolveAsset`
 - [x] Library support for `mergeData`
-- [ ] Service route parity for `POST /assets`
-- [ ] Service route parity for `PUT /assets/:id`
-- [ ] `cloneAsset`
-- [ ] `transferAsset`
+- [x] Service route parity for `POST /assets`
+- [x] Service route parity for `PUT /assets/:id`
+- [x] `cloneAsset`
+- [x] `transferAsset`
 - [ ] Asset registry-change semantics confirmed against TypeScript behavior
 - [ ] Full parity with `tests/keymaster/asset.test.ts`
 
@@ -128,31 +128,31 @@ Source of truth:
 
 ## Addresses
 
-- [ ] `listAddresses`
-- [ ] `getAddress`
-- [ ] `importAddress`
-- [ ] `checkAddress`
-- [ ] `addAddress`
-- [ ] `removeAddress`
-- [ ] Service route parity for `/addresses*`
+- [x] `listAddresses`
+- [x] `getAddress`
+- [x] `importAddress`
+- [x] `checkAddress`
+- [x] `addAddress`
+- [x] `removeAddress`
+- [x] Service route parity for `/addresses*`
 - [ ] Full parity with `tests/keymaster/address.test.ts`
 
 ## Credentials
 
-- [ ] `bindCredential`
-- [ ] `issueCredential`
-- [ ] `sendCredential`
-- [ ] `updateCredential`
-- [ ] `listCredentials`
-- [ ] `acceptCredential`
-- [ ] `getCredential`
-- [ ] `removeCredential`
-- [ ] `publishCredential`
-- [ ] `unpublishCredential`
-- [ ] `listIssued`
-- [ ] `revokeCredential`
-- [ ] Service route parity for `/credentials/held*`
-- [ ] Service route parity for `/credentials/issued*`
+- [x] `bindCredential`
+- [x] `issueCredential`
+- [x] `sendCredential`
+- [x] `updateCredential`
+- [x] `listCredentials`
+- [x] `acceptCredential`
+- [x] `getCredential`
+- [x] `removeCredential`
+- [x] `publishCredential`
+- [x] `unpublishCredential`
+- [x] `listIssued`
+- [x] `revokeCredential`
+- [x] Service route parity for `/credentials/held*`
+- [x] Service route parity for `/credentials/issued*`
 - [ ] Full parity with `tests/keymaster/credential.test.ts`
 
 ## Polls
@@ -222,11 +222,11 @@ Source of truth:
 - [ ] `removeDmailAttachment`
 - [ ] `getDmailAttachment`
 - [ ] `importDmail`
-- [ ] `createNotice`
-- [ ] `updateNotice`
-- [ ] `refreshNotices`
+- [x] `createNotice`
+- [x] `updateNotice`
+- [x] `refreshNotices`
 - [ ] Service route parity for dmail endpoints
-- [ ] Service route parity for notice endpoints
+- [x] Service route parity for notice endpoints
 - [ ] Full parity with `tests/keymaster/dmail.test.ts`
 - [ ] Full parity with `tests/keymaster/notice.test.ts`
 

@@ -82,3 +82,36 @@ def test_resolve_did_marks_owned_for_wallet_entries(testbed):
     docs = run(testbed.keymaster.resolve_did(did))
 
     assert docs["didDocumentMetadata"]["isOwned"] is True
+
+
+def test_change_registry_updates_id_registration(testbed):
+    did = run(testbed.keymaster.create_id("Bob", {"registry": "local"}))
+
+    assert run(testbed.keymaster.change_registry("Bob", "hyperswarm")) is True
+    assert run(testbed.keymaster.resolve_did(did))["didDocumentRegistration"]["registry"] == "hyperswarm"
+
+
+def test_change_registry_returns_true_when_unchanged(testbed):
+    did = run(testbed.keymaster.create_id("Bob", {"registry": "local"}))
+    before = run(testbed.keymaster.resolve_did(did))["didDocumentMetadata"]["versionSequence"]
+
+    assert run(testbed.keymaster.change_registry("Bob", "local")) is True
+    after = run(testbed.keymaster.resolve_did(did))["didDocumentMetadata"]["versionSequence"]
+    assert after == before
+
+
+def test_change_registry_accepts_raw_did(testbed):
+    did = run(testbed.keymaster.create_id("Bob", {"registry": "local"}))
+
+    assert run(testbed.keymaster.change_registry(did, "hyperswarm")) is True
+    assert run(testbed.keymaster.resolve_did(did))["didDocumentRegistration"]["registry"] == "hyperswarm"
+
+
+def test_change_registry_rejects_unsupported_or_empty_registry(testbed):
+    run(testbed.keymaster.create_id("Bob", {"registry": "local"}))
+
+    with pytest.raises(KeymasterError, match="not supported"):
+        run(testbed.keymaster.change_registry("Bob", "BTC:mainnet"))
+
+    with pytest.raises(KeymasterError, match="Invalid parameter: registry"):
+        run(testbed.keymaster.change_registry("Bob", ""))

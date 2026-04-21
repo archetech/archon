@@ -60,3 +60,8 @@ class GatekeeperClient:
         response = await self._client.get(path)
         response.raise_for_status()
         return response.json()
+
+    async def search(self, query: dict[str, Any]) -> list[str]:
+        response = await self._client.post("/query", json=query)
+        response.raise_for_status()
+        return response.json()
