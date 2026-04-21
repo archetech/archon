@@ -166,6 +166,31 @@ class StubService:
         self.calls.append(("remove_address", address))
         return True
 
+    async def add_nostr(self, identifier: str | None = None):
+        self.calls.append(("add_nostr", identifier))
+        return {"npub": "npub1test", "pubkey": "11" * 32}
+
+    async def remove_nostr(self, identifier: str | None = None) -> bool:
+        self.calls.append(("remove_nostr", identifier))
+        return True
+
+    async def import_nostr(self, nsec: str, identifier: str | None = None):
+        self.calls.append(("import_nostr", nsec, identifier))
+        return {"npub": "npub1imported", "pubkey": "22" * 32}
+
+    async def export_nsec(self, identifier: str | None = None) -> str:
+        self.calls.append(("export_nsec", identifier))
+        return "nsec1test"
+
+    async def sign_nostr_event(self, event):
+        self.calls.append(("sign_nostr_event", event))
+        return {
+            **event,
+            "id": "33" * 32,
+            "pubkey": "22" * 32,
+            "sig": "44" * 64,
+        }
+
     async def merge_data(self, identifier: str, data) -> bool:
         self.calls.append(("merge_data", identifier, data))
         return True
@@ -573,6 +598,54 @@ def test_address_handlers(stub_service: StubService):
         ("check_address", "alice@archon.social"),
         ("add_address", "alice@archon.social"),
         ("remove_address", "alice@archon.social"),
+    ]
+
+
+def test_nostr_handlers(stub_service: StubService):
+    added = run(app_module.add_nostr({"id": "Alice"}))
+    imported = run(app_module.import_nostr({"nsec": "nsec1imported", "id": "Alice"}))
+    exported = run(app_module.export_nsec({"id": "Alice"}))
+    signed = run(
+        app_module.sign_nostr_event(
+            {
+                "event": {
+                    "created_at": 1700000000,
+                    "kind": 1,
+                    "tags": [["p", "did:test:alice"]],
+                    "content": "hello nostr",
+                }
+            }
+        )
+    )
+    removed = run(app_module.remove_nostr({"id": "Alice"}))
+
+    assert added == {"npub": "npub1test", "pubkey": "11" * 32}
+    assert imported == {"npub": "npub1imported", "pubkey": "22" * 32}
+    assert exported == {"nsec": "nsec1test"}
+    assert signed == {
+        "created_at": 1700000000,
+        "kind": 1,
+        "tags": [["p", "did:test:alice"]],
+        "content": "hello nostr",
+        "id": "33" * 32,
+        "pubkey": "22" * 32,
+        "sig": "44" * 64,
+    }
+    assert removed == {"ok": True}
+    assert stub_service.calls == [
+        ("add_nostr", "Alice"),
+        ("import_nostr", "nsec1imported", "Alice"),
+        ("export_nsec", "Alice"),
+        (
+            "sign_nostr_event",
+            {
+                "created_at": 1700000000,
+                "kind": 1,
+                "tags": [["p", "did:test:alice"]],
+                "content": "hello nostr",
+            },
+        ),
+        ("remove_nostr", "Alice"),
     ]
 
 

@@ -25,8 +25,12 @@ from .crypto import (
     hash_json,
     hash_message,
     hd_root_from_mnemonic,
+    jwk_to_nostr,
+    jwk_to_nsec,
+    nsec_to_jwk,
     private_key_to_jwk_pair,
     sign_hash,
+    sign_schnorr,
     ub64url,
     verify_sig,
 )
@@ -405,6 +409,110 @@ class Keymaster:
             wallet.setdefault("aliases", {}).pop(alias, None)
             await self._save_loaded_wallet(wallet, overwrite=True)
         return True
+
+    async def store_nostr_nsec(self, nsec: str, name: str | None = None) -> None:
+        async with self._lock:
+            wallet = await self.load_wallet()
+            id_info = await self.fetch_id_info(name, wallet)
+            current_nostr = id_info.get("nostr")
+            if isinstance(current_nostr, dict):
+                id_info["nostr"] = {**current_nostr, "nsec": nsec}
+            else:
+                id_info["nostr"] = {"nsec": nsec}
+            await self._save_loaded_wallet(wallet, overwrite=True)
+
+    async def remove_stored_nostr(self, name: str | None = None) -> None:
+        async with self._lock:
+            wallet = await self.load_wallet()
+            id_info = await self.fetch_id_info(name, wallet)
+            id_info.pop("nostr", None)
+            await self._save_loaded_wallet(wallet, overwrite=True)
+
+    async def fetch_nostr_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]]:
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(name, wallet)
+        nostr_info = id_info.get("nostr")
+
+        if isinstance(nostr_info, dict):
+            stored_nsec = nostr_info.get("nsec")
+            if isinstance(stored_nsec, str) and stored_nsec:
+                return nsec_to_jwk(stored_nsec)
+
+        keypair = await self.fetch_key_pair(name)
+        if not keypair:
+            raise KeymasterError("Invalid parameter: id")
+        return keypair
+
+    async def add_nostr(self, name: str | None = None) -> dict[str, str]:
+        keypair = await self.fetch_key_pair(name)
+        if not keypair:
+            raise KeymasterError("Invalid parameter: id")
+
+        nostr = jwk_to_nostr(keypair["publicJwk"])
+        nsec = jwk_to_nsec(keypair["privateJwk"])
+        id_info = await self.fetch_id_info(name)
+        await self.merge_data(id_info["did"], {"nostr": nostr})
+        await self.store_nostr_nsec(nsec, name)
+        return nostr
+
+    async def import_nostr(self, nsec: str, name: str | None = None) -> dict[str, str]:
+        if not isinstance(nsec, str) or not nsec:
+            raise KeymasterError("Invalid parameter: nsec")
+
+        try:
+            keypair = nsec_to_jwk(nsec)
+        except Exception as exc:
+            raise KeymasterError("Invalid parameter: nsec") from exc
+
+        nostr = jwk_to_nostr(keypair["publicJwk"])
+        id_info = await self.fetch_id_info(name)
+        await self.merge_data(id_info["did"], {"nostr": nostr})
+        await self.store_nostr_nsec(nsec, name)
+        return nostr
+
+    async def remove_nostr(self, name: str | None = None) -> bool:
+        id_info = await self.fetch_id_info(name)
+        removed = await self.merge_data(id_info["did"], {"nostr": None})
+        await self.remove_stored_nostr(name)
+        return removed
+
+    async def export_nsec(self, name: str | None = None) -> str:
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(name, wallet)
+        nostr_info = id_info.get("nostr")
+
+        if isinstance(nostr_info, dict):
+            stored_nsec = nostr_info.get("nsec")
+            if isinstance(stored_nsec, str) and stored_nsec:
+                return stored_nsec
+
+        keypair = await self.fetch_key_pair(name)
+        if not keypair:
+            raise KeymasterError("Invalid parameter: id")
+        return jwk_to_nsec(keypair["privateJwk"])
+
+    async def sign_nostr_event(self, event: dict[str, Any]) -> dict[str, Any]:
+        keypair = await self.fetch_nostr_key_pair()
+        nostr = jwk_to_nostr(keypair["publicJwk"])
+        serialized = json.dumps(
+            [
+                0,
+                nostr["pubkey"],
+                event["created_at"],
+                event["kind"],
+                event["tags"],
+                event["content"],
+            ],
+            separators=(",", ":"),
+        )
+        event_id = hash_message(serialized)
+        sig = sign_schnorr(event_id, keypair["privateJwk"])
+        return {
+            **event,
+            "id": event_id,
+            "pubkey": nostr["pubkey"],
+            "sig": sig,
+        }
 
     def normalize_address_domain(self, domain: str) -> str:
         if not isinstance(domain, str) or not domain.strip():

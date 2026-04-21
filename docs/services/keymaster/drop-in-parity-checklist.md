@@ -232,12 +232,12 @@ Source of truth:
 
 ## Nostr
 
-- [ ] `addNostr`
-- [ ] `importNostr`
-- [ ] `removeNostr`
-- [ ] `exportNsec`
-- [ ] `signNostrEvent`
-- [ ] Service route parity for `/nostr*`
+- [x] `addNostr`
+- [x] `importNostr`
+- [x] `removeNostr`
+- [x] `exportNsec`
+- [x] `signNostrEvent`
+- [x] Service route parity for `/nostr*`
 - [ ] Full parity with `tests/keymaster/nostr.test.ts`
 
 ## Lightning
@@ -277,6 +277,6 @@ Source of truth:
 - [x] Implement polls
 - [x] Implement vaults
 - [x] Implement dmail and notices
-- [ ] Implement Nostr
+- [x] Implement Nostr
 - [ ] Implement Lightning
 - [ ] Close remaining response-shape and integration gaps

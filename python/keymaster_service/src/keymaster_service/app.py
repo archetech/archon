@@ -267,6 +267,31 @@ async def remove_address(address: str) -> dict[str, bool]:
     return {"ok": await service.remove_address(address)}
 
 
+@protected_api.post("/nostr")
+async def add_nostr(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.add_nostr(body.get("id"))
+
+
+@protected_api.delete("/nostr")
+async def remove_nostr(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.remove_nostr(body.get("id"))}
+
+
+@protected_api.post("/nostr/import")
+async def import_nostr(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.import_nostr(body["nsec"], body.get("id"))
+
+
+@protected_api.post("/nostr/nsec")
+async def export_nsec(body: dict[str, Any]) -> dict[str, str]:
+    return {"nsec": await service.export_nsec(body.get("id"))}
+
+
+@protected_api.post("/nostr/sign")
+async def sign_nostr_event(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.sign_nostr_event(body["event"])
+
+
 @protected_api.get("/did/{identifier}")
 async def resolve_did(identifier: str, request: Request) -> dict[str, Any]:
     options = {key: value for key, value in request.query_params.items()}

@@ -6,7 +6,8 @@ import json
 import os
 from typing import Any
 
-from bip_utils import Bip32Secp256k1, Bip39SeedGenerator
+from bip_utils import Bech32Decoder, Bech32Encoder, Bip32Secp256k1, Bip39SeedGenerator
+from coincurve import PrivateKey, PublicKeyXOnly
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -137,6 +138,35 @@ def verify_sig(msg_hash: str, sig_hex: str, public_jwk: dict[str, str]) -> bool:
     try:
         public_key.verify(der, bytes.fromhex(msg_hash), ec.ECDSA(utils.Prehashed(hashes.SHA256())))
         return True
+    except Exception:
+        return False
+
+
+def jwk_to_nostr(public_jwk: dict[str, str]) -> dict[str, str]:
+    pubkey_bytes = ub64url(public_jwk["x"])
+    return {
+        "npub": Bech32Encoder.Encode("npub", pubkey_bytes),
+        "pubkey": pubkey_bytes.hex(),
+    }
+
+
+def jwk_to_nsec(private_jwk: dict[str, str]) -> str:
+    return Bech32Encoder.Encode("nsec", ub64url(private_jwk["d"]))
+
+
+def nsec_to_jwk(nsec: str) -> dict[str, dict[str, str]]:
+    return private_key_to_jwk_pair(Bech32Decoder.Decode("nsec", nsec))
+
+
+def sign_schnorr(msg_hash: str, private_jwk: dict[str, str]) -> str:
+    secret = ub64url(private_jwk["d"])
+    return PrivateKey(secret).sign_schnorr(bytes.fromhex(msg_hash), aux_randomness=b"").hex()
+
+
+def verify_schnorr(msg_hash: str, sig_hex: str, pubkey_hex: str) -> bool:
+    try:
+        pubkey = PublicKeyXOnly(bytes.fromhex(pubkey_hex))
+        return pubkey.verify(bytes.fromhex(sig_hex), bytes.fromhex(msg_hash))
     except Exception:
         return False
 

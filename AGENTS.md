@@ -30,3 +30,4 @@ These rules apply to coding agents working in this repository.
 - Prefer a clean branch cut over moving changes around after the fact.
 - If branch state becomes confusing, stop and cleanly reestablish scope before making more commits.
 - When adding Prometheus HTTP route labels, normalize dynamic path segments like DIDs, hashes, txids, and CIDs before recording metrics so dashboards do not create one time series per identifier.
+- Nostr event IDs in Python parity code must use compact JSON serialization (`separators=(",", ":")`) to match the TypeScript `JSON.stringify` hashing/signing contract.
