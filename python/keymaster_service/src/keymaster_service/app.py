@@ -29,7 +29,10 @@ def apply_content_length(options: dict[str, Any], request: Request) -> dict[str,
     if not isinstance(content_length, str):
         return options
 
-    parsed_bytes = int(content_length)
+    try:
+        parsed_bytes = int(content_length)
+    except ValueError:
+        return options
     if parsed_bytes >= 0:
         options["bytes"] = parsed_bytes
     return options

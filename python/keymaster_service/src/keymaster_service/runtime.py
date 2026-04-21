@@ -28,6 +28,7 @@ class KeymasterService:
             default_registry=settings.default_registry or "hyperswarm",
         )
         self.server_ready = False
+        self._node_id_task: asyncio.Task[None] | None = None
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.keymaster, name)
@@ -43,6 +44,12 @@ class KeymasterService:
 
         await self.gatekeeper.connect(wait_until_ready=True, interval_seconds=5)
         await self.keymaster.load_wallet()
+        # Resolve the node ID in the background so the ASGI app can start
+        # serving /version, /metrics, and /ready immediately. /ready will
+        # report ready=False until this task completes.
+        self._node_id_task = asyncio.create_task(self._resolve_node_id())
+
+    async def _resolve_node_id(self) -> None:
         try:
             await self.wait_for_node_id()
             self.server_ready = True
@@ -50,6 +57,12 @@ class KeymasterService:
             LOGGER.exception("Failed to wait for node ID")
 
     async def shutdown(self) -> None:
+        if self._node_id_task is not None and not self._node_id_task.done():
+            self._node_id_task.cancel()
+            try:
+                await self._node_id_task
+            except (asyncio.CancelledError, Exception):
+                pass
         await self.gatekeeper.close()
 
     async def wait_for_node_id(self) -> None:

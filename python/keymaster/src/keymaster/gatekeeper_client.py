@@ -78,6 +78,8 @@ class GatekeeperClient:
 
     async def get_data(self, cid: str) -> bytes | None:
         response = await self._client.get(f"/ipfs/data/{cid}")
+        if response.status_code == 404:
+            return None
         response.raise_for_status()
         return response.content
 
@@ -92,6 +94,8 @@ class GatekeeperClient:
 
     async def get_text(self, cid: str) -> str | None:
         response = await self._client.get(f"/ipfs/text/{cid}")
+        if response.status_code == 404:
+            return None
         response.raise_for_status()
         return response.text
 
