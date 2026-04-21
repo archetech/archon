@@ -18,6 +18,7 @@ dependencies = [
 
 [project.scripts]
 keymaster-service = "keymaster_service.main:main"
+keymaster = "keymaster_service.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
