@@ -32,3 +32,4 @@ These rules apply to coding agents working in this repository.
 - When adding Prometheus HTTP route labels, normalize dynamic path segments like DIDs, hashes, txids, and CIDs before recording metrics so dashboards do not create one time series per identifier.
 - Nostr event IDs in Python parity code must use compact JSON serialization (`separators=(",", ":")`) to match the TypeScript `JSON.stringify` hashing/signing contract.
 - Python Lightning invoice parity should only surface `expiry` and `expires` when the BOLT11 invoice actually includes an expiry tag; the `bolt11` library exposes a default expiry even when the tag is absent.
+- Python keymaster flavor runs in CLI CI must force `ARCHON_KEYMASTER_DB=json`; the generated CLI test `.env` still defaults keymaster DB to `redis` for the TypeScript service.

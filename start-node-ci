@@ -26,6 +26,14 @@ case "${3:-${ARCHON_KEYMASTER_FLAVOR:-ts}}" in
     ;;
 esac
 
+# The Python keymaster service currently only supports the JSON wallet store.
+# CLI test env generation still defaults ARCHON_KEYMASTER_DB to redis for the
+# TypeScript service, so override it here for the Python flavor.
+if [[ "$ARCHON_KEYMASTER_FLAVOR" == "py" && "${ARCHON_KEYMASTER_DB:-json}" != "json" ]]; then
+  echo "Overriding ARCHON_KEYMASTER_DB=$ARCHON_KEYMASTER_DB to json for Python keymaster"
+  export ARCHON_KEYMASTER_DB="json"
+fi
+
 echo "Using gatekeeper flavor: $ARCHON_GATEKEEPER_FLAVOR"
 echo "Using keymaster flavor: $ARCHON_KEYMASTER_FLAVOR"
 
