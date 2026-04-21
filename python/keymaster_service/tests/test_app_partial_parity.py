@@ -177,6 +177,50 @@ class StubService:
         self.calls.append(("create_vault", options))
         return "did:test:vault"
 
+    async def poll_template(self):
+        self.calls.append(("poll_template",))
+        return {
+            "version": 2,
+            "name": "poll-name",
+            "description": "What is this poll about?",
+            "options": ["yes", "no", "abstain"],
+            "deadline": "2026-04-11T13:00:00.000Z",
+        }
+
+    async def list_polls(self, owner=None):
+        self.calls.append(("list_polls", owner))
+        return ["did:test:poll"]
+
+    async def create_poll(self, poll, options):
+        self.calls.append(("create_poll", poll, options))
+        return "did:test:poll"
+
+    async def get_poll(self, identifier: str):
+        self.calls.append(("get_poll", identifier))
+        return {
+            "version": 2,
+            "name": "poll-name",
+            "description": "What is this poll about?",
+            "options": ["yes", "no", "abstain"],
+            "deadline": "2026-04-11T13:00:00.000Z",
+        }
+
+    async def test_poll(self, identifier: str) -> bool:
+        self.calls.append(("test_poll", identifier))
+        return True
+
+    async def add_poll_voter(self, poll: str, member_id: str) -> bool:
+        self.calls.append(("add_poll_voter", poll, member_id))
+        return True
+
+    async def remove_poll_voter(self, poll: str, voter: str) -> bool:
+        self.calls.append(("remove_poll_voter", poll, voter))
+        return True
+
+    async def list_poll_voters(self, poll: str):
+        self.calls.append(("list_poll_voters", poll))
+        return {"did:test:alice": {"added": "2026-04-04T13:00:00.000Z"}}
+
     async def get_vault(self, identifier: str):
         self.calls.append(("get_vault", identifier))
         return {"version": 1, "keys": {}, "items": "enc", "publicJwk": {"kty": "EC"}}
@@ -454,4 +498,57 @@ def test_vault_handlers(stub_service: StubService):
         ("list_vault_items", "did:test:vault"),
         ("get_vault_item", "did:test:vault", "doc.txt"),
         ("remove_vault_item", "did:test:vault", "doc.txt"),
+    ]
+
+
+def test_poll_handlers(stub_service: StubService):
+    templated = run(app_module.poll_template())
+    listed = run(app_module.list_polls("did:test:bob"))
+    created = run(app_module.create_poll({
+        "poll": {
+            "version": 2,
+            "name": "poll-name",
+            "description": "What is this poll about?",
+            "options": ["yes", "no", "abstain"],
+            "deadline": "2026-04-11T13:00:00.000Z",
+        },
+        "options": {"registry": "local"},
+    }))
+    fetched = run(app_module.get_poll("did:test:poll"))
+    tested = run(app_module.test_poll("did:test:poll"))
+    added = run(app_module.add_poll_voter("did:test:poll", {"memberId": "did:test:alice"}))
+    voters = run(app_module.list_poll_voters("did:test:poll"))
+    removed = run(app_module.remove_poll_voter("did:test:poll", "did:test:alice"))
+
+    assert templated == {
+        "template": {
+            "version": 2,
+            "name": "poll-name",
+            "description": "What is this poll about?",
+            "options": ["yes", "no", "abstain"],
+            "deadline": "2026-04-11T13:00:00.000Z",
+        }
+    }
+    assert listed == {"polls": ["did:test:poll"]}
+    assert created == {"did": "did:test:poll"}
+    assert fetched["poll"]["name"] == "poll-name"
+    assert tested == {"test": True}
+    assert added == {"ok": True}
+    assert voters == {"voters": {"did:test:alice": {"added": "2026-04-04T13:00:00.000Z"}}}
+    assert removed == {"ok": True}
+    assert stub_service.calls == [
+        ("poll_template",),
+        ("list_polls", "did:test:bob"),
+        ("create_poll", {
+            "version": 2,
+            "name": "poll-name",
+            "description": "What is this poll about?",
+            "options": ["yes", "no", "abstain"],
+            "deadline": "2026-04-11T13:00:00.000Z",
+        }, {"registry": "local"}),
+        ("get_poll", "did:test:poll"),
+        ("test_poll", "did:test:poll"),
+        ("add_poll_voter", "did:test:poll", "did:test:alice"),
+        ("list_poll_voters", "did:test:poll"),
+        ("remove_poll_voter", "did:test:poll", "did:test:alice"),
     ]

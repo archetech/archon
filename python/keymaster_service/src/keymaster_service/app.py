@@ -494,6 +494,46 @@ async def create_group(body: dict[str, Any]) -> dict[str, str]:
     return {"did": await service.create_group(body["name"], body.get("options") or {})}
 
 
+@protected_api.get("/templates/poll")
+async def poll_template() -> dict[str, Any]:
+    return {"template": await service.poll_template()}
+
+
+@protected_api.get("/polls")
+async def list_polls(owner: str | None = None) -> dict[str, Any]:
+    return {"polls": await service.list_polls(owner)}
+
+
+@protected_api.post("/polls")
+async def create_poll(body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.create_poll(body["poll"], body.get("options") or {})}
+
+
+@protected_api.get("/polls/{poll}")
+async def get_poll(poll: str) -> dict[str, Any]:
+    return {"poll": await service.get_poll(poll)}
+
+
+@protected_api.get("/polls/{poll}/test")
+async def test_poll(poll: str) -> dict[str, bool]:
+    return {"test": await service.test_poll(poll)}
+
+
+@protected_api.post("/polls/{poll}/voters")
+async def add_poll_voter(poll: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.add_poll_voter(poll, body["memberId"])}
+
+
+@protected_api.delete("/polls/{poll}/voters/{voter}")
+async def remove_poll_voter(poll: str, voter: str) -> dict[str, bool]:
+    return {"ok": await service.remove_poll_voter(poll, voter)}
+
+
+@protected_api.get("/polls/{poll}/voters")
+async def list_poll_voters(poll: str) -> dict[str, Any]:
+    return {"voters": await service.list_poll_voters(poll)}
+
+
 @protected_api.get("/groups")
 async def list_groups(owner: str | None = None) -> dict[str, Any]:
     return {"groups": await service.list_groups(owner)}

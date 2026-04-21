@@ -47,6 +47,11 @@ class NoticeTags:
     CREDENTIAL = "credential"
 
 
+class PollItems:
+    POLL = "poll"
+    RESULTS = "results"
+
+
 class KeymasterError(Exception):
     pass
 
@@ -1534,6 +1539,94 @@ class Keymaster:
 
     async def create_group(self, name: str, options: dict[str, Any] | None = None) -> str:
         return await self.create_asset({"name": name, "group": {"version": 2, "members": []}}, options or {})
+
+    async def poll_template(self) -> dict[str, Any]:
+        next_week = __import__("datetime").datetime.now(__import__("datetime").timezone.utc) + __import__("datetime").timedelta(days=7)
+        return {
+            "version": 2,
+            "name": "poll-name",
+            "description": "What is this poll about?",
+            "options": ["yes", "no", "abstain"],
+            "deadline": next_week.isoformat().replace("+00:00", "Z"),
+        }
+
+    def _parse_poll_deadline(self, value: Any):
+        if not isinstance(value, str) or not value:
+            raise KeymasterError("Invalid parameter: poll.deadline")
+
+        candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
+        try:
+            parsed = __import__("datetime").datetime.fromisoformat(candidate)
+        except ValueError as exc:
+            raise KeymasterError("Invalid parameter: poll.deadline") from exc
+
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=__import__("datetime").timezone.utc)
+        return parsed.astimezone(__import__("datetime").timezone.utc)
+
+    async def create_poll(self, config: dict[str, Any], options: dict[str, Any] | None = None) -> str:
+        if not isinstance(config, dict) or config.get("version") != 2:
+            raise KeymasterError("Invalid parameter: poll.version")
+
+        if not isinstance(config.get("name"), str) or not config["name"]:
+            raise KeymasterError("Invalid parameter: poll.name")
+
+        if not isinstance(config.get("description"), str) or not config["description"]:
+            raise KeymasterError("Invalid parameter: poll.description")
+
+        poll_options = config.get("options")
+        if not isinstance(poll_options, list) or len(poll_options) < 2 or len(poll_options) > 10:
+            raise KeymasterError("Invalid parameter: poll.options")
+
+        deadline = self._parse_poll_deadline(config.get("deadline"))
+        if deadline < __import__("datetime").datetime.now(__import__("datetime").timezone.utc):
+            raise KeymasterError("Invalid parameter: poll.deadline")
+
+        vault_did = await self.create_vault(options or {})
+        buffer = json.dumps(config, separators=(",", ":")).encode("utf-8")
+        await self.add_vault_item(vault_did, PollItems.POLL, buffer)
+        return vault_did
+
+    async def get_poll(self, identifier: str) -> dict[str, Any] | None:
+        is_vault = await self.test_vault(identifier)
+        if not is_vault:
+            return None
+
+        try:
+            buffer = await self.get_vault_item(identifier, PollItems.POLL)
+            if not buffer:
+                return None
+            return json.loads(buffer.decode("utf-8"))
+        except Exception:
+            return None
+
+    async def test_poll(self, identifier: str) -> bool:
+        try:
+            return await self.get_poll(identifier) is not None
+        except Exception:
+            return False
+
+    async def list_polls(self, owner: str | None = None) -> list[str]:
+        polls: list[str] = []
+        for did in await self.list_assets(owner):
+            if await self.test_poll(did):
+                polls.append(did)
+        return polls
+
+    async def add_poll_voter(self, poll_id: str, member_id: str) -> bool:
+        if not await self.get_poll(poll_id):
+            raise KeymasterError("Invalid parameter: pollId")
+        return await self.add_vault_member(poll_id, member_id)
+
+    async def remove_poll_voter(self, poll_id: str, member_id: str) -> bool:
+        if not await self.get_poll(poll_id):
+            raise KeymasterError("Invalid parameter: pollId")
+        return await self.remove_vault_member(poll_id, member_id)
+
+    async def list_poll_voters(self, poll_id: str) -> dict[str, Any]:
+        if not await self.get_poll(poll_id):
+            raise KeymasterError("Invalid parameter: pollId")
+        return await self.list_vault_members(poll_id)
 
     async def get_group(self, identifier: str) -> dict[str, Any] | None:
         asset = await self.resolve_asset(identifier)

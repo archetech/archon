@@ -157,11 +157,11 @@ Source of truth:
 
 ## Polls
 
-- [ ] `pollTemplate`
-- [ ] `createPoll`
-- [ ] `getPoll`
-- [ ] `testPoll`
-- [ ] `listPolls`
+- [x] `pollTemplate`
+- [x] `createPoll`
+- [x] `getPoll`
+- [x] `testPoll`
+- [x] `listPolls`
 - [ ] `viewPoll`
 - [ ] `votePoll`
 - [ ] `sendPoll`
@@ -170,9 +170,9 @@ Source of truth:
 - [ ] `updatePoll`
 - [ ] `publishPoll`
 - [ ] `unpublishPoll`
-- [ ] `addPollVoter`
-- [ ] `removePollVoter`
-- [ ] `listPollVoters`
+- [x] `addPollVoter`
+- [x] `removePollVoter`
+- [x] `listPollVoters`
 - [ ] Service route parity for `/templates/poll` and `/polls*`
 - [ ] Full parity with `tests/keymaster/poll.test.ts`
 
