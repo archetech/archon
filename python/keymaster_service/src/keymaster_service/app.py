@@ -35,6 +35,15 @@ def apply_content_length(options: dict[str, Any], request: Request) -> dict[str,
     return options
 
 
+def parse_resolve_options(request: Request) -> dict[str, Any]:
+    options: dict[str, Any] = {}
+    for key in ("versionTime", "versionSequence"):
+        value = request.query_params.get(key)
+        if isinstance(value, str) and value:
+            options[key] = value
+    return options
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     LOGGER.info("Keymaster server v%s (%s) running on %s:%s", settings.service_version, settings.git_commit, settings.bind_address, settings.keymaster_port)
@@ -505,6 +514,67 @@ async def refresh_notices() -> dict[str, bool]:
 @protected_api.put("/notices/{identifier}")
 async def update_notice(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
     return {"ok": await service.update_notice(identifier, body["message"])}
+
+
+@protected_api.get("/dmail")
+async def list_dmail() -> dict[str, Any]:
+    return {"dmail": await service.list_dmail()}
+
+
+@protected_api.post("/dmail")
+async def create_dmail(body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.create_dmail(body["message"], body.get("options") or {})}
+
+
+@protected_api.post("/dmail/import")
+async def import_dmail(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.import_dmail(body["did"])}
+
+
+@protected_api.get("/dmail/{identifier}")
+async def get_dmail(identifier: str, request: Request) -> dict[str, Any]:
+    return {"message": await service.get_dmail_message(identifier, parse_resolve_options(request))}
+
+
+@protected_api.put("/dmail/{identifier}")
+async def update_dmail(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.update_dmail(identifier, body["message"])}
+
+
+@protected_api.delete("/dmail/{identifier}")
+async def remove_dmail(identifier: str) -> dict[str, bool]:
+    return {"ok": await service.remove_dmail(identifier)}
+
+
+@protected_api.post("/dmail/{identifier}/send")
+async def send_dmail(identifier: str) -> dict[str, str | None]:
+    return {"did": await service.send_dmail(identifier)}
+
+
+@protected_api.post("/dmail/{identifier}/file")
+async def file_dmail(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.file_dmail(identifier, body["tags"])}
+
+
+@protected_api.get("/dmail/{identifier}/attachments")
+async def list_dmail_attachments(identifier: str, request: Request) -> dict[str, Any]:
+    return {"attachments": await service.list_dmail_attachments(identifier, parse_resolve_options(request))}
+
+
+@protected_api.post("/dmail/{identifier}/attachments")
+async def add_dmail_attachment(identifier: str, request: Request) -> dict[str, bool]:
+    options = parse_options_header(request)
+    return {"ok": await service.add_dmail_attachment(identifier, options["name"], await request.body())}
+
+
+@protected_api.delete("/dmail/{identifier}/attachments/{name}")
+async def remove_dmail_attachment(identifier: str, name: str) -> dict[str, bool]:
+    return {"ok": await service.remove_dmail_attachment(identifier, name)}
+
+
+@protected_api.get("/dmail/{identifier}/attachments/{name}")
+async def get_dmail_attachment(identifier: str, name: str) -> Response:
+    return Response(content=await service.get_dmail_attachment(identifier, name), media_type="application/octet-stream")
 
 
 @protected_api.post("/keys/encrypt/message")

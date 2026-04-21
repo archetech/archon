@@ -371,6 +371,75 @@ class StubService:
         self.calls.append(("update_notice", identifier, message))
         return True
 
+    async def list_dmail(self):
+        self.calls.append(("list_dmail",))
+        return {
+            "did:test:dmail": {
+                "message": {
+                    "to": ["did:test:alice"],
+                    "cc": ["did:test:bob"],
+                    "subject": "Test Dmail",
+                    "body": "Hello from dmail.",
+                },
+                "to": ["Alice"],
+                "cc": ["Bob"],
+                "sender": "Bob",
+                "date": "2026-04-11T13:00:00.000Z",
+                "tags": ["draft"],
+                "attachments": {"doc.txt": {"bytes": 3, "type": "text/plain"}},
+                "docs": {"didDocument": {"controller": "did:test:bob"}},
+            }
+        }
+
+    async def create_dmail(self, message, options):
+        self.calls.append(("create_dmail", message, options))
+        return "did:test:dmail"
+
+    async def import_dmail(self, did: str) -> bool:
+        self.calls.append(("import_dmail", did))
+        return True
+
+    async def get_dmail_message(self, identifier: str, options=None):
+        self.calls.append(("get_dmail_message", identifier, options or {}))
+        return {
+            "to": ["did:test:alice"],
+            "cc": ["did:test:bob"],
+            "subject": "Test Dmail",
+            "body": "Hello from dmail.",
+        }
+
+    async def update_dmail(self, identifier: str, message) -> bool:
+        self.calls.append(("update_dmail", identifier, message))
+        return True
+
+    async def remove_dmail(self, identifier: str) -> bool:
+        self.calls.append(("remove_dmail", identifier))
+        return True
+
+    async def send_dmail(self, identifier: str) -> str:
+        self.calls.append(("send_dmail", identifier))
+        return "did:test:notice"
+
+    async def file_dmail(self, identifier: str, tags) -> bool:
+        self.calls.append(("file_dmail", identifier, tags))
+        return True
+
+    async def list_dmail_attachments(self, identifier: str, options=None):
+        self.calls.append(("list_dmail_attachments", identifier, options or {}))
+        return {"doc.txt": {"bytes": 3, "type": "text/plain"}}
+
+    async def add_dmail_attachment(self, identifier: str, name: str, data: bytes) -> bool:
+        self.calls.append(("add_dmail_attachment", identifier, name, data))
+        return True
+
+    async def remove_dmail_attachment(self, identifier: str, name: str) -> bool:
+        self.calls.append(("remove_dmail_attachment", identifier, name))
+        return True
+
+    async def get_dmail_attachment(self, identifier: str, name: str):
+        self.calls.append(("get_dmail_attachment", identifier, name))
+        return b"abc"
+
     async def export_encrypted_wallet(self):
         self.calls.append(("export_encrypted_wallet",))
         return {"version": 2, "seed": {"mnemonicEnc": {}}, "enc": "wallet"}
@@ -561,6 +630,64 @@ def test_notice_handlers(stub_service: StubService):
         ("create_notice", {"to": ["did:test:alice"], "dids": ["did:test:credential"]}, {"registry": "hyperswarm"}),
         ("refresh_notices",),
         ("update_notice", "did:test:notice", {"to": ["did:test:alice"], "dids": ["did:test:credential", "did:test:credential-2"]}),
+    ]
+
+
+def test_dmail_handlers(stub_service: StubService):
+    upload_request = app_module.Request(headers={"x-options": '{"name":"doc.txt"}'}, body=b"abc")
+    version_request = app_module.Request(query_params={"versionTime": "2026-04-11T13:00:00.000Z"})
+    attachment_request = app_module.Request(query_params={"versionSequence": "2"})
+
+    listed = run(app_module.list_dmail())
+    created = run(
+        app_module.create_dmail(
+            {"message": {"to": ["did:test:alice"], "cc": ["did:test:bob"], "subject": "Test Dmail", "body": "Hello from dmail."}, "options": {"secretMembers": True}}
+        )
+    )
+    imported = run(app_module.import_dmail({"did": "did:test:dmail"}))
+    fetched = run(app_module.get_dmail("did:test:dmail", version_request))
+    updated = run(app_module.update_dmail("did:test:dmail", {"message": {"to": ["did:test:alice"], "cc": [], "subject": "Updated", "body": "Updated body."}}))
+    removed = run(app_module.remove_dmail("did:test:dmail"))
+    sent = run(app_module.send_dmail("did:test:dmail"))
+    filed = run(app_module.file_dmail("did:test:dmail", {"tags": ["inbox", "unread"]}))
+    attachments = run(app_module.list_dmail_attachments("did:test:dmail", attachment_request))
+    uploaded = run(app_module.add_dmail_attachment("did:test:dmail", upload_request))
+    deleted_attachment = run(app_module.remove_dmail_attachment("did:test:dmail", "doc.txt"))
+    attachment = run(app_module.get_dmail_attachment("did:test:dmail", "doc.txt"))
+
+    assert listed["dmail"]["did:test:dmail"]["tags"] == ["draft"]
+    assert created == {"did": "did:test:dmail"}
+    assert imported == {"ok": True}
+    assert fetched == {
+        "message": {
+            "to": ["did:test:alice"],
+            "cc": ["did:test:bob"],
+            "subject": "Test Dmail",
+            "body": "Hello from dmail.",
+        }
+    }
+    assert updated == {"ok": True}
+    assert removed == {"ok": True}
+    assert sent == {"did": "did:test:notice"}
+    assert filed == {"ok": True}
+    assert attachments == {"attachments": {"doc.txt": {"bytes": 3, "type": "text/plain"}}}
+    assert uploaded == {"ok": True}
+    assert deleted_attachment == {"ok": True}
+    assert attachment.content == b"abc"
+    assert attachment.media_type == "application/octet-stream"
+    assert stub_service.calls == [
+        ("list_dmail",),
+        ("create_dmail", {"to": ["did:test:alice"], "cc": ["did:test:bob"], "subject": "Test Dmail", "body": "Hello from dmail."}, {"secretMembers": True}),
+        ("import_dmail", "did:test:dmail"),
+        ("get_dmail_message", "did:test:dmail", {"versionTime": "2026-04-11T13:00:00.000Z"}),
+        ("update_dmail", "did:test:dmail", {"to": ["did:test:alice"], "cc": [], "subject": "Updated", "body": "Updated body."}),
+        ("remove_dmail", "did:test:dmail"),
+        ("send_dmail", "did:test:dmail"),
+        ("file_dmail", "did:test:dmail", ["inbox", "unread"]),
+        ("list_dmail_attachments", "did:test:dmail", {"versionSequence": "2"}),
+        ("add_dmail_attachment", "did:test:dmail", "doc.txt", b"abc"),
+        ("remove_dmail_attachment", "did:test:dmail", "doc.txt"),
+        ("get_dmail_attachment", "did:test:dmail", "doc.txt"),
     ]
 
 

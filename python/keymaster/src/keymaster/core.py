@@ -42,6 +42,14 @@ DEFAULT_SCHEMA = {
 }
 
 
+class DmailTags:
+    DMAIL = "dmail"
+    INBOX = "inbox"
+    UNREAD = "unread"
+    SENT = "sent"
+    DRAFT = "draft"
+
+
 class NoticeTags:
     DMAIL = "dmail"
     POLL = "poll"
@@ -2321,6 +2329,8 @@ class Keymaster:
                 raise KeymasterError(f"Invalid parameter: Invalid tag: '{tag}'")
 
             normalized = tag.strip()
+            if any(character.isspace() for character in normalized):
+                raise KeymasterError(f"Invalid parameter: Invalid tag: '{tag}'")
             if normalized not in seen:
                 seen.add(normalized)
                 verified.append(normalized)
@@ -2331,19 +2341,196 @@ class Keymaster:
         if not isinstance(recipients, list):
             raise KeymasterError("Invalid parameter: list")
 
+        wallet = await self.load_wallet()
+        aliases = wallet.get("aliases", {})
+        ids = wallet.get("ids", {})
         verified: list[str] = []
         for recipient in recipients:
             if not isinstance(recipient, str):
                 raise KeymasterError(f"Invalid parameter: Invalid recipient type: {type(recipient).__name__}")
 
-            did = await self.lookup_did(recipient)
-            if await self.test_agent(did):
-                verified.append(did)
+            candidate = None
+            if recipient in aliases:
+                candidate = aliases[recipient]
+            elif recipient in ids:
+                candidate = ids[recipient]["did"]
+            elif "@" in recipient:
+                try:
+                    address = await self.check_address(recipient)
+                    if address.get("status") == "claimed" and isinstance(address.get("did"), str):
+                        candidate = address["did"]
+                except Exception:
+                    candidate = None
+            else:
+                candidate = await self.lookup_did(recipient)
+
+            if isinstance(candidate, str) and await self.test_agent(candidate):
+                verified.append(candidate)
                 continue
 
             raise KeymasterError(f"Invalid parameter: Invalid recipient: {recipient}")
 
         return verified
+
+    def build_did_name_map(self, wallet: dict[str, Any]) -> dict[str, str]:
+        did_to_name = {info["did"]: name for name, info in wallet.get("ids", {}).items()}
+        for name, did in wallet.get("aliases", {}).items():
+            did_to_name[did] = name
+        return did_to_name
+
+    async def list_dmail(self) -> dict[str, Any]:
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(None, wallet)
+        dmail_map = id_info.get("dmail") or {}
+        did_to_name = self.build_did_name_map(wallet)
+        dmail_list: dict[str, Any] = {}
+
+        for did, entry in dmail_map.items():
+            try:
+                message = await self.get_dmail_message(did)
+                if not message:
+                    continue
+
+                docs = await self.resolve_did(did)
+                controller = docs.get("didDocument", {}).get("controller") or ""
+                attachments = await self.list_dmail_attachments(did)
+                dmail_list[did] = {
+                    "message": message,
+                    "to": [did_to_name.get(item, item) for item in message.get("to", [])],
+                    "cc": [did_to_name.get(item, item) for item in message.get("cc", [])],
+                    "tags": entry.get("tags", []) if isinstance(entry, dict) else [],
+                    "sender": did_to_name.get(controller, controller),
+                    "date": docs.get("didDocumentMetadata", {}).get("updated", ""),
+                    "attachments": attachments,
+                    "docs": docs,
+                }
+            except Exception:
+                continue
+
+        return dmail_list
+
+    async def file_dmail(self, did: str, tags: list[str]) -> bool:
+        verified_tags = self.verify_tag_list(tags)
+        async with self._lock:
+            wallet = await self.load_wallet()
+            current = wallet.get("current")
+            if not current:
+                raise KeymasterError("No current ID")
+
+            id_info = wallet["ids"][current]
+            id_info.setdefault("dmail", {})
+            id_info["dmail"][did] = {"tags": verified_tags}
+            await self._save_loaded_wallet(wallet, overwrite=True)
+        return True
+
+    async def remove_dmail(self, did: str) -> bool:
+        async with self._lock:
+            wallet = await self.load_wallet()
+            current = wallet.get("current")
+            if not current:
+                raise KeymasterError("No current ID")
+
+            dmail_map = wallet["ids"][current].get("dmail") or {}
+            dmail_map.pop(did, None)
+            await self._save_loaded_wallet(wallet, overwrite=True)
+        return True
+
+    async def verify_dmail(self, message: dict[str, Any]) -> dict[str, Any]:
+        to_list = message.get("to")
+        cc_list = message.get("cc")
+        verified_to = await self.verify_recipient_list(cast(list[str], to_list))
+        verified_cc = await self.verify_recipient_list(cast(list[str], cc_list))
+
+        if not verified_to:
+            raise KeymasterError("Invalid parameter: dmail.to")
+        if not isinstance(message.get("subject"), str) or not message["subject"].strip():
+            raise KeymasterError("Invalid parameter: dmail.subject")
+        if not isinstance(message.get("body"), str) or not message["body"].strip():
+            raise KeymasterError("Invalid parameter: dmail.body")
+
+        verified = deepcopy(message)
+        verified["to"] = verified_to
+        verified["cc"] = verified_cc
+        return verified
+
+    async def create_dmail(self, message: dict[str, Any], options: dict[str, Any] | None = None) -> str:
+        dmail = await self.verify_dmail(message)
+        did = await self.create_vault(options or {})
+
+        for recipient in dmail["to"]:
+            await self.add_vault_member(did, recipient)
+        for recipient in dmail["cc"]:
+            await self.add_vault_member(did, recipient)
+
+        buffer = json.dumps({"dmail": dmail}, separators=(",", ":")).encode("utf-8")
+        await self.add_vault_item(did, DmailTags.DMAIL, buffer)
+        await self.file_dmail(did, [DmailTags.DRAFT])
+        return did
+
+    async def update_dmail(self, did: str, message: dict[str, Any]) -> bool:
+        dmail = await self.verify_dmail(message)
+
+        for recipient in dmail["to"]:
+            await self.add_vault_member(did, recipient)
+        for recipient in dmail["cc"]:
+            await self.add_vault_member(did, recipient)
+
+        buffer = json.dumps({"dmail": dmail}, separators=(",", ":")).encode("utf-8")
+        return await self.add_vault_item(did, DmailTags.DMAIL, buffer)
+
+    async def send_dmail(self, did: str) -> str | None:
+        dmail = await self.get_dmail_message(did)
+        if not dmail:
+            return None
+
+        valid_until = (__import__("datetime").datetime.utcnow() + __import__("datetime").timedelta(days=7)).isoformat() + "Z"
+        notice = await self.create_notice(
+            {"to": [*dmail["to"], *dmail["cc"]], "dids": [did]},
+            {"registry": self.ephemeral_registry, "validUntil": valid_until},
+        )
+        if notice:
+            await self.file_dmail(did, [DmailTags.SENT])
+        return notice
+
+    async def get_dmail_message(self, did: str, options: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        if not await self.test_vault(did, options):
+            return None
+
+        buffer = await self.get_vault_item(did, DmailTags.DMAIL, options)
+        if not buffer:
+            return None
+
+        try:
+            data = json.loads(buffer.decode("utf-8"))
+        except Exception:
+            return None
+
+        dmail = data.get("dmail") if isinstance(data, dict) else None
+        return dmail if isinstance(dmail, dict) else None
+
+    async def list_dmail_attachments(self, did: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        items = await self.list_vault_items(did, options)
+        items.pop(DmailTags.DMAIL, None)
+        return items
+
+    async def add_dmail_attachment(self, did: str, name: str, buffer: bytes) -> bool:
+        if name == DmailTags.DMAIL:
+            raise KeymasterError('Invalid parameter: Cannot add attachment with reserved name "dmail"')
+        return await self.add_vault_item(did, name, buffer)
+
+    async def remove_dmail_attachment(self, did: str, name: str) -> bool:
+        if name == DmailTags.DMAIL:
+            raise KeymasterError('Invalid parameter: Cannot remove attachment with reserved name "dmail"')
+        return await self.remove_vault_item(did, name)
+
+    async def get_dmail_attachment(self, did: str, name: str) -> bytes | None:
+        return await self.get_vault_item(did, name)
+
+    async def import_dmail(self, did: str) -> bool:
+        dmail = await self.get_dmail_message(did)
+        if not dmail:
+            return False
+        return await self.file_dmail(did, [DmailTags.INBOX, DmailTags.UNREAD])
 
     async def verify_did_list(self, did_list: list[str]) -> list[str]:
         if not isinstance(did_list, list):
@@ -2369,6 +2556,20 @@ class Keymaster:
         verified_to = await self.verify_recipient_list(to)
         verified_dids = await self.verify_did_list(dids)
         return {"to": verified_to, "dids": verified_dids}
+
+    async def is_ballot(self, ballot_did: str) -> bool:
+        try:
+            ballot = await self.decrypt_json(ballot_did)
+        except Exception:
+            return False
+
+        poll_did = ballot.get("poll") if isinstance(ballot, dict) else None
+        return (
+            isinstance(ballot, dict)
+            and isinstance(poll_did, str)
+            and self.is_managed_did(poll_did)
+            and isinstance(ballot.get("vote"), int)
+        )
 
     async def create_notice(self, message: dict[str, Any], options: dict[str, Any] | None = None) -> str:
         notice = await self.verify_notice(message)
@@ -2408,16 +2609,38 @@ class Keymaster:
         if not isinstance(recipients, list) or id_info["did"] not in recipients:
             return False
 
-        imported = False
         for notice_did in notice.get("dids") or []:
+            dmail = await self.get_dmail_message(notice_did)
+            if dmail:
+                imported = await self.import_dmail(notice_did)
+                if imported:
+                    await self.add_to_notices(did, [NoticeTags.DMAIL])
+                continue
+
+            if await self.is_ballot(notice_did):
+                imported = False
+                try:
+                    imported = await self.update_poll(notice_did)
+                except Exception:
+                    imported = False
+
+                if imported:
+                    await self.add_to_notices(did, [NoticeTags.BALLOT])
+                continue
+
+            poll = await self.get_poll(notice_did)
+            if poll:
+                await self.add_to_notices(did, [NoticeTags.POLL])
+                continue
+
             accepted = await self.accept_credential(notice_did)
-            if not accepted:
-                return False
+            if accepted:
+                await self.add_to_notices(did, [NoticeTags.CREDENTIAL])
+                continue
 
-            await self.add_to_notices(did, [NoticeTags.CREDENTIAL])
-            imported = True
+            return False
 
-        return imported
+        return True
 
     async def search_notices(self) -> bool:
         id_info = await self.fetch_id_info()

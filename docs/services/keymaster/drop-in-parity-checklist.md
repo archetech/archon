@@ -210,25 +210,25 @@ Source of truth:
 
 ## Dmail and notices
 
-- [ ] `listDmail`
-- [ ] `createDmail`
-- [ ] `updateDmail`
-- [ ] `sendDmail`
-- [ ] `fileDmail`
-- [ ] `removeDmail`
-- [ ] `getDmailMessage`
-- [ ] `listDmailAttachments`
-- [ ] `addDmailAttachment`
-- [ ] `removeDmailAttachment`
-- [ ] `getDmailAttachment`
-- [ ] `importDmail`
+- [x] `listDmail`
+- [x] `createDmail`
+- [x] `updateDmail`
+- [x] `sendDmail`
+- [x] `fileDmail`
+- [x] `removeDmail`
+- [x] `getDmailMessage`
+- [x] `listDmailAttachments`
+- [x] `addDmailAttachment`
+- [x] `removeDmailAttachment`
+- [x] `getDmailAttachment`
+- [x] `importDmail`
 - [x] `createNotice`
 - [x] `updateNotice`
 - [x] `refreshNotices`
-- [ ] Service route parity for dmail endpoints
+- [x] Service route parity for dmail endpoints
 - [x] Service route parity for notice endpoints
-- [ ] Full parity with `tests/keymaster/dmail.test.ts`
-- [ ] Full parity with `tests/keymaster/notice.test.ts`
+- [x] Full parity with `tests/keymaster/dmail.test.ts`
+- [x] Full parity with `tests/keymaster/notice.test.ts`
 
 ## Nostr
 
@@ -276,7 +276,7 @@ Source of truth:
 - [x] Implement files and images
 - [x] Implement polls
 - [x] Implement vaults
-- [ ] Implement dmail and notices
+- [x] Implement dmail and notices
 - [ ] Implement Nostr
 - [ ] Implement Lightning
 - [ ] Close remaining response-shape and integration gaps

@@ -1,3 +1,3 @@
-from .core import Keymaster, KeymasterError, UnknownIDError
+from .core import DmailTags, Keymaster, KeymasterError, NoticeTags, UnknownIDError
 
-__all__ = ["Keymaster", "KeymasterError", "UnknownIDError"]
+__all__ = ["DmailTags", "Keymaster", "KeymasterError", "NoticeTags", "UnknownIDError"]
