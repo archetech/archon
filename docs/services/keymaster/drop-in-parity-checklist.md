@@ -162,19 +162,19 @@ Source of truth:
 - [x] `getPoll`
 - [x] `testPoll`
 - [x] `listPolls`
-- [ ] `viewPoll`
-- [ ] `votePoll`
-- [ ] `sendPoll`
-- [ ] `sendBallot`
-- [ ] `viewBallot`
-- [ ] `updatePoll`
-- [ ] `publishPoll`
-- [ ] `unpublishPoll`
+- [x] `viewPoll`
+- [x] `votePoll`
+- [x] `sendPoll`
+- [x] `sendBallot`
+- [x] `viewBallot`
+- [x] `updatePoll`
+- [x] `publishPoll`
+- [x] `unpublishPoll`
 - [x] `addPollVoter`
 - [x] `removePollVoter`
 - [x] `listPollVoters`
-- [ ] Service route parity for `/templates/poll` and `/polls*`
-- [ ] Full parity with `tests/keymaster/poll.test.ts`
+- [x] Service route parity for `/templates/poll` and `/polls*`
+- [x] Full parity with `tests/keymaster/poll.test.ts`
 
 ## Files and images
 
@@ -274,7 +274,7 @@ Source of truth:
 - [ ] Implement credentials
 - [ ] Implement addresses
 - [ ] Implement files and images
-- [ ] Implement polls
+- [x] Implement polls
 - [x] Implement vaults
 - [ ] Implement dmail and notices
 - [ ] Implement Nostr

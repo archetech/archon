@@ -1628,6 +1628,293 @@ class Keymaster:
             raise KeymasterError("Invalid parameter: pollId")
         return await self.list_vault_members(poll_id)
 
+    async def view_poll(self, poll_id: str) -> dict[str, Any]:
+        id_info = await self.fetch_id_info()
+        config = await self.get_poll(poll_id)
+
+        if not config:
+            raise KeymasterError("Invalid parameter: pollId")
+
+        doc = await self.resolve_did(poll_id)
+        is_owner = doc.get("didDocument", {}).get("controller") == id_info["did"]
+        vote_expired = self._parse_poll_deadline(config["deadline"]) < __import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc
+        )
+
+        is_eligible = False
+        has_voted = False
+        ballots: list[str] = []
+
+        try:
+            vault = await self.get_vault(poll_id)
+            members = await self.list_vault_members(poll_id)
+            is_eligible = is_owner or bool(members.get(id_info["did"]))
+
+            items = await self.list_vault_items(poll_id)
+            for item_name in items.keys():
+                if item_name not in {PollItems.POLL, PollItems.RESULTS}:
+                    ballots.append(item_name)
+
+            has_voted = self.generate_ballot_key(vault, id_info["did"]) in ballots
+        except Exception:
+            is_eligible = False
+
+        view = {
+            "description": config["description"],
+            "options": config["options"],
+            "deadline": config["deadline"],
+            "isOwner": is_owner,
+            "isEligible": is_eligible,
+            "voteExpired": vote_expired,
+            "hasVoted": has_voted,
+            "ballots": ballots,
+        }
+
+        if is_owner:
+            view["results"] = await self.compute_poll_results(poll_id, config)
+        else:
+            try:
+                results_buffer = await self.get_vault_item(poll_id, PollItems.RESULTS)
+                if results_buffer:
+                    view["results"] = json.loads(results_buffer.decode("utf-8"))
+            except Exception:
+                pass
+
+        return view
+
+    async def compute_poll_results(self, poll_id: str, config: dict[str, Any]) -> dict[str, Any]:
+        vault = await self.get_vault(poll_id)
+        members = await self.list_vault_members(poll_id)
+        items = await self.list_vault_items(poll_id)
+
+        results: dict[str, Any] = {
+            "tally": [{"vote": 0, "option": "spoil", "count": 0}],
+            "ballots": [],
+        }
+        for index, option in enumerate(config["options"], start=1):
+            results["tally"].append({"vote": index, "option": option, "count": 0})
+
+        key_to_member = {
+            self.generate_ballot_key(vault, member_did): member_did for member_did in members.keys()
+        }
+        owner_id = await self.fetch_id_info()
+        key_to_member[self.generate_ballot_key(vault, owner_id["did"])] = owner_id["did"]
+
+        voted = 0
+        for item_name, item_meta in items.items():
+            if item_name in {PollItems.POLL, PollItems.RESULTS}:
+                continue
+
+            ballot_buffer = await self.get_vault_item(poll_id, item_name)
+            if not ballot_buffer:
+                continue
+
+            ballot_did = ballot_buffer.decode("utf-8")
+            decrypted = await self.decrypt_json(ballot_did)
+            vote = decrypted.get("vote")
+            option_name = "spoil" if vote == 0 else config["options"][vote - 1]
+            received = item_meta.get("added", "") if isinstance(item_meta, dict) else ""
+
+            results["ballots"].append(
+                {
+                    "voter": key_to_member.get(item_name, item_name),
+                    "vote": vote,
+                    "option": option_name,
+                    "received": received,
+                }
+            )
+
+            voted += 1
+            if isinstance(vote, int) and 0 <= vote < len(results["tally"]):
+                results["tally"][vote]["count"] += 1
+
+        total = len(members) + 1
+        vote_expired = self._parse_poll_deadline(config["deadline"]) < __import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc
+        )
+        results["votes"] = {
+            "eligible": total,
+            "received": voted,
+            "pending": total - voted,
+        }
+        results["final"] = vote_expired or voted == total
+        return results
+
+    async def vote_poll(self, poll_id: str, vote: int, options: dict[str, Any] | None = None) -> str:
+        id_info = await self.fetch_id_info()
+        did_poll = await self.lookup_did(poll_id)
+        doc = await self.resolve_did(did_poll)
+        config = await self.get_poll(poll_id)
+
+        if not config:
+            raise KeymasterError("Invalid parameter: pollId")
+
+        owner = doc.get("didDocument", {}).get("controller")
+        if not owner:
+            raise KeymasterError("Keymaster: owner missing from poll")
+
+        is_eligible = False
+        if id_info["did"] == owner:
+            is_eligible = True
+        else:
+            try:
+                vault = await self.get_vault(did_poll)
+                await self.decrypt_vault(vault)
+                is_eligible = True
+            except Exception:
+                is_eligible = False
+
+        if not is_eligible:
+            raise KeymasterError("Invalid parameter: pollId")
+
+        expired = self._parse_poll_deadline(config["deadline"]) < __import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc
+        )
+        if expired:
+            raise KeymasterError("Invalid parameter: poll has expired")
+
+        if not isinstance(vote, int) or vote < 0 or vote > len(config["options"]):
+            raise KeymasterError("Invalid parameter: vote")
+
+        ballot = {"poll": did_poll, "vote": vote}
+        return await self.encrypt_json(ballot, owner, options or {})
+
+    async def send_poll(self, poll_id: str) -> str:
+        did_poll = await self.lookup_did(poll_id)
+        config = await self.get_poll(did_poll)
+
+        if not config:
+            raise KeymasterError("Invalid parameter: pollId")
+
+        voters = list((await self.list_vault_members(did_poll)).keys())
+        if not voters:
+            raise KeymasterError("Keymaster: No poll voters found")
+
+        valid_until = (__import__("datetime").datetime.utcnow() + __import__("datetime").timedelta(days=7)).isoformat() + "Z"
+        return await self.create_notice(
+            {"to": voters, "dids": [did_poll]},
+            {"registry": self.ephemeral_registry, "validUntil": valid_until},
+        )
+
+    async def send_ballot(self, ballot_did: str, poll_id: str) -> str:
+        did_poll = await self.lookup_did(poll_id)
+        config = await self.get_poll(did_poll)
+
+        if not config:
+            raise KeymasterError("Invalid parameter: pollId is not a valid poll")
+
+        poll_doc = await self.resolve_did(did_poll)
+        owner_did = poll_doc.get("didDocument", {}).get("controller")
+        if not owner_did:
+            raise KeymasterError("Keymaster: poll owner not found")
+
+        valid_until = (__import__("datetime").datetime.utcnow() + __import__("datetime").timedelta(days=7)).isoformat() + "Z"
+        return await self.create_notice(
+            {"to": [owner_did], "dids": [ballot_did]},
+            {"registry": self.ephemeral_registry, "validUntil": valid_until},
+        )
+
+    async def view_ballot(self, ballot_did: str) -> dict[str, Any]:
+        ballot_doc = await self.resolve_did(ballot_did)
+        result: dict[str, Any] = {
+            "poll": "",
+            "voter": ballot_doc.get("didDocument", {}).get("controller") or None,
+        }
+
+        try:
+            data = await self.decrypt_json(ballot_did)
+            result["poll"] = data["poll"]
+            result["vote"] = data["vote"]
+
+            config = await self.get_poll(data["poll"])
+            if config and 0 < data["vote"] <= len(config["options"]):
+                result["option"] = config["options"][data["vote"] - 1]
+            elif data["vote"] == 0:
+                result["option"] = "spoil"
+        except Exception:
+            pass
+
+        return result
+
+    async def update_poll(self, ballot: str) -> bool:
+        id_info = await self.fetch_id_info()
+        did_ballot = await self.lookup_did(ballot)
+        ballot_doc = await self.resolve_did(did_ballot)
+        voter_did = ballot_doc.get("didDocument", {}).get("controller")
+
+        try:
+            ballot_data = await self.decrypt_json(did_ballot)
+            if not ballot_data.get("poll") or ballot_data.get("vote") is None:
+                raise KeymasterError("Invalid parameter: ballot")
+        except Exception as exc:
+            raise KeymasterError("Invalid parameter: ballot") from exc
+
+        did_poll = ballot_data["poll"]
+        poll_doc = await self.resolve_did(did_poll)
+        owner_did = poll_doc.get("didDocument", {}).get("controller")
+        config = await self.get_poll(did_poll)
+
+        if not config:
+            raise KeymasterError("Cannot find poll related to ballot")
+        if id_info["did"] != owner_did:
+            raise KeymasterError("Invalid parameter: only owner can update a poll")
+
+        vault = await self.get_vault(did_poll)
+        members = await self.list_vault_members(did_poll)
+        if not voter_did or (voter_did != id_info["did"] and voter_did not in members):
+            raise KeymasterError("Invalid parameter: voter is not a poll member")
+
+        expired = self._parse_poll_deadline(config["deadline"]) < __import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc
+        )
+        if expired:
+            raise KeymasterError("Invalid parameter: poll has expired")
+
+        vote = ballot_data["vote"]
+        if not isinstance(vote, int) or vote < 0 or vote > len(config["options"]):
+            raise KeymasterError("Invalid parameter: ballot.vote")
+
+        ballot_key = self.generate_ballot_key(vault, voter_did)
+        await self.add_vault_item(did_poll, ballot_key, did_ballot.encode("utf-8"))
+        return True
+
+    async def publish_poll(self, poll_id: str, options: dict[str, Any] | None = None) -> bool:
+        reveal = bool((options or {}).get("reveal", False))
+        id_info = await self.fetch_id_info()
+        doc = await self.resolve_did(poll_id)
+        owner = doc.get("didDocument", {}).get("controller")
+
+        if id_info["did"] != owner:
+            raise KeymasterError("Invalid parameter: only owner can publish a poll")
+
+        config = await self.get_poll(poll_id)
+        if not config:
+            raise KeymasterError(f"Invalid parameter: {poll_id}")
+
+        results = await self.compute_poll_results(poll_id, config)
+        if not results.get("final"):
+            raise KeymasterError("Invalid parameter: poll not final")
+
+        if not reveal:
+            results.pop("ballots", None)
+
+        await self.add_vault_item(poll_id, PollItems.RESULTS, json.dumps(results, separators=(",", ":")).encode("utf-8"))
+        return True
+
+    async def unpublish_poll(self, poll_id: str) -> bool:
+        id_info = await self.fetch_id_info()
+        doc = await self.resolve_did(poll_id)
+        owner = doc.get("didDocument", {}).get("controller")
+
+        if id_info["did"] != owner:
+            raise KeymasterError(f"Invalid parameter: {poll_id}")
+
+        config = await self.get_poll(poll_id)
+        if not config:
+            raise KeymasterError(f"Invalid parameter: {poll_id}")
+
+        return await self.remove_vault_item(poll_id, PollItems.RESULTS)
+
     async def get_group(self, identifier: str) -> dict[str, Any] | None:
         asset = await self.resolve_asset(identifier)
         group = asset.get("group")

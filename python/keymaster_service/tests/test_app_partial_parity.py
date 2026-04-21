@@ -209,6 +209,53 @@ class StubService:
         self.calls.append(("test_poll", identifier))
         return True
 
+    async def view_poll(self, identifier: str):
+        self.calls.append(("view_poll", identifier))
+        return {
+            "description": "What is this poll about?",
+            "options": ["yes", "no", "abstain"],
+            "deadline": "2026-04-11T13:00:00.000Z",
+            "isOwner": True,
+            "isEligible": True,
+            "voteExpired": False,
+            "hasVoted": False,
+            "ballots": [],
+            "results": {"tally": [], "votes": {"eligible": 1, "received": 0, "pending": 1}, "final": False},
+        }
+
+    async def send_poll(self, poll: str) -> str:
+        self.calls.append(("send_poll", poll))
+        return "did:test:notice"
+
+    async def vote_poll(self, poll: str, vote: int, options):
+        self.calls.append(("vote_poll", poll, vote, options))
+        return "did:test:ballot"
+
+    async def update_poll(self, ballot: str) -> bool:
+        self.calls.append(("update_poll", ballot))
+        return True
+
+    async def publish_poll(self, poll: str, options):
+        self.calls.append(("publish_poll", poll, options))
+        return True
+
+    async def unpublish_poll(self, poll: str) -> bool:
+        self.calls.append(("unpublish_poll", poll))
+        return True
+
+    async def send_ballot(self, ballot: str, poll: str) -> str:
+        self.calls.append(("send_ballot", ballot, poll))
+        return "did:test:notice"
+
+    async def view_ballot(self, ballot: str):
+        self.calls.append(("view_ballot", ballot))
+        return {
+            "poll": "did:test:poll",
+            "voter": "did:test:alice",
+            "vote": 1,
+            "option": "yes",
+        }
+
     async def add_poll_voter(self, poll: str, member_id: str) -> bool:
         self.calls.append(("add_poll_voter", poll, member_id))
         return True
@@ -516,6 +563,14 @@ def test_poll_handlers(stub_service: StubService):
     }))
     fetched = run(app_module.get_poll("did:test:poll"))
     tested = run(app_module.test_poll("did:test:poll"))
+    viewed = run(app_module.view_poll("did:test:poll"))
+    sent = run(app_module.send_poll("did:test:poll"))
+    voted = run(app_module.vote_poll("did:test:poll", {"vote": 2, "options": {"registry": "local"}}))
+    updated = run(app_module.update_poll({"ballot": "did:test:ballot"}))
+    published = run(app_module.publish_poll("did:test:poll", {"options": {"reveal": True}}))
+    unpublished = run(app_module.unpublish_poll("did:test:poll"))
+    ballot_notice = run(app_module.send_ballot({"ballot": "did:test:ballot", "poll": "did:test:poll"}))
+    ballot_view = run(app_module.view_ballot("did:test:ballot"))
     added = run(app_module.add_poll_voter("did:test:poll", {"memberId": "did:test:alice"}))
     voters = run(app_module.list_poll_voters("did:test:poll"))
     removed = run(app_module.remove_poll_voter("did:test:poll", "did:test:alice"))
@@ -533,6 +588,14 @@ def test_poll_handlers(stub_service: StubService):
     assert created == {"did": "did:test:poll"}
     assert fetched["poll"]["name"] == "poll-name"
     assert tested == {"test": True}
+    assert viewed["poll"]["isOwner"] is True
+    assert sent == {"did": "did:test:notice"}
+    assert voted == {"did": "did:test:ballot"}
+    assert updated == {"ok": True}
+    assert published == {"ok": True}
+    assert unpublished == {"ok": True}
+    assert ballot_notice == {"did": "did:test:notice"}
+    assert ballot_view == {"ballot": {"poll": "did:test:poll", "voter": "did:test:alice", "vote": 1, "option": "yes"}}
     assert added == {"ok": True}
     assert voters == {"voters": {"did:test:alice": {"added": "2026-04-04T13:00:00.000Z"}}}
     assert removed == {"ok": True}
@@ -548,6 +611,14 @@ def test_poll_handlers(stub_service: StubService):
         }, {"registry": "local"}),
         ("get_poll", "did:test:poll"),
         ("test_poll", "did:test:poll"),
+        ("view_poll", "did:test:poll"),
+        ("send_poll", "did:test:poll"),
+        ("vote_poll", "did:test:poll", 2, {"registry": "local"}),
+        ("update_poll", "did:test:ballot"),
+        ("publish_poll", "did:test:poll", {"reveal": True}),
+        ("unpublish_poll", "did:test:poll"),
+        ("send_ballot", "did:test:ballot", "did:test:poll"),
+        ("view_ballot", "did:test:ballot"),
         ("add_poll_voter", "did:test:poll", "did:test:alice"),
         ("list_poll_voters", "did:test:poll"),
         ("remove_poll_voter", "did:test:poll", "did:test:alice"),

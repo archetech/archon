@@ -519,6 +519,46 @@ async def test_poll(poll: str) -> dict[str, bool]:
     return {"test": await service.test_poll(poll)}
 
 
+@protected_api.get("/polls/{poll}/view")
+async def view_poll(poll: str) -> dict[str, Any]:
+    return {"poll": await service.view_poll(poll)}
+
+
+@protected_api.post("/polls/{poll}/send")
+async def send_poll(poll: str) -> dict[str, str]:
+    return {"did": await service.send_poll(poll)}
+
+
+@protected_api.post("/polls/{poll}/vote")
+async def vote_poll(poll: str, body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.vote_poll(poll, body["vote"], body.get("options") or {})}
+
+
+@protected_api.put("/polls/update")
+async def update_poll(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.update_poll(body["ballot"])}
+
+
+@protected_api.post("/polls/{poll}/publish")
+async def publish_poll(poll: str, body: dict[str, Any] | None = None) -> dict[str, bool]:
+    return {"ok": await service.publish_poll(poll, (body or {}).get("options") or {})}
+
+
+@protected_api.post("/polls/{poll}/unpublish")
+async def unpublish_poll(poll: str) -> dict[str, bool]:
+    return {"ok": await service.unpublish_poll(poll)}
+
+
+@protected_api.post("/polls/ballot/send")
+async def send_ballot(body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.send_ballot(body["ballot"], body["poll"])}
+
+
+@protected_api.get("/polls/ballot/{did}")
+async def view_ballot(did: str) -> dict[str, Any]:
+    return {"ballot": await service.view_ballot(did)}
+
+
 @protected_api.post("/polls/{poll}/voters")
 async def add_poll_voter(poll: str, body: dict[str, Any]) -> dict[str, bool]:
     return {"ok": await service.add_poll_voter(poll, body["memberId"])}
