@@ -11,6 +11,7 @@ dependencies = [
   "httpx==0.28.1",
   "mnemonic==0.21",
   "bip-utils==2.9.3",
+  "bolt11==2.2.0",
   "coincurve==21.0.0",
   "cryptography==46.0.5",
   "rfc8785==0.1.4"

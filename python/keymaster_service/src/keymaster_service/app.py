@@ -292,6 +292,61 @@ async def sign_nostr_event(body: dict[str, Any]) -> dict[str, Any]:
     return await service.sign_nostr_event(body["event"])
 
 
+@protected_api.post("/lightning")
+async def add_lightning(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.add_lightning(body.get("id"))
+
+
+@protected_api.delete("/lightning")
+async def remove_lightning(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.remove_lightning(body.get("id"))}
+
+
+@protected_api.post("/lightning/balance")
+async def get_lightning_balance(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.get_lightning_balance(body.get("id"))
+
+
+@protected_api.post("/lightning/invoice")
+async def create_lightning_invoice(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.create_lightning_invoice(body["amount"], body.get("memo", ""), body.get("id"))
+
+
+@protected_api.post("/lightning/pay")
+async def pay_lightning_invoice(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.pay_lightning_invoice(body["bolt11"], body.get("id"))
+
+
+@protected_api.post("/lightning/payment")
+async def check_lightning_payment(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.check_lightning_payment(body["paymentHash"], body.get("id"))
+
+
+@protected_api.post("/lightning/decode")
+async def decode_lightning_invoice(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.decode_lightning_invoice(body["bolt11"])
+
+
+@protected_api.post("/lightning/publish")
+async def publish_lightning(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.publish_lightning(body.get("id"))}
+
+
+@protected_api.post("/lightning/unpublish")
+async def unpublish_lightning(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.unpublish_lightning(body.get("id"))}
+
+
+@protected_api.post("/lightning/zap")
+async def zap_lightning(body: dict[str, Any]) -> dict[str, Any]:
+    return await service.zap_lightning(body["did"], body["amount"], body.get("memo"), body.get("id"))
+
+
+@protected_api.post("/lightning/payments")
+async def get_lightning_payments(body: dict[str, Any]) -> dict[str, Any]:
+    return {"payments": await service.get_lightning_payments(body.get("id"))}
+
+
 @protected_api.get("/did/{identifier}")
 async def resolve_did(identifier: str, request: Request) -> dict[str, Any]:
     options = {key: value for key, value in request.query_params.items()}

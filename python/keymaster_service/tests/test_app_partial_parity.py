@@ -191,6 +191,50 @@ class StubService:
             "sig": "44" * 64,
         }
 
+    async def add_lightning(self, identifier: str | None = None):
+        self.calls.append(("add_lightning", identifier))
+        return {"walletId": "wallet-1", "adminKey": "admin-1", "invoiceKey": "invoice-1"}
+
+    async def remove_lightning(self, identifier: str | None = None) -> bool:
+        self.calls.append(("remove_lightning", identifier))
+        return True
+
+    async def get_lightning_balance(self, identifier: str | None = None):
+        self.calls.append(("get_lightning_balance", identifier))
+        return {"balance": 1000}
+
+    async def create_lightning_invoice(self, amount: int, memo: str, identifier: str | None = None):
+        self.calls.append(("create_lightning_invoice", amount, memo, identifier))
+        return {"paymentRequest": "lnbc100...", "paymentHash": "hash123"}
+
+    async def pay_lightning_invoice(self, bolt11: str, identifier: str | None = None):
+        self.calls.append(("pay_lightning_invoice", bolt11, identifier))
+        return {"paymentHash": "out-hash"}
+
+    async def check_lightning_payment(self, payment_hash: str, identifier: str | None = None):
+        self.calls.append(("check_lightning_payment", payment_hash, identifier))
+        return {"paid": True, "status": "complete", "preimage": "preimage123", "paymentHash": payment_hash}
+
+    async def decode_lightning_invoice(self, bolt11: str):
+        self.calls.append(("decode_lightning_invoice", bolt11))
+        return {"description": "1 cup coffee", "network": "bc"}
+
+    async def publish_lightning(self, identifier: str | None = None) -> bool:
+        self.calls.append(("publish_lightning", identifier))
+        return True
+
+    async def unpublish_lightning(self, identifier: str | None = None) -> bool:
+        self.calls.append(("unpublish_lightning", identifier))
+        return True
+
+    async def zap_lightning(self, did: str, amount: int, memo: str | None = None, identifier: str | None = None):
+        self.calls.append(("zap_lightning", did, amount, memo, identifier))
+        return {"paymentHash": "zap-hash"}
+
+    async def get_lightning_payments(self, identifier: str | None = None):
+        self.calls.append(("get_lightning_payments", identifier))
+        return [{"paymentHash": "hash1", "amount": 100, "fee": 0, "memo": "received", "pending": False}]
+
     async def merge_data(self, identifier: str, data) -> bool:
         self.calls.append(("merge_data", identifier, data))
         return True
@@ -646,6 +690,45 @@ def test_nostr_handlers(stub_service: StubService):
             },
         ),
         ("remove_nostr", "Alice"),
+    ]
+
+
+def test_lightning_handlers(stub_service: StubService):
+    added = run(app_module.add_lightning({"id": "Alice"}))
+    removed = run(app_module.remove_lightning({"id": "Alice"}))
+    balance = run(app_module.get_lightning_balance({"id": "Alice"}))
+    invoice = run(app_module.create_lightning_invoice({"amount": 100, "memo": "coffee", "id": "Alice"}))
+    payment = run(app_module.pay_lightning_invoice({"bolt11": "lnbc100...", "id": "Alice"}))
+    status = run(app_module.check_lightning_payment({"paymentHash": "hash123", "id": "Alice"}))
+    decoded = run(app_module.decode_lightning_invoice({"bolt11": "lnbc100..."}))
+    published = run(app_module.publish_lightning({"id": "Alice"}))
+    unpublished = run(app_module.unpublish_lightning({"id": "Alice"}))
+    zap = run(app_module.zap_lightning({"did": "did:test:bob", "amount": 21, "memo": "thanks", "id": "Alice"}))
+    payments = run(app_module.get_lightning_payments({"id": "Alice"}))
+
+    assert added == {"walletId": "wallet-1", "adminKey": "admin-1", "invoiceKey": "invoice-1"}
+    assert removed == {"ok": True}
+    assert balance == {"balance": 1000}
+    assert invoice == {"paymentRequest": "lnbc100...", "paymentHash": "hash123"}
+    assert payment == {"paymentHash": "out-hash"}
+    assert status == {"paid": True, "status": "complete", "preimage": "preimage123", "paymentHash": "hash123"}
+    assert decoded == {"description": "1 cup coffee", "network": "bc"}
+    assert published == {"ok": True}
+    assert unpublished == {"ok": True}
+    assert zap == {"paymentHash": "zap-hash"}
+    assert payments == {"payments": [{"paymentHash": "hash1", "amount": 100, "fee": 0, "memo": "received", "pending": False}]}
+    assert stub_service.calls == [
+        ("add_lightning", "Alice"),
+        ("remove_lightning", "Alice"),
+        ("get_lightning_balance", "Alice"),
+        ("create_lightning_invoice", 100, "coffee", "Alice"),
+        ("pay_lightning_invoice", "lnbc100...", "Alice"),
+        ("check_lightning_payment", "hash123", "Alice"),
+        ("decode_lightning_invoice", "lnbc100..."),
+        ("publish_lightning", "Alice"),
+        ("unpublish_lightning", "Alice"),
+        ("zap_lightning", "did:test:bob", 21, "thanks", "Alice"),
+        ("get_lightning_payments", "Alice"),
     ]
 
 

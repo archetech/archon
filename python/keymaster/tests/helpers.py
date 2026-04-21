@@ -48,6 +48,7 @@ class FakeWalletStore:
 class FakeGatekeeper:
     def __init__(self, registries: list[str] | None = None) -> None:
         self.registries = registries or ["local", "hyperswarm", "BTC:signet"]
+        self.url = "http://test-drawbridge"
         self.docs: dict[str, dict[str, Any]] = {}
         self.data_blobs: dict[str, bytes] = {}
         self.text_blobs: dict[str, str] = {}
@@ -197,6 +198,39 @@ class FakeGatekeeper:
 
     async def get_text(self, cid: str) -> str | None:
         return self.text_blobs.get(cid)
+
+    async def create_lightning_wallet(self, name: str) -> dict[str, Any]:
+        url_key = self.url.rsplit("/", 1)[-1]
+        return {
+            "walletId": f"wallet-{url_key}-{name}",
+            "adminKey": f"admin-{url_key}-{name}",
+            "invoiceKey": f"invoice-{url_key}-{name}",
+        }
+
+    async def get_lightning_balance(self, invoice_key: str) -> dict[str, Any]:
+        return {"balance": 1000, "invoiceKey": invoice_key}
+
+    async def create_lightning_invoice(self, invoice_key: str, amount: int, memo: str) -> dict[str, Any]:
+        return {"paymentRequest": f"lnbc{amount}", "paymentHash": f"hash-{invoice_key}", "memo": memo}
+
+    async def pay_lightning_invoice(self, admin_key: str, bolt11: str) -> dict[str, Any]:
+        return {"paymentHash": f"paid-{admin_key}", "bolt11": bolt11}
+
+    async def check_lightning_payment(self, invoice_key: str, payment_hash: str) -> dict[str, Any]:
+        return {"paid": True, "status": "complete", "preimage": f"preimage-{invoice_key}", "paymentHash": payment_hash}
+
+    async def publish_lightning(self, did: str, invoice_key: str) -> dict[str, Any]:
+        return {"ok": True, "publicHost": self.url, "did": did, "invoiceKey": invoice_key}
+
+    async def unpublish_lightning(self, did: str) -> bool:
+        _ = did
+        return True
+
+    async def zap_lightning(self, admin_key: str, did: str, amount: int, memo: str | None = None) -> dict[str, Any]:
+        return {"paymentHash": f"zap-{admin_key}", "did": did, "amount": amount, "memo": memo}
+
+    async def get_lightning_payments(self, admin_key: str) -> list[dict[str, Any]]:
+        return [{"paymentHash": f"hash-{admin_key}", "amount": 100, "fee": 0, "memo": "received", "pending": False}]
 
 
 @dataclass

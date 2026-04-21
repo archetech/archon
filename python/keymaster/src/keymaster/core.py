@@ -10,6 +10,7 @@ import struct
 from typing import Any, Protocol, cast
 
 import httpx
+from bolt11 import decode as decode_bolt11
 
 from .crypto import (
     b64url,
@@ -75,6 +76,8 @@ class UnknownIDError(KeymasterError):
 
 
 class GatekeeperProtocol(Protocol):
+    url: str
+
     async def list_registries(self) -> list[str]: ...
     async def create_did(self, operation: dict[str, Any]) -> str: ...
     async def resolve_did(self, did: str, options: dict[str, Any] | None = None) -> dict[str, Any]: ...
@@ -86,6 +89,15 @@ class GatekeeperProtocol(Protocol):
     async def get_data(self, cid: str) -> bytes | None: ...
     async def add_text(self, text: str) -> str: ...
     async def get_text(self, cid: str) -> str | None: ...
+    async def create_lightning_wallet(self, name: str) -> dict[str, Any]: ...
+    async def get_lightning_balance(self, invoice_key: str) -> dict[str, Any]: ...
+    async def create_lightning_invoice(self, invoice_key: str, amount: int, memo: str) -> dict[str, Any]: ...
+    async def pay_lightning_invoice(self, admin_key: str, bolt11: str) -> dict[str, Any]: ...
+    async def check_lightning_payment(self, invoice_key: str, payment_hash: str) -> dict[str, Any]: ...
+    async def publish_lightning(self, did: str, invoice_key: str) -> dict[str, Any]: ...
+    async def unpublish_lightning(self, did: str) -> bool: ...
+    async def zap_lightning(self, admin_key: str, did: str, amount: int, memo: str | None = None) -> dict[str, Any]: ...
+    async def get_lightning_payments(self, admin_key: str) -> list[dict[str, Any]]: ...
 
 
 class WalletStoreProtocol(Protocol):
@@ -513,6 +525,218 @@ class Keymaster:
             "pubkey": nostr["pubkey"],
             "sig": sig,
         }
+
+    def require_drawbridge(self) -> GatekeeperProtocol:
+        drawbridge = self.gatekeeper
+        if not callable(getattr(drawbridge, "create_lightning_wallet", None)):
+            raise KeymasterError("Gateway does not support Lightning")
+        return drawbridge
+
+    async def get_lightning_config(self, name: str | None = None) -> dict[str, Any]:
+        drawbridge = self.require_drawbridge()
+        url = drawbridge.url
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(name, wallet)
+        lightning = id_info.get("lightning")
+
+        if not isinstance(lightning, dict) or not lightning:
+            raise KeymasterError(f"No Lightning wallet configured for {id_info['did']}")
+
+        if {"walletId", "adminKey", "invoiceKey"}.issubset(lightning):
+            async with self._lock:
+                current_wallet = await self.load_wallet()
+                current_id = await self.fetch_id_info(name, current_wallet)
+                current_lightning = current_id.get("lightning")
+                if isinstance(current_lightning, dict) and {"walletId", "adminKey", "invoiceKey"}.issubset(current_lightning):
+                    current_id["lightning"] = {url: dict(current_lightning)}
+                    await self._save_loaded_wallet(current_wallet, overwrite=True)
+            wallet = await self.load_wallet()
+            id_info = await self.fetch_id_info(name, wallet)
+            lightning = id_info.get("lightning")
+
+        config = lightning.get(url) if isinstance(lightning, dict) else None
+        if not isinstance(config, dict):
+            raise KeymasterError(f"No Lightning wallet configured for {id_info['did']} on {url}")
+        return config
+
+    async def add_lightning(self, name: str | None = None) -> dict[str, Any]:
+        try:
+            return await self.get_lightning_config(name)
+        except KeymasterError as exc:
+            if not str(exc).startswith("No Lightning wallet configured"):
+                raise
+
+        drawbridge = self.require_drawbridge()
+        url = drawbridge.url
+        result: dict[str, Any] = {}
+
+        async with self._lock:
+            wallet = await self.load_wallet()
+            id_info = await self.fetch_id_info(name, wallet)
+            lightning = id_info.get("lightning")
+            if isinstance(lightning, dict) and {"walletId", "adminKey", "invoiceKey"}.issubset(lightning):
+                lightning_store = {url: dict(lightning)}
+            elif isinstance(lightning, dict):
+                lightning_store = dict(lightning)
+            else:
+                lightning_store = {}
+
+            wallet_name = f"archon-{id_info['did'].split(':')[-1][:12]}"
+            created = await drawbridge.create_lightning_wallet(wallet_name)
+            lightning_store[url] = {
+                "walletId": created["walletId"],
+                "adminKey": created["adminKey"],
+                "invoiceKey": created["invoiceKey"],
+            }
+            id_info["lightning"] = lightning_store
+            result = lightning_store[url]
+            await self._save_loaded_wallet(wallet, overwrite=True)
+
+        return result
+
+    async def remove_lightning(self, name: str | None = None) -> bool:
+        try:
+            await self.get_lightning_config(name)
+        except Exception:
+            pass
+
+        url = getattr(self.gatekeeper, "url", None)
+        async with self._lock:
+            wallet = await self.load_wallet()
+            id_info = await self.fetch_id_info(name, wallet)
+            lightning = id_info.get("lightning")
+            if not isinstance(lightning, dict):
+                return True
+
+            if url:
+                lightning_store = dict(lightning)
+                lightning_store.pop(url, None)
+                if lightning_store:
+                    id_info["lightning"] = lightning_store
+                else:
+                    id_info.pop("lightning", None)
+            else:
+                id_info.pop("lightning", None)
+
+            await self._save_loaded_wallet(wallet, overwrite=True)
+        return True
+
+    async def get_lightning_balance(self, name: str | None = None) -> dict[str, Any]:
+        drawbridge = self.require_drawbridge()
+        config = await self.get_lightning_config(name)
+        return await drawbridge.get_lightning_balance(config["invoiceKey"])
+
+    async def create_lightning_invoice(self, amount: int, memo: str = "", name: str | None = None) -> dict[str, Any]:
+        if not amount or amount <= 0:
+            raise KeymasterError("Invalid parameter: amount")
+        drawbridge = self.require_drawbridge()
+        config = await self.get_lightning_config(name)
+        return await drawbridge.create_lightning_invoice(config["invoiceKey"], amount, memo)
+
+    async def pay_lightning_invoice(self, bolt11: str, name: str | None = None) -> dict[str, Any]:
+        if not bolt11:
+            raise KeymasterError("Invalid parameter: bolt11")
+        drawbridge = self.require_drawbridge()
+        config = await self.get_lightning_config(name)
+        return await drawbridge.pay_lightning_invoice(config["adminKey"], bolt11)
+
+    async def check_lightning_payment(self, payment_hash: str, name: str | None = None) -> dict[str, Any]:
+        if not payment_hash:
+            raise KeymasterError("Invalid parameter: paymentHash")
+        drawbridge = self.require_drawbridge()
+        config = await self.get_lightning_config(name)
+        data = await drawbridge.check_lightning_payment(config["invoiceKey"], payment_hash)
+        return {
+            "paid": data.get("paid"),
+            "status": data.get("status"),
+            "preimage": data.get("preimage"),
+            "paymentHash": payment_hash,
+        }
+
+    async def decode_lightning_invoice(self, bolt11: str) -> dict[str, Any]:
+        if not bolt11:
+            raise KeymasterError("Invalid parameter: bolt11")
+
+        decoded = decode_bolt11(bolt11)
+        info: dict[str, Any] = {}
+        if decoded.amount_msat is not None:
+            info["amount"] = f"{int(decoded.amount_msat) // 1000} sats"
+        if decoded.description is not None:
+            info["description"] = decoded.description
+        if decoded.payment_hash is not None:
+            info["payment_hash"] = decoded.payment_hash
+        if decoded.currency is not None:
+            info["network"] = decoded.currency
+        if decoded.date is not None:
+            info["created"] = __import__("datetime").datetime.fromtimestamp(decoded.date, __import__("datetime").timezone.utc).isoformat().replace("+00:00", "Z")
+
+        has_expiry_tag = any(getattr(tag.char, "name", "") == "expire_time" for tag in decoded.tags)
+        if has_expiry_tag and decoded.expiry is not None:
+            info["expiry"] = f"{decoded.expiry} seconds"
+            info["expires"] = __import__("datetime").datetime.fromtimestamp(
+                decoded.date + decoded.expiry,
+                __import__("datetime").timezone.utc,
+            ).isoformat().replace("+00:00", "Z")
+
+        return info
+
+    async def publish_lightning(self, name: str | None = None) -> bool:
+        drawbridge = self.require_drawbridge()
+        config = await self.get_lightning_config(name)
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        did_suffix = did.split(":")[-1]
+        result = await drawbridge.publish_lightning(did_suffix, config["invoiceKey"])
+
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+        services = [service for service in did_document.get("service", []) if service.get("id") != f"{did}#lightning"]
+        public_host = (result.get("publicHost") or drawbridge.url).rstrip("/")
+        services.append(
+            {
+                "id": f"{did}#lightning",
+                "type": "Lightning",
+                "serviceEndpoint": f"{public_host}/invoice/{did_suffix}",
+            }
+        )
+        did_document["service"] = services
+        doc["didDocument"] = did_document
+        await self.update_did(did, doc)
+        return True
+
+    async def unpublish_lightning(self, name: str | None = None) -> bool:
+        drawbridge = self.require_drawbridge()
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        did_suffix = did.split(":")[-1]
+        await drawbridge.unpublish_lightning(did_suffix)
+
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+        services = [service for service in did_document.get("service", []) if service.get("id") != f"{did}#lightning"]
+        if services:
+            did_document["service"] = services
+        else:
+            did_document.pop("service", None)
+        doc["didDocument"] = did_document
+        await self.update_did(did, doc)
+        return True
+
+    async def zap_lightning(self, identifier: str, amount: int, memo: str | None = None, name: str | None = None) -> dict[str, Any]:
+        if not identifier:
+            raise UnknownIDError("Unknown ID")
+        if not amount or amount <= 0:
+            raise KeymasterError("Invalid parameter: amount")
+
+        recipient = identifier if "@" in identifier and not identifier.startswith("did:") else await self.lookup_did(identifier)
+        drawbridge = self.require_drawbridge()
+        config = await self.get_lightning_config(name)
+        return await drawbridge.zap_lightning(config["adminKey"], recipient, amount, memo)
+
+    async def get_lightning_payments(self, name: str | None = None) -> list[dict[str, Any]]:
+        drawbridge = self.require_drawbridge()
+        config = await self.get_lightning_config(name)
+        return await drawbridge.get_lightning_payments(config["adminKey"])
 
     def normalize_address_domain(self, domain: str) -> str:
         if not isinstance(domain, str) or not domain.strip():

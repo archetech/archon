@@ -242,18 +242,18 @@ Source of truth:
 
 ## Lightning
 
-- [ ] `addLightning`
-- [ ] `removeLightning`
-- [ ] `getLightningBalance`
-- [ ] `createLightningInvoice`
-- [ ] `payLightningInvoice`
-- [ ] `checkLightningPayment`
-- [ ] `decodeLightningInvoice`
-- [ ] `publishLightning`
-- [ ] `unpublishLightning`
-- [ ] `zapLightning`
-- [ ] `getLightningPayments`
-- [ ] Service route parity for `/lightning*`
+- [x] `addLightning`
+- [x] `removeLightning`
+- [x] `getLightningBalance`
+- [x] `createLightningInvoice`
+- [x] `payLightningInvoice`
+- [x] `checkLightningPayment`
+- [x] `decodeLightningInvoice`
+- [x] `publishLightning`
+- [x] `unpublishLightning`
+- [x] `zapLightning`
+- [x] `getLightningPayments`
+- [x] Service route parity for `/lightning*`
 - [ ] Full parity with `tests/keymaster/lightning.test.ts`
 
 ## Client and integration parity
@@ -269,14 +269,14 @@ Source of truth:
 
 ## Suggested implementation order
 
-- [ ] Finish partial parity in existing domains: wallet passphrase,
+- [x] Finish partial parity in existing domains: wallet passphrase,
       ID registry changes, asset route parity, asset clone and transfer
-- [ ] Implement credentials
-- [ ] Implement addresses
+- [x] Implement credentials
+- [x] Implement addresses
 - [x] Implement files and images
 - [x] Implement polls
 - [x] Implement vaults
 - [x] Implement dmail and notices
 - [x] Implement Nostr
-- [ ] Implement Lightning
+- [x] Implement Lightning
 - [ ] Close remaining response-shape and integration gaps
