@@ -1,0 +1,39 @@
+name: Python keymaster unit tests
+
+on:
+  pull_request:
+
+jobs:
+  test_python_keymaster:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12"
+
+      - name: Install keymaster library
+        working-directory: ./python/keymaster
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest pytest-asyncio
+
+      - name: Run keymaster unit tests
+        working-directory: ./python/keymaster
+        run: |
+          pytest -q tests
+
+      - name: Install keymaster_service
+        working-directory: ./python/keymaster_service
+        run: |
+          pip install -e .
+
+      - name: Run keymaster_service unit tests
+        working-directory: ./python/keymaster_service
+        run: |
+          pytest -q tests
