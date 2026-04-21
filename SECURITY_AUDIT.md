@@ -251,7 +251,7 @@ app.use(cors({ origin: ['https://your-wallet.example.com'], credentials: true })
 
 **Severity:** 🟠 High
 **Category:** Container Security
-**Affected:** All 7 Dockerfiles (`Dockerfile.cli`, `Dockerfile.explorer`, `Dockerfile.gatekeeper-ts`, `Dockerfile.hyperswarm`, `Dockerfile.keymaster`, `Dockerfile.react-wallet`, `Dockerfile.satoshi`)
+**Affected:** All 7 Dockerfiles (`Dockerfile.cli`, `Dockerfile.explorer`, `Dockerfile.gatekeeper-ts`, `Dockerfile.hyperswarm`, `Dockerfile.keymaster-ts`, `Dockerfile.react-wallet`, `Dockerfile.satoshi`)
 
 No Dockerfile includes a `USER` directive or creates a non-root user. While some services override with `user:` in `docker-compose.yml`, the images themselves default to root. `npm ci` and `npm run build` execute as root during build, and any container started outside of compose runs as root.
 
@@ -732,7 +732,7 @@ sudo nginx -t && sudo systemctl reload nginx
 - `docker-compose.btc-mainnet.yml`
 - `docker-compose.btc-signet.yml`
 - `docker-compose.btc-testnet4.yml`
-- `Dockerfile.cli`, `Dockerfile.explorer`, `Dockerfile.gatekeeper-ts`, `Dockerfile.hyperswarm`, `Dockerfile.keymaster`, `Dockerfile.react-wallet`, `Dockerfile.satoshi`
+- `Dockerfile.cli`, `Dockerfile.explorer`, `Dockerfile.gatekeeper-ts`, `Dockerfile.hyperswarm`, `Dockerfile.keymaster-ts`, `Dockerfile.react-wallet`, `Dockerfile.satoshi`
 - `data/redis.conf`
 - `data/wallet.json`
 - `data/btc-signet/bitcoin.conf`

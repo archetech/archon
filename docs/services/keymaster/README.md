@@ -8,6 +8,9 @@ the [packages/keymaster/](../../../packages/keymaster/) SDK and the
 implements, and what a third implementation in Go, Python, Java, etc. would
 need to honor to be a drop-in replacement.
 
+Implementation tracking for the current Python effort lives in
+[drop-in-parity-checklist.md](drop-in-parity-checklist.md).
+
 The TypeScript implementation is the **source of truth**. Any divergence
 between this document and the TypeScript code is a bug in this document; file
 an issue. A new implementation is conformant when it can be swapped into
@@ -91,9 +94,9 @@ catch-all for unhandled paths.
 
 ### 2.1 Response envelope
 
-Every successful JSON response is an **object with a single descriptive
-key** wrapping the result. Examples (the key is contractual; clients depend
-on it):
+Most successful JSON responses are **objects whose top-level keys are part of
+the contract**. In practice, the exact key is route-specific and clients rely
+on the current `KeymasterClient` behavior. Examples:
 
 | Endpoint | Response shape |
 | --- | --- |
@@ -104,16 +107,20 @@ on it):
 | `GET /api/v1/registries` | `{ "registries": string[] }` |
 | `POST /api/v1/login` | `{ "adminApiKey": string }` |
 | `GET /api/v1/wallet/mnemonic` | `{ "mnemonic": string }` |
+| `GET /api/v1/addresses/check/:address` | `AddressCheckResult` (flat object) |
+| `POST /api/v1/lightning/invoice` | `LightningInvoice` (flat object) |
 
-Boolean-returning operations use `{ "ok": boolean }`. Resource-creating
-operations return `{ "did": "..." }` for asset/ID DIDs, or the resource
-type as the key (e.g. `{ "wallet": ... }`, `{ "schema": ... }`,
-`{ "vault": ... }`).
+Many status-style operations use `{ "ok": boolean }`, and many create-style
+operations return `{ "did": "..." }`, but there are shipped exceptions.
+For example, `POST /api/v1/wallet/backup` currently returns the backup DID in
+`ok`, and several Nostr / Lightning / address-check routes return flat
+objects rather than a single nested payload key.
 
 A new implementation MUST honor every key the existing
 [`KeymasterClient`](../../../packages/keymaster/src/keymaster-client.ts)
 parses (search the file for `response.data.<key>` to enumerate). The full
-key inventory is the contract.
+key inventory, including routes that return unwrapped objects, is the
+contract.
 
 ### 2.2 Authentication
 
@@ -276,9 +283,9 @@ decrement the counter — account numbers are never reused.
 | Route | Behavior |
 | --- | --- |
 | `GET /api/v1/wallet` | Returns the **decrypted** wallet object. Requires server to hold the passphrase (via `ARCHON_ENCRYPTED_PASSPHRASE`). |
-| `PUT /api/v1/wallet` | Body: `{ "wallet": WalletFile, "overwrite"?: boolean }`. Validates passphrase and saves. Returns `{ "ok": boolean }`. |
+| `PUT /api/v1/wallet` | Body: `{ "wallet": WalletFile }`. Validates passphrase by decrypting or re-encrypting the submitted wallet and saves it. Returns `{ "ok": boolean }`. |
 | `POST /api/v1/wallet/new` | Body: `{ "mnemonic"?: string, "overwrite"?: boolean }`. Generates a new mnemonic if not supplied. Returns `{ "wallet": WalletFile }`. |
-| `POST /api/v1/wallet/backup` | Encrypts the wallet to the seed bank DID (see §3.5). Returns `{ "ok": boolean }`. |
+| `POST /api/v1/wallet/backup` | Encrypts the wallet to a new backup asset DID, records that DID on the seed bank document (see §3.5), and returns `{ "ok": "<backup DID>" }`. |
 | `POST /api/v1/wallet/recover` | Restores the wallet from the seed bank using the current passphrase. Returns `{ "wallet": WalletFile }`. |
 | `POST /api/v1/wallet/check` | Walks every DID owned/held/aliased and verifies it resolves. Returns `{ "check": { checked, invalid, deleted } }`. |
 | `POST /api/v1/wallet/fix` | Removes invalid/deleted entries identified by `check`. Returns `{ "fix": { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } }`. |
@@ -291,12 +298,15 @@ decrement the counter — account numbers are never reused.
 The "seed bank" is a special DID that the wallet creates on first use to
 back itself up. Operations:
 
-- `wallet.backup` creates (or updates) an asset DID controlled by a
-  derived key, containing the JWE-encrypted wallet body.
-- `wallet.recover` resolves that DID and decrypts using the wallet's
-  passphrase.
-- The seed bank DID is stored in the wallet's `seed` field and is not
-  exposed directly to clients.
+- `wallet.backup` creates a **new** asset DID controlled by the seed-bank
+  DID, containing the encrypted wallet body, then updates the seed-bank DID
+  document data to point at that backup DID.
+- `wallet.recover` uses the explicit `did` argument when provided; otherwise
+  it resolves the seed-bank DID, reads the `wallet` pointer from that DID
+  document's data, then decrypts the referenced backup asset.
+- The seed-bank DID is derived from the wallet root key material and resolved
+  on demand by the TypeScript implementation; it is not persisted as a
+  separate field in the wallet JSON.
 
 A new implementation MUST use the same anchor algorithm so a wallet
 backed up by the TS implementation can be recovered by the new one.
@@ -410,7 +420,7 @@ identity for asset-creating operations that don't take an explicit owner.
 | --- | --- |
 | `GET /api/v1/ids` | `{ "ids": string[] }` — list of names, alphabetically. |
 | `POST /api/v1/ids` | Body: `{ "name": string, "options"?: { "registry"?: string } }`. Derives a new keypair, creates an `agent` DID via Gatekeeper, stores `IDInfo`. Returns `{ "did": string }`. Increments `counter`. Sets `current` if the wallet had none. |
-| `GET /api/v1/ids/:id` | `{ "id": IDInfo }` for the named ID. |
+| `GET /api/v1/ids/:id` | Resolves the supplied ID name or DID through the same lookup path as `GET /api/v1/did/:id` and returns `{ "docs": DidCidDocument }`. |
 | `DELETE /api/v1/ids/:id` | Removes the ID from the wallet (does NOT deactivate the DID on the gatekeeper). Returns `{ "ok": boolean }`. |
 | `POST /api/v1/ids/:id/rename` | Body: `{ "name": string }`. Returns `{ "ok": boolean }`. |
 | `POST /api/v1/ids/:id/change-registry` | Body: `{ "registry": string }`. Submits an `update` op moving the DID to the new registry. Returns `{ "ok": boolean }`. |
@@ -445,7 +455,8 @@ delete), the Keymaster:
    - `created = now() in RFC 3339`
    - `verificationMethod` per Gatekeeper §5.3 (relative `#key-1` for agent
      create, otherwise `<signerDid>#key-1`)
-   - `proofPurpose = "assertionMethod"`
+   - `proofPurpose = "authentication"` for the current TypeScript DID and
+     asset write paths (`create`, `update`, `delete`)
    - `proofValue = base64url(sig)`
 6. Submits via `gatekeeper.createDID(op)` / `updateDID(op)`.
 
@@ -476,9 +487,9 @@ the wallet has chosen to track for sending zaps.
 | Route | Behavior |
 | --- | --- |
 | `GET /api/v1/addresses` | `{ "addresses": { "<address>": StoredAddressInfo, ... } }` |
-| `GET /api/v1/addresses/:domain` | Resolves the DID anchor (if any) advertised at `https://<domain>/.well-known/lnurlp/...`. Returns `{ "address": ResolvedAddressInfo }`. |
-| `POST /api/v1/addresses/import` | Imports the address book from a remote DID document. |
-| `GET /api/v1/addresses/check/:address` | Probes whether the address is `claimed`/`available`/`unsupported`/`unreachable`. Returns `{ "address": AddressCheckResult }`. |
+| `GET /api/v1/addresses/:domain` | Returns the **locally stored** current-ID address record for the supplied domain, or `{ "address": null }` if none is stored. It does not resolve LNURL or remote DID anchors. |
+| `POST /api/v1/addresses/import` | Fetches `https://<domain>/.well-known/names`, imports any names that already point at the current ID's DID, and returns `{ "addresses": Record<string, AddressInfo> }`. |
+| `GET /api/v1/addresses/check/:address` | Probes whether the address is `claimed`/`available`/`unsupported`/`unreachable`. Returns a flat `AddressCheckResult` object: `{ "address": string, "status": ..., "available": boolean, "did": string | null }`. |
 | `POST /api/v1/addresses` | Body: `{ "address": string }`. Adds the address to the current ID. |
 | `DELETE /api/v1/addresses/:address` | Removes the address. |
 
@@ -537,8 +548,8 @@ asset DID owned by the sender:
 | `POST /api/v1/keys/decrypt/message` | Body: `{ "did": string }`. Resolves the asset, locates the receiver's private key in the wallet, decrypts the JWE, returns `{ "message": string }`. |
 | `POST /api/v1/keys/encrypt/json` | Same as `encrypt/message` but `JSON.stringify`s the input first. |
 | `POST /api/v1/keys/decrypt/json` | Same as `decrypt/message` but `JSON.parse`s the result. |
-| `POST /api/v1/keys/sign` | Body: `{ "msg": <any JSON> }`. `sha256(canonicalize(msg))` then ECDSA-sign with the current ID's key. Returns `{ "signed": <input with .proof> }`. |
-| `POST /api/v1/keys/verify` | Body: `{ "msg": <signed JSON> }`. Verifies `msg.proof.proofValue`. Returns `{ "verify": boolean }`. |
+| `POST /api/v1/keys/sign` | Body: `{ "contents": "<JSON string>" }`. The server parses `contents`, canonicalizes the resulting JSON value, signs it with the current ID's key, and returns `{ "signed": <input with .proof> }`. |
+| `POST /api/v1/keys/verify` | Body: `{ "json": <signed JSON> }`. Verifies `json.proof.proofValue`. Returns `{ "ok": boolean }`. |
 | `POST /api/v1/keys/rotate` | Generates a new keypair for the current ID, submits an `update` op replacing the verification method. |
 
 `EncryptOptions` extends `CreateAssetOptions`:
@@ -620,10 +631,10 @@ verifier-prover protocol:
 
 | Route | Behavior |
 | --- | --- |
-| `GET /api/v1/challenge` | Returns `{ "challenge": Challenge }` template. |
+| `GET /api/v1/challenge` | Creates a challenge asset using default parameters and returns `{ "did": string }`. There is no separate template-returning HTTP route in the current TS server. |
 | `POST /api/v1/challenge` | Body: `{ "challenge"?: Challenge, "options"?: { registry?, validUntil? } }`. Persists the challenge as an asset DID and returns `{ "did": string }`. |
-| `POST /api/v1/response` | Body: `{ "challengeDid": string, "options"?: CreateResponseOptions }`. Holder gathers matching held credentials, builds a `ChallengeResponse`, encrypts to the challenger, and creates a response asset. Returns `{ "did": string }`. |
-| `POST /api/v1/response/verify` | Body: `{ "responseDid": string, "options"?: { retries?, delay? } }`. Verifier decrypts, validates each presented VC's signature against its issuer's key, and returns `{ "verify": ChallengeResponse }`. |
+| `POST /api/v1/response` | Body: `{ "challenge": string, "options"?: CreateResponseOptions }`. Holder gathers matching held credentials, builds a `ChallengeResponse`, encrypts to the challenger, and creates a response asset. Returns `{ "did": string }`. |
+| `POST /api/v1/response/verify` | Body: `{ "response": string, "options"?: { retries?, delay? } }`. Verifier decrypts, validates each presented VC's signature against its issuer's key, and returns `{ "verify": ChallengeResponse }`. |
 
 `Challenge`:
 

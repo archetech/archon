@@ -2,7 +2,7 @@ name: Build & Publish Release
 
 on:
   push:
-    tags: ["v*"]
+    tags: [ "v*" ]
 
 env:
   REGISTRY: ghcr.io
@@ -34,7 +34,7 @@ jobs:
         include:
           - dockerfile: Dockerfile.gatekeeper-ts
             image: gatekeeper
-          - dockerfile: Dockerfile.keymaster
+          - dockerfile: Dockerfile.keymaster-ts
             image: keymaster
           - dockerfile: Dockerfile.hyperswarm
             image: hyperswarm-mediator
@@ -85,7 +85,8 @@ jobs:
       - name: Run Anchore vulnerability scanner
         uses: anchore/scan-action@3343887d815d7b07465f6fdcd395bd66508d486a
         with:
-          image: ${{ env.REGISTRY }}/archetech/${{ matrix.image }}:${{ needs.generate.outputs.GIT_TAG }}
+          image: ${{ env.REGISTRY }}/archetech/${{ matrix.image }}:${{
+            needs.generate.outputs.GIT_TAG }}
           fail-build: false
           severity-cutoff: critical
           output-format: table

@@ -4,6 +4,8 @@ tmp/
 .env
 custodials
 coverage/
+__pycache__/
+*.py[cod]
 **/*.log
 .clinic/
 .idea/

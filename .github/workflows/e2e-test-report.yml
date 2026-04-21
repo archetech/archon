@@ -14,11 +14,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flavor: [rust, typescript]
+        include:
+          - gatekeeper: rust
+            keymaster: typescript
+          - gatekeeper: rust
+            keymaster: python
+          - gatekeeper: typescript
+            keymaster: typescript
+          - gatekeeper: typescript
+            keymaster: python
     steps:
       - uses: dorny/test-reporter@0f7d1ed661203449e0ee89fa7a0a7f9c9a7d9911
         with:
-          artifact: E2E Artifacts (${{ matrix.flavor }})
-          name: CLI E2E Tests (${{ matrix.flavor }} gatekeeper)
+          artifact: E2E Artifacts (${{ matrix.gatekeeper }}, ${{ matrix.keymaster }})
+          name: CLI E2E Tests (${{ matrix.gatekeeper }} gatekeeper, ${{ matrix.keymaster }} keymaster)
           path: '*.xml'
           reporter: jest-junit

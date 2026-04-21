@@ -14,14 +14,16 @@ on:
 
 jobs:
   build_test_images:
-    name: build_test_images (${{ matrix.gatekeeper }} gatekeeper)
+    name: build_test_images (${{ matrix.gatekeeper }} gatekeeper, ${{ matrix.keymaster }} keymaster)
     runs-on: ubuntu-latest
     strategy:
       # Always run both legs even if one fails, so a Rust regression doesn't
-      # hide a TS regression or vice versa.
+      # hide a TS regression or vice versa. Apply the same treatment to the
+      # keymaster implementation matrix.
       fail-fast: false
       matrix:
         gatekeeper: [rust, typescript]
+        keymaster: [typescript, python]
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -43,7 +45,7 @@ jobs:
 
       - name: Run Node
         run: |
-          ./start-node-ci cli ${{ matrix.gatekeeper }}
+          ./start-node-ci cli ${{ matrix.gatekeeper }} ${{ matrix.keymaster }}
           docker compose ps
           sleep 30
 
@@ -66,12 +68,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: docker-compose-logs-${{ matrix.gatekeeper }}
+          name: docker-compose-logs-${{ matrix.gatekeeper }}-${{ matrix.keymaster }}
           path: docker-compose-logs.txt
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: E2E Artifacts (${{ matrix.gatekeeper }})
+          name: E2E Artifacts (${{ matrix.gatekeeper }}, ${{ matrix.keymaster }})
           path: e2e-results.xml

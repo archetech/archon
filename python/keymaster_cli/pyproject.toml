@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keymaster-cli"
+version = "0.1.0"
+description = "Python keymaster CLI mirroring the TypeScript keymaster CLI"
+readme = "README.md"
+dependencies = [
+  "archon-keymaster==0.1.0"
+]
+
+[project.scripts]
+keymaster = "keymaster_cli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["keymaster_cli*"]

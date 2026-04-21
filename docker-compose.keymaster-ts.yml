@@ -1,0 +1,53 @@
+# Full TypeScript keymaster service definition. Pulled into docker-compose.yml
+# via the `include:` directive. Keep in sync with docker-compose.keymaster-py.yml
+# whenever non-build env/ports/healthcheck fields change intentionally.
+services:
+  keymaster:
+    build:
+      context: .
+      dockerfile: Dockerfile.keymaster-ts
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/keymaster
+    environment:
+      - ARCHON_KEYMASTER_PORT=4226
+      - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_DISABLE_SEARCH=${ARCHON_DISABLE_SEARCH:-false}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_KEYMASTER_DB=${ARCHON_KEYMASTER_DB}
+      - ARCHON_ENCRYPTED_PASSPHRASE=${ARCHON_ENCRYPTED_PASSPHRASE}
+      - ARCHON_WALLET_CACHE=${ARCHON_WALLET_CACHE}
+      - ARCHON_DEFAULT_REGISTRY=${ARCHON_DEFAULT_REGISTRY}
+      - ARCHON_KEYMASTER_UPLOAD_LIMIT=${ARCHON_KEYMASTER_UPLOAD_LIMIT}
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+    volumes:
+      - ./data:/app/keymaster/data
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - ${ARCHON_KEYMASTER_PORT}:4226
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const http=require('http');const
+            req=http.get('http://127.0.0.1:4226/api/v1/ready',res=>{let
+            body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.\
+            exit(res.statusCode===200&&body.includes('\"ready\":true')?0:1));})\
+            ;req.on('error',()=>process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      gatekeeper:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
