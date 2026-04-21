@@ -8,6 +8,9 @@ the [packages/keymaster/](../../../packages/keymaster/) SDK and the
 implements, and what a third implementation in Go, Python, Java, etc. would
 need to honor to be a drop-in replacement.
 
+Implementation tracking for the current Python effort lives in
+[drop-in-parity-checklist.md](drop-in-parity-checklist.md).
+
 The TypeScript implementation is the **source of truth**. Any divergence
 between this document and the TypeScript code is a bug in this document; file
 an issue. A new implementation is conformant when it can be swapped into

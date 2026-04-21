@@ -1,0 +1,282 @@
+# Keymaster Drop-In Parity Checklist
+
+This checklist tracks the work required for the Python keymaster library and
+service to become a complete drop-in replacement for the canonical TypeScript
+implementation.
+
+Source of truth:
+
+- Service contract: `services/keymaster/server/src/keymaster-api.ts`
+- Client contract: `packages/keymaster/src/keymaster-client.ts`
+- Behavioral coverage: `tests/keymaster/*.test.ts`
+
+## Completion criteria
+
+- [ ] Every TypeScript keymaster HTTP route exists in the Python service with
+      matching request body, query params, auth behavior, response envelope,
+      and status codes.
+- [ ] Every public capability consumed through the TypeScript client contract
+      exists in the Python library.
+- [ ] Every major TypeScript keymaster test domain has equivalent Python tests.
+- [ ] The Python implementation can replace the TypeScript service in compose
+      without breaking existing Archon consumers.
+
+## Foundation and runtime
+
+- [x] Python keymaster business logic lives in a reusable library package.
+- [x] Python keymaster service is a thin HTTP wrapper over the library.
+- [x] Docker and compose support switching between TypeScript and Python
+      keymaster implementations.
+- [ ] Docker smoke tests confirm the currently documented Python runtime
+      import path and service entrypoint.
+
+## Wallet
+
+- [x] `loadWallet`
+- [x] `saveWallet`
+- [x] `newWallet`
+- [x] `backupWallet`
+- [x] `recoverWallet`
+- [x] `checkWallet`
+- [x] `fixWallet`
+- [x] `decryptMnemonic`
+- [x] `exportEncryptedWallet`
+- [ ] `changePassphrase`
+- [ ] Full parity with `tests/keymaster/wallet.test.ts`
+
+## IDs and DID lifecycle
+
+- [x] `listRegistries`
+- [x] `listIds`
+- [x] `getCurrentId`
+- [x] `setCurrentId`
+- [x] `createId`
+- [x] `createIdOperation`
+- [x] `removeId`
+- [x] `renameId`
+- [x] `backupId`
+- [x] `recoverId`
+- [x] `resolveDID`
+- [x] `updateDID`
+- [x] `revokeDID`
+- [x] `testAgent`
+- [ ] `changeRegistry`
+- [ ] Full parity with `tests/keymaster/id.test.ts`
+- [ ] Full parity with `tests/keymaster/utils.test.ts`
+
+## Aliases
+
+- [x] `addAlias`
+- [x] `getAlias`
+- [x] `removeAlias`
+- [x] `listAliases`
+- [ ] Full parity with `tests/keymaster/alias.test.ts`
+
+## Assets
+
+- [x] Library support for `createAsset`
+- [x] Library support for `listAssets`
+- [x] Library support for `resolveAsset`
+- [x] Library support for `mergeData`
+- [ ] Service route parity for `POST /assets`
+- [ ] Service route parity for `PUT /assets/:id`
+- [ ] `cloneAsset`
+- [ ] `transferAsset`
+- [ ] Asset registry-change semantics confirmed against TypeScript behavior
+- [ ] Full parity with `tests/keymaster/asset.test.ts`
+
+## Keys and cryptography
+
+- [x] `rotateKeys`
+- [x] `encryptMessage`
+- [x] `decryptMessage`
+- [x] `encryptJSON`
+- [x] `decryptJSON`
+- [x] `addProof`
+- [x] `verifyProof`
+- [x] RFC 8785-based JSON canonicalization compatible with the TypeScript
+      proof flow
+- [ ] Full parity with `tests/keymaster/crypto.test.ts`
+
+## Schemas
+
+- [x] `createSchema`
+- [x] `listSchemas`
+- [x] `getSchema`
+- [x] `setSchema`
+- [x] `testSchema`
+- [x] `createTemplate`
+- [ ] Full parity with `tests/keymaster/schema.test.ts`
+
+## Groups
+
+- [x] `createGroup`
+- [x] `getGroup`
+- [x] `addGroupMember`
+- [x] `removeGroupMember`
+- [x] `testGroup`
+- [x] `listGroups`
+- [ ] Full parity with `tests/keymaster/group.test.ts`
+
+## Challenge and response
+
+- [x] `createChallenge`
+- [x] `createResponse`
+- [x] `verifyResponse`
+- [ ] Full parity with `tests/keymaster/challenge.test.ts`
+- [ ] Full parity with `tests/keymaster/response.test.ts`
+
+## Addresses
+
+- [ ] `listAddresses`
+- [ ] `getAddress`
+- [ ] `importAddress`
+- [ ] `checkAddress`
+- [ ] `addAddress`
+- [ ] `removeAddress`
+- [ ] Service route parity for `/addresses*`
+- [ ] Full parity with `tests/keymaster/address.test.ts`
+
+## Credentials
+
+- [ ] `bindCredential`
+- [ ] `issueCredential`
+- [ ] `sendCredential`
+- [ ] `updateCredential`
+- [ ] `listCredentials`
+- [ ] `acceptCredential`
+- [ ] `getCredential`
+- [ ] `removeCredential`
+- [ ] `publishCredential`
+- [ ] `unpublishCredential`
+- [ ] `listIssued`
+- [ ] `revokeCredential`
+- [ ] Service route parity for `/credentials/held*`
+- [ ] Service route parity for `/credentials/issued*`
+- [ ] Full parity with `tests/keymaster/credential.test.ts`
+
+## Polls
+
+- [ ] `pollTemplate`
+- [ ] `createPoll`
+- [ ] `getPoll`
+- [ ] `testPoll`
+- [ ] `listPolls`
+- [ ] `viewPoll`
+- [ ] `votePoll`
+- [ ] `sendPoll`
+- [ ] `sendBallot`
+- [ ] `viewBallot`
+- [ ] `updatePoll`
+- [ ] `publishPoll`
+- [ ] `unpublishPoll`
+- [ ] `addPollVoter`
+- [ ] `removePollVoter`
+- [ ] `listPollVoters`
+- [ ] Service route parity for `/templates/poll` and `/polls*`
+- [ ] Full parity with `tests/keymaster/poll.test.ts`
+
+## Files and images
+
+- [ ] `createImage`
+- [ ] `updateImage`
+- [ ] `getImage`
+- [ ] `testImage`
+- [ ] `createFile`
+- [ ] `createFileStream`
+- [ ] `updateFile`
+- [ ] `updateFileStream`
+- [ ] `getFile`
+- [ ] `testFile`
+- [ ] Service route parity for image endpoints
+- [ ] Service route parity for file endpoints
+- [ ] Full parity with `tests/keymaster/image.test.ts`
+- [ ] Full parity with `tests/keymaster/file.test.ts`
+
+## Vaults
+
+- [ ] `createVault`
+- [ ] `getVault`
+- [ ] `testVault`
+- [ ] `addVaultMember`
+- [ ] `removeVaultMember`
+- [ ] `listVaultMembers`
+- [ ] `addVaultItem`
+- [ ] `removeVaultItem`
+- [ ] `listVaultItems`
+- [ ] `getVaultItem`
+- [ ] Service route parity for `/vault*`
+- [ ] Full parity with `tests/keymaster/vault.test.ts`
+
+## Dmail and notices
+
+- [ ] `listDmail`
+- [ ] `createDmail`
+- [ ] `updateDmail`
+- [ ] `sendDmail`
+- [ ] `fileDmail`
+- [ ] `removeDmail`
+- [ ] `getDmailMessage`
+- [ ] `listDmailAttachments`
+- [ ] `addDmailAttachment`
+- [ ] `removeDmailAttachment`
+- [ ] `getDmailAttachment`
+- [ ] `importDmail`
+- [ ] `createNotice`
+- [ ] `updateNotice`
+- [ ] `refreshNotices`
+- [ ] Service route parity for dmail endpoints
+- [ ] Service route parity for notice endpoints
+- [ ] Full parity with `tests/keymaster/dmail.test.ts`
+- [ ] Full parity with `tests/keymaster/notice.test.ts`
+
+## Nostr
+
+- [ ] `addNostr`
+- [ ] `importNostr`
+- [ ] `removeNostr`
+- [ ] `exportNsec`
+- [ ] `signNostrEvent`
+- [ ] Service route parity for `/nostr*`
+- [ ] Full parity with `tests/keymaster/nostr.test.ts`
+
+## Lightning
+
+- [ ] `addLightning`
+- [ ] `removeLightning`
+- [ ] `getLightningBalance`
+- [ ] `createLightningInvoice`
+- [ ] `payLightningInvoice`
+- [ ] `checkLightningPayment`
+- [ ] `decodeLightningInvoice`
+- [ ] `publishLightning`
+- [ ] `unpublishLightning`
+- [ ] `zapLightning`
+- [ ] `getLightningPayments`
+- [ ] Service route parity for `/lightning*`
+- [ ] Full parity with `tests/keymaster/lightning.test.ts`
+
+## Client and integration parity
+
+- [ ] Python-facing client or compatibility layer covers the same externally
+      relevant contract exercised by `tests/keymaster/client.test.ts`
+- [ ] Response envelope differences between TypeScript and Python are fully
+      removed
+- [ ] Compose-level swap test passes with the Python service in place of the
+      TypeScript service
+- [ ] Cross-service consumers still work: CLI, React wallet, Drawbridge,
+      mediators, Herald
+
+## Suggested implementation order
+
+- [ ] Finish partial parity in existing domains: wallet passphrase,
+      ID registry changes, asset route parity, asset clone and transfer
+- [ ] Implement credentials
+- [ ] Implement addresses
+- [ ] Implement files and images
+- [ ] Implement polls
+- [ ] Implement vaults
+- [ ] Implement dmail and notices
+- [ ] Implement Nostr
+- [ ] Implement Lightning
+- [ ] Close remaining response-shape and integration gaps
