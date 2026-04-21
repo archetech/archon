@@ -936,9 +936,14 @@ def _add_alias_registry(p: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    class _Formatter(argparse.HelpFormatter):
+        def __init__(self, prog: str) -> None:
+            super().__init__(prog, max_help_position=40, width=100)
+
     parser = argparse.ArgumentParser(
         prog="keymaster",
         description="Keymaster CLI - Archon wallet management tool",
+        formatter_class=_Formatter,
     )
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 
