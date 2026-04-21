@@ -24,9 +24,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from keymaster.core import Keymaster
-
-from .gatekeeper_client import GatekeeperClient
-from .wallet_store import JsonWalletStore
+from keymaster_service.gatekeeper_client import GatekeeperClient
+from keymaster_service.wallet_store import JsonWalletStore
 
 
 UPDATE_OK = "OK"
