@@ -23,6 +23,19 @@ def test_add_lightning_is_idempotent_and_stores_by_url(testbed):
     }
 
 
+def test_add_lightning_supports_named_ids_and_unknown_ids(testbed):
+    run(testbed.keymaster.create_id("Alice"))
+    run(testbed.keymaster.create_id("Bob"))
+
+    alice_config = run(testbed.keymaster.add_lightning("Alice"))
+
+    assert run(testbed.keymaster.load_wallet())["ids"]["Alice"]["lightning"]["http://test-drawbridge"] == alice_config
+    assert "lightning" not in run(testbed.keymaster.load_wallet())["ids"]["Bob"]
+
+    with pytest.raises(UnknownIDError, match="Unknown ID"):
+        run(testbed.keymaster.add_lightning("Unknown"))
+
+
 def test_add_and_remove_lightning_support_multiple_urls(testbed):
     run(testbed.keymaster.create_id("Bob"))
     config1 = run(testbed.keymaster.add_lightning())
@@ -86,6 +99,32 @@ def test_lightning_gateway_methods_and_publish_cycle(testbed):
     assert "service" not in run(testbed.keymaster.resolve_did(did))["didDocument"]
 
 
+def test_lightning_config_is_scoped_to_current_url(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+
+    testbed.gatekeeper.url = "http://other-drawbridge"
+
+    with pytest.raises(KeymasterError, match="No Lightning wallet configured"):
+        run(testbed.keymaster.get_lightning_balance())
+
+
+def test_publish_lightning_uses_public_host_and_replaces_existing_service(testbed):
+    async def publish_with_public_host(did: str, invoice_key: str):
+        return {"ok": True, "publicHost": "http://abc123.onion:4222", "did": did, "invoiceKey": invoice_key}
+
+    testbed.gatekeeper.publish_lightning = publish_with_public_host
+    did = run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+
+    assert run(testbed.keymaster.publish_lightning()) is True
+    assert run(testbed.keymaster.publish_lightning()) is True
+
+    services = run(testbed.keymaster.resolve_did(did))["didDocument"]["service"]
+    assert len(services) == 1
+    assert services[0]["serviceEndpoint"] == f"http://abc123.onion:4222/invoice/{did.split(':')[-1]}"
+
+
 def test_decode_lightning_invoice_vectors(testbed):
     coffee = run(testbed.keymaster.decode_lightning_invoice(COFFEE_INVOICE))
     donation = run(testbed.keymaster.decode_lightning_invoice(DONATION_INVOICE))
@@ -103,6 +142,12 @@ def test_decode_lightning_invoice_vectors(testbed):
     assert donation["network"] == "bc"
     assert "expiry" not in donation
     assert "expires" not in donation
+
+    with pytest.raises(KeymasterError, match="Invalid parameter: bolt11"):
+        run(testbed.keymaster.decode_lightning_invoice(""))
+
+    with pytest.raises(Exception):
+        run(testbed.keymaster.decode_lightning_invoice("not-a-valid-invoice"))
 
 
 def test_zap_lightning_resolves_alias_and_lud16(testbed):
@@ -131,6 +176,9 @@ def test_lightning_validation_and_unavailable_gateway(testbed):
 
     with pytest.raises(UnknownIDError, match="Unknown ID"):
         run(testbed.keymaster.zap_lightning("", 100))
+
+    with pytest.raises(KeymasterError, match="No Lightning wallet configured"):
+        run(testbed.keymaster.get_lightning_payments())
 
     class PlainGatekeeper:
         def __init__(self, delegate):

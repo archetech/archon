@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from keymaster import KeymasterError
+from keymaster import KeymasterError, UnknownIDError
 from keymaster.crypto import (
     generate_jwk_pair,
     hash_message,
@@ -47,6 +47,27 @@ def test_add_and_remove_nostr_updates_wallet_and_did_document(testbed):
     assert "nostr" not in run(testbed.keymaster.load_wallet())["ids"]["Bob"]
 
 
+def test_add_nostr_supports_named_ids_and_produces_distinct_keys(testbed):
+    run(testbed.keymaster.create_id("Alice"))
+    run(testbed.keymaster.create_id("Bob"))
+
+    alice_nostr = run(testbed.keymaster.add_nostr("Alice"))
+    bob_nostr = run(testbed.keymaster.add_nostr())
+
+    assert alice_nostr["pubkey"] != bob_nostr["pubkey"]
+    assert run(testbed.keymaster.export_nsec("Alice")).startswith("nsec1")
+    assert run(testbed.keymaster.resolve_did("Alice"))["didDocumentData"]["nostr"] == alice_nostr
+
+
+def test_add_nostr_requires_existing_identity(testbed):
+    with pytest.raises(KeymasterError, match="No current ID"):
+        run(testbed.keymaster.add_nostr())
+
+    run(testbed.keymaster.create_id("Bob"))
+    with pytest.raises(UnknownIDError, match="Unknown ID"):
+        run(testbed.keymaster.add_nostr("Unknown"))
+
+
 def test_import_nostr_stores_nsec_and_signs_with_imported_key(testbed):
     run(testbed.keymaster.create_id("Bob"))
     imported_keypair = generate_jwk_pair()
@@ -70,6 +91,25 @@ def test_import_nostr_stores_nsec_and_signs_with_imported_key(testbed):
     assert signed["pubkey"] == imported_nostr["pubkey"]
     assert verify_schnorr(signed["id"], signed["sig"], signed["pubkey"]) is True
     assert signed["id"] == hash_message('[0,"%s",1234567890,1,[["p","abc123"]],"NIP-01 test"]' % imported_nostr["pubkey"])
+
+
+def test_sign_nostr_event_preserves_fields_and_matches_added_pubkey(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+    nostr = run(testbed.keymaster.add_nostr())
+    event = {
+        "created_at": 1700000000,
+        "kind": 0,
+        "tags": [["e", "abc"], ["p", "def"]],
+        "content": '{"name":"Bob"}',
+    }
+
+    signed = run(testbed.keymaster.sign_nostr_event(event))
+
+    assert signed["pubkey"] == nostr["pubkey"]
+    assert signed["created_at"] == event["created_at"]
+    assert signed["kind"] == event["kind"]
+    assert signed["tags"] == event["tags"]
+    assert signed["content"] == event["content"]
 
 
 def test_import_nostr_rejects_invalid_nsec(testbed):

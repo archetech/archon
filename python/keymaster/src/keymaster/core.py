@@ -304,6 +304,8 @@ class Keymaster:
         docs = await self.gatekeeper.resolve_did(actual_did, options)
         metadata = docs.get("didResolutionMetadata") or {}
         if metadata.get("error"):
+            if not name.startswith("did:") and actual_did == name:
+                raise UnknownIDError("Unknown ID")
             raise KeymasterError(metadata["error"])
         did_metadata = docs.setdefault("didDocumentMetadata", {})
         controller = docs.get("didDocument", {}).get("controller") or docs.get("didDocument", {}).get("id")
@@ -1649,11 +1651,12 @@ class Keymaster:
             try:
                 id_info = await self.fetch_id_info(owner, wallet)
             except Exception:
-                return True
+                return False
             id_info.setdefault("owned", [])
+            removed = did in id_info["owned"]
             id_info["owned"] = [item for item in id_info["owned"] if item != did]
             await self._save_loaded_wallet(wallet, overwrite=True)
-        return True
+        return removed
 
     async def add_to_held(self, did: str) -> bool:
         async with self._lock:
@@ -2023,9 +2026,13 @@ class Keymaster:
             return ok
 
     async def get_public_key_jwk(self, doc: dict[str, Any]) -> dict[str, str]:
+        if "didDocument" not in doc:
+            raise KeymasterError("Missing didDocument.")
         methods = doc.get("didDocument", {}).get("verificationMethod") or []
-        if not methods or not methods[0].get("publicKeyJwk"):
+        if not methods:
             raise KeymasterError("The DID document does not contain any verification methods.")
+        if not methods[0].get("publicKeyJwk"):
+            raise KeymasterError("The publicKeyJwk is missing in the first verification method.")
         return methods[0]["publicKeyJwk"]
 
     async def encrypt_message(self, message: str, receiver: str, options: dict[str, Any] | None = None) -> str:

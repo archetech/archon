@@ -137,7 +137,7 @@ def test_file_helpers_handle_missing_and_invalid_assets():
     assert run(keymaster.test_file(asset_did)) is False
     assert run(keymaster.test_file("bogus")) is False
 
-    with pytest.raises(KeymasterError, match="notFound"):
+    with pytest.raises(KeymasterError, match="Unknown ID"):
         run(keymaster.get_file("bogus"))
 
 
@@ -232,5 +232,5 @@ def test_image_helpers_handle_invalid_buffers_and_non_image_assets():
     with pytest.raises(KeymasterError, match="Invalid parameter: buffer"):
         run(keymaster.update_image(created, b"mock"))
 
-    with pytest.raises(KeymasterError, match="notFound"):
+    with pytest.raises(KeymasterError, match="Unknown ID"):
         run(keymaster.get_image("bogus"))

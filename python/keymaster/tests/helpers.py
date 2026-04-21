@@ -161,6 +161,8 @@ class FakeGatekeeper:
         current["didDocumentMetadata"]["versionSequence"] = next_sequence
         current["didDocumentMetadata"]["versionId"] = f"{did}#{next_sequence}"
         current["didDocumentMetadata"]["deactivated"] = True
+        current["didDocument"] = {"id": did}
+        current["didDocumentData"] = {}
         self.docs[did] = current
         return True
 

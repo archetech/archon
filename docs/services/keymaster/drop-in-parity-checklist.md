@@ -61,7 +61,7 @@ Source of truth:
 - [x] `revokeDID`
 - [x] `testAgent`
 - [x] `changeRegistry`
-- [ ] Full parity with `tests/keymaster/id.test.ts`
+- [x] Full parity with `tests/keymaster/id.test.ts`
 - [ ] Full parity with `tests/keymaster/utils.test.ts`
 
 ## Aliases
@@ -70,7 +70,7 @@ Source of truth:
 - [x] `getAlias`
 - [x] `removeAlias`
 - [x] `listAliases`
-- [ ] Full parity with `tests/keymaster/alias.test.ts`
+- [x] Full parity with `tests/keymaster/alias.test.ts`
 
 ## Assets
 
@@ -83,7 +83,7 @@ Source of truth:
 - [x] `cloneAsset`
 - [x] `transferAsset`
 - [ ] Asset registry-change semantics confirmed against TypeScript behavior
-- [ ] Full parity with `tests/keymaster/asset.test.ts`
+- [x] Full parity with `tests/keymaster/asset.test.ts`
 
 ## Keys and cryptography
 
@@ -96,7 +96,7 @@ Source of truth:
 - [x] `verifyProof`
 - [x] RFC 8785-based JSON canonicalization compatible with the TypeScript
       proof flow
-- [ ] Full parity with `tests/keymaster/crypto.test.ts`
+- [x] Full parity with `tests/keymaster/crypto.test.ts`
 
 ## Schemas
 
@@ -123,7 +123,7 @@ Source of truth:
 - [x] `createChallenge`
 - [x] `createResponse`
 - [x] `verifyResponse`
-- [ ] Full parity with `tests/keymaster/challenge.test.ts`
+- [x] Full parity with `tests/keymaster/challenge.test.ts`
 - [ ] Full parity with `tests/keymaster/response.test.ts`
 
 ## Addresses
@@ -135,7 +135,7 @@ Source of truth:
 - [x] `addAddress`
 - [x] `removeAddress`
 - [x] Service route parity for `/addresses*`
-- [ ] Full parity with `tests/keymaster/address.test.ts`
+- [x] Full parity with `tests/keymaster/address.test.ts`
 
 ## Credentials
 
@@ -153,7 +153,7 @@ Source of truth:
 - [x] `revokeCredential`
 - [x] Service route parity for `/credentials/held*`
 - [x] Service route parity for `/credentials/issued*`
-- [ ] Full parity with `tests/keymaster/credential.test.ts`
+- [x] Full parity with `tests/keymaster/credential.test.ts`
 
 ## Polls
 
@@ -206,7 +206,7 @@ Source of truth:
 - [x] `listVaultItems`
 - [x] `getVaultItem`
 - [x] Service route parity for `/vaults*`
-- [ ] Full parity with `tests/keymaster/vault.test.ts`
+- [x] Full parity with `tests/keymaster/vault.test.ts`
 
 ## Dmail and notices
 
@@ -238,7 +238,7 @@ Source of truth:
 - [x] `exportNsec`
 - [x] `signNostrEvent`
 - [x] Service route parity for `/nostr*`
-- [ ] Full parity with `tests/keymaster/nostr.test.ts`
+- [x] Full parity with `tests/keymaster/nostr.test.ts`
 
 ## Lightning
 
@@ -254,7 +254,7 @@ Source of truth:
 - [x] `zapLightning`
 - [x] `getLightningPayments`
 - [x] Service route parity for `/lightning*`
-- [ ] Full parity with `tests/keymaster/lightning.test.ts`
+- [x] Full parity with `tests/keymaster/lightning.test.ts`
 
 ## Client and integration parity
 
