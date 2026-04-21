@@ -8,8 +8,7 @@ TypeScript CLI.
 ## Install
 
 ```bash
-pip install -e python/keymaster        # archon-keymaster library
-pip install -e python/keymaster_service  # wallet store + gatekeeper client
+pip install -e python/keymaster      # archon-keymaster library (includes wallet store + gatekeeper client)
 pip install -e python/keymaster_cli
 ```
 

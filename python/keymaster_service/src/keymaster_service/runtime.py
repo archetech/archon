@@ -7,8 +7,8 @@ from typing import Any
 from keymaster import Keymaster, KeymasterError
 
 from .config import Settings
-from .gatekeeper_client import GatekeeperClient
-from .wallet_store import JsonWalletStore, RedisWalletStore
+from keymaster.gatekeeper_client import GatekeeperClient
+from keymaster.wallet_store import JsonWalletStore, RedisWalletStore
 
 
 LOGGER = logging.getLogger(__name__)

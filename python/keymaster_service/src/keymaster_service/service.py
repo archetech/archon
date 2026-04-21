@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from .config import load_settings
-from .gatekeeper_client import GatekeeperClient
+from keymaster.gatekeeper_client import GatekeeperClient
 from .runtime import KeymasterService, KeymasterServiceError
-from .wallet_store import JsonWalletStore, RedisWalletStore
+from keymaster.wallet_store import JsonWalletStore, RedisWalletStore
 
 
 settings = load_settings()
