@@ -25,7 +25,8 @@ services:
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
     volumes:
-      - keymaster_py_data:/app/keymaster/data
+      - ./data:/app/keymaster/data
+    user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_KEYMASTER_PORT}:4226
     healthcheck:
@@ -49,6 +50,3 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
-
-volumes:
-  keymaster_py_data:

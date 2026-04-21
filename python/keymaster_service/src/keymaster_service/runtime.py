@@ -8,7 +8,7 @@ from keymaster import Keymaster, KeymasterError
 
 from .config import Settings
 from .gatekeeper_client import GatekeeperClient
-from .wallet_store import JsonWalletStore
+from .wallet_store import JsonWalletStore, RedisWalletStore
 
 
 LOGGER = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ KeymasterServiceError = KeymasterError
 
 
 class KeymasterService:
-    def __init__(self, settings: Settings, gatekeeper: GatekeeperClient, wallet_store: JsonWalletStore):
+    def __init__(self, settings: Settings, gatekeeper: GatekeeperClient, wallet_store: JsonWalletStore | RedisWalletStore):
         self.settings = settings
         self.gatekeeper = gatekeeper
         self.wallet_store = wallet_store
@@ -36,7 +36,7 @@ class KeymasterService:
         return await self.gatekeeper.get_data(cid)
 
     async def startup(self) -> None:
-        if self.settings.keymaster_db != "json":
+        if self.settings.keymaster_db not in ("json", "redis"):
             raise KeymasterServiceError(
                 f"Unsupported ARCHON_KEYMASTER_DB for Python service: {self.settings.keymaster_db}"
             )

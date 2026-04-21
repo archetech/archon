@@ -25,6 +25,7 @@ class Settings:
     admin_api_key: str = os.environ.get("ARCHON_ADMIN_API_KEY", "")
     node_id: str = os.environ.get("ARCHON_NODE_ID", "")
     data_dir: str = os.environ.get("ARCHON_DATA_DIR", "data")
+    redis_url: str = os.environ.get("ARCHON_REDIS_URL", "redis://localhost:6379") or "redis://localhost:6379"
     git_commit: str = (os.environ.get("GIT_COMMIT", "unknown") or "unknown")[:7]
     service_version: str = _package_version()
 

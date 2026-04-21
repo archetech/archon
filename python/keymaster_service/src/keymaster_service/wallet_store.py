@@ -6,6 +6,8 @@ from pathlib import Path
 import threading
 from typing import Any
 
+import redis as redis_lib
+
 
 class JsonWalletStore:
     def __init__(self, wallet_file_name: str = "wallet.json", data_folder: str = "data"):
@@ -28,3 +30,24 @@ class JsonWalletStore:
             if not self._wallet_path.exists():
                 return None
             return json.loads(self._wallet_path.read_text(encoding="utf-8"))
+
+
+class RedisWalletStore:
+    """Redis-backed wallet store, matching the behaviour of WalletRedis in the TypeScript service."""
+
+    def __init__(self, redis_url: str = "redis://localhost:6379", wallet_key: str = "wallet"):
+        self._wallet_key = wallet_key
+        self._client = redis_lib.from_url(redis_url, decode_responses=True)
+
+    def save_wallet(self, wallet: dict[str, Any], overwrite: bool = False) -> bool:
+        exists = self._client.exists(self._wallet_key)
+        if exists and not overwrite:
+            return False
+        self._client.set(self._wallet_key, json.dumps(wallet))
+        return True
+
+    def load_wallet(self) -> dict[str, Any] | None:
+        data = self._client.get(self._wallet_key)
+        if data is None:
+            return None
+        return json.loads(data)
