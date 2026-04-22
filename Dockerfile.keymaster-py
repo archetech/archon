@@ -22,6 +22,4 @@ WORKDIR /app/keymaster
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
 
-RUN mkdir -p /app/keymaster/data
-
 CMD ["keymaster-service"]
