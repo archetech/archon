@@ -2,7 +2,23 @@
 
 # Archon
 
-Archon is a decentralized identity (DID) protocol implementation. Visit our website [archetech.github.io/archon](https://archetech.github.io/archon) for additional documentation and details.
+Archon is a peer-to-peer decentralized identity platform built on the W3C **DID (Decentralized Identifier)** standard, and a reference implementation of the `did:cid` method. It lets anyone create, control, and resolve self-sovereign identities without a central authority — and without paying per-operation fees for routine use.
+
+The protocol separates **DID creation** from **DID updates**: creation is instant and free, since a DID is derived from the content-address (CID) of its initial document in IPFS; updates are anchored to one or more pluggable registries (Hyperswarm for gossip-based propagation, Bitcoin mainnet/signet/testnet4 for blockchain-anchored consensus, with room for more). This split gives Archon the unusual combination of zero-cost identity creation with cryptographically verifiable, consensus-driven history.
+
+An Archon node is a small constellation of interoperating microservices that you can run yourself in Docker:
+
+- **Gatekeeper** — maintains the integrity of the local DID database and serves the resolution API. Available in TypeScript (default) or native Rust; see the [Gatekeeper flavor](#gatekeeper-implementation-flavor) section below.
+- **Keymaster** — holds private keys, signs DID operations, and manages wallets, IDs, credentials, assets, groups, vaults, schemas, and polls. Available as a TypeScript service (default) or a Python service; see the [Keymaster flavor](#keymaster-implementation-flavor) section below.
+- **Mediators** — connect the Gatekeeper to networks: a [Hyperswarm](services/mediators/hyperswarm) mediator for peer gossip and a [Satoshi](services/mediators/satoshi) mediator for Bitcoin-anchored registries.
+- **IPFS** — content-addressable storage layer underpinning `did:cid`.
+- **Client apps** — a React wallet, a browser extension, a Gatekeeper admin UI, and a standalone Keymaster client UI, plus the `archon` and `admin` CLIs.
+
+On top of the identity primitive, Archon ships higher-level building blocks: [verifiable credentials](docs/services/keymaster/README.md) (issue, bind, publish, reveal, revoke), encrypted messaging between DIDs, group membership, cryptographic vaults for arbitrary files, JSON-schema-backed assets, and DID-authenticated polls. Everything is wallet-centric and portable — wallets can be encrypted, backed up to a file, or sealed into a DID-anchored recovery blob.
+
+Archon is designed to run either as a **full trustless node** (your own Gatekeeper + mediators + registries), as a **lightweight client** pointed at someone else's node, or anywhere in between. It is actively developed; the on-disk wallet and DID document formats, the HTTP APIs of Gatekeeper and Keymaster, and a growing Python SDK are all parity-tested across implementations.
+
+For protocol internals and rationale, see the [white paper](docs/WHITEPAPER.md). For service-level documentation visit [archetech.github.io/archon](https://archetech.github.io/archon) or the per-service READMEs linked throughout this file.
 
 ## Quick start
 
@@ -68,6 +84,24 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,BTC:testnet4,BTC:signet      # Supported
 ...
 {adjust registry details for advanced users only}
 ```
+
+### Gatekeeper implementation flavor
+
+Archon ships two interchangeable Gatekeeper service implementations that speak the same HTTP API. Pick one via `ARCHON_GATEKEEPER_FLAVOR` in your `.env`:
+
+- `ts` (default) — the Node/TypeScript service under [services/gatekeeper/server](services/gatekeeper/server).
+- `rust` — the native Rust service under [rust/services/gatekeeper](rust/services/gatekeeper).
+
+`docker-compose.yml` uses the flavor value to pull in the corresponding `docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
+
+### Keymaster implementation flavor
+
+Archon ships two interchangeable Keymaster service implementations that speak the same HTTP API. Pick one via `ARCHON_KEYMASTER_FLAVOR` in your `.env`:
+
+- `ts` (default) — the Node/TypeScript service under [services/keymaster/server](services/keymaster/server).
+- `py` — the Python service under [python/keymaster_service](python/keymaster_service), built on the [python/keymaster](python/keymaster) library. A matching Python CLI lives at [python/keymaster_cli](python/keymaster_cli) and exposes the `keymaster` command.
+
+`docker-compose.yml` uses the flavor value to pull in the corresponding `docker-compose.keymaster-${ARCHON_KEYMASTER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
 
 Once your node is operational (start-node), you can setup local dependencies and manage your server using local CLI wallet and other command line tools:
 
