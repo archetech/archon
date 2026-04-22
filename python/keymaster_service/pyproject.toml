@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keymaster-service"
-version = "0.1.0"
+version = "0.8.0"
 description = "Native Python Keymaster service for Archon"
 readme = "README.md"
 dependencies = [
-  "archon-keymaster==0.1.0",
+  "archon-keymaster==0.4.8",
   "fastapi==0.115.12",
   "uvicorn[standard]==0.34.2",
   "prometheus-client==0.21.1",
