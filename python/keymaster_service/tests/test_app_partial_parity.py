@@ -22,6 +22,9 @@ def _install_fastapi_stubs() -> None:
     fastapi: Any = types.ModuleType("fastapi")
     responses: Any = types.ModuleType("fastapi.responses")
     prometheus: Any = types.ModuleType("prometheus_client")
+    starlette: Any = types.ModuleType("starlette")
+    starlette_middleware: Any = types.ModuleType("starlette.middleware")
+    starlette_base: Any = types.ModuleType("starlette.middleware.base")
 
     class HTTPException(Exception):
         def __init__(self, status_code: int, detail):
@@ -77,6 +80,9 @@ def _install_fastapi_stubs() -> None:
 
             return decorate
 
+        def add_middleware(self, *args, **kwargs):
+            return None
+
     def Depends(value):
         return value
 
@@ -106,9 +112,39 @@ def _install_fastapi_stubs() -> None:
     prometheus.CONTENT_TYPE_LATEST = "text/plain"
     prometheus.generate_latest = lambda: b""
 
+    class _MetricStub:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def labels(self, *args, **kwargs):
+            return self
+
+        def inc(self, *args, **kwargs):
+            return None
+
+        def observe(self, *args, **kwargs):
+            return None
+
+        def set(self, *args, **kwargs):
+            return None
+
+    prometheus.Counter = _MetricStub
+    prometheus.Gauge = _MetricStub
+    prometheus.Histogram = _MetricStub
+
+    class BaseHTTPMiddleware:
+        def __init__(self, app, dispatch=None):
+            self.app = app
+            self.dispatch = dispatch
+
+    starlette_base.BaseHTTPMiddleware = BaseHTTPMiddleware
+
     sys.modules["fastapi"] = fastapi
     sys.modules["fastapi.responses"] = responses
     sys.modules["prometheus_client"] = prometheus
+    sys.modules["starlette"] = starlette
+    sys.modules["starlette.middleware"] = starlette_middleware
+    sys.modules["starlette.middleware.base"] = starlette_base
 
 
 _install_fastapi_stubs()
