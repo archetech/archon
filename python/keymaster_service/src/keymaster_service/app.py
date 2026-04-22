@@ -3,12 +3,20 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 import json
 import logging
+import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.middleware.base import BaseHTTPMiddleware
 
+from .metrics import (
+    http_request_duration_seconds,
+    http_requests_total,
+    normalize_path,
+    set_service_version_info,
+)
 from .runtime import KeymasterServiceError
 from .service import service, settings
 
@@ -54,6 +62,7 @@ async def lifespan(_: FastAPI):
         LOGGER.info("Admin API key protection is ENABLED")
     else:
         LOGGER.warning("ARCHON_ADMIN_API_KEY is not set — admin routes are unprotected")
+    set_service_version_info(settings.service_version, settings.git_commit)
     await service.startup()
     try:
         yield
@@ -61,7 +70,39 @@ async def lifespan(_: FastAPI):
         await service.shutdown()
 
 
+class _PrometheusMiddleware(BaseHTTPMiddleware):
+    """Record HTTP request count and duration for every response.
+
+    Mirrors the express middleware in services/keymaster/server/src/keymaster-api.ts
+    so the same Prometheus dashboards work against either flavor.
+    """
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        start = time.perf_counter()
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+        except Exception:
+            duration = time.perf_counter() - start
+            route = normalize_path(request.url.path)
+            labels = {"method": request.method, "route": route, "status": "500"}
+            http_requests_total.labels(**labels).inc()
+            http_request_duration_seconds.labels(**labels).observe(duration)
+            raise
+        duration = time.perf_counter() - start
+        route = normalize_path(request.url.path)
+        labels = {
+            "method": request.method,
+            "route": route,
+            "status": str(status_code),
+        }
+        http_requests_total.labels(**labels).inc()
+        http_request_duration_seconds.labels(**labels).observe(duration)
+        return response
+
+
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(_PrometheusMiddleware)
 public_api = APIRouter(prefix="/api/v1")
 
 
