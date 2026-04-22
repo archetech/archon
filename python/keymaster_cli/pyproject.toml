@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keymaster-cli"
-version = "0.1.0"
+version = "0.4.8"
 description = "Python keymaster CLI mirroring the TypeScript keymaster CLI"
 readme = "README.md"
 dependencies = [
-  "archon-keymaster==0.1.0"
+  "archon-keymaster==0.4.8"
 ]
 
 [project.scripts]
