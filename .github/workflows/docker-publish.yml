@@ -101,7 +101,7 @@ jobs:
             GIT_COMMIT=${{ github.sha }}
 
       - name: Run Anchore vulnerability scanner
-        uses: anchore/scan-action@3343887d815d7b07465f6fdcd395bd66508d486a
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2
         with:
           image: ${{ env.REGISTRY }}/archetech/${{ matrix.image }}:${{
             needs.generate.outputs.CALVER }}
