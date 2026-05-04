@@ -11,6 +11,12 @@ and local wallet file.
 ## Install
 
 ```bash
+pip install archon-keymaster
+```
+
+For local development from a repo checkout:
+
+```bash
 pip install -e python/keymaster
 ```
 

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,21 @@ name = "archon-keymaster"
 version = "0.4.8"
 description = "Reusable Python Keymaster core library for Archon"
 readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+  { name = "David McFadzean", email = "david@selfid.com" },
+  { name = "Peter Bushnell", email = "peter@selfid.com" }
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Security :: Cryptography",
+  "Topic :: Software Development :: Libraries :: Python Modules"
+]
 dependencies = [
   "httpx==0.28.1",
   "mnemonic==0.21",
@@ -20,6 +35,12 @@ dependencies = [
 
 [project.scripts]
 keymaster = "keymaster.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/archetech/archon/"
+Repository = "https://github.com/archetech/archon/"
+Issues = "https://github.com/archetech/archon/issues"
+Documentation = "https://github.com/archetech/archon/tree/main/python/keymaster"
 
 [tool.setuptools.packages.find]
 where = ["src"]
