@@ -11,8 +11,7 @@ requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
-  { name = "David McFadzean", email = "david@selfid.com" },
-  { name = "Peter Bushnell", email = "peter@selfid.com" }
+  { name = "David McFadzean", email = "davidmc@gmail.com" }
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
