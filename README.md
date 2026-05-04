@@ -99,7 +99,7 @@ Archon ships two interchangeable Gatekeeper service implementations that speak t
 Archon ships two interchangeable Keymaster service implementations that speak the same HTTP API. Pick one via `ARCHON_KEYMASTER_FLAVOR` in your `.env`:
 
 - `ts` (default) — the Node/TypeScript service under [services/keymaster/server](services/keymaster/server).
-- `py` — the Python service under [python/keymaster_service](python/keymaster_service), built on the [python/keymaster](python/keymaster) library. A matching Python CLI lives at [python/keymaster_cli](python/keymaster_cli) and exposes the `keymaster` command.
+- `py` — the Python service under [python/keymaster_service](python/keymaster_service), built on the [python/keymaster](python/keymaster) library. The Python Keymaster library also exposes the `keymaster` command.
 
 `docker-compose.yml` uses the flavor value to pull in the corresponding `docker-compose.keymaster-${ARCHON_KEYMASTER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
 
