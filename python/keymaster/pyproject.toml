@@ -18,6 +18,9 @@ dependencies = [
   "rfc8785==0.1.4"
 ]
 
+[project.scripts]
+keymaster = "keymaster.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["keymaster*"]
