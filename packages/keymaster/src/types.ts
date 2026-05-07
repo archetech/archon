@@ -44,6 +44,7 @@ export interface StoredNostrInfo {
 export interface StoredAddressInfo {
     name: string;
     added: string;
+    relay?: string;
     [key: string]: any;
 }
 

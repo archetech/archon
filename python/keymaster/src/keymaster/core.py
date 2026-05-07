@@ -859,10 +859,35 @@ class Keymaster:
 
         raise KeymasterError(last_error)
 
+    async def fetch_address_relay_agent(self, domain: str) -> str | None:
+        for endpoint in self.address_api_endpoints(domain, "config"):
+            try:
+                response = await self._http_request("GET", endpoint)
+                if not (200 <= response.status_code < 300):
+                    continue
+
+                data = await self.get_response_data(response)
+                if not isinstance(data, dict):
+                    continue
+
+                candidate = data.get("relayAgent") or data.get("heraldRelayAgent") or data.get("serviceDID")
+                if isinstance(candidate, str) and candidate.startswith("did:"):
+                    return candidate
+            except Exception:
+                # Relay discovery is optional; address claims should still succeed.
+                continue
+
+        return None
+
+    def address_metadata(self, info: dict[str, Any]) -> dict[str, Any]:
+        metadata = dict(info)
+        metadata.pop("name", None)
+        return metadata
+
     def collect_addresses(self, id_info: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
         addresses = {}
         for domain, info in (id_info or {}).get("addresses", {}).items():
-            addresses[f"{info['name']}@{domain}"] = {"added": info["added"]}
+            addresses[f"{info['name']}@{domain}"] = self.address_metadata(info)
         return addresses
 
     async def list_addresses(self) -> dict[str, dict[str, Any]]:
@@ -882,7 +907,7 @@ class Keymaster:
             "domain": normalized_domain,
             "name": stored["name"],
             "address": f"{stored['name']}@{normalized_domain}",
-            "added": stored["added"],
+            **self.address_metadata(stored),
         }
 
     async def import_address(self, domain: str) -> dict[str, dict[str, Any]]:
@@ -898,6 +923,7 @@ class Keymaster:
             names = {}
         imported = {}
         added = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+        relay = await self.fetch_address_relay_agent(normalized_domain)
 
         async with self._lock:
             wallet = await self.load_wallet()
@@ -907,8 +933,15 @@ class Keymaster:
                 if did != current["did"]:
                     continue
                 address = f"{str(name).lower()}@{normalized_domain}"
-                id_info["addresses"][normalized_domain] = {"name": str(name).lower(), "added": added}
-                imported[address] = {"added": added}
+                id_info["addresses"][normalized_domain] = {
+                    "name": str(name).lower(),
+                    "added": added,
+                    **({"relay": relay} if relay else {}),
+                }
+                imported[address] = {
+                    "added": added,
+                    **({"relay": relay} if relay else {}),
+                }
             await self._save_loaded_wallet(wallet, overwrite=True)
 
         return imported
@@ -974,6 +1007,7 @@ class Keymaster:
             {"name": parsed["name"]},
             "Failed to add address",
         )
+        relay = await self.fetch_address_relay_agent(parsed["domain"])
 
         async with self._lock:
             wallet = await self.load_wallet()
@@ -982,6 +1016,7 @@ class Keymaster:
             id_info["addresses"][parsed["domain"]] = {
                 "name": parsed["name"],
                 "added": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+                **({"relay": relay} if relay else {}),
             }
             await self._save_loaded_wallet(wallet, overwrite=True)
 

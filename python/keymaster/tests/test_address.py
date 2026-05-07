@@ -45,7 +45,12 @@ def test_import_address_stores_matching_remote_name(testbed, monkeypatch: pytest
         assert url == "https://archon.social/.well-known/names"
         return FakeResponse(200, {"names": {"alice": alice, "bob": "did:test:9999"}})
 
+    async def fake_relay(domain: str):
+        assert domain == "archon.social"
+        return None
+
     monkeypatch.setattr(testbed.keymaster, "_http_request", fake_request)
+    monkeypatch.setattr(testbed.keymaster, "fetch_address_relay_agent", fake_relay)
     imported = run(testbed.keymaster.import_address("archon.social"))
 
     assert list(imported.keys()) == ["alice@archon.social"]
@@ -95,11 +100,13 @@ def test_add_and_remove_address_updates_wallet(testbed, monkeypatch: pytest.Monk
 
     monkeypatch.setattr(testbed.keymaster, "create_address_bearer_token", fake_bearer)
     monkeypatch.setattr(testbed.keymaster, "fetch_address_api_response", fake_fetch)
+    monkeypatch.setattr(testbed.keymaster, "fetch_address_relay_agent", fake_bearer)
 
     assert run(testbed.keymaster.add_address("alice@archon.social")) is True
     stored = run(testbed.keymaster.get_address("archon.social"))
     assert stored is not None
     assert stored["address"] == "alice@archon.social"
+    assert stored["relay"] == "did:test:response"
 
     assert run(testbed.keymaster.remove_address("alice@archon.social")) is True
     assert run(testbed.keymaster.list_addresses()) == {}

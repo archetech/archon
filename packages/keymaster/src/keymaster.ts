@@ -67,6 +67,7 @@ import {
     WalletFile,
     WalletEncFile,
     Seed,
+    StoredAddressInfo,
 } from '@didcid/keymaster/types';
 import {
     isWalletEncFile,
@@ -1958,11 +1959,41 @@ export default class Keymaster implements KeymasterInterface {
         throw new KeymasterError(lastError);
     }
 
+    private async fetchAddressRelayAgent(domain: string): Promise<string | null> {
+        for (const endpoint of this.addressApiEndpoints(domain, 'config')) {
+            try {
+                const response = await fetch(endpoint);
+
+                if (!response.ok) {
+                    continue;
+                }
+
+                const data = await this.getResponseData(response);
+                const candidate = data?.relayAgent ?? data?.heraldRelayAgent ?? data?.serviceDID;
+
+                if (typeof candidate === 'string' && isValidDID(candidate)) {
+                    return candidate;
+                }
+            }
+            catch {
+                // Relay discovery is optional; address claims should still succeed.
+            }
+        }
+
+        return null;
+    }
+
+    private addressMetadata(info: StoredAddressInfo): AddressInfo {
+        const metadata: Record<string, any> = { ...info };
+        delete metadata.name;
+        return metadata as AddressInfo;
+    }
+
     private collectAddresses(id: IDInfo | undefined): Record<string, AddressInfo> {
         const addresses: Record<string, AddressInfo> = {};
 
         for (const [domain, info] of Object.entries(id?.addresses || {})) {
-            addresses[`${info.name}@${domain}`] = { added: info.added };
+            addresses[`${info.name}@${domain}`] = this.addressMetadata(info);
         }
 
         return addresses;
@@ -1991,7 +2022,7 @@ export default class Keymaster implements KeymasterInterface {
             domain: normalizedDomain,
             name: stored.name,
             address: `${stored.name}@${normalizedDomain}`,
-            added: stored.added,
+            ...this.addressMetadata(stored),
         };
     }
 
@@ -2008,6 +2039,7 @@ export default class Keymaster implements KeymasterInterface {
         const names = data?.names && typeof data.names === 'object' ? data.names : {};
         const imported: Record<string, AddressInfo> = {};
         const added = new Date().toISOString();
+        const relay = await this.fetchAddressRelayAgent(normalizedDomain);
 
         await this.mutateWallet((wallet) => {
             const id = wallet.ids[wallet.current!];
@@ -2024,8 +2056,12 @@ export default class Keymaster implements KeymasterInterface {
                 id.addresses[normalizedDomain] = {
                     name: String(name).toLowerCase(),
                     added,
+                    ...(relay ? { relay } : {}),
                 };
-                imported[address] = { added };
+                imported[address] = {
+                    added,
+                    ...(relay ? { relay } : {}),
+                };
             }
         });
 
@@ -2105,6 +2141,7 @@ export default class Keymaster implements KeymasterInterface {
             },
             body: JSON.stringify({ name: parsed.name }),
         }, 'Failed to add address');
+        const relay = await this.fetchAddressRelayAgent(parsed.domain);
 
         await this.mutateWallet((wallet) => {
             const id = wallet.ids[wallet.current!];
@@ -2115,6 +2152,7 @@ export default class Keymaster implements KeymasterInterface {
             id.addresses[parsed.domain] = {
                 name: parsed.name,
                 added: new Date().toISOString(),
+                ...(relay ? { relay } : {}),
             };
         });
 

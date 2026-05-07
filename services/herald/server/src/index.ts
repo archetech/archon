@@ -443,6 +443,8 @@ app.get('/api/version', async (_: Request, res: Response) => {
 app.get('/api/config', (_: Request, res: Response) => {
     res.json({
         serviceName: SERVICE_NAME,
+        serviceDID,
+        relayAgent: serviceDID,
         serviceDomain: SERVICE_DOMAIN,
         publicUrl: PUBLIC_URL,
         walletUrl: WALLET_URL,
