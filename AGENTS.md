@@ -37,3 +37,4 @@ These rules apply to coding agents working in this repository.
 - Python keymaster flavor runs in CLI CI use `ARCHON_KEYMASTER_DB=redis` exactly like the TypeScript service; no override is needed.
 - The Python keymaster service MUST be a drop-in replacement for the TypeScript keymaster. `docker-compose.keymaster-py.yml` and `docker-compose.keymaster-ts.yml` must agree on env, ports, healthcheck behaviour, volumes, and `user:` overrides. The data dir is a host bind mount of `./data` running as `${ARCHON_UID}:${ARCHON_GID}`, identical to the ts flavor — do not switch py to a named volume to dodge UID issues; fix the UID setup instead.
 - For Python package publishing prep, build and check artifacts locally, but do not upload to TestPyPI or PyPI unless the user explicitly asks for publication.
+- When reproducing Python CI checks locally, prefer the repo `.venv` Python so helper scripts and imports run in the same prepared environment.

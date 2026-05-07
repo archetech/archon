@@ -41,4 +41,4 @@ jobs:
             - name: Smoke test keymaster CLI
               run: |
                   keymaster --help > /dev/null
-                  python -c "import argparse; from keymaster.cli import build_parser; p=build_parser(); sp=[a for a in p._actions if isinstance(a, argparse._SubParsersAction)][0]; assert len(sp.choices)==132, f'expected 132 commands, got {len(sp.choices)}'; print(f'keymaster CLI OK ({len(sp.choices)} commands)')"
+                  python -c "import argparse; from keymaster.cli import build_parser; p=build_parser(); sp=[a for a in p._actions if isinstance(a, argparse._SubParsersAction)][0]; assert len(sp.choices)==134, f'expected 134 commands, got {len(sp.choices)}'; print(f'keymaster CLI OK ({len(sp.choices)} commands)')"

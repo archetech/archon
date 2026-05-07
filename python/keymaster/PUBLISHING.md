@@ -38,7 +38,7 @@ python3 -m venv /tmp/archon-keymaster-install-test
   --extra-index-url https://pypi.org/simple/ \
   archon-keymaster
 /tmp/archon-keymaster-install-test/bin/keymaster --help
-/tmp/archon-keymaster-install-test/bin/python -c "import argparse; from keymaster.cli import build_parser; p=build_parser(); sp=[a for a in p._actions if isinstance(a, argparse._SubParsersAction)][0]; assert len(sp.choices)==132"
+/tmp/archon-keymaster-install-test/bin/python -c "import argparse; from keymaster.cli import build_parser; p=build_parser(); sp=[a for a in p._actions if isinstance(a, argparse._SubParsersAction)][0]; assert len(sp.choices)==134"
 ```
 
 ## PyPI
