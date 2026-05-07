@@ -297,6 +297,33 @@ describe('addAddress', () => {
         expect(globalThis.fetch).toHaveBeenNthCalledWith(3, 'https://archon.social/names/api/config');
     });
 
+    it('should not treat a Herald service DID as an email relay unless relay is advertised', async () => {
+        const serviceDID = await keymaster.createId('Herald');
+        await keymaster.createId('Alice');
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date('2026-04-04T13:20:00.000Z'));
+
+        jest.spyOn(keymaster, 'createResponse').mockResolvedValue('did:cid:response');
+        jest.spyOn(globalThis, 'fetch')
+            .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge' }))
+            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }))
+            .mockResolvedValueOnce(mockFetchResponse(true, { serviceDID }));
+
+        const ok = await keymaster.addAddress('alice@archon.social');
+        const addresses = await keymaster.listAddresses();
+        const walletData = await keymaster.loadWallet();
+        const info = { added: '2026-04-04T13:20:00.000Z' };
+
+        expect(ok).toBe(true);
+        expect(addresses).toStrictEqual({ 'alice@archon.social': info });
+        expect(walletData.ids.Alice.addresses).toStrictEqual({
+            'archon.social': {
+                name: 'alice',
+                ...info,
+            },
+        });
+    });
+
     it('should fall back to direct Herald endpoints when drawbridge paths are unavailable', async () => {
         await keymaster.createId('Alice');
         jest.useFakeTimers();

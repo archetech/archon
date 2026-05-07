@@ -870,7 +870,7 @@ class Keymaster:
                 if not isinstance(data, dict):
                     continue
 
-                candidate = data.get("relayAgent") or data.get("heraldRelayAgent") or data.get("serviceDID")
+                candidate = data.get("relayAgent") or data.get("heraldRelayAgent")
                 if isinstance(candidate, str) and candidate.startswith("did:"):
                     return candidate
             except Exception:

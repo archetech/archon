@@ -444,7 +444,7 @@ app.get('/api/config', (_: Request, res: Response) => {
     res.json({
         serviceName: SERVICE_NAME,
         serviceDID,
-        relayAgent: serviceDID,
+        ...(SENDGRID_API_KEY ? { relayAgent: serviceDID } : {}),
         serviceDomain: SERVICE_DOMAIN,
         publicUrl: PUBLIC_URL,
         walletUrl: WALLET_URL,

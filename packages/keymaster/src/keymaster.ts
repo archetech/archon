@@ -1969,7 +1969,7 @@ export default class Keymaster implements KeymasterInterface {
                 }
 
                 const data = await this.getResponseData(response);
-                const candidate = data?.relayAgent ?? data?.heraldRelayAgent ?? data?.serviceDID;
+                const candidate = data?.relayAgent ?? data?.heraldRelayAgent;
 
                 if (typeof candidate === 'string' && isValidDID(candidate)) {
                     return candidate;

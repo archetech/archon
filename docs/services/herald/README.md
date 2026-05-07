@@ -69,7 +69,7 @@ several namespaces:
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/api/version` | `1` (the literal integer). Stable schema version of the API. |
-| `GET` | `/api/config` | `{ serviceName, serviceDID, relayAgent, serviceDomain, publicUrl, walletUrl }`. `relayAgent` is the Herald service DID clients can address for dmail/email relay. |
+| `GET` | `/api/config` | `{ serviceName, serviceDID, serviceDomain, publicUrl, walletUrl }`, plus `relayAgent` when the email bridge is enabled. `relayAgent` is the Herald service DID clients can address for dmail/email relay. |
 
 ### 2.2 Login (challenge-response)
 
