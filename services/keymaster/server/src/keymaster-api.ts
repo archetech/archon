@@ -2001,6 +2001,39 @@ v1router.post('/addresses', async (req, res) => {
  * /addresses/publish:
  *   post:
  *     summary: Publish a stored address to the current identity DID document.
+ *     description: Sets `didDocumentData.address` to the selected stored address. If the stored address has a Herald relay, also publishes an `Email` DID service endpoint using `mailto:<address>`.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               address:
+ *                 type: string
+ *                 description: Optional `name@domain` address to publish. Required when the identity has more than one stored address.
+ *               name:
+ *                 type: string
+ *                 description: Optional identity name. Defaults to the current identity.
+ *     responses:
+ *       200:
+ *         description: Indicates whether the address was successfully published.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 v1router.post('/addresses/publish', async (req, res) => {
     try {
@@ -2017,6 +2050,36 @@ v1router.post('/addresses/publish', async (req, res) => {
  * /addresses/publish:
  *   delete:
  *     summary: Remove the published address from the current identity DID document.
+ *     description: Removes `didDocumentData.address` and the `#email` DID service endpoint from the selected identity.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Optional identity name. Defaults to the current identity.
+ *     responses:
+ *       200:
+ *         description: Indicates whether the address was successfully unpublished.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 v1router.delete('/addresses/publish', async (req, res) => {
     try {
