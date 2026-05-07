@@ -2037,7 +2037,7 @@ v1router.post('/addresses', async (req, res) => {
  */
 v1router.post('/addresses/publish', async (req, res) => {
     try {
-        const { address, name } = req.body;
+        const { address, name } = req.body || {};
         const ok = await keymaster.publishAddress(address, name);
         res.json({ ok });
     } catch (error: any) {
