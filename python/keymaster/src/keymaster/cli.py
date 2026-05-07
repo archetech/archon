@@ -443,6 +443,16 @@ async def cmd_remove_address(km: Keymaster, args: argparse.Namespace) -> None:
     print(UPDATE_OK)
 
 
+async def cmd_publish_address(km: Keymaster, args: argparse.Namespace) -> None:
+    await km.publish_address(args.address, args.id)
+    print(UPDATE_OK)
+
+
+async def cmd_unpublish_address(km: Keymaster, args: argparse.Namespace) -> None:
+    await km.unpublish_address(args.id)
+    print(UPDATE_OK)
+
+
 # Nostr -----------------------------------------------------------------------
 
 async def cmd_add_nostr(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1082,6 +1092,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("address")
     sp = add("remove-address", "Remove an address for the current ID", cmd_remove_address)
     sp.add_argument("address")
+    sp = add("publish-address", "Publish a stored address as an Email service endpoint for a DID", cmd_publish_address)
+    sp.add_argument("address", nargs="?")
+    sp.add_argument("id", nargs="?")
+    sp = add("unpublish-address", "Remove the published Email service endpoint from a DID", cmd_unpublish_address)
+    sp.add_argument("id", nargs="?")
 
     # Nostr
     sp = add("add-nostr", "Derive and add nostr keys to an agent DID", cmd_add_nostr)

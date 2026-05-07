@@ -2190,6 +2190,72 @@ export default class Keymaster implements KeymasterInterface {
         return true;
     }
 
+    private resolveStoredAddressForPublish(id: IDInfo, address?: string): string {
+        if (address !== undefined) {
+            const parsed = this.parseAddress(address);
+            const stored = id.addresses?.[parsed.domain];
+
+            if (!stored || stored.name !== parsed.name) {
+                throw new InvalidParameterError('address');
+            }
+
+            return parsed.address;
+        }
+
+        const entries = Object.entries(id.addresses || {});
+
+        if (entries.length !== 1) {
+            throw new InvalidParameterError('address');
+        }
+
+        const [domain, info] = entries[0];
+        return `${info.name}@${domain}`;
+    }
+
+    async publishAddress(address?: string, name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+        const normalizedAddress = this.resolveStoredAddressForPublish(id, address);
+        const doc = await this.resolveDID(did);
+        const didDocument = { ...doc.didDocument! };
+        const serviceId = `${did}#email`;
+        const services = (didDocument.service || []).filter(s => s.id !== serviceId);
+        const didDocumentData = {
+            ...(doc.didDocumentData as Record<string, unknown> || {}),
+            address: normalizedAddress,
+        };
+
+        services.push({
+            id: serviceId,
+            type: 'Email',
+            serviceEndpoint: `mailto:${normalizedAddress}`,
+        });
+        didDocument.service = services;
+
+        return this.updateDID(did, { didDocument, didDocumentData });
+    }
+
+    async unpublishAddress(name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+        const doc = await this.resolveDID(did);
+        const didDocument = { ...doc.didDocument! };
+        const serviceId = `${did}#email`;
+        const services = (didDocument.service || []).filter(s => s.id !== serviceId);
+        const didDocumentData = { ...(doc.didDocumentData as Record<string, unknown> || {}) };
+
+        delete didDocumentData.address;
+
+        if (services.length > 0) {
+            didDocument.service = services;
+        }
+        else {
+            delete didDocument.service;
+        }
+
+        return this.updateDID(did, { didDocument, didDocumentData });
+    }
+
     async addAlias(
         alias: string,
         did: string

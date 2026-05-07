@@ -120,3 +120,57 @@ def test_remove_address_rejects_mismatched_stored_name(testbed):
 
     with pytest.raises(KeymasterError, match="Invalid parameter: address"):
         run(testbed.keymaster.remove_address("alice@archon.social"))
+
+
+def test_publish_address_adds_profile_data_and_email_service(testbed):
+    did = run(testbed.keymaster.create_id("Alice"))
+    wallet = run(testbed.keymaster.load_wallet())
+    wallet["ids"]["Alice"]["addresses"] = {"archon.social": {"name": "alice", "added": "2026-04-04T13:00:00.000Z"}}
+    assert run(testbed.keymaster.save_wallet(wallet, True)) is True
+
+    assert run(testbed.keymaster.publish_address("alice@archon.social")) is True
+    doc = run(testbed.keymaster.resolve_did(did))
+
+    assert doc["didDocumentData"]["address"] == "alice@archon.social"
+    assert {
+        "id": f"{did}#email",
+        "type": "Email",
+        "serviceEndpoint": "mailto:alice@archon.social",
+    } in doc["didDocument"]["service"]
+
+
+def test_publish_address_rejects_unstored_address(testbed):
+    run(testbed.keymaster.create_id("Alice"))
+
+    with pytest.raises(KeymasterError, match="Invalid parameter: address"):
+        run(testbed.keymaster.publish_address("alice@archon.social"))
+
+
+def test_unpublish_address_removes_profile_data_and_email_service(testbed):
+    did = run(testbed.keymaster.create_id("Alice"))
+    wallet = run(testbed.keymaster.load_wallet())
+    wallet["ids"]["Alice"]["addresses"] = {"archon.social": {"name": "alice", "added": "2026-04-04T13:00:00.000Z"}}
+    assert run(testbed.keymaster.save_wallet(wallet, True)) is True
+    assert run(testbed.keymaster.publish_address("alice@archon.social")) is True
+
+    doc = run(testbed.keymaster.resolve_did(did))
+    doc["didDocument"]["service"].append(
+        {
+            "id": f"{did}#example",
+            "type": "Example",
+            "serviceEndpoint": "https://example.com",
+        }
+    )
+    assert run(testbed.keymaster.update_did(did, {"didDocument": doc["didDocument"]})) is True
+
+    assert run(testbed.keymaster.unpublish_address()) is True
+    doc = run(testbed.keymaster.resolve_did(did))
+
+    assert "address" not in doc.get("didDocumentData", {})
+    assert doc["didDocument"].get("service") == [
+        {
+            "id": f"{did}#example",
+            "type": "Example",
+            "serviceEndpoint": "https://example.com",
+        }
+    ]

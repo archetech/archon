@@ -75,6 +75,7 @@ function normalizePath(path: string): string {
         .replace(/\/aliases\/[^/]+/g, '/aliases/:alias')
         .replace(/\/addresses\/check\/[^/]+/g, '/addresses/check/:address')
         .replace(/\/addresses\/import/g, '/addresses/import')
+        .replace(/\/addresses\/publish/g, '/addresses/publish')
         .replace(/\/addresses\/[^/]+/g, '/addresses/:address')
         .replace(/\/groups\/[^/]+/g, '/groups/:name')
         .replace(/\/schemas\/[^/]+/g, '/schemas/:id')
@@ -1989,6 +1990,38 @@ v1router.post('/addresses', async (req, res) => {
     try {
         const { address } = req.body;
         const ok = await keymaster.addAddress(address);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /addresses/publish:
+ *   post:
+ *     summary: Publish a stored address to the current identity DID document.
+ */
+v1router.post('/addresses/publish', async (req, res) => {
+    try {
+        const { address, name } = req.body;
+        const ok = await keymaster.publishAddress(address, name);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /addresses/publish:
+ *   delete:
+ *     summary: Remove the published address from the current identity DID document.
+ */
+v1router.delete('/addresses/publish', async (req, res) => {
+    try {
+        const { name } = req.body || {};
+        const ok = await keymaster.unpublishAddress(name);
         res.json({ ok });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });

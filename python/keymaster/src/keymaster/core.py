@@ -1050,6 +1050,59 @@ class Keymaster:
 
         return True
 
+    def resolve_stored_address_for_publish(self, id_info: dict[str, Any], address: str | None = None) -> str:
+        if address is not None:
+            parsed = self.parse_address(address)
+            stored = id_info.get("addresses", {}).get(parsed["domain"])
+            if not stored or stored.get("name") != parsed["name"]:
+                raise KeymasterError("Invalid parameter: address")
+            return parsed["address"]
+
+        entries = list(id_info.get("addresses", {}).items())
+        if len(entries) != 1:
+            raise KeymasterError("Invalid parameter: address")
+
+        domain, info = entries[0]
+        return f"{info['name']}@{domain}"
+
+    async def publish_address(self, address: str | None = None, name: str | None = None) -> bool:
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        normalized_address = self.resolve_stored_address_for_publish(id_info, address)
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+        service_id = f"{did}#email"
+        services = [service for service in did_document.get("service", []) if service.get("id") != service_id]
+        did_document_data = {**(doc.get("didDocumentData") or {}), "address": normalized_address}
+
+        services.append(
+            {
+                "id": service_id,
+                "type": "Email",
+                "serviceEndpoint": f"mailto:{normalized_address}",
+            }
+        )
+        did_document["service"] = services
+
+        return await self.update_did(did, {"didDocument": did_document, "didDocumentData": did_document_data})
+
+    async def unpublish_address(self, name: str | None = None) -> bool:
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+        service_id = f"{did}#email"
+        services = [service for service in did_document.get("service", []) if service.get("id") != service_id]
+        did_document_data = dict(doc.get("didDocumentData") or {})
+        did_document_data.pop("address", None)
+
+        if services:
+            did_document["service"] = services
+        else:
+            did_document.pop("service", None)
+
+        return await self.update_did(did, {"didDocument": did_document, "didDocumentData": did_document_data})
+
     async def fetch_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]] | None:
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)

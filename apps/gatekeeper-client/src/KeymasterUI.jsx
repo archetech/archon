@@ -1879,7 +1879,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 return;
             }
 
-            await keymaster.mergeData(selectedId, { address: normalizedAddress });
+            await keymaster.publishAddress(normalizedAddress, selectedId);
             setPublishedAddress(normalizedAddress);
             showSuccess(`${normalizedAddress} published`);
             await resolveId();
@@ -1898,7 +1898,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 return;
             }
 
-            await keymaster.mergeData(selectedId, { address: null });
+            await keymaster.unpublishAddress(selectedId);
             setPublishedAddress('');
             showSuccess('Address unpublished');
             await resolveId();
@@ -1922,7 +1922,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             if (await showConfirm(`Are you sure you want to remove ${normalizedAddress}?`)) {
                 await keymaster.removeAddress(normalizedAddress);
                 if (publishedAddress === normalizedAddress && selectedId) {
-                    await keymaster.mergeData(selectedId, { address: null });
+                    await keymaster.unpublishAddress(selectedId);
                     setPublishedAddress('');
                     await resolveId();
                 }

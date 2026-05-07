@@ -526,3 +526,70 @@ describe('removeAddress', () => {
         );
     });
 });
+
+describe('publishAddress', () => {
+    it('should publish one stored address as profile data and an Email service endpoint', async () => {
+        const did = await keymaster.createId('Alice');
+        const walletData = await keymaster.loadWallet();
+        walletData.ids.Alice.addresses = {
+            'archon.social': {
+                name: 'alice',
+                added: '2026-04-04T13:00:00.000Z',
+            },
+        };
+        await keymaster.saveWallet(walletData, true);
+
+        const ok = await keymaster.publishAddress('alice@archon.social');
+        const doc = await keymaster.resolveDID(did);
+
+        expect(ok).toBe(true);
+        expect(doc.didDocumentData).toMatchObject({
+            address: 'alice@archon.social',
+        });
+        expect(doc.didDocument?.service).toContainEqual({
+            id: `${did}#email`,
+            type: 'Email',
+            serviceEndpoint: 'mailto:alice@archon.social',
+        });
+    });
+
+    it('should reject publishing an address that is not stored for the ID', async () => {
+        await keymaster.createId('Alice');
+
+        await expect(keymaster.publishAddress('alice@archon.social')).rejects.toThrow('Invalid parameter: address');
+    });
+
+    it('should unpublish the address and preserve unrelated service endpoints', async () => {
+        const did = await keymaster.createId('Alice');
+        const walletData = await keymaster.loadWallet();
+        walletData.ids.Alice.addresses = {
+            'archon.social': {
+                name: 'alice',
+                added: '2026-04-04T13:00:00.000Z',
+            },
+        };
+        await keymaster.saveWallet(walletData, true);
+        await keymaster.publishAddress('alice@archon.social');
+
+        let doc = await keymaster.resolveDID(did);
+        doc.didDocument!.service!.push({
+            id: `${did}#example`,
+            type: 'Example',
+            serviceEndpoint: 'https://example.com',
+        });
+        await keymaster.updateDID(did, { didDocument: doc.didDocument });
+
+        const ok = await keymaster.unpublishAddress();
+        doc = await keymaster.resolveDID(did);
+
+        expect(ok).toBe(true);
+        expect(doc.didDocumentData).not.toHaveProperty('address');
+        expect(doc.didDocument?.service).toStrictEqual([
+            {
+                id: `${did}#example`,
+                type: 'Example',
+                serviceEndpoint: 'https://example.com',
+            },
+        ]);
+    });
+});

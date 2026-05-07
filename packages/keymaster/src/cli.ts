@@ -898,6 +898,32 @@ program
         }
     });
 
+program
+    .command('publish-address [address] [id]')
+    .description('Publish a stored address as an Email service endpoint for a DID')
+    .action(async (address, id) => {
+        try {
+            await keymaster.publishAddress(address, id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('unpublish-address [id]')
+    .description('Remove the published Email service endpoint from a DID')
+    .action(async (id) => {
+        try {
+            await keymaster.unpublishAddress(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
 // Nostr commands
 program
     .command('add-nostr [id]')

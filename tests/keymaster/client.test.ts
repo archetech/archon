@@ -1309,6 +1309,66 @@ describe('removeAddress', () => {
     });
 });
 
+describe('publishAddress', () => {
+    const mockAddress = 'alice@archon.social';
+
+    it('should publish address', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.addresses}/publish`, (body: any) => body.address === mockAddress)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.publishAddress(mockAddress);
+
+        expect(ok).toStrictEqual(true);
+    });
+
+    it('should throw exception on publishAddress server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.addresses}/publish`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.publishAddress(mockAddress);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('unpublishAddress', () => {
+    it('should unpublish address', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.addresses}/publish`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.unpublishAddress();
+
+        expect(ok).toStrictEqual(true);
+    });
+
+    it('should throw exception on unpublishAddress server error', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.addresses}/publish`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.unpublishAddress();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('addNostr', () => {
     const mockKeys = { npub: 'npub1test', nsec: 'nsec1test' };
 

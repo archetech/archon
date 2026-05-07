@@ -525,6 +525,26 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async publishAddress(address?: string, name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/addresses/publish`, { address, name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpublishAddress(name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/addresses/publish`, { data: { name } });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async addNostr(id?: string): Promise<NostrKeys> {
         try {
             const response = await this.axios.post(`${this.API}/nostr`, { id });

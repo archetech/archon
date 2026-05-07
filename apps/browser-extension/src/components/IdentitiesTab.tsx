@@ -801,7 +801,7 @@ function IdentitiesTab() {
                 setError("Select an address to publish");
                 return;
             }
-            await keymaster.mergeData(currentId, { address: normalizedAddress });
+            await keymaster.publishAddress(normalizedAddress, currentId);
             setPublishedAddress(normalizedAddress);
             await refreshCurrentIdDocs();
             setSuccess(`${normalizedAddress} published`);
@@ -822,7 +822,7 @@ function IdentitiesTab() {
                 setError("Select an identity first");
                 return;
             }
-            await keymaster.mergeData(currentId, { address: null });
+            await keymaster.unpublishAddress(currentId);
             setPublishedAddress("");
             await refreshCurrentIdDocs();
             setSuccess("Address unpublished");
@@ -846,7 +846,7 @@ function IdentitiesTab() {
             }
             await keymaster.removeAddress(normalizedAddress);
             if (publishedAddress === normalizedAddress && currentId) {
-                await keymaster.mergeData(currentId, { address: null });
+                await keymaster.unpublishAddress(currentId);
                 setPublishedAddress("");
                 await refreshCurrentIdDocs();
             }
