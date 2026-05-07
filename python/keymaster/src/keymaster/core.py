@@ -1050,39 +1050,44 @@ class Keymaster:
 
         return True
 
-    def resolve_stored_address_for_publish(self, id_info: dict[str, Any], address: str | None = None) -> str:
+    def resolve_stored_address_for_publish(self, id_info: dict[str, Any], address: str | None = None) -> dict[str, Any]:
         if address is not None:
             parsed = self.parse_address(address)
             stored = id_info.get("addresses", {}).get(parsed["domain"])
             if not stored or stored.get("name") != parsed["name"]:
                 raise KeymasterError("Invalid parameter: address")
-            return parsed["address"]
+            return {"address": parsed["address"], "info": stored}
 
         entries = list(id_info.get("addresses", {}).items())
         if len(entries) != 1:
             raise KeymasterError("Invalid parameter: address")
 
         domain, info = entries[0]
-        return f"{info['name']}@{domain}"
+        return {"address": f"{info['name']}@{domain}", "info": info}
 
     async def publish_address(self, address: str | None = None, name: str | None = None) -> bool:
         id_info = await self.fetch_id_info(name)
         did = id_info["did"]
-        normalized_address = self.resolve_stored_address_for_publish(id_info, address)
+        stored = self.resolve_stored_address_for_publish(id_info, address)
         doc = await self.resolve_did(did)
         did_document = dict(doc.get("didDocument") or {})
         service_id = f"{did}#email"
         services = [service for service in did_document.get("service", []) if service.get("id") != service_id]
-        did_document_data = {**(doc.get("didDocumentData") or {}), "address": normalized_address}
+        did_document_data = {**(doc.get("didDocumentData") or {}), "address": stored["address"]}
 
-        services.append(
-            {
-                "id": service_id,
-                "type": "Email",
-                "serviceEndpoint": f"mailto:{normalized_address}",
-            }
-        )
-        did_document["service"] = services
+        if stored["info"].get("relay"):
+            services.append(
+                {
+                    "id": service_id,
+                    "type": "Email",
+                    "serviceEndpoint": f"mailto:{stored['address']}",
+                }
+            )
+
+        if services:
+            did_document["service"] = services
+        else:
+            did_document.pop("service", None)
 
         return await self.update_did(did, {"didDocument": did_document, "didDocumentData": did_document_data})
 

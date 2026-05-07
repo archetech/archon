@@ -900,7 +900,7 @@ program
 
 program
     .command('publish-address [address] [id]')
-    .description('Publish a stored address as an Email service endpoint for a DID')
+    .description('Publish a stored address for a DID')
     .action(async (address, id) => {
         try {
             await keymaster.publishAddress(address, id);
@@ -913,7 +913,7 @@ program
 
 program
     .command('unpublish-address [id]')
-    .description('Remove the published Email service endpoint from a DID')
+    .description('Remove the published address from a DID')
     .action(async (id) => {
         try {
             await keymaster.unpublishAddress(id);

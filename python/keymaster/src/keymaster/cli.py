@@ -1092,10 +1092,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("address")
     sp = add("remove-address", "Remove an address for the current ID", cmd_remove_address)
     sp.add_argument("address")
-    sp = add("publish-address", "Publish a stored address as an Email service endpoint for a DID", cmd_publish_address)
+    sp = add("publish-address", "Publish a stored address for a DID", cmd_publish_address)
     sp.add_argument("address", nargs="?")
     sp.add_argument("id", nargs="?")
-    sp = add("unpublish-address", "Remove the published Email service endpoint from a DID", cmd_unpublish_address)
+    sp = add("unpublish-address", "Remove the published address from a DID", cmd_unpublish_address)
     sp.add_argument("id", nargs="?")
 
     # Nostr

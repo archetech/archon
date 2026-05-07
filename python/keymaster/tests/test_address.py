@@ -122,10 +122,27 @@ def test_remove_address_rejects_mismatched_stored_name(testbed):
         run(testbed.keymaster.remove_address("alice@archon.social"))
 
 
-def test_publish_address_adds_profile_data_and_email_service(testbed):
+def test_publish_address_without_relay_only_adds_profile_data(testbed):
     did = run(testbed.keymaster.create_id("Alice"))
     wallet = run(testbed.keymaster.load_wallet())
     wallet["ids"]["Alice"]["addresses"] = {"archon.social": {"name": "alice", "added": "2026-04-04T13:00:00.000Z"}}
+    assert run(testbed.keymaster.save_wallet(wallet, True)) is True
+
+    assert run(testbed.keymaster.publish_address("alice@archon.social")) is True
+    doc = run(testbed.keymaster.resolve_did(did))
+
+    assert doc["didDocumentData"]["address"] == "alice@archon.social"
+    assert "service" not in doc["didDocument"]
+
+
+def test_publish_address_with_relay_adds_email_service(testbed):
+    did = run(testbed.keymaster.create_id("Alice"))
+    relay = run(testbed.keymaster.create_id("Herald"))
+    run(testbed.keymaster.set_current_id("Alice"))
+    wallet = run(testbed.keymaster.load_wallet())
+    wallet["ids"]["Alice"]["addresses"] = {
+        "archon.social": {"name": "alice", "added": "2026-04-04T13:00:00.000Z", "relay": relay}
+    }
     assert run(testbed.keymaster.save_wallet(wallet, True)) is True
 
     assert run(testbed.keymaster.publish_address("alice@archon.social")) is True
@@ -148,8 +165,12 @@ def test_publish_address_rejects_unstored_address(testbed):
 
 def test_unpublish_address_removes_profile_data_and_email_service(testbed):
     did = run(testbed.keymaster.create_id("Alice"))
+    relay = run(testbed.keymaster.create_id("Herald"))
+    run(testbed.keymaster.set_current_id("Alice"))
     wallet = run(testbed.keymaster.load_wallet())
-    wallet["ids"]["Alice"]["addresses"] = {"archon.social": {"name": "alice", "added": "2026-04-04T13:00:00.000Z"}}
+    wallet["ids"]["Alice"]["addresses"] = {
+        "archon.social": {"name": "alice", "added": "2026-04-04T13:00:00.000Z", "relay": relay}
+    }
     assert run(testbed.keymaster.save_wallet(wallet, True)) is True
     assert run(testbed.keymaster.publish_address("alice@archon.social")) is True
 

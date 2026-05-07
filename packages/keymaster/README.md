@@ -199,8 +199,8 @@ It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the
 | Addresses | `check-address <address>` | Check whether an address is available |
 | Addresses | `add-address <address>` | Claim an address for the current ID |
 | Addresses | `remove-address <address>` | Remove an address from the current ID |
-| Addresses | `publish-address [address] [id]` | Publish an address as an Email service endpoint |
-| Addresses | `unpublish-address [id]` | Remove the published Email service endpoint |
+| Addresses | `publish-address [address] [id]` | Publish an address for the current ID |
+| Addresses | `unpublish-address [id]` | Remove the published address |
 | Groups | `create-group <name>` | Create a group |
 | Groups | `list-groups` | List owned groups |
 | Groups | `get-group <did>` | Get group details |

@@ -528,13 +528,37 @@ describe('removeAddress', () => {
 });
 
 describe('publishAddress', () => {
-    it('should publish one stored address as profile data and an Email service endpoint', async () => {
+    it('should publish one stored address as profile data without an Email service endpoint when no relay is stored', async () => {
         const did = await keymaster.createId('Alice');
         const walletData = await keymaster.loadWallet();
         walletData.ids.Alice.addresses = {
             'archon.social': {
                 name: 'alice',
                 added: '2026-04-04T13:00:00.000Z',
+            },
+        };
+        await keymaster.saveWallet(walletData, true);
+
+        const ok = await keymaster.publishAddress('alice@archon.social');
+        const doc = await keymaster.resolveDID(did);
+
+        expect(ok).toBe(true);
+        expect(doc.didDocumentData).toMatchObject({
+            address: 'alice@archon.social',
+        });
+        expect(doc.didDocument?.service).toBeUndefined();
+    });
+
+    it('should publish an Email service endpoint when the stored address has a relay', async () => {
+        const did = await keymaster.createId('Alice');
+        const relay = await keymaster.createId('Herald');
+        await keymaster.setCurrentId('Alice');
+        const walletData = await keymaster.loadWallet();
+        walletData.ids.Alice.addresses = {
+            'archon.social': {
+                name: 'alice',
+                added: '2026-04-04T13:00:00.000Z',
+                relay,
             },
         };
         await keymaster.saveWallet(walletData, true);
@@ -561,11 +585,14 @@ describe('publishAddress', () => {
 
     it('should unpublish the address and preserve unrelated service endpoints', async () => {
         const did = await keymaster.createId('Alice');
+        const relay = await keymaster.createId('Herald');
+        await keymaster.setCurrentId('Alice');
         const walletData = await keymaster.loadWallet();
         walletData.ids.Alice.addresses = {
             'archon.social': {
                 name: 'alice',
                 added: '2026-04-04T13:00:00.000Z',
+                relay,
             },
         };
         await keymaster.saveWallet(walletData, true);

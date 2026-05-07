@@ -2190,7 +2190,10 @@ export default class Keymaster implements KeymasterInterface {
         return true;
     }
 
-    private resolveStoredAddressForPublish(id: IDInfo, address?: string): string {
+    private resolveStoredAddressForPublish(id: IDInfo, address?: string): {
+        address: string;
+        info: StoredAddressInfo;
+    } {
         if (address !== undefined) {
             const parsed = this.parseAddress(address);
             const stored = id.addresses?.[parsed.domain];
@@ -2199,7 +2202,10 @@ export default class Keymaster implements KeymasterInterface {
                 throw new InvalidParameterError('address');
             }
 
-            return parsed.address;
+            return {
+                address: parsed.address,
+                info: stored,
+            };
         }
 
         const entries = Object.entries(id.addresses || {});
@@ -2209,28 +2215,39 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const [domain, info] = entries[0];
-        return `${info.name}@${domain}`;
+        return {
+            address: `${info.name}@${domain}`,
+            info,
+        };
     }
 
     async publishAddress(address?: string, name?: string): Promise<boolean> {
         const id = await this.fetchIdInfo(name);
         const did = id.did;
-        const normalizedAddress = this.resolveStoredAddressForPublish(id, address);
+        const stored = this.resolveStoredAddressForPublish(id, address);
         const doc = await this.resolveDID(did);
         const didDocument = { ...doc.didDocument! };
         const serviceId = `${did}#email`;
         const services = (didDocument.service || []).filter(s => s.id !== serviceId);
         const didDocumentData = {
             ...(doc.didDocumentData as Record<string, unknown> || {}),
-            address: normalizedAddress,
+            address: stored.address,
         };
 
-        services.push({
-            id: serviceId,
-            type: 'Email',
-            serviceEndpoint: `mailto:${normalizedAddress}`,
-        });
-        didDocument.service = services;
+        if (stored.info.relay) {
+            services.push({
+                id: serviceId,
+                type: 'Email',
+                serviceEndpoint: `mailto:${stored.address}`,
+            });
+        }
+
+        if (services.length > 0) {
+            didDocument.service = services;
+        }
+        else {
+            delete didDocument.service;
+        }
 
         return this.updateDID(did, { didDocument, didDocumentData });
     }
