@@ -354,7 +354,9 @@ async function dedupeDiscovered(): Promise<void> {
     let removed = 0;
 
     await jsonPersister.updateDb((db) => {
-        const discovered = db.discovered ?? [];
+        db.discovered ??= [];
+
+        const discovered = db.discovered;
         const byKey = new Map<string, DiscoveredItem>();
         const keys: string[] = [];
 
@@ -420,8 +422,9 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
                     if (textString.startsWith('did:cid:') && isValidDID(textString)) {
                         await jsonPersister.updateDb((db) => {
                             const item = { height, index: i, time: timestamp, txid, did: textString };
+                            const itemKey = discoveredKey(item);
 
-                            if (!db.discovered.some(discovered => discoveredKey(discovered) === discoveredKey(item))) {
+                            if (!db.discovered.some(discovered => discoveredKey(discovered) === itemKey)) {
                                 db.discovered.push(item);
                             }
                         });
