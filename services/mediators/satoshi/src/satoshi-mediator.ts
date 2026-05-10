@@ -328,6 +328,72 @@ async function resolveScanStart(blockCount: number): Promise<number> {
     return fallbackHeight + 1;
 }
 
+function discoveredKey(item: Pick<DiscoveredItem, 'height' | 'index' | 'txid' | 'did'>): string {
+    return `${item.height}:${item.index}:${item.txid}:${item.did}`;
+}
+
+function isFullyProcessed(item: DiscoveredItem): boolean {
+    return !!item.imported && !!item.processed && !item.processed.busy && (item.processed.pending ?? 0) === 0;
+}
+
+function preferDiscoveredItem(current: DiscoveredItem, candidate: DiscoveredItem): DiscoveredItem {
+    const currentDone = isFullyProcessed(current);
+    const candidateDone = isFullyProcessed(candidate);
+
+    if (candidateDone !== currentDone) {
+        return candidateDone ? candidate : current;
+    }
+
+    const currentState = Number(!!current.imported) + Number(!!current.processed) + Number(!!current.error);
+    const candidateState = Number(!!candidate.imported) + Number(!!candidate.processed) + Number(!!candidate.error);
+
+    return candidateState > currentState ? candidate : current;
+}
+
+async function dedupeDiscovered(): Promise<void> {
+    let removed = 0;
+
+    await jsonPersister.updateDb((db) => {
+        db.discovered ??= [];
+
+        const discovered = db.discovered;
+        const byKey = new Map<string, DiscoveredItem>();
+        const keys: string[] = [];
+
+        for (const item of discovered) {
+            const key = discoveredKey(item);
+            const current = byKey.get(key);
+
+            if (!current) {
+                byKey.set(key, item);
+                keys.push(key);
+                continue;
+            }
+
+            removed += 1;
+            byKey.set(key, preferDiscoveredItem(current, item));
+        }
+
+        if (removed > 0) {
+            db.discovered = keys.map(key => byKey.get(key)!);
+        }
+    });
+
+    if (removed > 0) {
+        console.log(`Removed ${removed} duplicate discovered item(s)`);
+    }
+}
+
+function updateDiscoveredItems(db: MediatorDb, update: DiscoveredItem): void {
+    const list = db.discovered ?? [];
+
+    for (let idx = 0; idx < list.length; idx++) {
+        if (sameItem(list[idx], update)) {
+            list[idx] = update;
+        }
+    }
+}
+
 async function fetchBlock(height: number, blockCount: number): Promise<void> {
     try {
         const blockHash = await btcClient.getBlockHash(height);
@@ -355,7 +421,12 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
                     const textString = Buffer.from(parts[1], 'hex').toString('utf8');
                     if (textString.startsWith('did:cid:') && isValidDID(textString)) {
                         await jsonPersister.updateDb((db) => {
-                            db.discovered.push({ height, index: i, time: timestamp, txid, did: textString });
+                            const item = { height, index: i, time: timestamp, txid, did: textString };
+                            const itemKey = discoveredKey(item);
+
+                            if (!db.discovered.some(discovered => discoveredKey(discovered) === itemKey)) {
+                                db.discovered.push(item);
+                            }
                         });
                     }
                 } catch (error: any) {
@@ -401,8 +472,7 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
     }
 
     // Skip fully processed items (unless retrying)
-    const isFullyProcessed = item.processed && !item.processed.busy && (item.processed.pending ?? 0) === 0;
-    if (item.imported && isFullyProcessed && !retry) {
+    if (isFullyProcessed(item) && !retry) {
         return;
     }
 
@@ -467,11 +537,7 @@ async function importBatches(): Promise<boolean> {
             }
 
             await jsonPersister.updateDb((db) => {
-                const list = db.discovered ?? [];
-                const idx = list.findIndex(d => sameItem(d, update));
-                if (idx >= 0) {
-                    list[idx] = update;
-                }
+                updateDiscoveredItems(db, update);
             });
         }
         catch (error: any) {
@@ -503,11 +569,7 @@ async function retryFailedImports(): Promise<void> {
             }
 
             await jsonPersister.updateDb((db) => {
-                const list = db.discovered ?? [];
-                const idx = list.findIndex(d => sameItem(d, update));
-                if (idx >= 0) {
-                    list[idx] = update;
-                }
+                updateDiscoveredItems(db, update);
             });
 
             if (update.imported) {
@@ -928,6 +990,8 @@ async function main() {
             console.log(`Persisting to ${config.db}`);
         }
     }
+
+    await dedupeDiscovered();
 
     if (config.reimport) {
         const db = await loadDb();
