@@ -46,7 +46,7 @@ The Gatekeeper is the canonical gateway between Archon clients (Keymaster,
 mediators, wallets) and:
 
 - a **DID event store** (per-DID append-only log of create/update/delete operations)
-- one or more **registries** (`local`, `hyperswarm`, `BTC:mainnet`, `BTC:signet`, `BTC:testnet4`)
+- one or more **registries** (`local`, `hyperswarm`, `BTC:mainnet`, `BTC:signet`, `BTC:testnet4`, `ZEC:mainnet`, `ZEC:testnet`)
 - an **IPFS node** (Kubo-compatible)
 - a **block store** (per-registry block index for resolution timestamps)
 
@@ -198,7 +198,7 @@ omitted from the JSON object; required fields MUST be present unless noted.
 {
   "version": 1,                               // currently only version 1 is valid
   "type": "agent" | "asset",
-  "registry": "local" | "hyperswarm" | "BTC:mainnet" | "BTC:signet" | "BTC:testnet4",
+  "registry": "local" | "hyperswarm" | "BTC:mainnet" | "BTC:signet" | "BTC:testnet4" | "ZEC:mainnet" | "ZEC:testnet",
   "validUntil": "<RFC 3339>",                 // optional ephemeral expiry
   "prefix": "did:cid"                          // optional override of server default
 }

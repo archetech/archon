@@ -43,6 +43,8 @@ const ValidRegistries = [
     'BTC:mainnet',
     'BTC:testnet4',
     'BTC:signet',
+    'ZEC:mainnet',
+    'ZEC:testnet',
 ];
 
 enum ImportStatus {

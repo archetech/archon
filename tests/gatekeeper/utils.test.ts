@@ -593,12 +593,13 @@ describe('listRegistries', () => {
     });
 
     it('should return list of configured registries', async () => {
-        const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['hyperswarm', 'BTC:signet'] });
+        const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['hyperswarm', 'BTC:signet', 'ZEC:mainnet'] });
         const registries = await gatekeeper.listRegistries();
 
-        expect(registries.length).toBe(2);
+        expect(registries.length).toBe(3);
         expect(registries.includes('hyperswarm')).toBe(true);
         expect(registries.includes('BTC:signet')).toBe(true);
+        expect(registries.includes('ZEC:mainnet')).toBe(true);
     });
 
     it('should return list of inferred registries', async () => {
@@ -606,13 +607,15 @@ describe('listRegistries', () => {
         await gatekeeper.getQueue('hyperswarm');
         await gatekeeper.getQueue('BTC:signet');
         await gatekeeper.getQueue('BTC:testnet4');
+        await gatekeeper.getQueue('ZEC:testnet');
         const registries = await gatekeeper.listRegistries();
 
-        expect(registries.length).toBe(4);
+        expect(registries.length).toBe(5);
         expect(registries.includes('local')).toBe(true);
         expect(registries.includes('hyperswarm')).toBe(true);
         expect(registries.includes('BTC:signet')).toBe(true);
         expect(registries.includes('BTC:testnet4')).toBe(true);
+        expect(registries.includes('ZEC:testnet')).toBe(true);
     });
 
     it('should return non-redundant list of inferred registries', async () => {
@@ -624,12 +627,15 @@ describe('listRegistries', () => {
         await gatekeeper.getQueue('BTC:testnet4');
         await gatekeeper.getQueue('BTC:testnet4');
         await gatekeeper.getQueue('BTC:testnet4');
+        await gatekeeper.getQueue('ZEC:mainnet');
+        await gatekeeper.getQueue('ZEC:mainnet');
         const registries = await gatekeeper.listRegistries();
 
-        expect(registries.length).toBe(4);
+        expect(registries.length).toBe(5);
         expect(registries.includes('local')).toBe(true);
         expect(registries.includes('hyperswarm')).toBe(true);
         expect(registries.includes('BTC:signet')).toBe(true);
         expect(registries.includes('BTC:testnet4')).toBe(true);
+        expect(registries.includes('ZEC:mainnet')).toBe(true);
     });
 });
