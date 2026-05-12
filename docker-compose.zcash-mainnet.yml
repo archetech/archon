@@ -1,0 +1,26 @@
+services:
+  zcash-mainnet-wallet:
+    build:
+      context: .
+      dockerfile: Dockerfile.zcash-wallet
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/zcash-wallet
+    environment:
+      - ARCHON_WALLET_PORT=4250
+      - ARCHON_WALLET_METRICS_PORT=4251
+      - ARCHON_WALLET_NETWORK=mainnet
+      - ARCHON_WALLET_ZEC_HOST=${ARCHON_ZEC_HOST}
+      - ARCHON_WALLET_ZEC_PORT=${ARCHON_ZEC_PORT:-8232}
+      - ARCHON_WALLET_ZEC_USER=${ARCHON_ZEC_USER}
+      - ARCHON_WALLET_ZEC_PASS=${ARCHON_ZEC_PASS}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "127.0.0.1:4250:4250"
+      - "127.0.0.1:4251:4251"
+    depends_on:
+      keymaster:
+        condition: service_started

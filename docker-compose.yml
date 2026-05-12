@@ -14,6 +14,7 @@ include:
   - docker-compose.lightning.yml
   - docker-compose.drawbridge.yml
 #  - docker-compose.btc-testnet4.yml
+  - docker-compose.zcash-mainnet.yml
 
 services:
   mongodb:
