@@ -10,7 +10,7 @@ const config = {
     ipfsURL: process.env.ARCHON_IPFS_URL || 'http://localhost:5001/api/v0',
     nodeID: process.env.ARCHON_NODE_ID || '',
     nodeName: process.env.ARCHON_NODE_NAME || 'anon',
-    protocol: process.env.ARCHON_PROTOCOL || '/ARCHON/v0.1',
+    protocol: process.env.ARCHON_PROTOCOL || '/ARCHON/v0.8-beta',
     exportInterval: process.env.ARCHON_HYPR_EXPORT_INTERVAL ? parseInt(process.env.ARCHON_HYPR_EXPORT_INTERVAL) : 2,
     metricsPort: process.env.ARCHON_HYPR_METRICS_PORT ? parseInt(process.env.ARCHON_HYPR_METRICS_PORT) : 4232,
 };

@@ -16,5 +16,5 @@ When a node receives a `queue` message it will import the operations like during
 | `ARCHON_IPFS_URL`             | http://localhost:5001/api/v0  | IPFS RPC URL           |
 | `ARCHON_NODE_ID       `       | (no default)           | Keymaster node agent name     |
 | `ARCHON_NODE_NAME`            | anon                   | Human-readable name for the node |
-| `ARCHON_PROTOCOL`        | /ARCHON/v0.1      | Archon network topic to join    |
+| `ARCHON_PROTOCOL`        | /ARCHON/v0.8-beta | Archon network topic to join    |
 | `ARCHON_HYPR_EXPORT_INTERVAL` |  2                     | Seconds between export cycles |

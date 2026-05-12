@@ -57,7 +57,7 @@ local node.
 topic = sha256(ARCHON_PROTOCOL)         // 32 bytes, used as the hyperswarm discovery key
 ```
 
-Default `ARCHON_PROTOCOL` is `/ARCHON/v0.1`. All nodes that want to peer
+Default `ARCHON_PROTOCOL` is `/ARCHON/v0.8-beta`. All nodes that want to peer
 MUST share the same protocol string.
 
 Each mediator joins the topic as both **client** and **server** (`{client:
@@ -321,7 +321,7 @@ Gatekeeper / Keymaster cleanup — those are HTTP clients.
 | --- | --- | --- |
 | `ARCHON_NODE_ID` | unset, **required** | Name of this node's agent ID in the Keymaster wallet. |
 | `ARCHON_NODE_NAME` | `anon` | Free-form label used in message `node` field. |
-| `ARCHON_PROTOCOL` | `/ARCHON/v0.1` | Hyperswarm topic seed. Must match peers you want to talk to. |
+| `ARCHON_PROTOCOL` | `/ARCHON/v0.8-beta` | Hyperswarm topic seed. Must match peers you want to talk to. |
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | |
 | `ARCHON_KEYMASTER_URL` | `http://localhost:4226` | |
 | `ARCHON_IPFS_URL` | `http://localhost:5001/api/v0` | Kubo HTTP API. |

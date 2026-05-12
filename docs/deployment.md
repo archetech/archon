@@ -88,7 +88,7 @@ Comment out the `include:` lines at the top of `docker-compose.yml` for any serv
 | `ARCHON_GATEKEEPER_DID_PREFIX` | `did:cid` | DID method prefix |
 | `ARCHON_GATEKEEPER_REGISTRIES` | `hyperswarm` | Comma-separated list of registries |
 | `ARCHON_DEFAULT_REGISTRY` | `hyperswarm` | Default registry for new DIDs |
-| `ARCHON_PROTOCOL` | `/ARCHON/v0.2-reboot` | Hyperswarm protocol identifier |
+| `ARCHON_PROTOCOL` | `/ARCHON/v0.8-beta` | Hyperswarm protocol identifier |
 
 ### Services
 
