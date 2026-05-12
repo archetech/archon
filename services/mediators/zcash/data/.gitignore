@@ -1,1 +1,5 @@
 *.json
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*

@@ -18,6 +18,7 @@ export interface AppConfig {
     gapLimit: number;
     feeTarget: number;
     defaultFeeZat: number;
+    defaultFeeRateZatKb: number;
 }
 
 function toNetwork(name: string | undefined): WalletNetwork {
@@ -54,6 +55,9 @@ const config: AppConfig = {
     feeTarget: process.env.ARCHON_WALLET_FEE_TARGET ? parseInt(process.env.ARCHON_WALLET_FEE_TARGET) : 6,
     defaultFeeZat: process.env.ARCHON_WALLET_ZEC_DEFAULT_FEE_ZAT
         ? parseInt(process.env.ARCHON_WALLET_ZEC_DEFAULT_FEE_ZAT)
+        : 10_000,
+    defaultFeeRateZatKb: process.env.ARCHON_WALLET_ZEC_FALLBACK_FEE_ZAT_KB
+        ? parseInt(process.env.ARCHON_WALLET_ZEC_FALLBACK_FEE_ZAT_KB)
         : 10_000,
 };
 

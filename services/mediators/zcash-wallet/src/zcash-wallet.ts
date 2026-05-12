@@ -167,7 +167,7 @@ export async function estimateFee(
 ): Promise<{ feerate: number; blocks: number }> {
     const networkInfo = await zecClient.command<{ relayfee?: number }>('getnetworkinfo');
     return {
-        feerate: networkInfo.relayfee || zatsToZec(config.defaultFeeZat),
+        feerate: networkInfo.relayfee || zatsToZec(config.defaultFeeRateZatKb),
         blocks: blocks || config.feeTarget,
     };
 }

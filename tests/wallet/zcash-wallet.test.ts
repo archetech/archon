@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 import {
     anchorData,
+    estimateFee,
     getBalance,
     getReceiveAddress,
     getUtxos,
@@ -76,6 +77,17 @@ describe('zcash-wallet RPC-backed behavior', () => {
         await expect(getBalance(rpc, TEST_MNEMONIC, 'mainnet')).resolves.toEqual({
             balance: 1.23456789,
             unconfirmed_balance: 0,
+        });
+    });
+
+    it('uses a fee-rate fallback when Zebra relay fee is unavailable', async () => {
+        const rpc = createRpcMock({
+            getnetworkinfo: {},
+        });
+
+        await expect(estimateFee(rpc, 3)).resolves.toEqual({
+            feerate: 0.0001,
+            blocks: 3,
         });
     });
 

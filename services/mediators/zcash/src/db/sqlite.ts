@@ -1,9 +1,11 @@
+import fs from 'fs';
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import { MediatorDb } from '../types.js';
 import AbstractDB from "./abstract-db.js";
 
 export default class JsonSQLite extends AbstractDB {
+    private readonly dataFolder: string;
     private readonly fileName: string;
     private db?: Database;
 
@@ -15,10 +17,13 @@ export default class JsonSQLite extends AbstractDB {
 
     constructor(registry: string, dataFolder = 'data') {
         super();
+        this.dataFolder = dataFolder;
         this.fileName = `${dataFolder}/${registry}-mediator.db`;
     }
 
     async connect(): Promise<void> {
+        fs.mkdirSync(this.dataFolder, { recursive: true });
+
         this.db = await open({
             filename: this.fileName,
             driver: sqlite3.Database
