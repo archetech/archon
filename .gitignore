@@ -17,4 +17,5 @@ dids.db-journal
 
 
 **/.npmrc
+!/.npmrc
 rust/services/gatekeeper/target/

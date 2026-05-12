@@ -39,10 +39,12 @@ updates:
       - "/services/mediators/satoshi"
       - "/services/satoshi-wallet/server"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
       day: "monday"
       time: "05:00"
       timezone: "America/Toronto"
+    cooldown:
+      default-days: 3
     open-pull-requests-limit: 1
     labels:
       - "dependencies"
