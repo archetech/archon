@@ -1,0 +1,41 @@
+services:
+  filecoin-wallet:
+    build:
+      context: .
+      dockerfile: Dockerfile.filecoin-wallet
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/filecoin-wallet
+    environment:
+      - ARCHON_FIL_WALLET_PORT=4242
+      - ARCHON_FIL_WALLET_METRICS_PORT=4243
+      - ARCHON_FIL_NETWORK=${ARCHON_FIL_NETWORK:-calibration}
+      - ARCHON_FIL_PRIVATE_KEY=${ARCHON_FIL_PRIVATE_KEY}
+      - ARCHON_FIL_WALLET_ADDRESS=${ARCHON_FIL_WALLET_ADDRESS}
+      - ARCHON_FIL_SESSION_KEY=${ARCHON_FIL_SESSION_KEY}
+      - ARCHON_FIL_RPC_URL=${ARCHON_FIL_RPC_URL}
+      - ARCHON_IPFS_API_URL=http://gatekeeper:5001
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+    ports:
+      - "127.0.0.1:4242:4242"
+      - "127.0.0.1:4243:4243"
+
+  filecoin-mediator:
+    build:
+      context: .
+      dockerfile: Dockerfile.filecoin
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/filecoin-mediator
+    environment:
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_FIL_WALLET_URL=http://filecoin-wallet:4242
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+      - ARCHON_FIL_EXPORT_INTERVAL=${ARCHON_FIL_EXPORT_INTERVAL:-60000}
+      - ARCHON_FIL_MEDIATOR_PORT=4244
+      - ARCHON_FIL_MEDIATOR_METRICS_PORT=4245
+    ports:
+      - "127.0.0.1:4244:4244"
+      - "127.0.0.1:4245:4245"
+    depends_on:
+      - filecoin-wallet

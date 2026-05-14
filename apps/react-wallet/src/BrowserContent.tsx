@@ -30,6 +30,7 @@ import {
     MoreHoriz,
     Close,
     Tune,
+    Cloud,
 } from "@mui/icons-material";
 import CredentialsTab from "./components/CredentialsTab";
 import WalletTab from "./components/WalletTab";
@@ -47,6 +48,7 @@ import AliasedDIDs from "./components/AliasedDIDs";
 import AssetsTab from "./components/AssetsTab";
 import DmailTab from "./components/DmailTab";
 import LightningTab from "./components/LightningTab";
+import FilecoinTab from "./components/FilecoinTab";
 import PollTab from "./components/PollTab";
 import AuthTab from "./components/AuthTab";
 import PropertiesTab from "./components/PropertiesTab";
@@ -59,7 +61,7 @@ function BrowserContent() {
     const [menuOpen, setMenuOpen] = useState<boolean>(false);
     const { isTabletUp } = useThemeContext();
 
-    const { hasLightning } = useWalletContext();
+    const { hasLightning, hasFilecoin } = useWalletContext();
     const { currentId, validId } = useVariablesContext();
     const {
         selectedTab,
@@ -213,6 +215,12 @@ function BrowserContent() {
             {displayComponent && hasLightning && (
                 <TabPanel value="lightning" sx={{ p: 0 }}>
                     <LightningTab />
+                </TabPanel>
+            )}
+
+            {displayComponent && hasFilecoin && (
+                <TabPanel value="filecoin" sx={{ p: 0 }}>
+                    <FilecoinTab />
                 </TabPanel>
             )}
 
@@ -395,6 +403,17 @@ function BrowserContent() {
                                                     menuOpen ? "Lightning" : ""
                                                 }
                                                 value="lightning"
+                                                iconPosition="start"
+                                            />
+                                        )}
+
+                                        {displayComponent && hasFilecoin && (
+                                            <Tab
+                                                icon={<Cloud />}
+                                                label={
+                                                    menuOpen ? "Filecoin" : ""
+                                                }
+                                                value="filecoin"
                                                 iconPosition="start"
                                             />
                                         )}
@@ -629,6 +648,17 @@ function BrowserContent() {
                                             <Bolt />
                                         </ListItemIcon>
                                         <ListItemText primary="Lightning" />
+                                    </ListItemButton>
+                                )}
+
+                                {hasFilecoin && (
+                                    <ListItemButton
+                                        onClick={() => selectFromMore("filecoin")}
+                                    >
+                                        <ListItemIcon>
+                                            <Cloud />
+                                        </ListItemIcon>
+                                        <ListItemText primary="Filecoin" />
                                     </ListItemButton>
                                 )}
 

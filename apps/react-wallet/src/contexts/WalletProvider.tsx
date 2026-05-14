@@ -24,6 +24,8 @@ import { extractAlias, extractDid } from '../utils/utils';
 import {
     DEFAULT_GATEKEEPER_URL,
     GATEKEEPER_KEY,
+    DEFAULT_FILECOIN_WALLET_URL,
+    FILECOIN_WALLET_KEY,
 } from "../constants"
 import {
     getSessionPassphrase,
@@ -33,6 +35,15 @@ import {
 
 const gatekeeper = new DrawbridgeClient();
 const cipher = new CipherWeb();
+
+export interface FilecoinPinRecord {
+    requestid: string;
+    status: 'queued' | 'pinning' | 'pinned' | 'failed';
+    created: string;
+    pin: { cid: string; did: string; name?: string };
+    filecoin?: { pieceCid: string; network: string; ipniValidated: boolean };
+    error?: string;
+}
 
 interface WalletContextValue {
     pendingMnemonic: string;
@@ -45,6 +56,11 @@ interface WalletContextValue {
     refreshFlag: number;
     keymaster: Keymaster | null;
     hasLightning: boolean;
+    hasFilecoin: boolean;
+    filecoinWalletUrl: string;
+    pinToFilecoin: (cid: string, did: string) => Promise<FilecoinPinRecord>;
+    getFilecoinPin: (requestid: string) => Promise<FilecoinPinRecord>;
+    listFilecoinPins: () => Promise<FilecoinPinRecord[]>;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -66,6 +82,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const [showRecoverSetup, setShowRecoverSetup] = useState(false);
     const [refreshFlag, setRefreshFlag] = useState<number>(0);
     const [hasLightning, setHasLightning] = useState<boolean>(false);
+    const [hasFilecoin, setHasFilecoin] = useState<boolean>(false);
+    const [filecoinWalletUrl, setFilecoinWalletUrl] = useState<string>(DEFAULT_FILECOIN_WALLET_URL);
 
     const keymasterRef = useRef<Keymaster | null>(null);
 
@@ -110,6 +128,39 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error('Failed to connect to gatekeeper:', error);
         }
+
+        const walletUrl = localStorage.getItem(FILECOIN_WALLET_KEY) || DEFAULT_FILECOIN_WALLET_URL;
+        localStorage.setItem(FILECOIN_WALLET_KEY, walletUrl);
+        setFilecoinWalletUrl(walletUrl);
+        try {
+            const res = await fetch(`${walletUrl}/api/v1/wallet/version`);
+            setHasFilecoin(res.ok);
+        } catch {
+            setHasFilecoin(false);
+        }
+    }
+
+    async function pinToFilecoin(cid: string, did: string): Promise<FilecoinPinRecord> {
+        const res = await fetch(`${filecoinWalletUrl}/api/v1/wallet/anchor`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cid, did }),
+        });
+        if (!res.ok) throw new Error(`Filecoin pin failed: ${res.statusText}`);
+        return res.json();
+    }
+
+    async function getFilecoinPin(requestid: string): Promise<FilecoinPinRecord> {
+        const res = await fetch(`${filecoinWalletUrl}/api/v1/wallet/pin/${requestid}`);
+        if (!res.ok) throw new Error(`Pin not found: ${res.statusText}`);
+        return res.json();
+    }
+
+    async function listFilecoinPins(): Promise<FilecoinPinRecord[]> {
+        const res = await fetch(`${filecoinWalletUrl}/api/v1/wallet/pins`);
+        if (!res.ok) throw new Error(`Failed to list pins: ${res.statusText}`);
+        const data = await res.json();
+        return data.results as FilecoinPinRecord[];
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
@@ -360,6 +411,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         refreshFlag,
         keymaster: keymasterRef.current,
         hasLightning,
+        hasFilecoin,
+        filecoinWalletUrl,
+        pinToFilecoin,
+        getFilecoinPin,
+        listFilecoinPins,
     };
 
     return (

@@ -1,0 +1,34 @@
+{
+  "name": "filecoin-wallet",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Archon Filecoin Wallet Service — pins DID operation CIDs to Filecoin via filecoin-pin",
+  "main": "dist/wallet-api.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/wallet-api.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Archetech",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.16.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.22.1",
+    "filecoin-pin": "^0.21.0",
+    "morgan": "^1.10.0",
+    "multiformats": "^13.3.2",
+    "pino": "^9.14.0",
+    "pino-http": "^10.5.0",
+    "prom-client": "^15.1.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.13.16",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.2"
+  }
+}

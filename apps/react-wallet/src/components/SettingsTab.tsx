@@ -7,6 +7,8 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 import {
     DEFAULT_GATEKEEPER_URL,
     GATEKEEPER_KEY,
+    DEFAULT_FILECOIN_WALLET_URL,
+    FILECOIN_WALLET_KEY,
 } from "../constants";
 import packageJson from "../../package.json";
 
@@ -26,6 +28,7 @@ function loadRefreshIntervalSeconds() {
 
 const SettingsTab = () => {
     const [gatekeeperUrl, setGatekeeperUrl] = useState<string>(DEFAULT_GATEKEEPER_URL);
+    const [filecoinWalletUrl, setFilecoinWalletUrl] = useState<string>(DEFAULT_FILECOIN_WALLET_URL);
     const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<string>(String(DEFAULT_REFRESH_INTERVAL_SECONDS));
     const [serverVersion, setServerVersion] = useState<string>("");
     const {
@@ -45,9 +48,13 @@ const SettingsTab = () => {
                 if (gatekeeperUrl) {
                     setGatekeeperUrl(gatekeeperUrl);
                 }
+                const filecoinUrl = localStorage.getItem(FILECOIN_WALLET_KEY);
+                if (filecoinUrl) {
+                    setFilecoinWalletUrl(filecoinUrl);
+                }
                 setRefreshIntervalSeconds(String(loadRefreshIntervalSeconds()));
             } catch (error: any) {
-                console.error("Error retrieving gatekeeperUrl:", error);
+                console.error("Error retrieving settings:", error);
             }
         };
         init();
@@ -73,6 +80,7 @@ const SettingsTab = () => {
             }
 
             localStorage.setItem(GATEKEEPER_KEY, gatekeeperUrl);
+            localStorage.setItem(FILECOIN_WALLET_KEY, filecoinWalletUrl);
             localStorage.setItem(REFRESH_INTERVAL_STORAGE_KEY, String(Math.floor(parsedRefreshInterval)));
             window.dispatchEvent(new Event('archon:refresh-interval-change'));
             await initialiseServices();
@@ -108,6 +116,16 @@ const SettingsTab = () => {
                 onChange={(e) => setGatekeeperUrl(e.target.value)}
                 sx={{ mb: 2 }}
                 className="text-field"
+            />
+
+            <TextField
+                label="Filecoin Wallet URL"
+                variant="outlined"
+                value={filecoinWalletUrl}
+                onChange={(e) => setFilecoinWalletUrl(e.target.value)}
+                sx={{ mb: 2 }}
+                className="text-field"
+                helperText="Leave blank to disable Filecoin pinning."
             />
 
             <TextField

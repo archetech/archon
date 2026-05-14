@@ -1,6 +1,6 @@
 import { MongoClient, Db } from 'mongodb';
 import { InvalidDIDError } from '@didcid/common/errors';
-import { GatekeeperDb, GatekeeperEvent, Operation, BlockId, BlockInfo } from '../types.js'
+import { GatekeeperDb, GatekeeperEvent, FilecoinQueueItem, Operation, BlockId, BlockInfo } from '../types.js'
 
 interface DidsDoc {
     id: string
@@ -313,5 +313,47 @@ export default class DbMongo implements GatekeeperDb {
         );
 
         return doc as Operation | null;
+    }
+
+    async queueFilecoinCid(cid: string, did: string): Promise<number> {
+        if (!this.db) {
+            throw new Error(MONGO_NOT_STARTED_ERROR);
+        }
+        await this.db.collection('filecoin_queue').updateOne(
+            { cid },
+            { $setOnInsert: { cid, did, time: new Date().toISOString() } },
+            { upsert: true }
+        );
+        return this.db.collection('filecoin_queue').countDocuments();
+    }
+
+    async getFilecoinQueue(): Promise<FilecoinQueueItem[]> {
+        if (!this.db) {
+            throw new Error(MONGO_NOT_STARTED_ERROR);
+        }
+        try {
+            const docs = await this.db.collection('filecoin_queue')
+                .find({}, { projection: { _id: 0 } })
+                .toArray();
+            return docs as unknown as FilecoinQueueItem[];
+        } catch {
+            return [];
+        }
+    }
+
+    async clearFilecoinQueue(cids: string[]): Promise<boolean> {
+        if (!this.db) {
+            throw new Error(MONGO_NOT_STARTED_ERROR);
+        }
+        if (cids.length === 0) {
+            return true;
+        }
+        try {
+            await this.db.collection('filecoin_queue').deleteMany({ cid: { $in: cids } });
+            return true;
+        } catch (error) {
+            console.error(error);
+            return false;
+        }
     }
 }

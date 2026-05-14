@@ -7,6 +7,7 @@ export interface JsonDbFile {
     blocks?: Record<string, any>
     hashes?: Record<string, any>
     ops?: Record<string, Operation>
+    filecoinQueue?: FilecoinQueueItem[]
 }
 
 export interface ImportBatchResult {
@@ -81,6 +82,12 @@ export interface GatekeeperEvent {
     registration?: DidRegistration;
 }
 
+export interface FilecoinQueueItem {
+    cid: string;
+    did: string;
+    time: string;
+}
+
 export interface GatekeeperDb {
     start(): Promise<void>;
     stop(): Promise<void>;
@@ -93,6 +100,9 @@ export interface GatekeeperDb {
     queueOperation(registry: string, op: Operation): Promise<number>;
     getQueue(registry: string): Promise<Operation[]>;
     clearQueue(registry: string, batch: Operation[]): Promise<boolean>;
+    queueFilecoinCid(cid: string, did: string): Promise<number>;
+    getFilecoinQueue(): Promise<FilecoinQueueItem[]>;
+    clearFilecoinQueue(cids: string[]): Promise<boolean>;
     addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean>;
     getBlock(registry: string, blockId?: BlockId): Promise<BlockInfo | null>;
     addOperation(opid: string, op: Operation): Promise<void>;
@@ -155,6 +165,8 @@ export interface GatekeeperInterface {
     processEvents(): Promise<ProcessEventsResult>;
     getQueue(registry: string): Promise<Operation[]>;
     clearQueue(registry: string, events: Operation[]): Promise<boolean>;
+    getFilecoinQueue(): Promise<FilecoinQueueItem[]>;
+    clearFilecoinQueue(cids: string[]): Promise<boolean>;
     addData(data: Buffer): Promise<string>;
     getData(cid: string): Promise<Buffer | null>;
     addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string>;
