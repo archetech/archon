@@ -11,6 +11,11 @@ import DbMongo from '@didcid/gatekeeper/db/mongo';
 import { CheckDIDsResult, ResolveDIDOptions, Operation } from '@didcid/gatekeeper/types';
 import KuboClient from '@didcid/ipfs/kubo';
 import config from './config.js';
+import {
+    CONFIRM_FALLBACK_HEADER,
+    resolveFromConfirmFallback,
+    shouldTryConfirmFallback,
+} from './confirm-fallback.js';
 import promClient from 'prom-client';
 import pino from 'pino';
 import { pinoHttp } from 'pino-http';
@@ -608,6 +613,8 @@ v1router.post("/did/generate", async (req, res) => {
  *       falls back to a configurable universal resolver (default: https://dev.uniresolver.io).
  *       Set `ARCHON_GATEKEEPER_FALLBACK_URL` to override the resolver URL (empty string disables fallback).
  *       Set `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` to override the timeout in milliseconds (default: 5000).
+ *       Set `ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL` to delegate unconfirmed `confirm=true`
+ *       responses to another Gatekeeper node (empty string disables fallback).
  *
  *     parameters:
  *       - in: path
@@ -823,6 +830,29 @@ v1router.get('/did/:did', async (req, res) => {
             if (resolved) {
                 res.json(resolved);
                 return;
+            }
+        }
+
+        if (shouldTryConfirmFallback(
+            doc,
+            options,
+            config.confirmFallbackURL,
+            Boolean(req.get(CONFIRM_FALLBACK_HEADER))
+        )) {
+            try {
+                const resolved = await resolveFromConfirmFallback(
+                    req.params.did,
+                    options,
+                    config.confirmFallbackURL,
+                    config.fallbackTimeout
+                );
+
+                if (resolved) {
+                    res.json(resolved);
+                    return;
+                }
+            } catch (error) {
+                logger.error({ did: req.params.did, error }, 'Confirmed Gatekeeper fallback failed');
             }
         }
 

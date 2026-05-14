@@ -41,3 +41,4 @@ These rules apply to coding agents working in this repository.
 - Satoshi mediator discovered items must be unique by height/index/txid/DID; duplicate rows can leave later copies unimported and make the import loop reprocess the same batches every interval.
 - The Zcash wallet service is Zebra-backed and transparent-only: Zebra provides chain/address-index/broadcast RPCs, while the wallet derives transparent keys from the Keymaster mnemonic and signs locally. Do not assume Zebra has wallet RPCs like `getwalletinfo`.
 - Keep Zcash mediator registry strings as `ZEC:mainnet`/`ZEC:testnet` distinct from Bitcoin `BTC:*`; update both TypeScript and Rust Gatekeeper registry validators when adding a new chain registry.
+- Gatekeeper confirmed-resolution peer fallback is HTTP-layer proxy behavior only. It should not import events, cache delegated documents, or change core Gatekeeper package resolution semantics unless explicitly requested.

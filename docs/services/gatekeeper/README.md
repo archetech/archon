@@ -1016,6 +1016,7 @@ The label MUST include the `/api/v1` prefix.
 | `ARCHON_ADMIN_API_KEY` | empty | Admin API key. Empty disables admin auth. |
 | `ARCHON_GATEKEEPER_FALLBACK_URL` | `https://dev.uniresolver.io` | Universal resolver to consult on local notFound. Empty disables. |
 | `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` | `5000` | Fallback timeout in ms. |
+| `ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL` | empty | Optional Gatekeeper peer to consult when `confirm=true` local resolution is unconfirmed. Empty disables. |
 | `GIT_COMMIT` | `unknown` | Build commit. |
 
 ### 14.3 Healthcheck

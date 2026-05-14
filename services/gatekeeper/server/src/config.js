@@ -16,6 +16,7 @@ const config = {
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
     fallbackURL: process.env.ARCHON_GATEKEEPER_FALLBACK_URL || 'https://dev.uniresolver.io',
     fallbackTimeout: process.env.ARCHON_GATEKEEPER_FALLBACK_TIMEOUT ? parseInt(process.env.ARCHON_GATEKEEPER_FALLBACK_TIMEOUT) : 5000,
+    confirmFallbackURL: process.env.ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL || '',
 };
 
 export default config;
