@@ -1663,16 +1663,13 @@ async fn fetch_ipfs_json(state: &AppState, cid: &str) -> Option<Value> {
 }
 
 pub(crate) fn is_valid_registry(registry: &str) -> bool {
-    matches!(
-        registry,
-        "local"
-            | "hyperswarm"
-            | "BTC:mainnet"
-            | "BTC:testnet4"
-            | "BTC:signet"
-            | "ZEC:mainnet"
-            | "ZEC:testnet"
-    )
+    let mut chars = registry.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    registry.len() <= 128
+        && first.is_ascii_alphanumeric()
+        && chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, ':' | '_' | '-'))
 }
 
 fn require_admin_key(state: &AppState, headers: &HeaderMap) -> Option<Response> {

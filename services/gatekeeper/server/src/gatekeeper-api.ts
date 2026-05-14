@@ -747,7 +747,7 @@ v1router.post("/did/generate", async (req, res) => {
  *                       description: The DID type.
  *                     registry:
  *                       type: string
- *                       enum: [ "local", "hyperswarm", "BTC:testnet4", "BTC:signet" ]
+ *                       pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]*$'
  *                       description: Registry in which this DID is maintained.
  *                     version:
  *                       type: integer
@@ -1417,7 +1417,7 @@ v1router.post('/batch/import/cids', requireAdminKey, async (req, res) => {
  *           type: string
  *         description: >
  *           The name of the registry whose queue is being retrieved.
- *           Valid values may include "local", "hyperswarm", "BTC:testnet4", "BTC:signet", etc.
+ *           Registry names must match `[A-Za-z0-9][A-Za-z0-9:_-]*`.
  *
  *     responses:
  *       200:

@@ -44,12 +44,15 @@ describe('constructor', () => {
             expect(error.message).toBe('Invalid parameter: missing options.db');
         }
 
+        const customGatekeeper = new Gatekeeper({ db, ipfs, registries: ['hyperswarm', 'bogus_reg'] });
+        expect(await customGatekeeper.listRegistries()).toStrictEqual(['hyperswarm', 'bogus_reg']);
+
         try {
-            new Gatekeeper({ db, ipfs, registries: ['hyperswarm', 'bogus_reg'] });
+            new Gatekeeper({ db, ipfs, registries: ['hyperswarm', 'bogus registry'] });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
-            expect(error.message).toBe('Invalid parameter: registry=bogus_reg');
+            expect(error.message).toBe('Invalid parameter: registry=bogus registry');
         }
     });
 });
@@ -253,7 +256,7 @@ describe('generateDoc', () => {
 
     it('should return an empty doc if register registry invalid', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'mock' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'mock registry' });
         const doc = await gatekeeper.generateDoc(agentOp);
 
         expect(doc).toStrictEqual({});

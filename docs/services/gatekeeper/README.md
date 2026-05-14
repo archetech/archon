@@ -198,7 +198,7 @@ omitted from the JSON object; required fields MUST be present unless noted.
 {
   "version": 1,                               // currently only version 1 is valid
   "type": "agent" | "asset",
-  "registry": "local" | "hyperswarm" | "BTC:mainnet" | "BTC:signet" | "BTC:testnet4" | "ZEC:mainnet" | "ZEC:testnet",
+  "registry": "<registry-name>",              // e.g. "local", "hyperswarm", "BTC:signet", "ZEC:mainnet", or another configured registry
   "validUntil": "<RFC 3339>",                 // optional ephemeral expiry
   "prefix": "did:cid"                          // optional override of server default
 }
@@ -702,7 +702,7 @@ re-registers it.
 ### 8.5 Event shape validation
 
 ```
-event.registry ∈ ValidRegistries
+event.registry is a valid registry name (`[A-Za-z0-9][A-Za-z0-9:_-]*`, max 128 chars)
 event.time parses as RFC 3339
 event.operation present, canonical-bytes <= 64 KB
 proof format valid (§5.2)

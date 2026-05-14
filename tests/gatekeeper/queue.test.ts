@@ -57,11 +57,11 @@ describe('getQueue', () => {
 
     it('should throw an exception if invalid registry', async () => {
         try {
-            await gatekeeper.getQueue('mock');
+            await gatekeeper.getQueue('mock registry');
             throw new ExpectedExceptionError();
         } catch (error: any) {
             // eslint-disable-next-line
-            expect(error.message).toBe('Invalid parameter: registry=mock');
+            expect(error.message).toBe('Invalid parameter: registry=mock registry');
         }
     });
 });
@@ -143,10 +143,10 @@ describe('clearQueue', () => {
 
     it('should throw an exception if invalid registry', async () => {
         try {
-            await gatekeeper.clearQueue('mock', []);
+            await gatekeeper.clearQueue('mock registry', []);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid parameter: registry=mock');
+            expect(error.message).toBe('Invalid parameter: registry=mock registry');
         }
     });
 });

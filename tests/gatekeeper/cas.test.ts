@@ -143,11 +143,11 @@ describe('addBlock', () => {
 
     it('should throw exception on invalid registry', async () => {
         try {
-            await gatekeeper.addBlock('mock', mockBlock);
+            await gatekeeper.addBlock('mock registry', mockBlock);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
-            expect(error.message).toBe('Invalid parameter: registry=mock');
+            expect(error.message).toBe('Invalid parameter: registry=mock registry');
         }
     });
 });
@@ -198,11 +198,11 @@ describe('getBlock', () => {
     it('should throw exception on invalid registry', async () => {
         try {
             await gatekeeper.addBlock('local', mockBlock);
-            await gatekeeper.getBlock('mock', mockBlock.height);
+            await gatekeeper.getBlock('mock registry', mockBlock.height);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
-            expect(error.message).toBe('Invalid parameter: registry=mock');
+            expect(error.message).toBe('Invalid parameter: registry=mock registry');
         }
     });
 });

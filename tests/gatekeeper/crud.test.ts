@@ -64,13 +64,13 @@ describe('createDID', () => {
     // eslint-disable-next-line
     it('should throw exception on invalid registry', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'mockRegistry' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'mock registry' });
 
         try {
             await gatekeeper.createDID(agentOp);
             throw new ExpectedExceptionError();
         } catch (error: any) {
-            expect(error.message).toBe('Invalid operation: registration.registry=mockRegistry');
+            expect(error.message).toBe('Invalid operation: registration.registry=mock registry');
         }
     });
 
@@ -91,7 +91,7 @@ describe('createDID', () => {
 
     it('should throw exception on invalid type', async () => {
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'mockRegistry' });
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'mock registry' });
         // @ts-expect-error Testing invalid usage
         agentOp.registration!.type = 'mock';
 
