@@ -13,8 +13,12 @@ import {
 export { getXpub } from './derivation.js';
 
 const ZATS_PER_ZEC = 100_000_000;
-const DEFAULT_TX_VERSION = bitgo.ZcashTransaction.VERSION5_BRANCH_NU6_1;
+const DEFAULT_TX_VERSION = bitgo.ZcashTransaction.VERSION4_BRANCH_NU6_1;
 const CHANGE_DUST_ZAT = 1_000;
+const ZIP317_FEE_ZAT_PER_ACTION = 5_000;
+const ZIP317_GRACE_ACTIONS = 2;
+const ZIP317_P2PKH_INPUT_SIZE = 150;
+const ZIP317_P2PKH_OUTPUT_SIZE = 34;
 
 export interface ZcashUtxo {
     txid: string;
@@ -339,7 +343,7 @@ async function buildSignAndBroadcast(
     for (const utxo of utxos.sort((a, b) => b.zats - a.zats)) {
         selected.push(utxo);
         inputTotal += utxo.zats;
-        feeZats = estimateFeeZats(selected.length, outputs.length + 1, feeRate, outputs.some(output => output.script));
+        feeZats = estimateFeeZats(selected.length, outputs, feeRate, true);
         if (inputTotal >= spendAmount + feeZats) {
             break;
         }
@@ -415,11 +419,58 @@ async function getChangeAddress(zecClient: RpcClient, mnemonic: string, network:
     return deriveTransparentAddress(mnemonic, network, 1, config.gapLimit - 1);
 }
 
-function estimateFeeZats(inputCount: number, outputCount: number, feeRate?: number, hasOpReturn?: boolean): number {
+export function estimateZip317TransparentFeeZats(
+    transparentInputSizes: number[],
+    transparentOutputSizes: number[],
+    feeRate?: number,
+    defaultFeeZats: number = config.defaultFeeZat,
+): number {
+    const inputSize = transparentInputSizes.reduce((total, size) => total + size, 0);
+    const outputSize = transparentOutputSizes.reduce((total, size) => total + size, 0);
+    const logicalActions = Math.max(
+        ceilDiv(inputSize, ZIP317_P2PKH_INPUT_SIZE),
+        ceilDiv(outputSize, ZIP317_P2PKH_OUTPUT_SIZE),
+    );
+    const conventionalFee = ZIP317_FEE_ZAT_PER_ACTION * Math.max(ZIP317_GRACE_ACTIONS, logicalActions);
+
     if (!feeRate) {
-        return config.defaultFeeZat;
+        return Math.max(defaultFeeZats, conventionalFee);
     }
 
-    const estimatedBytes = 80 + (inputCount * 150) + (outputCount * 40) + (hasOpReturn ? 90 : 0);
-    return Math.max(config.defaultFeeZat, Math.ceil(estimatedBytes * feeRate));
+    const estimatedBytes = 80 + inputSize + outputSize;
+    return Math.max(defaultFeeZats, conventionalFee, Math.ceil(estimatedBytes * feeRate));
+}
+
+function estimateFeeZats(inputCount: number, outputs: BuildOutput[], feeRate?: number, includeChange?: boolean): number {
+    const inputSizes = Array.from({ length: inputCount }, () => ZIP317_P2PKH_INPUT_SIZE);
+    const outputSizes = outputs.map(estimateOutputSize);
+    if (includeChange) {
+        outputSizes.push(ZIP317_P2PKH_OUTPUT_SIZE);
+    }
+    return estimateZip317TransparentFeeZats(inputSizes, outputSizes, feeRate);
+}
+
+function estimateOutputSize(output: BuildOutput): number {
+    if (output.script) {
+        return 8 + compactSizeLength(output.script.length) + output.script.length;
+    }
+
+    return ZIP317_P2PKH_OUTPUT_SIZE;
+}
+
+function compactSizeLength(length: number): number {
+    if (length < 253) {
+        return 1;
+    }
+    if (length <= 0xffff) {
+        return 3;
+    }
+    if (length <= 0xffffffff) {
+        return 5;
+    }
+    return 9;
+}
+
+function ceilDiv(num: number, den: number): number {
+    return Math.ceil(num / den);
 }

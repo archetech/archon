@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 import {
     anchorData,
+    estimateZip317TransparentFeeZats,
     estimateFee,
     getBalance,
     getReceiveAddress,
@@ -48,6 +49,13 @@ function createRpcMock(overrides?: Partial<Record<string, any>>): RpcClient & { 
 }
 
 describe('zcash-wallet RPC-backed behavior', () => {
+    it('calculates ZIP-317 transparent fees from logical actions', () => {
+        expect(estimateZip317TransparentFeeZats([150], [34], undefined, 0)).toBe(10_000);
+        expect(estimateZip317TransparentFeeZats([150], [82, 34], undefined, 0)).toBe(20_000);
+        expect(estimateZip317TransparentFeeZats([150], [92, 34], undefined, 0)).toBe(20_000);
+        expect(estimateZip317TransparentFeeZats([150], [92, 34], 100, 0)).toBe(35_600);
+    });
+
     it('sets up idempotently when Zebra address-index RPCs are available', async () => {
         const rpc = createRpcMock();
         const result = await setupTransparentWallet(rpc, TEST_MNEMONIC, 'mainnet');
@@ -125,14 +133,14 @@ describe('zcash-wallet RPC-backed behavior', () => {
                 height: 3_339_230,
             }],
             sendrawtransaction: (params?: any[]) => {
-                expect(params?.[0]).toMatch(/^050000800a27a726/);
+                expect(params?.[0]).toMatch(/^0400008085202f89/);
                 return 'broadcast-txid';
             },
         });
 
-        await expect(anchorData(rpc, TEST_MNEMONIC, 'mainnet', 'archon')).resolves.toEqual({
+        await expect(anchorData(rpc, TEST_MNEMONIC, 'mainnet', `did:mdip:${'a'.repeat(54)}`)).resolves.toEqual({
             txid: 'broadcast-txid',
-            fee: 0.0001,
+            fee: 0.0002,
         });
     });
 });
