@@ -396,7 +396,7 @@ describe('importBatch', () => {
         const did = await gatekeeper.createDID(agentOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].operation.registration!.registry = 'mock';
+        ops[0].operation.registration!.registry = 'mock registry';
 
         const response = await gatekeeper.importBatch(ops);
 
