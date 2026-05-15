@@ -1,4 +1,4 @@
-import ZecClient, { Block, BlockVerbose, BlockHeader } from 'bitcoin-core';
+import type { Block, BlockVerbose, BlockHeader } from 'bitcoin-core';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import KeymasterClient from '@didcid/keymaster/client';
@@ -23,11 +23,58 @@ const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
 const keymaster = new KeymasterClient();
-const zecClient = new ZecClient({
-    username: config.user,
-    password: config.pass,
-    host: `http://${config.host}:${config.port}`,
-});
+
+class ZecRpcClient {
+    private readonly client = axios.create({
+        baseURL: `http://${config.host}:${config.port}`,
+        auth: config.user || config.pass ? {
+            username: config.user || '',
+            password: config.pass || '',
+        } : undefined,
+        headers: { 'content-type': 'application/json' },
+    });
+
+    private async command<T>(method: string, params: unknown[] = []): Promise<T> {
+        const { data } = await this.client.post('/', {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method,
+            params,
+        });
+
+        if (data?.error) {
+            throw new Error(data.error.message || `Zcash RPC ${method} failed`);
+        }
+
+        return data.result as T;
+    }
+
+    getBlock(hash: string, verbosity?: number): Promise<Block | BlockVerbose | string> {
+        return this.command('getblock', verbosity === undefined ? [hash] : [hash, verbosity]);
+    }
+
+    getBlockHeader(hash: string): Promise<BlockHeader> {
+        return this.command('getblockheader', [hash]);
+    }
+
+    getBlockHash(height: number): Promise<string> {
+        return this.command('getblockhash', [height]);
+    }
+
+    getBlockCount(): Promise<number> {
+        return this.command('getblockcount');
+    }
+
+    getNetworkInfo(): Promise<{ relayfee?: number }> {
+        return this.command('getnetworkinfo');
+    }
+
+    getBlockchainInfo(): Promise<unknown> {
+        return this.command('getblockchaininfo');
+    }
+}
+
+const zecClient = new ZecRpcClient();
 
 // Wallet service API helpers
 function walletHeaders(): Record<string, string> {
