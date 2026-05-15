@@ -1570,15 +1570,7 @@ impl JsonDb {
                 "height": block.get("height").cloned().unwrap_or(Value::Null)
             }));
 
-        let registration = event
-            .operation
-            .get("registration")
-            .cloned()
-            .or_else(|| {
-                // registration may be attached at the event level for batch-imported events
-                event.registration.clone()
-            });
-        let upper = registration.as_ref().and_then(|reg| {
+        let upper = event.registration.as_ref().and_then(|reg| {
             let height = reg.get("height").and_then(Value::as_u64)?;
             let block = self.get_block(registry, Some(BlockLookup::Height(height)))?;
             let mut obj = serde_json::Map::new();

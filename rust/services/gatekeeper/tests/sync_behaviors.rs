@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use common::{
     create_agent_operation, create_asset_operation, create_update_operation, make_event,
-    spawn_json,
+    sign_operation, spawn_json,
 };
 
 async fn admin_post(service: &common::TestService, path: &str, payload: Value) -> Result<Value> {
@@ -374,6 +374,85 @@ async fn sync_import_from_native_registry_confirms_latest_version() -> Result<()
     let resolved = resolve_did(&service, &agent_did).await?;
     assert_eq!(resolved["didDocumentMetadata"]["versionSequence"], "2");
     assert_eq!(resolved["didDocumentMetadata"]["confirmed"], true);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn sync_create_timestamp_uses_event_registration_for_upper_bound() -> Result<()> {
+    let service = spawn_json().await?;
+    let operation = sign_operation(
+        7,
+        &json!({
+            "type": "create",
+            "created": "2026-04-11T12:00:00Z",
+            "blockid": "zec-lower-block",
+            "registration": {
+                "version": 1,
+                "type": "agent",
+                "registry": "ZEC:mainnet"
+            },
+            "publicJwk": common::public_jwk(7)
+        }),
+        "#key-1",
+        "2026-04-11T12:00:00Z",
+    );
+    let did = admin_post(&service, "did/generate", operation.clone()).await?;
+    let did = did.as_str().unwrap().to_string();
+    let event = json!({
+        "registry": "ZEC:mainnet",
+        "time": "2026-04-11T12:00:00Z",
+        "ordinal": [101, 3, 0],
+        "operation": operation,
+        "height": 101,
+        "registration": {
+            "height": 101,
+            "index": 3,
+            "txid": "zec-txid",
+            "batch": "did:cid:zec-batch",
+            "opidx": 0
+        }
+    });
+
+    admin_get(&service, "db/reset").await?;
+    admin_post(
+        &service,
+        "block/ZEC:mainnet",
+        json!({
+            "hash": "zec-lower-block",
+            "height": 100,
+            "time": 1000
+        }),
+    )
+    .await?;
+    admin_post(
+        &service,
+        "block/ZEC:mainnet",
+        json!({
+            "hash": "zec-upper-block",
+            "height": 101,
+            "time": 1100
+        }),
+    )
+    .await?;
+    let imported = admin_post(&service, "batch/import", json!([event])).await?;
+    assert_eq!(imported["queued"], 1);
+    assert_eq!(imported["rejected"], 0);
+
+    let processed = admin_post(&service, "events/process", json!(null)).await?;
+    assert_eq!(processed["added"], 1);
+    assert_eq!(processed["rejected"], 0);
+
+    let resolved = resolve_did(&service, &did).await?;
+    let timestamp = &resolved["didDocumentMetadata"]["timestamp"];
+    assert_eq!(timestamp["chain"], "ZEC:mainnet");
+    assert_eq!(timestamp["lowerBound"]["blockid"], "zec-lower-block");
+    assert_eq!(timestamp["upperBound"]["blockid"], "zec-upper-block");
+    assert_eq!(timestamp["upperBound"]["height"], 101);
+    assert_eq!(timestamp["upperBound"]["txid"], "zec-txid");
+    assert_eq!(timestamp["upperBound"]["txidx"], 3);
+    assert_eq!(timestamp["upperBound"]["batchid"], "did:cid:zec-batch");
+    assert_eq!(timestamp["upperBound"]["opidx"], 0);
 
     Ok(())
 }

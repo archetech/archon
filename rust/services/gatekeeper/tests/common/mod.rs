@@ -281,7 +281,7 @@ fn signing_key(seed: u8) -> SigningKey {
     SigningKey::from(secret)
 }
 
-fn public_jwk(seed: u8) -> Value {
+pub fn public_jwk(seed: u8) -> Value {
     let signing_key = signing_key(seed);
     let verifying_key = signing_key.verifying_key();
     let point = verifying_key.to_encoded_point(false);
@@ -296,7 +296,7 @@ fn public_jwk(seed: u8) -> Value {
     })
 }
 
-fn sign_operation(seed: u8, operation: &Value, verification_method: &str, created: &str) -> Value {
+pub fn sign_operation(seed: u8, operation: &Value, verification_method: &str, created: &str) -> Value {
     let mut unsigned = operation.clone();
     unsigned
         .as_object_mut()
