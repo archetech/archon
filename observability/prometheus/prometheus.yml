@@ -46,3 +46,13 @@ scrape_configs:
     static_configs:
       - targets: ['btc-signet-mediator:4236']
     metrics_path: '/metrics'
+
+  - job_name: 'zcash-mainnet-wallet'
+    static_configs:
+      - targets: ['zcash-mainnet-wallet:4251']
+    metrics_path: '/metrics'
+
+  - job_name: 'zcash-mainnet-mediator'
+    static_configs:
+      - targets: ['zcash-mainnet-mediator:4238']
+    metrics_path: '/metrics'
