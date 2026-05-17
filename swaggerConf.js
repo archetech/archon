@@ -5,7 +5,7 @@ const baseDefinition = {
     openapi: '3.0.0',
     info: {
         title: 'Keymaster API',
-        version: '0.8.0',
+        version: '0.9.0',
         description: 'Documentation for Keymaster API'
     },
 };
@@ -38,4 +38,3 @@ const gatekeeperSpec = swaggerJsdoc(gatekeeperOptions);
 const keymasterSpec = swaggerJsdoc(keymasterOptions);
 fs.writeFileSync('docs/gatekeeper-api.json', JSON.stringify(gatekeeperSpec, null, 2));
 fs.writeFileSync('docs/keymaster-api.json', JSON.stringify(keymasterSpec, null, 2));
-
