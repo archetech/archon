@@ -1,17 +1,18 @@
 # Archon Deployment Guide
 
-This guide walks you through deploying an Archon node, from a minimal DID-only setup to a full Lightning-enabled stack. Each section builds on the previous one — start with the core and add layers as needed.
+This guide walks you through deploying an Archon node, from a minimal DID-only setup to a full registry, Drawbridge, and Lightning-enabled stack. Each section builds on the previous one — start with the core and add layers as needed.
 
 ## Table of Contents
 
 1. [Prerequisites](#1-prerequisites)
 2. [Core Node (DID Only)](#2-core-node-did-only)
 3. [Adding Bitcoin Registries](#3-adding-bitcoin-registries)
-4. [Adding Drawbridge (API Gateway + Tor)](#4-adding-drawbridge-api-gateway--tor)
-5. [Bundled Lightning Stack (Optional)](#5-bundled-lightning-stack-optional)
-6. [Production Hardening](#6-production-hardening)
-7. [Port Reference](#7-port-reference)
-8. [Troubleshooting](#8-troubleshooting)
+4. [Adding Zcash Registry](#4-adding-zcash-registry)
+5. [Adding Drawbridge (API Gateway + Tor)](#5-adding-drawbridge-api-gateway--tor)
+6. [Bundled Lightning Stack (Optional)](#6-bundled-lightning-stack-optional)
+7. [Production Hardening](#7-production-hardening)
+8. [Port Reference](#8-port-reference)
+9. [Troubleshooting](#9-troubleshooting)
 
 ---
 
@@ -70,6 +71,7 @@ Comment out the `include:` lines at the top of `docker-compose.yml` for any serv
 #   - docker-compose.btc-signet.yml
 #   - docker-compose.lightning.yml
 #   - docker-compose.drawbridge.yml
+#   - docker-compose.zcash-mainnet.yml
 ```
 
 ### Key Environment Variables
@@ -89,6 +91,7 @@ Comment out the `include:` lines at the top of `docker-compose.yml` for any serv
 | `ARCHON_GATEKEEPER_REGISTRIES` | `hyperswarm` | Comma-separated list of registries |
 | `ARCHON_DEFAULT_REGISTRY` | `hyperswarm` | Default registry for new DIDs |
 | `ARCHON_PROTOCOL` | `/ARCHON/v0.8-beta` | Hyperswarm protocol identifier |
+| `ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL` | *(empty)* | Optional Gatekeeper peer for `confirm=true` resolution when local data is not confirmed |
 
 ### Services
 
@@ -100,6 +103,8 @@ Comment out the `include:` lines at the top of `docker-compose.yml` for any serv
 | **gatekeeper** | DID resolution and management API |
 | **keymaster** | Wallet and credential management API |
 | **hyperswarm-mediator** | P2P DID synchronization |
+| **zcash-mainnet-mediator** | Optional transparent Zcash DID anchoring |
+| **zcash-mainnet-wallet** | Optional transparent Zcash wallet for anchoring transactions |
 | **cli** | Command-line interface container |
 | **explorer** | DID explorer web app |
 | **gatekeeper-client** | Browser UI for the Gatekeeper API |
@@ -181,7 +186,68 @@ curl http://localhost:4236/metrics
 
 ---
 
-## 4. Adding Drawbridge (API Gateway + Tor)
+## 4. Adding Zcash Registry
+
+Zcash support is optional. If enabled, the Zcash registry anchors DID batches in transparent Zcash transactions via the Zcash mediator. The bundled compose layer includes both `zcash-mainnet-mediator` and a companion `zcash-mainnet-wallet` service. It expects an external Zebra node with RPC access; Zebra provides chain, address-index, and broadcast RPCs while the wallet derives transparent keys from Keymaster and signs locally.
+
+Only transparent Zcash flows are supported in this stack. Shielded and unified-address wallet flows are intentionally out of scope for the current mediator.
+
+### Enable Zcash
+
+Uncomment in `docker-compose.yml`:
+
+```yaml
+include:
+  - docker-compose.zcash-mainnet.yml
+```
+
+### Key Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ARCHON_ZEC_HOST` | none | Zebra RPC host |
+| `ARCHON_ZEC_PORT` | `8232` | Zebra RPC port |
+| `ARCHON_ZEC_USER` | *(empty)* | Zebra RPC username, if configured |
+| `ARCHON_ZEC_PASS` | *(empty)* | Zebra RPC password, if configured |
+| `ARCHON_WALLET_ZEC_FALLBACK_FEE_ZAT_KB` | `10000` | Wallet fallback fee in zatoshis per KB |
+| `ARCHON_ZEC_CHAIN` | `ZEC:mainnet` | Gatekeeper registry name |
+| `ARCHON_ZEC_NETWORK` | `mainnet` | Zcash network name |
+| `ARCHON_ZEC_START_BLOCK` | `3339235` | Block height to start scanning |
+| `ARCHON_ZEC_IMPORT_INTERVAL` | `1` | Minutes between import scans; `0` disables importing |
+| `ARCHON_ZEC_EXPORT_INTERVAL` | `1` | Minutes between export attempts; `0` makes the mediator read-only |
+| `ARCHON_ZEC_FEE_BLOCK_TARGET` | `1` | Fee target used for local/oracle fee selection |
+| `ARCHON_ZEC_FEE_FALLBACK_ZAT_BYTE` | `10` | Mediator fallback fee in zatoshis per virtual byte |
+| `ARCHON_ZEC_FEE_MAX` | `0.00010000` | Maximum fee budget in ZEC |
+| `ARCHON_ZEC_FEE_ORACLE_URL` | *(empty)* | Optional external fee oracle |
+| `ARCHON_ZEC_RBF_ENABLED` | `false` | Config parity flag; fee bumping is not supported yet |
+| `ARCHON_ZEC_REIMPORT` | `true` | Reprocess discovered batches on startup |
+| `ARCHON_ZEC_DB` | `json` | Mediator state backend: `json`, `sqlite`, `mongodb`, or `redis` |
+
+### Verify
+
+```bash
+# Zcash mediator metrics
+curl http://localhost:4238/metrics
+
+# Zcash wallet metrics
+curl http://localhost:4251/metrics
+```
+
+Grafana includes a **Zcash Mediator (ZEC:mainnet)** dashboard when the observability stack is enabled.
+
+### Confirmed Resolution Without Local Zcash
+
+If you do not enable `docker-compose.zcash-mainnet.yml`, you can still delegate confirmed Zcash resolution to another Gatekeeper node that does track `ZEC:mainnet`:
+
+```env
+ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL=https://gatekeeper.example.com
+```
+
+This fallback is only used for `confirm=true` requests when the local node can resolve a DID but cannot confirm it locally. It does not import Zcash events, run a wallet, or make this node able to anchor new Zcash operations.
+
+---
+
+## 5. Adding Drawbridge (API Gateway + Tor)
 
 Drawbridge is the L402 API gateway that enables Lightning payments for API access and Lightning zaps between DIDs. The Drawbridge compose layer also brings in Herald, Herald client, Drawbridge client, the Lightning mediator, and a Tor hidden service for privacy.
 
@@ -225,7 +291,7 @@ ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL=http://your-lnbits:5000
 
 #### Option B: Bundled CLN
 
-Include the Lightning stack (see [Section 5](#5-bundled-lightning-stack-optional)). Runes and secrets are auto-generated by init containers and shared with `lightning-mediator` via Docker volumes — no manual configuration needed.
+Include the Lightning stack (see [Section 6](#6-bundled-lightning-stack-optional)). Runes and secrets are auto-generated by init containers and shared with `lightning-mediator` via Docker volumes — no manual configuration needed.
 
 ### Key Environment Variables
 
@@ -265,7 +331,7 @@ Optional UIs when Drawbridge is enabled:
 
 ---
 
-## 5. Bundled Lightning Stack (Optional)
+## 6. Bundled Lightning Stack (Optional)
 
 If you don't have an existing CLN node, the bundled Lightning stack provides a complete setup with CLN, RTL, and LNbits.
 
@@ -344,7 +410,7 @@ curl http://localhost:4235/ready
 
 ---
 
-## 6. Production Hardening
+## 7. Production Hardening
 
 ### Reverse Proxy
 
@@ -375,6 +441,7 @@ Back up the entire `./data/` directory regularly. Critical data:
 | `./data/cln-mainnet/` | Lightning wallet, channels, keys | **Critical** — loss means lost funds |
 | `./data/tor-drawbridge/` | Tor hidden service keys | High — loss means new `.onion` address |
 | `./data/mongodb/` | Registry and wallet-side service state used by bundled Bitcoin mediators | High |
+| `./data/ZEC:mainnet-mediator.json` or `./data/ZEC:mainnet-mediator.db` | Zcash mediator scan/export state when using local JSON or SQLite storage | High |
 | `./data/redis/` | Cache (reconstructible) | Low |
 
 ### Monitoring
@@ -393,7 +460,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 
 ---
 
-## 7. Port Reference
+## 8. Port Reference
 
 | Port | Service | Default | Env Var | Binding |
 |------|---------|---------|---------|---------|
@@ -411,8 +478,11 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 3001 | CLN REST | 3001 | -- | localhost |
 | 3002 | RTL | 3002 | `ARCHON_RTL_PORT` | localhost |
 | 5000 | LNbits | 5000 | `ARCHON_LNBITS_PORT` | localhost |
+| 4238 | Zcash Mainnet Mediator Metrics | 4238 | `ARCHON_ZEC_METRICS_PORT` | localhost |
 | 4240 | BTC Signet Wallet API | 4240 | -- | localhost |
 | 4241 | BTC Signet Wallet Metrics | 4241 | -- | localhost |
+| 4250 | Zcash Mainnet Wallet API | 4250 | -- | localhost |
+| 4251 | Zcash Mainnet Wallet Metrics | 4251 | -- | localhost |
 | 27017 | MongoDB | 27017 | -- | localhost |
 | 6379 | Redis | 6379 | -- | localhost |
 | 5001 | IPFS API | 5001 | -- | localhost |
@@ -425,7 +495,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### CLN Not Syncing
 
@@ -456,6 +526,18 @@ If CLN is taking too long to start (e.g., first-time Tor setup), the init contai
 ```bash
 docker compose restart drawbridge-init
 ```
+
+### Zcash Mediator Not Scanning
+
+Check Zebra RPC connectivity and credentials:
+
+```bash
+docker compose logs zcash-mainnet-mediator
+docker compose logs zcash-mainnet-wallet
+curl http://localhost:4238/metrics
+```
+
+Verify `ARCHON_ZEC_HOST`, `ARCHON_ZEC_PORT`, `ARCHON_ZEC_USER`, and `ARCHON_ZEC_PASS` are correct and reachable from inside the Docker network. Also confirm `ARCHON_GATEKEEPER_REGISTRIES` includes `ZEC:mainnet`; otherwise Gatekeeper will not accept queued Zcash operations.
 
 ### Tor Onion Not Resolving
 
