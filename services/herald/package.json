@@ -1,5 +1,6 @@
 {
   "name": "herald",
+  "version": "0.9.0",
   "private": true,
   "scripts": {
     "install": "npm install --prefix server",
