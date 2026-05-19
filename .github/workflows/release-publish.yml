@@ -32,17 +32,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dockerfile: Dockerfile.gatekeeper-ts
+          - dockerfile: docker/Dockerfile.gatekeeper-ts
             image: gatekeeper
-          - dockerfile: Dockerfile.keymaster-ts
+          - dockerfile: docker/Dockerfile.keymaster-ts
             image: keymaster
-          - dockerfile: Dockerfile.hyperswarm
+          - dockerfile: docker/Dockerfile.hyperswarm
             image: hyperswarm-mediator
-          - dockerfile: Dockerfile.satoshi
+          - dockerfile: docker/Dockerfile.satoshi
             image: sat-mediator
-          - dockerfile: Dockerfile.cli
+          - dockerfile: docker/Dockerfile.cli
             image: cli
-          - dockerfile: Dockerfile.explorer
+          - dockerfile: docker/Dockerfile.explorer
             image: explorer
     steps:
       - name: Checkout repository

@@ -32,35 +32,35 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dockerfile: Dockerfile.gatekeeper-ts
+          - dockerfile: docker/Dockerfile.gatekeeper-ts
             image: gatekeeper
-          - dockerfile: Dockerfile.keymaster-ts
+          - dockerfile: docker/Dockerfile.keymaster-ts
             image: keymaster
           - dockerfile: services/herald/Dockerfile
             image: herald
-          - dockerfile: Dockerfile.drawbridge
+          - dockerfile: docker/Dockerfile.drawbridge
             image: drawbridge
-          - dockerfile: Dockerfile.hyperswarm
+          - dockerfile: docker/Dockerfile.hyperswarm
             image: hyperswarm-mediator
-          - dockerfile: Dockerfile.satoshi-wallet
+          - dockerfile: docker/Dockerfile.satoshi-wallet
             image: satoshi-wallet
-          - dockerfile: Dockerfile.satoshi
+          - dockerfile: docker/Dockerfile.satoshi
             image: satoshi-mediator
-          - dockerfile: Dockerfile.lightning-mediator
+          - dockerfile: docker/Dockerfile.lightning-mediator
             image: lightning-mediator
-          - dockerfile: Dockerfile.cli
+          - dockerfile: docker/Dockerfile.cli
             image: cli
-          - dockerfile: Dockerfile.explorer
+          - dockerfile: docker/Dockerfile.explorer
             image: explorer
-          - dockerfile: Dockerfile.gatekeeper-client
+          - dockerfile: docker/Dockerfile.gatekeeper-client
             image: gatekeeper-client
-          - dockerfile: Dockerfile.keymaster-client
+          - dockerfile: docker/Dockerfile.keymaster-client
             image: keymaster-client
-          - dockerfile: Dockerfile.react-wallet
+          - dockerfile: docker/Dockerfile.react-wallet
             image: react-wallet
-          - dockerfile: Dockerfile.herald-client
+          - dockerfile: docker/Dockerfile.herald-client
             image: herald-client
-          - dockerfile: Dockerfile.gatekeeper-client
+          - dockerfile: docker/Dockerfile.gatekeeper-client
             image: drawbridge-client
     steps:
       - name: Checkout repository
