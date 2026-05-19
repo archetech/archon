@@ -232,7 +232,9 @@ describe('addAddress', () => {
         jest.spyOn(keymaster, 'createResponse').mockResolvedValue('did:cid:response');
         jest.spyOn(globalThis, 'fetch')
             .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge' }))
-            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }));
+            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }))
+            .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404))
+            .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404));
 
         const ok = await keymaster.addAddress('alice@archon.social');
         const addresses = await keymaster.listAddresses();
@@ -307,7 +309,8 @@ describe('addAddress', () => {
         jest.spyOn(globalThis, 'fetch')
             .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge' }))
             .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }))
-            .mockResolvedValueOnce(mockFetchResponse(true, { serviceDID }));
+            .mockResolvedValueOnce(mockFetchResponse(true, { serviceDID }))
+            .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404));
 
         const ok = await keymaster.addAddress('alice@archon.social');
         const addresses = await keymaster.listAddresses();
@@ -334,7 +337,9 @@ describe('addAddress', () => {
             .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404))
             .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge' }))
             .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404))
-            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }));
+            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }))
+            .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404))
+            .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404));
 
         const ok = await keymaster.addAddress('alice@archon.social');
         const addresses = await keymaster.listAddresses();
@@ -369,7 +374,9 @@ describe('addAddress', () => {
             .mockResolvedValueOnce(mockFetchResponse(true, '<html>Name Service</html>', 200, 'text/html; charset=utf-8'))
             .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge' }))
             .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404))
-            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }));
+            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true, name: 'alice' }))
+            .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404))
+            .mockResolvedValueOnce(mockFetchResponse(false, { error: 'not found' }, 404));
 
         const ok = await keymaster.addAddress('alice@archon.social');
         const addresses = await keymaster.listAddresses();
