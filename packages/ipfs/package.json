@@ -79,7 +79,7 @@
     "@helia/unixfs": "^5.0.0",
     "axios": "^1.16.0",
     "blockstore-fs": "^2.0.2",
-    "helia": "^5.3.0",
+    "helia": "^6.1.4",
     "ip": "^2.0.1",
     "kubo-rpc-client": "^5.1.0",
     "multiformats": "^13.3.3"

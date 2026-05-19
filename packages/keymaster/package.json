@@ -148,12 +148,13 @@
     "commander": "^11.1.0",
     "dotenv": "^16.4.5",
     "file-type": "^21.3.2",
+    "helia": "6.1.4",
     "image-size": "^2.0.1",
     "ioredis": "^5.4.1",
     "light-bolt11-decoder": "^3.2.0",
     "mongodb": "^6.5.0",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^6.0.1"
   },
   "repository": {
     "type": "git",
