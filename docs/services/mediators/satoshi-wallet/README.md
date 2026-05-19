@@ -307,7 +307,7 @@ contractual for dashboards or log aggregators today.
 Verified end-to-end against:
 
 - signet + real Bitcoin Core on the
-  [docker/compose/docker-compose.btc-signet.yml](../../../../docker/compose/docker-compose.btc-signet.yml)
+  [docker/compose/btc-signet.yml](../../../../docker/compose/btc-signet.yml)
   stack.
 - The satoshi-mediator anchor + RBF flow.
 

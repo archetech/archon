@@ -1,15 +1,14 @@
-# Full Rust gatekeeper service definition. Pulled into docker-compose.yml via
-# the `include:` directive when ARCHON_GATEKEEPER_FLAVOR=rust. Keep in sync
-# with docker-compose.gatekeeper-ts.yml whenever non-build env/ports/healthcheck
-# fields change.
+# Full TypeScript gatekeeper service definition. Pulled into docker-compose.yml
+# via the `include:` directive. Keep in sync with gatekeeper-rust.yml
+# whenever non-build env/ports/healthcheck fields change.
 services:
   gatekeeper:
     build:
       context: ../..
-      dockerfile: docker/Dockerfile.gatekeeper-rust
+      dockerfile: docker/Dockerfile.gatekeeper-ts
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/gatekeeper-rust
+    image: ghcr.io/archetech/gatekeeper-typescript
     environment:
       - ARCHON_GATEKEEPER_PORT=4224
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}

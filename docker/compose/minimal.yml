@@ -1,0 +1,3 @@
+include:
+  - core.yml
+  - gatekeeper-${ARCHON_GATEKEEPER_FLAVOR:-ts}.yml

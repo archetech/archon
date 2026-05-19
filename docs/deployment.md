@@ -67,11 +67,11 @@ Comment out the `include:` lines at the top of `docker-compose.yml` for any serv
 
 ```yaml
 # include:
-#   - docker/compose/docker-compose.btc-mainnet.yml
-#   - docker/compose/docker-compose.btc-signet.yml
-#   - docker/compose/docker-compose.lightning.yml
-#   - docker/compose/docker-compose.drawbridge.yml
-#   - docker/compose/docker-compose.zcash-mainnet.yml
+#   - docker/compose/btc-mainnet.yml
+#   - docker/compose/btc-signet.yml
+#   - docker/compose/lightning.yml
+#   - docker/compose/drawbridge.yml
+#   - docker/compose/zcash-mainnet.yml
 ```
 
 ### Key Environment Variables
@@ -138,9 +138,9 @@ Bitcoin registries anchor DIDs on-chain via the Satoshi mediator. Each bundled n
 
 | File | Network | Bitcoin Node |
 |------|---------|-------------|
-| `docker/compose/docker-compose.btc-mainnet.yml` | BTC mainnet | **You provide** — requires an external Bitcoin Core node with RPC access |
-| `docker/compose/docker-compose.btc-signet.yml` | BTC signet | Bundled — runs its own `bitcoin-core` container |
-| `docker/compose/docker-compose.btc-testnet4.yml` | BTC testnet4 | Bundled — runs its own `bitcoin-core` container |
+| `docker/compose/btc-mainnet.yml` | BTC mainnet | **You provide** — requires an external Bitcoin Core node with RPC access |
+| `docker/compose/btc-signet.yml` | BTC signet | Bundled — runs its own `bitcoin-core` container |
+| `docker/compose/btc-testnet4.yml` | BTC testnet4 | Bundled — runs its own `bitcoin-core` container |
 
 ### Enable a Registry
 
@@ -148,8 +148,8 @@ Uncomment the relevant `include:` line in `docker-compose.yml`:
 
 ```yaml
 include:
-  - docker/compose/docker-compose.btc-mainnet.yml
-  # - docker/compose/docker-compose.btc-signet.yml
+  - docker/compose/btc-mainnet.yml
+  # - docker/compose/btc-signet.yml
 ```
 
 ### Key Environment Variables (Mainnet)
@@ -198,7 +198,7 @@ Uncomment in `docker-compose.yml`:
 
 ```yaml
 include:
-  - docker/compose/docker-compose.zcash-mainnet.yml
+  - docker/compose/zcash-mainnet.yml
 ```
 
 ### Key Environment Variables
@@ -237,7 +237,7 @@ Grafana includes a **Zcash Mediator (ZEC:mainnet)** dashboard when the observabi
 
 ### Confirmed Resolution Without Local Zcash
 
-If you do not enable `docker/compose/docker-compose.zcash-mainnet.yml`, you can still delegate confirmed Zcash resolution to another Gatekeeper node that does track `ZEC:mainnet`:
+If you do not enable `docker/compose/zcash-mainnet.yml`, you can still delegate confirmed Zcash resolution to another Gatekeeper node that does track `ZEC:mainnet`:
 
 ```env
 ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL=https://gatekeeper.example.com
@@ -257,7 +257,7 @@ Uncomment in `docker-compose.yml`:
 
 ```yaml
 include:
-  - docker/compose/docker-compose.drawbridge.yml
+  - docker/compose/drawbridge.yml
 ```
 
 ### Lightning Backend
@@ -341,8 +341,8 @@ Uncomment in `docker-compose.yml`:
 
 ```yaml
 include:
-  - docker/compose/docker-compose.lightning.yml
-  - docker/compose/docker-compose.drawbridge.yml
+  - docker/compose/lightning.yml
+  - docker/compose/drawbridge.yml
 ```
 
 ### Bitcoin RPC

@@ -69,7 +69,7 @@ The cryptographic implementation (cipher package) uses sound primitives (secp256
 | H-06 | 🟠 High | Git | `.gitignore` missing critical data exclusions | `.gitignore` |
 | H-07 | 🟠 High | Extension | `<all_urls>` content script + host permissions | `apps/chrome-extension/` — `manifest.json` |
 | H-08 | 🟠 High | Extension | Plaintext passphrase stored in offscreen memory | `apps/chrome-extension/src/offscreen.ts` |
-| H-09 | 🟠 High | Infra | Bitcoin signet RPC port exposed to all interfaces | `docker/compose/docker-compose.btc-signet.yml` |
+| H-09 | 🟠 High | Infra | Bitcoin signet RPC port exposed to all interfaces | `docker/compose/btc-signet.yml` |
 | M-01 | 🟡 Medium | Validation | No input validation library/schema enforcement | All API servers |
 | M-02 | 🟡 Medium | Info Leak | Error messages expose `error.message` to clients | All API servers |
 | M-03 | 🟡 Medium | Injection | Potential NoSQL injection via `queryDocs` endpoint | `services/gatekeeper/server/` — `POST /dids/query` |
@@ -333,7 +333,7 @@ The wallet passphrase is stored as a plaintext string in a module-scoped variabl
 
 **Severity:** 🟠 High
 **Category:** Network Exposure
-**Affected:** `docker/compose/docker-compose.btc-signet.yml`
+**Affected:** `docker/compose/btc-signet.yml`
 
 ```yaml
 ports:
@@ -729,9 +729,9 @@ sudo nginx -t && sudo systemctl reload nginx
 - `sample.env` *(updated with `ARCHON_BIND_ADDRESS` and `ARCHON_ADMIN_API_KEY`)*
 - `.gitignore`
 - `docker-compose.yml` *(updated with new env vars)*
-- `docker/compose/docker-compose.btc-mainnet.yml`
-- `docker/compose/docker-compose.btc-signet.yml`
-- `docker/compose/docker-compose.btc-testnet4.yml`
+- `docker/compose/btc-mainnet.yml`
+- `docker/compose/btc-signet.yml`
+- `docker/compose/btc-testnet4.yml`
 - `docker/Dockerfile.cli`, `docker/Dockerfile.explorer`, `docker/Dockerfile.gatekeeper-ts`, `docker/Dockerfile.hyperswarm`, `docker/Dockerfile.keymaster-ts`, `docker/Dockerfile.react-wallet`, `docker/Dockerfile.satoshi`
 - `data/redis.conf`
 - `data/wallet.json`
