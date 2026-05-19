@@ -1,0 +1,23 @@
+services:
+  react-wallet:
+    build:
+      context: .
+      dockerfile: Dockerfile.react-wallet
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        VITE_GATEKEEPER_URL: ${ARCHON_REACT_WALLET_GATEKEEPER_URL-}
+    image: ghcr.io/archetech/react-wallet
+    environment:
+      - VITE_PORT=${ARCHON_REACT_WALLET_PORT:-4228}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "${ARCHON_REACT_WALLET_PORT:-4228}:${ARCHON_REACT_WALLET_PORT:-4228}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4228/',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      gatekeeper:
+        condition: service_healthy

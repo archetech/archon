@@ -1,255 +1,37 @@
 include:
+  # Minimal node:
+  #   docker compose -f docker-compose.minimal.yml up
+  #
+  # To customize this full-node file by hand, keep the core and Gatekeeper
+  # includes, then comment out any optional includes you do not want to run.
+  - docker-compose.core.yml
+  #
   # Gatekeeper implementation. Set ARCHON_GATEKEEPER_FLAVOR=rust (or ts) in
   # .env to choose, or export it before `docker compose up`. Defaults to the
   # TypeScript service. Each flavor file carries the full gatekeeper service
   # definition.
   - docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR:-ts}.yml
+
   # Keymaster implementation. Set ARCHON_KEYMASTER_FLAVOR=py (or ts) in
   # .env to choose, or export it before `docker compose up`. Defaults to the
   # TypeScript service. Each flavor file carries the full keymaster service
-  # definition.
+  # definition. Required by wallet, CLI, Herald, Hyperswarm, and chain
+  # mediator services.
   - docker-compose.keymaster-${ARCHON_KEYMASTER_FLAVOR:-ts}.yml
+
+  # Optional node services. Comment out any component you do not want to run.
+  # Services with chain, Lightning, Herald, or Hyperswarm dependencies generally
+  # require Keymaster to remain enabled.
+  - docker-compose.hyperswarm.yml
+  - docker-compose.cli.yml
+  - docker-compose.explorer.yml
+  - docker-compose.gatekeeper-client.yml
+  - docker-compose.keymaster-client.yml
+  - docker-compose.react-wallet.yml
+  - docker-compose.observability.yml
   - docker-compose.btc-mainnet.yml
   - docker-compose.btc-signet.yml
   - docker-compose.lightning.yml
   - docker-compose.drawbridge.yml
 #  - docker-compose.btc-testnet4.yml
   - docker-compose.zcash-mainnet.yml
-
-services:
-  mongodb:
-    image: mongo:8.0
-    volumes:
-      - ./data/mongodb:/data/db
-    ports:
-      - 127.0.0.1:27017:27017
-    healthcheck:
-      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/27017 && exec 3<&- && exec 3>&-'"]
-      interval: 60s
-      timeout: 5s
-      retries: 6
-      start_period: 15s
-
-  redis:
-    image: redis:8.0.4-alpine
-    command: redis-server /usr/local/etc/redis/redis.conf
-    volumes:
-      - ./data/redis.conf:/usr/local/etc/redis/redis.conf
-      - ./data/redis:/data
-    ports:
-      - 127.0.0.1:6379:6379
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 60s
-      timeout: 5s
-      retries: 6
-      start_period: 10s
-
-  ipfs:
-    image: ipfs/kubo:v0.40.1
-    ports:
-      - 4001:4001
-      - 4001:4001/udp
-      - 127.0.0.1:5001:5001
-    volumes:
-      - ./data/ipfs:/data/ipfs
-      - ./share:/export/share
-    healthcheck:
-      test: ["CMD-SHELL", "wget --post-data='' -qO- http://127.0.0.1:5001/api/v0/version >/dev/null"]
-      interval: 30s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-
-  # The `gatekeeper` service is pulled in via the `include:` at the top of
-  # this file. ARCHON_GATEKEEPER_FLAVOR (ts | rust) selects which flavor
-  # file is loaded; default is ts.
-
-  # The `keymaster` service is pulled in via the `include:` at the top of
-  # this file. ARCHON_KEYMASTER_FLAVOR (ts | py) selects which flavor file
-  # is loaded; default is ts.
-
-  hyperswarm-mediator:
-    build:
-      context: .
-      dockerfile: Dockerfile.hyperswarm
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/hyperswarm-mediator
-    environment:
-      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
-      - ARCHON_KEYMASTER_URL=http://keymaster:4226
-      - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
-      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
-      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
-      - ARCHON_NODE_NAME=${ARCHON_NODE_NAME}
-      - ARCHON_PROTOCOL=${ARCHON_PROTOCOL}
-      - ARCHON_HYPR_EXPORT_INTERVAL=${ARCHON_HYPR_EXPORT_INTERVAL}
-      - ARCHON_HYPR_METRICS_PORT=4232
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    ports:
-      - "127.0.0.1:4232:4232"
-    healthcheck:
-      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4232/health',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
-      interval: 15s
-      timeout: 5s
-      retries: 6
-      start_period: 25s
-    depends_on:
-      gatekeeper:
-        condition: service_healthy
-      keymaster:
-        condition: service_healthy
-      ipfs:
-        condition: service_healthy
-
-  cli:
-    build:
-      context: .
-      dockerfile: Dockerfile.cli
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/cli
-    environment:
-      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
-      - ARCHON_KEYMASTER_URL=http://keymaster:4226
-      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
-      - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
-    volumes:
-      - ./share:/app/share
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    depends_on:
-      gatekeeper:
-        condition: service_healthy
-      keymaster:
-        condition: service_healthy
-      ipfs:
-        condition: service_healthy
-
-  explorer:
-    build:
-      context: .
-      dockerfile: Dockerfile.explorer
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/explorer
-    environment:
-      - VITE_EXPLORER_PORT=4000
-      - VITE_GATEKEEPER_URL=http://localhost:4224
-      - VITE_SEARCH_SERVER=http://localhost:4224
-      - VITE_OPERATION_NETWORKS=hyperswarm,local,BTC:signet,BTC:testnet4,ZEC:mainnet
-    ports:
-      - "4000:4000"
-    healthcheck:
-      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4000/version',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
-      interval: 15s
-      timeout: 5s
-      retries: 6
-      start_period: 20s
-    depends_on:
-      gatekeeper:
-        condition: service_healthy
-
-  gatekeeper-client:
-    build:
-      context: .
-      dockerfile: Dockerfile.gatekeeper-client
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-        VITE_SERVER_PORT: ${ARCHON_GATEKEEPER_PORT:-4224}
-    image: ghcr.io/archetech/gatekeeper-client
-    environment:
-      - VITE_PORT=4225
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    ports:
-      - "${ARCHON_GATEKEEPER_CLIENT_PORT:-4225}:4225"
-    healthcheck:
-      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4225/',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
-      interval: 15s
-      timeout: 5s
-      retries: 6
-      start_period: 20s
-    depends_on:
-      gatekeeper:
-        condition: service_healthy
-
-  keymaster-client:
-    build:
-      context: .
-      dockerfile: Dockerfile.keymaster-client
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-        VITE_SERVER_PORT: ${ARCHON_KEYMASTER_PORT:-4226}
-    image: ghcr.io/archetech/keymaster-client
-    environment:
-      - VITE_PORT=4227
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    ports:
-      - "${ARCHON_KEYMASTER_CLIENT_PORT:-4227}:4227"
-    healthcheck:
-      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4227/',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
-      interval: 15s
-      timeout: 5s
-      retries: 6
-      start_period: 20s
-    depends_on:
-      keymaster:
-        condition: service_healthy
-
-  react-wallet:
-    build:
-      context: .
-      dockerfile: Dockerfile.react-wallet
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-        VITE_GATEKEEPER_URL: ${ARCHON_REACT_WALLET_GATEKEEPER_URL-}
-    image: ghcr.io/archetech/react-wallet
-    environment:
-      - VITE_PORT=${ARCHON_REACT_WALLET_PORT:-4228}
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    ports:
-      - "${ARCHON_REACT_WALLET_PORT:-4228}:${ARCHON_REACT_WALLET_PORT:-4228}"
-    healthcheck:
-      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4228/',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
-      interval: 15s
-      timeout: 5s
-      retries: 6
-      start_period: 20s
-    depends_on:
-      gatekeeper:
-        condition: service_healthy
-
-  # Observability Stack
-  prometheus:
-    image: prom/prometheus:v2.51.0
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    volumes:
-      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./data/prometheus:/prometheus
-    ports:
-      - "127.0.0.1:9090:9090"
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=15d"
-    depends_on:
-      gatekeeper:
-        condition: service_healthy
-      keymaster:
-        condition: service_healthy
-
-  grafana:
-    image: grafana/grafana:10.4.0
-    user: "${ARCHON_UID}:${ARCHON_GID}"
-    volumes:
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning
-      - ./data/grafana:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_USERS_DEFAULT_THEME=dark
-    ports:
-      - "${ARCHON_GRAFANA_PORT:-3000}:3000"
-    depends_on:
-      - prometheus

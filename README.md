@@ -35,6 +35,17 @@ $ cp sample.env .env
 $ ./start-node
 ```
 
+To run only a minimal Gatekeeper node and its core dependencies (MongoDB,
+Redis, and IPFS), use the minimal Compose file:
+
+```bash
+docker compose -f docker-compose.minimal.yml up --build
+```
+
+The default `docker-compose.yml` keeps the full node enabled, but its
+top-level `include:` list is organized so optional components can be commented
+out when you want a custom stack.
+
 ### Keymaster Onboarding
 
 For a local Keymaster wallet and identity without running a full node, use the hosted installer:

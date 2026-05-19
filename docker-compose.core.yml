@@ -1,0 +1,44 @@
+services:
+  mongodb:
+    image: mongo:8.0
+    volumes:
+      - ./data/mongodb:/data/db
+    ports:
+      - 127.0.0.1:27017:27017
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/27017 && exec 3<&- && exec 3>&-'"]
+      interval: 60s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  redis:
+    image: redis:8.0.4-alpine
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./data/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./data/redis:/data
+    ports:
+      - 127.0.0.1:6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 60s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  ipfs:
+    image: ipfs/kubo:v0.40.1
+    ports:
+      - 4001:4001
+      - 4001:4001/udp
+      - 127.0.0.1:5001:5001
+    volumes:
+      - ./data/ipfs:/data/ipfs
+      - ./share:/export/share
+    healthcheck:
+      test: ["CMD-SHELL", "wget --post-data='' -qO- http://127.0.0.1:5001/api/v0/version >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 20s

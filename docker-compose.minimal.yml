@@ -1,0 +1,3 @@
+include:
+  - docker-compose.core.yml
+  - docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR:-ts}.yml
