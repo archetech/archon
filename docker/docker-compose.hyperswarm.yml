@@ -1,8 +1,8 @@
 services:
   hyperswarm-mediator:
     build:
-      context: .
-      dockerfile: Dockerfile.hyperswarm
+      context: ..
+      dockerfile: docker/Dockerfile.hyperswarm
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/hyperswarm-mediator

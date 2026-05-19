@@ -4,8 +4,8 @@
 services:
   keymaster:
     build:
-      context: .
-      dockerfile: Dockerfile.keymaster-ts
+      context: ..
+      dockerfile: docker/Dockerfile.keymaster-ts
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/keymaster
@@ -24,7 +24,7 @@ services:
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
     volumes:
-      - ./data:/app/keymaster/data
+      - ../data:/app/keymaster/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_KEYMASTER_PORT}:4226

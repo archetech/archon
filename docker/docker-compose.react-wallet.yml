@@ -1,8 +1,8 @@
 services:
   react-wallet:
     build:
-      context: .
-      dockerfile: Dockerfile.react-wallet
+      context: ..
+      dockerfile: docker/Dockerfile.react-wallet
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         VITE_GATEKEEPER_URL: ${ARCHON_REACT_WALLET_GATEKEEPER_URL-}

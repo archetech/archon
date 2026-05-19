@@ -1,8 +1,8 @@
 services:
   explorer:
     build:
-      context: .
-      dockerfile: Dockerfile.explorer
+      context: ..
+      dockerfile: docker/Dockerfile.explorer
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/explorer

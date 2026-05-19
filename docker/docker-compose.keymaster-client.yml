@@ -1,8 +1,8 @@
 services:
   keymaster-client:
     build:
-      context: .
-      dockerfile: Dockerfile.keymaster-client
+      context: ..
+      dockerfile: docker/Dockerfile.keymaster-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         VITE_SERVER_PORT: ${ARCHON_KEYMASTER_PORT:-4226}
