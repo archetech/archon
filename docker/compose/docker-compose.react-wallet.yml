@@ -1,7 +1,7 @@
 services:
   react-wallet:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.react-wallet
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}

@@ -3,8 +3,8 @@ services:
     image: prom/prometheus:v2.51.0
     user: "${ARCHON_UID}:${ARCHON_GID}"
     volumes:
-      - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ../data/prometheus:/prometheus
+      - ../../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../../data/prometheus:/prometheus
     ports:
       - "127.0.0.1:9090:9090"
     command:
@@ -19,8 +19,8 @@ services:
     image: grafana/grafana:10.4.0
     user: "${ARCHON_UID}:${ARCHON_GID}"
     volumes:
-      - ../observability/grafana/provisioning:/etc/grafana/provisioning
-      - ../data/grafana:/var/lib/grafana
+      - ../../observability/grafana/provisioning:/etc/grafana/provisioning
+      - ../../data/grafana:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}

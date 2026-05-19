@@ -1,7 +1,7 @@
 services:
   herald:
     build:
-      context: ..
+      context: ../..
       dockerfile: services/herald/Dockerfile
     image: ghcr.io/archetech/herald
     environment:
@@ -30,7 +30,7 @@ services:
       - ARCHON_HERALD_SENDGRID_PARSE_DOMAIN=${ARCHON_HERALD_SENDGRID_PARSE_DOMAIN:-}
       - ARCHON_HERALD_WEBHOOK_SECRET=${ARCHON_HERALD_WEBHOOK_SECRET:-}
     volumes:
-      - ../data/herald:/app/server/data
+      - ../../data/herald:/app/server/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     healthcheck:
       test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4230/api/version',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
@@ -52,7 +52,7 @@ services:
 
   herald-client:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.herald-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
@@ -75,7 +75,7 @@ services:
 
   drawbridge:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.drawbridge
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
@@ -99,8 +99,8 @@ services:
     ports:
       - ${ARCHON_DRAWBRIDGE_PORT:-4222}:4222
     volumes:
-      - ../scripts/drawbridge-entrypoint.sh:/scripts/drawbridge-entrypoint.sh:ro
-      - ../data/drawbridge:/data/drawbridge
+      - ../../scripts/drawbridge-entrypoint.sh:/scripts/drawbridge-entrypoint.sh:ro
+      - ../../data/drawbridge:/data/drawbridge
     healthcheck:
       test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4222/api/v1/ready',res=>{let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.exit(res.statusCode===200&&(body.trim()==='true'||body.includes('\"ready\":true'))?0:1));});req.on('error',()=>process.exit(1));"]
       interval: 15s
@@ -117,7 +117,7 @@ services:
 
   lightning-mediator:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.lightning-mediator
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
@@ -140,8 +140,8 @@ services:
     ports:
       - ${ARCHON_LIGHTNING_MEDIATOR_PORT:-4235}:4235
     volumes:
-      - ../scripts/lightning-mediator-entrypoint.sh:/scripts/lightning-mediator-entrypoint.sh:ro
-      - ../data/cln-mainnet:/data/lightning:ro
+      - ../../scripts/lightning-mediator-entrypoint.sh:/scripts/lightning-mediator-entrypoint.sh:ro
+      - ../../data/cln-mainnet:/data/lightning:ro
       - tor-hostname:/data/tor:ro
     healthcheck:
       test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4235/ready',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
@@ -159,7 +159,7 @@ services:
 
   drawbridge-client:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.gatekeeper-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
@@ -189,7 +189,7 @@ services:
       DRAWBRIDGE_TOR_SERVICE_VERSION: '3'
       TOR_SOCKS_PORT: '0.0.0.0:9050'
     volumes:
-      - ../data/tor-drawbridge:/var/lib/tor/hidden_service
+      - ../../data/tor-drawbridge:/var/lib/tor/hidden_service
       - tor-hostname:/tor-hostname
     entrypoint:
       - /bin/sh

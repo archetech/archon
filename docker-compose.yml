@@ -1,37 +1,37 @@
 include:
   # Minimal node:
-  #   docker compose --env-file .env -f docker/docker-compose.minimal.yml up
+  #   docker compose --env-file .env -f docker/compose/docker-compose.minimal.yml up
   #
   # To customize this full-node file by hand, keep the core and Gatekeeper
   # includes, then comment out any optional includes you do not want to run.
-  - docker/docker-compose.core.yml
+  - docker/compose/docker-compose.core.yml
   #
   # Gatekeeper implementation. Set ARCHON_GATEKEEPER_FLAVOR=rust (or ts) in
   # .env to choose, or export it before `docker compose up`. Defaults to the
   # TypeScript service. Each flavor file carries the full gatekeeper service
   # definition.
-  - docker/docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR:-ts}.yml
+  - docker/compose/docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR:-ts}.yml
 
   # Keymaster implementation. Set ARCHON_KEYMASTER_FLAVOR=py (or ts) in
   # .env to choose, or export it before `docker compose up`. Defaults to the
   # TypeScript service. Each flavor file carries the full keymaster service
   # definition. Required by wallet, CLI, Herald, Hyperswarm, and chain
   # mediator services.
-  - docker/docker-compose.keymaster-${ARCHON_KEYMASTER_FLAVOR:-ts}.yml
+  - docker/compose/docker-compose.keymaster-${ARCHON_KEYMASTER_FLAVOR:-ts}.yml
 
   # Optional node services. Comment out any component you do not want to run.
   # Services with chain, Lightning, Herald, or Hyperswarm dependencies generally
   # require Keymaster to remain enabled.
-  - docker/docker-compose.hyperswarm.yml
-  - docker/docker-compose.cli.yml
-  - docker/docker-compose.explorer.yml
-  - docker/docker-compose.gatekeeper-client.yml
-  - docker/docker-compose.keymaster-client.yml
-  - docker/docker-compose.react-wallet.yml
-  - docker/docker-compose.observability.yml
-  - docker/docker-compose.btc-mainnet.yml
-  - docker/docker-compose.btc-signet.yml
-  - docker/docker-compose.lightning.yml
-  - docker/docker-compose.drawbridge.yml
-#  - docker/docker-compose.btc-testnet4.yml
-  - docker/docker-compose.zcash-mainnet.yml
+  - docker/compose/docker-compose.hyperswarm.yml
+  - docker/compose/docker-compose.cli.yml
+  - docker/compose/docker-compose.explorer.yml
+  - docker/compose/docker-compose.gatekeeper-client.yml
+  - docker/compose/docker-compose.keymaster-client.yml
+  - docker/compose/docker-compose.react-wallet.yml
+  - docker/compose/docker-compose.observability.yml
+  - docker/compose/docker-compose.btc-mainnet.yml
+  - docker/compose/docker-compose.btc-signet.yml
+  - docker/compose/docker-compose.lightning.yml
+  - docker/compose/docker-compose.drawbridge.yml
+#  - docker/compose/docker-compose.btc-testnet4.yml
+  - docker/compose/docker-compose.zcash-mainnet.yml

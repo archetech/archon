@@ -39,7 +39,7 @@ To run only a minimal Gatekeeper node and its core dependencies (MongoDB,
 Redis, and IPFS), use the minimal Compose file:
 
 ```bash
-docker compose --env-file .env -f docker/docker-compose.minimal.yml up --build
+docker compose --env-file .env -f docker/compose/docker-compose.minimal.yml up --build
 ```
 
 The default `docker-compose.yml` keeps the full node enabled, but its
@@ -103,7 +103,7 @@ Archon ships two interchangeable Gatekeeper service implementations that speak t
 - `ts` (default) — the Node/TypeScript service under [services/gatekeeper/server](services/gatekeeper/server).
 - `rust` — the native Rust service under [rust/services/gatekeeper](rust/services/gatekeeper).
 
-`docker-compose.yml` uses the flavor value to pull in the corresponding `docker/docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
+`docker-compose.yml` uses the flavor value to pull in the corresponding `docker/compose/docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
 
 ### Keymaster implementation flavor
 
@@ -112,7 +112,7 @@ Archon ships two interchangeable Keymaster service implementations that speak th
 - `ts` (default) — the Node/TypeScript service under [services/keymaster/server](services/keymaster/server).
 - `py` — the Python service under [python/keymaster_service](python/keymaster_service), built on the [python/keymaster](python/keymaster) library. The Python Keymaster library also exposes the `keymaster` command.
 
-`docker-compose.yml` uses the flavor value to pull in the corresponding `docker/docker-compose.keymaster-${ARCHON_KEYMASTER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
+`docker-compose.yml` uses the flavor value to pull in the corresponding `docker/compose/docker-compose.keymaster-${ARCHON_KEYMASTER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
 
 Once your node is operational (start-node), you can setup local dependencies and manage your server using local CLI wallet and other command line tools:
 

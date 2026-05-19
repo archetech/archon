@@ -1,7 +1,7 @@
 services:
   explorer:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.explorer
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}

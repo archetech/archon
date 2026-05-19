@@ -5,7 +5,7 @@
 services:
   gatekeeper:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.gatekeeper-rust
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
@@ -27,7 +27,7 @@ services:
       - ARCHON_REDIS_URL=redis://redis:6379
       - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
     volumes:
-      - ../data:/app/gatekeeper/data
+      - ../../data:/app/gatekeeper/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_GATEKEEPER_PORT}:4224

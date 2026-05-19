@@ -1,7 +1,7 @@
 services:
   keymaster-client:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.keymaster-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}

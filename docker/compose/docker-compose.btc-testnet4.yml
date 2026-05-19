@@ -2,11 +2,11 @@ services:
   btc-testnet4-node:
     image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
     volumes:
-      - ../data/btc-testnet4:/root/.bitcoin
+      - ../../data/btc-testnet4:/root/.bitcoin
 
   btc-testnet4-wallet:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.satoshi-wallet
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
@@ -34,7 +34,7 @@ services:
 
   btc-testnet4-mediator:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.satoshi
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
@@ -64,7 +64,7 @@ services:
       - ARCHON_SAT_REIMPORT=${ARCHON_BTC_T4_REIMPORT}
       - ARCHON_SAT_DB=${ARCHON_BTC_T4_DB}
     volumes:
-      - ../data:/app/satoshi/data
+      - ../../data:/app/satoshi/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - btc-testnet4-node

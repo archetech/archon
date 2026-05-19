@@ -1,15 +1,14 @@
-# Full Python keymaster service definition. Pulled into docker-compose.yml via
-# the `include:` directive when ARCHON_KEYMASTER_FLAVOR=py. Keep in sync with
-# docker-compose.keymaster-ts.yml whenever non-build env/ports/depends_on
-# fields change intentionally.
+# Full TypeScript keymaster service definition. Pulled into docker-compose.yml
+# via the `include:` directive. Keep in sync with docker-compose.keymaster-py.yml
+# whenever non-build env/ports/healthcheck fields change intentionally.
 services:
   keymaster:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.keymaster-py
+      context: ../..
+      dockerfile: docker/Dockerfile.keymaster-ts
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/keymaster-python
+    image: ghcr.io/archetech/keymaster
     environment:
       - ARCHON_KEYMASTER_PORT=4226
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
@@ -25,7 +24,7 @@ services:
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
     volumes:
-      - ../data:/app/keymaster/data
+      - ../../data:/app/keymaster/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_KEYMASTER_PORT}:4226
@@ -33,11 +32,13 @@ services:
       test:
         [
           "CMD",
-          "python",
-          "-c",
-          "import json,sys,urllib.request;
-            data=json.load(urllib.request.urlopen('http://127.0.0.1:4226/api/v1\
-            /ready')); sys.exit(0 if data.get('ready') is True else 1)",
+          "node",
+          "-e",
+          "const http=require('http');const
+            req=http.get('http://127.0.0.1:4226/api/v1/ready',res=>{let
+            body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.\
+            exit(res.statusCode===200&&body.includes('\"ready\":true')?0:1));})\
+            ;req.on('error',()=>process.exit(1));",
         ]
       interval: 10s
       timeout: 5s

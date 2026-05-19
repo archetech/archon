@@ -2,7 +2,7 @@ services:
   mongodb:
     image: mongo:8.0
     volumes:
-      - ../data/mongodb:/data/db
+      - ../../data/mongodb:/data/db
     ports:
       - 127.0.0.1:27017:27017
     healthcheck:
@@ -16,8 +16,8 @@ services:
     image: redis:8.0.4-alpine
     command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
-      - ../data/redis.conf:/usr/local/etc/redis/redis.conf
-      - ../data/redis:/data
+      - ../../data/redis.conf:/usr/local/etc/redis/redis.conf
+      - ../../data/redis:/data
     ports:
       - 127.0.0.1:6379:6379
     healthcheck:
@@ -34,8 +34,8 @@ services:
       - 4001:4001/udp
       - 127.0.0.1:5001:5001
     volumes:
-      - ../data/ipfs:/data/ipfs
-      - ../share:/export/share
+      - ../../data/ipfs:/data/ipfs
+      - ../../share:/export/share
     healthcheck:
       test: ["CMD-SHELL", "wget --post-data='' -qO- http://127.0.0.1:5001/api/v0/version >/dev/null"]
       interval: 30s

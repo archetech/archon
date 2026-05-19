@@ -1,7 +1,7 @@
 services:
   gatekeeper-client:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.gatekeeper-client
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
