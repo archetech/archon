@@ -36,10 +36,10 @@ $ ./start-node
 ```
 
 To run only a minimal Gatekeeper node and its core dependencies (MongoDB,
-Redis, and IPFS), use the minimal Compose file:
+Redis, and IPFS), use minimal mode:
 
 ```bash
-docker compose --env-file .env -f docker/compose/minimal.yml up --build
+./start-node minimal
 ```
 
 The default `docker-compose.yml` keeps the full node enabled, but its
@@ -281,4 +281,13 @@ To upgrade to the latest version:
 $ ./stop-node
 $ git pull
 $ ./start-node
+```
+
+If you are running the minimal node, use the matching mode when stopping and
+starting:
+
+```
+$ ./stop-node minimal
+$ git pull
+$ ./start-node minimal
 ```

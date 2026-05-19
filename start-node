@@ -1,8 +1,27 @@
 #!/usr/bin/env bash
 set -e
 
+MODE="full"
+if [[ "${1:-}" == "full" || "${1:-}" == "minimal" ]]; then
+  MODE="$1"
+  shift
+fi
+
+COMPOSE_ARGS=()
+case "$MODE" in
+  full)
+    ;;
+  minimal)
+    COMPOSE_ARGS=(-f docker/compose/minimal.yml)
+    ;;
+  *)
+    echo "Unknown node mode: $MODE (expected: full | minimal)"
+    exit 1
+    ;;
+esac
+
 export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-docker compose down
-docker compose build "$@"
-docker compose up "$@"
+docker compose "${COMPOSE_ARGS[@]}" down
+docker compose "${COMPOSE_ARGS[@]}" build "$@"
+docker compose "${COMPOSE_ARGS[@]}" up "$@"
