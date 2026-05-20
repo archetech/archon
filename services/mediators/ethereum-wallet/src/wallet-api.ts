@@ -124,8 +124,7 @@ function batchHashForDid(batchDid: string): string {
 
 async function getConnectedWallet(provider: JsonRpcProvider) {
     const mnemonic = await fetchMnemonic();
-    const wallet = deriveWallet(mnemonic, config.derivationPath).connect(provider);
-    return wallet;
+    return deriveWallet(mnemonic, config.derivationPath).connect(provider);
 }
 
 async function main() {
