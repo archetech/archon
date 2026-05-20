@@ -1034,6 +1034,11 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const expectedRegistry = expectedRegistryForIndex(currentEvents, index);
 
                     if (expectedRegistry && opMatch.registry === expectedRegistry) {
+                        if (event.registry === expectedRegistry && event.registration && !opMatch.registration) {
+                            currentEvents[index] = event;
+                            await this.db.setEvents(did, currentEvents);
+                            return ImportStatus.ADDED;
+                        }
                         // Already confirmed on the expected registry for this version
                         return ImportStatus.MERGED;
                     }
