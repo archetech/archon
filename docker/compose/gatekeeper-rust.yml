@@ -1,12 +1,12 @@
 # Full Rust gatekeeper service definition. Pulled into docker-compose.yml via
 # the `include:` directive when ARCHON_GATEKEEPER_FLAVOR=rust. Keep in sync
-# with docker-compose.gatekeeper-ts.yml whenever non-build env/ports/healthcheck
+# with gatekeeper-ts.yml whenever non-build env/ports/healthcheck
 # fields change.
 services:
   gatekeeper:
     build:
-      context: .
-      dockerfile: Dockerfile.gatekeeper-rust
+      context: ../..
+      dockerfile: docker/Dockerfile.gatekeeper-rust
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/gatekeeper-rust
@@ -27,7 +27,7 @@ services:
       - ARCHON_REDIS_URL=redis://redis:6379
       - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
     volumes:
-      - ./data:/app/gatekeeper/data
+      - ../../data:/app/gatekeeper/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_GATEKEEPER_PORT}:4224

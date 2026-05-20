@@ -1,11 +1,11 @@
 # Full TypeScript keymaster service definition. Pulled into docker-compose.yml
-# via the `include:` directive. Keep in sync with docker-compose.keymaster-py.yml
+# via the `include:` directive. Keep in sync with keymaster-py.yml
 # whenever non-build env/ports/healthcheck fields change intentionally.
 services:
   keymaster:
     build:
-      context: .
-      dockerfile: Dockerfile.keymaster-ts
+      context: ../..
+      dockerfile: docker/Dockerfile.keymaster-ts
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/keymaster
@@ -24,7 +24,7 @@ services:
       - ARCHON_MONGODB_URL=mongodb://mongodb:27017
       - ARCHON_REDIS_URL=redis://redis:6379
     volumes:
-      - ./data:/app/keymaster/data
+      - ../../data:/app/keymaster/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_KEYMASTER_PORT}:4226

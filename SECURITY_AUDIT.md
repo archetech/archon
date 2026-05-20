@@ -69,7 +69,7 @@ The cryptographic implementation (cipher package) uses sound primitives (secp256
 | H-06 | 🟠 High | Git | `.gitignore` missing critical data exclusions | `.gitignore` |
 | H-07 | 🟠 High | Extension | `<all_urls>` content script + host permissions | `apps/chrome-extension/` — `manifest.json` |
 | H-08 | 🟠 High | Extension | Plaintext passphrase stored in offscreen memory | `apps/chrome-extension/src/offscreen.ts` |
-| H-09 | 🟠 High | Infra | Bitcoin signet RPC port exposed to all interfaces | `docker-compose.btc-signet.yml` |
+| H-09 | 🟠 High | Infra | Bitcoin signet RPC port exposed to all interfaces | `docker/compose/btc-signet.yml` |
 | M-01 | 🟡 Medium | Validation | No input validation library/schema enforcement | All API servers |
 | M-02 | 🟡 Medium | Info Leak | Error messages expose `error.message` to clients | All API servers |
 | M-03 | 🟡 Medium | Injection | Potential NoSQL injection via `queryDocs` endpoint | `services/gatekeeper/server/` — `POST /dids/query` |
@@ -83,8 +83,8 @@ The cryptographic implementation (cipher package) uses sound primitives (secp256
 | M-11 | 🟡 Medium | Extension | `wasm-unsafe-eval` in CSP | `apps/chrome-extension/` — `manifest.json` |
 | M-12 | 🟡 Medium | Crypto | PBKDF2 iterations overridable via environment variable | `packages/keymaster/src/encryption.ts` |
 | L-01 | 🔵 Low | Docker | `mongo:8.0` not pinned to patch version | `docker-compose.yml` |
-| L-02 | 🔵 Low | Docker | Build tools (`python3`, `make`, `g++`) remain in final images | `Dockerfile.hyperswarm` |
-| L-03 | 🔵 Low | Docker | CLI container runs idle with `tail -f /dev/null` | `Dockerfile.cli` |
+| L-02 | 🔵 Low | Docker | Build tools (`python3`, `make`, `g++`) remain in final images | `docker/Dockerfile.hyperswarm` |
+| L-03 | 🔵 Low | Docker | CLI container runs idle with `tail -f /dev/null` | `docker/Dockerfile.cli` |
 | L-04 | 🔵 Low | Docker | No `security_opt` or capability dropping | All `docker-compose` files |
 | L-05 | 🔵 Low | Docker | No restart policies on critical services | All `docker-compose` files |
 | L-06 | 🔵 Low | Deps | `@noble/ciphers` on pre-stable 0.x line | `packages/cipher/package.json` |
@@ -251,7 +251,7 @@ app.use(cors({ origin: ['https://your-wallet.example.com'], credentials: true })
 
 **Severity:** 🟠 High
 **Category:** Container Security
-**Affected:** All 7 Dockerfiles (`Dockerfile.cli`, `Dockerfile.explorer`, `Dockerfile.gatekeeper-ts`, `Dockerfile.hyperswarm`, `Dockerfile.keymaster-ts`, `Dockerfile.react-wallet`, `Dockerfile.satoshi`)
+**Affected:** All 7 Dockerfiles (`docker/Dockerfile.cli`, `docker/Dockerfile.explorer`, `docker/Dockerfile.gatekeeper-ts`, `docker/Dockerfile.hyperswarm`, `docker/Dockerfile.keymaster-ts`, `docker/Dockerfile.react-wallet`, `docker/Dockerfile.satoshi`)
 
 No Dockerfile includes a `USER` directive or creates a non-root user. While some services override with `user:` in `docker-compose.yml`, the images themselves default to root. `npm ci` and `npm run build` execute as root during build, and any container started outside of compose runs as root.
 
@@ -333,7 +333,7 @@ The wallet passphrase is stored as a plaintext string in a module-scoped variabl
 
 **Severity:** 🟠 High
 **Category:** Network Exposure
-**Affected:** `docker-compose.btc-signet.yml`
+**Affected:** `docker/compose/btc-signet.yml`
 
 ```yaml
 ports:
@@ -528,11 +528,11 @@ Pin to `mongo:8.0.4` (or specific patch) and consider SHA256 digest pinning for 
 
 ### L-02: Build Tools Remain in Final Images
 
-`Dockerfile.hyperswarm` installs `python3`, `make`, `g++` for native module compilation but leaves them in the final image. Use multi-stage builds to reduce attack surface.
+`docker/Dockerfile.hyperswarm` installs `python3`, `make`, `g++` for native module compilation but leaves them in the final image. Use multi-stage builds to reduce attack surface.
 
 ### L-03: CLI Container Runs Idle
 
-`Dockerfile.cli` uses `CMD ["tail", "-f", "/dev/null"]` keeping the container alive indefinitely. Use one-shot execution (`docker compose run --rm cli ...`).
+`docker/Dockerfile.cli` uses `CMD ["tail", "-f", "/dev/null"]` keeping the container alive indefinitely. Use one-shot execution (`docker compose run --rm cli ...`).
 
 ### L-04: No `security_opt` or Capability Dropping
 
@@ -729,10 +729,10 @@ sudo nginx -t && sudo systemctl reload nginx
 - `sample.env` *(updated with `ARCHON_BIND_ADDRESS` and `ARCHON_ADMIN_API_KEY`)*
 - `.gitignore`
 - `docker-compose.yml` *(updated with new env vars)*
-- `docker-compose.btc-mainnet.yml`
-- `docker-compose.btc-signet.yml`
-- `docker-compose.btc-testnet4.yml`
-- `Dockerfile.cli`, `Dockerfile.explorer`, `Dockerfile.gatekeeper-ts`, `Dockerfile.hyperswarm`, `Dockerfile.keymaster-ts`, `Dockerfile.react-wallet`, `Dockerfile.satoshi`
+- `docker/compose/btc-mainnet.yml`
+- `docker/compose/btc-signet.yml`
+- `docker/compose/btc-testnet4.yml`
+- `docker/Dockerfile.cli`, `docker/Dockerfile.explorer`, `docker/Dockerfile.gatekeeper-ts`, `docker/Dockerfile.hyperswarm`, `docker/Dockerfile.keymaster-ts`, `docker/Dockerfile.react-wallet`, `docker/Dockerfile.satoshi`
 - `data/redis.conf`
 - `data/wallet.json`
 - `data/btc-signet/bitcoin.conf`

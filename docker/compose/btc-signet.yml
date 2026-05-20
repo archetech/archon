@@ -2,14 +2,14 @@ services:
   btc-signet-node:
     image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
     volumes:
-      - ./data/btc-signet:/root/.bitcoin
+      - ../../data/btc-signet:/root/.bitcoin
     ports:
       - 127.0.0.1:38332:38332
 
   btc-signet-wallet:
     build:
-      context: .
-      dockerfile: Dockerfile.satoshi-wallet
+      context: ../..
+      dockerfile: docker/Dockerfile.satoshi-wallet
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/satoshi-wallet
@@ -34,8 +34,8 @@ services:
 
   btc-signet-mediator:
     build:
-      context: .
-      dockerfile: Dockerfile.satoshi
+      context: ../..
+      dockerfile: docker/Dockerfile.satoshi
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/satoshi-mediator
@@ -67,7 +67,7 @@ services:
     ports:
       - "127.0.0.1:4236:4236"
     volumes:
-      - ./data:/app/satoshi/data
+      - ../../data:/app/satoshi/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - btc-signet-node

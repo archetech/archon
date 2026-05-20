@@ -1,0 +1,24 @@
+services:
+  explorer:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.explorer
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/explorer
+    environment:
+      - VITE_EXPLORER_PORT=4000
+      - VITE_GATEKEEPER_URL=http://localhost:4224
+      - VITE_SEARCH_SERVER=http://localhost:4224
+      - VITE_OPERATION_NETWORKS=hyperswarm,local,BTC:signet,BTC:testnet4,ZEC:mainnet
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4000/version',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      gatekeeper:
+        condition: service_healthy

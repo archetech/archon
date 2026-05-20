@@ -19,8 +19,8 @@ services:
       - MIN_CAPACITY_SAT=${ARCHON_CLN_MIN_CAPACITY_SAT:-50000}
       - LOG_LEVEL=${ARCHON_CLN_LOG_LEVEL:-info}
     volumes:
-      - ./data/cln-mainnet:/data/lightning
-      - ./data/cln-mainnet/tor:/var/lib/tor
+      - ../../data/cln-mainnet:/data/lightning
+      - ../../data/cln-mainnet/tor:/var/lib/tor
     networks:
       default:
         aliases:
@@ -67,7 +67,7 @@ services:
         echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE"
         echo "[drawbridge-init] Rune created successfully (restricted to invoice methods)"
     volumes:
-      - ./data/cln-mainnet:/data/lightning
+      - ../../data/cln-mainnet:/data/lightning
     depends_on:
       - cln-mainnet-node
     restart: "no"
@@ -109,7 +109,7 @@ services:
         echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE"
         echo "[rtl-init] Rune created successfully"
     volumes:
-      - ./data/cln-mainnet:/data/lightning
+      - ../../data/cln-mainnet:/data/lightning
     depends_on:
       - cln-mainnet-node
     restart: "no"
@@ -124,8 +124,8 @@ services:
       - RTL_NODE_NAME=${ARCHON_CLN_ALIAS:-archon}
       - RTL_PASSWORD=${ARCHON_RTL_PASSWORD:-changeme}
     volumes:
-      - ./scripts/rtl-entrypoint.sh:/scripts/rtl-entrypoint.sh:ro
-      - ./data/cln-mainnet/rtl:/data
+      - ../../scripts/rtl-entrypoint.sh:/scripts/rtl-entrypoint.sh:ro
+      - ../../data/cln-mainnet/rtl:/data
     ports:
       - "${ARCHON_RTL_PORT:-3002}:3000"
     depends_on:
@@ -190,7 +190,7 @@ services:
 
         echo "[lnbits-init] Runes created successfully"
     volumes:
-      - ./data/cln-mainnet:/data/lightning
+      - ../../data/cln-mainnet:/data/lightning
     depends_on:
       - cln-mainnet-node
     restart: "no"
@@ -209,9 +209,9 @@ services:
       - FORWARDED_ALLOW_IPS=*
       - AUTH_SECRET_KEY=${ARCHON_LNBITS_AUTH_SECRET:-}
     volumes:
-      - ./scripts/lnbits-entrypoint.sh:/scripts/lnbits-entrypoint.sh:ro
-      - ./data/cln-mainnet:/data/lightning:ro
-      - ./data/lnbits:/data/lnbits
+      - ../../scripts/lnbits-entrypoint.sh:/scripts/lnbits-entrypoint.sh:ro
+      - ../../data/cln-mainnet:/data/lightning:ro
+      - ../../data/lnbits:/data/lnbits
     ports:
       - "${ARCHON_LNBITS_PORT:-5000}:5000"
     depends_on:

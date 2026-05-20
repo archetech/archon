@@ -1,0 +1,23 @@
+services:
+  keymaster-client:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.keymaster-client
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        VITE_SERVER_PORT: ${ARCHON_KEYMASTER_PORT:-4226}
+    image: ghcr.io/archetech/keymaster-client
+    environment:
+      - VITE_PORT=4227
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "${ARCHON_KEYMASTER_CLIENT_PORT:-4227}:4227"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4227/',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      keymaster:
+        condition: service_healthy

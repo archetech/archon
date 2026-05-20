@@ -35,6 +35,17 @@ $ cp sample.env .env
 $ ./start-node
 ```
 
+To run a minimal peer-capable node with Gatekeeper, Keymaster, Hyperswarm,
+MongoDB, Redis, and IPFS, use the minimal startup script:
+
+```bash
+./start-node-minimal
+```
+
+The default `docker-compose.yml` keeps the full node enabled, but its
+top-level `include:` list is organized so optional components can be commented
+out when you want a custom stack.
+
 ### Keymaster Onboarding
 
 For a local Keymaster wallet and identity without running a full node, use the hosted installer:
@@ -92,7 +103,7 @@ Archon ships two interchangeable Gatekeeper service implementations that speak t
 - `ts` (default) — the Node/TypeScript service under [services/gatekeeper/server](services/gatekeeper/server).
 - `rust` — the native Rust service under [rust/services/gatekeeper](rust/services/gatekeeper).
 
-`docker-compose.yml` uses the flavor value to pull in the corresponding `docker-compose.gatekeeper-${ARCHON_GATEKEEPER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
+`docker-compose.yml` uses the flavor value to pull in the corresponding `docker/compose/gatekeeper-${ARCHON_GATEKEEPER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
 
 ### Keymaster implementation flavor
 
@@ -101,7 +112,7 @@ Archon ships two interchangeable Keymaster service implementations that speak th
 - `ts` (default) — the Node/TypeScript service under [services/keymaster/server](services/keymaster/server).
 - `py` — the Python service under [python/keymaster_service](python/keymaster_service), built on the [python/keymaster](python/keymaster) library. The Python Keymaster library also exposes the `keymaster` command.
 
-`docker-compose.yml` uses the flavor value to pull in the corresponding `docker-compose.keymaster-${ARCHON_KEYMASTER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
+`docker-compose.yml` uses the flavor value to pull in the corresponding `docker/compose/keymaster-${ARCHON_KEYMASTER_FLAVOR}.yml` via `include:`, so no other config changes are required to switch.
 
 Once your node is operational (start-node), you can setup local dependencies and manage your server using local CLI wallet and other command line tools:
 
@@ -270,4 +281,13 @@ To upgrade to the latest version:
 $ ./stop-node
 $ git pull
 $ ./start-node
+```
+
+If you are running the minimal node, stop the minimal compose stack and restart
+it with the minimal startup script:
+
+```
+$ ./stop-node-minimal
+$ git pull
+$ ./start-node-minimal
 ```

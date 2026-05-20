@@ -51,7 +51,7 @@ Implemented natively:
 Cutover validation completed on 2026-04-11:
 
 - side-by-side parity fixtures pass against the TypeScript implementation, including asset, ephemeral, hyperswarm, IPFS, and fallback-resolution flows
-- the default `docker-compose.yml` Gatekeeper service now builds from `Dockerfile.gatekeeper-rust`
+- the default `docker-compose.yml` Gatekeeper service now builds from `docker/Dockerfile.gatekeeper-rust`
 - the final image runs with zero Node or TypeScript runtime
 - dependent services can start against the Rust Gatekeeper unchanged in compose validation
 
@@ -81,4 +81,4 @@ Backend-specific runtime knobs:
 
 ## Docker
 
-Use `Dockerfile.gatekeeper-rust` to build the native Rust Gatekeeper image.
+Use `docker/Dockerfile.gatekeeper-rust` to build the native Rust Gatekeeper image.

@@ -1,5 +1,9 @@
 FROM node:22.15.0-bullseye-slim
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -10,7 +14,9 @@ RUN npm run build
 
 COPY services/mediators/zcash ./zcash/
 WORKDIR /app/zcash
-RUN npm ci && npm run build
+RUN npm ci \
+    && npm rebuild sqlite3 --build-from-source \
+    && npm run build
 
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT

@@ -1,0 +1,34 @@
+services:
+  hyperswarm-mediator:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.hyperswarm
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/hyperswarm-mediator
+    environment:
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_IPFS_URL=http://ipfs:5001/api/v0
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_NODE_NAME=${ARCHON_NODE_NAME}
+      - ARCHON_PROTOCOL=${ARCHON_PROTOCOL}
+      - ARCHON_HYPR_EXPORT_INTERVAL=${ARCHON_HYPR_EXPORT_INTERVAL}
+      - ARCHON_HYPR_METRICS_PORT=4232
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "127.0.0.1:4232:4232"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4232/health',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 25s
+    depends_on:
+      gatekeeper:
+        condition: service_healthy
+      keymaster:
+        condition: service_healthy
+      ipfs:
+        condition: service_healthy

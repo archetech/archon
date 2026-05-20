@@ -422,9 +422,9 @@ structured output but SHOULD keep the human-readable lines stable.
 - Source: [services/mediators/satoshi/](../../../../services/mediators/satoshi/)
 - DB backends: [src/db/](../../../../services/mediators/satoshi/src/db/)
 - Compose files:
-  [docker-compose.btc-mainnet.yml](../../../../docker-compose.btc-mainnet.yml),
-  [docker-compose.btc-signet.yml](../../../../docker-compose.btc-signet.yml),
-  [docker-compose.btc-testnet4.yml](../../../../docker-compose.btc-testnet4.yml).
+  [docker/compose/btc-mainnet.yml](../../../../docker/compose/btc-mainnet.yml),
+  [docker/compose/btc-signet.yml](../../../../docker/compose/btc-signet.yml),
+  [docker/compose/btc-testnet4.yml](../../../../docker/compose/btc-testnet4.yml).
 - Image: `ghcr.io/archetech/satoshi-mediator`
 - Grafana dashboards: `satoshi-mediator-mainnet.json`, `-signet.json`.
 

@@ -1,8 +1,8 @@
 services:
   zcash-mainnet-wallet:
     build:
-      context: .
-      dockerfile: Dockerfile.zcash-wallet
+      context: ../..
+      dockerfile: docker/Dockerfile.zcash-wallet
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/zcash-wallet
@@ -28,8 +28,8 @@ services:
 
   zcash-mainnet-mediator:
     build:
-      context: .
-      dockerfile: Dockerfile.zcash
+      context: ../..
+      dockerfile: docker/Dockerfile.zcash
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: ghcr.io/archetech/zcash-mediator
@@ -61,7 +61,7 @@ services:
     ports:
       - "127.0.0.1:4238:4238"
     volumes:
-      - ./data:/app/zcash/data
+      - ../../data:/app/zcash/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
       - gatekeeper

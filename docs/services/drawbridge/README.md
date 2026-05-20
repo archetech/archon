@@ -468,7 +468,7 @@ No log lines are contractual for downstream consumers.
 - Rate limiter: [src/rate-limiter.ts](../../../services/drawbridge/server/src/rate-limiter.ts)
 - Redis store: [src/store.ts](../../../services/drawbridge/server/src/store.ts)
 - Image: `ghcr.io/archetech/drawbridge`
-- Compose: [docker-compose.drawbridge.yml](../../../docker-compose.drawbridge.yml)
+- Compose: [docker/compose/drawbridge.yml](../../../docker/compose/drawbridge.yml)
 
 No dedicated unit tests. Validation is end-to-end via:
 

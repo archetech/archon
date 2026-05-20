@@ -1083,7 +1083,7 @@ The CI workflow
 matrix-runs the 27-test CLI integration suite against both the TS and Rust
 gatekeeper images on every PR; a third implementation can be added by:
 
-1. Adding a `docker-compose.gatekeeper-<flavor>.yml` flavor file with the
+1. Adding a `docker/compose/gatekeeper-<flavor>.yml` flavor file with the
    build/image plus the shared service body.
 2. Adding `<flavor>` to the matrix in `docker-build-test.yml`.
 
