@@ -1,0 +1,63 @@
+services:
+  ethereum-sepolia-wallet:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.ethereum-wallet
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/ethereum-wallet
+    environment:
+      - ARCHON_WALLET_PORT=4252
+      - ARCHON_WALLET_METRICS_PORT=4253
+      - ARCHON_WALLET_ETH_NETWORK=sepolia
+      - ARCHON_WALLET_ETH_CHAIN_ID=${ARCHON_ETH_CHAIN_ID:-11155111}
+      - ARCHON_WALLET_ETH_RPC_URL=${ARCHON_ETH_RPC_URL}
+      - ARCHON_WALLET_ETH_DERIVATION_PATH=${ARCHON_WALLET_ETH_DERIVATION_PATH}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "127.0.0.1:4252:4252"
+      - "127.0.0.1:4253:4253"
+    depends_on:
+      keymaster:
+        condition: service_started
+
+  ethereum-sepolia-mediator:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.ethereum
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/ethereum-mediator
+    environment:
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_ETH_CHAIN=${ARCHON_ETH_CHAIN:-ETH:sepolia}
+      - ARCHON_ETH_NETWORK=sepolia
+      - ARCHON_ETH_CHAIN_ID=${ARCHON_ETH_CHAIN_ID:-11155111}
+      - ARCHON_ETH_RPC_URL=${ARCHON_ETH_RPC_URL}
+      - ARCHON_ETH_CONTRACT=${ARCHON_ETH_CONTRACT}
+      - ARCHON_ETH_START_BLOCK=${ARCHON_ETH_START_BLOCK}
+      - ARCHON_ETH_CONFIRMATIONS=${ARCHON_ETH_CONFIRMATIONS}
+      - ARCHON_ETH_LOG_CHUNK_SIZE=${ARCHON_ETH_LOG_CHUNK_SIZE}
+      - ARCHON_WALLET_URL=http://ethereum-sepolia-wallet:4252
+      - ARCHON_ETH_IMPORT_INTERVAL=${ARCHON_ETH_IMPORT_INTERVAL}
+      - ARCHON_ETH_EXPORT_INTERVAL=${ARCHON_ETH_EXPORT_INTERVAL}
+      - ARCHON_ETH_REIMPORT=${ARCHON_ETH_REIMPORT}
+      - ARCHON_ETH_DB=${ARCHON_ETH_DB}
+      - ARCHON_ETH_METRICS_PORT=4239
+    ports:
+      - "127.0.0.1:4239:4239"
+    volumes:
+      - ../../data:/app/ethereum/data
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    depends_on:
+      - gatekeeper
+      - keymaster
+      - ethereum-sepolia-wallet

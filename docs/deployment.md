@@ -8,11 +8,12 @@ This guide walks you through deploying an Archon node, from a minimal DID-only s
 2. [Core Node (DID Only)](#2-core-node-did-only)
 3. [Adding Bitcoin Registries](#3-adding-bitcoin-registries)
 4. [Adding Zcash Registry](#4-adding-zcash-registry)
-5. [Adding Drawbridge (API Gateway + Tor)](#5-adding-drawbridge-api-gateway--tor)
-6. [Bundled Lightning Stack (Optional)](#6-bundled-lightning-stack-optional)
-7. [Production Hardening](#7-production-hardening)
-8. [Port Reference](#8-port-reference)
-9. [Troubleshooting](#9-troubleshooting)
+5. [Adding Ethereum Registry](#5-adding-ethereum-registry)
+6. [Adding Drawbridge (API Gateway + Tor)](#6-adding-drawbridge-api-gateway--tor)
+7. [Bundled Lightning Stack (Optional)](#7-bundled-lightning-stack-optional)
+8. [Production Hardening](#8-production-hardening)
+9. [Port Reference](#9-port-reference)
+10. [Troubleshooting](#10-troubleshooting)
 
 ---
 
@@ -247,7 +248,60 @@ This fallback is only used for `confirm=true` requests when the local node can r
 
 ---
 
-## 5. Adding Drawbridge (API Gateway + Tor)
+## 5. Adding Ethereum Registry
+
+Ethereum support is optional. If enabled, the Ethereum registry anchors DID batches by submitting transactions to a canonical `ArchonRegistry` smart contract and importing its `ArchonBatch` events. The bundled Sepolia compose layer includes `ethereum-sepolia-mediator` plus a companion `ethereum-sepolia-wallet` service. The wallet derives an EVM account from the Keymaster mnemonic and signs transactions; the mediator scans logs and imports batches.
+
+Sepolia is intended for testing. Production deployments should use a canonical contract on the chosen chain, with L2s such as Base, Optimism, or Arbitrum preferred when low anchoring cost matters.
+
+### Enable Ethereum Sepolia
+
+Uncomment in `docker-compose.yml`:
+
+```yaml
+include:
+  - docker/compose/ethereum-sepolia.yml
+```
+
+Add the registry to Gatekeeper:
+
+```env
+ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,ETH:sepolia
+```
+
+### Key Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ARCHON_ETH_RPC_URL` | none | Ethereum JSON-RPC endpoint |
+| `ARCHON_ETH_CONTRACT` | none | Canonical `ArchonRegistry` contract address |
+| `ARCHON_ETH_CHAIN` | `ETH:sepolia` | Gatekeeper registry name |
+| `ARCHON_ETH_NETWORK` | `sepolia` | Ethereum network name |
+| `ARCHON_ETH_CHAIN_ID` | `11155111` | EVM chain ID |
+| `ARCHON_ETH_START_BLOCK` | `0` | Block height to start scanning |
+| `ARCHON_ETH_CONFIRMATIONS` | `12` | Confirmations before logs are imported |
+| `ARCHON_ETH_LOG_CHUNK_SIZE` | `2000` | Blocks per `eth_getLogs` request |
+| `ARCHON_ETH_IMPORT_INTERVAL` | `1` | Minutes between import scans; `0` disables importing |
+| `ARCHON_ETH_EXPORT_INTERVAL` | `1` | Minutes between export attempts; `0` makes the mediator read-only |
+| `ARCHON_ETH_REIMPORT` | `true` | Reprocess discovered batches on startup |
+| `ARCHON_ETH_DB` | `json` | Mediator state backend: `json`, `sqlite`, `mongodb`, or `redis` |
+| `ARCHON_WALLET_ETH_DERIVATION_PATH` | `m/44'/60'/0'/0/0` | EVM account derivation path |
+
+### Verify
+
+```bash
+# Ethereum mediator metrics
+curl http://localhost:4239/metrics
+
+# Ethereum wallet metrics
+curl http://localhost:4253/metrics
+```
+
+The reference Solidity contract lives at `services/mediators/ethereum/contracts/ArchonRegistry.sol`.
+
+---
+
+## 6. Adding Drawbridge (API Gateway + Tor)
 
 Drawbridge is the L402 API gateway that enables Lightning payments for API access and Lightning zaps between DIDs. The Drawbridge compose layer also brings in Herald, Herald client, Drawbridge client, the Lightning mediator, and a Tor hidden service for privacy.
 
@@ -331,7 +385,7 @@ Optional UIs when Drawbridge is enabled:
 
 ---
 
-## 6. Bundled Lightning Stack (Optional)
+## 7. Bundled Lightning Stack (Optional)
 
 If you don't have an existing CLN node, the bundled Lightning stack provides a complete setup with CLN, RTL, and LNbits.
 
@@ -410,7 +464,7 @@ curl http://localhost:4235/ready
 
 ---
 
-## 7. Production Hardening
+## 8. Production Hardening
 
 ### Reverse Proxy
 
@@ -460,7 +514,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 
 ---
 
-## 8. Port Reference
+## 9. Port Reference
 
 | Port | Service | Default | Env Var | Binding |
 |------|---------|---------|---------|---------|
@@ -483,6 +537,9 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 4241 | BTC Signet Wallet Metrics | 4241 | -- | localhost |
 | 4250 | Zcash Mainnet Wallet API | 4250 | -- | localhost |
 | 4251 | Zcash Mainnet Wallet Metrics | 4251 | -- | localhost |
+| 4239 | Ethereum Sepolia Mediator Metrics | 4239 | `ARCHON_ETH_METRICS_PORT` | localhost |
+| 4252 | Ethereum Sepolia Wallet API | 4252 | -- | localhost |
+| 4253 | Ethereum Sepolia Wallet Metrics | 4253 | -- | localhost |
 | 27017 | MongoDB | 27017 | -- | localhost |
 | 6379 | Redis | 6379 | -- | localhost |
 | 5001 | IPFS API | 5001 | -- | localhost |
@@ -495,7 +552,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 ### CLN Not Syncing
 

@@ -10,7 +10,7 @@ An Archon node is a small constellation of interoperating microservices that you
 
 - **Gatekeeper** — maintains the integrity of the local DID database and serves the resolution API. Available in TypeScript (default) or native Rust; see the [Gatekeeper flavor](#gatekeeper-implementation-flavor) section below.
 - **Keymaster** — holds private keys, signs DID operations, and manages wallets, IDs, credentials, assets, groups, vaults, schemas, and polls. Available as a TypeScript service (default) or a Python service; see the [Keymaster flavor](#keymaster-implementation-flavor) section below.
-- **Mediators** — connect the Gatekeeper to networks: a [Hyperswarm](services/mediators/hyperswarm) mediator for peer gossip and a [Satoshi](services/mediators/satoshi) mediator for Bitcoin-anchored registries.
+- **Mediators** — connect the Gatekeeper to networks: a [Hyperswarm](services/mediators/hyperswarm) mediator for peer gossip, a [Satoshi](services/mediators/satoshi) mediator for Bitcoin-anchored registries, and optional Zcash/Ethereum blockchain mediators.
 - **IPFS** — content-addressable storage layer underpinning `did:cid`.
 - **Client apps** — a React wallet, a browser extension, a Gatekeeper admin UI, and a standalone Keymaster client UI, plus the `archon` and `admin` CLIs.
 

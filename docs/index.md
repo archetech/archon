@@ -34,6 +34,8 @@ canonical TypeScript reference.
 - [Lightning mediator](services/mediators/lightning/README.md) — LNbits + CLN bridge
 - [Satoshi mediator](services/mediators/satoshi/README.md) — BTC chain anchoring
 - [Satoshi wallet](services/mediators/satoshi-wallet/README.md) — BIP84 HD wallet for anchoring
+- [Ethereum mediator](services/mediators/ethereum/README.md) — EVM contract-log anchoring
+- [Ethereum wallet](services/mediators/ethereum-wallet/README.md) — EVM key derivation and transaction signing
 
 ## API Reference
 

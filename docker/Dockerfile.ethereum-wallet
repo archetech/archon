@@ -1,0 +1,22 @@
+FROM node:22.15.0-bullseye-slim
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY packages/ ./packages/
+
+RUN npm ci
+RUN npm run build
+
+COPY services/mediators/ethereum-wallet ./wallet/
+
+RUN cd wallet && npm ci && npm run build
+
+WORKDIR /app/wallet
+
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
+EXPOSE 4252 4253
+
+CMD ["node", "dist/wallet-api.js"]
