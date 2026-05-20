@@ -260,7 +260,7 @@ Uncomment in `docker-compose.yml`:
 
 ```yaml
 include:
-  - docker/compose/ethereum-sepolia.yml
+  - docker/compose/eth-sepolia.yml
 ```
 
 Add the registry to Gatekeeper:
