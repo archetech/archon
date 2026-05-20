@@ -287,7 +287,7 @@ If you are running the minimal node, stop the minimal compose stack and restart
 it with the minimal startup script:
 
 ```
-$ ./stop-node minimal
+$ ./stop-node-minimal
 $ git pull
 $ ./start-node-minimal
 ```

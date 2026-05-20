@@ -1,19 +1,4 @@
 #!/usr/bin/env bash
 set -e
 
-MODE="${1:-full}"
-
-COMPOSE_ARGS=()
-case "$MODE" in
-  full)
-    ;;
-  minimal)
-    COMPOSE_ARGS=(--env-file .env -f docker/compose/minimal.yml)
-    ;;
-  *)
-    echo "Unknown node mode: $MODE (expected: full | minimal)"
-    exit 1
-    ;;
-esac
-
-docker compose "${COMPOSE_ARGS[@]}" down
+docker compose down
