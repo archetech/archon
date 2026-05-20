@@ -250,7 +250,7 @@ This fallback is only used for `confirm=true` requests when the local node can r
 
 ## 5. Adding Ethereum Registry
 
-Ethereum support is optional. If enabled, the Ethereum registry anchors DID batches by submitting transactions to a canonical `ArchonRegistry` smart contract and importing its `ArchonBatch` events. The bundled Sepolia compose layer includes `ethereum-sepolia-mediator` plus a companion `ethereum-sepolia-wallet` service. The wallet derives an EVM account from the Keymaster mnemonic and signs transactions; the mediator scans logs and imports batches.
+Ethereum support is optional. If enabled, the Ethereum registry anchors DID batches by submitting transactions to a canonical `ArchonRegistry` smart contract and importing its `ArchonBatch` events. The bundled Sepolia compose layer includes `eth-sepolia-mediator` plus a companion `eth-sepolia-wallet` service. The wallet derives an EVM account from the Keymaster mnemonic and signs transactions; the mediator scans logs and imports batches.
 
 Sepolia is intended for testing. Production deployments should use a canonical contract on the chosen chain, with L2s such as Base, Optimism, or Arbitrum preferred when low anchoring cost matters.
 
