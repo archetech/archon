@@ -550,26 +550,6 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
         }) {
             let expected_registry = expected_registry_for_index(&current_events, index);
             if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) {
-                if expected_registry.as_deref() == Some(event.registry.as_str())
-                    && event.registration.is_some()
-                    && current_events[index].registration.is_none()
-                {
-                    current_events[index] = event.clone();
-                    {
-                        let mut store = state.store.lock().await;
-                        let _ = store.set_events(&did, current_events);
-                    }
-                    update_search_doc(state, &did).await;
-                    if trace {
-                        info!(
-                            "process_events added reason=upgrade_with_chain_registration expected_registry={} did={} opid={}",
-                            expected_registry.as_deref().unwrap_or("-"),
-                            did,
-                            opid
-                        );
-                    }
-                    return ImportStatus::Added;
-                }
                 if trace {
                     info!(
                         "process_events merged reason=duplicate_already_confirmed current_registry={} expected_registry={} {}",
