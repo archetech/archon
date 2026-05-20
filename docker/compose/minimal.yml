@@ -1,3 +1,5 @@
 include:
   - core.yml
   - gatekeeper-${ARCHON_GATEKEEPER_FLAVOR:-ts}.yml
+  - keymaster-${ARCHON_KEYMASTER_FLAVOR:-ts}.yml
+  - hyperswarm.yml

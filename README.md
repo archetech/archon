@@ -35,8 +35,8 @@ $ cp sample.env .env
 $ ./start-node
 ```
 
-To run only a minimal Gatekeeper node and its core dependencies (MongoDB,
-Redis, and IPFS), use the minimal startup script:
+To run a minimal peer-capable node with Gatekeeper, Keymaster, Hyperswarm,
+MongoDB, Redis, and IPFS, use the minimal startup script:
 
 ```bash
 ./start-node-minimal
