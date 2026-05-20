@@ -8,7 +8,7 @@ case "$MODE" in
   full)
     ;;
   minimal)
-    COMPOSE_ARGS=(-f docker/compose/minimal.yml)
+    COMPOSE_ARGS=(--env-file .env -f docker/compose/minimal.yml)
     ;;
   *)
     echo "Unknown node mode: $MODE (expected: full | minimal)"
