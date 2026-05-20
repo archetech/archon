@@ -1,6 +1,6 @@
 {
   "name": "archon",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "type": "module",
   "description": "Self-sovereign identity infrastructure for the decentralized web",
   "private": true,
