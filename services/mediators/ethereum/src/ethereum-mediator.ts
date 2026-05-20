@@ -34,6 +34,24 @@ let jsonPersister: MediatorDbInterface;
 let importRunning = false;
 let exportRunning = false;
 
+function formatError(error: unknown): string {
+    if (error instanceof Error) {
+        return error.stack || error.message;
+    }
+
+    if (typeof error === 'string') {
+        return error;
+    }
+
+    try {
+        return JSON.stringify(error, (_key, value) => (
+            typeof value === 'bigint' ? value.toString() : value
+        ));
+    } catch {
+        return String(error);
+    }
+}
+
 function walletHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (config.adminApiKey) {
@@ -519,7 +537,7 @@ async function importBatches(): Promise<boolean> {
         }
         catch (error: any) {
             if (error.error !== 'DID not found') {
-                console.error(`Error importing ${item.did}: ${error.error || JSON.stringify(error)}`);
+                console.error(`Error importing ${item.did}: ${formatError(error?.error ?? error)}`);
             }
         }
     }
@@ -550,7 +568,7 @@ async function retryFailedImports(): Promise<void> {
         }
         catch (error: any) {
             if (error.error !== 'DID not found') {
-                console.error(`Retry failed for ${item.did}: ${error.error || JSON.stringify(error)}`);
+                console.error(`Retry failed for ${item.did}: ${formatError(error?.error ?? error)}`);
             }
         }
     }
@@ -660,13 +678,16 @@ async function importLoop(): Promise<void> {
     }
 
     importRunning = true;
+    let stage = 'scanBlocks';
 
     try {
         await scanBlocks();
+        stage = 'importBatches';
         await importBatches();
+        stage = 'retryFailedImports';
         await retryFailedImports();
     } catch (error: any) {
-        console.error(`Error in importLoop: ${error.error || JSON.stringify(error)}`);
+        console.error(`Error in importLoop during ${stage}: ${formatError(error?.error ?? error)}`);
     } finally {
         importRunning = false;
         console.log(`import loop waiting ${config.importInterval} minute(s)...`);
@@ -686,7 +707,7 @@ async function exportLoop(): Promise<void> {
     try {
         await anchorBatch();
     } catch (error) {
-        console.error(`Error in exportLoop: ${error}`);
+        console.error(`Error in exportLoop: ${formatError(error)}`);
     } finally {
         exportRunning = false;
         console.log(`export loop waiting ${config.exportInterval} minute(s)...`);
