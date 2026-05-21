@@ -36,6 +36,8 @@ canonical TypeScript reference.
 - [Satoshi wallet](services/mediators/satoshi-wallet/README.md) — BIP84 HD wallet for anchoring
 - [Ethereum mediator](services/mediators/ethereum/README.md) — EVM contract-log anchoring
 - [Ethereum wallet](services/mediators/ethereum-wallet/README.md) — EVM key derivation and transaction signing
+- [Solana mediator](services/mediators/solana/README.md) — Solana memo anchoring
+- [Solana wallet](services/mediators/solana-wallet/README.md) — Solana key derivation and transaction signing
 
 ## API Reference
 

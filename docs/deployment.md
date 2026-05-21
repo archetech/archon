@@ -301,7 +301,59 @@ The reference Solidity contract lives at `services/mediators/ethereum/contracts/
 
 ---
 
-## 6. Adding Drawbridge (API Gateway + Tor)
+## 6. Adding Solana Devnet Registry
+
+Solana support is optional. If enabled, the Solana registry anchors DID batches by submitting Solana Memo transactions with an Archon-specific payload and importing matching memos back into Gatekeeper. The bundled devnet compose layer includes `solana-devnet-mediator` plus a companion `solana-devnet-wallet` service. The wallet derives a Solana account from the Keymaster mnemonic and signs transactions; the mediator scans Memo program signatures and imports batches.
+
+Devnet is intended for testing. Production deployments should use a hardened discovery target, either a canonical custom Solana program or an explicitly documented non-canonical memo registry.
+
+### Enable Solana Devnet
+
+Uncomment in `docker-compose.yml`:
+
+```yaml
+include:
+  - docker/compose/solana-devnet.yml
+```
+
+Add the registry to Gatekeeper:
+
+```env
+ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,SOL:devnet
+```
+
+### Key Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ARCHON_SOL_RPC_URL` | `https://api.devnet.solana.com` | Solana JSON-RPC endpoint |
+| `ARCHON_SOL_CHAIN` | `SOL:devnet` | Gatekeeper registry name |
+| `ARCHON_SOL_NETWORK` | `devnet` | Solana network name |
+| `ARCHON_SOL_COMMITMENT` | `confirmed` | Commitment level for reads and writes |
+| `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Memo program ID used for Archon anchors |
+| `ARCHON_SOL_START_SLOT` | `0` | Slot to start scanning |
+| `ARCHON_SOL_SIGNATURE_PAGE_LIMIT` | `100` | Signatures per scan page |
+| `ARCHON_SOL_SIGNATURE_PAGE_MAX` | `20` | Maximum scan pages per import loop |
+| `ARCHON_SOL_PENDING_TX_TIMEOUT_SLOTS` | `150` | Slots to wait before re-anchoring stale pending transactions |
+| `ARCHON_SOL_IMPORT_INTERVAL` | `1` | Minutes between import scans; `0` disables importing |
+| `ARCHON_SOL_EXPORT_INTERVAL` | `1` | Minutes between export attempts; `0` makes the mediator read-only |
+| `ARCHON_SOL_REIMPORT` | `true` | Reprocess discovered batches on startup |
+| `ARCHON_SOL_DB` | `json` | Mediator state backend: `json`, `sqlite`, `mongodb`, or `redis` |
+| `ARCHON_WALLET_SOL_DERIVATION_PATH` | `m/44'/501'/0'/0'` | Solana account derivation path |
+
+### Verify
+
+```bash
+# Solana mediator metrics
+curl http://localhost:4249/metrics
+
+# Solana wallet metrics
+curl http://localhost:4263/metrics
+```
+
+---
+
+## 7. Adding Drawbridge (API Gateway + Tor)
 
 Drawbridge is the L402 API gateway that enables Lightning payments for API access and Lightning zaps between DIDs. The Drawbridge compose layer also brings in Herald, Herald client, Drawbridge client, the Lightning mediator, and a Tor hidden service for privacy.
 
