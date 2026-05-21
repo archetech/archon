@@ -313,7 +313,7 @@ Uncomment in `docker-compose.yml`:
 
 ```yaml
 include:
-  - docker/compose/solana-devnet.yml
+  - docker/compose/sol-devnet.yml
 ```
 
 Add the registry to Gatekeeper:
