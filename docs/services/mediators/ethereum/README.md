@@ -13,7 +13,7 @@ The smart contract intentionally does not validate Archon DID semantics. Gatekee
 
 Each public EVM registry should use one canonical contract address. For example, every `ETH:sepolia` node should scan the same Sepolia `ArchonRegistry` deployment. Custom deployments should use a distinct registry name or be clearly marked as non-canonical in node configuration.
 
-The reference contract is in [`contracts/ArchonRegistry.sol`](contracts/ArchonRegistry.sol).
+The reference contract is in [`services/mediators/ethereum/contracts/ArchonRegistry.sol`](../../../../services/mediators/ethereum/contracts/ArchonRegistry.sol).
 
 ## Environment variables
 
@@ -32,8 +32,11 @@ The reference contract is in [`contracts/ArchonRegistry.sol`](contracts/ArchonRe
 | `ARCHON_ETH_START_BLOCK` | `0` | First block to scan |
 | `ARCHON_ETH_CONFIRMATIONS` | `12` | Confirmations before import |
 | `ARCHON_ETH_LOG_CHUNK_SIZE` | `2000` | Blocks per `eth_getLogs` query |
+| `ARCHON_ETH_PENDING_TX_TIMEOUT_BLOCKS` | `120` | Blocks to wait before bumping a pending anchor transaction |
+| `ARCHON_ETH_MIN_GAS_BALANCE_WEI` | `1000000000000000` | Minimum wallet balance required before anchoring |
 | `ARCHON_ETH_IMPORT_INTERVAL` | `0` | Minutes between import cycles; `0` disables importing |
 | `ARCHON_ETH_EXPORT_INTERVAL` | `0` | Minutes between export cycles; `0` makes the mediator read-only |
 | `ARCHON_ETH_REIMPORT` | `true` | Reprocess discovered batches on startup |
 | `ARCHON_ETH_DB` | `json` | Database adapter: `json`, `sqlite`, `mongodb`, or `redis` |
+| `ARCHON_ETH_DB_NAME` | chain derived | Persister file/key name, derived from the registry chain by default |
 | `ARCHON_ETH_METRICS_PORT` | `4239` | Metrics server port |

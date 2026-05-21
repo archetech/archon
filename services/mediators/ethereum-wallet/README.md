@@ -16,6 +16,7 @@ All wallet endpoints are under `/api/v1` and require `X-Archon-Admin-Key` when `
 | `GET /wallet/info` | Returns address, balance, nonce, chain, and derivation path |
 | `POST /wallet/send` | Sends ETH |
 | `POST /wallet/anchor` | Calls `ArchonRegistry.anchorBatch` |
+| `POST /wallet/bump-fee` | Replaces a pending wallet transaction with the same nonce and higher fee |
 | `GET /wallet/transaction/:txid` | Returns transaction receipt/confirmation status |
 
 ## Environment variables

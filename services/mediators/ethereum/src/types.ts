@@ -35,6 +35,9 @@ export interface MediatorDb {
     pending?: {
         txids?: string[];
         blockCount: number;
+        batchDid?: string;
+        batchHash?: string;
+        opCount?: number;
     }
 }
 

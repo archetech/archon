@@ -122,6 +122,17 @@ function batchHashForDid(batchDid: string): string {
     return `0x${createHash('sha256').update(batchDid).digest('hex')}`;
 }
 
+function bumpWei(previous?: bigint | null, current?: bigint | null): bigint | undefined {
+    const bumpedPrevious = previous ? (previous * 125n / 100n) + 1n : undefined;
+    const bumpedCurrent = current ? (current * 110n / 100n) + 1n : undefined;
+
+    if (bumpedPrevious && bumpedCurrent) {
+        return bumpedPrevious > bumpedCurrent ? bumpedPrevious : bumpedCurrent;
+    }
+
+    return bumpedPrevious ?? bumpedCurrent;
+}
+
 async function getConnectedWallet(provider: JsonRpcProvider) {
     const mnemonic = await fetchMnemonic();
     return deriveWallet(mnemonic, config.derivationPath).connect(provider);
@@ -333,6 +344,90 @@ async function main() {
         } catch (error: any) {
             walletSendsTotal.inc({ status: 'failed' });
             logger.error({ err: error }, 'Failed to anchor batch');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    v1router.post('/wallet/bump-fee', requireAdminKey, async (req, res) => {
+        try {
+            const { txid } = req.body;
+            if (!txid || typeof txid !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(txid)) {
+                res.status(400).json({ error: 'Missing or invalid "txid"' });
+                return;
+            }
+
+            const [tx, receipt, feeData] = await Promise.all([
+                provider.getTransaction(txid),
+                provider.getTransactionReceipt(txid),
+                provider.getFeeData(),
+            ]);
+
+            if (receipt) {
+                res.json({
+                    txid,
+                    hash: txid,
+                    confirmations: Math.max(0, (await provider.getBlockNumber()) - receipt.blockNumber + 1),
+                    blockhash: receipt.blockHash,
+                    blockNumber: receipt.blockNumber,
+                    status: receipt.status,
+                    network: config.network,
+                });
+                return;
+            }
+
+            if (!tx) {
+                res.status(404).json({ error: 'Transaction not found' });
+                return;
+            }
+
+            if (!tx.to) {
+                res.status(400).json({ error: 'Cannot replace transaction without a recipient' });
+                return;
+            }
+
+            const wallet = await getConnectedWallet(provider);
+            const replacement: {
+                to: string;
+                data: string;
+                value: bigint;
+                nonce: number;
+                gasLimit: bigint;
+                gasPrice?: bigint;
+                maxFeePerGas?: bigint;
+                maxPriorityFeePerGas?: bigint;
+            } = {
+                to: tx.to,
+                data: tx.data,
+                value: tx.value,
+                nonce: tx.nonce,
+                gasLimit: tx.gasLimit,
+            };
+
+            if (tx.maxFeePerGas || tx.maxPriorityFeePerGas || feeData.maxFeePerGas) {
+                const maxFeePerGas = bumpWei(tx.maxFeePerGas, feeData.maxFeePerGas ?? feeData.gasPrice);
+                const maxPriorityFeePerGas = bumpWei(
+                    tx.maxPriorityFeePerGas,
+                    feeData.maxPriorityFeePerGas ?? feeData.gasPrice
+                );
+                if (maxFeePerGas) {
+                    replacement.maxFeePerGas = maxFeePerGas;
+                }
+                if (maxPriorityFeePerGas) {
+                    replacement.maxPriorityFeePerGas = maxPriorityFeePerGas;
+                }
+            } else {
+                const gasPrice = bumpWei(tx.gasPrice, feeData.gasPrice);
+                if (gasPrice) {
+                    replacement.gasPrice = gasPrice;
+                }
+            }
+
+            const bumped = await wallet.sendTransaction(replacement);
+            walletSendsTotal.inc({ status: 'success' });
+            res.json({ txid: bumped.hash, hash: bumped.hash, replaces: txid, network: config.network });
+        } catch (error: any) {
+            walletSendsTotal.inc({ status: 'failed' });
+            logger.error({ err: error }, 'Failed to bump transaction fee');
             res.status(500).json({ error: error.message });
         }
     });

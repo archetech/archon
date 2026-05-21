@@ -88,6 +88,15 @@ async function walletGetTransaction(txid: string): Promise<{ confirmations: numb
     }
 }
 
+async function walletBumpFee(txid: string): Promise<{ txid?: string; confirmations?: number }> {
+    const { data } = await axios.post(
+        `${config.walletURL}/api/v1/wallet/bump-fee`,
+        { txid },
+        { headers: walletHeaders() }
+    );
+    return data;
+}
+
 const register = promClient.register;
 promClient.collectDefaultMetrics({ register });
 
@@ -494,7 +503,6 @@ async function importBatch(item: DiscoveredItem, retry = false) {
             index: item.index,
             txid: item.txid,
             batch: item.did,
-            opidx: item.index,
         } as DidRegistration,
     };
 
@@ -574,7 +582,9 @@ async function retryFailedImports(): Promise<void> {
     }
 }
 
-async function checkPendingTransactions(txids: string[]): Promise<boolean> {
+async function checkPendingTransactions(pending: NonNullable<MediatorDb['pending']>): Promise<boolean> {
+    const txids = pending.txids ?? [];
+
     for (const txid of txids) {
         const tx = await walletGetTransaction(txid);
         if (tx && tx.confirmations > 0) {
@@ -583,8 +593,57 @@ async function checkPendingTransactions(txids: string[]): Promise<boolean> {
         }
     }
 
+    const currentBlock = await provider.getBlockNumber();
+    const elapsedBlocks = Math.max(0, currentBlock - pending.blockCount);
+
+    if (config.pendingTxTimeoutBlocks > 0 && elapsedBlocks >= config.pendingTxTimeoutBlocks) {
+        const lastTxid = txids.at(-1);
+
+        if (lastTxid) {
+            try {
+                const replacement = await walletBumpFee(lastTxid);
+                if ((replacement.confirmations ?? 0) > 0) {
+                    await jsonPersister.updateDb((db) => { db.pending = undefined; });
+                    return false;
+                }
+                if (replacement.txid) {
+                    await jsonPersister.updateDb((db) => {
+                        if (db.pending) {
+                            db.pending.txids = [...(db.pending.txids ?? []), replacement.txid!];
+                            db.pending.blockCount = currentBlock;
+                        }
+                    });
+                    console.log(`Bumped pending ${REGISTRY} anchor tx ${lastTxid}: ${replacement.txid}`);
+                    return true;
+                }
+            } catch (error) {
+                console.log(`Unable to bump pending ${REGISTRY} anchor tx ${lastTxid}: ${formatError(error)}`);
+            }
+        }
+
+        if (pending.batchDid && pending.batchHash) {
+            try {
+                const txid = await walletAnchor(pending.batchDid, pending.batchHash, pending.opCount ?? 0);
+                await jsonPersister.updateDb((db) => {
+                    if (db.pending) {
+                        db.pending.txids = [...(db.pending.txids ?? []), txid];
+                        db.pending.blockCount = currentBlock;
+                    }
+                });
+                console.log(`Re-anchored stale ${REGISTRY} batch ${pending.batchDid}: ${txid}`);
+            } catch (error) {
+                console.log(`Unable to re-anchor stale ${REGISTRY} batch ${pending.batchDid}: ${formatError(error)}`);
+            }
+            return true;
+        }
+
+        await jsonPersister.updateDb((db) => { db.pending = undefined; });
+        console.log(`Cleared stale ${REGISTRY} pending anchor after ${elapsedBlocks} block(s)`);
+        return false;
+    }
+
     if (txids.length) {
-        console.log('pending txid', txids.at(-1));
+        console.log(`pending txid ${txids.at(-1)} (${elapsedBlocks}/${config.pendingTxTimeoutBlocks} blocks)`);
     }
 
     return txids.length > 0;
@@ -614,23 +673,23 @@ async function anchorBatch(): Promise<void> {
         return;
     }
 
-    const db = await loadDb();
-    if (db.pending?.txids && await checkPendingTransactions(db.pending.txids)) {
-        return;
-    }
-
     const end = ethereumAnchorBatchDuration.startTimer();
 
     try {
         try {
-            const { balance } = await walletGetBalance();
-            if (balance <= 0) {
+            const { balance, balanceWei } = await walletGetBalance();
+            if (BigInt(balanceWei) < config.minGasBalanceWei) {
                 const address = await walletGetAddress();
-                console.log(`Wallet has no ETH for gas. Send ${config.chain} gas funds to ${address}`);
+                console.log(`Wallet has ${balance} ETH, below gas floor ${config.minGasBalanceWei} wei. Send ${config.chain} gas funds to ${address}`);
                 return;
             }
         } catch {
             console.log(`${config.chain} wallet service not accessible`);
+            return;
+        }
+
+        const db = await loadDb();
+        if (db.pending?.txids && await checkPendingTransactions(db.pending)) {
             return;
         }
 
@@ -656,7 +715,7 @@ async function anchorBatch(): Promise<void> {
                     const blockCount = await provider.getBlockNumber();
                     await jsonPersister.updateDb((db) => {
                         (db.registered ??= []).push({ did, txid, batchHash });
-                        db.pending = { txids: [txid], blockCount };
+                        db.pending = { txids: [txid], blockCount, batchDid: did, batchHash, opCount: cids.length };
                         db.lastExport = new Date().toISOString();
                     });
                 }

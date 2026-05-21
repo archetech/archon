@@ -20,6 +20,8 @@ export interface AppConfig {
     exportInterval: number;
     confirmations: number;
     logChunkSize: number;
+    pendingTxTimeoutBlocks: number;
+    minGasBalanceWei: bigint;
     startBlock: number;
     reimport: boolean;
     db: EthereumDB;
@@ -94,6 +96,8 @@ const config: AppConfig = {
     exportInterval: process.env.ARCHON_ETH_EXPORT_INTERVAL ? parseInt(process.env.ARCHON_ETH_EXPORT_INTERVAL) : 0,
     confirmations: process.env.ARCHON_ETH_CONFIRMATIONS ? parseInt(process.env.ARCHON_ETH_CONFIRMATIONS) : 12,
     logChunkSize: process.env.ARCHON_ETH_LOG_CHUNK_SIZE ? parseInt(process.env.ARCHON_ETH_LOG_CHUNK_SIZE) : 2_000,
+    pendingTxTimeoutBlocks: process.env.ARCHON_ETH_PENDING_TX_TIMEOUT_BLOCKS ? parseInt(process.env.ARCHON_ETH_PENDING_TX_TIMEOUT_BLOCKS) : 120,
+    minGasBalanceWei: BigInt(process.env.ARCHON_ETH_MIN_GAS_BALANCE_WEI || '1000000000000000'),
     startBlock: process.env.ARCHON_ETH_START_BLOCK ? parseInt(process.env.ARCHON_ETH_START_BLOCK) : 0,
     reimport: process.env.ARCHON_ETH_REIMPORT ? (process.env.ARCHON_ETH_REIMPORT === 'true') : true,
     db: toDB(process.env.ARCHON_ETH_DB),
