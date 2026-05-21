@@ -303,7 +303,7 @@ The reference Solidity contract lives at `services/mediators/ethereum/contracts/
 
 ## 6. Adding Solana Devnet Registry
 
-Solana support is optional. If enabled, the Solana registry anchors DID batches by submitting Solana Memo transactions with an Archon-specific payload and importing matching memos back into Gatekeeper. The bundled devnet compose layer includes `solana-devnet-mediator` plus a companion `solana-devnet-wallet` service. The wallet derives a Solana account from the Keymaster mnemonic and signs transactions; the mediator scans Memo program signatures and imports batches.
+Solana support is optional. If enabled, the Solana registry anchors DID batches by submitting Solana Memo transactions with an Archon-specific payload and importing matching memos back into Gatekeeper. The bundled devnet compose layer includes `sol-devnet-mediator` plus a companion `sol-devnet-wallet` service. The wallet derives a Solana account from the Keymaster mnemonic and signs transactions; the mediator scans Memo program signatures and imports batches.
 
 Devnet is intended for testing. Production deployments should use a hardened discovery target, either a canonical custom Solana program or an explicitly documented non-canonical memo registry.
 
