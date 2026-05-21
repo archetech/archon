@@ -17,7 +17,7 @@ The devnet registry uses the Solana Memo program with an Archon-specific payload
 ARCHON_BATCH_V1:{"batchHash":"0x...","batchDid":"did:cid:...","opCount":1}
 ```
 
-Every `SOL:devnet` node should scan the same Memo program ID and payload format. A future custom Solana program can replace this format under a distinct registry name or explicit non-canonical configuration.
+Every `SOL:devnet` node should scan the same registry address and payload format. The default registry address is a deterministic program-derived address using the Memo program, `archon-batch-v1`, and the registry name as seeds. Wallet anchors include that address as a read-only Memo instruction account so discovery can query a narrow address instead of the global Memo program. A future custom Solana program can replace this format under a distinct registry name or explicit non-canonical configuration.
 
 ## Environment variables
 
@@ -33,6 +33,7 @@ Every `SOL:devnet` node should scan the same Memo program ID and payload format.
 | `ARCHON_SOL_RPC_URL` | network derived | Solana JSON-RPC endpoint |
 | `ARCHON_SOL_COMMITMENT` | `confirmed` | Solana commitment: `processed`, `confirmed`, or `finalized` |
 | `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Solana Memo program ID to scan and publish to |
+| `ARCHON_SOL_REGISTRY_ADDRESS` | derived | Address included in Archon memo transactions and scanned for discovery |
 | `ARCHON_SOL_START_SLOT` | `0` | First slot to scan |
 | `ARCHON_SOL_SIGNATURE_PAGE_LIMIT` | `100` | Signatures per `getSignaturesForAddress` page |
 | `ARCHON_SOL_SIGNATURE_PAGE_MAX` | `20` | Maximum signature pages per import loop |

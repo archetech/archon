@@ -303,7 +303,7 @@ The reference Solidity contract lives at `services/mediators/ethereum/contracts/
 
 ## 6. Adding Solana Devnet Registry
 
-Solana support is optional. If enabled, the Solana registry anchors DID batches by submitting Solana Memo transactions with an Archon-specific payload and importing matching memos back into Gatekeeper. The bundled devnet compose layer includes `sol-devnet-mediator` plus a companion `sol-devnet-wallet` service. The wallet derives a Solana account from the Keymaster mnemonic and signs transactions; the mediator scans Memo program signatures and imports batches.
+Solana support is optional. If enabled, the Solana registry anchors DID batches by submitting Solana Memo transactions with an Archon-specific payload and importing matching memos back into Gatekeeper. The bundled devnet compose layer includes `sol-devnet-mediator` plus a companion `sol-devnet-wallet` service. The wallet derives a Solana account from the Keymaster mnemonic and signs transactions; the mediator scans an Archon registry address included in Memo transactions and imports batches.
 
 Devnet is intended for testing. Production deployments should use a hardened discovery target, either a canonical custom Solana program or an explicitly documented non-canonical memo registry.
 
@@ -331,6 +331,7 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,SOL:devnet
 | `ARCHON_SOL_NETWORK` | `devnet` | Solana network name |
 | `ARCHON_SOL_COMMITMENT` | `confirmed` | Commitment level for reads and writes |
 | `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Memo program ID used for Archon anchors |
+| `ARCHON_SOL_REGISTRY_ADDRESS` | derived | Address included in Archon memo transactions and scanned for discovery |
 | `ARCHON_SOL_START_SLOT` | `0` | Slot to start scanning |
 | `ARCHON_SOL_SIGNATURE_PAGE_LIMIT` | `100` | Signatures per scan page |
 | `ARCHON_SOL_SIGNATURE_PAGE_MAX` | `20` | Maximum scan pages per import loop |

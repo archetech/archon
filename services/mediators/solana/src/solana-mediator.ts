@@ -30,7 +30,7 @@ const ARCHON_MEMO_PREFIX = 'ARCHON_BATCH_V1:';
 const SLOT_OVERLAP = 64;
 
 const connection = new Connection(config.rpcUrl, config.commitment);
-const memoProgramId = new PublicKey(config.memoProgramId);
+const registryAddress = new PublicKey(config.registryAddress);
 const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
 const keymaster = new KeymasterClient();
@@ -384,7 +384,7 @@ async function scanSignatures(): Promise<void> {
     let before: string | undefined;
 
     for (let page = 0; page < config.signaturePageMax; page++) {
-        const signatures = await connection.getSignaturesForAddress(memoProgramId, {
+        const signatures = await connection.getSignaturesForAddress(registryAddress, {
             limit: config.signaturePageLimit,
             before,
         }, transactionFinality());

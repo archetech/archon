@@ -145,6 +145,7 @@ async function main() {
     const v1router = express.Router();
     const connection = new Connection(config.rpcUrl, config.commitment);
     const memoProgramId = new PublicKey(config.memoProgramId);
+    const registryAddress = new PublicKey(config.registryAddress);
 
     app.use(cors());
     if (process.env.NODE_ENV === 'production') {
@@ -337,7 +338,7 @@ async function main() {
 
             const keypair = await getKeypair();
             const transaction = new Transaction().add(new TransactionInstruction({
-                keys: [],
+                keys: [{ pubkey: registryAddress, isSigner: false, isWritable: false }],
                 programId: memoProgramId,
                 data: Buffer.from(memo, 'utf8'),
             }));

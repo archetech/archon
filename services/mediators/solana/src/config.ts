@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { Commitment } from '@solana/web3.js';
+import { Commitment, PublicKey } from '@solana/web3.js';
 
 dotenv.config();
 
@@ -17,6 +17,7 @@ export interface AppConfig {
     rpcUrl: string;
     commitment: Commitment;
     memoProgramId: string;
+    registryAddress: string;
     importInterval: number;
     exportInterval: number;
     signaturePageLimit: number;
@@ -94,6 +95,15 @@ function toCommitment(value: string | undefined): Commitment {
 
 const network = toNetwork(process.env.ARCHON_SOL_NETWORK);
 const chain = process.env.ARCHON_SOL_CHAIN || defaultChain(network);
+const memoProgramId = process.env.ARCHON_SOL_MEMO_PROGRAM_ID || 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
+
+function defaultRegistryAddress(): string {
+    const [address] = PublicKey.findProgramAddressSync(
+        [Buffer.from('archon-batch-v1'), Buffer.from(chain)],
+        new PublicKey(memoProgramId)
+    );
+    return address.toBase58();
+}
 
 const config: AppConfig = {
     nodeID: process.env.ARCHON_NODE_ID,
@@ -105,7 +115,8 @@ const config: AppConfig = {
     network,
     rpcUrl: process.env.ARCHON_SOL_RPC_URL || defaultRpcUrl(network),
     commitment: toCommitment(process.env.ARCHON_SOL_COMMITMENT),
-    memoProgramId: process.env.ARCHON_SOL_MEMO_PROGRAM_ID || 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
+    memoProgramId,
+    registryAddress: process.env.ARCHON_SOL_REGISTRY_ADDRESS || defaultRegistryAddress(),
     importInterval: process.env.ARCHON_SOL_IMPORT_INTERVAL ? parseInt(process.env.ARCHON_SOL_IMPORT_INTERVAL) : 0,
     exportInterval: process.env.ARCHON_SOL_EXPORT_INTERVAL ? parseInt(process.env.ARCHON_SOL_EXPORT_INTERVAL) : 0,
     signaturePageLimit: process.env.ARCHON_SOL_SIGNATURE_PAGE_LIMIT ? parseInt(process.env.ARCHON_SOL_SIGNATURE_PAGE_LIMIT) : 100,
