@@ -1045,6 +1045,7 @@ pub(crate) async fn add_block(
 pub(crate) async fn resolve_did(
     State(state): State<AppState>,
     Path(did): Path<String>,
+    headers: HeaderMap,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     let start = Instant::now();
@@ -1117,6 +1118,66 @@ pub(crate) async fn resolve_did(
             Ok(_) => {}
             Err(error) => {
                 error!("resolve DID fallback failed: {error}");
+            }
+        }
+    }
+
+    let already_fallback = headers
+        .get("x-archon-confirm-fallback")
+        .and_then(|value| value.to_str().ok())
+        .is_some();
+    let local_confirmed = local_doc
+        .get("didDocumentMetadata")
+        .and_then(|value| value.get("confirmed"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    if resolve_options.confirm
+        && !already_fallback
+        && !local_confirmed
+        && !state.config.confirm_fallback_url.trim().is_empty()
+    {
+        let url = confirm_fallback_url(&state.config.confirm_fallback_url, &did, &resolve_options);
+
+        match state
+            .client
+            .get(url)
+            .header("x-archon-confirm-fallback", "1")
+            .timeout(Duration::from_millis(state.config.fallback_timeout_ms))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => match response.bytes().await {
+                Ok(body) => match serde_json::from_slice::<Value>(&body) {
+                    Ok(resolved) => {
+                        let fallback_confirmed = resolved
+                            .get("didDocumentMetadata")
+                            .and_then(|value| value.get("confirmed"))
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false);
+
+                        if fallback_confirmed {
+                            record_metrics(
+                                &state,
+                                "GET",
+                                "/did/:did",
+                                200,
+                                start.elapsed().as_secs_f64(),
+                            );
+                            return Json(resolved).into_response();
+                        }
+                    }
+                    Err(error) => {
+                        error!("confirmed Gatekeeper fallback body parse failed: {error}");
+                    }
+                },
+                Err(error) => {
+                    error!("confirmed Gatekeeper fallback body read failed: {error}");
+                }
+            },
+            Ok(_) => {}
+            Err(error) => {
+                error!("confirmed Gatekeeper fallback failed: {error}");
             }
         }
     }
@@ -1724,4 +1785,23 @@ fn url_encode_component(value: &str) -> String {
         }
     }
     encoded
+}
+
+fn confirm_fallback_url(base_url: &str, did: &str, options: &ResolveOptions) -> String {
+    let mut params = Vec::new();
+    if let Some(version_time) = options.version_time.as_ref() {
+        params.push(format!("versionTime={}", url_encode_component(version_time)));
+    }
+    if let Some(version_sequence) = options.version_sequence {
+        params.push(format!("versionSequence={version_sequence}"));
+    }
+    params.push(format!("confirm={}", options.confirm));
+    params.push(format!("verify={}", options.verify));
+
+    format!(
+        "{}/api/v1/did/{}?{}",
+        base_url.trim_end_matches('/'),
+        url_encode_component(did),
+        params.join("&")
+    )
 }
