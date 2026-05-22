@@ -33,7 +33,10 @@ const CHECKPOINT_SLOT_CHUNK = 1000;
 const CHECKPOINT_SLOT_LOOKBACK = 1000;
 const CHECKPOINT_SLOT_CHUNKS_PER_CYCLE = 10;
 
-const connection = new Connection(config.rpcUrl, config.commitment);
+const connection = new Connection(config.rpcUrl, {
+    commitment: config.commitment,
+    disableRetryOnRateLimit: true,
+});
 const registryAddress = new PublicKey(config.registryAddress);
 const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
