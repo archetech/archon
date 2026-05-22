@@ -1122,10 +1122,7 @@ pub(crate) async fn resolve_did(
         }
     }
 
-    let already_fallback = headers
-        .get("x-archon-confirm-fallback")
-        .and_then(|value| value.to_str().ok())
-        .is_some();
+    let already_fallback = headers.get("x-archon-confirm-fallback").is_some();
     let local_confirmed = local_doc
         .get("didDocumentMetadata")
         .and_then(|value| value.get("confirmed"))
@@ -1133,6 +1130,7 @@ pub(crate) async fn resolve_did(
         .unwrap_or(false);
 
     if resolve_options.confirm
+        && !has_resolver_error
         && !already_fallback
         && !local_confirmed
         && !state.config.confirm_fallback_url.trim().is_empty()
