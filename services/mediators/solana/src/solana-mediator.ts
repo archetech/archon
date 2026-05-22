@@ -328,6 +328,23 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
     await gatekeeper.addBlock(REGISTRY, { hash, height, time });
 }
 
+async function getSlotBlock(slot: number): Promise<{ hash: string; time: number } | undefined> {
+    const block = await connection.getBlock(slot, {
+        commitment: transactionFinality(),
+        transactionDetails: 'none',
+        rewards: false,
+    });
+
+    if (!block?.blockhash || block.blockTime === null) {
+        return undefined;
+    }
+
+    return {
+        hash: block.blockhash,
+        time: block.blockTime,
+    };
+}
+
 function parseArchonMemo(memo: string): { batchDid: string; batchHash: string; opCount: number } | undefined {
     if (!memo.startsWith(ARCHON_MEMO_PREFIX)) {
         return undefined;
@@ -425,8 +442,13 @@ async function scanSignatures(): Promise<void> {
             continue;
         }
 
-        const blockTime = tx.blockTime ?? candidate.blockTime ?? Math.floor(Date.now() / 1000);
-        const blockHash = tx.transaction.message.recentBlockhash || candidate.signature;
+        const block = await getSlotBlock(candidate.slot);
+        if (!block) {
+            continue;
+        }
+
+        const blockTime = block.time;
+        const blockHash = block.hash;
         const instructions = tx.transaction.message.instructions;
 
         for (let index = 0; index < instructions.length; index++) {
@@ -533,7 +555,7 @@ async function importBatch(item: DiscoveredItem, retry = false) {
         }
     } catch (error) {
         solanaImportErrors.inc();
-        update.error = JSON.stringify(error);
+        update.error = formatError(error);
     } finally {
         end();
     }

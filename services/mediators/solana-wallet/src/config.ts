@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
-import { Commitment, PublicKey } from '@solana/web3.js';
+import { Commitment, Keypair } from '@solana/web3.js';
+import { createHash } from 'crypto';
 
 dotenv.config();
 
@@ -11,6 +12,7 @@ export interface AppConfig {
     keymasterURL: string;
     adminApiKey?: string;
     rpcUrl: string;
+    chain: string;
     network: WalletNetwork;
     commitment: Commitment;
     memoProgramId: string;
@@ -64,12 +66,13 @@ const network = toNetwork(process.env.ARCHON_WALLET_SOL_NETWORK || process.env.A
 const chain = process.env.ARCHON_SOL_CHAIN || (network === 'mainnet-beta' ? 'SOL:mainnet-beta' : `SOL:${network}`);
 const memoProgramId = process.env.ARCHON_SOL_MEMO_PROGRAM_ID || 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
 
-function defaultRegistryAddress(): string {
-    const [address] = PublicKey.findProgramAddressSync(
-        [Buffer.from('archon-batch-v1'), Buffer.from(chain)],
-        new PublicKey(memoProgramId)
-    );
-    return address.toBase58();
+function registryAddress(): string {
+    const seed = createHash('sha256')
+        .update('archon-solana-registry-signer-v1')
+        .update(chain)
+        .update(memoProgramId)
+        .digest();
+    return Keypair.fromSeed(seed).publicKey.toBase58();
 }
 
 const config: AppConfig = {
@@ -78,10 +81,11 @@ const config: AppConfig = {
     keymasterURL: process.env.ARCHON_KEYMASTER_URL || 'http://localhost:4226',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY,
     rpcUrl: process.env.ARCHON_WALLET_SOL_RPC_URL || process.env.ARCHON_SOL_RPC_URL || defaultRpcUrl(network),
+    chain,
     network,
     commitment: toCommitment(process.env.ARCHON_WALLET_SOL_COMMITMENT || process.env.ARCHON_SOL_COMMITMENT),
     memoProgramId,
-    registryAddress: process.env.ARCHON_SOL_REGISTRY_ADDRESS || defaultRegistryAddress(),
+    registryAddress: registryAddress(),
     derivationPath: process.env.ARCHON_WALLET_SOL_DERIVATION_PATH || "m/44'/501'/0'/0'",
 };
 

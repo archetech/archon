@@ -19,7 +19,7 @@ export default class JsonMongo extends AbstractDB {
         super();
         const url = process.env.ARCHON_MONGODB_URL || 'mongodb://localhost:27017';
         this.client = new MongoClient(url);
-        this.dbName = 'eth-mediator';
+        this.dbName = 'sol-mediator';
         this.collectionName = registry;
     }
 

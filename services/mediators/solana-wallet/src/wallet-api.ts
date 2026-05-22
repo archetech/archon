@@ -135,6 +135,15 @@ function buildMemo(batchDid: string, batchHash: string, opCount: number): string
     return `${ARCHON_MEMO_PREFIX}${JSON.stringify({ batchHash, batchDid, opCount })}`;
 }
 
+function defaultRegistryKeypair(): Keypair {
+    const seed = createHash('sha256')
+        .update('archon-solana-registry-signer-v1')
+        .update(config.chain)
+        .update(config.memoProgramId)
+        .digest();
+    return Keypair.fromSeed(seed);
+}
+
 async function getKeypair(): Promise<Keypair> {
     const mnemonic = await fetchMnemonic();
     return deriveKeypair(mnemonic, config.derivationPath);
@@ -146,6 +155,7 @@ async function main() {
     const connection = new Connection(config.rpcUrl, config.commitment);
     const memoProgramId = new PublicKey(config.memoProgramId);
     const registryAddress = new PublicKey(config.registryAddress);
+    const registrySigner = defaultRegistryKeypair();
 
     app.use(cors());
     if (process.env.NODE_ENV === 'production') {
@@ -325,24 +335,23 @@ async function main() {
                 res.status(400).json({ error: 'Missing or invalid "batchDid"' });
                 return;
             }
-            if (Buffer.from(batchDid, 'utf8').length > 256) {
-                res.status(400).json({ error: 'batchDid exceeds 256 byte memo limit' });
-                return;
-            }
-
             const resolvedBatchHash = typeof batchHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(batchHash)
                 ? batchHash
                 : batchHashForDid(batchDid);
             const resolvedOpCount = Number.isInteger(opCount) && opCount >= 0 ? opCount : 0;
             const memo = buildMemo(batchDid, resolvedBatchHash, resolvedOpCount);
+            if (Buffer.byteLength(memo, 'utf8') > 256) {
+                res.status(400).json({ error: 'Archon memo exceeds 256 byte limit' });
+                return;
+            }
 
             const keypair = await getKeypair();
             const transaction = new Transaction().add(new TransactionInstruction({
-                keys: [{ pubkey: registryAddress, isSigner: false, isWritable: false }],
+                keys: [{ pubkey: registryAddress, isSigner: true, isWritable: false }],
                 programId: memoProgramId,
                 data: Buffer.from(memo, 'utf8'),
             }));
-            const signature = await connection.sendTransaction(transaction, [keypair], { preflightCommitment: config.commitment });
+            const signature = await connection.sendTransaction(transaction, [keypair, registrySigner], { preflightCommitment: config.commitment });
             walletSendsTotal.inc({ status: 'success' });
             res.json({
                 txid: signature,

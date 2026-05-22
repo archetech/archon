@@ -30,5 +30,4 @@ All wallet endpoints are under `/api/v1` and require `X-Archon-Admin-Key` when `
 | `ARCHON_WALLET_SOL_RPC_URL` | `ARCHON_SOL_RPC_URL` or network derived | Solana JSON-RPC endpoint |
 | `ARCHON_WALLET_SOL_COMMITMENT` | `ARCHON_SOL_COMMITMENT` or `confirmed` | Solana commitment |
 | `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Solana Memo program ID used for anchors |
-| `ARCHON_SOL_REGISTRY_ADDRESS` | derived | Address included as a read-only Memo instruction account |
 | `ARCHON_WALLET_SOL_DERIVATION_PATH` | `m/44'/501'/0'/0'` | HD derivation path |

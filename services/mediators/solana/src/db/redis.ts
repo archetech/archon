@@ -16,7 +16,7 @@ export default class JsonRedis extends AbstractDB {
     constructor(registry: string) {
         super();
         this.url = process.env.ARCHON_REDIS_URL || 'redis://localhost:6379';
-        this.dbKey = `eth-mediator/${registry}`;
+        this.dbKey = `sol-mediator/${registry}`;
     }
 
     async connect(): Promise<void> {
