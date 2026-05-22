@@ -28,6 +28,9 @@ const READ_ONLY = config.exportInterval === 0;
 const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 const ARCHON_MEMO_PREFIX = 'ARCHON_BATCH_V1:';
 const SLOT_OVERLAP = 64;
+const CHECKPOINT_BLOCK_INTERVAL = 100;
+const CHECKPOINT_SLOT_CHUNK = 1000;
+const CHECKPOINT_SLOT_LOOKBACK = 1000;
 
 const connection = new Connection(config.rpcUrl, config.commitment);
 const registryAddress = new PublicKey(config.registryAddress);
@@ -328,9 +331,9 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
     await gatekeeper.addBlock(REGISTRY, { hash, height, time });
 }
 
-async function getSlotBlock(slot: number): Promise<{ height: number; hash: string; time: number } | undefined> {
+async function getSlotBlock(slot: number, finality: Finality = transactionFinality()): Promise<{ height: number; hash: string; time: number } | undefined> {
     const block = await connection.getBlock(slot, {
-        commitment: transactionFinality(),
+        commitment: finality,
         transactionDetails: 'none',
         rewards: false,
     });
@@ -346,6 +349,93 @@ async function getSlotBlock(slot: number): Promise<{ height: number; hash: strin
         hash: block.blockhash,
         time: block.blockTime,
     };
+}
+
+async function getNearestProducedBlockAtOrBefore(slot: number, finality: Finality): Promise<{ slot: number; height: number } | undefined> {
+    const startSlot = Math.max(0, slot - CHECKPOINT_SLOT_LOOKBACK);
+    const slots = await connection.getBlocks(startSlot, slot, finality);
+    const producedSlot = slots.at(-1);
+
+    if (producedSlot === undefined) {
+        return undefined;
+    }
+
+    const block = await getSlotBlock(producedSlot, finality);
+    return block ? { slot: producedSlot, height: block.height } : undefined;
+}
+
+async function findFirstSlotAtOrAfterBlockHeight(targetHeight: number, currentSlot: number, finality: Finality): Promise<number> {
+    if (targetHeight <= 0) {
+        return 0;
+    }
+
+    let low = 0;
+    let high = currentSlot;
+    let result = currentSlot;
+
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const produced = await getNearestProducedBlockAtOrBefore(mid, finality);
+
+        if (!produced || produced.height < targetHeight) {
+            low = mid + 1;
+            continue;
+        }
+
+        result = produced.slot;
+        high = mid - 1;
+    }
+
+    return Math.max(0, result - CHECKPOINT_SLOT_LOOKBACK);
+}
+
+async function syncBlockCheckpoints(): Promise<void> {
+    const finality: Finality = 'finalized';
+    const currentSlot = await connection.getSlot(finality);
+    const currentBlockHeight = await connection.getBlockHeight(finality);
+
+    if (config.startBlock > currentBlockHeight) {
+        console.log(`Skipping ${REGISTRY} checkpoint sync because start block ${config.startBlock} is ahead of finalized block height ${currentBlockHeight}`);
+        return;
+    }
+
+    const db = await loadDb();
+    let startSlot = db.checkpointSlot !== undefined
+        ? Math.max(0, db.checkpointSlot + 1)
+        : await findFirstSlotAtOrAfterBlockHeight(config.startBlock, currentSlot, finality);
+
+    let checkpointed = 0;
+    let maxCheckpointHeight = db.checkpointHeight ?? 0;
+
+    while (startSlot <= currentSlot) {
+        const endSlot = Math.min(currentSlot, startSlot + CHECKPOINT_SLOT_CHUNK - 1);
+        const slots = await connection.getBlocks(startSlot, endSlot, finality);
+
+        for (const slot of slots) {
+            const block = await getSlotBlock(slot, finality);
+            if (!block) {
+                continue;
+            }
+
+            maxCheckpointHeight = Math.max(maxCheckpointHeight, block.height);
+
+            if (block.height < config.startBlock || block.height % CHECKPOINT_BLOCK_INTERVAL !== 0) {
+                continue;
+            }
+
+            await addBlock(block.height, block.hash, block.time);
+            checkpointed += 1;
+        }
+
+        await jsonPersister.updateDb((db) => {
+            db.checkpointSlot = endSlot;
+            db.checkpointHeight = Math.max(db.checkpointHeight ?? 0, maxCheckpointHeight);
+        });
+
+        startSlot = endSlot + 1;
+    }
+
+    console.log(`Synced ${checkpointed} ${REGISTRY} block checkpoint(s) through finalized block height ${currentBlockHeight}`);
 }
 
 function parseArchonMemo(memo: string): { batchDid: string; batchHash: string; opCount: number } | undefined {
@@ -751,9 +841,11 @@ async function importLoop(): Promise<void> {
     }
 
     importRunning = true;
-    let stage = 'scanSignatures';
+    let stage = 'syncBlockCheckpoints';
 
     try {
+        await syncBlockCheckpoints();
+        stage = 'scanSignatures';
         await scanSignatures();
         stage = 'importBatches';
         await importBatches();

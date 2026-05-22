@@ -9,6 +9,8 @@ The mediator has two responsibilities:
 
 The memo payload intentionally does not validate Archon DID semantics. Gatekeeper remains the validation authority; Solana is used as a publication, ordering, and timestamping layer.
 
+Each import cycle also syncs finalized Solana block checkpoints into Gatekeeper for every produced block whose block height is divisible by 100. The mediator uses Solana slots as an internal scan cursor, but Gatekeeper block records and DID registration metadata use produced block heights so independent nodes can derive the same lower-bound timestamps.
+
 ## Canonical memo format
 
 The devnet registry uses the Solana Memo program with an Archon-specific payload prefix:
@@ -34,7 +36,7 @@ Every `SOL:devnet` node should scan the same registry address and payload format
 | `ARCHON_SOL_COMMITMENT` | `confirmed` | Solana commitment: `processed`, `confirmed`, or `finalized` |
 | `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Solana Memo program ID to scan and publish to |
 | `ARCHON_SOL_REGISTRY_ADDRESS` | derived | Address included in Archon memo transactions and scanned for discovery |
-| `ARCHON_SOL_START_BLOCK` | `0` | First produced block height to import/register |
+| `ARCHON_SOL_START_BLOCK` | `0` | First produced block height to checkpoint and import/register |
 | `ARCHON_SOL_SIGNATURE_PAGE_LIMIT` | `100` | Signatures per `getSignaturesForAddress` page |
 | `ARCHON_SOL_SIGNATURE_PAGE_MAX` | `20` | Maximum signature pages per import loop |
 | `ARCHON_SOL_PENDING_TX_TIMEOUT_SLOTS` | `150` | Slots to wait before re-anchoring a stale pending transaction |

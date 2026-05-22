@@ -332,7 +332,7 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,SOL:devnet
 | `ARCHON_SOL_COMMITMENT` | `confirmed` | Commitment level for reads and writes |
 | `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Memo program ID used for Archon anchors |
 | `ARCHON_SOL_REGISTRY_ADDRESS` | derived | Address included in Archon memo transactions and scanned for discovery |
-| `ARCHON_SOL_START_BLOCK` | `0` | Produced block height to start importing/registering |
+| `ARCHON_SOL_START_BLOCK` | `0` | Produced block height to start checkpointing and importing/registering |
 | `ARCHON_SOL_SIGNATURE_PAGE_LIMIT` | `100` | Signatures per scan page |
 | `ARCHON_SOL_SIGNATURE_PAGE_MAX` | `20` | Maximum scan pages per import loop |
 | `ARCHON_SOL_PENDING_TX_TIMEOUT_SLOTS` | `150` | Slots to wait before re-anchoring stale pending transactions |
