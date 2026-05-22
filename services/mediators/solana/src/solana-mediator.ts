@@ -328,18 +328,21 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
     await gatekeeper.addBlock(REGISTRY, { hash, height, time });
 }
 
-async function getSlotBlock(slot: number): Promise<{ hash: string; time: number } | undefined> {
+async function getSlotBlock(slot: number): Promise<{ height: number; hash: string; time: number } | undefined> {
     const block = await connection.getBlock(slot, {
         commitment: transactionFinality(),
         transactionDetails: 'none',
         rewards: false,
     });
 
-    if (!block?.blockhash || block.blockTime === null) {
+    const rpcBlock = block as typeof block & { blockHeight?: number | null };
+
+    if (!block?.blockhash || block.blockTime === null || rpcBlock.blockHeight == null) {
         return undefined;
     }
 
     return {
+        height: rpcBlock.blockHeight,
         hash: block.blockhash,
         time: block.blockTime,
     };
@@ -387,13 +390,19 @@ function memoFromInstruction(instruction: ParsedInstruction | PartiallyDecodedIn
 
 async function scanSignatures(): Promise<void> {
     const currentSlot = await connection.getSlot(config.commitment);
+    const currentBlockHeight = await connection.getBlockHeight(config.commitment);
     const db = await loadDb();
     const scanFloor = db.height > 0 ? Math.max(config.startSlot, db.height - SLOT_OVERLAP) : config.startSlot;
 
-    console.log(`current slot height: ${currentSlot}, scan floor: ${scanFloor}`);
+    console.log(`current slot height: ${currentSlot}, current block height: ${currentBlockHeight}, scan floor: ${scanFloor}, start block: ${config.startBlock}`);
 
     if (config.startSlot > currentSlot) {
         console.log(`Skipping ${REGISTRY} scan because start slot ${config.startSlot} is ahead of current slot ${currentSlot}`);
+        return;
+    }
+
+    if (config.startBlock > currentBlockHeight) {
+        console.log(`Skipping ${REGISTRY} scan because start block ${config.startBlock} is ahead of current block height ${currentBlockHeight}`);
         return;
     }
 
@@ -451,6 +460,16 @@ async function scanSignatures(): Promise<void> {
         const blockHash = block.hash;
         const instructions = tx.transaction.message.instructions;
 
+        if (candidate.slot > maxSlot) {
+            maxSlot = candidate.slot;
+            maxSlotTime = new Date(blockTime * 1000).toISOString();
+            maxSlotHash = blockHash;
+        }
+
+        if (block.height < config.startBlock) {
+            continue;
+        }
+
         for (let index = 0; index < instructions.length; index++) {
             const memo = memoFromInstruction(instructions[index]);
             if (!memo) {
@@ -463,7 +482,8 @@ async function scanSignatures(): Promise<void> {
             }
 
             const item: DiscoveredItem = {
-                height: candidate.slot,
+                height: block.height,
+                slot: candidate.slot,
                 index,
                 time: new Date(blockTime * 1000).toISOString(),
                 txid: candidate.signature,
@@ -480,14 +500,8 @@ async function scanSignatures(): Promise<void> {
                 }
             });
 
-            await addBlock(candidate.slot, blockHash, blockTime);
+            await addBlock(block.height, blockHash, blockTime);
             scanned += 1;
-        }
-
-        if (candidate.slot > maxSlot) {
-            maxSlot = candidate.slot;
-            maxSlotTime = new Date(blockTime * 1000).toISOString();
-            maxSlotHash = blockHash;
         }
     }
 

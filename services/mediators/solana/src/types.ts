@@ -2,6 +2,7 @@ import { ImportBatchResult, ProcessEventsResult } from '@didcid/gatekeeper/types
 
 export interface DiscoveredItem {
     height: number;
+    slot?: number;
     index: number;
     time: string;
     txid: string;
