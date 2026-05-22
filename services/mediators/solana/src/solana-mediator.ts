@@ -65,6 +65,12 @@ function formatError(error: unknown): string {
     }
 }
 
+function isRateLimitError(error: unknown): boolean {
+    const anyError = error as { code?: unknown; status?: unknown; message?: unknown };
+    const message = typeof anyError?.message === 'string' ? anyError.message : formatError(error);
+    return anyError?.code === 429 || anyError?.status === 429 || /429|too many requests/i.test(message);
+}
+
 function walletHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (config.adminApiKey) {
@@ -365,6 +371,30 @@ async function getNearestProducedBlockAtOrBefore(slot: number, finality: Finalit
     return block ? { slot: producedSlot, height: block.height } : undefined;
 }
 
+async function getBlocksOrPause(startSlot: number, endSlot: number, finality: Finality): Promise<number[] | undefined> {
+    try {
+        return await connection.getBlocks(startSlot, endSlot, finality);
+    } catch (error) {
+        if (isRateLimitError(error)) {
+            console.log(`Pausing ${REGISTRY} checkpoint sync at slot ${startSlot}: Solana RPC rate limit`);
+            return undefined;
+        }
+        throw error;
+    }
+}
+
+async function getSlotBlockOrPause(slot: number, finality: Finality): Promise<{ height: number; hash: string; time: number } | undefined | 'rate-limited'> {
+    try {
+        return await getSlotBlock(slot, finality);
+    } catch (error) {
+        if (isRateLimitError(error)) {
+            console.log(`Pausing ${REGISTRY} checkpoint sync at slot ${slot}: Solana RPC rate limit`);
+            return 'rate-limited';
+        }
+        throw error;
+    }
+}
+
 async function findFirstSlotAtOrAfterBlockHeight(targetHeight: number, currentSlot: number, finality: Finality): Promise<number> {
     if (targetHeight <= 0) {
         return 0;
@@ -376,7 +406,16 @@ async function findFirstSlotAtOrAfterBlockHeight(targetHeight: number, currentSl
 
     while (low <= high) {
         const mid = Math.floor((low + high) / 2);
-        const produced = await getNearestProducedBlockAtOrBefore(mid, finality);
+        let produced: { slot: number; height: number } | undefined;
+        try {
+            produced = await getNearestProducedBlockAtOrBefore(mid, finality);
+        } catch (error) {
+            if (isRateLimitError(error)) {
+                console.log(`Pausing ${REGISTRY} checkpoint sync while finding start block ${targetHeight}: Solana RPC rate limit`);
+                return currentSlot + 1;
+            }
+            throw error;
+        }
 
         if (!produced || produced.height < targetHeight) {
             low = mid + 1;
@@ -411,12 +450,18 @@ async function syncBlockCheckpoints(): Promise<void> {
 
     while (startSlot <= currentSlot && chunksProcessed < CHECKPOINT_SLOT_CHUNKS_PER_CYCLE) {
         const endSlot = Math.min(currentSlot, startSlot + CHECKPOINT_SLOT_CHUNK - 1);
-        const slots = await connection.getBlocks(startSlot, endSlot, finality);
+        const slots = await getBlocksOrPause(startSlot, endSlot, finality);
+        if (!slots) {
+            return;
+        }
         let processedThroughSlot = endSlot;
         chunksProcessed += 1;
 
         if (slots.length > 0) {
-            const firstBlock = await getSlotBlock(slots[0], finality);
+            const firstBlock = await getSlotBlockOrPause(slots[0], finality);
+            if (firstBlock === 'rate-limited') {
+                return;
+            }
 
             if (firstBlock) {
                 const lastHeight = firstBlock.height + slots.length - 1;
@@ -428,7 +473,11 @@ async function syncBlockCheckpoints(): Promise<void> {
                 }
 
                 for (let index = checkpointIndex; index < slots.length; index += CHECKPOINT_BLOCK_INTERVAL) {
-                    const block = await getSlotBlock(slots[index], finality);
+                    const block = await getSlotBlockOrPause(slots[index], finality);
+                    if (block === 'rate-limited') {
+                        return;
+                    }
+
                     if (!block) {
                         processedThroughSlot = slots[index] - 1;
                         processedThroughHeight = firstBlock.height + index - 1;
