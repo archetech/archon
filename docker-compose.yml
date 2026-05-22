@@ -36,3 +36,4 @@ include:
 #  - docker/compose/btc-testnet4.yml
   - docker/compose/zcash-mainnet.yml
   - docker/compose/eth-sepolia.yml
+#  - docker/compose/sol-devnet.yml
