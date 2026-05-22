@@ -25,7 +25,6 @@ export interface AppConfig {
     signaturePageMax: number;
     pendingTxTimeoutSlots: number;
     startBlock: number;
-    startSlot: number;
     minSolBalanceLamports: bigint;
     reimport: boolean;
     db: SolanaDB;
@@ -126,7 +125,6 @@ const config: AppConfig = {
     signaturePageMax: process.env.ARCHON_SOL_SIGNATURE_PAGE_MAX ? parseInt(process.env.ARCHON_SOL_SIGNATURE_PAGE_MAX) : 20,
     pendingTxTimeoutSlots: process.env.ARCHON_SOL_PENDING_TX_TIMEOUT_SLOTS ? parseInt(process.env.ARCHON_SOL_PENDING_TX_TIMEOUT_SLOTS) : 150,
     startBlock: process.env.ARCHON_SOL_START_BLOCK ? parseInt(process.env.ARCHON_SOL_START_BLOCK) : 0,
-    startSlot: process.env.ARCHON_SOL_START_SLOT ? parseInt(process.env.ARCHON_SOL_START_SLOT) : 0,
     minSolBalanceLamports: BigInt(process.env.ARCHON_SOL_MIN_BALANCE_LAMPORTS || '10000000'),
     reimport: process.env.ARCHON_SOL_REIMPORT ? (process.env.ARCHON_SOL_REIMPORT === 'true') : true,
     db: toDB(process.env.ARCHON_SOL_DB),

@@ -34,7 +34,6 @@ Every `SOL:devnet` node should scan the same registry address and payload format
 | `ARCHON_SOL_COMMITMENT` | `confirmed` | Solana commitment: `processed`, `confirmed`, or `finalized` |
 | `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Solana Memo program ID to scan and publish to |
 | `ARCHON_SOL_START_BLOCK` | `0` | First produced block height to import/register |
-| `ARCHON_SOL_START_SLOT` | `0` | First slot to scan |
 | `ARCHON_SOL_SIGNATURE_PAGE_LIMIT` | `100` | Signatures per `getSignaturesForAddress` page |
 | `ARCHON_SOL_SIGNATURE_PAGE_MAX` | `20` | Maximum signature pages per import loop |
 | `ARCHON_SOL_PENDING_TX_TIMEOUT_SLOTS` | `150` | Slots to wait before re-anchoring a stale pending transaction |

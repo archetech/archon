@@ -318,8 +318,8 @@ function batchHashForDid(batchDid: string): string {
 }
 
 function formatSyncProgress(height: number, blockCount: number): string {
-    const totalSlots = Math.max(1, blockCount - config.startSlot + 1);
-    const completedSlots = Math.min(totalSlots, Math.max(0, height - config.startSlot + 1));
+    const totalSlots = Math.max(1, blockCount + 1);
+    const completedSlots = Math.min(totalSlots, Math.max(0, height + 1));
 
     return (100 * completedSlots / totalSlots).toFixed(2);
 }
@@ -392,14 +392,9 @@ async function scanSignatures(): Promise<void> {
     const currentSlot = await connection.getSlot(config.commitment);
     const currentBlockHeight = await connection.getBlockHeight(config.commitment);
     const db = await loadDb();
-    const scanFloor = db.height > 0 ? Math.max(config.startSlot, db.height - SLOT_OVERLAP) : config.startSlot;
+    const scanFloor = db.height > 0 ? Math.max(0, db.height - SLOT_OVERLAP) : 0;
 
     console.log(`current slot height: ${currentSlot}, current block height: ${currentBlockHeight}, scan floor: ${scanFloor}, start block: ${config.startBlock}`);
-
-    if (config.startSlot > currentSlot) {
-        console.log(`Skipping ${REGISTRY} scan because start slot ${config.startSlot} is ahead of current slot ${currentSlot}`);
-        return;
-    }
 
     if (config.startBlock > currentBlockHeight) {
         console.log(`Skipping ${REGISTRY} scan because start block ${config.startBlock} is ahead of current block height ${currentBlockHeight}`);
@@ -509,7 +504,7 @@ async function scanSignatures(): Promise<void> {
         db.height = Math.max(db.height, maxSlot);
         db.hash = maxSlotHash;
         db.time = maxSlotTime;
-        db.blocksScanned = Math.max(0, db.height - config.startSlot + 1);
+        db.blocksScanned = Math.max(0, db.height + 1);
         db.txnsScanned += scanned;
         db.blockCount = currentSlot;
         db.blocksPending = Math.max(0, currentSlot - db.height);
