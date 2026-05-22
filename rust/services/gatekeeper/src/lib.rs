@@ -68,6 +68,7 @@ mod tests {
             status_interval_minutes: 60,
             admin_api_key: String::new(),
             fallback_url: String::new(),
+            confirm_fallback_url: String::new(),
             fallback_timeout_ms: 0,
             max_queue_size: 100,
             git_commit: "test".to_string(),
@@ -177,6 +178,7 @@ mod tests {
             operation: json!({ "type": "create" }),
             opid: Some("bagaaieratestopid".to_string()),
             did: Some("did:cid:bagaaieratestdid".to_string()),
+            registration: None,
         };
 
         let stored = redis_event_to_stored_value(&event);
@@ -204,6 +206,7 @@ mod tests {
             operation: json!({ "type": "create", "created": "2026-04-11T12:00:00.000Z" }),
             opid: None,
             did: Some("did:cid:bagaaieralocal".to_string()),
+            registration: None,
         };
 
         let stored = redis_event_to_stored_value(&event);
@@ -267,6 +270,7 @@ mod tests {
             operation: json!({ "type": "create", "registration": { "registry": "hyperswarm" } }),
             opid: Some("bagaaieratestopid".to_string()),
             did: Some("did:cid:bagaaieratestdid".to_string()),
+            registration: None,
         };
 
         let round_trip = value_to_event_record(&event_record_to_value(&original));
@@ -394,6 +398,7 @@ mod tests {
                     operation: create_operation,
                     opid: Some("create-op".to_string()),
                     did: Some(did.to_string()),
+                    registration: None,
                 },
                 EventRecord {
                     registry: "local".to_string(),
@@ -402,6 +407,7 @@ mod tests {
                     operation: update_operation,
                     opid: Some("update-op".to_string()),
                     did: Some(did.to_string()),
+                    registration: None,
                 },
                 EventRecord {
                     registry: "local".to_string(),
@@ -410,6 +416,7 @@ mod tests {
                     operation: delete_operation,
                     opid: Some("delete-op".to_string()),
                     did: Some(did.to_string()),
+                    registration: None,
                 },
             ],
         );
@@ -651,6 +658,7 @@ mod tests {
                 }),
                 opid: Some("create-op".to_string()),
                 did: Some(did.to_string()),
+                registration: None,
             },
             EventRecord {
                 registry: "local".to_string(),
@@ -668,6 +676,7 @@ mod tests {
                 }),
                 opid: Some("update-op".to_string()),
                 did: Some(did.to_string()),
+                registration: None,
             },
             EventRecord {
                 registry: "hyperswarm".to_string(),
@@ -680,6 +689,7 @@ mod tests {
                 }),
                 opid: Some("delete-op".to_string()),
                 did: Some(did.to_string()),
+                registration: None,
             },
         ];
 
@@ -713,6 +723,7 @@ mod tests {
                 }),
                 opid: Some("create-op".to_string()),
                 did: Some(did.to_string()),
+                registration: None,
             }],
         );
 
@@ -791,6 +802,7 @@ mod tests {
                     }),
                     opid: Some("create-op".to_string()),
                     did: Some(did.to_string()),
+                    registration: None,
                 },
                 EventRecord {
                     registry: "hyperswarm".to_string(),
@@ -808,6 +820,7 @@ mod tests {
                     }),
                     opid: Some("update-op".to_string()),
                     did: Some(did.to_string()),
+                    registration: None,
                 },
                 EventRecord {
                     registry: "local".to_string(),
@@ -825,6 +838,7 @@ mod tests {
                     }),
                     opid: Some("late-update-op".to_string()),
                     did: Some(did.to_string()),
+                    registration: None,
                 },
             ],
         );
@@ -913,6 +927,7 @@ mod tests {
                     }),
                     opid: Some("agent-create".to_string()),
                     did: Some(did_agent.to_string()),
+                    registration: None,
                 },
                 EventRecord {
                     registry: "hyperswarm".to_string(),
@@ -930,6 +945,7 @@ mod tests {
                     }),
                     opid: Some("agent-update".to_string()),
                     did: Some(did_agent.to_string()),
+                    registration: None,
                 },
             ],
         );
@@ -951,6 +967,7 @@ mod tests {
                 }),
                 opid: Some("asset-create".to_string()),
                 did: Some(did_asset.to_string()),
+                registration: None,
             }],
         );
         db.data.dids.insert(
@@ -968,6 +985,7 @@ mod tests {
                 }),
                 opid: Some("invalid-update".to_string()),
                 did: Some(did_invalid.to_string()),
+                registration: None,
             }],
         );
         let (state, _state_dir) = make_state(db);
@@ -978,6 +996,7 @@ mod tests {
             operation: json!({ "type": "create" }),
             opid: Some("queued".to_string()),
             did: Some("did:cid:queued".to_string()),
+            registration: None,
         });
         let result = check_dids_impl(&state, None, false).await;
 
@@ -1033,6 +1052,7 @@ mod tests {
                 }),
                 opid: Some("expired-create".to_string()),
                 did: Some(expired_did.to_string()),
+                registration: None,
             }],
         );
         db.data.dids.insert(
@@ -1051,6 +1071,7 @@ mod tests {
                 }),
                 opid: Some("invalid-op".to_string()),
                 did: Some(invalid_did.to_string()),
+                registration: None,
             }],
         );
         let (state, _state_dir) = make_state(db);
@@ -1061,6 +1082,7 @@ mod tests {
             operation: json!({ "type": "create" }),
             opid: Some("queued".to_string()),
             did: Some("did:cid:queued".to_string()),
+            registration: None,
         });
         let result = verify_db_impl(&state, false).await;
         assert_eq!(result.total, 3);
@@ -1113,6 +1135,7 @@ mod tests {
                 }),
                 opid: Some("create-a".to_string()),
                 did: Some(did_a.to_string()),
+                registration: None,
             }],
         );
         db.data.dids.insert(
@@ -1143,6 +1166,7 @@ mod tests {
                 }),
                 opid: Some("create-b".to_string()),
                 did: Some(did_b.to_string()),
+                registration: None,
             }],
         );
 

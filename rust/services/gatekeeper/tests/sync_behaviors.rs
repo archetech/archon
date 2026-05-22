@@ -5,12 +5,16 @@ use serde_json::{json, Value};
 
 use common::{
     create_agent_operation, create_asset_operation, create_update_operation, make_event,
-    sign_operation, spawn_json,
+    sign_operation, spawn_json, spawn_service,
 };
 
 async fn admin_post(service: &common::TestService, path: &str, payload: Value) -> Result<Value> {
     let response = service
-        .admin(service.client.post(format!("{}/{}", service.base_url, path)))
+        .admin(
+            service
+                .client
+                .post(format!("{}/{}", service.base_url, path)),
+        )
         .json(&payload)
         .send()
         .await?;
@@ -35,7 +39,12 @@ async fn create_did(service: &common::TestService, operation: Value) -> Result<S
         .send()
         .await?;
     assert!(response.status().is_success(), "create DID should succeed");
-    Ok(response.json::<Value>().await?.as_str().unwrap().to_string())
+    Ok(response
+        .json::<Value>()
+        .await?
+        .as_str()
+        .unwrap()
+        .to_string())
 }
 
 async fn resolve_did(service: &common::TestService, did: &str) -> Result<Value> {
@@ -354,7 +363,10 @@ async fn sync_import_from_native_registry_confirms_latest_version() -> Result<()
         .json(&update)
         .send()
         .await?;
-    assert!(response.status().is_success(), "local update should succeed");
+    assert!(
+        response.status().is_success(),
+        "local update should succeed"
+    );
     let local_latest = resolve_did(&service, &agent_did).await?;
     assert_eq!(local_latest["didDocumentMetadata"]["versionSequence"], "2");
     assert_eq!(local_latest["didDocumentMetadata"]["confirmed"], false);
@@ -374,6 +386,95 @@ async fn sync_import_from_native_registry_confirms_latest_version() -> Result<()
     let resolved = resolve_did(&service, &agent_did).await?;
     assert_eq!(resolved["didDocumentMetadata"]["versionSequence"], "2");
     assert_eq!(resolved["didDocumentMetadata"]["confirmed"], true);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn confirm_resolution_uses_configured_fallback_without_recursing() -> Result<()> {
+    let fallback = spawn_json().await?;
+    let primary_data_dir = tempfile::tempdir()?;
+    let primary = spawn_service(
+        "json",
+        primary_data_dir,
+        &[(
+            "ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL",
+            fallback.root_url.clone(),
+        )],
+    )
+    .await?;
+
+    let agent_did = create_did(
+        &primary,
+        create_agent_operation(7, "2026-04-11T12:00:00Z", "hyperswarm"),
+    )
+    .await?;
+    let mut agent_doc = resolve_did(&primary, &agent_did).await?;
+    agent_doc["didDocumentData"] = json!({ "version": 2 });
+    let version_id = agent_doc["didDocumentMetadata"]["versionId"]
+        .as_str()
+        .map(ToString::to_string);
+    let update = create_update_operation(
+        7,
+        &agent_did,
+        version_id.as_deref(),
+        "2026-04-11T12:01:00Z",
+        agent_doc,
+    );
+    let response = primary
+        .client
+        .post(format!("{}/did", primary.base_url))
+        .json(&update)
+        .send()
+        .await?;
+    assert!(
+        response.status().is_success(),
+        "local update should succeed"
+    );
+
+    let local_latest = resolve_did(&primary, &agent_did).await?;
+    assert_eq!(local_latest["didDocumentMetadata"]["versionSequence"], "2");
+    assert_eq!(local_latest["didDocumentMetadata"]["confirmed"], false);
+
+    let mut events = export_did(&primary, &agent_did).await?;
+    for event in &mut events {
+        event["registry"] = Value::String("hyperswarm".to_string());
+    }
+    admin_post(&fallback, "batch/import", json!(events)).await?;
+    let processed = admin_post(&fallback, "events/process", json!(null)).await?;
+    assert_eq!(processed["pending"], 0);
+
+    let response = primary
+        .client
+        .get(format!(
+            "{}/did/{}?confirm=true",
+            primary.base_url, agent_did
+        ))
+        .send()
+        .await?;
+    assert!(
+        response.status().is_success(),
+        "fallback resolve should succeed"
+    );
+    let resolved = response.json::<Value>().await?;
+    assert_eq!(resolved["didDocumentMetadata"]["versionSequence"], "2");
+    assert_eq!(resolved["didDocumentMetadata"]["confirmed"], true);
+
+    let response = primary
+        .client
+        .get(format!(
+            "{}/did/{}?confirm=true",
+            primary.base_url, agent_did
+        ))
+        .header("x-archon-confirm-fallback", "1")
+        .send()
+        .await?;
+    assert!(
+        response.status().is_success(),
+        "guarded resolve should succeed"
+    );
+    let guarded = response.json::<Value>().await?;
+    assert_eq!(guarded["didDocumentMetadata"]["confirmed"], false);
 
     Ok(())
 }
@@ -484,7 +585,10 @@ async fn sync_import_batch_without_event_dids_processes_cleanly() -> Result<()> 
         .json(&update)
         .send()
         .await?;
-    assert!(response.status().is_success(), "local update should succeed");
+    assert!(
+        response.status().is_success(),
+        "local update should succeed"
+    );
 
     let asset_did = create_did(
         &service,
@@ -555,7 +659,10 @@ async fn sync_processing_handles_large_linear_update_chain_without_pending() -> 
             .json(&update)
             .send()
             .await?;
-        assert!(response.status().is_success(), "chain update {i} should succeed");
+        assert!(
+            response.status().is_success(),
+            "chain update {i} should succeed"
+        );
         current_doc = resolve_did(&service, &agent_did).await?;
     }
 

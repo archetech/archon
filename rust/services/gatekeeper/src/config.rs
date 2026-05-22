@@ -17,6 +17,7 @@ pub(crate) struct Config {
     pub(crate) status_interval_minutes: u64,
     pub(crate) admin_api_key: String,
     pub(crate) fallback_url: String,
+    pub(crate) confirm_fallback_url: String,
     pub(crate) fallback_timeout_ms: u64,
     pub(crate) max_queue_size: usize,
     pub(crate) git_commit: String,
@@ -60,6 +61,7 @@ impl Config {
                 "ARCHON_GATEKEEPER_FALLBACK_URL",
                 "https://dev.uniresolver.io",
             ),
+            confirm_fallback_url: env_var_or_default("ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL", ""),
             fallback_timeout_ms: env_parse("ARCHON_GATEKEEPER_FALLBACK_TIMEOUT", 5000)?,
             max_queue_size: 100,
             git_commit: env::var("GIT_COMMIT")
