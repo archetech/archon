@@ -31,6 +31,7 @@ const SLOT_OVERLAP = 64;
 const CHECKPOINT_BLOCK_INTERVAL = 100;
 const CHECKPOINT_SLOT_CHUNK = 1000;
 const CHECKPOINT_SLOT_LOOKBACK = 1000;
+const CHECKPOINT_SLOT_CHUNKS_PER_CYCLE = 10;
 
 const connection = new Connection(config.rpcUrl, config.commitment);
 const registryAddress = new PublicKey(config.registryAddress);
@@ -400,23 +401,26 @@ async function syncBlockCheckpoints(): Promise<void> {
     }
 
     const db = await loadDb();
-    let startSlot = db.checkpointSlot !== undefined
+    let startSlot = db.checkpointSlot !== undefined && (db.checkpointHeight ?? 0) >= config.startBlock
         ? Math.max(0, db.checkpointSlot + 1)
         : await findFirstSlotAtOrAfterBlockHeight(config.startBlock, currentSlot, finality);
 
     let checkpointed = 0;
     let maxCheckpointHeight = db.checkpointHeight ?? 0;
+    let chunksProcessed = 0;
 
-    while (startSlot <= currentSlot) {
+    while (startSlot <= currentSlot && chunksProcessed < CHECKPOINT_SLOT_CHUNKS_PER_CYCLE) {
         const endSlot = Math.min(currentSlot, startSlot + CHECKPOINT_SLOT_CHUNK - 1);
         const slots = await connection.getBlocks(startSlot, endSlot, finality);
+        let processedThroughSlot = endSlot;
+        chunksProcessed += 1;
 
         if (slots.length > 0) {
             const firstBlock = await getSlotBlock(slots[0], finality);
 
             if (firstBlock) {
                 const lastHeight = firstBlock.height + slots.length - 1;
-                maxCheckpointHeight = Math.max(maxCheckpointHeight, lastHeight);
+                let processedThroughHeight = lastHeight;
 
                 let checkpointIndex = (CHECKPOINT_BLOCK_INTERVAL - (firstBlock.height % CHECKPOINT_BLOCK_INTERVAL)) % CHECKPOINT_BLOCK_INTERVAL;
                 while (firstBlock.height + checkpointIndex < config.startBlock) {
@@ -425,25 +429,40 @@ async function syncBlockCheckpoints(): Promise<void> {
 
                 for (let index = checkpointIndex; index < slots.length; index += CHECKPOINT_BLOCK_INTERVAL) {
                     const block = await getSlotBlock(slots[index], finality);
-                    if (!block || block.height < config.startBlock || block.height % CHECKPOINT_BLOCK_INTERVAL !== 0) {
+                    if (!block) {
+                        processedThroughSlot = slots[index] - 1;
+                        processedThroughHeight = firstBlock.height + index - 1;
+                        break;
+                    }
+
+                    if (block.height < config.startBlock || block.height % CHECKPOINT_BLOCK_INTERVAL !== 0) {
                         continue;
                     }
 
                     await addBlock(block.height, block.hash, block.time);
                     checkpointed += 1;
                 }
+
+                maxCheckpointHeight = Math.max(maxCheckpointHeight, processedThroughHeight);
+            } else {
+                processedThroughSlot = slots[0] - 1;
             }
         }
 
         await jsonPersister.updateDb((db) => {
-            db.checkpointSlot = endSlot;
+            db.checkpointSlot = processedThroughSlot;
             db.checkpointHeight = Math.max(db.checkpointHeight ?? 0, maxCheckpointHeight);
         });
 
-        startSlot = endSlot + 1;
+        startSlot = processedThroughSlot + 1;
+
+        if (processedThroughSlot < endSlot) {
+            break;
+        }
     }
 
-    console.log(`Synced ${checkpointed} ${REGISTRY} block checkpoint(s) through finalized block height ${currentBlockHeight}`);
+    const pending = startSlot <= currentSlot ? `; checkpoint catch-up will resume from slot ${startSlot}` : '';
+    console.log(`Synced ${checkpointed} ${REGISTRY} block checkpoint(s) through finalized block height ${currentBlockHeight}${pending}`);
 }
 
 function parseArchonMemo(memo: string): { batchDid: string; batchHash: string; opCount: number } | undefined {
