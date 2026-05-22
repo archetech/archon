@@ -411,20 +411,28 @@ async function syncBlockCheckpoints(): Promise<void> {
         const endSlot = Math.min(currentSlot, startSlot + CHECKPOINT_SLOT_CHUNK - 1);
         const slots = await connection.getBlocks(startSlot, endSlot, finality);
 
-        for (const slot of slots) {
-            const block = await getSlotBlock(slot, finality);
-            if (!block) {
-                continue;
+        if (slots.length > 0) {
+            const firstBlock = await getSlotBlock(slots[0], finality);
+
+            if (firstBlock) {
+                const lastHeight = firstBlock.height + slots.length - 1;
+                maxCheckpointHeight = Math.max(maxCheckpointHeight, lastHeight);
+
+                let checkpointIndex = (CHECKPOINT_BLOCK_INTERVAL - (firstBlock.height % CHECKPOINT_BLOCK_INTERVAL)) % CHECKPOINT_BLOCK_INTERVAL;
+                while (firstBlock.height + checkpointIndex < config.startBlock) {
+                    checkpointIndex += CHECKPOINT_BLOCK_INTERVAL;
+                }
+
+                for (let index = checkpointIndex; index < slots.length; index += CHECKPOINT_BLOCK_INTERVAL) {
+                    const block = await getSlotBlock(slots[index], finality);
+                    if (!block || block.height < config.startBlock || block.height % CHECKPOINT_BLOCK_INTERVAL !== 0) {
+                        continue;
+                    }
+
+                    await addBlock(block.height, block.hash, block.time);
+                    checkpointed += 1;
+                }
             }
-
-            maxCheckpointHeight = Math.max(maxCheckpointHeight, block.height);
-
-            if (block.height < config.startBlock || block.height % CHECKPOINT_BLOCK_INTERVAL !== 0) {
-                continue;
-            }
-
-            await addBlock(block.height, block.hash, block.time);
-            checkpointed += 1;
         }
 
         await jsonPersister.updateDb((db) => {
