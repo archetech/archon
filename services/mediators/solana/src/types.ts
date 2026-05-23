@@ -2,6 +2,7 @@ import { ImportBatchResult, ProcessEventsResult } from '@didcid/gatekeeper/types
 
 export interface DiscoveredItem {
     height: number;
+    slot?: number;
     index: number;
     time: string;
     txid: string;
@@ -29,6 +30,8 @@ export interface MediatorDb {
     blocksScanned: number;
     blocksPending: number;
     txnsScanned: number;
+    checkpointSlot?: number;
+    checkpointHeight?: number;
     registered: RegisteredItem[];
     discovered: DiscoveredItem[];
     lastExport?: string;

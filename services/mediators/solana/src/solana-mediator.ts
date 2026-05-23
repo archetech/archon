@@ -28,8 +28,15 @@ const READ_ONLY = config.exportInterval === 0;
 const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 const ARCHON_MEMO_PREFIX = 'ARCHON_BATCH_V1:';
 const SLOT_OVERLAP = 64;
+const CHECKPOINT_BLOCK_INTERVAL = 100;
+const CHECKPOINT_SLOT_CHUNK = 1000;
+const CHECKPOINT_SLOT_LOOKBACK = 1000;
+const CHECKPOINT_SLOT_CHUNKS_PER_CYCLE = 10;
 
-const connection = new Connection(config.rpcUrl, config.commitment);
+const connection = new Connection(config.rpcUrl, {
+    commitment: config.commitment,
+    disableRetryOnRateLimit: true,
+});
 const registryAddress = new PublicKey(config.registryAddress);
 const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
@@ -59,6 +66,12 @@ function formatError(error: unknown): string {
     } catch {
         return String(error);
     }
+}
+
+function isRateLimitError(error: unknown): boolean {
+    const anyError = error as { code?: unknown; status?: unknown; message?: unknown };
+    const message = typeof anyError?.message === 'string' ? anyError.message : formatError(error);
+    return anyError?.code === 429 || anyError?.status === 429 || /429|too many requests/i.test(message);
 }
 
 function walletHeaders(): Record<string, string> {
@@ -318,8 +331,8 @@ function batchHashForDid(batchDid: string): string {
 }
 
 function formatSyncProgress(height: number, blockCount: number): string {
-    const totalSlots = Math.max(1, blockCount - config.startSlot + 1);
-    const completedSlots = Math.min(totalSlots, Math.max(0, height - config.startSlot + 1));
+    const totalSlots = Math.max(1, blockCount + 1);
+    const completedSlots = Math.min(totalSlots, Math.max(0, height + 1));
 
     return (100 * completedSlots / totalSlots).toFixed(2);
 }
@@ -328,21 +341,193 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
     await gatekeeper.addBlock(REGISTRY, { hash, height, time });
 }
 
-async function getSlotBlock(slot: number): Promise<{ hash: string; time: number } | undefined> {
+async function getSlotBlock(slot: number, finality: Finality = transactionFinality()): Promise<{ height: number; hash: string; time: number } | undefined> {
     const block = await connection.getBlock(slot, {
-        commitment: transactionFinality(),
+        commitment: finality,
         transactionDetails: 'none',
         rewards: false,
     });
 
-    if (!block?.blockhash || block.blockTime === null) {
+    const rpcBlock = block as typeof block & { blockHeight?: number | null };
+
+    if (!block?.blockhash || block.blockTime === null || rpcBlock.blockHeight == null) {
         return undefined;
     }
 
     return {
+        height: rpcBlock.blockHeight,
         hash: block.blockhash,
         time: block.blockTime,
     };
+}
+
+async function getNearestProducedBlockAtOrBefore(slot: number, finality: Finality): Promise<{ slot: number; height: number } | undefined> {
+    const startSlot = Math.max(0, slot - CHECKPOINT_SLOT_LOOKBACK);
+    const slots = await connection.getBlocks(startSlot, slot, finality);
+    const producedSlot = slots.at(-1);
+
+    if (producedSlot === undefined) {
+        return undefined;
+    }
+
+    const block = await getSlotBlock(producedSlot, finality);
+    return block ? { slot: producedSlot, height: block.height } : undefined;
+}
+
+async function getBlocksOrPause(startSlot: number, endSlot: number, finality: Finality): Promise<number[] | undefined> {
+    try {
+        return await connection.getBlocks(startSlot, endSlot, finality);
+    } catch (error) {
+        if (isRateLimitError(error)) {
+            console.log(`Pausing ${REGISTRY} checkpoint sync at slot ${startSlot}: Solana RPC rate limit`);
+            return undefined;
+        }
+        throw error;
+    }
+}
+
+async function getSlotBlockOrPause(slot: number, finality: Finality): Promise<{ height: number; hash: string; time: number } | undefined | 'rate-limited'> {
+    try {
+        return await getSlotBlock(slot, finality);
+    } catch (error) {
+        if (isRateLimitError(error)) {
+            console.log(`Pausing ${REGISTRY} checkpoint sync at slot ${slot}: Solana RPC rate limit`);
+            return 'rate-limited';
+        }
+        throw error;
+    }
+}
+
+async function findFirstSlotAtOrAfterBlockHeight(targetHeight: number, currentSlot: number, finality: Finality): Promise<number | undefined> {
+    if (targetHeight <= 0) {
+        return 0;
+    }
+
+    let low = 0;
+    let high = currentSlot;
+    let result = currentSlot;
+
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        let produced: { slot: number; height: number } | undefined;
+        try {
+            produced = await getNearestProducedBlockAtOrBefore(mid, finality);
+        } catch (error) {
+            if (isRateLimitError(error)) {
+                console.log(`Pausing ${REGISTRY} checkpoint sync while finding start block ${targetHeight}: Solana RPC rate limit`);
+                return undefined;
+            }
+            throw error;
+        }
+
+        if (!produced || produced.height < targetHeight) {
+            low = mid + 1;
+            continue;
+        }
+
+        result = produced.slot;
+        high = mid - 1;
+    }
+
+    return Math.max(0, result - CHECKPOINT_SLOT_LOOKBACK);
+}
+
+async function syncBlockCheckpoints(): Promise<void> {
+    const finality: Finality = 'finalized';
+    const currentSlot = await connection.getSlot(finality);
+    const currentBlockHeight = await connection.getBlockHeight(finality);
+
+    if (config.startBlock > currentBlockHeight) {
+        console.log(`Skipping ${REGISTRY} checkpoint sync because start block ${config.startBlock} is ahead of finalized block height ${currentBlockHeight}`);
+        return;
+    }
+
+    const db = await loadDb();
+    let startSlot = db.checkpointSlot !== undefined && (db.checkpointHeight ?? 0) >= config.startBlock
+        ? Math.max(0, db.checkpointSlot + 1)
+        : await findFirstSlotAtOrAfterBlockHeight(config.startBlock, currentSlot, finality);
+    if (startSlot === undefined) {
+        return;
+    }
+
+    let checkpointed = 0;
+    let maxCheckpointHeight = db.checkpointHeight ?? 0;
+    let chunksProcessed = 0;
+
+    while (startSlot <= currentSlot && chunksProcessed < CHECKPOINT_SLOT_CHUNKS_PER_CYCLE) {
+        const endSlot = Math.min(currentSlot, startSlot + CHECKPOINT_SLOT_CHUNK - 1);
+        const slots = await getBlocksOrPause(startSlot, endSlot, finality);
+        if (!slots) {
+            return;
+        }
+        let processedThroughSlot = endSlot;
+        chunksProcessed += 1;
+
+        if (slots.length > 0) {
+            let anchorBlock: { height: number; hash: string; time: number } | undefined;
+            let anchorIndex = 0;
+
+            for (; anchorIndex < slots.length; anchorIndex++) {
+                const block = await getSlotBlockOrPause(slots[anchorIndex], finality);
+                if (block === 'rate-limited') {
+                    return;
+                }
+                if (block) {
+                    anchorBlock = block;
+                    break;
+                }
+                console.log(`Skipping unavailable ${REGISTRY} checkpoint block at slot ${slots[anchorIndex]}`);
+            }
+
+            if (anchorBlock) {
+                const firstHeight = anchorBlock.height - anchorIndex;
+                const lastHeight = firstHeight + slots.length - 1;
+                let processedThroughHeight = lastHeight;
+
+                let checkpointIndex = (CHECKPOINT_BLOCK_INTERVAL - (firstHeight % CHECKPOINT_BLOCK_INTERVAL)) % CHECKPOINT_BLOCK_INTERVAL;
+                while (firstHeight + checkpointIndex < config.startBlock) {
+                    checkpointIndex += CHECKPOINT_BLOCK_INTERVAL;
+                }
+
+                for (let index = checkpointIndex; index < slots.length; index += CHECKPOINT_BLOCK_INTERVAL) {
+                    const block = await getSlotBlockOrPause(slots[index], finality);
+                    if (block === 'rate-limited') {
+                        return;
+                    }
+
+                    if (!block) {
+                        console.log(`Skipping unavailable ${REGISTRY} checkpoint block at slot ${slots[index]}`);
+                        continue;
+                    }
+
+                    if (block.height < config.startBlock || block.height % CHECKPOINT_BLOCK_INTERVAL !== 0) {
+                        continue;
+                    }
+
+                    await addBlock(block.height, block.hash, block.time);
+                    checkpointed += 1;
+                }
+
+                maxCheckpointHeight = Math.max(maxCheckpointHeight, processedThroughHeight);
+            } else {
+                console.log(`Skipping ${slots.length} unavailable ${REGISTRY} produced block(s) from slot ${slots[0]} through ${slots.at(-1)}`);
+            }
+        }
+
+        await jsonPersister.updateDb((db) => {
+            db.checkpointSlot = processedThroughSlot;
+            db.checkpointHeight = Math.max(db.checkpointHeight ?? 0, maxCheckpointHeight);
+        });
+
+        startSlot = processedThroughSlot + 1;
+
+        if (processedThroughSlot < endSlot) {
+            break;
+        }
+    }
+
+    const pending = startSlot <= currentSlot ? `; checkpoint catch-up will resume from slot ${startSlot}` : '';
+    console.log(`Synced ${checkpointed} ${REGISTRY} block checkpoint(s) through finalized block height ${currentBlockHeight}${pending}`);
 }
 
 function parseArchonMemo(memo: string): { batchDid: string; batchHash: string; opCount: number } | undefined {
@@ -387,13 +572,14 @@ function memoFromInstruction(instruction: ParsedInstruction | PartiallyDecodedIn
 
 async function scanSignatures(): Promise<void> {
     const currentSlot = await connection.getSlot(config.commitment);
+    const currentBlockHeight = await connection.getBlockHeight(config.commitment);
     const db = await loadDb();
-    const scanFloor = db.height > 0 ? Math.max(config.startSlot, db.height - SLOT_OVERLAP) : config.startSlot;
+    const scanFloor = db.height > 0 ? Math.max(0, db.height - SLOT_OVERLAP) : 0;
 
-    console.log(`current slot height: ${currentSlot}, scan floor: ${scanFloor}`);
+    console.log(`current slot height: ${currentSlot}, current block height: ${currentBlockHeight}, scan floor: ${scanFloor}, start block: ${config.startBlock}`);
 
-    if (config.startSlot > currentSlot) {
-        console.log(`Skipping ${REGISTRY} scan because start slot ${config.startSlot} is ahead of current slot ${currentSlot}`);
+    if (config.startBlock > currentBlockHeight) {
+        console.log(`Skipping ${REGISTRY} scan because start block ${config.startBlock} is ahead of current block height ${currentBlockHeight}`);
         return;
     }
 
@@ -451,6 +637,16 @@ async function scanSignatures(): Promise<void> {
         const blockHash = block.hash;
         const instructions = tx.transaction.message.instructions;
 
+        if (candidate.slot > maxSlot) {
+            maxSlot = candidate.slot;
+            maxSlotTime = new Date(blockTime * 1000).toISOString();
+            maxSlotHash = blockHash;
+        }
+
+        if (block.height < config.startBlock) {
+            continue;
+        }
+
         for (let index = 0; index < instructions.length; index++) {
             const memo = memoFromInstruction(instructions[index]);
             if (!memo) {
@@ -463,7 +659,8 @@ async function scanSignatures(): Promise<void> {
             }
 
             const item: DiscoveredItem = {
-                height: candidate.slot,
+                height: block.height,
+                slot: candidate.slot,
                 index,
                 time: new Date(blockTime * 1000).toISOString(),
                 txid: candidate.signature,
@@ -480,14 +677,8 @@ async function scanSignatures(): Promise<void> {
                 }
             });
 
-            await addBlock(candidate.slot, blockHash, blockTime);
+            await addBlock(block.height, blockHash, blockTime);
             scanned += 1;
-        }
-
-        if (candidate.slot > maxSlot) {
-            maxSlot = candidate.slot;
-            maxSlotTime = new Date(blockTime * 1000).toISOString();
-            maxSlotHash = blockHash;
         }
     }
 
@@ -495,7 +686,7 @@ async function scanSignatures(): Promise<void> {
         db.height = Math.max(db.height, maxSlot);
         db.hash = maxSlotHash;
         db.time = maxSlotTime;
-        db.blocksScanned = Math.max(0, db.height - config.startSlot + 1);
+        db.blocksScanned = Math.max(0, db.height + 1);
         db.txnsScanned += scanned;
         db.blockCount = currentSlot;
         db.blocksPending = Math.max(0, currentSlot - db.height);
@@ -742,9 +933,11 @@ async function importLoop(): Promise<void> {
     }
 
     importRunning = true;
-    let stage = 'scanSignatures';
+    let stage = 'syncBlockCheckpoints';
 
     try {
+        await syncBlockCheckpoints();
+        stage = 'scanSignatures';
         await scanSignatures();
         stage = 'importBatches';
         await importBatches();

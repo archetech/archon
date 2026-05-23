@@ -30,6 +30,7 @@ These rules apply to coding agents working in this repository.
 - Do not use stash-based branch juggling as the default workflow.
 - Never run mutating git operations in parallel. Serialize `git add`, `git commit`, `git push`, branch moves, stash operations, and any command that writes to `.git`.
 - After opening a PR, add follow-up fixes with normal commits and regular pushes; do not amend published commits or force-push unless the user explicitly requests history rewriting.
+- When the user asks to evaluate PR comments, only inspect and assess the comments. Do not edit code, commit, push, reply, or resolve threads unless the user explicitly asks for action after the evaluation.
 - Prefer a clean branch cut over moving changes around after the fact.
 - If branch state becomes confusing, stop and cleanly reestablish scope before making more commits.
 - When adding Prometheus HTTP route labels, normalize dynamic path segments like DIDs, hashes, txids, and CIDs before recording metrics so dashboards do not create one time series per identifier.
@@ -52,3 +53,5 @@ These rules apply to coding agents working in this repository.
 - Ethereum Archon registries should use one canonical `ArchonRegistry` contract per registry name (for example `ETH:sepolia`); custom/private deployments need distinct registry naming or explicit non-canonical configuration to avoid fragmenting discovery.
 - Solana devnet Archon registry support currently uses the Solana Memo program with an `ARCHON_BATCH_V1:` payload prefix and a deterministic registry address for `SOL:devnet`; discover by registry address, do not scan every slot or the global Memo program, and keep any future custom Solana program under a distinct canonical registry decision.
 - Solana Memo instruction accounts are signer attestations. Do not attach a registry marker account as read-only/non-signer; canonical Memo-based Solana registries need a deterministic signer marker or a real custom program.
+- Solana mediator scan cursors are internal slots, but Gatekeeper registration/block metadata should use produced Solana block heights. Keep `ARCHON_SOL_START_BLOCK` as the only operator-facing import/register floor; do not expose a Solana start-slot env var.
+- Solana mediator block checkpoints are canonical every 100 finalized produced blocks (`blockHeight % 100 == 0`) starting at `ARCHON_SOL_START_BLOCK`; do not make this interval configurable because all nodes must independently produce the same checkpoint set.
