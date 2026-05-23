@@ -1,6 +1,7 @@
 import axios from 'axios';
 import pino from 'pino';
 import { initializeSynapse, checkUploadReadiness, executeUpload } from 'filecoin-pin';
+import { depositUSDFC } from 'filecoin-pin/core/payments';
 import { mainnet, calibration } from 'filecoin-pin/core/synapse';
 import { getPaymentStatus } from 'filecoin-pin/core/payments';
 import type { SynapseSetupConfig } from 'filecoin-pin';
@@ -27,6 +28,7 @@ export interface WalletPinResult {
         pieceCid: string;
         network: string;
         ipniValidated: boolean;
+        depositTx?: string;
     };
 }
 
@@ -84,7 +86,20 @@ export async function pinCid(cid: string, fingerprint?: string, registry?: strin
 
         const carStat = await stat(tempCarPath);
         const synapse = await getSynapse();
-        const readiness = await checkUploadReadiness({ synapse, fileSize: carStat.size });
+        let readiness = await checkUploadReadiness({ synapse, fileSize: carStat.size });
+        let depositTx: string | undefined;
+
+        const insufficientDeposit = readiness.capacity?.issues.insufficientDeposit;
+        if (readiness.status === 'blocked' && insufficientDeposit && insufficientDeposit > 0n) {
+            if (readiness.walletUsdfcBalance < insufficientDeposit) {
+                throw new Error(`Filecoin payment not ready: insufficient balance`);
+            }
+
+            const deposit = await depositUSDFC(synapse, insufficientDeposit);
+            depositTx = deposit.depositTx;
+            logger.info({ depositTx, amount: insufficientDeposit.toString() }, 'Deposited USDFC to Filecoin Pay');
+            readiness = await checkUploadReadiness({ synapse, fileSize: carStat.size });
+        }
 
         if (readiness.status === 'blocked') {
             throw new Error(`Filecoin payment not ready: ${readiness.validation.errorMessage ?? 'insufficient balance'}`);
@@ -117,6 +132,7 @@ export async function pinCid(cid: string, fingerprint?: string, registry?: strin
                 pieceCid: uploadResult.pieceCid,
                 network: uploadResult.network,
                 ipniValidated: Boolean(uploadResult.ipniValidated),
+                ...(depositTx && { depositTx }),
             },
         };
     } finally {
