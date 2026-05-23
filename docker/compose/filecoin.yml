@@ -11,9 +11,8 @@ services:
       - ARCHON_FIL_WALLET_METRICS_PORT=4272
       - ARCHON_FIL_NETWORK=${ARCHON_FIL_NETWORK}
       - ARCHON_FIL_RPC_URL=${ARCHON_FIL_RPC_URL}
-      - ARCHON_FIL_PRIVATE_KEY=${ARCHON_FIL_PRIVATE_KEY}
-      - ARCHON_FIL_WALLET_ADDRESS=${ARCHON_FIL_WALLET_ADDRESS}
-      - ARCHON_FIL_SESSION_KEY=${ARCHON_FIL_SESSION_KEY}
+      - ARCHON_WALLET_FIL_DERIVATION_PATH=${ARCHON_WALLET_FIL_DERIVATION_PATH}
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
       - ARCHON_IPFS_API_URL=http://ipfs:5001/api/v0
       - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
     user: "${ARCHON_UID}:${ARCHON_GID}"
@@ -22,6 +21,8 @@ services:
       - "127.0.0.1:4272:4272"
     depends_on:
       ipfs:
+        condition: service_healthy
+      keymaster:
         condition: service_healthy
 
   filecoin-mediator:

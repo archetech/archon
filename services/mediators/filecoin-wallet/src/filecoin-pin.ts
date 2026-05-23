@@ -2,7 +2,9 @@ import axios from 'axios';
 import pino from 'pino';
 import { initializeSynapse, checkUploadReadiness, executeUpload } from 'filecoin-pin';
 import { mainnet, calibration } from 'filecoin-pin/core/synapse';
+import { getPaymentStatus } from 'filecoin-pin/core/payments';
 import type { SynapseSetupConfig } from 'filecoin-pin';
+import type { PaymentStatus } from 'filecoin-pin/core/payments';
 import { CID } from 'multiformats/cid';
 import { createReadStream } from 'node:fs';
 import { stat, unlink, writeFile } from 'node:fs/promises';
@@ -11,6 +13,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import config from './config.js';
+import { deriveAddress, derivePrivateKey } from './derivation.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -28,9 +31,21 @@ export interface WalletPinResult {
 }
 
 let synapseClient: Awaited<ReturnType<typeof initializeSynapse>> | null = null;
+let walletPrivateKey: `0x${string}` | null = null;
+let walletAddress: string | null = null;
 
-function prefixedHex(value: string): `0x${string}` {
-    return value.startsWith('0x') ? value as `0x${string}` : `0x${value}` as `0x${string}`;
+export function configureWallet(mnemonic: string): string {
+    walletPrivateKey = derivePrivateKey(mnemonic, config.derivationPath);
+    walletAddress = deriveAddress(mnemonic, config.derivationPath);
+    synapseClient = null;
+    return walletAddress;
+}
+
+export function getWalletAddress(): string {
+    if (!walletAddress) {
+        throw new Error('Filecoin wallet not configured');
+    }
+    return walletAddress;
 }
 
 async function getSynapse() {
@@ -38,24 +53,15 @@ async function getSynapse() {
         return synapseClient;
     }
 
-    let synapseConfig: SynapseSetupConfig;
-
-    if (config.privateKey) {
-        synapseConfig = {
-            privateKey: prefixedHex(config.privateKey),
-            chain: config.network === 'calibration' ? calibration : mainnet,
-            ...(config.rpcUrl && { rpcUrl: config.rpcUrl }),
-        };
-    } else if (config.walletAddress && config.sessionKey) {
-        synapseConfig = {
-            walletAddress: prefixedHex(config.walletAddress),
-            sessionKey: prefixedHex(config.sessionKey),
-            chain: config.network === 'calibration' ? calibration : mainnet,
-            ...(config.rpcUrl && { rpcUrl: config.rpcUrl }),
-        };
-    } else {
-        throw new Error('Filecoin auth not configured. Set ARCHON_FIL_PRIVATE_KEY or ARCHON_FIL_WALLET_ADDRESS plus ARCHON_FIL_SESSION_KEY');
+    if (!walletPrivateKey) {
+        throw new Error('Filecoin wallet not configured');
     }
+
+    const synapseConfig: SynapseSetupConfig = {
+        privateKey: walletPrivateKey,
+        chain: config.network === 'calibration' ? calibration : mainnet,
+        ...(config.rpcUrl && { rpcUrl: config.rpcUrl }),
+    };
 
     synapseClient = await initializeSynapse(synapseConfig, logger);
     return synapseClient;
@@ -120,10 +126,26 @@ export async function pinCid(cid: string, fingerprint?: string, registry?: strin
     }
 }
 
+function stringifyBigInts(value: unknown): unknown {
+    if (typeof value === 'bigint') {
+        return value.toString();
+    }
+    if (Array.isArray(value)) {
+        return value.map(stringifyBigInts);
+    }
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value).map(([key, item]) => [key, stringifyBigInts(item)])
+        );
+    }
+    return value;
+}
+
 export async function getPaymentInfo(): Promise<unknown> {
     const synapse = await getSynapse();
-    return {
-        network: config.network,
-        chain: synapse.chain.name,
-    };
+    const status = await getPaymentStatus(synapse) as PaymentStatus;
+    return stringifyBigInts({
+        ...status,
+        derivationPath: config.derivationPath,
+    });
 }

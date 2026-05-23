@@ -1,6 +1,7 @@
 # Filecoin Wallet Service
 
-The Filecoin wallet service exposes an admin-only synchronous pin API:
+The Filecoin wallet service derives a Filecoin/Synapse payment wallet from the
+Keymaster mnemonic and exposes an admin-only synchronous pin API:
 
 `POST /api/v1/wallet/pin`
 

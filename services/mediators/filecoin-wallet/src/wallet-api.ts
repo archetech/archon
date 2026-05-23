@@ -6,9 +6,10 @@ import pinoHttp from 'pino-http';
 import { register, Counter, Gauge, Histogram, collectDefaultMetrics } from 'prom-client';
 import { readFile } from 'fs/promises';
 import { pathToFileURL } from 'url';
+import axios from 'axios';
 import config from './config.js';
 import { requireAdminKeyFor } from './auth.js';
-import { getPaymentInfo, pinCid } from './filecoin-pin.js';
+import { configureWallet, getPaymentInfo, getWalletAddress, pinCid } from './filecoin-pin.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 collectDefaultMetrics();
@@ -38,6 +39,11 @@ const pinsTotal = new Counter({
     labelNames: ['status'],
 });
 
+const walletSetupStatus = new Gauge({
+    name: 'wallet_setup_status',
+    help: 'Filecoin wallet initialization status (1=ready, 0=not ready)',
+});
+
 let serviceVersion = 'unknown';
 const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
 
@@ -55,6 +61,15 @@ function normalizePath(path: string): string {
 
 export function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction): void {
     return requireAdminKeyFor(config.adminApiKey)(req, res, next);
+}
+
+export async function fetchMnemonic(): Promise<string> {
+    const headers: Record<string, string> = {};
+    if (config.adminApiKey) {
+        headers['X-Archon-Admin-Key'] = config.adminApiKey;
+    }
+    const response = await axios.get(`${config.keymasterURL}/api/v1/wallet/mnemonic`, { headers });
+    return response.data.mnemonic;
 }
 
 async function main(): Promise<void> {
@@ -82,11 +97,32 @@ async function main(): Promise<void> {
 
     v1router.use(requireAdminKey);
 
+    let walletReady = false;
+    for (let attempt = 1; attempt <= 12; attempt++) {
+        try {
+            const mnemonic = await fetchMnemonic();
+            const address = configureWallet(mnemonic);
+            logger.info({ address, network: config.network, derivationPath: config.derivationPath }, 'Filecoin wallet ready');
+            walletReady = true;
+            break;
+        } catch (error: any) {
+            if (attempt === 12) {
+                logger.error({ err: error }, 'Wallet setup failed after retries, starting without wallet');
+                break;
+            }
+            logger.warn(`Wallet setup attempt ${attempt}/12 failed: ${error.message}. Retrying in 10s...`);
+            await new Promise(resolve => setTimeout(resolve, 10000));
+        }
+    }
+    walletSetupStatus.set(walletReady ? 1 : 0);
+
     v1router.get('/wallet/version', (_req, res) => {
         res.json({
             version: serviceVersion,
             commit: serviceCommit,
             network: config.network,
+            address: walletReady ? getWalletAddress() : null,
+            derivationPath: config.derivationPath,
             ipfsApiUrl: config.ipfsApiUrl,
         });
     });
