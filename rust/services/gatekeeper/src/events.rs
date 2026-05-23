@@ -152,12 +152,17 @@ pub(crate) async fn handle_did_operation(
 
     let supported_registries = state.supported_registries.lock().await.clone();
     let mut resolved_registry: Option<String> = None;
+    let is_ephemeral: bool;
     if op_type == "create" {
         let registry = payload
             .get("registration")
             .and_then(|value| value.get("registry"))
             .and_then(Value::as_str)
             .ok_or_else(|| "missing operation.registration.registry".to_string())?;
+        is_ephemeral = payload
+            .get("registration")
+            .and_then(|value| value.get("validUntil"))
+            .is_some();
         if registry == "filecoin" {
             return Err("Invalid operation: registry filecoin is auxiliary storage only".to_string());
         }
@@ -165,21 +170,21 @@ pub(crate) async fn handle_did_operation(
             return Err(format!("Invalid operation: registry {registry} not supported"));
         }
     } else {
-        let current_registry = {
+        let current_info = {
             let store = state.store.lock().await;
             store
                 .resolve_doc(&state.config, &did, ResolveOptions::default())
                 .ok()
                 .and_then(|doc| {
-                    doc.get("didDocumentRegistration")
-                        .and_then(|value| value.get("registry"))
-                        .and_then(Value::as_str)
-                        .map(ToString::to_string)
+                    let registration = doc.get("didDocumentRegistration")?;
+                    let registry = registration.get("registry")?.as_str()?.to_string();
+                    Some((registry, registration.get("validUntil").is_some()))
                 })
         };
 
-        let current_registry = current_registry
+        let (current_registry, current_is_ephemeral) = current_info
             .ok_or_else(|| "Invalid operation: registry missing".to_string())?;
+        is_ephemeral = current_is_ephemeral;
         if current_registry == "filecoin" {
             return Err("Invalid operation: registry filecoin is auxiliary storage only".to_string());
         }
@@ -256,7 +261,7 @@ pub(crate) async fn handle_did_operation(
     .await?;
 
     if let Some(registry) = queue_registry {
-        let _ = queue_outbound_operation(state, &registry, payload.clone()).await;
+        let _ = queue_outbound_operation(state, &registry, payload.clone(), is_ephemeral).await;
     }
     // Invalidate the cached status snapshot so the next /status request
     // recomputes DID counts lazily instead of doing a full database scan
@@ -289,6 +294,7 @@ pub(crate) async fn queue_outbound_operation(
     state: &AppState,
     registry: &str,
     operation: Value,
+    skip_filecoin: bool,
 ) -> Result<()> {
     if registry == "local" {
         return Ok(());
@@ -303,7 +309,7 @@ pub(crate) async fn queue_outbound_operation(
             .any(|item| item == "filecoin");
         let mut store = state.store.lock().await;
         let _ = store.queue_operation("hyperswarm", operation.clone())?;
-        let filecoin_queue_size = if filecoin_enabled && registry != "filecoin" {
+        let filecoin_queue_size = if !skip_filecoin && filecoin_enabled && registry != "filecoin" {
             Some(store.queue_operation("filecoin", operation.clone())?)
         } else {
             None

@@ -516,7 +516,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
     }
 
-    async queueOperation(registry: string, operation: Operation) {
+    async queueOperation(registry: string, operation: Operation, options: { skipFilecoin?: boolean } = {}) {
         // Don't distribute local DIDs
         if (registry === 'local') {
             return;
@@ -527,7 +527,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         // Filecoin is an auxiliary storage queue. When enabled, it receives a
         // copy of every non-local operation without changing its registry.
-        if (this.supportedRegistries.includes('filecoin') && registry !== 'filecoin') {
+        if (!options.skipFilecoin && this.supportedRegistries.includes('filecoin') && registry !== 'filecoin') {
             const queueSize = await this.db.queueOperation('filecoin', operation);
 
             if (queueSize >= this.maxQueueSize) {
@@ -581,7 +581,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                 did
             });
 
-            await this.queueOperation(registry, operation);
+            await this.queueOperation(registry, operation, {
+                skipFilecoin: Boolean(operation.registration?.validUntil)
+            });
             await this.updateSearchIndex(did);
             return did;
         });
@@ -908,7 +910,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                 did: operation.did
             });
 
-            await this.queueOperation(registry, operation);
+            await this.queueOperation(registry, operation, {
+                skipFilecoin: Boolean(doc.didDocumentRegistration?.validUntil)
+            });
             await this.updateSearchIndex(operation.did!);
 
             return true;

@@ -1230,7 +1230,7 @@ mod tests {
             }
         });
 
-        queue_outbound_operation(&state, "BTC:signet", operation.clone())
+        queue_outbound_operation(&state, "BTC:signet", operation.clone(), false)
             .await
             .expect("operation should queue");
 
@@ -1257,12 +1257,40 @@ mod tests {
             }
         });
 
-        queue_outbound_operation(&state, "local", operation)
+        queue_outbound_operation(&state, "local", operation, false)
             .await
             .expect("local operation should be ignored");
 
         let store = state.store.lock().await;
         assert!(store.get_queue("hyperswarm").is_empty());
+        assert!(store.get_queue("filecoin").is_empty());
+    }
+
+    #[tokio::test]
+    async fn queue_outbound_operation_does_not_copy_ephemeral_ops_to_filecoin() {
+        let (db, _db_dir) = temp_json_db();
+        let (state, _state_dir) = make_state(db);
+        state
+            .supported_registries
+            .lock()
+            .await
+            .push("filecoin".to_string());
+        let operation = json!({
+            "type": "create",
+            "registration": {
+                "version": 1,
+                "registry": "BTC:signet",
+                "validUntil": "2026-12-31T00:00:00Z"
+            }
+        });
+
+        queue_outbound_operation(&state, "BTC:signet", operation.clone(), true)
+            .await
+            .expect("ephemeral operation should queue to normal registries");
+
+        let store = state.store.lock().await;
+        assert_eq!(store.get_queue("hyperswarm"), vec![operation.clone()]);
+        assert_eq!(store.get_queue("BTC:signet"), vec![operation]);
         assert!(store.get_queue("filecoin").is_empty());
     }
 }

@@ -134,6 +134,26 @@ describe('filecoin queue', () => {
         expect(await gk.getQueue('filecoin')).toStrictEqual([]);
     });
 
+    it('should not queue ephemeral operations to filecoin', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet', 'filecoin']);
+        await gk.resetDb();
+        const testHelper = new TestHelper(gk, cipher);
+        const registry = 'BTC:signet';
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry });
+        const agent = await gk.createDID(agentOp);
+        const assetOp = await testHelper.createAssetOp(agent, keypair, {
+            registry,
+            validUntil: '2026-12-31T00:00:00Z',
+        });
+
+        await gk.createDID(assetOp);
+
+        expect(await gk.getQueue(registry)).toStrictEqual([agentOp, assetOp]);
+        expect(await gk.getQueue('hyperswarm')).toStrictEqual([agentOp, assetOp]);
+        expect(await gk.getQueue('filecoin')).toStrictEqual([agentOp]);
+    });
+
     it('should reject filecoin as a DID registry', async () => {
         const gk = newGatekeeper(['local', 'hyperswarm', 'filecoin']);
         await gk.resetDb();
