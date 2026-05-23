@@ -92,6 +92,21 @@ describe('filecoin queue', () => {
         expect(await gk.getQueue('filecoin')).toStrictEqual([agentOp]);
     });
 
+    it('should queue non-local operations to filecoin after mediator self-registers', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet']);
+        await gk.resetDb();
+        const testHelper = new TestHelper(gk, cipher);
+        const registry = 'BTC:signet';
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry });
+
+        expect(await gk.getQueue('filecoin')).toStrictEqual([]);
+        await gk.createDID(agentOp);
+
+        expect(await gk.getQueue(registry)).toStrictEqual([agentOp]);
+        expect(await gk.getQueue('filecoin')).toStrictEqual([agentOp]);
+    });
+
     it('should not queue operations to filecoin when unsupported', async () => {
         const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet']);
         await gk.resetDb();
