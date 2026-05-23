@@ -316,6 +316,68 @@ async function dedupeDiscovered(): Promise<void> {
     }
 }
 
+async function migrateLegacyDiscoveredItems(): Promise<boolean> {
+    const db = await loadDb();
+    const legacy = (db.discovered ?? []).filter(item => item.slot === undefined);
+
+    if (legacy.length === 0) {
+        return true;
+    }
+
+    let migrated = 0;
+    let removed = 0;
+    let completed = true;
+    const updates = new Map<string, DiscoveredItem | undefined>();
+
+    for (const item of legacy) {
+        const itemKey = discoveredKey(item);
+        const slot = item.height;
+
+        try {
+            const block = await getSlotBlock(slot);
+            if (!block) {
+                updates.set(itemKey, undefined);
+                removed += 1;
+                continue;
+            }
+
+            updates.set(itemKey, {
+                ...item,
+                height: block.height,
+                slot,
+                time: new Date(block.time * 1000).toISOString(),
+                blockHash: block.hash,
+            });
+            migrated += 1;
+        } catch (error) {
+            if (isRateLimitError(error)) {
+                console.log(`Pausing ${REGISTRY} legacy discovered-item migration at slot ${slot}: Solana RPC rate limit`);
+                completed = false;
+                break;
+            }
+            throw error;
+        }
+    }
+
+    if (updates.size === 0) {
+        return completed;
+    }
+
+    await jsonPersister.updateDb((db) => {
+        db.discovered = (db.discovered ?? []).flatMap(item => {
+            const updateKey = discoveredKey(item);
+            if (!updates.has(updateKey)) {
+                return [item];
+            }
+            const update = updates.get(updateKey);
+            return update ? [update] : [];
+        });
+    });
+
+    console.log(`Migrated ${migrated} legacy ${REGISTRY} discovered item(s); removed ${removed} unavailable legacy item(s)`);
+    return completed;
+}
+
 function updateDiscoveredItems(db: MediatorDb, update: DiscoveredItem): void {
     const list = db.discovered ?? [];
 
@@ -398,7 +460,7 @@ async function getSlotBlockOrPause(slot: number, finality: Finality): Promise<{ 
     }
 }
 
-async function findFirstSlotAtOrAfterBlockHeight(targetHeight: number, currentSlot: number, finality: Finality): Promise<number> {
+async function findFirstSlotAtOrAfterBlockHeight(targetHeight: number, currentSlot: number, finality: Finality): Promise<number | undefined> {
     if (targetHeight <= 0) {
         return 0;
     }
@@ -415,7 +477,7 @@ async function findFirstSlotAtOrAfterBlockHeight(targetHeight: number, currentSl
         } catch (error) {
             if (isRateLimitError(error)) {
                 console.log(`Pausing ${REGISTRY} checkpoint sync while finding start block ${targetHeight}: Solana RPC rate limit`);
-                return currentSlot + 1;
+                return undefined;
             }
             throw error;
         }
@@ -446,6 +508,9 @@ async function syncBlockCheckpoints(): Promise<void> {
     let startSlot = db.checkpointSlot !== undefined && (db.checkpointHeight ?? 0) >= config.startBlock
         ? Math.max(0, db.checkpointSlot + 1)
         : await findFirstSlotAtOrAfterBlockHeight(config.startBlock, currentSlot, finality);
+    if (startSlot === undefined) {
+        return;
+    }
 
     let checkpointed = 0;
     let maxCheckpointHeight = db.checkpointHeight ?? 0;
@@ -461,17 +526,28 @@ async function syncBlockCheckpoints(): Promise<void> {
         chunksProcessed += 1;
 
         if (slots.length > 0) {
-            const firstBlock = await getSlotBlockOrPause(slots[0], finality);
-            if (firstBlock === 'rate-limited') {
-                return;
+            let anchorBlock: { height: number; hash: string; time: number } | undefined;
+            let anchorIndex = 0;
+
+            for (; anchorIndex < slots.length; anchorIndex++) {
+                const block = await getSlotBlockOrPause(slots[anchorIndex], finality);
+                if (block === 'rate-limited') {
+                    return;
+                }
+                if (block) {
+                    anchorBlock = block;
+                    break;
+                }
+                console.log(`Skipping unavailable ${REGISTRY} checkpoint block at slot ${slots[anchorIndex]}`);
             }
 
-            if (firstBlock) {
-                const lastHeight = firstBlock.height + slots.length - 1;
+            if (anchorBlock) {
+                const firstHeight = anchorBlock.height - anchorIndex;
+                const lastHeight = firstHeight + slots.length - 1;
                 let processedThroughHeight = lastHeight;
 
-                let checkpointIndex = (CHECKPOINT_BLOCK_INTERVAL - (firstBlock.height % CHECKPOINT_BLOCK_INTERVAL)) % CHECKPOINT_BLOCK_INTERVAL;
-                while (firstBlock.height + checkpointIndex < config.startBlock) {
+                let checkpointIndex = (CHECKPOINT_BLOCK_INTERVAL - (firstHeight % CHECKPOINT_BLOCK_INTERVAL)) % CHECKPOINT_BLOCK_INTERVAL;
+                while (firstHeight + checkpointIndex < config.startBlock) {
                     checkpointIndex += CHECKPOINT_BLOCK_INTERVAL;
                 }
 
@@ -482,9 +558,8 @@ async function syncBlockCheckpoints(): Promise<void> {
                     }
 
                     if (!block) {
-                        processedThroughSlot = slots[index] - 1;
-                        processedThroughHeight = firstBlock.height + index - 1;
-                        break;
+                        console.log(`Skipping unavailable ${REGISTRY} checkpoint block at slot ${slots[index]}`);
+                        continue;
                     }
 
                     if (block.height < config.startBlock || block.height % CHECKPOINT_BLOCK_INTERVAL !== 0) {
@@ -497,7 +572,7 @@ async function syncBlockCheckpoints(): Promise<void> {
 
                 maxCheckpointHeight = Math.max(maxCheckpointHeight, processedThroughHeight);
             } else {
-                processedThroughSlot = slots[0] - 1;
+                console.log(`Skipping ${slots.length} unavailable ${REGISTRY} produced block(s) from slot ${slots[0]} through ${slots.at(-1)}`);
             }
         }
 
@@ -1035,6 +1110,15 @@ async function main() {
         }
     }
 
+    const ok = await waitForChain();
+    if (!ok) {
+        return;
+    }
+
+    if (!await migrateLegacyDiscoveredItems()) {
+        console.log(`Startup paused until legacy ${REGISTRY} discovered items can be migrated`);
+        return;
+    }
     await dedupeDiscovered();
 
     if (config.reimport) {
@@ -1045,11 +1129,6 @@ async function main() {
             delete item.error;
         }
         await jsonPersister.saveDb(db);
-    }
-
-    const ok = await waitForChain();
-    if (!ok) {
-        return;
     }
 
     await gatekeeper.connect({
