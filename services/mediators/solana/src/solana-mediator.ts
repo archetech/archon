@@ -316,68 +316,6 @@ async function dedupeDiscovered(): Promise<void> {
     }
 }
 
-async function migrateLegacyDiscoveredItems(): Promise<boolean> {
-    const db = await loadDb();
-    const legacy = (db.discovered ?? []).filter(item => item.slot === undefined);
-
-    if (legacy.length === 0) {
-        return true;
-    }
-
-    let migrated = 0;
-    let removed = 0;
-    let completed = true;
-    const updates = new Map<string, DiscoveredItem | undefined>();
-
-    for (const item of legacy) {
-        const itemKey = discoveredKey(item);
-        const slot = item.height;
-
-        try {
-            const block = await getSlotBlock(slot);
-            if (!block) {
-                updates.set(itemKey, undefined);
-                removed += 1;
-                continue;
-            }
-
-            updates.set(itemKey, {
-                ...item,
-                height: block.height,
-                slot,
-                time: new Date(block.time * 1000).toISOString(),
-                blockHash: block.hash,
-            });
-            migrated += 1;
-        } catch (error) {
-            if (isRateLimitError(error)) {
-                console.log(`Pausing ${REGISTRY} legacy discovered-item migration at slot ${slot}: Solana RPC rate limit`);
-                completed = false;
-                break;
-            }
-            throw error;
-        }
-    }
-
-    if (updates.size === 0) {
-        return completed;
-    }
-
-    await jsonPersister.updateDb((db) => {
-        db.discovered = (db.discovered ?? []).flatMap(item => {
-            const updateKey = discoveredKey(item);
-            if (!updates.has(updateKey)) {
-                return [item];
-            }
-            const update = updates.get(updateKey);
-            return update ? [update] : [];
-        });
-    });
-
-    console.log(`Migrated ${migrated} legacy ${REGISTRY} discovered item(s); removed ${removed} unavailable legacy item(s)`);
-    return completed;
-}
-
 function updateDiscoveredItems(db: MediatorDb, update: DiscoveredItem): void {
     const list = db.discovered ?? [];
 
@@ -1110,15 +1048,6 @@ async function main() {
         }
     }
 
-    const ok = await waitForChain();
-    if (!ok) {
-        return;
-    }
-
-    if (!await migrateLegacyDiscoveredItems()) {
-        console.log(`Startup paused until legacy ${REGISTRY} discovered items can be migrated`);
-        return;
-    }
     await dedupeDiscovered();
 
     if (config.reimport) {
@@ -1129,6 +1058,11 @@ async function main() {
             delete item.error;
         }
         await jsonPersister.saveDb(db);
+    }
+
+    const ok = await waitForChain();
+    if (!ok) {
+        return;
     }
 
     await gatekeeper.connect({
