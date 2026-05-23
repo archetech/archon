@@ -48,7 +48,7 @@ describe('filecoin mediator queue processing', () => {
 
             const result = await processFilecoinQueue('filecoin', gatekeeper, store, cipher, walletPin);
 
-            expect(result).toStrictEqual({ queued: 1, pinned: 1, failed: 0 });
+            expect(result).toMatchObject({ queued: 1, pinned: 1, failed: 0 });
             expect(cleared).toStrictEqual([[op]]);
             expect(walletPin).toHaveBeenCalledWith('bagaaieraok', expect.any(String), 'BTC:signet');
         });
@@ -66,7 +66,13 @@ describe('filecoin mediator queue processing', () => {
 
             const result = await processFilecoinQueue('filecoin', gatekeeper, store, cipher, walletPin);
 
-            expect(result).toStrictEqual({ queued: 1, pinned: 0, failed: 1 });
+            expect(result).toMatchObject({
+                queued: 1,
+                pinned: 0,
+                failed: 1,
+                lastError: 'too many requests',
+                lastFailedFingerprint: expect.any(String),
+            });
             expect(gatekeeper.clearQueue).not.toHaveBeenCalled();
             expect(store.count('failed')).toBe(1);
         });

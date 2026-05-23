@@ -12,6 +12,8 @@ export interface ProcessQueueResult {
     queued: number;
     pinned: number;
     failed: number;
+    lastError?: string;
+    lastFailedFingerprint?: string;
 }
 
 export type WalletPin = (cid: string, fingerprint: string, registry?: string) => Promise<unknown>;
@@ -40,6 +42,8 @@ export async function processFilecoinQueue(
     const operations = await gatekeeper.getQueue(registry);
     const pinned: Operation[] = [];
     let failed = 0;
+    let lastError: string | undefined;
+    let lastFailedFingerprint: string | undefined;
 
     for (const operation of operations) {
         const fingerprint = fingerprintOperation(cipher, operation);
@@ -64,6 +68,8 @@ export async function processFilecoinQueue(
                 await store.recordFailure(fingerprint, cid, opRegistry, message);
             }
             failed += 1;
+            lastError = message;
+            lastFailedFingerprint = fingerprint;
             break;
         }
     }
@@ -76,5 +82,7 @@ export async function processFilecoinQueue(
         queued: operations.length,
         pinned: pinned.length,
         failed,
+        lastError,
+        lastFailedFingerprint,
     };
 }

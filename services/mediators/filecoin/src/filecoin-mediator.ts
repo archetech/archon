@@ -94,7 +94,8 @@ async function importQueue(): Promise<void> {
 
         if (result.failed > 0) {
             filecoinPinsTotal.inc({ status: 'failed' }, result.failed);
-            console.error(`Filecoin pin failed; leaving remaining operation(s) queued`);
+            const suffix = result.lastError ? `: ${result.lastError}` : '';
+            console.error(`Filecoin pin failed${suffix}; leaving remaining operation(s) queued`);
         }
 
         filecoinPinRecords.set({ status: 'pinned' }, store.count('pinned'));
