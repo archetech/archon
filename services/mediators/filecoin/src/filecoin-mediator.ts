@@ -70,6 +70,18 @@ async function walletPin(cid: string, fingerprint: string, registry?: string): P
     return response.data;
 }
 
+async function walletGetVersion(): Promise<any> {
+    const response = await axios.get(`${config.walletURL}/api/v1/wallet/version`, {
+        headers: adminHeaders(),
+        timeout: 30_000,
+    });
+    return response.data;
+}
+
+function fundingAddressFromVersion(version: any): string | undefined {
+    return typeof version?.address === 'string' ? version.address : undefined;
+}
+
 async function importQueue(): Promise<void> {
     if (importRunning) {
         return;
@@ -96,6 +108,18 @@ async function importQueue(): Promise<void> {
             filecoinPinsTotal.inc({ status: 'failed' }, result.failed);
             const suffix = result.lastError ? `: ${result.lastError}` : '';
             console.error(`Filecoin pin failed${suffix}; leaving remaining operation(s) queued`);
+            if (result.lastError?.includes('Insufficient FIL')) {
+                try {
+                    const version = await walletGetVersion();
+                    const address = fundingAddressFromVersion(version);
+                    if (address) {
+                        const network = version.network ? `${version.network} ` : '';
+                        console.log(`Filecoin wallet has insufficient funds. Send ${network}FIL to ${address}`);
+                    }
+                } catch (error: any) {
+                    console.error(`Unable to fetch Filecoin wallet funding address: ${error?.message || String(error)}`);
+                }
+            }
         }
 
         filecoinPinRecords.set({ status: 'pinned' }, store.count('pinned'));
