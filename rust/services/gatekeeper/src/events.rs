@@ -158,6 +158,9 @@ pub(crate) async fn handle_did_operation(
             .and_then(|value| value.get("registry"))
             .and_then(Value::as_str)
             .ok_or_else(|| "missing operation.registration.registry".to_string())?;
+        if registry == "filecoin" {
+            return Err("Invalid operation: registry filecoin is auxiliary storage only".to_string());
+        }
         if !supported_registries.iter().any(|item| item == registry) {
             return Err(format!("Invalid operation: registry {registry} not supported"));
         }
@@ -177,6 +180,9 @@ pub(crate) async fn handle_did_operation(
 
         let current_registry = current_registry
             .ok_or_else(|| "Invalid operation: registry missing".to_string())?;
+        if current_registry == "filecoin" {
+            return Err("Invalid operation: registry filecoin is auxiliary storage only".to_string());
+        }
         if !supported_registries.iter().any(|item| item == &current_registry) {
             return Err(format!(
                 "Invalid operation: registry {current_registry} not supported"
@@ -189,6 +195,9 @@ pub(crate) async fn handle_did_operation(
             .and_then(|value| value.get("registry"))
             .and_then(Value::as_str);
         if let Some(new_registry) = new_registry {
+            if new_registry == "filecoin" {
+                return Err("Invalid operation: registry filecoin is auxiliary storage only".to_string());
+            }
             if new_registry != current_registry
                 && !supported_registries.iter().any(|item| item == new_registry)
             {
@@ -286,18 +295,33 @@ pub(crate) async fn queue_outbound_operation(
     }
 
     let queue_size = {
+        let filecoin_enabled = state
+            .supported_registries
+            .lock()
+            .await
+            .iter()
+            .any(|item| item == "filecoin");
         let mut store = state.store.lock().await;
         let _ = store.queue_operation("hyperswarm", operation.clone())?;
-        if registry != "hyperswarm" {
-            Some(store.queue_operation(registry, operation)?)
+        let filecoin_queue_size = if filecoin_enabled && registry != "filecoin" {
+            Some(store.queue_operation("filecoin", operation.clone())?)
         } else {
             None
+        };
+        if registry != "hyperswarm" {
+            (Some(store.queue_operation(registry, operation)?), filecoin_queue_size)
+        } else {
+            (None, filecoin_queue_size)
         }
     };
 
-    if queue_size.is_some_and(|size| size >= state.config.max_queue_size) {
+    if queue_size.0.is_some_and(|size| size >= state.config.max_queue_size) {
         let mut supported = state.supported_registries.lock().await;
         supported.retain(|item| item != registry);
+    }
+    if queue_size.1.is_some_and(|size| size >= state.config.max_queue_size) {
+        let mut supported = state.supported_registries.lock().await;
+        supported.retain(|item| item != "filecoin");
     }
 
     Ok(())

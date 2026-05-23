@@ -18,6 +18,15 @@ const ipfs = new HeliaClient();
 const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet'] });
 const helper = new TestHelper(gatekeeper, cipher);
 
+function newGatekeeper(registries: string[]): Gatekeeper {
+    return new Gatekeeper({
+        db: new DbJsonMemory('test'),
+        ipfs,
+        console: mockConsole,
+        registries,
+    });
+}
+
 beforeAll(async () => {
     await ipfs.start();
 });
@@ -63,6 +72,61 @@ describe('getQueue', () => {
             // eslint-disable-next-line
             expect(error.message).toBe('Invalid parameter: registry=mock registry');
         }
+    });
+});
+
+describe('filecoin queue', () => {
+
+    it('should queue non-local operations to filecoin when supported', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet', 'filecoin']);
+        await gk.resetDb();
+        const testHelper = new TestHelper(gk, cipher);
+        const registry = 'BTC:signet';
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry });
+
+        await gk.createDID(agentOp);
+
+        expect(await gk.getQueue(registry)).toStrictEqual([agentOp]);
+        expect(await gk.getQueue('hyperswarm')).toStrictEqual([agentOp]);
+        expect(await gk.getQueue('filecoin')).toStrictEqual([agentOp]);
+    });
+
+    it('should not queue operations to filecoin when unsupported', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet']);
+        await gk.resetDb();
+        const testHelper = new TestHelper(gk, cipher);
+        const registry = 'BTC:signet';
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry });
+
+        await gk.createDID(agentOp);
+
+        expect(await gk.getQueue(registry)).toStrictEqual([agentOp]);
+        expect(await gk.getQueue('filecoin')).toStrictEqual([]);
+    });
+
+    it('should not queue local operations to filecoin', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'filecoin']);
+        await gk.resetDb();
+        const testHelper = new TestHelper(gk, cipher);
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry: 'local' });
+
+        await gk.createDID(agentOp);
+
+        expect(await gk.getQueue('hyperswarm')).toStrictEqual([]);
+        expect(await gk.getQueue('filecoin')).toStrictEqual([]);
+    });
+
+    it('should reject filecoin as a DID registry', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'filecoin']);
+        await gk.resetDb();
+        const testHelper = new TestHelper(gk, cipher);
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry: 'filecoin' });
+
+        await expect(gk.createDID(agentOp)).rejects.toThrow('Invalid operation: registry filecoin is auxiliary storage only');
     });
 });
 

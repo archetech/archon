@@ -1,0 +1,22 @@
+FROM node:22.15.0-bullseye-slim
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY packages/ ./packages/
+
+RUN npm ci
+RUN npm run build
+
+COPY services/mediators/filecoin ./filecoin/
+
+RUN cd filecoin && npm ci && npm run build
+
+WORKDIR /app/filecoin
+
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+
+EXPOSE 4271
+
+CMD ["node", "dist/filecoin-mediator.js"]

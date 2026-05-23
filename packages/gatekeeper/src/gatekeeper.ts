@@ -525,6 +525,16 @@ export default class Gatekeeper implements GatekeeperInterface {
         // Always distribute on hyperswarm
         await this.db.queueOperation('hyperswarm', operation);
 
+        // Filecoin is an auxiliary storage queue. When enabled, it receives a
+        // copy of every non-local operation without changing its registry.
+        if (this.supportedRegistries.includes('filecoin') && registry !== 'filecoin') {
+            const queueSize = await this.db.queueOperation('filecoin', operation);
+
+            if (queueSize >= this.maxQueueSize) {
+                this.supportedRegistries = this.supportedRegistries.filter(reg => reg !== 'filecoin');
+            }
+        }
+
         // Distribute on specified registry
         if (registry !== 'hyperswarm') {
             const queueSize = await this.db.queueOperation(registry, operation);
@@ -546,6 +556,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         // Reject operations with unsupported registries
         if (!registry || !this.supportedRegistries.includes(registry)) {
             throw new InvalidOperationError(`registry ${registry} not supported`);
+        }
+        if (registry === 'filecoin') {
+            throw new InvalidOperationError('registry filecoin is auxiliary storage only');
         }
 
         const did = await this.generateDID(operation);
@@ -871,11 +884,17 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (!registry || !this.supportedRegistries.includes(registry)) {
             throw new InvalidOperationError(`registry ${registry} not supported`);
         }
+        if (registry === 'filecoin') {
+            throw new InvalidOperationError('registry filecoin is auxiliary storage only');
+        }
 
         const newRegistry = operation.doc?.didDocumentRegistration?.registry;
 
         if (newRegistry && newRegistry !== registry && !this.supportedRegistries.includes(newRegistry)) {
             throw new InvalidOperationError(`registry ${newRegistry} not supported`);
+        }
+        if (newRegistry === 'filecoin') {
+            throw new InvalidOperationError('registry filecoin is auxiliary storage only');
         }
 
         return this.withDidLock(operation.did, async () => {

@@ -13,7 +13,9 @@ pub use app::run;
 pub(crate) use api::is_valid_registry;
 pub(crate) use app::AppState;
 pub(crate) use config::Config;
-pub(crate) use events::{handle_did_operation, import_batch_impl, process_events_impl};
+pub(crate) use events::{
+    handle_did_operation, import_batch_impl, process_events_impl, queue_outbound_operation,
+};
 pub(crate) use metrics::{normalize_path, record_metrics, Metrics};
 pub(crate) use proofs::{
     ensure_event_opid, generate_did_from_operation, generate_json_cid, infer_event_did,
@@ -1209,5 +1211,58 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn queue_outbound_operation_copies_non_local_ops_to_filecoin_when_supported() {
+        let (db, _db_dir) = temp_json_db();
+        let (state, _state_dir) = make_state(db);
+        state
+            .supported_registries
+            .lock()
+            .await
+            .push("filecoin".to_string());
+        let operation = json!({
+            "type": "create",
+            "registration": {
+                "version": 1,
+                "registry": "BTC:signet"
+            }
+        });
+
+        queue_outbound_operation(&state, "BTC:signet", operation.clone())
+            .await
+            .expect("operation should queue");
+
+        let store = state.store.lock().await;
+        assert_eq!(store.get_queue("hyperswarm"), vec![operation.clone()]);
+        assert_eq!(store.get_queue("BTC:signet"), vec![operation.clone()]);
+        assert_eq!(store.get_queue("filecoin"), vec![operation]);
+    }
+
+    #[tokio::test]
+    async fn queue_outbound_operation_does_not_copy_local_ops_to_filecoin() {
+        let (db, _db_dir) = temp_json_db();
+        let (state, _state_dir) = make_state(db);
+        state
+            .supported_registries
+            .lock()
+            .await
+            .push("filecoin".to_string());
+        let operation = json!({
+            "type": "create",
+            "registration": {
+                "version": 1,
+                "registry": "local"
+            }
+        });
+
+        queue_outbound_operation(&state, "local", operation)
+            .await
+            .expect("local operation should be ignored");
+
+        let store = state.store.lock().await;
+        assert!(store.get_queue("hyperswarm").is_empty());
+        assert!(store.get_queue("filecoin").is_empty());
     }
 }
