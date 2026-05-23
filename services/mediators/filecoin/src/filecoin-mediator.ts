@@ -82,6 +82,19 @@ function fundingAddressFromVersion(version: any): string | undefined {
     return typeof version?.address === 'string' ? version.address : undefined;
 }
 
+function missingFundingToken(error: string | undefined): string | undefined {
+    if (!error) {
+        return undefined;
+    }
+    if (error.includes('Insufficient FIL')) {
+        return 'FIL';
+    }
+    if (error.includes('USDFC')) {
+        return 'USDFC';
+    }
+    return undefined;
+}
+
 async function importQueue(): Promise<void> {
     if (importRunning) {
         return;
@@ -108,13 +121,14 @@ async function importQueue(): Promise<void> {
             filecoinPinsTotal.inc({ status: 'failed' }, result.failed);
             const suffix = result.lastError ? `: ${result.lastError}` : '';
             console.error(`Filecoin pin failed${suffix}; leaving remaining operation(s) queued`);
-            if (result.lastError?.includes('Insufficient FIL')) {
+            const token = missingFundingToken(result.lastError);
+            if (token) {
                 try {
                     const version = await walletGetVersion();
                     const address = fundingAddressFromVersion(version);
                     if (address) {
                         const network = version.network ? `${version.network} ` : '';
-                        console.log(`Filecoin wallet has insufficient funds. Send ${network}FIL to ${address}`);
+                        console.log(`Filecoin wallet needs ${network}${token}. Send ${network}${token} to ${address}`);
                     }
                 } catch (error: any) {
                     console.error(`Unable to fetch Filecoin wallet funding address: ${error?.message || String(error)}`);
