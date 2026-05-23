@@ -30,6 +30,7 @@ These rules apply to coding agents working in this repository.
 - Do not use stash-based branch juggling as the default workflow.
 - Never run mutating git operations in parallel. Serialize `git add`, `git commit`, `git push`, branch moves, stash operations, and any command that writes to `.git`.
 - After opening a PR, add follow-up fixes with normal commits and regular pushes; do not amend published commits or force-push unless the user explicitly requests history rewriting.
+- When the user asks to evaluate PR comments, only inspect and assess the comments. Do not edit code, commit, push, reply, or resolve threads unless the user explicitly asks for action after the evaluation.
 - Prefer a clean branch cut over moving changes around after the fact.
 - If branch state becomes confusing, stop and cleanly reestablish scope before making more commits.
 - When adding Prometheus HTTP route labels, normalize dynamic path segments like DIDs, hashes, txids, and CIDs before recording metrics so dashboards do not create one time series per identifier.
