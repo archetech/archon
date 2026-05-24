@@ -61,6 +61,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     readonly didPrefix: string;
     private readonly maxOpBytes: number;
     private readonly maxQueueSize: number;
+    private readonly pinRegistries: string[];
     supportedRegistries: string[];
     private didLocks = new Map<string, Promise<void>>();
     private searchIndex: SearchIndex;
@@ -90,10 +91,16 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         // Only DIDs registered on supported registries will be created by this node
         this.supportedRegistries = options.registries || ['local', 'hyperswarm'];
+        this.pinRegistries = options.registriesPin || [];
 
         for (const registry of this.supportedRegistries) {
             if (!isValidRegistryName(registry)) {
                 throw new InvalidParameterError(`registry=${registry}`);
+            }
+        }
+        for (const registry of this.pinRegistries) {
+            if (!isValidRegistryName(registry)) {
+                throw new InvalidParameterError(`registryPin=${registry}`);
             }
         }
 
@@ -527,7 +534,10 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         // Filecoin is an auxiliary storage queue. When enabled, it receives a
         // copy of every non-local operation without changing its registry.
-        if (!options.skipFilecoin && this.supportedRegistries.includes('filecoin') && registry !== 'filecoin') {
+        if (!options.skipFilecoin &&
+            this.supportedRegistries.includes('filecoin') &&
+            this.pinRegistries.includes(registry) &&
+            registry !== 'filecoin') {
             const queueSize = await this.db.queueOperation('filecoin', operation);
 
             if (queueSize >= this.maxQueueSize) {

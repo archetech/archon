@@ -64,6 +64,7 @@ mod tests {
             ipfs_url: String::new(),
             did_prefix: "did:cid".to_string(),
             registries: vec!["local".to_string(), "hyperswarm".to_string()],
+            pin_registries: vec![],
             json_limit: 4 * 1024 * 1024,
             upload_limit: 10 * 1024 * 1024,
             gc_interval_minutes: 60,
@@ -91,9 +92,17 @@ mod tests {
     }
 
     fn make_state(db: JsonDb) -> (AppState, TempDir) {
+        make_state_with_pin_registries(db, Vec::new())
+    }
+
+    fn make_state_with_pin_registries(
+        db: JsonDb,
+        pin_registries: Vec<String>,
+    ) -> (AppState, TempDir) {
         let temp_dir = tempfile::tempdir().expect("temp dir should be created");
         let config = Config {
             data_dir: temp_dir.path().to_path_buf(),
+            pin_registries,
             ..test_config()
         };
 
@@ -1216,7 +1225,8 @@ mod tests {
     #[tokio::test]
     async fn queue_outbound_operation_copies_non_local_ops_to_filecoin_when_supported() {
         let (db, _db_dir) = temp_json_db();
-        let (state, _state_dir) = make_state(db);
+        let (state, _state_dir) =
+            make_state_with_pin_registries(db, vec!["BTC:signet".to_string()]);
         state
             .supported_registries
             .lock()
@@ -1238,6 +1248,34 @@ mod tests {
         assert_eq!(store.get_queue("hyperswarm"), vec![operation.clone()]);
         assert_eq!(store.get_queue("BTC:signet"), vec![operation.clone()]);
         assert_eq!(store.get_queue("filecoin"), vec![operation]);
+    }
+
+    #[tokio::test]
+    async fn queue_outbound_operation_does_not_copy_unlisted_ops_to_filecoin() {
+        let (db, _db_dir) = temp_json_db();
+        let (state, _state_dir) =
+            make_state_with_pin_registries(db, vec!["ZEC:mainnet".to_string()]);
+        state
+            .supported_registries
+            .lock()
+            .await
+            .push("filecoin".to_string());
+        let operation = json!({
+            "type": "create",
+            "registration": {
+                "version": 1,
+                "registry": "BTC:signet"
+            }
+        });
+
+        queue_outbound_operation(&state, "BTC:signet", operation.clone(), false)
+            .await
+            .expect("operation should queue to normal registries");
+
+        let store = state.store.lock().await;
+        assert_eq!(store.get_queue("hyperswarm"), vec![operation.clone()]);
+        assert_eq!(store.get_queue("BTC:signet"), vec![operation]);
+        assert!(store.get_queue("filecoin").is_empty());
     }
 
     #[tokio::test]
@@ -1269,7 +1307,8 @@ mod tests {
     #[tokio::test]
     async fn queue_outbound_operation_does_not_copy_ephemeral_ops_to_filecoin() {
         let (db, _db_dir) = temp_json_db();
-        let (state, _state_dir) = make_state(db);
+        let (state, _state_dir) =
+            make_state_with_pin_registries(db, vec!["BTC:signet".to_string()]);
         state
             .supported_registries
             .lock()

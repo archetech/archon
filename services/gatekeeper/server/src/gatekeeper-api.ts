@@ -129,7 +129,8 @@ const gatekeeper = new Gatekeeper({
     db,
     ipfs,
     didPrefix: config.didPrefix,
-    registries: config.registries
+    registries: config.registries,
+    registriesPin: config.registriesPin
 });
 const startTime = new Date();
 const app = express();

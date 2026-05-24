@@ -11,6 +11,7 @@ pub(crate) struct Config {
     pub(crate) ipfs_url: String,
     pub(crate) did_prefix: String,
     pub(crate) registries: Vec<String>,
+    pub(crate) pin_registries: Vec<String>,
     pub(crate) json_limit: usize,
     pub(crate) upload_limit: usize,
     pub(crate) gc_interval_minutes: u64,
@@ -36,16 +37,14 @@ impl Config {
             registries: env::var("ARCHON_GATEKEEPER_REGISTRIES")
                 .ok()
                 .filter(|value| !value.trim().is_empty())
-                .map(|value| {
-                    value
-                        .split(',')
-                        .map(str::trim)
-                        .filter(|item| !item.is_empty())
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                })
+                .map(|value| parse_csv(&value))
                 .filter(|items| !items.is_empty())
                 .unwrap_or_else(|| vec!["local".to_string(), "hyperswarm".to_string()]),
+            pin_registries: env::var("ARCHON_GATEKEEPER_REGISTRIES_PIN")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .map(|value| parse_csv(&value))
+                .unwrap_or_default(),
             json_limit: parse_size_string(&env_var_or_default(
                 "ARCHON_GATEKEEPER_JSON_LIMIT",
                 "4mb",
@@ -72,6 +71,15 @@ impl Config {
             version: env_var_or_default("ARCHON_GATEKEEPER_VERSION", env!("CARGO_PKG_VERSION")),
         })
     }
+}
+
+fn parse_csv(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
 }
 
 pub(crate) fn env_parse<T>(name: &str, default: T) -> Result<T>

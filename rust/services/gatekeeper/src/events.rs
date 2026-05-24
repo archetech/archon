@@ -309,7 +309,11 @@ pub(crate) async fn queue_outbound_operation(
             .any(|item| item == "filecoin");
         let mut store = state.store.lock().await;
         let _ = store.queue_operation("hyperswarm", operation.clone())?;
-        let filecoin_queue_size = if !skip_filecoin && filecoin_enabled && registry != "filecoin" {
+        let filecoin_queue_size = if !skip_filecoin
+            && filecoin_enabled
+            && state.config.pin_registries.iter().any(|item| item == registry)
+            && registry != "filecoin"
+        {
             Some(store.queue_operation("filecoin", operation.clone())?)
         } else {
             None

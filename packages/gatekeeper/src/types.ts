@@ -107,6 +107,7 @@ export interface GatekeeperOptions {
     maxOpBytes?: number,
     maxQueueSize?: number,
     registries?: string[],
+    registriesPin?: string[],
 }
 
 export interface CheckDIDsOptions {
