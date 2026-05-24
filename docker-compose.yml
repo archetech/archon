@@ -4,7 +4,7 @@ include:
   #
   # To customize this full-node file, set COMPOSE_PROFILES in .env to the
   # comma-separated optional profiles you want to run. Example:
-  #   COMPOSE_PROFILES=hyperswarm,cli,btc-signet,filecoin
+  #   COMPOSE_PROFILES=hyperswarm,cli,btc-signet,pinning
   - docker/compose/core.yml
   #
   # Gatekeeper implementation. Set ARCHON_GATEKEEPER_FLAVOR=rust (or ts) in
@@ -39,4 +39,5 @@ include:
   - docker/compose/zcash-mainnet.yml
   - docker/compose/eth-sepolia.yml
   - docker/compose/sol-devnet.yml
+  - docker/compose/pinning.yml
   - docker/compose/filecoin.yml
