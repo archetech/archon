@@ -572,6 +572,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 4224 | Gatekeeper | 4224 | `ARCHON_GATEKEEPER_PORT` | configurable |
 | 4225 | Gatekeeper Client | 4225 | `ARCHON_GATEKEEPER_CLIENT_PORT` | configurable |
 | 4226 | Keymaster | 4226 | `ARCHON_KEYMASTER_PORT` | configurable |
+| 4227 | Keymaster Client | 4227 | `ARCHON_KEYMASTER_CLIENT_PORT` | configurable |
 | 4223 | Drawbridge Client | 4223 | `ARCHON_DRAWBRIDGE_CLIENT_PORT` | configurable |
 | 4228 | React Wallet | 4228 | `ARCHON_REACT_WALLET_PORT` | configurable |
 | 4222 | Drawbridge | 4222 | `ARCHON_DRAWBRIDGE_PORT` | public |
@@ -583,23 +584,35 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 3001 | CLN REST | 3001 | -- | localhost |
 | 3002 | RTL | 3002 | `ARCHON_RTL_PORT` | localhost |
 | 5000 | LNbits | 5000 | `ARCHON_LNBITS_PORT` | localhost |
-| 4238 | Zcash Mainnet Mediator Metrics | 4238 | `ARCHON_ZEC_METRICS_PORT` | localhost |
+| 9050 | Tor SOCKS | 9050 | `ARCHON_TOR_SOCKS_PORT` | configurable |
+| 38332 | BTC Signet Node RPC | 38332 | -- | localhost |
+| 4232 | Hyperswarm Metrics | 4232 | -- | localhost |
+| 4234 | BTC Mainnet Mediator Metrics | 4234 | -- | localhost |
+| 4236 | BTC Signet Mediator Metrics | 4236 | -- | localhost |
+| 4238 | Zcash Mainnet Mediator Metrics | 4238 | -- | localhost |
+| 4239 | Ethereum Sepolia Mediator Metrics | 4239 | -- | localhost |
+| 4249 | Solana Devnet Mediator Metrics | 4249 | -- | localhost |
 | 4240 | BTC Signet Wallet API | 4240 | -- | localhost |
 | 4241 | BTC Signet Wallet Metrics | 4241 | -- | localhost |
+| 4242 | BTC Mainnet Wallet API | 4242 | -- | localhost |
+| 4243 | BTC Mainnet Wallet Metrics | 4243 | -- | localhost |
+| 4244 | BTC Testnet4 Wallet API | 4244 | -- | localhost |
+| 4245 | BTC Testnet4 Wallet Metrics | 4245 | -- | localhost |
 | 4250 | Zcash Mainnet Wallet API | 4250 | -- | localhost |
 | 4251 | Zcash Mainnet Wallet Metrics | 4251 | -- | localhost |
-| 4239 | Ethereum Sepolia Mediator Metrics | 4239 | `ARCHON_ETH_METRICS_PORT` | localhost |
 | 4252 | Ethereum Sepolia Wallet API | 4252 | -- | localhost |
 | 4253 | Ethereum Sepolia Wallet Metrics | 4253 | -- | localhost |
+| 4262 | Solana Devnet Wallet API | 4262 | -- | localhost |
+| 4263 | Solana Devnet Wallet Metrics | 4263 | -- | localhost |
+| 4270 | Filecoin Wallet API | 4270 | -- | localhost |
+| 4271 | Filecoin Mediator Metrics | 4271 | -- | localhost |
+| 4272 | Filecoin Wallet Metrics | 4272 | -- | localhost |
 | 27017 | MongoDB | 27017 | -- | localhost |
 | 6379 | Redis | 6379 | -- | localhost |
 | 5001 | IPFS API | 5001 | -- | localhost |
 | 4001 | IPFS Swarm | 4001 | -- | public |
 | 9090 | Prometheus | 9090 | -- | localhost |
-| 3000 | Grafana | 3000 | -- | localhost |
-| 4232 | Hyperswarm Metrics | 4232 | -- | localhost |
-| 4234 | BTC Mainnet Metrics | 4234 | -- | localhost |
-| 4236 | BTC Signet Metrics | 4236 | -- | localhost |
+| 3000 | Grafana | 3000 | `ARCHON_GRAFANA_PORT` | configurable |
 
 ---
 
