@@ -67,8 +67,9 @@ export async function processPinningQueue(
         try {
             cid ||= await operationCid(gatekeeper, cipher, operation);
 
-            const status = existing?.requestid
-                ? await provider.getStatus(existing.requestid)
+            const requestid = existing?.provider === provider.name ? existing.requestid : undefined;
+            const status = requestid
+                ? await provider.getStatus(requestid)
                 : await provider.pin({
                     cid,
                     name: pinName(fingerprint, opRegistry),
@@ -80,7 +81,7 @@ export async function processPinningQueue(
                     },
                 });
 
-            if (existing?.requestid) {
+            if (requestid) {
                 await store.recordStatus(fingerprint, status.status, status.response);
             } else {
                 await store.recordSubmitted(

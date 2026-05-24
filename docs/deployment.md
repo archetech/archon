@@ -407,7 +407,7 @@ ARCHON_PIN_ORIGINS=/ip4/203.0.113.10/tcp/4001/p2p/12D3KooW...
 | `ARCHON_PIN_PROVIDER` | `filebase` | Provider label used in logs, state, and metrics |
 | `ARCHON_PIN_API_URL` | Filebase PSA endpoint | IPFS Pinning Service API base URL |
 | `ARCHON_PIN_API_TOKEN` | *(empty)* | Bearer token for the pinning provider |
-| `ARCHON_PIN_ORIGINS` | *(empty)* | Optional comma-separated IPFS provider multiaddrs |
+| `ARCHON_PIN_ORIGINS` | *(empty)* | Optional comma-separated multiaddrs for origin IPFS nodes where the provider can fetch CIDs |
 | `ARCHON_PIN_IMPORT_INTERVAL` | `1` | Minutes between pin queue import attempts |
 
 ### Verify

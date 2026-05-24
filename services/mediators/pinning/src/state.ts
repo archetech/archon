@@ -124,9 +124,12 @@ export class JsonPinStore {
         await this.save();
     }
 
-    count(status?: PinStatus): number {
+    count(status?: PinStatus, provider?: string): number {
         const records = Object.values(this.state.pins);
-        return status ? records.filter(record => record.status === status).length : records.length;
+        return records.filter(record =>
+            (!status || record.status === status) &&
+            (!provider || record.provider === provider)
+        ).length;
     }
 
     private async save(): Promise<void> {

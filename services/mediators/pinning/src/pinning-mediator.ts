@@ -81,7 +81,7 @@ async function importQueue(): Promise<void> {
         }
 
         if (result.pending > 0) {
-            pinsTotal.inc({ provider: provider.name, status: 'pending' }, result.pending);
+            pinsTotal.inc({ provider: provider.name, status: 'pinning' }, result.pending);
             console.log(`${result.pending} ${REGISTRY} operation(s) still pending with ${provider.name}`);
         }
 
@@ -91,10 +91,10 @@ async function importQueue(): Promise<void> {
             console.error(`Pinning failed${suffix}; leaving remaining operation(s) queued`);
         }
 
-        pinRecords.set({ provider: provider.name, status: 'queued' }, store.count('queued'));
-        pinRecords.set({ provider: provider.name, status: 'pinning' }, store.count('pinning'));
-        pinRecords.set({ provider: provider.name, status: 'pinned' }, store.count('pinned'));
-        pinRecords.set({ provider: provider.name, status: 'failed' }, store.count('failed'));
+        pinRecords.set({ provider: provider.name, status: 'queued' }, store.count('queued', provider.name));
+        pinRecords.set({ provider: provider.name, status: 'pinning' }, store.count('pinning', provider.name));
+        pinRecords.set({ provider: provider.name, status: 'pinned' }, store.count('pinned', provider.name));
+        pinRecords.set({ provider: provider.name, status: 'failed' }, store.count('failed', provider.name));
     } finally {
         importActive.set(0);
         importRunning = false;

@@ -149,6 +149,57 @@ describe('pinning mediator queue processing', () => {
         });
     });
 
+    it('submits a new pin when stored request belongs to a different provider', async () => {
+        await withStore(async store => {
+            const gatekeeper = new FakeGatekeeper([op('one')]);
+            const provider = new FakeProvider();
+            provider.pin = async () => {
+                provider.pins += 1;
+                return { requestid: 'request-old', status: 'pinning', response: { status: 'pinning' } };
+            };
+
+            await processPinningQueue(
+                'pin',
+                gatekeeper,
+                store,
+                new CipherNode(),
+                provider as unknown as PinningServiceProvider,
+                []
+            );
+
+            provider.name = 'other-provider';
+            provider.pin = async () => {
+                provider.pins += 1;
+                return { requestid: 'request-new', status: 'pinned', response: { status: 'pinned' } };
+            };
+
+            const result = await processPinningQueue(
+                'pin',
+                gatekeeper,
+                store,
+                new CipherNode(),
+                provider as unknown as PinningServiceProvider,
+                []
+            );
+
+            expect(result.pinned).toBe(1);
+            expect(provider.pins).toBe(2);
+            expect(gatekeeper.cleared).toHaveLength(1);
+        });
+    });
+
+    it('counts pin records by status and provider', async () => {
+        await withStore(async store => {
+            await store.load();
+            await store.recordSubmitted('one', 'cid-one', 'BTC:mainnet', 'pinata', 'request-one', 'pinned', {});
+            await store.recordSubmitted('two', 'cid-two', 'BTC:mainnet', 'filebase', 'request-two', 'pinned', {});
+
+            expect(store.count('pinned')).toBe(2);
+            expect(store.count('pinned', 'pinata')).toBe(1);
+            expect(store.count('pinned', 'filebase')).toBe(1);
+        });
+    });
+
     it('leaves failed provider status queued and retries as a new pin next cycle', async () => {
         await withStore(async store => {
             const gatekeeper = new FakeGatekeeper([op('one')]);
