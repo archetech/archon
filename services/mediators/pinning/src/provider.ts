@@ -42,12 +42,7 @@ export class PinningServiceProvider {
     }
 
     async pin(request: ProviderPinRequest): Promise<ProviderPinStatus> {
-        const response = await this.client.post('/pins', {
-            cid: request.cid,
-            name: request.name,
-            origins: request.origins || [],
-            meta: request.meta,
-        });
+        const response = await this.client.post('/pins', pinPayload(request));
         return normalizeStatus(response.data);
     }
 
@@ -59,6 +54,16 @@ export class PinningServiceProvider {
 
 export function createProvider(): PinningServiceProvider {
     return new PinningServiceProvider(config.provider, config.apiUrl, config.apiToken);
+}
+
+export function pinPayload(request: ProviderPinRequest): object {
+    const origins = request.origins?.filter(Boolean) || [];
+    return {
+        cid: request.cid,
+        name: request.name,
+        meta: request.meta,
+        ...(origins.length > 0 && { origins }),
+    };
 }
 
 export function normalizeStatus(response: any): ProviderPinStatus {

@@ -6,6 +6,7 @@ import CipherNode from '@didcid/cipher/node';
 import type { Operation } from '@didcid/gatekeeper/types';
 import { JsonPinStore } from '../../services/mediators/pinning/src/state.ts';
 import { processPinningQueue, type PinningGatekeeper } from '../../services/mediators/pinning/src/sync.ts';
+import { pinPayload } from '../../services/mediators/pinning/src/provider.ts';
 import type { PinningServiceProvider } from '../../services/mediators/pinning/src/provider.ts';
 
 function op(id: string, registry = 'BTC:mainnet'): Operation {
@@ -186,6 +187,19 @@ describe('pinning mediator queue processing', () => {
             expect(second.pinned).toBe(1);
             expect(provider.pins).toBe(2);
             expect(gatekeeper.cleared).toHaveLength(1);
+        });
+    });
+
+    it('omits empty origins from provider pin requests', () => {
+        expect(pinPayload({
+            cid: 'bagaaieraexample',
+            name: 'archon-test',
+            meta: {},
+            origins: [''],
+        })).toStrictEqual({
+            cid: 'bagaaieraexample',
+            name: 'archon-test',
+            meta: {},
         });
     });
 });
