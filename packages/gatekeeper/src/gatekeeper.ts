@@ -36,6 +36,7 @@ function base64urlToHex(b64: string): string {
 
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
+const PIN_QUEUE = 'pin';
 function isValidRegistryName(registry: unknown): registry is string {
     return typeof registry === 'string' &&
         registry.length > 0 &&
@@ -523,7 +524,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
     }
 
-    async queueOperation(registry: string, operation: Operation, options: { skipFilecoin?: boolean } = {}) {
+    async queueOperation(registry: string, operation: Operation, options: { skipPin?: boolean } = {}) {
         // Don't distribute local DIDs
         if (registry === 'local') {
             return;
@@ -532,16 +533,16 @@ export default class Gatekeeper implements GatekeeperInterface {
         // Always distribute on hyperswarm
         await this.db.queueOperation('hyperswarm', operation);
 
-        // Filecoin is an auxiliary storage queue. When enabled, it receives a
-        // copy of every non-local operation without changing its registry.
-        if (!options.skipFilecoin &&
-            this.supportedRegistries.includes('filecoin') &&
+        // Pinning is an auxiliary storage queue. When enabled, it receives a
+        // copy of allowlisted non-local operations without changing their registry.
+        if (!options.skipPin &&
+            this.supportedRegistries.includes(PIN_QUEUE) &&
             this.pinRegistries.includes(registry) &&
-            registry !== 'filecoin') {
-            const queueSize = await this.db.queueOperation('filecoin', operation);
+            registry !== PIN_QUEUE) {
+            const queueSize = await this.db.queueOperation(PIN_QUEUE, operation);
 
             if (queueSize >= this.maxQueueSize) {
-                this.supportedRegistries = this.supportedRegistries.filter(reg => reg !== 'filecoin');
+                this.supportedRegistries = this.supportedRegistries.filter(reg => reg !== PIN_QUEUE);
             }
         }
 
@@ -567,8 +568,8 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (!registry || !this.supportedRegistries.includes(registry)) {
             throw new InvalidOperationError(`registry ${registry} not supported`);
         }
-        if (registry === 'filecoin') {
-            throw new InvalidOperationError('registry filecoin is auxiliary storage only');
+        if (registry === PIN_QUEUE) {
+            throw new InvalidOperationError(`registry ${registry} is auxiliary storage only`);
         }
 
         const did = await this.generateDID(operation);
@@ -592,7 +593,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             });
 
             await this.queueOperation(registry, operation, {
-                skipFilecoin: Boolean(operation.registration?.validUntil)
+                skipPin: Boolean(operation.registration?.validUntil)
             });
             await this.updateSearchIndex(did);
             return did;
@@ -896,8 +897,8 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (!registry || !this.supportedRegistries.includes(registry)) {
             throw new InvalidOperationError(`registry ${registry} not supported`);
         }
-        if (registry === 'filecoin') {
-            throw new InvalidOperationError('registry filecoin is auxiliary storage only');
+        if (registry === PIN_QUEUE) {
+            throw new InvalidOperationError(`registry ${registry} is auxiliary storage only`);
         }
 
         const newRegistry = operation.doc?.didDocumentRegistration?.registry;
@@ -905,8 +906,8 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (newRegistry && newRegistry !== registry && !this.supportedRegistries.includes(newRegistry)) {
             throw new InvalidOperationError(`registry ${newRegistry} not supported`);
         }
-        if (newRegistry === 'filecoin') {
-            throw new InvalidOperationError('registry filecoin is auxiliary storage only');
+        if (newRegistry === PIN_QUEUE) {
+            throw new InvalidOperationError(`registry ${newRegistry} is auxiliary storage only`);
         }
 
         return this.withDidLock(operation.did, async () => {
@@ -921,7 +922,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             });
 
             await this.queueOperation(registry, operation, {
-                skipFilecoin: Boolean(doc.didDocumentRegistration?.validUntil)
+                skipPin: Boolean(doc.didDocumentRegistration?.validUntil)
             });
             await this.updateSearchIndex(operation.did!);
 

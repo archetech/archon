@@ -46,7 +46,7 @@ describe('filecoin mediator queue processing', () => {
             };
             const walletPin = jest.fn().mockResolvedValue({ status: 'pinned' });
 
-            const result = await processFilecoinQueue('filecoin', gatekeeper, store, cipher, walletPin);
+            const result = await processFilecoinQueue('pin', gatekeeper, store, cipher, walletPin);
 
             expect(result).toMatchObject({ queued: 1, pinned: 1, failed: 0 });
             expect(cleared).toStrictEqual([[op]]);
@@ -64,7 +64,7 @@ describe('filecoin mediator queue processing', () => {
             };
             const walletPin = jest.fn().mockRejectedValue(new Error('too many requests'));
 
-            const result = await processFilecoinQueue('filecoin', gatekeeper, store, cipher, walletPin);
+            const result = await processFilecoinQueue('pin', gatekeeper, store, cipher, walletPin);
 
             expect(result).toMatchObject({
                 queued: 1,

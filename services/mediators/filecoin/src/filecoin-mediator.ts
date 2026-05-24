@@ -9,7 +9,7 @@ import config from './config.js';
 import { JsonPinStore } from './state.js';
 import { processFilecoinQueue } from './sync.js';
 
-const REGISTRY = 'filecoin';
+const REGISTRY = 'pin';
 const gatekeeper = new GatekeeperClient();
 const cipher = new CipherNode();
 const store = new JsonPinStore(config.statePath);
@@ -19,7 +19,7 @@ promClient.collectDefaultMetrics({ register });
 
 const filecoinQueueDepth = new promClient.Gauge({
     name: 'filecoin_mediator_queue_depth',
-    help: 'Number of operations in the filecoin Gatekeeper queue',
+    help: 'Number of operations in the pin Gatekeeper queue',
 });
 
 const filecoinPinsTotal = new promClient.Counter({

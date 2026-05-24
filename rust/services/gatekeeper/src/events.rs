@@ -13,6 +13,8 @@ use crate::{
     GatekeeperDb, ResolveOptions,
 };
 
+const PIN_QUEUE: &str = "pin";
+
 #[derive(Serialize)]
 pub(crate) struct ImportBatchResult {
     pub(crate) queued: usize,
@@ -163,8 +165,10 @@ pub(crate) async fn handle_did_operation(
             .get("registration")
             .and_then(|value| value.get("validUntil"))
             .is_some();
-        if registry == "filecoin" {
-            return Err("Invalid operation: registry filecoin is auxiliary storage only".to_string());
+        if registry == PIN_QUEUE {
+            return Err(format!(
+                "Invalid operation: registry {registry} is auxiliary storage only"
+            ));
         }
         if !supported_registries.iter().any(|item| item == registry) {
             return Err(format!("Invalid operation: registry {registry} not supported"));
@@ -185,8 +189,10 @@ pub(crate) async fn handle_did_operation(
         let (current_registry, current_is_ephemeral) = current_info
             .ok_or_else(|| "Invalid operation: registry missing".to_string())?;
         is_ephemeral = current_is_ephemeral;
-        if current_registry == "filecoin" {
-            return Err("Invalid operation: registry filecoin is auxiliary storage only".to_string());
+        if current_registry == PIN_QUEUE {
+            return Err(format!(
+                "Invalid operation: registry {current_registry} is auxiliary storage only"
+            ));
         }
         if !supported_registries.iter().any(|item| item == &current_registry) {
             return Err(format!(
@@ -200,8 +206,10 @@ pub(crate) async fn handle_did_operation(
             .and_then(|value| value.get("registry"))
             .and_then(Value::as_str);
         if let Some(new_registry) = new_registry {
-            if new_registry == "filecoin" {
-                return Err("Invalid operation: registry filecoin is auxiliary storage only".to_string());
+            if new_registry == PIN_QUEUE {
+                return Err(format!(
+                    "Invalid operation: registry {new_registry} is auxiliary storage only"
+                ));
             }
             if new_registry != current_registry
                 && !supported_registries.iter().any(|item| item == new_registry)
@@ -294,34 +302,34 @@ pub(crate) async fn queue_outbound_operation(
     state: &AppState,
     registry: &str,
     operation: Value,
-    skip_filecoin: bool,
+    skip_pin: bool,
 ) -> Result<()> {
     if registry == "local" {
         return Ok(());
     }
 
     let queue_size = {
-        let filecoin_enabled = state
+        let pin_enabled = state
             .supported_registries
             .lock()
             .await
             .iter()
-            .any(|item| item == "filecoin");
+            .any(|item| item == PIN_QUEUE);
         let mut store = state.store.lock().await;
         let _ = store.queue_operation("hyperswarm", operation.clone())?;
-        let filecoin_queue_size = if !skip_filecoin
-            && filecoin_enabled
+        let pin_queue_size = if !skip_pin
+            && pin_enabled
             && state.config.pin_registries.iter().any(|item| item == registry)
-            && registry != "filecoin"
+            && registry != PIN_QUEUE
         {
-            Some(store.queue_operation("filecoin", operation.clone())?)
+            Some(store.queue_operation(PIN_QUEUE, operation.clone())?)
         } else {
             None
         };
         if registry != "hyperswarm" {
-            (Some(store.queue_operation(registry, operation)?), filecoin_queue_size)
+            (Some(store.queue_operation(registry, operation)?), pin_queue_size)
         } else {
-            (None, filecoin_queue_size)
+            (None, pin_queue_size)
         }
     };
 
@@ -331,7 +339,7 @@ pub(crate) async fn queue_outbound_operation(
     }
     if queue_size.1.is_some_and(|size| size >= state.config.max_queue_size) {
         let mut supported = state.supported_registries.lock().await;
-        supported.retain(|item| item != "filecoin");
+        supported.retain(|item| item != PIN_QUEUE);
     }
 
     Ok(())

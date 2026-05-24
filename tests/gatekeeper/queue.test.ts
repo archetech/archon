@@ -76,10 +76,10 @@ describe('getQueue', () => {
     });
 });
 
-describe('filecoin queue', () => {
+describe('pin queue', () => {
 
-    it('should queue non-local operations to filecoin when supported', async () => {
-        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet', 'filecoin'], ['BTC:signet']);
+    it('should queue non-local operations to pin when pin queue is supported', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet', 'pin'], ['BTC:signet']);
         await gk.resetDb();
         const testHelper = new TestHelper(gk, cipher);
         const registry = 'BTC:signet';
@@ -90,10 +90,10 @@ describe('filecoin queue', () => {
 
         expect(await gk.getQueue(registry)).toStrictEqual([agentOp]);
         expect(await gk.getQueue('hyperswarm')).toStrictEqual([agentOp]);
-        expect(await gk.getQueue('filecoin')).toStrictEqual([agentOp]);
+        expect(await gk.getQueue('pin')).toStrictEqual([agentOp]);
     });
 
-    it('should queue non-local operations to filecoin after mediator self-registers', async () => {
+    it('should queue non-local operations to pin after mediator self-registers', async () => {
         const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet'], ['BTC:signet']);
         await gk.resetDb();
         const testHelper = new TestHelper(gk, cipher);
@@ -101,14 +101,14 @@ describe('filecoin queue', () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry });
 
-        expect(await gk.getQueue('filecoin')).toStrictEqual([]);
+        expect(await gk.getQueue('pin')).toStrictEqual([]);
         await gk.createDID(agentOp);
 
         expect(await gk.getQueue(registry)).toStrictEqual([agentOp]);
-        expect(await gk.getQueue('filecoin')).toStrictEqual([agentOp]);
+        expect(await gk.getQueue('pin')).toStrictEqual([agentOp]);
     });
 
-    it('should not queue operations to filecoin when unsupported', async () => {
+    it('should not queue operations to pin when unsupported', async () => {
         const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet'], ['BTC:signet']);
         await gk.resetDb();
         const testHelper = new TestHelper(gk, cipher);
@@ -119,11 +119,11 @@ describe('filecoin queue', () => {
         await gk.createDID(agentOp);
 
         expect(await gk.getQueue(registry)).toStrictEqual([agentOp]);
-        expect(await gk.getQueue('filecoin')).toStrictEqual([]);
+        expect(await gk.getQueue('pin')).toStrictEqual([]);
     });
 
-    it('should not queue operations to filecoin when registry is not in the pin list', async () => {
-        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet', 'filecoin'], ['ZEC:mainnet']);
+    it('should not queue operations to pin when registry is not in the pin list', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet', 'pin'], ['ZEC:mainnet']);
         await gk.resetDb();
         const testHelper = new TestHelper(gk, cipher);
         const registry = 'BTC:signet';
@@ -134,11 +134,11 @@ describe('filecoin queue', () => {
 
         expect(await gk.getQueue(registry)).toStrictEqual([agentOp]);
         expect(await gk.getQueue('hyperswarm')).toStrictEqual([agentOp]);
-        expect(await gk.getQueue('filecoin')).toStrictEqual([]);
+        expect(await gk.getQueue('pin')).toStrictEqual([]);
     });
 
-    it('should not queue local operations to filecoin', async () => {
-        const gk = newGatekeeper(['local', 'hyperswarm', 'filecoin']);
+    it('should not queue local operations to pin', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'pin']);
         await gk.resetDb();
         const testHelper = new TestHelper(gk, cipher);
         const keypair = cipher.generateRandomJwk();
@@ -147,11 +147,11 @@ describe('filecoin queue', () => {
         await gk.createDID(agentOp);
 
         expect(await gk.getQueue('hyperswarm')).toStrictEqual([]);
-        expect(await gk.getQueue('filecoin')).toStrictEqual([]);
+        expect(await gk.getQueue('pin')).toStrictEqual([]);
     });
 
-    it('should not queue ephemeral operations to filecoin', async () => {
-        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet', 'filecoin'], ['BTC:signet']);
+    it('should not queue ephemeral operations to pin', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'BTC:signet', 'pin'], ['BTC:signet']);
         await gk.resetDb();
         const testHelper = new TestHelper(gk, cipher);
         const registry = 'BTC:signet';
@@ -167,17 +167,17 @@ describe('filecoin queue', () => {
 
         expect(await gk.getQueue(registry)).toStrictEqual([agentOp, assetOp]);
         expect(await gk.getQueue('hyperswarm')).toStrictEqual([agentOp, assetOp]);
-        expect(await gk.getQueue('filecoin')).toStrictEqual([agentOp]);
+        expect(await gk.getQueue('pin')).toStrictEqual([agentOp]);
     });
 
-    it('should reject filecoin as a DID registry', async () => {
-        const gk = newGatekeeper(['local', 'hyperswarm', 'filecoin']);
+    it('should reject pin as a DID registry', async () => {
+        const gk = newGatekeeper(['local', 'hyperswarm', 'pin']);
         await gk.resetDb();
         const testHelper = new TestHelper(gk, cipher);
         const keypair = cipher.generateRandomJwk();
-        const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry: 'filecoin' });
+        const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry: 'pin' });
 
-        await expect(gk.createDID(agentOp)).rejects.toThrow('Invalid operation: registry filecoin is auxiliary storage only');
+        await expect(gk.createDID(agentOp)).rejects.toThrow('Invalid operation: registry pin is auxiliary storage only');
     });
 });
 

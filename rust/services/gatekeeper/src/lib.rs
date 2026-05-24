@@ -1223,7 +1223,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn queue_outbound_operation_copies_non_local_ops_to_filecoin_when_supported() {
+    async fn queue_outbound_operation_copies_non_local_ops_to_pin_when_supported() {
         let (db, _db_dir) = temp_json_db();
         let (state, _state_dir) =
             make_state_with_pin_registries(db, vec!["BTC:signet".to_string()]);
@@ -1231,7 +1231,7 @@ mod tests {
             .supported_registries
             .lock()
             .await
-            .push("filecoin".to_string());
+            .push("pin".to_string());
         let operation = json!({
             "type": "create",
             "registration": {
@@ -1247,11 +1247,11 @@ mod tests {
         let store = state.store.lock().await;
         assert_eq!(store.get_queue("hyperswarm"), vec![operation.clone()]);
         assert_eq!(store.get_queue("BTC:signet"), vec![operation.clone()]);
-        assert_eq!(store.get_queue("filecoin"), vec![operation]);
+        assert_eq!(store.get_queue("pin"), vec![operation]);
     }
 
     #[tokio::test]
-    async fn queue_outbound_operation_does_not_copy_unlisted_ops_to_filecoin() {
+    async fn queue_outbound_operation_does_not_copy_unlisted_ops_to_pin() {
         let (db, _db_dir) = temp_json_db();
         let (state, _state_dir) =
             make_state_with_pin_registries(db, vec!["ZEC:mainnet".to_string()]);
@@ -1259,7 +1259,7 @@ mod tests {
             .supported_registries
             .lock()
             .await
-            .push("filecoin".to_string());
+            .push("pin".to_string());
         let operation = json!({
             "type": "create",
             "registration": {
@@ -1275,18 +1275,18 @@ mod tests {
         let store = state.store.lock().await;
         assert_eq!(store.get_queue("hyperswarm"), vec![operation.clone()]);
         assert_eq!(store.get_queue("BTC:signet"), vec![operation]);
-        assert!(store.get_queue("filecoin").is_empty());
+        assert!(store.get_queue("pin").is_empty());
     }
 
     #[tokio::test]
-    async fn queue_outbound_operation_does_not_copy_local_ops_to_filecoin() {
+    async fn queue_outbound_operation_does_not_copy_local_ops_to_pin() {
         let (db, _db_dir) = temp_json_db();
         let (state, _state_dir) = make_state(db);
         state
             .supported_registries
             .lock()
             .await
-            .push("filecoin".to_string());
+            .push("pin".to_string());
         let operation = json!({
             "type": "create",
             "registration": {
@@ -1301,11 +1301,11 @@ mod tests {
 
         let store = state.store.lock().await;
         assert!(store.get_queue("hyperswarm").is_empty());
-        assert!(store.get_queue("filecoin").is_empty());
+        assert!(store.get_queue("pin").is_empty());
     }
 
     #[tokio::test]
-    async fn queue_outbound_operation_does_not_copy_ephemeral_ops_to_filecoin() {
+    async fn queue_outbound_operation_does_not_copy_ephemeral_ops_to_pin() {
         let (db, _db_dir) = temp_json_db();
         let (state, _state_dir) =
             make_state_with_pin_registries(db, vec!["BTC:signet".to_string()]);
@@ -1313,7 +1313,7 @@ mod tests {
             .supported_registries
             .lock()
             .await
-            .push("filecoin".to_string());
+            .push("pin".to_string());
         let operation = json!({
             "type": "create",
             "registration": {
@@ -1330,6 +1330,6 @@ mod tests {
         let store = state.store.lock().await;
         assert_eq!(store.get_queue("hyperswarm"), vec![operation.clone()]);
         assert_eq!(store.get_queue("BTC:signet"), vec![operation]);
-        assert!(store.get_queue("filecoin").is_empty());
+        assert!(store.get_queue("pin").is_empty());
     }
 }
