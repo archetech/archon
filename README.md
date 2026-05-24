@@ -44,7 +44,8 @@ COMPOSE_PROFILES= docker compose --env-file .env up
 
 The default `docker-compose.yml` keeps optional fragments included, but gates
 their services with Docker Compose profiles. Set `COMPOSE_PROFILES` in `.env`
-to enable the optional parts of the stack you want.
+to enable the optional parts of the stack you want, such as `pinning` for the
+generic IPFS Pinning Service API mediator.
 
 ### Keymaster Onboarding
 

@@ -10,11 +10,12 @@ This guide walks you through deploying an Archon node, from a core DID-only setu
 4. [Adding Zcash Registry](#4-adding-zcash-registry)
 5. [Adding Ethereum Registry](#5-adding-ethereum-registry)
 6. [Adding Solana Devnet Registry](#6-adding-solana-devnet-registry)
-7. [Adding Drawbridge (API Gateway + Tor)](#7-adding-drawbridge-api-gateway--tor)
-8. [Bundled Lightning Stack (Optional)](#8-bundled-lightning-stack-optional)
-9. [Production Hardening](#9-production-hardening)
-10. [Port Reference](#10-port-reference)
-11. [Troubleshooting](#11-troubleshooting)
+7. [Adding Generic IPFS Pinning](#7-adding-generic-ipfs-pinning)
+8. [Adding Drawbridge (API Gateway + Tor)](#8-adding-drawbridge-api-gateway--tor)
+9. [Bundled Lightning Stack (Optional)](#9-bundled-lightning-stack-optional)
+10. [Production Hardening](#10-production-hardening)
+11. [Port Reference](#11-port-reference)
+12. [Troubleshooting](#12-troubleshooting)
 
 ---
 
@@ -75,7 +76,7 @@ COMPOSE_PROFILES=
 COMPOSE_PROFILES=hyperswarm,cli,explorer,gatekeeper-client,keymaster-client,react-wallet,observability,btc-signet
 ```
 
-Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `lightning`, `drawbridge`, `zcash-mainnet`, `eth-sepolia`, `sol-devnet`, and `filecoin`.
+Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `lightning`, `drawbridge`, `zcash-mainnet`, `eth-sepolia`, `sol-devnet`, `pinning`, and `filecoin`.
 
 ### Key Environment Variables
 
@@ -116,6 +117,7 @@ Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keyma
 | **react-wallet** | Web wallet UI |
 | **prometheus** | Metrics collection |
 | **grafana** | Metrics dashboards |
+| **pinning-mediator** | Optional generic IPFS pinning service backup |
 
 ### Start and Verify
 
@@ -355,7 +357,70 @@ curl http://localhost:4263/metrics
 
 ---
 
-## 7. Adding Drawbridge (API Gateway + Tor)
+## 7. Adding Generic IPFS Pinning
+
+Archon can back up selected operation CIDs to an external IPFS pinning service through the generic `pin` queue. This is cheaper than per-operation Filecoin storage for small DID operations and keeps the provider separate from canonical DID registries.
+
+### Enable Generic Pinning
+
+Add the pinning profile to `COMPOSE_PROFILES`:
+
+```env
+COMPOSE_PROFILES=hyperswarm,pinning
+```
+
+Then choose which registries Gatekeeper should copy into the pin queue:
+
+```env
+ARCHON_GATEKEEPER_REGISTRIES_PIN=BTC:mainnet,ZEC:mainnet
+```
+
+Local and ephemeral operations are not pinned unless explicitly queued by Gatekeeper policy.
+
+### Configure Provider
+
+The mediator uses the standard IPFS Pinning Service API. Filebase and Pinata both expose compatible endpoints:
+
+```env
+# Filebase
+ARCHON_PIN_PROVIDER=filebase
+ARCHON_PIN_API_URL=https://api.filebase.io/v1/ipfs
+ARCHON_PIN_API_TOKEN=your-filebase-token
+
+# Pinata
+ARCHON_PIN_PROVIDER=pinata
+ARCHON_PIN_API_URL=https://api.pinata.cloud/psa
+ARCHON_PIN_API_TOKEN=your-pinata-jwt
+```
+
+If your IPFS node has known reachable multiaddrs, pass them so the provider can fetch CIDs directly:
+
+```env
+ARCHON_PIN_ORIGINS=/ip4/203.0.113.10/tcp/4001/p2p/12D3KooW...
+```
+
+### Key Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ARCHON_GATEKEEPER_REGISTRIES_PIN` | *(empty)* | Registries copied into the generic `pin` queue |
+| `ARCHON_PIN_PROVIDER` | `filebase` | Provider label used in logs, state, and metrics |
+| `ARCHON_PIN_API_URL` | Filebase PSA endpoint | IPFS Pinning Service API base URL |
+| `ARCHON_PIN_API_TOKEN` | *(empty)* | Bearer token for the pinning provider |
+| `ARCHON_PIN_ORIGINS` | *(empty)* | Optional comma-separated IPFS provider multiaddrs |
+| `ARCHON_PIN_IMPORT_INTERVAL` | `1` | Minutes between pin queue import attempts |
+
+### Verify
+
+```bash
+curl http://localhost:4273/metrics
+```
+
+The mediator leaves operations queued while a provider reports `queued` or `pinning`, and clears them only after the provider reports `pinned`.
+
+---
+
+## 8. Adding Drawbridge (API Gateway + Tor)
 
 Drawbridge is the L402 API gateway that enables Lightning payments for API access and Lightning zaps between DIDs. The Drawbridge compose layer also brings in Herald, Herald client, Drawbridge client, the Lightning mediator, and a Tor hidden service for privacy.
 
@@ -438,7 +503,7 @@ Optional UIs when Drawbridge is enabled:
 
 ---
 
-## 8. Bundled Lightning Stack (Optional)
+## 9. Bundled Lightning Stack (Optional)
 
 If you don't have an existing CLN node, the bundled Lightning stack provides a complete setup with CLN, RTL, and LNbits.
 
@@ -515,7 +580,7 @@ curl http://localhost:4235/ready
 
 ---
 
-## 9. Production Hardening
+## 10. Production Hardening
 
 ### Reverse Proxy
 
@@ -565,7 +630,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 
 ---
 
-## 10. Port Reference
+## 11. Port Reference
 
 | Port | Service | Default | Env Var | Binding |
 |------|---------|---------|---------|---------|
@@ -607,6 +672,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 4270 | Filecoin Wallet API | 4270 | -- | localhost |
 | 4271 | Filecoin Mediator Metrics | 4271 | -- | localhost |
 | 4272 | Filecoin Wallet Metrics | 4272 | -- | localhost |
+| 4273 | Pinning Mediator Metrics | 4273 | -- | localhost |
 | 27017 | MongoDB | 27017 | -- | localhost |
 | 6379 | Redis | 6379 | -- | localhost |
 | 5001 | IPFS API | 5001 | -- | localhost |
@@ -616,7 +682,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 ### CLN Not Syncing
 
