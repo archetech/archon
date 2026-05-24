@@ -5,8 +5,7 @@
   "description": "Archon generic IPFS pinning mediator",
   "main": "dist/pinning-mediator.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "node --test dist/**/*.test.js"
+    "build": "tsc -p tsconfig.json"
   },
   "keywords": [],
   "author": "Archetech",
