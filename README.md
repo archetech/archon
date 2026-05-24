@@ -35,16 +35,16 @@ $ cp sample.env .env
 $ ./start-node
 ```
 
-To run a minimal peer-capable node with Gatekeeper, Keymaster, Hyperswarm,
-MongoDB, Redis, and IPFS, use the minimal startup script:
+To run only the core services, leave `COMPOSE_PROFILES` empty and use the
+default compose file:
 
 ```bash
-./start-node-minimal
+COMPOSE_PROFILES= docker compose --env-file .env up
 ```
 
-The default `docker-compose.yml` keeps the full node enabled, but its
-top-level `include:` list is organized so optional components can be commented
-out when you want a custom stack.
+The default `docker-compose.yml` keeps optional fragments included, but gates
+their services with Docker Compose profiles. Set `COMPOSE_PROFILES` in `.env`
+to enable the optional parts of the stack you want.
 
 ### Keymaster Onboarding
 
@@ -283,11 +283,11 @@ $ git pull
 $ ./start-node
 ```
 
-If you are running the minimal node, stop the minimal compose stack and restart
-it with the minimal startup script:
+If you are running only the core services, keep `COMPOSE_PROFILES` empty when
+restarting:
 
 ```
-$ ./stop-node-minimal
+$ COMPOSE_PROFILES= docker compose --env-file .env down
 $ git pull
-$ ./start-node-minimal
+$ COMPOSE_PROFILES= docker compose --env-file .env up
 ```
