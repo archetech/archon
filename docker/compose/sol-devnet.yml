@@ -1,5 +1,6 @@
 services:
   sol-devnet-wallet:
+    profiles: ["sol-devnet"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.solana-wallet
@@ -26,6 +27,7 @@ services:
         condition: service_started
 
   sol-devnet-mediator:
+    profiles: ["sol-devnet"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.solana

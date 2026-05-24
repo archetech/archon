@@ -1,5 +1,6 @@
 services:
   react-wallet:
+    profiles: ["react-wallet"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.react-wallet

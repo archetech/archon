@@ -1,5 +1,6 @@
 services:
   prometheus:
+    profiles: ["observability"]
     image: prom/prometheus:v2.51.0
     user: "${ARCHON_UID}:${ARCHON_GID}"
     volumes:
@@ -16,6 +17,7 @@ services:
         condition: service_healthy
 
   grafana:
+    profiles: ["observability"]
     image: grafana/grafana:10.4.0
     user: "${ARCHON_UID}:${ARCHON_GID}"
     volumes:

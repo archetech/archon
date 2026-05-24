@@ -2,8 +2,9 @@ include:
   # Minimal node:
   #   docker compose --env-file .env -f docker/compose/minimal.yml up
   #
-  # To customize this full-node file by hand, keep the core and Gatekeeper
-  # includes, then comment out any optional includes you do not want to run.
+  # To customize this full-node file, set COMPOSE_PROFILES in .env to the
+  # comma-separated optional profiles you want to run. Example:
+  #   COMPOSE_PROFILES=hyperswarm,cli,btc-signet,filecoin
   - docker/compose/core.yml
   #
   # Gatekeeper implementation. Set ARCHON_GATEKEEPER_FLAVOR=rust (or ts) in
@@ -19,7 +20,8 @@ include:
   # mediator services.
   - docker/compose/keymaster-${ARCHON_KEYMASTER_FLAVOR:-ts}.yml
 
-  # Optional node services. Comment out any component you do not want to run.
+  # Optional node services. These fragments stay included; their services are
+  # enabled by matching Docker Compose profiles from COMPOSE_PROFILES.
   # Services with chain, Lightning, Herald, or Hyperswarm dependencies generally
   # require Keymaster to remain enabled.
   - docker/compose/hyperswarm.yml
@@ -33,8 +35,8 @@ include:
   - docker/compose/btc-signet.yml
   - docker/compose/lightning.yml
   - docker/compose/drawbridge.yml
-#  - docker/compose/btc-testnet4.yml
+  - docker/compose/btc-testnet4.yml
   - docker/compose/zcash-mainnet.yml
   - docker/compose/eth-sepolia.yml
-#  - docker/compose/sol-devnet.yml
-#  - docker/compose/filecoin.yml
+  - docker/compose/sol-devnet.yml
+  - docker/compose/filecoin.yml

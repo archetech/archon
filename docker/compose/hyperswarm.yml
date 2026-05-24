@@ -1,5 +1,6 @@
 services:
   hyperswarm-mediator:
+    profiles: ["hyperswarm"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.hyperswarm

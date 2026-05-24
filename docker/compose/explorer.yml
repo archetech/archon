@@ -1,5 +1,6 @@
 services:
   explorer:
+    profiles: ["explorer"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.explorer

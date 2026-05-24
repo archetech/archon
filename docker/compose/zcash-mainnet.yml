@@ -1,5 +1,6 @@
 services:
   zcash-mainnet-wallet:
+    profiles: ["zcash-mainnet"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.zcash-wallet
@@ -27,6 +28,7 @@ services:
         condition: service_started
 
   zcash-mainnet-mediator:
+    profiles: ["zcash-mainnet"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.zcash

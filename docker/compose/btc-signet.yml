@@ -1,5 +1,6 @@
 services:
   btc-signet-node:
+    profiles: ["btc-signet"]
     image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
     volumes:
       - ../../data/btc-signet:/root/.bitcoin
@@ -7,6 +8,7 @@ services:
       - 127.0.0.1:38332:38332
 
   btc-signet-wallet:
+    profiles: ["btc-signet"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.satoshi-wallet
@@ -33,6 +35,7 @@ services:
         condition: service_started
 
   btc-signet-mediator:
+    profiles: ["btc-signet"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.satoshi

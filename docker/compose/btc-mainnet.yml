@@ -1,5 +1,6 @@
 services:
   btc-mainnet-wallet:
+    profiles: ["btc-mainnet"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.satoshi-wallet
@@ -26,6 +27,7 @@ services:
         condition: service_started
 
   btc-mainnet-mediator:
+    profiles: ["btc-mainnet"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.satoshi

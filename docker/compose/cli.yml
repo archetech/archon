@@ -1,5 +1,6 @@
 services:
   cli:
+    profiles: ["cli"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.cli

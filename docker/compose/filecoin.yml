@@ -1,5 +1,6 @@
 services:
   filecoin-wallet:
+    profiles: ["filecoin"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.filecoin-wallet
@@ -26,6 +27,7 @@ services:
         condition: service_healthy
 
   filecoin-mediator:
+    profiles: ["filecoin"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.filecoin

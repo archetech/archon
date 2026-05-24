@@ -1,5 +1,6 @@
 services:
   keymaster-client:
+    profiles: ["keymaster-client"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.keymaster-client

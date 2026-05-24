@@ -1,5 +1,6 @@
 services:
   gatekeeper-client:
+    profiles: ["gatekeeper-client"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.gatekeeper-client
