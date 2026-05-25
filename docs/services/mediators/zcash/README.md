@@ -267,11 +267,12 @@ One JSON document per chain, stored in whichever backend
 
 ### 4.1 Filesystem layout
 
-- JSON backend: `data/<dbName>.json` where `dbName` defaults to the
-  chain name with `:` → `-` (e.g. `ZEC-mainnet.json`).
-- SQLite: `data/<dbName>.db`.
-- Redis: key `zcash-mediator:<dbName>` → JSON string.
-- MongoDB: collection `zcash-mediator`, document `_id = <dbName>`.
+- JSON backend: `data/<dbName>-mediator.json` where `dbName` defaults to
+  the chain name with `:` → `-` (e.g. `data/ZEC-mainnet-mediator.json`).
+- SQLite: `data/<dbName>-mediator.db`.
+- Redis: key `zec-mediator/<dbName>` → JSON string.
+- MongoDB: database `zec-mediator`, collection named after the registry
+  (`<dbName>`), single document retrieved via `findOne({})`.
 
 The backend is abstracted via a `MediatorDbInterface`:
 

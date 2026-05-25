@@ -158,7 +158,7 @@ the same as Gatekeeper's: `<digits>(b|kb|mb)?`, case-insensitive.
 
 ### 2.5 Route inventory
 
-There are **146 routes** under `/api/v1`. Rather than list them all here,
+There are **148 routes** under `/api/v1`. Rather than list them all here,
 they are grouped into the functional sections below; complete and
 authoritative inventory:
 
@@ -425,7 +425,7 @@ identity for asset-creating operations that don't take an explicit owner.
 | `POST /api/v1/ids/:id/rename` | Body: `{ "name": string }`. Returns `{ "ok": boolean }`. |
 | `POST /api/v1/ids/:id/change-registry` | Body: `{ "registry": string }`. Submits an `update` op moving the DID to the new registry. Returns `{ "ok": boolean }`. |
 | `POST /api/v1/ids/:id/backup` | Anchors a JWE backup of the ID's owned-asset list to its DID document. Returns `{ "ok": boolean }`. |
-| `POST /api/v1/ids/:id/recover` | Body: `{ "did": string }`. Decrypts and re-imports an ID backup. Returns `{ "recovered": string }` (the ID name). |
+| `POST /api/v1/ids/:id/recover` | No body. The path `:id` IS the backup DID. Decrypts and re-imports an ID backup. Returns `{ "recovered": string }` (the ID name). |
 | `GET /api/v1/ids/current` | `{ "current": string | undefined }` |
 | `PUT /api/v1/ids/current` | Body: `{ "name": string }`. Sets the active ID. Returns `{ "ok": boolean }`. |
 
@@ -436,6 +436,7 @@ Resolution endpoints proxied through to Gatekeeper:
 | `GET /api/v1/did/:id` | Body-less; query params match Gatekeeper's `/did/:did` (`versionTime`, `versionSequence`, `confirm`, `verify`). Accepts a DID **or** a wallet alias / ID name; resolves the alias first, then forwards to Gatekeeper. Returns `{ "docs": DidCidDocument }`. |
 | `PUT /api/v1/did/:id` | Body: `{ "doc": DidCidDocument }`. Submits an `update` operation signing it with the ID's key. Returns `{ "ok": boolean }`. |
 | `DELETE /api/v1/did/:id` | Submits a `delete` operation. Returns `{ "ok": boolean }`. |
+| `POST /api/v1/agents/:id/test` | Tests whether the given DID resolves to a valid agent. Returns `{ "test": boolean }`. |
 
 The `:id` parameter accepts (in this lookup order): wallet alias name, ID
 name, raw DID. Implementations MUST resolve aliases/names BEFORE
@@ -491,6 +492,8 @@ the wallet has chosen to track for sending zaps.
 | `POST /api/v1/addresses/import` | Fetches `https://<domain>/.well-known/names`, imports any names that already point at the current ID's DID, and returns `{ "addresses": Record<string, AddressInfo> }`. |
 | `GET /api/v1/addresses/check/:address` | Probes whether the address is `claimed`/`available`/`unsupported`/`unreachable`. Returns a flat `AddressCheckResult` object: `{ "address": string, "status": ..., "available": boolean, "did": string | null }`. |
 | `POST /api/v1/addresses` | Body: `{ "address": string }`. Adds the address to the current ID. |
+| `POST /api/v1/addresses/publish` | Body: `{ "address": string, "name"?: string }`. Publishes the address to the identity's DID document. |
+| `DELETE /api/v1/addresses/publish` | Body: `{ "name"?: string }`. Removes the published address from the identity's DID document. |
 | `DELETE /api/v1/addresses/:address` | Removes the address. |
 
 ---
@@ -521,8 +524,9 @@ the DID document carries the asset payload.
 }
 ```
 
-Asset data MUST be valid JSON. The TS implementation enforces a
-`maxDataLength` of 8 KB on the JSON-stringified form.
+Asset data MUST be valid JSON. `createAsset` itself does not enforce a
+size limit; the `maxDataLength` constant (8 KB) only gates inline storage
+of encrypted vault-item data.
 
 ### 7.1 Owned-list bookkeeping
 
@@ -576,9 +580,10 @@ The on-asset envelope shape (`didDocumentData`):
 }
 ```
 
-`decryptMessage` tries `cipher_receiver` first (current ID is receiver),
-falling back to `cipher_sender` (current ID is sender re-reading own
-message).
+`decryptMessage` chooses the ciphertext by sender identity: if the current
+ID is the sender and `cipher_sender` is present, it uses `cipher_sender`
+(sender re-reading own message); otherwise it uses `cipher_receiver`
+(current ID is receiver).
 
 ---
 
@@ -750,7 +755,7 @@ Vault = {
 | `POST /api/v1/vaults/:id/members` | Add member. |
 | `DELETE /api/v1/vaults/:id/members/:member` | Remove member. |
 | `GET /api/v1/vaults/:id/members` | `{ "members": string[] }`. |
-| `POST /api/v1/vaults/:id/items` | Body: `{ "name": string, "buffer": "<base64>" }`. |
+| `POST /api/v1/vaults/:id/items` | Body: raw `application/octet-stream` bytes. The item name is supplied via the `X-Options` header (JSON, e.g. `{"name":"..."}`). |
 | `DELETE /api/v1/vaults/:id/items/:name` | |
 | `GET /api/v1/vaults/:id/items` | `{ "items": Record<string, ...> }`. |
 | `GET /api/v1/vaults/:id/items/:name` | Returns the binary item (decrypted). |
@@ -766,7 +771,7 @@ an asset DID.
 
 | Route | Behavior |
 | --- | --- |
-| `POST /api/v1/files` | Body: `application/octet-stream` (up to `ARCHON_KEYMASTER_UPLOAD_LIMIT`); query/headers carry `filename`, `contentType`, `bytes`. Pushes bytes to Gatekeeper `/ipfs/data`, creates asset, returns `{ "did": string }`. |
+| `POST /api/v1/files` | Body: `application/octet-stream` (up to `ARCHON_KEYMASTER_UPLOAD_LIMIT`). Options (`filename`, `contentType`, `bytes`, etc.) are supplied as a JSON string in the `X-Options` header; `bytes` is inferred from `Content-Length` when not provided. Pushes bytes to Gatekeeper `/ipfs/data`, creates asset, returns `{ "did": string }`. |
 | `PUT /api/v1/files/:id` | Replace the file under the same DID. |
 | `GET /api/v1/files/:id` | `{ "file": FileAsset }` (metadata + base64 of bytes). |
 | `POST /api/v1/files/:id/test` | Sanity check. |
@@ -796,7 +801,7 @@ Encrypted DM with optional file attachments.
 | `GET /api/v1/dmail` | `{ "dmail": Record<DID, DmailItem> }`. |
 | `GET /api/v1/dmail/:id` | `{ "message": DmailMessage }`. |
 | `GET /api/v1/dmail/:id/attachments` | `{ "attachments": Record<string, ...> }`. |
-| `POST /api/v1/dmail/:id/attachments` | Add an attachment (binary body, `name` query). |
+| `POST /api/v1/dmail/:id/attachments` | Add an attachment. Body: raw `application/octet-stream` bytes. The attachment name is supplied via the `X-Options` header (JSON, e.g. `{"name":"..."}`). |
 | `DELETE /api/v1/dmail/:id/attachments/:name` | |
 | `GET /api/v1/dmail/:id/attachments/:name` | Returns the binary attachment. |
 
@@ -826,11 +831,11 @@ derived from the same secp256k1 key as the DID).
 
 | Route | Behavior |
 | --- | --- |
-| `POST /api/v1/nostr` | Body: `{ "id"?: string }`. Generates Nostr keys for the named ID (or current). Returns `{ "nostr": NostrKeys }` (`{ npub, pubkey }`). |
+| `POST /api/v1/nostr` | Body: `{ "id"?: string }`. Generates Nostr keys for the named ID (or current). Returns `NostrKeys` (flat object: `{ npub, pubkey }`). |
 | `DELETE /api/v1/nostr` | Removes Nostr keys from the ID. |
 | `POST /api/v1/nostr/import` | Body: `{ "nsec": string, "id"?: string }`. Imports an externally-generated nsec. |
 | `POST /api/v1/nostr/nsec` | Body: `{ "id"?: string }`. Returns `{ "nsec": string }` (export). |
-| `POST /api/v1/nostr/sign` | Body: `{ "event": NostrEvent, "id"?: string }`. Signs the event (Schnorr / BIP340) and returns `{ "event": NostrEvent }` with `id`/`pubkey`/`sig` populated. |
+| `POST /api/v1/nostr/sign` | Body: `{ "event": NostrEvent, "id"?: string }`. Signs the event (Schnorr / BIP340) and returns the signed `NostrEvent` (flat object) with `id`/`pubkey`/`sig` populated. |
 
 `NostrKeys = { npub: <bech32>, pubkey: <hex> }`.
 `nsec` is a `bech32`-encoded 32-byte private key with prefix `nsec`.
@@ -847,14 +852,14 @@ reach Lightning functionality via the same `DrawbridgeClient`.
 | --- | --- |
 | `POST /api/v1/lightning` | `{ "id"?: string }`. Provisions an LNbits wallet for the ID, stores `LightningConfig` in `IDInfo`. |
 | `DELETE /api/v1/lightning` | Decommissions the Lightning wallet. |
-| `POST /api/v1/lightning/balance` | `{ "balance": LightningBalance }`. |
-| `POST /api/v1/lightning/invoice` | `{ "amount": number, "memo": string, "id"?: string }` → `{ "invoice": LightningInvoice }`. |
-| `POST /api/v1/lightning/pay` | `{ "bolt11": string, "id"?: string }` → `{ "payment": LightningPayment }`. |
-| `POST /api/v1/lightning/payment` | `{ "paymentHash": string, "id"?: string }` → `{ "status": LightningPaymentStatus }`. |
-| `POST /api/v1/lightning/decode` | `{ "bolt11": string }` → `{ "decoded": DecodedLightningInvoice }`. |
+| `POST /api/v1/lightning/balance` | Returns `LightningBalance` (flat object). |
+| `POST /api/v1/lightning/invoice` | `{ "amount": number, "memo": string, "id"?: string }` → `LightningInvoice` (flat object). |
+| `POST /api/v1/lightning/pay` | `{ "bolt11": string, "id"?: string }` → `LightningPayment` (flat object). |
+| `POST /api/v1/lightning/payment` | `{ "paymentHash": string, "id"?: string }` → `LightningPaymentStatus` (flat object). |
+| `POST /api/v1/lightning/decode` | `{ "bolt11": string }` → `DecodedLightningInvoice` (flat object). |
 | `POST /api/v1/lightning/publish` | Publishes the ID's invoice key to its DID document (so others can zap by DID). |
 | `POST /api/v1/lightning/unpublish` | |
-| `POST /api/v1/lightning/zap` | `{ "id": string, "amount": number, "memo"?: string, "name"?: string }`. Resolves recipient (DID, alias, or LUD-16) and pays. |
+| `POST /api/v1/lightning/zap` | `{ "did": string, "amount": number, "memo"?: string, "id"?: string }` where `did` is the recipient (DID, alias, or LUD-16) and `id` is the optional sender identity. Resolves recipient and pays. |
 | `POST /api/v1/lightning/payments` | `{ "payments": LightningPaymentRecord[] }`. |
 
 ---

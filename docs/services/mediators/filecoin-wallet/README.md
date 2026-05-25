@@ -67,7 +67,7 @@ the process is restarted.
 
 ## 2. HTTP API contract
 
-All routes are mounted at `/api/v1` and require `X-Archon-Admin-Key`
+All /api/v1 routes are mounted at `/api/v1` and require `X-Archon-Admin-Key`
 matching `ARCHON_ADMIN_API_KEY`. The admin key is **mandatory**:
 `ARCHON_ADMIN_API_KEY` must be set or every `/api/v1/*` request is
 rejected with `403 { "error": "Admin API key not configured" }`. With

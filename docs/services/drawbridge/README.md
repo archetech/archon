@@ -60,9 +60,9 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/api/v1/ready` | Returns `<bool>` — proxies upstream Gatekeeper readiness. `false` on connect failure. |
-| `GET` | `/api/v1/version` | `{ version, commit }` (commit truncated to 7 chars). |
+| `GET` | `/api/v1/version` | `{ version, commit }` (commit is `GIT_COMMIT` sliced to 7 chars; the sentinel string `"unknown"` is returned when `GIT_COMMIT` is unset). |
 | `GET` | `/api/v1/status` | `{ service: "drawbridge", upstream: GatekeeperStatus, uptime: <seconds>, memoryUsage: <node memUsage> }`. HTTP 502 if Gatekeeper is unreachable. |
-| `POST` | `/api/v1/l402/pay` | Final step of L402 flow. Body: `{ paymentHash, preimage }`. Marks the matching macaroon as paid + returns the bearer credential. See [§4.4](#44-payment-completion). |
+| `POST` | `/api/v1/l402/pay` | Final step of L402 flow. Body: `{ paymentHash }`. Marks the matching macaroon as paid + returns the bearer credential. See [§4.4](#44-payment-completion). |
 | `GET` | `/invoice/:did` | Forwarded to lightning-mediator's `/invoice/:did`. Returns `{ paymentRequest, paymentHash, ... }`. Used by external zappers to pay any DID that has published a Lightning service. |
 | `GET` | `/.well-known/*` | Forwarded to Herald (e.g. `lnurlp/<name>`, `webfinger`, `names`). |
 | `GET\|POST\|PUT\|DELETE` | `/names/*` | Forwarded to Herald (`/api/*`). |
@@ -72,13 +72,14 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/api/v1/l402/status?id=<macaroonId>` | Returns the macaroon's current state (`{ valid, expiresAt, currentUses, maxUses, revoked }`). |
-| `POST` | `/api/v1/l402/revoke` | Body: `{ id: <macaroonId> }`. Revokes the macaroon (subsequent verifications return invalid). |
+| `GET` | `/api/v1/l402/status` | Returns service-level L402 status: `{ enabled, lightning, pricing: [<operationKey>, ...] }`. |
+| `POST` | `/api/v1/l402/revoke` | Body: `{ macaroonId: <macaroonId> }`. Revokes the macaroon (subsequent verifications return invalid). |
 | `GET` | `/api/v1/l402/payments/:did` | List of `PaymentRecord` for the DID. |
 
-All admin routes require the `X-Archon-Admin-Key` header. Missing /
-wrong key → HTTP 401. When `ARCHON_ADMIN_API_KEY` is empty, admin
-routes return HTTP 403 `{ "error": "Admin API key not configured" }`.
+All admin routes require the `X-Archon-Admin-Key` header. When the
+server `ARCHON_ADMIN_API_KEY` is unconfigured (empty), admin routes
+return HTTP 403 `{ "error": "Admin API key not configured" }`. When
+configured, a missing or mismatched client header returns HTTP 401.
 Constant-time comparison is used.
 
 ### 2.3 Authenticated proxy routes
@@ -188,23 +189,20 @@ private / single-tenant deployments.
 
 ### 3.1 Bypass routes
 
-The L402 middleware has a hard-coded bypass list for routes that should
-never be paywalled:
+The L402 middleware (mounted on the `/api/v1` router) has a hard-coded
+bypass list for paths that should never be paywalled. Paths are matched
+against the request path with the `/api/v1` prefix stripped:
 
-- `/api/v1/ready`
-- `/api/v1/version`
-- `/api/v1/status`
-- `/api/v1/l402/pay`
-- `/api/v1/l402/status`
-- `/api/v1/l402/revoke`
-- `/api/v1/l402/payments/:did`
-- `/invoice/:did`
-- `/metrics`
-- Anything under `/.well-known/*` and `/names/*`
-- Lightning support probe `/api/v1/lightning/supported`
+- Exact matches (any method): `/ready`, `/version`, `/status`, `/metrics`
+- Prefix matches (any method): anything under `/l402/`
+- GET-only prefix matches: anything under `/did/` or `/ipfs/`
+
+All other routes are handled outside this router and so are not subject
+to the L402 middleware at all (e.g. `/invoice/:did`, `/.well-known/*`,
+`/names/*`).
 
 Implementations MUST honor this list — clients depend on at least
-`/ready`, `/version`, and `/.well-known/*` being free.
+`/ready`, `/version`, and the GET DID/IPFS read paths being free.
 
 ---
 
@@ -226,7 +224,7 @@ When auth fails on a protected route, Drawbridge:
    a CLN invoice for that amount.
 4. Generates a fresh macaroon ID (16 random bytes hex) and builds a
    macaroon with these caveats:
-   - `did = <header X-Subscription-DID or empty>`
+   - `did = <header X-DID or empty>`
    - `scope = <operation key>`
    - `expiry = <now + ARCHON_DRAWBRIDGE_INVOICE_EXPIRY seconds>` (default 3600)
    - `payment_hash = <invoice payment hash>`
@@ -279,14 +277,15 @@ Drawbridge's L402 middleware:
    caveats.
 3. Verifies the macaroon signature against `rootSecret`.
 4. Checks each caveat is satisfied:
-   - `did` matches the request's `X-Subscription-DID` (or empty).
+   - `did` matches the request's `X-DID` (or empty).
    - `scope` matches the operation key for the requested route.
    - `expiry > now`.
    - `currentUses < maxUses` (incremented on every accepted request).
    - `payment_hash` matches the now-verified preimage.
 5. Looks up the persisted macaroon record; rejects if revoked.
-6. Increments `currentUses` atomically in the store.
-7. Allows the request to proceed.
+6. Allows the request to proceed; on the response `finish` event, if
+   the upstream status was `< 500`, increments `currentUses` in the
+   store.
 
 On any failure: HTTP 401 with a fresh 402 challenge.
 
@@ -296,22 +295,31 @@ On any failure: HTTP 401 with a fresh 402 challenge.
 Drawbridge to confirm the payment server-side rather than presenting
 the credential immediately:
 
-1. Body: `{ paymentHash, preimage }`.
+1. Body: `{ paymentHash }`. (Any `preimage` in the body is IGNORED.)
 2. Drawbridge fetches the pending macaroon record via the Lightning
    mediator (`GET /api/v1/l402/pending/:paymentHash`).
-3. Verifies preimage matches the payment hash.
+3. Fetches the preimage server-side from the Lightning mediator
+   (`/api/v1/l402/check`) and verifies it matches the payment hash.
 4. Persists the macaroon record (now no longer "pending").
 5. Records the payment in the store.
 6. Deletes the pending entry on the Lightning mediator.
-7. Returns `{ macaroon, paymentHash, scope, did, expiresAt }`.
+7. Returns `{ macaroonId, macaroon, paymentHash, method, amountSat, preimage }`.
 
 ---
 
 ## 5. Pricing
 
-Per-operation prices are loaded at startup from environment variables of
-the form `ARCHON_DRAWBRIDGE_PRICE_<OPERATION>=<sats>` (and an optional
-`ARCHON_DRAWBRIDGE_DESC_<OPERATION>=<text>`). The operation keys are:
+Per-operation prices are loaded at startup. Only two individual
+operations have dedicated environment-variable overrides:
+
+- `ARCHON_DRAWBRIDGE_PRICE_CREATE_DID` — sats for `createDID`
+  (accepts `>= 0`).
+- `ARCHON_DRAWBRIDGE_PRICE_RESOLVE_DID` — sats for `resolveDID`
+  (must be `> 0`).
+
+For any other operation, set the JSON override
+`ARCHON_DRAWBRIDGE_PRICING` (see [§8.2](#82-environment-variables)).
+The full set of operation keys (used by the route-to-scope mapper):
 
 | Key | Routes |
 | --- | --- |
@@ -320,32 +328,46 @@ the form `ARCHON_DRAWBRIDGE_PRICE_<OPERATION>=<sats>` (and an optional
 | `generateDID` | `POST /did/generate` |
 | `getDIDs` | `POST /dids` |
 | `exportDIDs` | `POST /dids/export` |
+| `importDIDs` | `POST /dids/import` |
+| `removeDIDs` | `POST /dids/remove` |
+| `exportBatch` | `POST /batch/export` |
+| `importBatch` | `POST /batch/import` |
+| `importBatchByCids` | `POST /batch/import/cids` |
+| `getQueue` | `GET /queue/:registry` |
+| `clearQueue` | `POST /queue/:registry/clear` |
+| `processEvents` | `POST /events/process` |
 | `listRegistries` | `GET /registries` |
 | `searchDIDs` | `GET /search` |
 | `queryDIDs` | `POST /query` |
 | `getBlock` | `GET /block/:registry/:blockId` and `/latest` |
+| `addBlock` | `POST /block/:registry` |
 | `addJSON` | `POST /ipfs/json` |
 | `getJSON` | `GET /ipfs/json/:cid` |
 | `addText` | `POST /ipfs/text` |
 | `getText` | `GET /ipfs/text/:cid` |
-| `addData` | `POST /ipfs/data` and `/ipfs/stream` |
-| `getData` | `GET /ipfs/data/:cid` and `/ipfs/stream/:cid` |
+| `addData` | `POST /ipfs/data` |
+| `getData` | `GET /ipfs/data/:cid` |
+
+The IPFS streaming routes (`/ipfs/stream`, `/ipfs/stream/:cid`) have no
+explicit scope entry and so fall through to the default price.
 
 Any operation without an explicit price uses
-`ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS`. Free
-(0-sat) operations are not supported — set the value to omit the
-operation from the pricing map and rely on the default, or disable L402
-entirely.
+`ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS`. `createDID` accepts a value of
+`0` (free); `resolveDID` requires `> 0`. Other free operations must be
+configured via the `ARCHON_DRAWBRIDGE_PRICING` JSON override or by
+disabling L402 entirely.
 
 ---
 
 ## 6. Rate limiting
 
 Per-DID sliding window stored in Redis. Request ledger key:
-`drawbridge:ratelimit:<did>:<window-bucket>`. Each authenticated request
-increments the counter for the current window; if > `rateLimitMax` in
-the last `rateLimitWindow` seconds, the request is rejected with HTTP
-429 `{ "error": "Rate limit exceeded", "remaining": 0, "resetAt": <unix> }`.
+`drawbridge:ratelimit:<did>` (a sorted set of per-request members
+scored by timestamp, TTL = `rateLimitWindow` seconds). Each
+authenticated request adds an entry; if more than `rateLimitMax`
+entries fall in the last `rateLimitWindow` seconds, the request is
+rejected with HTTP
+429 `{ "error": "Rate limit exceeded", "resetAt": <unix> }`.
 
 Defaults: 100 requests / 60 seconds. Configured via:
 
@@ -353,8 +375,8 @@ Defaults: 100 requests / 60 seconds. Configured via:
 - `ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW`
 
 Anonymous (unauthenticated) requests are rate-limited per-IP. The DID
-used for rate-limiting is whichever auth path provided one
-(subscription DID, or the macaroon's `did` caveat).
+used for rate-limiting is read from the `X-DID` request header (the L402
+middleware also uses this header for the macaroon's `did` caveat).
 
 ---
 
@@ -366,8 +388,8 @@ Namespace: `drawbridge:`. All values are JSON strings unless noted.
 | --- | --- | --- | --- |
 | `drawbridge:macaroon:<id>` | STRING | none | `MacaroonRecord` |
 | `drawbridge:payment:<id>` | STRING | none | `PaymentRecord` |
-| `drawbridge:payment:did:<did>` | SET | none | Payment IDs for that DID |
-| `drawbridge:ratelimit:<did>:<bucket>` | STRING (counter) | `2 * windowSeconds` | Sliding-window count |
+| `drawbridge:payments:did:<did>` | SORTED SET | none | Payment IDs for that DID, scored by `createdAt` |
+| `drawbridge:ratelimit:<did>` | SORTED SET | `windowSeconds` | Sliding-window members scored by request timestamp |
 
 `MacaroonRecord`:
 
@@ -424,8 +446,9 @@ shared with the reference TypeScript service.
 | `ARCHON_DRAWBRIDGE_INVOICE_EXPIRY` | `3600` | Macaroon expiry, seconds. |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX` | `100` | |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW` | `60` | Seconds. |
-| `ARCHON_DRAWBRIDGE_PRICE_<OP>` | unset | Per-operation override in sats. |
-| `ARCHON_DRAWBRIDGE_DESC_<OP>` | unset | Optional human description for the operation. |
+| `ARCHON_DRAWBRIDGE_PRICE_CREATE_DID` | unset | Sats price for `createDID` (accepts `>= 0`). |
+| `ARCHON_DRAWBRIDGE_PRICE_RESOLVE_DID` | unset | Sats price for `resolveDID` (must be `> 0`). |
+| `ARCHON_DRAWBRIDGE_PRICING` | unset | JSON pricing override; `{ "operations": { "<scope>": { "amountSat": <n>, "description": "..." } } }`. Merged on top of the per-operation env vars. |
 | `GIT_COMMIT` | `unknown` | Build commit. |
 
 ### 8.3 Shutdown

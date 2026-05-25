@@ -86,7 +86,7 @@ HTTP:
 | Call | Purpose |
 | --- | --- |
 | `POST /api/v1/wallet/pin { cid, fingerprint, registry }` | Export the IPFS DAG for `cid` as CAR data and upload it through Synapse. |
-| `GET /api/v1/wallet/version` | Used only to fetch the funding `address` when a failure hints at insufficient funds. |
+| `GET /api/v1/wallet/version` | Called on every `/ready` probe to determine readiness, and also used to fetch the funding `address` when a failure hints at insufficient funds. |
 
 All calls include `X-Archon-Admin-Key: ${ARCHON_ADMIN_API_KEY}` when the
 key is configured.

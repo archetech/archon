@@ -100,6 +100,11 @@ entire `data` event buffer. **Messages MUST fit within one write-buffer
 boundary (8 MB in the reference implementation).** Senders that build
 larger batches split them recursively before sending.
 
+> **Note.** The reference implementation computes the limit as
+> `8 * 1024 * 1014` (note `1014`, not `1024`), so the actual cap is
+> 8,118,272 bytes (~7.74 MB). This is almost certainly a typo, but
+> documents the current behavior.
+
 ### 3.1 Envelope
 
 Every message shares:
@@ -241,9 +246,11 @@ Walks every DID in `gatekeeper.getDIDs()` in 1000-DID chunks, calls
 result, and sends via `batch` messages (split to fit the 8 MB write
 limit).
 
-`exportBatch` already filters out `local` registry events, so the
-output is safe to broadcast — it contains only operations that have
-already been committed somewhere non-local.
+The mediator's `shareDb` does no filtering of its own — it simply maps
+`exports.map(event => event.operation)`. It relies on Gatekeeper's
+`exportBatch` to exclude `local`-registry events. Implementations
+SHOULD verify this assumption against the Gatekeeper spec rather than
+relying on mediator-side filtering.
 
 ### 4.4 Concurrency
 
@@ -271,7 +278,7 @@ Binds to `${ARCHON_HYPR_METRICS_PORT}` (default `4232`).
 | Method | Path | Body |
 | --- | --- | --- |
 | `GET` | `/health` | `{ "ok": true }` (always) |
-| `GET` | `/ready` | `{ "ready": <all-deps-ready> }` — `true` iff Gatekeeper, Keymaster, IPFS, and own node info are all healthy |
+| `GET` | `/ready` | `{ "ready": <all-deps-ready> }` — `true` iff Gatekeeper, Keymaster, and IPFS are healthy and own node info has been initialized |
 | `GET` | `/version` | `{ "version": string, "commit": string }` |
 | `GET` | `/metrics` | Prometheus exposition (see [§7](#7-prometheus-metrics-contract)) |
 
@@ -293,17 +300,21 @@ scraped by Prometheus on a private network only.
    `resetPeeringPeers()`.
 6. Read own IPFS peer ID + addresses.
 7. Start the metrics HTTP server.
-8. Start export loop and connection loop.
+8. Start the export loop (`exportLoop()`).
 9. Publish `{ node: { name, ipfs: { id, addresses } } }` onto the node
    DID document via `keymaster.mergeData(nodeDID, ...)`.
-10. Create the swarm and join the topic.
+10. Start the connection loop (`connectionLoop()`). The swarm itself is
+    created lazily inside `connectionLoop → checkConnections →
+    createSwarm()` on the first tick when there are no active
+    connections — it is not a separate startup step.
 
 ### 6.2 Connection loop
 
 Interval: 60 seconds.
 
-1. If no active connections, destroy + recreate the swarm
-   (`createSwarm()`).
+1. If no active connections, call `createSwarm()`, which destroys the
+   existing swarm (if any) and creates a new one. The first
+   `connectionLoop` tick is what creates the initial swarm.
 2. Prune `connectionInfo` entries that haven't produced data in > 3
    minutes.
 3. Build a `ping` message listing all known peer DIDs and relay it to
@@ -402,7 +413,7 @@ A conformant third implementation MUST:
   with the reference above.
 - Join the same topic derived from the same `ARCHON_PROTOCOL`.
 - Call Gatekeeper's `importBatch` / `processEvents` / `getQueue` /
-  `clearQueue` / `exportBatch` / `addBlock` endpoints (all documented in
+  `clearQueue` / `exportBatch` endpoints (all documented in
   the [Gatekeeper spec](../../gatekeeper/README.md)).
 - Call Keymaster's `resolveDID` and `mergeData` (Keymaster spec §7).
 - Publish its own IPFS peer info on its node DID and honor inbound peer

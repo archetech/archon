@@ -31,7 +31,8 @@ namespace and serves:
    verifies it via Keymaster and stores the resulting authenticated DID
    in an Express session.
 2. **Name claim / release** — authenticated users claim a unique
-   `@name` (3-32 chars, `[a-z0-9-_]i`); the name is recorded on the
+   `@name` (3-32 chars; names are lowercased before validation and
+   storage, then matched against `[a-z0-9_-]+`); the name is recorded on the
    Herald's local user database and a verifiable credential is issued
    and stored as an asset DID owned by the Herald's service identity.
 3. **Public registry** — the full `name → DID` directory is served as
@@ -69,7 +70,7 @@ several namespaces:
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/api/version` | `1` (the literal integer). Stable schema version of the API. |
-| `GET` | `/api/config` | `{ serviceName, serviceDID, serviceDomain, publicUrl, walletUrl }`, plus `relayAgent` when the email bridge is enabled. `relayAgent` is the Herald service DID clients can address for dmail/email relay. |
+| `GET` | `/api/config` | `{ serviceName, serviceDID, serviceDomain, publicUrl, walletUrl }`, plus `relayAgent` when `ARCHON_HERALD_SENDGRID_API_KEY` is set. `relayAgent` is the Herald service DID clients can address for dmail/email relay. |
 
 ### 2.2 Login (challenge-response)
 
@@ -88,9 +89,9 @@ several namespaces:
 | `GET` | `/api/users` | Authenticated. Returns `string[]` of all known DIDs. |
 | `GET` | `/api/profile/:did` | Authenticated. Returns the user's profile. |
 | `GET` | `/api/profile/:did/name` | Authenticated. Returns `{ name }`. |
-| `PUT` | `/api/profile/:did/name` | Owner-of-`:did` only. Body: `{ name }`. Validates, claims, issues credential. |
+| `PUT` | `/api/profile/:did/name` | Owner-of-`:did` only. Body: `{ name }`. Validates, claims, issues credential. Returns `{ ok: true, message }` (the credential is not included in the response; fetch via `GET /api/credential`). |
 | `DELETE` | `/api/profile/:did/name` | Owner-of-`:did` only. Releases name + revokes credential. |
-| `GET` | `/api/credential` | Authenticated. Returns the caller's `{ hasCredential, credentialDid, credentialIssuedAt, credential }`. |
+| `GET` | `/api/credential` | Authenticated. When the caller has a credential, returns `{ hasCredential: true, credentialDid, credentialIssuedAt, credential }`. When the caller has no credential, returns `{ hasCredential: false, name, message }`. |
 
 ### 2.4 Stateless name management (Bearer token)
 
@@ -110,7 +111,7 @@ challenge response.
 | `GET` | `/directory.json` | Same as `/api/registry`. Convention for IPNS publication. |
 | `GET` | `/api/name/:name` | `{ name, did }` or 404 `{ error: "Name not found" }`. |
 | `GET` | `/api/member/:name` | Full `DidCidDocument` of the named member, fetched via Keymaster. |
-| `GET` | `/api/name/:name/avatar` | Binary image bytes; sets `Content-Type` to a safe-listed image MIME (`image/png`, `image/jpeg`, `image/webp`, `image/gif`); strips other types. |
+| `GET` | `/api/name/:name/avatar` | Binary image bytes; sets `Content-Type` to a safe-listed image MIME (`image/avif`, `image/gif`, `image/jpeg`, `image/jpg`, `image/png`, `image/webp`); other types are served as `application/octet-stream`. |
 
 ### 2.6 LUD-16 Lightning address
 
@@ -125,8 +126,8 @@ challenge response.
 | --- | --- | --- |
 | `GET` | `/.well-known/names` | Same as `/api/registry`. |
 | `GET` | `/.well-known/names/:name` | Same as `/api/name/:name`. |
-| `GET` | `/.well-known/webfinger?resource=acct:name@domain` | RFC 7033. `domain` MUST equal `ARCHON_HERALD_DOMAIN` (when set). Returns a JRD with `subject`, `aliases: [<DID>]`, and `links`. |
-| `GET` | `/.well-known/openid-configuration` | OIDC discovery; advertises `/oauth/authorize`, `/oauth/token`, `/oauth/userinfo`, `/oauth/.well-known/jwks.json`. |
+| `GET` | `/.well-known/webfinger?resource=acct:name@domain` | RFC 7033. `domain` MUST equal `ARCHON_HERALD_DOMAIN` (when set). Returns a JRD with `subject`, `aliases: [<DID>]`, and `links`. The `https://w3id.org/did` link `href` is built as `https://${SERVICE_DOMAIN}/api/v1/did/${did}` — a hardcoded externally-resolvable DID URL that is not served by Herald or Drawbridge directly. |
+| `GET` | `/.well-known/openid-configuration` | OIDC discovery; advertises `/oauth/authorize`, `/oauth/token`, `/oauth/userinfo`. The root discovery payload does NOT include `jwks_uri`; only the `/oauth/.well-known/openid-configuration` variant advertises the JWKS endpoint. |
 
 ### 2.8 OAuth 2.0 / OIDC (`/oauth`)
 
@@ -136,7 +137,7 @@ challenge response.
 | `POST` | `/oauth/callback` | Internal — completes the authorization code exchange started by `/oauth/authorize`. |
 | `GET` | `/oauth/poll` | Polling endpoint for desktop / native flows. |
 | `POST` | `/oauth/token` | Exchange `code` (or `refresh_token`) for an `access_token` + `id_token`. Form-encoded body. |
-| `GET` | `/oauth/userinfo` | Bearer-token-protected. Returns `{ sub, name, preferred_username, picture }`. |
+| `GET` | `/oauth/userinfo` | Bearer-token-protected. Returns `{ sub, name, preferred_username, picture, email, email_verified, updated_at }`. The `/oauth/.well-known/openid-configuration` discovery payload advertises `scopes_supported: ['openid','profile','email']` and `claims_supported: ['sub','name','preferred_username','picture','email','email_verified']`. |
 | `GET` | `/oauth/.well-known/jwks.json` | The Herald's ES256 public signing key. |
 | `POST` | `/oauth/clients` | Internal client registration — present in the reference but locked down by deployment policy. |
 
@@ -152,7 +153,7 @@ rotating it invalidates all outstanding sessions.
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/api/admin` | Owner. Admin dashboard payload. |
-| `POST` | `/api/admin/publish` | Owner. Publishes the current registry to IPNS. Returns `{ ok, cid, name, gateway }`. |
+| `POST` | `/api/admin/publish` | Owner. Publishes the current registry to IPNS. Returns `{ ok, cid, ipns, registry }`. |
 | `DELETE` | `/api/admin/user/:did` | Owner. Removes the user record + revokes their credential. |
 
 The owner is the single DID in `ARCHON_HERALD_OWNER_DID`. There is no
@@ -171,10 +172,16 @@ finer-grained role system.
 
 ### 2.11 Error envelope
 
-`application/json` `{ "error": "<message>" }` for most failures. Login
-endpoints return `{ authenticated: false }` on a non-match (200, not
-401) so the wallet can poll cleanly. LUD-16 errors return `{ status:
-"ERROR", reason }` per the LUD-06 spec rather than HTTP error codes.
+Error responses are a mix of formats: most route handlers return
+`application/json` `{ "error": "<message>" }` (or `{ ok: false, message }`
+for name-claim validation errors), but the `isAuthenticated` middleware
+sends `401` with the plain-text body `You need to log in first`, the
+owner middleware sends `403` with plain-text `Owner access required`,
+and many `500` handlers fall back to `res.status(500).send(String(error))`
+(plain text). Login endpoints return `{ authenticated: false }` on a
+non-match (200, not 401) so the wallet can poll cleanly. LUD-16 errors
+return `{ status: "ERROR", reason }` per the LUD-06 spec rather than
+HTTP error codes.
 
 ---
 
@@ -197,11 +204,14 @@ endpoints return `{ authenticated: false }` on a non-match (200, not
 
 ### 3.2 Bearer auth (programmatic)
 
-For tools that don't want sessions, send the response DID as a Bearer
-token:
+For tools that don't want sessions, send the verifiable challenge
+response as a Bearer token. The token value is the DID of a response
+asset produced by `keymaster.createResponse(challenge)` — Herald passes
+the entire bearer value to `keymaster.verifyResponse(<token>)` without
+any `did:cid:` prefix validation:
 
 ```
-Authorization: Bearer did:cid:<response DID>
+Authorization: Bearer <responseDid>
 ```
 
 Herald calls `keymaster.verifyResponse(<token>)` on every request
@@ -265,8 +275,10 @@ where possible.
 ### 5.1 Validation rules
 
 - Length: 3–32 chars (after trim).
-- Allowed characters: `[A-Za-z0-9_-]` (case-preserved when stored,
-  but lookups are lowercase).
+- Names are lowercased (via `.toLowerCase()`) before validation and
+  storage, then matched against `[a-z0-9_-]+`. The stored name is
+  always lowercase; claim `Alice` and the stored/looked-up name is
+  `alice`.
 - Names are case-insensitive: claim `Alice`, lookup matches `alice`.
 - A DID can hold at most **one** name at a time. Claiming a new name
   releases the previous claim (and revokes the previous credential).
@@ -349,6 +361,13 @@ interface DatabaseInterface {
   deleteUser(did: string): Promise<boolean>;
   listUsers(): Promise<Record<string, User>>;
   findDidByName(name: string): Promise<string | null>;
+
+  // Email bridge
+  setReplyToken(token: string, data: ReplyToken): Promise<void>;
+  getReplyToken(token: string): Promise<ReplyToken | null>;
+  deleteExpiredReplyTokens(maxAgeMs: number): Promise<number>;
+  setEmailMapping(dmailDid: string, mapping: EmailMapping): Promise<void>;
+  getEmailMapping(dmailDid: string): Promise<EmailMapping | null>;
 }
 ```
 
@@ -401,7 +420,7 @@ gateway at `ipns://<key-id>/`.
 | `ARCHON_HERALD_WALLET_PASSPHRASE` | empty | Required for standalone mode; ignored in shared mode. |
 | `ARCHON_HERALD_WALLET_URL` | `https://wallet.archon.technology` | URL embedded in `challengeURL` so wallets know where to load. |
 | `ARCHON_HERALD_IPFS_API_URL` | `http://localhost:5001/api/v0` | Kubo HTTP API for IPNS publication. |
-| `ARCHON_HERALD_IPNS_KEY_NAME` | `${ARCHON_HERALD_NAME}` | IPNS key name. |
+| `ARCHON_HERALD_IPNS_KEY_NAME` | `name-service` (the value of `ARCHON_HERALD_NAME`) | IPNS key name. |
 | `ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID` | `did:cid:bagaaieravnv5o...` | Schema DID for issued membership credentials. |
 | `ARCHON_HERALD_TOR_PROXY` | empty | SOCKS5 proxy `host:port` for `.onion` Lightning lookups. |
 | `ARCHON_HERALD_JWT_KEY_PATH` | `${DATA_DIR}/oauth-signing-key.json` | Persisted ES256 OAuth signing key. |
@@ -422,8 +441,11 @@ hit `https://your-domain.example/names/api/login` etc.
 
 ### 8.4 Shutdown
 
-No explicit handler. SIGTERM / SIGINT terminate the Express server.
-The OAuth signing key and IPNS key persist on disk.
+No SIGTERM / SIGINT handler — those signals terminate the Express
+server directly. Herald does install `process.on('uncaughtException')`
+and `process.on('unhandledRejection')` handlers that log the error and
+let the process continue. The OAuth signing key and IPNS key persist
+on disk.
 
 ---
 

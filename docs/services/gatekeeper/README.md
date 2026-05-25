@@ -85,8 +85,7 @@ catch-all for unhandled paths.
 | `POST` | `/api/v1/did` | no | Submit a `create`, `update`, or `delete` operation. Create returns the new DID string; update/delete return `true`. See [§7](#7-did-create--update--delete-validation). |
 | `POST` | `/api/v1/did/generate` | no | Deterministic DID generation without persistence. Body: `Operation`. Returns: DID string. |
 | `GET` | `/api/v1/did/:did` | no | Resolve a DID. Query params: `versionTime` (ISO 8601), `versionSequence` (int), `confirm` (`"true"`/`"false"`), `verify` (`"true"`/`"false"`). See [§6](#6-did-resolution-algorithm). |
-| `POST` | `/api/v1/dids` | no | List DIDs. Aliased to `/api/v1/dids/`. Body: `GetDIDOptions`. |
-| `POST` | `/api/v1/dids/` | no | Same as above. |
+| `POST` | `/api/v1/dids/` | no | List DIDs. Body: `GetDIDOptions`. Only `/dids/` is registered explicitly; Express matches both `/dids` and `/dids/`. |
 | `POST` | `/api/v1/dids/remove` | yes | Body: array of DIDs. Returns boolean. |
 | `POST` | `/api/v1/dids/export` | no | Body: `{ "dids": string[] | undefined }`. Returns `GatekeeperEvent[][]` (one inner array per DID). |
 | `POST` | `/api/v1/dids/import` | yes | Body: `GatekeeperEvent[][]`. Flattens into a batch and queues for processing. Returns `ImportBatchResult`. |
@@ -94,7 +93,7 @@ catch-all for unhandled paths.
 | `POST` | `/api/v1/batch/import` | yes | Body: `GatekeeperEvent[]`. Returns `ImportBatchResult`. Empty arrays MUST be rejected with HTTP 500 `Error: Invalid parameter: batch`. |
 | `POST` | `/api/v1/batch/import/cids` | yes | Body: `{ "cids": string[], "metadata": BatchMetadata }`. Hydrates each CID via the operation store or IPFS, then imports. Empty `cids` MUST 500 with `Error: Invalid parameter: cids`; missing `metadata.registry`/`time`/`ordinal` MUST 500 with `Error: Invalid parameter: metadata`. |
 | `GET` | `/api/v1/queue/:registry` | yes | Returns queued outbound `Operation[]` for the registry. |
-| `POST` | `/api/v1/queue/:registry/clear` | yes | Body: `Operation[]`. Removes the matching events (matched by `proof.proofValue`) from the queue. Returns the **remaining** queue array. |
+| `POST` | `/api/v1/queue/:registry/clear` | yes | Body: `Operation[]`. Removes the matching events (matched by `proof.proofValue`) from the queue. Returns `boolean` (true on success). |
 | `GET` | `/api/v1/db/reset` | yes | Resets the DB. MUST return HTTP 403 `{"error":"Database reset is disabled in production"}` when `NODE_ENV=production`. |
 | `GET` | `/api/v1/db/verify` | yes | Runs `verifyDb` (see [§12](#12-maintenance-loops)) and returns `VerifyDbResult`. |
 | `POST` | `/api/v1/events/process` | yes | Drains the import queue. Returns `{ "busy": true }` if already running, otherwise `ProcessEventsResult`. |
@@ -129,8 +128,8 @@ The service MUST respond to cross-origin requests with permissive CORS so
 that browser-based wallets/explorers can call it directly:
 
 - `Access-Control-Allow-Origin: *`
-- `Access-Control-Allow-Methods: *`
-- `Access-Control-Allow-Headers: *`
+- `Access-Control-Allow-Methods: GET,HEAD,PUT,PATCH,POST,DELETE` (the `cors()` default)
+- `Access-Control-Allow-Headers`: reflects the request's `Access-Control-Request-Headers` (the `cors()` default)
 
 Preflight `OPTIONS` requests MUST succeed.
 
@@ -433,10 +432,11 @@ Then signature verification:
 
 ### 5.4 Operation size limit
 
-`canonical_operation_bytes <= 64 * 1024`. Operations exceeding this MUST be
-rejected (HTTP 500 from create/update; counted as `rejected` in
-`importBatch`). Implementations SHOULD avoid full JSON serialization for the
-size check (e.g. counting writer with early abort).
+`JSON.stringify(operation).length <= 64 * 1024` (character count, not byte
+count, so non-ASCII content may diverge between implementations). Operations
+exceeding this MUST be rejected (HTTP 500 from create/update; counted as
+`rejected` in `importBatch`). Implementations SHOULD avoid full JSON
+serialization for the size check (e.g. counting writer with early abort).
 
 ### 5.5 JWK encoding
 
@@ -801,10 +801,10 @@ content-addressed import via `/batch/import/cids`.
 
 | Backend | Path |
 | --- | --- |
-| `json` / `json-cache` | `${ARCHON_DATA_DIR}/archon.json` |
-| `sqlite` | `${ARCHON_DATA_DIR}/archon.db` |
+| `json` / `json-cache` | `data/archon.json` |
+| `sqlite` | `data/archon.db` |
 
-`ARCHON_DATA_DIR` defaults to `data` (relative to working directory) and
+The `data` folder is hard-coded (relative to working directory) and
 inside the container is mounted at `/app/gatekeeper/data`.
 
 ### 10.4 Outbound queue
@@ -822,7 +822,7 @@ When a non-`local` operation is committed, the implementation MUST:
 
 For interoperability with the existing TypeScript service when sharing a
 Redis instance, implementations using Redis MUST use this schema (namespace
-defaults to `"archon"`):
+is hard-coded to `archon`):
 
 | Key | Type | Contents |
 | --- | --- | --- |
@@ -839,8 +839,8 @@ defaults to `"archon"`):
 ### 10.6 SQLite schema (reference)
 
 ```sql
-CREATE TABLE dids       (id TEXT PRIMARY KEY, events TEXT NOT NULL);
-CREATE TABLE queue      (id TEXT PRIMARY KEY, ops TEXT NOT NULL);
+CREATE TABLE dids       (id TEXT PRIMARY KEY, events TEXT);
+CREATE TABLE queue      (id TEXT PRIMARY KEY, ops TEXT);
 CREATE TABLE blocks     (registry TEXT, hash TEXT, height INTEGER NOT NULL,
                          time TEXT NOT NULL, txns INTEGER NOT NULL,
                          PRIMARY KEY (registry, hash));
@@ -900,7 +900,8 @@ block to stdout. This loop also refreshes the DID-count Prometheus gauges.
 ### 12.2 GC loop
 
 Interval: `ARCHON_GATEKEEPER_GC_INTERVAL` minutes (default 15).
-Runs `verifyDb()`:
+Runs `verifyDb()` followed by `checkDids()`, so this loop also refreshes the
+DID-count Prometheus gauges:
 
 ```
 total = 0; verified = 0; expired = 0; invalid = 0
@@ -921,9 +922,10 @@ import_queue.clear()
 return { total, verified, expired, invalid }
 ```
 
-A passed `verifyDb` MUST clear the import queue (events that survived a full
-re-verify are good; orphaned ones are not re-considered until the next
-import cycle).
+`verifyDb` always clears the import queue at the end of the loop, regardless
+of outcome. The `verified` count is seeded from the size of the memoized
+`verifiedDIDs` set, so DIDs verified in prior runs are included in the count
+even though they are skipped this pass.
 
 `verifyDb` also drives chatty per-DID logs at INFO level: `removing N/T DID
 invalid`, `removing N/T DID expired`, `expiring N/T DID in M minutes`,
@@ -1003,7 +1005,6 @@ The label MUST include the `/api/v1` prefix.
 | `ARCHON_GATEKEEPER_PORT` | `4224` | HTTP listen port. |
 | `ARCHON_BIND_ADDRESS` | `0.0.0.0` | HTTP bind address. |
 | `ARCHON_GATEKEEPER_DB` | `redis` | Storage backend selector (`json`, `json-cache`, `sqlite`, `redis`, `mongodb`). |
-| `ARCHON_DATA_DIR` | `data` | On-disk data root. |
 | `ARCHON_IPFS_URL` | `http://localhost:5001/api/v0` | Kubo HTTP API base. |
 | `ARCHON_REDIS_URL` | `redis://localhost:6379` | Redis URL when `db=redis`. |
 | `ARCHON_MONGODB_URL` | `mongodb://localhost:27017` | MongoDB URL when `db=mongodb`. |

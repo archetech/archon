@@ -67,10 +67,10 @@ Binds to `${ARCHON_WALLET_PORT}` (default `4240`). Routes under
 | `GET` | `/metrics` | no | Prometheus. Binds to `${ARCHON_WALLET_METRICS_PORT}` (default `4241`), NOT the main port. |
 
 Every admin route requires `X-Archon-Admin-Key` matching
-`ARCHON_ADMIN_API_KEY`. Missing/wrong key → HTTP 401. When
-`ARCHON_ADMIN_API_KEY` is empty, routes are **open** (dev mode) — the
-mediator doesn't probe for this, so you must configure it matching on
-both sides.
+`ARCHON_ADMIN_API_KEY`. With the key set, missing/wrong header → HTTP
+401. When `ARCHON_ADMIN_API_KEY` is empty, admin routes return HTTP 403
+"Admin API key not configured" — the mediator doesn't probe for this,
+so you must configure it matching on both sides.
 
 ### 2.2 Response envelope
 
@@ -160,7 +160,7 @@ For `/send`, `/anchor`, `/bump-fee`:
 5. Finalize the PSBT and extract the fully-signed transaction.
 6. `sendrawtransaction(<hex>)` and return the txid.
 
-For `bump-fee`, the same flow plus `bumpfee` from Core's RPC which
+For `bump-fee`, the same flow plus `psbtbumpfee` from Core's RPC which
 returns a new PSBT; same signing pass follows.
 
 `OP_RETURN` anchors add a single zero-value
@@ -195,12 +195,13 @@ txs, which is all the mediator touches.
 | `getwalletinfo` | `/wallet/info` |
 | `getbalances` | `/wallet/balance` |
 | `getnewaddress` (with `bech32` type) | `/wallet/address` |
+| `getreceivedbyaddress` | `/wallet/address` (address-rotation check) |
 | `listtransactions` | `/wallet/transactions` |
 | `listunspent` | `/wallet/utxos` |
 | `estimatesmartfee` | `/wallet/fee-estimate` and inside `/send`/`/anchor` when no `feeRate` is supplied |
 | `walletcreatefundedpsbt` | `/send`, `/anchor` |
 | `gettransaction` | `/wallet/transaction/:txid` |
-| `bumpfee` | `/wallet/bump-fee` |
+| `psbtbumpfee` | `/wallet/bump-fee` |
 | `sendrawtransaction` | `/send`, `/anchor`, `/bump-fee` |
 | `getblockcount` | metrics |
 
@@ -230,10 +231,9 @@ Only these three are supported — `regtest` is intentionally omitted.
 3. Start the metrics HTTP server (separate port).
 4. Start the main HTTP server.
 
-The service does NOT eagerly run `/wallet/setup` — the first caller
-must POST to it explicitly. This lets the deployer decide when the
-watch-only wallet is created (typically the satoshi-mediator hits it on
-its own startup).
+The service eagerly runs `setupWatchOnlyWallet` at startup with a
+12-attempt retry loop before serving requests, so the watch-only wallet
+is ready by the time the satoshi-mediator hits it.
 
 ### 5.2 Environment variables
 
@@ -268,15 +268,15 @@ Binds to the metrics port (separate from the API port). Refreshed every
 | Metric | Type | Labels |
 | --- | --- | --- |
 | `wallet_setup_status` | gauge | (none) — 1 if the watch-only wallet is ready, 0 otherwise |
-| `wallet_balance_confirmed` | gauge | (none) — BTC |
-| `wallet_balance_unconfirmed` | gauge | (none) — BTC |
+| `wallet_balance_confirmed_btc` | gauge | (none) — BTC |
+| `wallet_balance_unconfirmed_btc` | gauge | (none) — BTC |
 | `wallet_utxo_count` | gauge | (none) |
-| `wallet_fee_estimate` | gauge | (none) — sat/vB |
-| `wallet_block_height` | gauge | (none) |
+| `wallet_fee_estimate_sat_per_vb` | gauge | (none) — sat/vB |
+| `wallet_bitcoind_block_height` | gauge | (none) |
 | `wallet_sends_total` | counter | `status` (`success` / `failed`) |
 | `wallet_http_requests_total` | counter | `method`, `route`, `status` |
 
-Plus `service_version_info{version,commit}` and standard Prometheus
+Plus `wallet_version_info{version,commit}` and standard Prometheus
 process metrics.
 
 Route normalization on the `route` label:

@@ -45,7 +45,7 @@ balance — all actual Lightning state lives in LNbits and CLN.
 ## 2. HTTP API contract
 
 The service binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_LIGHTNING_MEDIATOR_PORT}`
-(default `0.0.0.0:4235`). Routes live under `/api/v1` with two
+(default `0.0.0.0:4235`). Routes live under `/api/v1` with three
 unversioned routes (`/ready`, `/version`, `/metrics`) plus a single
 public endpoint (`/invoice/:did`).
 
@@ -56,21 +56,21 @@ public endpoint (`/invoice/:did`).
 | `GET` | `/ready` | no | `{ ready, dependencies: { redis, clnConfigured, lnbitsConfigured } }`. HTTP 503 if `redis` is unreachable. |
 | `GET` | `/version` | no | `{ version, commit }` (commit 7 chars). |
 | `GET` | `/metrics` | no | Prometheus. |
-| `GET` | `/api/v1/lightning/supported` | no | `{ supported: true, mediator: "lightning-mediator", clnConfigured, lnbitsConfigured }`. Used by clients to probe capabilities before committing to Lightning operations. |
+| `GET` | `/api/v1/lightning/supported` | no | `{ supported: true, mediator: "lightning-mediator", clnConfigured, lnbitsConfigured }`. Used by clients to probe capabilities before committing to Lightning operations. Note the asymmetry: `clnConfigured` requires BOTH `clnRune` and `clnRestUrl` to be set, while `lnbitsConfigured` requires only the LNbits URL. |
 | `POST` | `/api/v1/lightning/wallet` | yes | `{ name? }` → new LNbits wallet. Returns `LnbitsWallet = { walletId, adminKey, invoiceKey }`. |
 | `POST` | `/api/v1/lightning/balance` | yes | `{ invoiceKey }` → `{ balance: <sats> }`. |
-| `POST` | `/api/v1/lightning/invoice` | yes | `{ invoiceKey, amount, memo }` → `LightningInvoice`. |
-| `POST` | `/api/v1/lightning/pay` | yes | `{ adminKey, bolt11 }` → `LightningPayment`. |
+| `POST` | `/api/v1/lightning/invoice` | yes | `{ invoiceKey, amount, memo }` → `{ paymentRequest, paymentHash }` (LNbits path; the full `LightningInvoice` shape is only returned by `/l402/invoice` via CLN). |
+| `POST` | `/api/v1/lightning/pay` | yes | `{ adminKey, bolt11 }` → `{ paymentHash }`. |
 | `POST` | `/api/v1/lightning/payment` | yes | `{ invoiceKey, paymentHash }` → `LightningPaymentStatus & { paymentHash }`. |
 | `POST` | `/api/v1/lightning/payments` | yes | `{ adminKey }` → `{ payments: LnbitsPayment[] }`. |
-| `POST` | `/api/v1/lightning/publish` | yes | `{ did, invoiceKey }` — stores the mapping + adds a `Lightning` service entry to the DID document. |
-| `DELETE` | `/api/v1/lightning/publish/:did` | yes | Removes the mapping + DID document entry. |
+| `POST` | `/api/v1/lightning/publish` | yes | `{ did, invoiceKey }` — stores the mapping via `store.savePublishedLightning(did, invoiceKey)`. Returns `{ ok: true, publicHost }`. Does NOT modify the DID document (the DID-document service entry is added client-side by Keymaster). Returns HTTP 503 if `publicHost` is not yet available. |
+| `DELETE` | `/api/v1/lightning/publish/:did` | yes | Removes the mapping. |
 | `POST` | `/api/v1/lightning/zap` | yes | `{ adminKey, did, amount, memo? }`. Resolves recipient (DID or LUD-16 address), requests an invoice, and pays it via LNbits. See [§4](#4-zap-flow). |
-| `POST` | `/api/v1/l402/invoice` | yes | `{ amountSat, memo? }` — creates a CLN invoice for L402. Returns `{ paymentRequest, paymentHash, amountSat, expiry, label }`. |
+| `POST` | `/api/v1/l402/invoice` | yes | `{ amountSat, memo? }` — creates a CLN invoice for L402. Returns the full `LightningInvoice` shape `{ paymentRequest, paymentHash, amountSat, expiry, label }`. |
 | `POST` | `/api/v1/l402/check` | yes | `{ paymentHash }` → CLN `listinvoices` response (paid / pending / expired). |
 | `POST` | `/api/v1/l402/pending` | yes | Body: `PendingInvoiceData`. Persists the record for later redemption. Returns HTTP 201 `{ ok: true, paymentHash }`. |
 | `GET` | `/api/v1/l402/pending/:paymentHash` | yes | Returns the stored `PendingInvoiceData` or HTTP 404. |
-| `DELETE` | `/api/v1/l402/pending/:paymentHash` | yes | Removes the record. |
+| `DELETE` | `/api/v1/l402/pending/:paymentHash` | yes | Removes the record. Returns `{ ok: true, paymentHash }`. |
 | `GET` | `/invoice/:did` | no (public) | Query: `amount` (required sats), `memo` (optional). Looks up the DID's `invoiceKey` via `/api/v1/lightning/publish` storage, asks LNbits to create an invoice, returns `{ paymentRequest, paymentHash, ... }`. Used by external zappers and the Archon HTTP zap flow. |
 
 All routes under `/api/v1/*` (except `/lightning/supported`) require the
@@ -94,8 +94,10 @@ Constant-time admin-key comparison is used (`crypto.timingSafeEqual`).
 
 Every 4xx / 5xx response: `application/json` `{ "error": "<message>" }`.
 502 is used for upstream-LNbits/CLN errors; 400 for
-`LightningPaymentError` (validation-class failures from LNbits); 503
-when a dependency (LNbits or CLN) is not configured at startup.
+`LightningPaymentError` (validation-class failures from LNbits). The
+`/l402/*` routes do not pre-check CLN configuration at startup; a
+missing rune surfaces at call time as a `LightningUnavailableError`
+which the handler returns as HTTP 502 (not 503).
 
 ---
 
@@ -129,8 +131,10 @@ HTTP status: `200` when Redis is up, `503` when not.
   (default `https://cln:3001`).
 - Rune: `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` (issued by the CLN node
   operator; grants the `invoice` and `listinvoices` permissions).
-- Required for all `/api/v1/l402/*` routes. If either is empty, those
-  routes return HTTP 502.
+- Required for all `/api/v1/l402/*` routes. There is no startup
+  pre-check: `/l402/invoice` and `/l402/check` always call CLN, and a
+  missing rune throws `LightningUnavailableError` which the handler
+  returns as HTTP 502 (never 503).
 - Accepts self-signed TLS (it's the local CLN node's REST plugin).
 
 ### 3.4 Redis
@@ -159,8 +163,9 @@ Detected by `did.includes('@') && !did.startsWith('did:')`. Flow:
 4. Validate the callback URL is `https:` and not a private address.
 5. Enforce `amountMsats = amount * 1000` against `minSendable` /
    `maxSendable` from the LNURL response.
-6. Append `?amount=<msats>&comment=<memo>` (comment only if memo is
-   non-empty) to the callback and fetch it.
+6. Append `?amount=<msats>&comment=<memo>` to the callback if it has no
+   existing query string, otherwise append `&amount=<msats>&comment=<memo>`
+   (comment only if memo is non-empty) and fetch it.
 7. The response's `pr` field is the BOLT11 invoice.
 
 ### 4.2 DID (`did:cid:...`)
@@ -186,21 +191,21 @@ Detected by `did.includes('@') && !did.startsWith('did:')`. Flow:
 
 Either path produces a BOLT11 string; the mediator hands it to
 `lnbits.payInvoice(lnbitsUrl, adminKey, paymentRequest)` and returns
-the LNbits response (`LightningPayment` shape).
+the LNbits response (`{ paymentHash }`).
 
 ---
 
 ## 5. Redis key schema
 
-Namespace: `lightning-mediator:`. All values are JSON strings unless
-noted.
+Namespace: `lightning-mediator:`. Value encoding varies by key (see
+Type column).
 
 | Key | Type | TTL | Contents |
 | --- | --- | --- | --- |
 | `lightning-mediator:published:<DID>` | STRING | none | `invoiceKey` for the DID |
-| `lightning-mediator:pending:<paymentHash>` | STRING | ~ `expiresAt - now` | `PendingInvoiceData` |
-| `lightning-mediator:payment:<id>` | STRING | none | `LightningPaymentRecord` |
-| `lightning-mediator:payment:did:<DID>` | SET | none | Payment IDs for that DID (used by `getPaymentsByDid`) |
+| `lightning-mediator:pending:<paymentHash>` | HASH | ~ `expiresAt - now` (seconds) | `PendingInvoiceData` (stored via `hmset`) |
+| `lightning-mediator:payment:<id>` | HASH | none | `LightningPaymentRecord` (stored via `hmset`) |
+| `lightning-mediator:payments:did:<DID>` | SORTED SET | none | Payment IDs for that DID (written via `zadd`, read via `zrange`; used by `getPaymentsByDid`) |
 
 `PendingInvoiceData`:
 
@@ -212,8 +217,8 @@ noted.
   "did":         "<DID>",
   "scope":       ["<cap>", ...],
   "amountSat":   <int>,
-  "expiresAt":   <unix ms>,
-  "createdAt":   <unix ms>
+  "expiresAt":   <unix seconds>,
+  "createdAt":   <unix seconds>
 }
 ```
 
@@ -226,9 +231,24 @@ noted.
   "method":        "lightning",
   "paymentHash":   "<hex>",
   "amountSat":     <int>,
-  "createdAt":     <unix ms>,
+  "createdAt":     <unix seconds>,
   "macaroonId":    "<opaque id>",
   "scope":         ["<cap>", ...]
+}
+```
+
+`LnbitsPayment` (returned by `/api/v1/lightning/payments`):
+
+```jsonc
+{
+  "paymentHash": "<hex>",
+  "amount":      <int>,
+  "fee":         <int>,
+  "memo":        "<string>",
+  "time":        <unix seconds>,
+  "pending":     <bool>,
+  "status":      "<string>",
+  "expiry":      <unix seconds>   // optional
 }
 ```
 
@@ -262,7 +282,7 @@ Redis instance is shared with the reference TypeScript service.
 | `ARCHON_LIGHTNING_MEDIATOR_PUBLIC_HOST` | empty | External URL the mediator advertises (overrides onion discovery). |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Preferred over `PUBLIC_HOST` if set. |
 | `ARCHON_DRAWBRIDGE_PORT` | `4222` | Used for internal shortcut in zap. |
-| `ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY` | empty | SOCKS5 proxy for `.onion` lookups. Expected form: `host:port`. |
+| `ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY` | empty | SOCKS5 proxy for `.onion` lookups. Expected form: `host:port`. If set but malformed (split yields empty host or port), the mediator falls back to `localhost:9050`. |
 | `GIT_COMMIT` | `unknown` | Build commit. |
 
 ### 6.3 Public host resolution
@@ -284,12 +304,15 @@ this order and caches the result:
 | `lightning_mediator_version_info` | gauge | `version`, `commit` |
 
 Plus the standard Prometheus process metrics (`process_*`). The
-`route` label collapses dynamic segments:
+`route` label collapses dynamic segments — but only DID-shaped
+segments are normalised (`normalizePath` matches the
+`/lightning/publish/` regex against DID-shaped values); non-DID
+dynamic segments (e.g. payment hashes) stay as-is in the label:
 
 ```
 /lightning/publish/<DID>  -> /lightning/publish/:did
-/l402/pending/<hash>       -> /l402/pending/:paymentHash
 /invoice/<DID>             -> /invoice/:did
+/l402/pending/<hash>       -> /l402/pending/<hash>   (NOT normalised)
 ```
 
 Route labels do **not** include the `/api/v1` prefix (they come from

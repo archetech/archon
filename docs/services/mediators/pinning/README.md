@@ -142,8 +142,8 @@ A single JSON file at `ARCHON_PIN_STATE_PATH`
       "attempts":    <int>,                    // submit + poll attempts combined
       "created":     "<RFC 3339>",
       "updated":     "<RFC 3339>",
-      "response":    <last provider JSON>,
-      "lastError":   "<string, set when status is failed>"
+      "response":    <last provider JSON>,                   // on `recordFailure`, the previous successful response is preserved (the failing response is not stored)
+      "lastError":   "<string, set when status is failed>"   // cleared (set to undefined) on every subsequent successful (non-failed) status update
     },
     ...
   }
@@ -153,8 +153,11 @@ A single JSON file at `ARCHON_PIN_STATE_PATH`
 The store is loaded lazily on first import-loop tick and rewritten in
 full on every record update. Switching `ARCHON_PIN_PROVIDER` against
 the same state file is supported — records keyed under the previous
-provider stay readable but the mediator will re-submit fingerprints
-whose stored `provider` does not match the active one.
+provider stay readable. Cross-provider `pinned` records are **not**
+re-submitted (a stored `pinned` status short-circuits and the op is
+treated as done regardless of which provider pinned it); only
+`queued` / `pinning` / `failed` records under a stale provider are
+re-submitted under the new one.
 
 ---
 
@@ -225,7 +228,7 @@ Counters:
 
 | Metric | Notes |
 | --- | --- |
-| `pinning_mediator_pins_total{provider,status}` | Per-tick outcomes. `status` ∈ `pinned`, `pinning` (newly recorded as still-in-progress), `failed`. |
+| `pinning_mediator_pins_total{provider,status}` | Per-tick outcomes. `status` ∈ `pinned`, `pinning` (per-tick count of operations still in `pinning`/`queued` state, including re-polls of the same fingerprint), `failed`. |
 
 Plus `service_version_info{version,commit}` and standard Prometheus
 process metrics.
@@ -240,7 +243,7 @@ Plain `console.log` / `console.error`:
 - `Pinned N pin operation(s) with <provider>` — successful tick summary.
 - `N pin operation(s) still pending with <provider>` — operations
   acknowledged but not yet `pinned`.
-- `Pinning failed: <message>; leaving remaining operation(s) queued` —
+- `Pinning failed[: <message>]; leaving remaining operation(s) queued` —
   failure path.
 
 ---

@@ -10,6 +10,8 @@ All wallet endpoints are under `/api/v1` and require `X-Archon-Admin-Key` when `
 
 | endpoint | description |
 | --- | --- |
+| `GET /wallet/version` | Returns `{version, commit}` (unauthenticated) |
+| `POST /wallet/setup` | Eagerly initializes the wallet |
 | `GET /wallet/address` | Returns the derived EVM funding address |
 | `GET /wallet/balance` | Returns ETH balance |
 | `GET /wallet/fee-estimate` | Returns current gas fee data |
@@ -27,7 +29,7 @@ All wallet endpoints are under `/api/v1` and require `X-Archon-Admin-Key` when `
 | `ARCHON_WALLET_METRICS_PORT` | `4253` | Metrics server port |
 | `ARCHON_KEYMASTER_URL` | `http://localhost:4226` | Keymaster service URL |
 | `ARCHON_ADMIN_API_KEY` | none | Admin API key for service-to-service calls |
-| `ARCHON_WALLET_ETH_NETWORK` | `mainnet` | `mainnet`, `sepolia`, `holesky`, or `local` |
+| `ARCHON_WALLET_ETH_NETWORK` | `ARCHON_ETH_NETWORK` or `mainnet` | `mainnet`, `sepolia`, `holesky`, or `local` |
 | `ARCHON_WALLET_ETH_CHAIN_ID` | network derived | EVM chain ID |
 | `ARCHON_WALLET_ETH_RPC_URL` | `ARCHON_ETH_RPC_URL` or `http://localhost:8545` | Ethereum JSON-RPC endpoint |
 | `ARCHON_WALLET_ETH_DERIVATION_PATH` | `m/44'/60'/0'/0/0` | HD derivation path |

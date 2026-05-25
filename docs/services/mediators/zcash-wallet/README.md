@@ -53,6 +53,7 @@ implementation.
 | `ARCHON_WALLET_GAP_LIMIT` | `20` | External and internal address scan window. |
 | `ARCHON_WALLET_ZEC_DEFAULT_FEE_ZAT` | `10000` | Default transparent transaction fee. |
 | `ARCHON_WALLET_ZEC_FALLBACK_FEE_ZAT_KB` | `10000` | Fallback fee-estimate rate in zats/kB. |
+| `ARCHON_WALLET_FEE_TARGET` | `6` | Default `blocks` value for `/wallet/fee-estimate` when the caller omits the query param. |
 | `ARCHON_KEYMASTER_URL` | `http://localhost:4226` | Keymaster mnemonic source. |
 | `ARCHON_ADMIN_API_KEY` | unset | Required for admin routes. |
 
