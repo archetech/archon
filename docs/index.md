@@ -22,22 +22,14 @@ Archon is a decentralized identity protocol implementing the W3C-compliant `did:
 
 ## Service Specifications
 
-Language-agnostic contracts for each Archon service. A conforming
-implementation in any language is a drop-in replacement for the
-canonical TypeScript reference.
+See [services/](services/README.md) for the full index of
+language-agnostic contracts that every Archon service must satisfy.
 
-- [Gatekeeper](services/gatekeeper/README.md) — DID event store, resolution, IPFS passthrough
-- [Keymaster](services/keymaster/README.md) — wallet service, IDs, credentials, encryption
-- [Drawbridge](services/drawbridge/README.md) — L402 paywall and public-facing proxy
-- [Herald](services/herald/README.md) — name service with W3C credentials
-- [Hyperswarm mediator](services/mediators/hyperswarm/README.md) — P2P DID operation relay
-- [Lightning mediator](services/mediators/lightning/README.md) — LNbits + CLN bridge
-- [Satoshi mediator](services/mediators/satoshi/README.md) — BTC chain anchoring
-- [Satoshi wallet](services/mediators/satoshi-wallet/README.md) — BIP84 HD wallet for anchoring
-- [Ethereum mediator](services/mediators/ethereum/README.md) — EVM contract-log anchoring
-- [Ethereum wallet](services/mediators/ethereum-wallet/README.md) — EVM key derivation and transaction signing
-- [Solana mediator](services/mediators/solana/README.md) — Solana memo anchoring
-- [Solana wallet](services/mediators/solana-wallet/README.md) — Solana key derivation and transaction signing
+- **Core**: [Gatekeeper](services/gatekeeper/README.md), [Keymaster](services/keymaster/README.md), [Drawbridge](services/drawbridge/README.md), [Herald](services/herald/README.md)
+- **Anchoring mediators** (paired with a wallet service): [Satoshi](services/mediators/satoshi/README.md), [Ethereum](services/mediators/ethereum/README.md), [Solana](services/mediators/solana/README.md), [Zcash](services/mediators/zcash/README.md)
+- **P2P**: [Hyperswarm](services/mediators/hyperswarm/README.md)
+- **Storage** (`pin` queue): [Filecoin](services/mediators/filecoin/README.md), [Pinning](services/mediators/pinning/README.md)
+- **Payments**: [Lightning](services/mediators/lightning/README.md)
 
 ## API Reference
 
