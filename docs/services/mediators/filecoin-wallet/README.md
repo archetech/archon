@@ -31,8 +31,9 @@ during upload and there is no concept of an Archon "anchor" on Filecoin.
 
 For each request:
 
-1. `GET ${ARCHON_IPFS_API_URL}/dag/export?arg=<cid>` — fetch the CAR
-   bytes for the requested CID from the local IPFS node.
+1. `POST ${ARCHON_IPFS_API_URL}/dag/export?arg=<cid>` — fetch the CAR
+   bytes for the requested CID from the local IPFS node. (Kubo's HTTP
+   RPC uses POST for all endpoints, even read-only ones.)
 2. Write the bytes to a temp file under `os.tmpdir()`.
 3. Lazily initialise the Synapse client (`initializeSynapse`) with the
    derived private key and the configured chain (`mainnet` or
@@ -66,9 +67,13 @@ the process is restarted.
 
 ## 2. HTTP API contract
 
-All routes are mounted at `/api/v1`. Every route requires
-`X-Archon-Admin-Key` matching `ARCHON_ADMIN_API_KEY` when the key is
-configured.
+All routes are mounted at `/api/v1` and require `X-Archon-Admin-Key`
+matching `ARCHON_ADMIN_API_KEY`. The admin key is **mandatory**:
+`ARCHON_ADMIN_API_KEY` must be set or every `/api/v1/*` request is
+rejected with `403 { "error": "Admin API key not configured" }`. With
+the key set, a missing header returns `401 { "error": "Admin API key
+required" }` and a mismatched header returns
+`401 { "error": "Invalid admin API key" }` (constant-time compared).
 
 ### 2.1 `GET /api/v1/wallet/version`
 
@@ -258,7 +263,9 @@ A conformant third implementation MUST:
 - Export CAR data from the configured IPFS HTTP API rather than
   fetching from a public gateway, so requests stay within the operator's
   trust boundary.
-- Enforce `X-Archon-Admin-Key` on every `/api/v1/*` route when the env
-  var is set.
+- Require a configured `ARCHON_ADMIN_API_KEY` and reject every
+  `/api/v1/*` request that does not present a matching
+  `X-Archon-Admin-Key` (403 when unconfigured, 401 when missing or
+  mismatched). The wallet has no anonymous mode.
 - Not expose any private-key, sign, or send routes — Filecoin Pay
   flows are the only intended use of this wallet.
