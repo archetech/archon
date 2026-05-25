@@ -59,9 +59,9 @@ queue (`gatekeeper.getQueue(<chain>)`) has pending operations:
    collecting the CIDs.
 2. Creates an asset DID via Keymaster containing the batch:
    `{ batch: { version: 1, ops: [<CID>, ...] } }`. The asset is
-   registered to `hyperswarm`, not to the ZEC registry, so the
-   operation chain itself propagates through the hyperswarm mediator
-   while the Zcash anchor is purely a timestamp proof.
+   registered to `pin` when that registry is available, otherwise
+   `hyperswarm`, and never to the ZEC registry; the Zcash anchor is
+   purely a timestamp proof.
 3. Computes a fee rate using the hybrid estimator (§3.2) and calls
    zcash-wallet `/api/v1/wallet/anchor` with the batch DID as the
    `OP_RETURN` payload and the selected `feeRate`.
@@ -132,8 +132,8 @@ The batch asset (created via Keymaster) has `didDocumentData`:
 - `ops` MUST be a non-empty array of strings; each string is the CID of
   an operation already pinned on IPFS via Gatekeeper `addJSON`.
 
-The asset is owned by `ARCHON_NODE_ID` and registered to the
-`hyperswarm` registry.
+The asset is owned by `ARCHON_NODE_ID` and registered to the `pin`
+registry when available, otherwise `hyperswarm`.
 
 ### 2.3 Importing a discovered batch
 

@@ -5,7 +5,7 @@ The Ethereum mediator anchors Archon DID batches on EVM chains through a canonic
 The mediator has two responsibilities:
 
 - **Import**: Scans confirmed `ArchonBatch` logs from the configured registry contract, resolves discovered batch DIDs, and imports the signed operations into Gatekeeper.
-- **Export**: Polls the Gatekeeper queue for the configured registry, creates an Archon batch DID, and asks the Ethereum wallet service to submit an `anchorBatch` transaction.
+- **Export**: Polls the Gatekeeper queue for the configured registry, creates an Archon batch DID on `pin` when that registry is available, falls back to `hyperswarm`, and asks the Ethereum wallet service to submit an `anchorBatch` transaction.
 
 The smart contract intentionally does not validate Archon DID semantics. Gatekeeper remains the validation authority; Ethereum is used as a publication, ordering, and timestamping layer.
 

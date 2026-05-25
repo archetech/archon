@@ -50,7 +50,9 @@ queue (`gatekeeper.getQueue(<chain>)`) has pending operations:
 1. Pushes each operation JSON to IPFS via `gatekeeper.addJSON`,
    collecting the CIDs.
 2. Creates an asset DID via Keymaster containing the batch:
-   `{ batch: { version: 1, ops: [<CID>, ...] } }`.
+   `{ batch: { version: 1, ops: [<CID>, ...] } }`. If the `pin`
+   registry is available, the batch asset is registered to `pin`;
+   otherwise it falls back to `hyperswarm`.
 3. Calls `satoshi-wallet` `/api/v1/wallet/anchor` with the batch DID as
    the `OP_RETURN` payload.
 4. Records the txid + batch DID in the local registered list, clears the
@@ -115,9 +117,9 @@ The batch asset (created via Keymaster) has `didDocumentData`:
 - `ops` MUST be a non-empty array of strings; each string is the CID of
   an operation already pinned on IPFS via Gatekeeper `addJSON`.
 
-The asset is owned by `ARCHON_NODE_ID` and registered to the
-`hyperswarm` registry (so the operation chain itself propagates through
-the hyperswarm mediator; the BTC anchor is just a timestamp proof).
+The asset is owned by `ARCHON_NODE_ID`. Exporters register it to the
+`pin` registry when that registry is available, otherwise to
+`hyperswarm`; the BTC anchor remains a timestamp proof.
 
 ### 2.3 Importing a discovered batch
 

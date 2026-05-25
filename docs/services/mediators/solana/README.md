@@ -5,7 +5,7 @@ The Solana mediator anchors Archon DID batches on Solana by publishing Archon-fo
 The mediator has two responsibilities:
 
 - **Import**: Scans Solana Memo program transactions for Archon batch memos, resolves discovered batch DIDs, and imports the signed operations into Gatekeeper.
-- **Export**: Polls the Gatekeeper queue for the configured registry, creates an Archon batch DID, and asks the Solana wallet service to submit a memo transaction.
+- **Export**: Polls the Gatekeeper queue for the configured registry, creates an Archon batch DID on `pin` when that registry is available, falls back to `hyperswarm`, and asks the Solana wallet service to submit a memo transaction.
 
 The memo payload intentionally does not validate Archon DID semantics. Gatekeeper remains the validation authority; Solana is used as a publication, ordering, and timestamping layer.
 
