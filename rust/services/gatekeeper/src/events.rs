@@ -165,11 +165,6 @@ pub(crate) async fn handle_did_operation(
             .get("registration")
             .and_then(|value| value.get("validUntil"))
             .is_some();
-        if registry == PIN_QUEUE {
-            return Err(format!(
-                "Invalid operation: registry {registry} is auxiliary storage only"
-            ));
-        }
         if !supported_registries.iter().any(|item| item == registry) {
             return Err(format!("Invalid operation: registry {registry} not supported"));
         }
@@ -189,11 +184,6 @@ pub(crate) async fn handle_did_operation(
         let (current_registry, current_is_ephemeral) = current_info
             .ok_or_else(|| "Invalid operation: registry missing".to_string())?;
         is_ephemeral = current_is_ephemeral;
-        if current_registry == PIN_QUEUE {
-            return Err(format!(
-                "Invalid operation: registry {current_registry} is auxiliary storage only"
-            ));
-        }
         if !supported_registries.iter().any(|item| item == &current_registry) {
             return Err(format!(
                 "Invalid operation: registry {current_registry} not supported"
@@ -206,11 +196,6 @@ pub(crate) async fn handle_did_operation(
             .and_then(|value| value.get("registry"))
             .and_then(Value::as_str);
         if let Some(new_registry) = new_registry {
-            if new_registry == PIN_QUEUE {
-                return Err(format!(
-                    "Invalid operation: registry {new_registry} is auxiliary storage only"
-                ));
-            }
             if new_registry != current_registry
                 && !supported_registries.iter().any(|item| item == new_registry)
             {

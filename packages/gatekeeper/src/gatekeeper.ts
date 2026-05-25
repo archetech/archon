@@ -568,9 +568,6 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (!registry || !this.supportedRegistries.includes(registry)) {
             throw new InvalidOperationError(`registry ${registry} not supported`);
         }
-        if (registry === PIN_QUEUE) {
-            throw new InvalidOperationError(`registry ${registry} is auxiliary storage only`);
-        }
 
         const did = await this.generateDID(operation);
 
@@ -897,17 +894,11 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (!registry || !this.supportedRegistries.includes(registry)) {
             throw new InvalidOperationError(`registry ${registry} not supported`);
         }
-        if (registry === PIN_QUEUE) {
-            throw new InvalidOperationError(`registry ${registry} is auxiliary storage only`);
-        }
 
         const newRegistry = operation.doc?.didDocumentRegistration?.registry;
 
         if (newRegistry && newRegistry !== registry && !this.supportedRegistries.includes(newRegistry)) {
             throw new InvalidOperationError(`registry ${newRegistry} not supported`);
-        }
-        if (newRegistry === PIN_QUEUE) {
-            throw new InvalidOperationError(`registry ${newRegistry} is auxiliary storage only`);
         }
 
         return this.withDidLock(operation.did, async () => {

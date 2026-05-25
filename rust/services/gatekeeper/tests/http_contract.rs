@@ -154,6 +154,29 @@ async fn http_contract_matches_resolution_error_and_supported_registry_semantics
             .contains("Invalid operation: registry BTC:signet not supported")
     );
 
+    let response = service
+        .admin(service.client.get(format!("{}/queue/pin", service.base_url)))
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+
+    let pin_create = create_agent_operation(12, "2026-04-11T12:00:30Z", "pin");
+    let response = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&pin_create)
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+
+    let response = service
+        .admin(service.client.get(format!("{}/queue/pin", service.base_url)))
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    let queue = response.json::<Value>().await?;
+    assert_eq!(queue.as_array().unwrap(), &[pin_create]);
+
     let create = create_agent_operation(7, "2026-04-11T12:01:00Z", "local");
     let response = service
         .client
