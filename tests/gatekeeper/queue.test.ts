@@ -170,14 +170,17 @@ describe('pin queue', () => {
         expect(await gk.getQueue('pin')).toStrictEqual([agentOp]);
     });
 
-    it('should reject pin as a DID registry', async () => {
+    it('should allow pin as a DID registry', async () => {
         const gk = newGatekeeper(['local', 'hyperswarm', 'pin']);
         await gk.resetDb();
         const testHelper = new TestHelper(gk, cipher);
         const keypair = cipher.generateRandomJwk();
         const agentOp = await testHelper.createAgentOp(keypair, { version: 1, registry: 'pin' });
 
-        await expect(gk.createDID(agentOp)).rejects.toThrow('Invalid operation: registry pin is auxiliary storage only');
+        await gk.createDID(agentOp);
+
+        expect(await gk.getQueue('hyperswarm')).toStrictEqual([agentOp]);
+        expect(await gk.getQueue('pin')).toStrictEqual([agentOp]);
     });
 });
 

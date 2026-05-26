@@ -97,6 +97,11 @@ async function walletBumpFee(txid: string): Promise<{ txid?: string; confirmatio
     return data;
 }
 
+async function batchDidRegistry(): Promise<string> {
+    const registries = await gatekeeper.listRegistries();
+    return registries.includes('pin') ? 'pin' : 'hyperswarm';
+}
+
 const register = promClient.register;
 promClient.collectDefaultMetrics({ register });
 
@@ -703,7 +708,7 @@ async function anchorBatch(): Promise<void> {
                 return gatekeeper.addJSON(canonical);
             }));
             const batch = { version: 1, ops: cids };
-            const did = await keymaster.createAsset({ batch }, { registry: 'hyperswarm', controller: config.nodeID });
+            const did = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
             const batchHash = batchHashForDid(did);
             const txid = await walletAnchor(did, batchHash, cids.length);
 
