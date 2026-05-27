@@ -2,6 +2,7 @@
 // so we test the toNetwork logic by replicating it.
 
 type WalletNetwork = 'mainnet' | 'signet' | 'testnet4';
+type WalletBackend = 'core' | 'alchemy';
 
 function toNetwork(name: string | undefined): WalletNetwork {
     switch (name) {
@@ -15,6 +16,27 @@ function toNetwork(name: string | undefined): WalletNetwork {
     default:
         throw new Error(`Unsupported network "${name}"`);
     }
+}
+
+function toBackend(name: string | undefined): WalletBackend {
+    switch (name) {
+    case 'core':
+    case undefined:
+        return 'core';
+    case 'alchemy':
+        return 'alchemy';
+    default:
+        throw new Error(`Unsupported wallet backend "${name}"`);
+    }
+}
+
+function defaultUtxoUrl(rpcUrl?: string): string | undefined {
+    if (!rpcUrl) {
+        return undefined;
+    }
+
+    const url = new URL(rpcUrl);
+    return `${url.origin}${url.pathname.replace(/\/+$/, '')}/api/v2`;
 }
 
 describe('Config', () => {
@@ -43,4 +65,27 @@ describe('Config', () => {
             expect(() => toNetwork('')).toThrow('Unsupported network ""');
         });
     });
+
+    describe('toBackend', () => {
+        it('defaults to core when undefined', () => {
+            expect(toBackend(undefined)).toBe('core');
+        });
+
+        it('accepts alchemy', () => {
+            expect(toBackend('alchemy')).toBe('alchemy');
+        });
+
+        it('throws for unsupported wallet backends', () => {
+            expect(() => toBackend('hosted')).toThrow('Unsupported wallet backend "hosted"');
+        });
+    });
+
+    describe('defaultUtxoUrl', () => {
+        it('derives the hosted UTXO API base from a full RPC URL', () => {
+            expect(defaultUtxoUrl('https://bitcoin-testnet4.g.alchemy.com/v2/key')).toBe(
+                'https://bitcoin-testnet4.g.alchemy.com/v2/key/api/v2',
+            );
+        });
+    });
+
 });

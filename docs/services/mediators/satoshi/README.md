@@ -339,6 +339,7 @@ No `/ready`, no CORS, no admin auth. No public client-facing routes.
 | `ARCHON_WALLET_URL` | unset | Required for export mode. Points at [satoshi-wallet](../satoshi-wallet/README.md). |
 | `ARCHON_SAT_CHAIN` | `BTC:mainnet` | One of `BTC:mainnet`, `BTC:testnet4`, `BTC:signet`. Becomes the registry name. |
 | `ARCHON_SAT_NETWORK` | `bitcoin` | `bitcoin` / `testnet` / `regtest`. |
+| `ARCHON_SAT_RPC_URL` | unset | Full Bitcoin JSON-RPC URL. When set, takes precedence over `ARCHON_SAT_HOST` / `ARCHON_SAT_PORT` / user / password. Useful for hosted RPC providers. |
 | `ARCHON_SAT_HOST` | `localhost` | bitcoind RPC host. |
 | `ARCHON_SAT_PORT` | `8332` | bitcoind RPC port. |
 | `ARCHON_SAT_USER` / `ARCHON_SAT_PASS` | empty | bitcoind RPC auth. |
@@ -426,12 +427,14 @@ structured output but SHOULD keep the human-readable lines stable.
 - Compose files:
   [docker/compose/btc-mainnet.yml](../../../../docker/compose/btc-mainnet.yml),
   [docker/compose/btc-signet.yml](../../../../docker/compose/btc-signet.yml),
-  [docker/compose/btc-testnet4.yml](../../../../docker/compose/btc-testnet4.yml).
+  [docker/compose/btc-testnet4.yml](../../../../docker/compose/btc-testnet4.yml),
+  [docker/compose/btc-testnet4-hosted.yml](../../../../docker/compose/btc-testnet4-hosted.yml).
 - Image: `ghcr.io/archetech/satoshi-mediator`
 - Grafana dashboards: `satoshi-mediator-mainnet.json`, `-signet.json`.
 
 No dedicated conformance tests. Validation is manual: stand up a
-bitcoind + satoshi-wallet + satoshi-mediator trio on signet/testnet4,
+bitcoind + satoshi-wallet + satoshi-mediator trio on signet/testnet4
+or the hosted testnet4 profile,
 create an ephemeral DID with `registry=BTC:signet`, watch the mediator
 anchor it, wait for confirmation, and verify the resolution includes
 `didDocumentMetadata.timestamp.upperBound.blockid` matching the

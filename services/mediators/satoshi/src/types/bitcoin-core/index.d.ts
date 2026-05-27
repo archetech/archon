@@ -3,6 +3,7 @@ export interface BtcClientOptions {
     password?: string;
     host?: string;
     wallet?: string;
+    headers?: Record<string, string>;
 }
 
 export interface ScriptSig {

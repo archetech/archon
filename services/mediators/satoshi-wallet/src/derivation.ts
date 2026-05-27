@@ -1,5 +1,6 @@
 import * as bip39 from 'bip39';
 import HDKey from 'hdkey';
+import * as bitcoin from 'bitcoinjs-lib';
 import type { WalletNetwork } from './config.js';
 
 const MAINNET_VERSIONS = { private: 0x0488ADE4, public: 0x0488B21E }; // xprv / xpub
@@ -33,6 +34,44 @@ export function getMasterFingerprint(mnemonic: string, network: WalletNetwork): 
 export function getXpub(mnemonic: string, network: WalletNetwork): string {
     const account = deriveAccountKey(mnemonic, network);
     return account.publicExtendedKey;
+}
+
+export function getBtcNetwork(network: WalletNetwork): bitcoin.Network {
+    return network === 'mainnet' ? bitcoin.networks.bitcoin : bitcoin.networks.testnet;
+}
+
+export function derivePath(network: WalletNetwork, chain: 0 | 1, index: number): string {
+    return `m/84'/${getCoinType(network)}'/0'/${chain}/${index}`;
+}
+
+export function deriveAddress(
+    mnemonic: string,
+    network: WalletNetwork,
+    chain: 0 | 1,
+    index: number,
+): { address: string; output: Buffer; path: string; publicKey: Buffer } {
+    const account = deriveAccountKey(mnemonic, network);
+    const child = account.deriveChild(chain).deriveChild(index);
+
+    if (!child.publicKey) {
+        throw new Error(`Could not derive public key at ${chain}/${index}`);
+    }
+
+    const payment = bitcoin.payments.p2wpkh({
+        pubkey: child.publicKey,
+        network: getBtcNetwork(network),
+    });
+
+    if (!payment.address || !payment.output) {
+        throw new Error(`Could not derive address at ${chain}/${index}`);
+    }
+
+    return {
+        address: payment.address,
+        output: payment.output,
+        path: derivePath(network, chain, index),
+        publicKey: child.publicKey,
+    };
 }
 
 export function buildDescriptors(

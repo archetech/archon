@@ -20,13 +20,21 @@ const REGISTRY = config.chain;
 const READ_ONLY = config.exportInterval === 0;
 const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 
+function maskUrl(url: string): string {
+    return url.replace(/\/v2\/[^/?#]+/, '/v2/<redacted>');
+}
+
+function rpcDescription(): string {
+    return config.rpcUrl ? maskUrl(config.rpcUrl) : `${config.host}:${config.port}`;
+}
+
 const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
 const keymaster = new KeymasterClient();
 const btcClient = new BtcClient({
-    username: config.user,
-    password: config.pass,
-    host: `http://${config.host}:${config.port}`,
+    username: config.rpcUrl ? undefined : config.user,
+    password: config.rpcUrl ? undefined : config.pass,
+    host: config.rpcUrl || `http://${config.host}:${config.port}`,
 });
 
 // Wallet service API helpers
@@ -864,7 +872,7 @@ async function exportLoop(): Promise<void> {
 async function waitForChain() {
     let isReady = false;
 
-    console.log(`Connecting to ${config.chain} node on ${config.host}:${config.port}`);
+    console.log(`Connecting to ${config.chain} node on ${rpcDescription()}`);
 
     while (!isReady) {
         try {

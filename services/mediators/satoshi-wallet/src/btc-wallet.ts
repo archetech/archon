@@ -13,10 +13,24 @@ import BtcClient, {
     type WalletInfo,
     type EstimateSmartFeeResult,
     type ListDescriptorsResult,
+    type BtcClientOptions,
 } from 'bitcoin-core';
 import config from './config.js';
 import type { WalletNetwork } from './config.js';
-import { buildDescriptors } from './derivation.js';
+import { buildDescriptors, getBtcNetwork } from './derivation.js';
+import {
+    anchorAlchemyData,
+    bumpAlchemyTransactionFee,
+    estimateAlchemyFee,
+    getAlchemyBalance,
+    getAlchemyReceiveAddress,
+    getAlchemyTransactions,
+    getAlchemyTransaction,
+    getAlchemyUtxos,
+    getAlchemyWalletStatus,
+    sendAlchemyBtc,
+    setupAlchemyWallet,
+} from './alchemy-wallet.js';
 
 export { getXpub } from './derivation.js';
 
@@ -32,16 +46,18 @@ function needsDescriptorTopUp(descriptor: ListDescriptorsResult['descriptors'][n
     return descriptor.next > end;
 }
 
-function getBtcNetwork(network: WalletNetwork): bitcoin.Network {
-    return network === 'mainnet' ? bitcoin.networks.bitcoin : bitcoin.networks.testnet;
-}
-
 export function createBtcClient(): BtcClient {
+    const options: BtcClientOptions = {
+        host: config.btcRpcUrl || `http://${config.btcHost}:${config.btcPort}`,
+        ...(config.btcRpcUrl ? {} : {
+            username: config.btcUser,
+            password: config.btcPass,
+        }),
+        ...(config.backend === 'core' ? { wallet: config.walletName } : {}),
+    };
+
     return new BtcClient({
-        username: config.btcUser,
-        password: config.btcPass,
-        host: `http://${config.btcHost}:${config.btcPort}`,
-        wallet: config.walletName,
+        ...options,
     });
 }
 
@@ -50,6 +66,10 @@ export async function setupWatchOnlyWallet(
     mnemonic: string,
     network: WalletNetwork,
 ): Promise<{ walletName: string; descriptors: string[] }> {
+    if (config.backend === 'alchemy') {
+        return setupAlchemyWallet(btcClient, mnemonic, network);
+    }
+
     // Create a blank watch-only descriptor wallet
     // createwallet args: name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
     try {
@@ -160,10 +180,14 @@ export async function setupWatchOnlyWallet(
     };
 }
 
-export async function getBalance(btcClient: BtcClient): Promise<{
+export async function getBalance(btcClient: BtcClient, mnemonic?: string): Promise<{
     balance: number;
     unconfirmed_balance: number;
 }> {
+    if (config.backend === 'alchemy') {
+        return getAlchemyBalance(mnemonic);
+    }
+
     const info: WalletInfo = await btcClient.getWalletInfo();
     return {
         balance: info.balance,
@@ -173,7 +197,18 @@ export async function getBalance(btcClient: BtcClient): Promise<{
 
 let cachedReceiveAddress: string | null = null;
 
-export async function getReceiveAddress(btcClient: BtcClient): Promise<string> {
+export async function getReceiveAddress(
+    btcClient: BtcClient,
+    mnemonic?: string,
+    network: WalletNetwork = config.network,
+): Promise<string> {
+    if (config.backend === 'alchemy') {
+        if (!mnemonic) {
+            throw new Error('Mnemonic is required for ARCHON_WALLET_BACKEND=alchemy');
+        }
+        return getAlchemyReceiveAddress(mnemonic, network);
+    }
+
     if (cachedReceiveAddress) {
         const received = await btcClient.command('getreceivedbyaddress', cachedReceiveAddress, 0);
         if (received === 0) {
@@ -189,14 +224,24 @@ export async function getTransactions(
     btcClient: BtcClient,
     count: number = 10,
     skip: number = 0,
+    mnemonic?: string,
 ): Promise<ListTransactionsEntry[]> {
+    if (config.backend === 'alchemy') {
+        return getAlchemyTransactions(count, skip, mnemonic);
+    }
+
     return btcClient.command('listtransactions', '*', count, skip, true);
 }
 
 export async function getUtxos(
     btcClient: BtcClient,
     minconf: number = 1,
+    mnemonic?: string,
 ): Promise<UnspentOutput[]> {
+    if (config.backend === 'alchemy') {
+        return getAlchemyUtxos(minconf, mnemonic);
+    }
+
     return btcClient.listUnspent(minconf);
 }
 
@@ -204,6 +249,10 @@ export async function estimateFee(
     btcClient: BtcClient,
     blocks?: number,
 ): Promise<EstimateSmartFeeResult> {
+    if (config.backend === 'alchemy') {
+        return estimateAlchemyFee(btcClient, blocks);
+    }
+
     return btcClient.estimateSmartFee(blocks || config.feeTarget, 'ECONOMICAL');
 }
 
@@ -213,6 +262,10 @@ export async function getWalletStatus(btcClient: BtcClient): Promise<{
     ready: boolean;
     descriptorCount: number;
 }> {
+    if (config.backend === 'alchemy') {
+        return getAlchemyWalletStatus();
+    }
+
     try {
         const info: ListDescriptorsResult = await btcClient.listDescriptors(false);
         return {
@@ -231,6 +284,28 @@ export async function getWalletStatus(btcClient: BtcClient): Promise<{
     }
 }
 
+export async function getTransaction(
+    btcClient: BtcClient,
+    txid: string,
+): Promise<{
+    txid: string;
+    confirmations: number;
+    blockhash?: string;
+    fee?: number;
+}> {
+    if (config.backend === 'alchemy') {
+        return getAlchemyTransaction(txid);
+    }
+
+    const tx = await btcClient.command('gettransaction', txid, true) as any;
+    return {
+        txid: tx.txid,
+        confirmations: tx.confirmations,
+        blockhash: tx.blockhash,
+        fee: tx.fee,
+    };
+}
+
 export async function anchorData(
     btcClient: BtcClient,
     mnemonic: string,
@@ -238,6 +313,10 @@ export async function anchorData(
     data: string,
     feeRate?: number,
 ): Promise<{ txid: string; fee: number }> {
+    if (config.backend === 'alchemy') {
+        return anchorAlchemyData(btcClient, mnemonic, network, data, feeRate);
+    }
+
     const opReturnHex = Buffer.from(data, 'utf8').toString('hex');
 
     // Create funded PSBT with OP_RETURN output
@@ -267,6 +346,10 @@ export async function bumpTransactionFee(
     txid: string,
     feeRate?: number,
 ): Promise<{ txid: string; fee: number }> {
+    if (config.backend === 'alchemy') {
+        return bumpAlchemyTransactionFee();
+    }
+
     // psbtbumpfee returns a PSBT for watch-only wallets
     const bumpResult = await btcClient.command('psbtbumpfee', txid, {
         ...(feeRate ? { fee_rate: feeRate } : {}),
@@ -352,6 +435,10 @@ export async function sendBtc(
     feeRate?: number,
     subtractFee?: boolean,
 ): Promise<{ txid: string; fee: number }> {
+    if (config.backend === 'alchemy') {
+        return sendAlchemyBtc(btcClient, mnemonic, network, to, amountBtc, feeRate, subtractFee);
+    }
+
     const btcNetwork = getBtcNetwork(network);
 
     // Validate address
