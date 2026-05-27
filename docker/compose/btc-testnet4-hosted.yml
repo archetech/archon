@@ -1,5 +1,5 @@
 services:
-  btc-testnet4-wallet:
+  btc-testnet4-hosted-wallet:
     profiles: ["btc-testnet4-hosted"]
     build:
       context: ../..
@@ -28,7 +28,7 @@ services:
       keymaster:
         condition: service_started
 
-  btc-testnet4-mediator:
+  btc-testnet4-hosted-mediator:
     profiles: ["btc-testnet4-hosted"]
     build:
       context: ../..
@@ -47,7 +47,7 @@ services:
       - ARCHON_SAT_NETWORK=testnet
       - ARCHON_SAT_RPC_URL=${ARCHON_BTC_T4_RPC_URL}
       - ARCHON_SAT_START_BLOCK=${ARCHON_BTC_T4_START_BLOCK}
-      - ARCHON_WALLET_URL=http://btc-testnet4-wallet:4244
+      - ARCHON_WALLET_URL=http://btc-testnet4-hosted-wallet:4244
       - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_BTC_T4_IMPORT_INTERVAL}
       - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_BTC_T4_EXPORT_INTERVAL}
       - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_BTC_T4_FEE_BLOCK_TARGET}
@@ -63,4 +63,4 @@ services:
     depends_on:
       - gatekeeper
       - keymaster
-      - btc-testnet4-wallet
+      - btc-testnet4-hosted-wallet
