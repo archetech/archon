@@ -429,6 +429,9 @@ structured output but SHOULD keep the human-readable lines stable.
   [docker/compose/btc-signet.yml](../../../../docker/compose/btc-signet.yml),
   [docker/compose/btc-testnet4.yml](../../../../docker/compose/btc-testnet4.yml),
   [docker/compose/btc-testnet4-hosted.yml](../../../../docker/compose/btc-testnet4-hosted.yml).
+  `docker-compose.yml` includes only one testnet4 fragment at a time;
+  set `ARCHON_BTC_T4_COMPOSE=btc-testnet4-hosted.yml` when enabling the
+  `btc-testnet4-hosted` profile.
 - Image: `ghcr.io/archetech/satoshi-mediator`
 - Grafana dashboards: `satoshi-mediator-mainnet.json`, `-signet.json`.
 

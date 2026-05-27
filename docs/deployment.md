@@ -147,6 +147,7 @@ Bitcoin registries anchor DIDs on-chain via the Satoshi mediator. Each bundled n
 | `docker/compose/btc-mainnet.yml` | BTC mainnet | **You provide** — requires an external Bitcoin Core node with RPC access |
 | `docker/compose/btc-signet.yml` | BTC signet | Bundled — runs its own `bitcoin-core` container |
 | `docker/compose/btc-testnet4.yml` | BTC testnet4 | Bundled — runs its own `bitcoin-core` container |
+| `docker/compose/btc-testnet4-hosted.yml` | BTC testnet4 | Hosted JSON-RPC plus hosted UTXO REST |
 
 ### Enable a Registry
 
@@ -157,6 +158,13 @@ COMPOSE_PROFILES=hyperswarm,btc-mainnet
 
 # or
 COMPOSE_PROFILES=hyperswarm,btc-signet
+```
+
+For hosted testnet4, select the hosted fragment and profile together:
+
+```env
+ARCHON_BTC_T4_COMPOSE=btc-testnet4-hosted.yml
+COMPOSE_PROFILES=hyperswarm,btc-testnet4-hosted
 ```
 
 ### Key Environment Variables (Mainnet)
