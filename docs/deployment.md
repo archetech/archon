@@ -259,6 +259,8 @@ Ethereum support is optional. If enabled, the Ethereum registry anchors DID batc
 
 Mainnet uses the canonical `ETH:mainnet` contract. Sepolia is intended for testing. Future production L2 deployments should use a canonical contract on the chosen chain, with L2s such as Base, Optimism, or Arbitrum preferred when low anchoring cost matters.
 
+Ethereum mediators record Gatekeeper block checkpoints for the configured start block, every 10th confirmed block, and every block that contains an `ArchonBatch` event. This keeps timestamp bounds tight without storing every empty Ethereum block in Gatekeeper.
+
 ### Enable Ethereum Mainnet
 
 Add the Ethereum mainnet profile to `COMPOSE_PROFILES`:

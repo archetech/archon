@@ -9,6 +9,8 @@ The mediator has two responsibilities:
 
 The smart contract intentionally does not validate Archon DID semantics. Gatekeeper remains the validation authority; Ethereum is used as a publication, ordering, and timestamping layer.
 
+Each import cycle records Gatekeeper block checkpoints for `ARCHON_ETH_START_BLOCK`, every 10th confirmed Ethereum block, and any block that contains an `ArchonBatch` event. The mediator still keeps its own exact scan cursor internally, while Gatekeeper gets sparse timestamp bounds plus exact event-block timestamps.
+
 ## Canonical contract
 
 Each public EVM registry should use one canonical contract address. For example, every `ETH:sepolia` node should scan the same Sepolia `ArchonRegistry` deployment. Custom deployments should use a distinct registry name or be clearly marked as non-canonical in node configuration.

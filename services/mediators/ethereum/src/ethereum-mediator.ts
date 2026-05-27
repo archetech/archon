@@ -19,6 +19,7 @@ import { Interface, JsonRpcProvider, Log, isAddress } from 'ethers';
 const REGISTRY = config.chain;
 const READ_ONLY = config.exportInterval === 0;
 const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
+const CHECKPOINT_BLOCK_INTERVAL = 10;
 
 const ARCHON_REGISTRY_ABI = [
     'event ArchonBatch(address indexed sender, bytes32 indexed batchHash, string batchDid, uint256 opCount)',
@@ -338,6 +339,10 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
     await gatekeeper.addBlock(REGISTRY, { hash, height, time });
 }
 
+function shouldRecordBlockCheckpoint(height: number): boolean {
+    return height === config.startBlock || height % CHECKPOINT_BLOCK_INTERVAL === 0;
+}
+
 async function resolveScanStart(blockCount: number): Promise<number> {
     const db = await loadDb();
 
@@ -430,11 +435,14 @@ async function scanBlocks(): Promise<void> {
             return value;
         };
 
+        const eventBlockNumbers = new Set<number>();
+
         for (const log of logs) {
             const block = await getCachedBlock(log.blockNumber);
             if (!block) {
                 continue;
             }
+            eventBlockNumbers.add(log.blockNumber);
             const timestamp = new Date(block.timestamp * 1000).toISOString();
             const item = parseArchonLog(log, timestamp);
             if (!item) {
@@ -449,16 +457,18 @@ async function scanBlocks(): Promise<void> {
             });
         }
 
-        let lastBlock: { hash: string; timestamp: number } | undefined;
         for (let height = start; height <= end; height++) {
+            if (!shouldRecordBlockCheckpoint(height) && !eventBlockNumbers.has(height)) {
+                continue;
+            }
             const block = await getCachedBlock(height);
             if (!block) {
                 continue;
             }
-            lastBlock = block;
             await addBlock(height, block.hash, block.timestamp);
         }
 
+        const lastBlock = await getCachedBlock(end);
         if (lastBlock) {
             const scannedThrough = end;
             await jsonPersister.updateDb((db) => {
@@ -865,6 +875,9 @@ async function syncBlocks(): Promise<void> {
         }
 
         for (let height = startHeight; height <= blockCount; height++) {
+            if (!shouldRecordBlockCheckpoint(height)) {
+                continue;
+            }
             const block = await provider.getBlock(height);
             if (!block?.hash) {
                 continue;
