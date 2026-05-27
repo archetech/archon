@@ -1,11 +1,11 @@
 services:
-  btc-testnet4-node:
+  btc-t4-node:
     profiles: ["btc-testnet4"]
     image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
     volumes:
       - ../../data/btc-testnet4:/root/.bitcoin
 
-  btc-testnet4-wallet:
+  btc-t4-wallet:
     profiles: ["btc-testnet4"]
     build:
       context: ../..
@@ -17,7 +17,7 @@ services:
       - ARCHON_WALLET_PORT=4244
       - ARCHON_WALLET_METRICS_PORT=4245
       - ARCHON_WALLET_NETWORK=testnet4
-      - ARCHON_WALLET_BTC_HOST=btc-testnet4-node
+      - ARCHON_WALLET_BTC_HOST=btc-t4-node
       - ARCHON_WALLET_BTC_PORT=48332
       - ARCHON_WALLET_BTC_USER=${ARCHON_BTC_T4_USER}
       - ARCHON_WALLET_BTC_PASS=${ARCHON_BTC_T4_PASS}
@@ -29,12 +29,12 @@ services:
       - "127.0.0.1:4244:4244"
       - "127.0.0.1:4245:4245"
     depends_on:
-      btc-testnet4-node:
+      btc-t4-node:
         condition: service_started
       keymaster:
         condition: service_started
 
-  btc-testnet4-mediator:
+  btc-t4-mediator:
     profiles: ["btc-testnet4"]
     build:
       context: ../..
@@ -51,12 +51,12 @@ services:
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
       - ARCHON_SAT_CHAIN=BTC:testnet4
       - ARCHON_SAT_NETWORK=testnet
-      - ARCHON_SAT_HOST=btc-testnet4-node
+      - ARCHON_SAT_HOST=btc-t4-node
       - ARCHON_SAT_PORT=48332
       - ARCHON_SAT_START_BLOCK=${ARCHON_BTC_T4_START_BLOCK}
       - ARCHON_SAT_USER=${ARCHON_BTC_T4_USER}
       - ARCHON_SAT_PASS=${ARCHON_BTC_T4_PASS}
-      - ARCHON_WALLET_URL=http://btc-testnet4-wallet:4244
+      - ARCHON_WALLET_URL=http://btc-t4-wallet:4244
       - ARCHON_SAT_IMPORT_INTERVAL=${ARCHON_BTC_T4_IMPORT_INTERVAL}
       - ARCHON_SAT_EXPORT_INTERVAL=${ARCHON_BTC_T4_EXPORT_INTERVAL}
       - ARCHON_SAT_FEE_BLOCK_TARGET=${ARCHON_BTC_T4_FEE_BLOCK_TARGET}
@@ -70,7 +70,7 @@ services:
       - ../../data:/app/satoshi/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     depends_on:
-      - btc-testnet4-node
+      - btc-t4-node
       - gatekeeper
       - keymaster
-      - btc-testnet4-wallet
+      - btc-t4-wallet
