@@ -1,4 +1,4 @@
-import { getXpub, getMasterFingerprint, getCoinType, getHDKeyVersions, buildDescriptors } from '../../services/mediators/satoshi-wallet/src/derivation';
+import { getXpub, getMasterFingerprint, getCoinType, getHDKeyVersions, buildDescriptors, deriveAddress } from '../../services/mediators/satoshi-wallet/src/derivation';
 
 // BIP-39 test mnemonic (DO NOT use for real funds)
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
@@ -141,6 +141,23 @@ describe('Wallet derivation', () => {
             const { external } = buildDescriptors(TEST_MNEMONIC, 'mainnet');
             const fp = getMasterFingerprint(TEST_MNEMONIC, 'mainnet');
             expect(external).toMatch(new RegExp(`\\[${fp}/`));
+        });
+    });
+
+    describe('deriveAddress', () => {
+        it('derives BIP84 receive addresses without relative-path errors', () => {
+            const derived = deriveAddress(TEST_MNEMONIC, 'testnet4', 0, 0);
+
+            expect(derived.path).toBe("m/84'/1'/0'/0/0");
+            expect(derived.address).toBe('tb1q6rz28mcfaxtmd6v789l9rrlrusdprr9pqcpvkl');
+            expect(derived.output.toString('hex')).toBe('0014d0c4a3ef09e997b6e99e397e518fe3e41a118ca1');
+        });
+
+        it('derives BIP84 change addresses', () => {
+            const derived = deriveAddress(TEST_MNEMONIC, 'testnet4', 1, 0);
+
+            expect(derived.path).toBe("m/84'/1'/0'/1/0");
+            expect(derived.address).toMatch(/^tb1q/);
         });
     });
 });

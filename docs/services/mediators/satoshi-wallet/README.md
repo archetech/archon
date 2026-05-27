@@ -16,8 +16,9 @@ it fetches the wallet's BIP39 mnemonic from the local
 > [satoshi-mediator](../satoshi/README.md) (which calls its HTTP
 > routes to anchor batches and manage fees) and the
 > [Keymaster](../../keymaster/README.md) (source of the mnemonic).
-> The UTXO / balance / history side of the wallet is delegated to a
-> locally-reachable Bitcoin Core node via RPC.
+> The UTXO / balance / history side of the wallet is delegated either to
+> a locally-reachable Bitcoin Core wallet via RPC (`core` backend) or to
+> a hosted Bitcoin JSON-RPC + UTXO provider (`alchemy` backend).
 
 ---
 
@@ -31,11 +32,17 @@ Two halves, both thin wrappers:
    Core. The descriptor wallet name is `${ARCHON_WALLET_NAME}` (default
    `archon-watch-<nodeID>`).
 
-2. **Signing authority** — for `send`, `anchor`, and `bump-fee`
+2. **Hosted UTXO wallet** — when `ARCHON_WALLET_BACKEND=alchemy`,
+   derives BIP84 external/internal addresses locally, scans a gap window
+   through the configured UTXO API, persists scan state on disk, builds
+   funded PSBTs locally, signs from the Keymaster mnemonic, and broadcasts
+   through Bitcoin JSON-RPC `sendrawtransaction`.
+
+3. **Signing authority** — for `send`, `anchor`, and `bump-fee`
    operations, re-derives the private keys on demand from the mnemonic,
-   builds a PSBT via Core (`walletcreatefundedpsbt`), signs locally with
-   bitcoinjs-lib + ECPair, and broadcasts via
-   `sendrawtransaction`.
+   signs locally with bitcoinjs-lib + ECPair, and broadcasts via
+   `sendrawtransaction`. RBF bumping is currently supported only by the
+   `core` backend.
 
 The mnemonic never lives in this service's memory between requests.
 Every signing call fetches it afresh and scope-bounds its use to a single
@@ -58,7 +65,7 @@ Binds to `${ARCHON_WALLET_PORT}` (default `4240`). Routes under
 | `GET` | `/api/v1/wallet/address` | yes | `{ address, network }` — next unused external bech32 address. |
 | `GET` | `/api/v1/wallet/transactions?count=N&skip=N` | yes | `{ transactions: ListTransactionsEntry[], network }`. Pagination: `count` (default 10), `skip` (default 0). |
 | `GET` | `/api/v1/wallet/utxos?minconf=N` | yes | `{ utxos: UnspentOutput[], network }`. `minconf` default 1. |
-| `GET` | `/api/v1/wallet/fee-estimate?blocks=N` | yes | `{ feerate, blocks, network }` — BTC/kB from Core's `estimatesmartfee`. |
+| `GET` | `/api/v1/wallet/fee-estimate?blocks=N` | yes | `{ feerate, blocks, network }` — BTC/kB from Bitcoin JSON-RPC `estimatesmartfee`, with a conservative fallback in hosted mode. |
 | `GET` | `/api/v1/wallet/info` | yes | Wallet status block (balance, tx count, network, etc.). |
 | `POST` | `/api/v1/wallet/send` | yes | `{ to, amount, feeRate?, subtractFee? }` → `{ txid, ... }`. `amount` in BTC. `feeRate` in sat/vB. |
 | `POST` | `/api/v1/wallet/anchor` | yes | `{ data, feeRate? }` → `{ txid, ... }`. `data` is the UTF-8 string to put in `OP_RETURN` (≤ 80 bytes). Called by satoshi-mediator. |
@@ -243,6 +250,11 @@ is ready by the time the satoshi-mediator hits it.
 | `ARCHON_WALLET_METRICS_PORT` | `4241` | Prometheus port (separate listener). |
 | `ARCHON_KEYMASTER_URL` | `http://localhost:4226` | |
 | `ARCHON_ADMIN_API_KEY` | empty | Shared admin key between Keymaster / wallet / mediator. |
+| `ARCHON_WALLET_BACKEND` | `core` | `core` uses Bitcoin Core descriptor wallet RPCs. `alchemy` uses local BIP84 signing plus hosted JSON-RPC / UTXO APIs. |
+| `ARCHON_WALLET_BTC_RPC_URL` | unset | Full Bitcoin JSON-RPC URL. When set, takes precedence over host / port / user / password. Required for hosted `alchemy` mode. |
+| `ARCHON_WALLET_UTXO_URL` | derived from `ARCHON_WALLET_BTC_RPC_URL` | Base UTXO REST URL for `alchemy` mode. Defaults to `<rpc-url>/api/v2`. The wallet supports Alchemy `/utxo/{address}` and Esplora/mempool.space `/address/{address}/utxo` shapes. |
+| `ARCHON_WALLET_STATE_PATH` | `./data/satoshi-wallet-state.json` | Local scan-state cache used by `alchemy` mode. |
+| `ARCHON_WALLET_REFRESH_TTL_MS` | `30000` | In-process hosted wallet scan cache TTL. Balance/address/UTXO calls inside this window reuse the same gap-window scan. |
 | `ARCHON_WALLET_BTC_HOST` | `localhost` | bitcoind RPC host. |
 | `ARCHON_WALLET_BTC_PORT` | `38332` (signet) | bitcoind RPC port. |
 | `ARCHON_WALLET_BTC_USER` / `ARCHON_WALLET_BTC_PASS` | empty | bitcoind RPC auth. |

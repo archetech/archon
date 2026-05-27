@@ -14,6 +14,7 @@ export interface AppConfig {
     walletURL?: string;
     chain: ChainName;
     network: NetworkName;
+    rpcUrl?: string;
     host: string;
     port: number;
     user?: string;
@@ -85,6 +86,7 @@ const config: AppConfig = {
     walletURL: process.env.ARCHON_WALLET_URL,
     chain: toChain(process.env.ARCHON_SAT_CHAIN),
     network: toNetwork(process.env.ARCHON_SAT_NETWORK),
+    rpcUrl: process.env.ARCHON_SAT_RPC_URL,
     host: process.env.ARCHON_SAT_HOST || 'localhost',
     port: process.env.ARCHON_SAT_PORT ? parseInt(process.env.ARCHON_SAT_PORT) : 8332,
     user: process.env.ARCHON_SAT_USER,

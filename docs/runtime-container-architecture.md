@@ -38,9 +38,9 @@ flowchart TD
         BSW[btc-signet-wallet :4240]
         BSM[btc-signet-mediator :4236]
         BTN[btc-signet-node]
-        BT4W[btc-testnet4-wallet :4244]
-        BT4M[btc-testnet4-mediator]
-        BT4N[btc-testnet4-node]
+        BT4W[btc-t4-wallet :4244]
+        BT4M[btc-t4-mediator]
+        BT4N[btc-t4-node]
     end
 
     subgraph Naming[Herald and Onion Access]
@@ -175,9 +175,9 @@ flowchart LR
     end
 
     subgraph Testnet4[Testnet4]
-        BT4N[btc-testnet4-node]
-        BT4W[btc-testnet4-wallet]
-        BT4M[btc-testnet4-mediator]
+        BT4N[btc-t4-node]
+        BT4W[btc-t4-wallet]
+        BT4M[btc-t4-mediator]
     end
 
     BMM --> BMW

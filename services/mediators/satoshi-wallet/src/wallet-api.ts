@@ -8,6 +8,7 @@ import { readFile } from 'fs/promises';
 import { timingSafeEqual } from 'crypto';
 import axios from 'axios';
 import config from './config.js';
+import { redactUrl } from './url-redaction.js';
 import {
     createBtcClient,
     setupWatchOnlyWallet,
@@ -15,6 +16,7 @@ import {
     getReceiveAddress,
     getTransactions,
     getUtxos,
+    getTransaction,
     estimateFee,
     getWalletStatus,
     sendBtc,
@@ -99,6 +101,10 @@ const ARCHON_ADMIN_HEADER = 'x-archon-admin-key';
 function normalizePath(path: string): string {
     return path
         .replace(/\/wallet\/transaction\/[^/]+/g, '/wallet/transaction/:txid');
+}
+
+function rpcDescription(): string {
+    return config.btcRpcUrl ? redactUrl(config.btcRpcUrl) : `${config.btcHost}:${config.btcPort}`;
 }
 
 function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -202,11 +208,12 @@ async function main() {
     // Periodic metrics collection (every 60s)
     async function updateMetrics() {
         try {
-            const balance = await getBalance(btcClient);
+            const mnemonic = config.backend === 'alchemy' ? await fetchMnemonic() : undefined;
+            const balance = await getBalance(btcClient, mnemonic);
             walletBalanceConfirmed.set(balance.balance);
             walletBalanceUnconfirmed.set(balance.unconfirmed_balance);
 
-            const utxos = await getUtxos(btcClient, 0);
+            const utxos = await getUtxos(btcClient, 0, mnemonic);
             walletUtxoCount.set(utxos.length);
 
             const fee = await estimateFee(btcClient);
@@ -248,7 +255,8 @@ async function main() {
     // Balance
     v1router.get('/wallet/balance', requireAdminKey, async (_req, res) => {
         try {
-            const balance = await getBalance(btcClient);
+            const mnemonic = config.backend === 'alchemy' ? await fetchMnemonic() : undefined;
+            const balance = await getBalance(btcClient, mnemonic);
             res.json({ ...balance, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get balance');
@@ -259,7 +267,8 @@ async function main() {
     // Receive address
     v1router.get('/wallet/address', requireAdminKey, async (_req, res) => {
         try {
-            const address = await getReceiveAddress(btcClient);
+            const mnemonic = config.backend === 'alchemy' ? await fetchMnemonic() : undefined;
+            const address = await getReceiveAddress(btcClient, mnemonic, config.network);
             res.json({ address, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get address');
@@ -282,7 +291,8 @@ async function main() {
                 return;
             }
 
-            const transactions = await getTransactions(btcClient, count, skip);
+            const mnemonic = config.backend === 'alchemy' ? await fetchMnemonic() : undefined;
+            const transactions = await getTransactions(btcClient, count, skip, mnemonic);
             res.json({ transactions, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get transactions');
@@ -300,7 +310,8 @@ async function main() {
                 return;
             }
 
-            const utxos = await getUtxos(btcClient, minconf);
+            const mnemonic = config.backend === 'alchemy' ? await fetchMnemonic() : undefined;
+            const utxos = await getUtxos(btcClient, minconf, mnemonic);
             res.json({ utxos, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get UTXOs');
@@ -389,10 +400,16 @@ async function main() {
         }
     });
 
-    // Transaction status (uses wallet's gettransaction which works without txindex)
+    // Transaction status
     v1router.get('/wallet/transaction/:txid', requireAdminKey, async (req, res) => {
         try {
-            const tx = await btcClient.command('gettransaction', req.params.txid, true) as any;
+            const txid = req.params.txid;
+            if (typeof txid !== 'string' || !txid) {
+                res.status(400).json({ error: 'Missing or invalid "txid"' });
+                return;
+            }
+
+            const tx = await getTransaction(btcClient, txid);
             res.json({
                 txid: tx.txid,
                 confirmations: tx.confirmations,
@@ -436,7 +453,11 @@ async function main() {
     const server = app.listen(config.port, () => {
         logger.info(`Wallet v${serviceVersion} (${serviceCommit}) running on port ${config.port}`);
         logger.info(`Network: ${config.network}`);
-        logger.info(`Bitcoin RPC: ${config.btcHost}:${config.btcPort}`);
+        logger.info(`Wallet backend: ${config.backend}`);
+        logger.info(`Bitcoin RPC: ${rpcDescription()}`);
+        if (config.utxoUrl) {
+            logger.info(`UTXO API: ${redactUrl(config.utxoUrl)}`);
+        }
         logger.info(`Keymaster: ${config.keymasterURL}`);
     });
 
