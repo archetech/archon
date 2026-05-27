@@ -76,7 +76,7 @@ COMPOSE_PROFILES=
 COMPOSE_PROFILES=hyperswarm,cli,explorer,gatekeeper-client,keymaster-client,react-wallet,observability,btc-signet
 ```
 
-Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `lightning`, `drawbridge`, `zcash-mainnet`, `eth-sepolia`, `sol-devnet`, `pinning`, and `filecoin`.
+Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `lightning`, `drawbridge`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-devnet`, `pinning`, and `filecoin`.
 
 ### Key Environment Variables
 
@@ -255,13 +255,27 @@ This fallback is only used for `confirm=true` requests when the local node can r
 
 ## 5. Adding Ethereum Registry
 
-Ethereum support is optional. If enabled, the Ethereum registry anchors DID batches by submitting transactions to a canonical `ArchonRegistry` smart contract and importing its `ArchonBatch` events. The bundled Sepolia compose layer includes `eth-sepolia-mediator` plus a companion `eth-sepolia-wallet` service. The wallet derives an EVM account from the Keymaster mnemonic and signs transactions; the mediator scans logs and imports batches.
+Ethereum support is optional. If enabled, the Ethereum registry anchors DID batches by submitting transactions to a canonical `ArchonRegistry` smart contract and importing its `ArchonBatch` events. The bundled compose layers include mainnet (`eth-mainnet-mediator` plus `eth-mainnet-wallet`) and Sepolia (`eth-sepolia-mediator` plus `eth-sepolia-wallet`) variants. The wallet derives an EVM account from the Keymaster mnemonic and signs transactions; the mediator scans logs and imports batches.
 
-Sepolia is intended for testing. Production deployments should use a canonical contract on the chosen chain, with L2s such as Base, Optimism, or Arbitrum preferred when low anchoring cost matters.
+Mainnet uses the canonical `ETH:mainnet` contract. Sepolia is intended for testing. Future production L2 deployments should use a canonical contract on the chosen chain, with L2s such as Base, Optimism, or Arbitrum preferred when low anchoring cost matters.
+
+### Enable Ethereum Mainnet
+
+Add the Ethereum mainnet profile to `COMPOSE_PROFILES`:
+
+```env
+COMPOSE_PROFILES=hyperswarm,eth-mainnet
+```
+
+Add the registry to Gatekeeper:
+
+```env
+ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,ETH:mainnet
+```
 
 ### Enable Ethereum Sepolia
 
-Add the Ethereum Sepolia profile to `COMPOSE_PROFILES`:
+For test deployments, use the Sepolia profile instead:
 
 ```env
 COMPOSE_PROFILES=hyperswarm,eth-sepolia
@@ -279,9 +293,9 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,ETH:sepolia
 |----------|---------|-------------|
 | `ARCHON_ETH_RPC_URL` | none | Ethereum JSON-RPC endpoint |
 | `ARCHON_ETH_CONTRACT` | none | Canonical `ArchonRegistry` contract address |
-| `ARCHON_ETH_CHAIN` | `ETH:sepolia` | Gatekeeper registry name |
-| `ARCHON_ETH_NETWORK` | `sepolia` | Ethereum network name |
-| `ARCHON_ETH_CHAIN_ID` | `11155111` | EVM chain ID |
+| `ARCHON_ETH_CHAIN` | `ETH:mainnet` | Gatekeeper registry name |
+| `ARCHON_ETH_NETWORK` | `mainnet` | Ethereum network name |
+| `ARCHON_ETH_CHAIN_ID` | `1` | EVM chain ID |
 | `ARCHON_ETH_START_BLOCK` | `0` | Block height to start scanning |
 | `ARCHON_ETH_CONFIRMATIONS` | `12` | Confirmations before logs are imported |
 | `ARCHON_ETH_LOG_CHUNK_SIZE` | `2000` | Blocks per `eth_getLogs` request |
@@ -294,10 +308,16 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,ETH:sepolia
 ### Verify
 
 ```bash
-# Ethereum mediator metrics
+# Ethereum mainnet mediator metrics
+curl http://localhost:4246/metrics
+
+# Ethereum mainnet wallet metrics
+curl http://localhost:4255/metrics
+
+# Ethereum Sepolia mediator metrics
 curl http://localhost:4239/metrics
 
-# Ethereum wallet metrics
+# Ethereum Sepolia wallet metrics
 curl http://localhost:4253/metrics
 ```
 
@@ -656,6 +676,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 4236 | BTC Signet Mediator Metrics | 4236 | -- | localhost |
 | 4238 | Zcash Mainnet Mediator Metrics | 4238 | -- | localhost |
 | 4239 | Ethereum Sepolia Mediator Metrics | 4239 | -- | localhost |
+| 4246 | Ethereum Mainnet Mediator Metrics | 4246 | -- | localhost |
 | 4249 | Solana Devnet Mediator Metrics | 4249 | -- | localhost |
 | 4240 | BTC Signet Wallet API | 4240 | -- | localhost |
 | 4241 | BTC Signet Wallet Metrics | 4241 | -- | localhost |
@@ -667,6 +688,8 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 4251 | Zcash Mainnet Wallet Metrics | 4251 | -- | localhost |
 | 4252 | Ethereum Sepolia Wallet API | 4252 | -- | localhost |
 | 4253 | Ethereum Sepolia Wallet Metrics | 4253 | -- | localhost |
+| 4254 | Ethereum Mainnet Wallet API | 4254 | -- | localhost |
+| 4255 | Ethereum Mainnet Wallet Metrics | 4255 | -- | localhost |
 | 4262 | Solana Devnet Wallet API | 4262 | -- | localhost |
 | 4263 | Solana Devnet Wallet Metrics | 4263 | -- | localhost |
 | 4270 | Filecoin Wallet API | 4270 | -- | localhost |

@@ -1,0 +1,67 @@
+services:
+  eth-mainnet-wallet:
+    profiles: ["eth-mainnet"]
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.ethereum-wallet
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/ethereum-wallet
+    environment:
+      - ARCHON_WALLET_PORT=4254
+      - ARCHON_WALLET_METRICS_PORT=4255
+      - ARCHON_WALLET_ETH_NETWORK=mainnet
+      - ARCHON_WALLET_ETH_CHAIN_ID=${ARCHON_ETH_CHAIN_ID:-1}
+      - ARCHON_WALLET_ETH_RPC_URL=${ARCHON_ETH_RPC_URL}
+      - ARCHON_WALLET_ETH_DERIVATION_PATH=${ARCHON_WALLET_ETH_DERIVATION_PATH}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "127.0.0.1:4254:4254"
+      - "127.0.0.1:4255:4255"
+    depends_on:
+      keymaster:
+        condition: service_started
+
+  eth-mainnet-mediator:
+    profiles: ["eth-mainnet"]
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.ethereum
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/ethereum-mediator
+    environment:
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_MONGODB_URL=mongodb://mongodb:27017
+      - ARCHON_REDIS_URL=redis://redis:6379
+      - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
+      - ARCHON_ETH_CHAIN=${ARCHON_ETH_CHAIN:-ETH:mainnet}
+      - ARCHON_ETH_NETWORK=mainnet
+      - ARCHON_ETH_CHAIN_ID=${ARCHON_ETH_CHAIN_ID:-1}
+      - ARCHON_ETH_RPC_URL=${ARCHON_ETH_RPC_URL}
+      - ARCHON_ETH_CONTRACT=${ARCHON_ETH_CONTRACT}
+      - ARCHON_ETH_START_BLOCK=${ARCHON_ETH_START_BLOCK}
+      - ARCHON_ETH_CONFIRMATIONS=${ARCHON_ETH_CONFIRMATIONS}
+      - ARCHON_ETH_LOG_CHUNK_SIZE=${ARCHON_ETH_LOG_CHUNK_SIZE}
+      - ARCHON_ETH_PENDING_TX_TIMEOUT_BLOCKS=${ARCHON_ETH_PENDING_TX_TIMEOUT_BLOCKS}
+      - ARCHON_ETH_MIN_GAS_BALANCE_WEI=${ARCHON_ETH_MIN_GAS_BALANCE_WEI}
+      - ARCHON_WALLET_URL=http://eth-mainnet-wallet:4254
+      - ARCHON_ETH_IMPORT_INTERVAL=${ARCHON_ETH_IMPORT_INTERVAL}
+      - ARCHON_ETH_EXPORT_INTERVAL=${ARCHON_ETH_EXPORT_INTERVAL}
+      - ARCHON_ETH_REIMPORT=${ARCHON_ETH_REIMPORT}
+      - ARCHON_ETH_DB=${ARCHON_ETH_DB}
+      - ARCHON_ETH_METRICS_PORT=4246
+    ports:
+      - "127.0.0.1:4246:4246"
+    volumes:
+      - ../../data:/app/ethereum/data
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    depends_on:
+      - gatekeeper
+      - keymaster
+      - eth-mainnet-wallet

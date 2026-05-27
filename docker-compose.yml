@@ -38,6 +38,7 @@ include:
   - docker/compose/btc-testnet4.yml
   - docker/compose/btc-testnet4-hosted.yml
   - docker/compose/zcash-mainnet.yml
+  - docker/compose/eth-mainnet.yml
   - docker/compose/eth-sepolia.yml
   - docker/compose/sol-devnet.yml
   - docker/compose/pinning.yml
