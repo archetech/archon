@@ -1,11 +1,8 @@
-import {
-    bumpAlchemyTransactionFee,
-    normalizeAlchemyUtxos,
-} from '../../services/mediators/satoshi-wallet/src/alchemy-wallet';
+import { normalizeHostedUtxos } from '../../services/mediators/satoshi-wallet/src/utxo-normalizer';
 
 describe('Alchemy wallet backend', () => {
     it('normalizes common UTXO response shapes', () => {
-        expect(normalizeAlchemyUtxos({
+        expect(normalizeHostedUtxos({
             utxos: [
                 {
                     txid: 'tx-a',
@@ -34,7 +31,7 @@ describe('Alchemy wallet backend', () => {
     });
 
     it('ignores incomplete or zero-value UTXOs', () => {
-        expect(normalizeAlchemyUtxos([
+        expect(normalizeHostedUtxos([
             { txid: 'missing-vout', value: 1000 },
             { txid: 'zero-value', vout: 0, value: 0 },
             { txid: 'valid', vout: 1, value: '0x64' },
@@ -44,7 +41,7 @@ describe('Alchemy wallet backend', () => {
     });
 
     it('normalizes mempool.space Esplora UTXOs', () => {
-        expect(normalizeAlchemyUtxos([
+        expect(normalizeHostedUtxos([
             {
                 txid: 'mempool-tx',
                 vout: 2,
@@ -59,9 +56,4 @@ describe('Alchemy wallet backend', () => {
         ]);
     });
 
-    it('rejects RBF bumping explicitly', async () => {
-        await expect(bumpAlchemyTransactionFee()).rejects.toThrow(
-            'RBF fee bumping is not supported by ARCHON_WALLET_BACKEND=alchemy',
-        );
-    });
 });

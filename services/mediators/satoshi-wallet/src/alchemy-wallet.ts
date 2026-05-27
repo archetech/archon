@@ -7,6 +7,7 @@ import { ECPairFactory } from 'ecpair';
 import config from './config.js';
 import type { WalletNetwork } from './config.js';
 import { deriveAccountKey, deriveAddress, getBtcNetwork } from './derivation.js';
+import { normalizeHostedUtxos, type NormalizedRawUtxo } from './utxo-normalizer.js';
 import type { EstimateSmartFeeResult, ListTransactionsEntry, UnspentOutput } from 'bitcoin-core';
 import type BtcClient from 'bitcoin-core';
 
@@ -41,13 +42,6 @@ interface AlchemyWalletState {
     utxos: AlchemyWalletUtxo[];
     transactions: ListTransactionsEntry[];
     updatedAt?: string;
-}
-
-interface NormalizedRawUtxo {
-    txid: string;
-    vout: number;
-    valueSats: number;
-    confirmations: number;
 }
 
 interface FundedPsbt {
@@ -128,71 +122,6 @@ function formatAlchemyError(error: any, url: string): Error {
     return new Error(`Alchemy UTXO request failed at ${maskUrl(url)}. ${detail || error.message}`.trim());
 }
 
-function extractArray(payload: any): any[] {
-    if (Array.isArray(payload)) {
-        return payload;
-    }
-    if (Array.isArray(payload?.utxos)) {
-        return payload.utxos;
-    }
-    if (Array.isArray(payload?.data)) {
-        return payload.data;
-    }
-    if (Array.isArray(payload?.result)) {
-        return payload.result;
-    }
-    if (Array.isArray(payload?.result?.utxos)) {
-        return payload.result.utxos;
-    }
-    if (Array.isArray(payload?.outputs)) {
-        return payload.outputs;
-    }
-    return [];
-}
-
-function toSats(value: any): number {
-    if (typeof value === 'number') {
-        return Number.isInteger(value) ? value : Math.round(value * SATS_PER_BTC);
-    }
-    if (typeof value === 'bigint') {
-        return Number(value);
-    }
-    if (typeof value === 'string') {
-        if (value.startsWith('0x')) {
-            return Number.parseInt(value, 16);
-        }
-        if (value.includes('.')) {
-            return Math.round(Number.parseFloat(value) * SATS_PER_BTC);
-        }
-        return Number.parseInt(value, 10);
-    }
-    return 0;
-}
-
-export function normalizeAlchemyUtxos(payload: any): NormalizedRawUtxo[] {
-    return extractArray(payload)
-        .map((item: any) => {
-            const txid = item.txid || item.txId || item.hash || item.tx_hash || item.transactionHash;
-            const vout = item.vout ?? item.outputIndex ?? item.index ?? item.n;
-            const value = item.value ?? item.satoshis ?? item.amount ?? item.valueSats ?? item.value_sat;
-            const confirmations = item.confirmations
-                ?? item.confirmedConfirmations
-                ?? item.numConfirmations
-                ?? (item.status?.confirmed ? 1 : 0);
-
-            return {
-                txid,
-                vout: Number(vout),
-                valueSats: toSats(value),
-                confirmations: Number(confirmations),
-            };
-        })
-        .filter(utxo => Boolean(utxo.txid)
-            && Number.isInteger(utxo.vout)
-            && Number.isFinite(utxo.valueSats)
-            && utxo.valueSats > 0);
-}
-
 async function fetchAddressUtxos(address: string): Promise<NormalizedRawUtxo[]> {
     const base = requireUtxoUrl();
     const candidates = [
@@ -207,7 +136,7 @@ async function fetchAddressUtxos(address: string): Promise<NormalizedRawUtxo[]> 
     for (const url of candidates) {
         try {
             const response = await axios.get(url, { timeout: 30_000 });
-            return normalizeAlchemyUtxos(response.data);
+            return normalizeHostedUtxos(response.data);
         } catch (error: any) {
             lastError = formatAlchemyError(error, url);
             if (error.response && ![400, 404].includes(error.response.status)) {
