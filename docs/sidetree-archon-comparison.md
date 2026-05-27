@@ -19,9 +19,13 @@ repository.
 | --- | --- | --- |
 | Primary abstraction | A protocol for DID methods that batch off-chain operations and anchor commitments in a ledger | A `did:cid` method and runtime stack for content-addressed DIDs, local resolution, P2P synchronization, and optional anchoring |
 | Creation | Create operations are part of the Sidetree operation model and become resolvable through Sidetree CAS plus ledger-ordered batches | Create operations deterministically produce the DID CID and are immediately usable once the create object is available through IPFS/Gatekeeper |
+| Pre-anchor use | Long-form DIDs can carry initial state before anchoring | The CID-derived DID can resolve locally as soon as the create operation is stored |
 | Updates | Update, recover, and deactivate operations are ordered by Sidetree transaction/batch files | Update and delete operations are appended to a per-DID event log, distributed through a configured registry, and replayed by Gatekeeper |
 | Recovery model | Explicit recovery keys and recover operations are central to the protocol | No separate recovery operation in the core DID log; recovery is handled at the wallet/Keymaster layer and DID delete is final |
+| Mutation granularity | Delta-based document patches | Signed operation documents that replace the submitted document-set fields during replay |
 | Anchoring | A DID method chooses a single anchoring system, such as Bitcoin for ION | A DID records a registry such as `hyperswarm`, `BTC:*`, `ZEC:*`, `ETH:*`, `SOL:*`, or `pin`; mediators implement each network |
+| Registry changes | Generally a DID is bound to the method/network's anchoring stream | The registration registry can be changed by a valid update when the new registry is supported |
+| Write control | Can include protocol-level mechanisms such as value locking or writer locks | Primarily node, admin, queue, registry, and mediator policy |
 | Data storage | CAS stores Sidetree core/provisional/chunk/delta objects; services typically externalize application data | IPFS stores operations, batch assets, and arbitrary DID-linked data; `didDocumentData` is a first-class Archon extension |
 | Node role | Sidetree nodes process ledger transactions and CAS objects to construct DID state | Gatekeeper owns local DID state and APIs; mediators synchronize with networks; Keymaster owns wallet/private-key workflows |
 | Compatibility goal | Interoperable Sidetree methods that share the Sidetree processing rules | Drop-in service parity across Archon implementations, plus W3C DID resolution compatibility for `did:cid` |
@@ -100,6 +104,9 @@ Sidetree DID creation is decentralized, but it is still part of the Sidetree
 operation pipeline. A create operation introduces a suffix data commitment and
 initial state. The operation is included in Sidetree's batch/CAS/anchor flow,
 and resolution depends on the Sidetree method's operation processing rules.
+Sidetree also supports a long-form DID pattern where the initial state is
+carried with the identifier, allowing pre-anchor use before the abbreviated DID
+is anchored in the method's canonical operation stream.
 
 Archon makes creation more directly content-addressed. A `did:cid` DID is
 derived from the canonical create operation:
@@ -113,6 +120,8 @@ Because the DID is the CID of the create object, creation can be immediate and
 zero-fee. The create event is stored locally and can be propagated through IPFS
 and peer networks without waiting for a blockchain. The registry named in the
 create operation controls where later updates are expected to appear.
+Archon does not need a separate long-form identifier for pre-anchor use because
+the method identifier already is the content address of the create operation.
 
 This is one of the sharpest differences between the systems. Sidetree uses CAS
 to scale a ledger-rooted operation log. Archon uses CAS as the root of identity
@@ -139,6 +148,14 @@ Archon uses a smaller core operation set:
 - **update**: merge a new DID document, `didDocumentData`, or registration
   payload into the current state;
 - **delete**: deactivate the DID and clear document/data contents.
+
+Sidetree updates are delta-based: operations carry patches that add, remove, or
+replace pieces of the DID document while advancing the commitment chain. Archon
+updates are coarser. During Gatekeeper replay, any top-level document-set field
+present in `operation.doc` replaces the corresponding field on the running
+document. Clients therefore usually resolve the current document, modify the
+parts they intend to change, and submit the resulting update with the current
+`previd`.
 
 Archon recovery is intentionally handled above the DID event log. Keymaster
 supports HD wallets, encrypted backups, identity recovery, seed-bank workflows,
@@ -190,6 +207,14 @@ Examples include:
 - `ZEC:mainnet` and `ZEC:testnet` through the Zcash mediator;
 - `ETH:*` and `SOL:*` through chain-specific mediators;
 - `pin` for auxiliary storage pinning and, when enabled, DID registration.
+
+This registry is not only creation-time metadata. A valid Archon update can
+include a new `didDocumentRegistration.registry`, and Gatekeeper's replay logic
+uses that registration history to decide which registry is expected for later
+events. That gives Archon a migration path between supported registries. A
+Sidetree DID method is usually defined around one canonical anchoring stream, so
+moving an existing DID to a different ledger is not a native operation in the
+same way.
 
 For Bitcoin-family anchoring, Archon does not put the whole operation batch in
 the transaction. The Satoshi mediator writes each operation JSON to IPFS,
@@ -246,6 +271,11 @@ canonical JSON, SHA-256, secp256k1 ECDSA proofs, and `previd` links. Create
 operations are self-certifying through their CID-derived DID. Updates and
 deletes are verified against the current controller. Registry metadata adds
 ordering and timestamp evidence without replacing signature verification.
+This makes Archon's operation chain easier to inspect, but it also means it
+does not inherit Sidetree's commitment-reveal protection for future update or
+recovery keys. Archon's main conflict guard is the `previd` hash chain plus
+registry ordering: an update is only valid when it points at the current
+version.
 
 The resulting posture differs:
 
@@ -318,6 +348,9 @@ implementations must remain substitutable.
 
 - Mature protocol model for batching DID operations over a ledger.
 - Explicit recovery operation with separate recovery authority.
+- Commitment-reveal key rotation avoids publishing future update and recovery
+  keys before they are used.
+- Delta-based operation patches can be compact for DID document changes.
 - Clear separation between DID protocol machinery and application data.
 - Strong fit for a DID method that wants one canonical anchoring network.
 - Existing lineage through ION and the broader decentralized identity
@@ -333,6 +366,8 @@ implementations must remain substitutable.
   DID document.
 - Multi-registry behavior is a method design problem rather than a native
   per-DID registry abstraction.
+- Protocol-level write controls, file limits, compression, and commitment
+  tracking add operator and implementation surface area.
 
 ### Archon advantages
 
@@ -341,6 +376,8 @@ implementations must remain substitutable.
 - First-class `didDocumentData` for assets, credentials, messages, groups,
   polls, batches, and node metadata.
 - Pluggable registries with different cost/finality profiles.
+- Registry changes can be expressed as signed DID updates when both registries
+  are supported.
 - Service separation: Gatekeeper, Keymaster, mediators, and wallet services can
   evolve or be replaced independently.
 - Local UX can be fast while confirmed resolution remains available for
@@ -351,6 +388,8 @@ implementations must remain substitutable.
 - Not Sidetree wire-compatible.
 - Recovery is not a separate consensus operation; wallet backup and recovery
   hygiene matter more.
+- No Sidetree-style commitment-reveal chain for future update/recovery keys.
+- Coarser update documents can be less compact than small delta patches.
 - Rich `didDocumentData` makes privacy, size limits, pinning, and retention
   policy more central to application design.
 - Multi-registry flexibility increases operator configuration and mediator
