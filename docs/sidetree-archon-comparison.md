@@ -296,7 +296,7 @@ the anchored stream.
 Archon separates the cost and latency profile by operation type:
 
 - create: local/IPFS-derived, immediate, zero-fee;
-- `hyperswarm` update: seconds-scale gossip with eventual consistency;
+- `hyperswarm` update: fast P2P gossip with best-effort peer synchronization;
 - blockchain update: queued, batched, and confirmed according to the mediator's
   chain rules;
 - auxiliary pinning: opt-in, registry-controlled persistence work.
