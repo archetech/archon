@@ -21,7 +21,19 @@ const READ_ONLY = config.exportInterval === 0;
 const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 
 function maskUrl(url: string): string {
-    return url.replace(/\/v2\/[^/?#]+/, '/v2/<redacted>');
+    try {
+        const parsed = new URL(url);
+        parsed.username = '';
+        parsed.password = '';
+        parsed.search = '';
+        parsed.pathname = parsed.pathname.replace(/\/v2\/[^/]+/, '/v2/<redacted>');
+        return parsed.toString().replace('%3Credacted%3E', '<redacted>');
+    } catch {
+        return url
+            .replace(/\/\/[^:@/?#]+:[^@/?#]+@/, '//<redacted>@')
+            .replace(/\/v2\/[^/?#]+/, '/v2/<redacted>')
+            .replace(/[?&](api[_-]?key|apikey|key|token|access_token)=[^&#]+/gi, '?$1=<redacted>');
+    }
 }
 
 function rpcDescription(): string {
@@ -32,9 +44,11 @@ const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
 const keymaster = new KeymasterClient();
 const btcClient = new BtcClient({
-    username: config.rpcUrl ? undefined : config.user,
-    password: config.rpcUrl ? undefined : config.pass,
     host: config.rpcUrl || `http://${config.host}:${config.port}`,
+    ...(config.rpcUrl ? {} : {
+        username: config.user,
+        password: config.pass,
+    }),
 });
 
 // Wallet service API helpers

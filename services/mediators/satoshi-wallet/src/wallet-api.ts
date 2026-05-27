@@ -8,6 +8,7 @@ import { readFile } from 'fs/promises';
 import { timingSafeEqual } from 'crypto';
 import axios from 'axios';
 import config from './config.js';
+import { redactUrl } from './url-redaction.js';
 import {
     createBtcClient,
     setupWatchOnlyWallet,
@@ -102,12 +103,8 @@ function normalizePath(path: string): string {
         .replace(/\/wallet\/transaction\/[^/]+/g, '/wallet/transaction/:txid');
 }
 
-function maskUrl(url: string): string {
-    return url.replace(/\/v2\/[^/?#]+/, '/v2/<redacted>');
-}
-
 function rpcDescription(): string {
-    return config.btcRpcUrl ? maskUrl(config.btcRpcUrl) : `${config.btcHost}:${config.btcPort}`;
+    return config.btcRpcUrl ? redactUrl(config.btcRpcUrl) : `${config.btcHost}:${config.btcPort}`;
 }
 
 function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -406,7 +403,12 @@ async function main() {
     // Transaction status
     v1router.get('/wallet/transaction/:txid', requireAdminKey, async (req, res) => {
         try {
-            const txid = Array.isArray(req.params.txid) ? req.params.txid[0] : req.params.txid;
+            const txid = req.params.txid;
+            if (typeof txid !== 'string' || !txid) {
+                res.status(400).json({ error: 'Missing or invalid "txid"' });
+                return;
+            }
+
             const tx = await getTransaction(btcClient, txid);
             res.json({
                 txid: tx.txid,
@@ -454,7 +456,7 @@ async function main() {
         logger.info(`Wallet backend: ${config.backend}`);
         logger.info(`Bitcoin RPC: ${rpcDescription()}`);
         if (config.utxoUrl) {
-            logger.info(`UTXO API: ${maskUrl(config.utxoUrl)}`);
+            logger.info(`UTXO API: ${redactUrl(config.utxoUrl)}`);
         }
         logger.info(`Keymaster: ${config.keymasterURL}`);
     });

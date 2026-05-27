@@ -39,6 +39,11 @@ function toSats(value: any): number {
     return 0;
 }
 
+function toConfirmations(value: any): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+}
+
 export interface NormalizedRawUtxo {
     txid: string;
     vout: number;
@@ -61,7 +66,7 @@ export function normalizeHostedUtxos(payload: any): NormalizedRawUtxo[] {
                 txid,
                 vout: Number(vout),
                 valueSats: toSats(value),
-                confirmations: Number(confirmations),
+                confirmations: toConfirmations(confirmations),
             };
         })
         .filter(utxo => Boolean(utxo.txid)

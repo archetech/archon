@@ -8,6 +8,7 @@ import config from './config.js';
 import type { WalletNetwork } from './config.js';
 import { deriveAccountKey, deriveAddress, getBtcNetwork } from './derivation.js';
 import { normalizeHostedUtxos, type NormalizedRawUtxo } from './utxo-normalizer.js';
+import { redactUrl } from './url-redaction.js';
 import type { EstimateSmartFeeResult, ListTransactionsEntry, UnspentOutput } from 'bitcoin-core';
 import type BtcClient from 'bitcoin-core';
 
@@ -101,10 +102,6 @@ function requireUtxoUrl(): string {
     return config.utxoUrl.replace(/\/+$/, '');
 }
 
-function maskUrl(url: string): string {
-    return url.replace(/\/v2\/[^/]+/, '/v2/<redacted>');
-}
-
 function formatAlchemyError(error: any, url: string): Error {
     const status = error.response?.status;
     const detail = typeof error.response?.data === 'string'
@@ -112,14 +109,14 @@ function formatAlchemyError(error: any, url: string): Error {
         : error.response?.data?.message || error.response?.data?.error || error.message;
 
     if (status === 401) {
-        return new Error(`Alchemy UTXO request unauthorized at ${maskUrl(url)}. Check that the API key is valid and enabled for the Bitcoin UTXO API. ${detail || ''}`.trim());
+        return new Error(`Alchemy UTXO request unauthorized at ${redactUrl(url)}. Check that the API key is valid and enabled for the Bitcoin UTXO API. ${detail || ''}`.trim());
     }
 
     if (status) {
-        return new Error(`Alchemy UTXO request failed with status ${status} at ${maskUrl(url)}. ${detail || ''}`.trim());
+        return new Error(`Alchemy UTXO request failed with status ${status} at ${redactUrl(url)}. ${detail || ''}`.trim());
     }
 
-    return new Error(`Alchemy UTXO request failed at ${maskUrl(url)}. ${detail || error.message}`.trim());
+    return new Error(`Alchemy UTXO request failed at ${redactUrl(url)}. ${detail || error.message}`.trim());
 }
 
 async function fetchAddressUtxos(address: string): Promise<NormalizedRawUtxo[]> {
@@ -426,12 +423,13 @@ function fundSend(
 
         if (subtractFee) {
             const candidateChange = selectedSats - amountSats;
-            const candidateFee = candidateChange > DUST_SATS ? feeWithChange : feeNoChange + Math.max(candidateChange, 0);
+            const hasChange = candidateChange > DUST_SATS;
+            const candidateFee = hasChange ? feeWithChange : feeNoChange;
             const candidateRecipient = amountSats - candidateFee;
             if (selectedSats >= amountSats && candidateRecipient > DUST_SATS) {
-                feeSats = candidateFee;
-                recipientSats = candidateChange > DUST_SATS ? candidateRecipient : selectedSats - candidateFee;
-                changeSats = candidateChange > DUST_SATS ? candidateChange : 0;
+                feeSats = hasChange ? candidateFee : selectedSats - candidateRecipient;
+                recipientSats = candidateRecipient;
+                changeSats = hasChange ? candidateChange : 0;
                 break;
             }
             continue;

@@ -56,4 +56,16 @@ describe('Alchemy wallet backend', () => {
         ]);
     });
 
+    it('defaults non-numeric confirmations to zero', () => {
+        expect(normalizeHostedUtxos([
+            {
+                txid: 'bad-confirmations',
+                vout: 0,
+                value: 5000,
+                confirmations: 'not-a-number',
+            },
+        ])).toEqual([
+            { txid: 'bad-confirmations', vout: 0, valueSats: 5000, confirmations: 0 },
+        ]);
+    });
 });
