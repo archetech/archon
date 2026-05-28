@@ -1,6 +1,6 @@
 # Archon Solana mediator
 
-The Solana mediator anchors Archon DID batches on Solana by publishing Archon-formatted memos. It is designed first for `SOL:devnet`.
+The Solana mediator anchors Archon DID batches on Solana by publishing Archon-formatted memos. It supports canonical `SOL:mainnet-beta` and `SOL:devnet` registries.
 
 The mediator has two responsibilities:
 
@@ -13,13 +13,13 @@ Each import cycle also syncs finalized Solana block checkpoints into Gatekeeper 
 
 ## Canonical memo format
 
-The devnet registry uses the Solana Memo program with an Archon-specific payload prefix:
+The Solana registries use the Solana Memo program with an Archon-specific payload prefix:
 
 ```text
 ARCHON_BATCH_V1:{"batchHash":"0x...","batchDid":"did:cid:...","opCount":1}
 ```
 
-Every `SOL:devnet` node should scan the same registry address and payload format. The default registry address is the deterministic public key `BxFUuKEhYMrKYB1vDngAvN8d21zU8jGptpnUMs6kjYxr`, derived from the Memo program ID and registry name. Wallet anchors include that address as a Memo instruction signer so discovery can query a narrow address instead of the global Memo program. A future custom Solana program can replace this format under a distinct registry name or explicit non-canonical configuration.
+Every node on a canonical Solana registry should scan the same registry address and payload format. The default registry address is derived from the Memo program ID and registry name. Wallet anchors include that address as a Memo instruction signer so discovery can query a narrow address instead of the global Memo program. A future custom Solana program can replace this format under a distinct registry name or explicit non-canonical configuration.
 
 ## Environment variables
 

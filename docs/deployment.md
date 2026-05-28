@@ -9,7 +9,7 @@ This guide walks you through deploying an Archon node, from a core DID-only setu
 3. [Adding Bitcoin Registries](#3-adding-bitcoin-registries)
 4. [Adding Zcash Registry](#4-adding-zcash-registry)
 5. [Adding Ethereum Registry](#5-adding-ethereum-registry)
-6. [Adding Solana Devnet Registry](#6-adding-solana-devnet-registry)
+6. [Adding Solana Registry](#6-adding-solana-registry)
 7. [Adding Generic IPFS Pinning](#7-adding-generic-ipfs-pinning)
 8. [Adding Drawbridge (API Gateway + Tor)](#8-adding-drawbridge-api-gateway--tor)
 9. [Bundled Lightning Stack (Optional)](#9-bundled-lightning-stack-optional)
@@ -76,7 +76,7 @@ COMPOSE_PROFILES=
 COMPOSE_PROFILES=hyperswarm,cli,explorer,gatekeeper-client,keymaster-client,react-wallet,observability,btc-signet
 ```
 
-Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `lightning`, `drawbridge`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-devnet`, `pinning`, and `filecoin`.
+Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `lightning`, `drawbridge`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-mainnet`, `sol-devnet`, `pinning`, and `filecoin`.
 
 ### Key Environment Variables
 
@@ -327,15 +327,29 @@ The reference Solidity contract lives at `services/mediators/ethereum/contracts/
 
 ---
 
-## 6. Adding Solana Devnet Registry
+## 6. Adding Solana Registry
 
-Solana support is optional. If enabled, the Solana registry anchors DID batches by submitting Solana Memo transactions with an Archon-specific payload and importing matching memos back into Gatekeeper. The bundled devnet compose layer includes `sol-devnet-mediator` plus a companion `sol-devnet-wallet` service. The wallet derives a Solana account from the Keymaster mnemonic and signs transactions; the mediator scans an Archon registry address included in Memo transactions and imports batches.
+Solana support is optional. If enabled, the Solana registry anchors DID batches by submitting Solana Memo transactions with an Archon-specific payload and importing matching memos back into Gatekeeper. The bundled compose layers include mainnet (`sol-mainnet-mediator` plus `sol-mainnet-wallet`) and devnet (`sol-devnet-mediator` plus `sol-devnet-wallet`) variants. The wallet derives a Solana account from the Keymaster mnemonic and signs transactions; the mediator scans an Archon registry address included in Memo transactions and imports batches.
 
-Devnet is intended for testing. Production deployments should use a hardened discovery target, either a canonical custom Solana program or an explicitly documented non-canonical memo registry.
+Mainnet uses the canonical `SOL:mainnet-beta` memo registry. Devnet is intended for testing. Future custom Solana programs should use a distinct canonical registry decision.
+
+### Enable Solana Mainnet
+
+Add the Solana mainnet profile to `COMPOSE_PROFILES`:
+
+```env
+COMPOSE_PROFILES=hyperswarm,sol-mainnet
+```
+
+Add the registry to Gatekeeper:
+
+```env
+ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,SOL:mainnet-beta
+```
 
 ### Enable Solana Devnet
 
-Add the Solana Devnet profile to `COMPOSE_PROFILES`:
+For test deployments, use the Devnet profile instead:
 
 ```env
 COMPOSE_PROFILES=hyperswarm,sol-devnet
@@ -351,9 +365,9 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,SOL:devnet
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ARCHON_SOL_RPC_URL` | `https://api.devnet.solana.com` | Solana JSON-RPC endpoint |
-| `ARCHON_SOL_CHAIN` | `SOL:devnet` | Gatekeeper registry name |
-| `ARCHON_SOL_NETWORK` | `devnet` | Solana network name |
+| `ARCHON_SOL_RPC_URL` | `https://api.mainnet-beta.solana.com` | Solana JSON-RPC endpoint |
+| `ARCHON_SOL_CHAIN` | `SOL:mainnet-beta` | Gatekeeper registry name |
+| `ARCHON_SOL_NETWORK` | `mainnet-beta` | Solana network name |
 | `ARCHON_SOL_COMMITMENT` | `confirmed` | Commitment level for reads and writes |
 | `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Memo program ID used for Archon anchors |
 | `ARCHON_SOL_REGISTRY_ADDRESS` | derived | Address included in Archon memo transactions and scanned for discovery |
@@ -370,10 +384,16 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,SOL:devnet
 ### Verify
 
 ```bash
-# Solana mediator metrics
+# Solana mainnet mediator metrics
+curl http://localhost:4248/metrics
+
+# Solana mainnet wallet metrics
+curl http://localhost:4257/metrics
+
+# Solana Devnet mediator metrics
 curl http://localhost:4249/metrics
 
-# Solana wallet metrics
+# Solana Devnet wallet metrics
 curl http://localhost:4263/metrics
 ```
 
@@ -679,6 +699,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 4238 | Zcash Mainnet Mediator Metrics | 4238 | -- | localhost |
 | 4239 | Ethereum Sepolia Mediator Metrics | 4239 | -- | localhost |
 | 4246 | Ethereum Mainnet Mediator Metrics | 4246 | -- | localhost |
+| 4248 | Solana Mainnet Mediator Metrics | 4248 | -- | localhost |
 | 4249 | Solana Devnet Mediator Metrics | 4249 | -- | localhost |
 | 4240 | BTC Signet Wallet API | 4240 | -- | localhost |
 | 4241 | BTC Signet Wallet Metrics | 4241 | -- | localhost |
@@ -692,6 +713,8 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 4253 | Ethereum Sepolia Wallet Metrics | 4253 | -- | localhost |
 | 4254 | Ethereum Mainnet Wallet API | 4254 | -- | localhost |
 | 4255 | Ethereum Mainnet Wallet Metrics | 4255 | -- | localhost |
+| 4256 | Solana Mainnet Wallet API | 4256 | -- | localhost |
+| 4257 | Solana Mainnet Wallet Metrics | 4257 | -- | localhost |
 | 4262 | Solana Devnet Wallet API | 4262 | -- | localhost |
 | 4263 | Solana Devnet Wallet Metrics | 4263 | -- | localhost |
 | 4270 | Filecoin Wallet API | 4270 | -- | localhost |
