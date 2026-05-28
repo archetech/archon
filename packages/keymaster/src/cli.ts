@@ -310,6 +310,22 @@ program
     });
 
 program
+    .command('list-registries')
+    .description('List supported registries')
+    .action(async () => {
+        try {
+            const registries = await keymaster.listRegistries();
+
+            for (const registry of registries) {
+                console.log(registry);
+            }
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('use-id <name>')
     .description('Set the current ID')
     .action(async (name) => {
@@ -2077,7 +2093,7 @@ async function run() {
         const cipher = new CipherNode();
 
         // For commands that need an existing wallet, verify it exists
-        const walletCreationCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file'];
+        const walletCreationCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file', 'list-registries'];
         const commandName = process.argv[2];
         if (commandName && !walletCreationCommands.includes(commandName)) {
             const existing = await wallet.loadWallet();

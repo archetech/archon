@@ -57,6 +57,7 @@ Commands:
   list-ids                                List IDs and show current ID
   list-issued                             List issued credentials
   list-names                              List DID names (aliases)
+  list-registries                         List supported registries
   list-schemas                            List schemas owned by current ID
   list-vault-items <id>                   List items in the vault
   list-vault-members <id>                 List members of a vault
