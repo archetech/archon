@@ -5,9 +5,9 @@ import { tmpdir } from 'os';
 import CipherNode from '@didcid/cipher/node';
 import type { Operation } from '@didcid/gatekeeper/types';
 import { JsonPinStore } from '../../services/mediators/pinning/src/state.ts';
-import { processPinningQueue, type PinningGatekeeper } from '../../services/mediators/pinning/src/sync.ts';
+import { fingerprintOperation, processPinningQueue, type PinningGatekeeper } from '../../services/mediators/pinning/src/sync.ts';
 import { pinPayload } from '../../services/mediators/pinning/src/provider.ts';
-import type { PinningServiceProvider } from '../../services/mediators/pinning/src/provider.ts';
+import type { PinningServiceProvider, ProviderPinRequest } from '../../services/mediators/pinning/src/provider.ts';
 
 function op(id: string, registry = 'BTC:mainnet'): Operation {
     return {
@@ -24,6 +24,16 @@ function op(id: string, registry = 'BTC:mainnet'): Operation {
             registry,
         },
     } as unknown as Operation;
+}
+
+function updateOp(did: string): Operation {
+    return {
+        type: 'update',
+        did,
+        doc: {
+            didDocumentData: { mock: true },
+        },
+    } as Operation;
 }
 
 class FakeGatekeeper implements PinningGatekeeper {
@@ -48,10 +58,12 @@ class FakeGatekeeper implements PinningGatekeeper {
 class FakeProvider {
     name = 'test';
     pins = 0;
+    requests: ProviderPinRequest[] = [];
     statuses = new Map<string, any>();
 
-    async pin(): Promise<any> {
+    async pin(request: ProviderPinRequest): Promise<any> {
         this.pins += 1;
+        this.requests.push(request);
         return { requestid: `request-${this.pins}`, status: 'pinned', response: { status: 'pinned' } };
     }
 
@@ -88,6 +100,34 @@ describe('pinning mediator queue processing', () => {
             expect(result).toMatchObject({ pinned: 1, failed: 0 });
             expect(gatekeeper.cleared).toHaveLength(1);
             expect(provider.pins).toBe(1);
+        });
+    });
+
+    it('uses registry-free provider names and metadata', async () => {
+        await withStore(async store => {
+            const operation = updateOp('did:test:one');
+            const gatekeeper = new FakeGatekeeper([operation]);
+            const provider = new FakeProvider();
+            const cipher = new CipherNode();
+            const fingerprint = fingerprintOperation(cipher, operation);
+
+            const result = await processPinningQueue(
+                'pin',
+                gatekeeper,
+                store,
+                cipher,
+                provider as unknown as PinningServiceProvider,
+                []
+            );
+
+            expect(result).toMatchObject({ pinned: 1, failed: 0 });
+            expect(provider.requests).toHaveLength(1);
+            expect(provider.requests[0].name).toBe(`archon-${fingerprint.slice(0, 16)}`);
+            expect(provider.requests[0].name).not.toContain('unknown');
+            expect(provider.requests[0].meta).toStrictEqual({
+                archonFingerprint: fingerprint,
+                archonCid: provider.requests[0].cid,
+            });
         });
     });
 
