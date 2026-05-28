@@ -2092,10 +2092,10 @@ async function run() {
         // Initialize cipher
         const cipher = new CipherNode();
 
-        // For commands that need an existing wallet, verify it exists
-        const walletCreationCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file', 'list-registries'];
+        // Commands in this allowlist can run before a local wallet exists.
+        const walletOptionalCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file', 'list-registries'];
         const commandName = process.argv[2];
-        if (commandName && !walletCreationCommands.includes(commandName)) {
+        if (commandName && !walletOptionalCommands.includes(commandName)) {
             const existing = await wallet.loadWallet();
             if (!existing) {
                 console.error(`Error: Wallet not found at ${walletPath}`);

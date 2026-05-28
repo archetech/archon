@@ -51,7 +51,7 @@ def _error(message: Any) -> None:
     print(str(message), file=sys.stderr)
 
 
-WALLET_CREATION_COMMANDS = {
+WALLET_OPTIONAL_COMMANDS = {
     "create-wallet",
     "new-wallet",
     "create-id",
@@ -1339,7 +1339,7 @@ async def _run(args: argparse.Namespace) -> int:
         data_folder=str(wallet_path_obj.parent) if wallet_path_obj.parent.as_posix() else ".",
     )
 
-    if args.command not in WALLET_CREATION_COMMANDS:
+    if args.command not in WALLET_OPTIONAL_COMMANDS:
         existing = wallet_store.load_wallet()
         if not existing:
             print(f"Error: Wallet not found at {wallet_path}", file=sys.stderr)
