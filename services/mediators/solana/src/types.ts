@@ -30,6 +30,7 @@ export interface MediatorDb {
     blocksScanned: number;
     blocksPending: number;
     txnsScanned: number;
+    currentBlockHeight?: number;
     checkpointSlot?: number;
     checkpointHeight?: number;
     registered: RegisteredItem[];

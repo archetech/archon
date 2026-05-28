@@ -120,22 +120,52 @@ promClient.collectDefaultMetrics({ register });
 
 const solanaBlockHeight = new promClient.Gauge({
     name: 'solana_block_height',
-    help: 'Current scanned slot height',
+    help: 'Deprecated alias for solana_slot_cursor; current scanned Solana slot',
 });
 
 const solanaBlockCount = new promClient.Gauge({
     name: 'solana_block_count',
-    help: 'Total Solana slot height',
+    help: 'Deprecated alias for solana_current_slot; current Solana slot',
 });
 
 const solanaBlocksPending = new promClient.Gauge({
     name: 'solana_blocks_pending',
-    help: 'Remaining slots to scan',
+    help: 'Deprecated alias for solana_slot_lag; current slot minus scanned Solana slot cursor',
 });
 
 const solanaBlocksScanned = new promClient.Gauge({
     name: 'solana_blocks_scanned',
-    help: 'Total slots scanned',
+    help: 'Deprecated alias for solana_slots_scanned; total Solana slots covered by the scan cursor',
+});
+
+const solanaSlotCursor = new promClient.Gauge({
+    name: 'solana_slot_cursor',
+    help: 'Current scanned Solana slot cursor',
+});
+
+const solanaCurrentSlot = new promClient.Gauge({
+    name: 'solana_current_slot',
+    help: 'Current Solana slot reported by the configured RPC commitment',
+});
+
+const solanaSlotLag = new promClient.Gauge({
+    name: 'solana_slot_lag',
+    help: 'Current Solana slot minus scanned slot cursor; can grow between registry memo anchors',
+});
+
+const solanaSlotsScanned = new promClient.Gauge({
+    name: 'solana_slots_scanned',
+    help: 'Total Solana slots covered by the scan cursor',
+});
+
+const solanaCheckpointBlockHeight = new promClient.Gauge({
+    name: 'solana_checkpoint_block_height',
+    help: 'Latest produced Solana block height checkpoint synced to Gatekeeper',
+});
+
+const solanaCurrentBlockHeight = new promClient.Gauge({
+    name: 'solana_current_block_height',
+    help: 'Current produced Solana block height reported by the configured RPC commitment',
 });
 
 const solanaTxnsScanned = new promClient.Gauge({
@@ -213,6 +243,12 @@ async function updateGauges(): Promise<void> {
     solanaBlockCount.set(db.blockCount);
     solanaBlocksPending.set(db.blocksPending);
     solanaBlocksScanned.set(db.blocksScanned);
+    solanaSlotCursor.set(db.height);
+    solanaCurrentSlot.set(db.blockCount);
+    solanaSlotLag.set(db.blocksPending);
+    solanaSlotsScanned.set(db.blocksScanned);
+    solanaCheckpointBlockHeight.set(db.checkpointHeight ?? 0);
+    solanaCurrentBlockHeight.set(db.currentBlockHeight ?? 0);
     solanaTxnsScanned.set(db.txnsScanned);
     solanaDidsDiscovered.set(db.discovered.length);
     solanaDidsRegistered.set(db.registered.length);
@@ -522,6 +558,7 @@ async function syncBlockCheckpoints(): Promise<void> {
         await jsonPersister.updateDb((db) => {
             db.checkpointSlot = processedThroughSlot;
             db.checkpointHeight = Math.max(db.checkpointHeight ?? 0, maxCheckpointHeight);
+            db.currentBlockHeight = currentBlockHeight;
         });
 
         startSlot = processedThroughSlot + 1;
@@ -584,6 +621,11 @@ async function scanSignatures(): Promise<void> {
     console.log(`current slot height: ${currentSlot}, current block height: ${currentBlockHeight}, scan floor: ${scanFloor}, start block: ${config.startBlock}`);
 
     if (config.startBlock > currentBlockHeight) {
+        await jsonPersister.updateDb((db) => {
+            db.blockCount = currentSlot;
+            db.blocksPending = Math.max(0, currentSlot - db.height);
+            db.currentBlockHeight = currentBlockHeight;
+        });
         console.log(`Skipping ${REGISTRY} scan because start block ${config.startBlock} is ahead of current block height ${currentBlockHeight}`);
         return;
     }
@@ -695,6 +737,7 @@ async function scanSignatures(): Promise<void> {
         db.txnsScanned += scanned;
         db.blockCount = currentSlot;
         db.blocksPending = Math.max(0, currentSlot - db.height);
+        db.currentBlockHeight = currentBlockHeight;
     });
 
     if (maxSlot > 0) {

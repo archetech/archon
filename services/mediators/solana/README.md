@@ -11,6 +11,12 @@ The memo payload intentionally does not validate Archon DID semantics. Gatekeepe
 
 Each import cycle also syncs finalized Solana block checkpoints into Gatekeeper for every produced block whose block height is divisible by 100. The mediator uses Solana slots as an internal scan cursor, but Gatekeeper block records and DID registration metadata use produced block heights so independent nodes can derive the same lower-bound timestamps.
 
+Mediator metrics distinguish slot scan state from produced block heights:
+
+- `solana_slot_cursor`, `solana_current_slot`, `solana_slot_lag`, and `solana_slots_scanned` describe slot-based import scanning.
+- `solana_checkpoint_block_height` and `solana_current_block_height` describe produced block heights.
+- The older `solana_block_height`, `solana_block_count`, `solana_blocks_pending`, and `solana_blocks_scanned` names remain as compatibility aliases for the slot metrics.
+
 ## Canonical memo format
 
 The Solana registries use the Solana Memo program with an Archon-specific payload prefix:

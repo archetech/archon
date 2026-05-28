@@ -191,7 +191,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "solana_block_height{job=\"sol-mainnet-mediator\"}",
+          "expr": "solana_slot_cursor{job=\"sol-mainnet-mediator\"}",
           "legendFormat": "Slot Cursor",
           "refId": "A"
         }
@@ -207,23 +207,16 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "blue"
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "blue",
                 "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 100
-              },
-              {
-                "color": "red",
-                "value": 1000
               }
             ]
           },
@@ -256,12 +249,12 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "solana_blocks_pending{job=\"sol-mainnet-mediator\"}",
-          "legendFormat": "Slot Lag",
+          "expr": "solana_slot_lag{job=\"sol-mainnet-mediator\"}",
+          "legendFormat": "Current Slot - Cursor",
           "refId": "A"
         }
       ],
-      "title": "Slot Lag",
+      "title": "Slot Gap",
       "type": "stat"
     },
     {
@@ -340,7 +333,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 4
       },
@@ -362,17 +355,112 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "solana_block_height{job=\"sol-mainnet-mediator\"}",
+          "expr": "solana_slot_cursor{job=\"sol-mainnet-mediator\"}",
           "legendFormat": "Slot Cursor",
           "refId": "A"
         },
         {
-          "expr": "solana_block_count{job=\"sol-mainnet-mediator\"}",
+          "expr": "solana_current_slot{job=\"sol-mainnet-mediator\"}",
           "legendFormat": "Current Slot",
           "refId": "B"
         }
       ],
       "title": "Slot Scan Progress",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 25,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 4
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "solana_checkpoint_block_height{job=\"sol-mainnet-mediator\"}",
+          "legendFormat": "Checkpoint Block Height",
+          "refId": "A"
+        },
+        {
+          "expr": "solana_current_block_height{job=\"sol-mainnet-mediator\"}",
+          "legendFormat": "Current Block Height",
+          "refId": "B"
+        }
+      ],
+      "title": "Produced Block Heights",
       "type": "timeseries"
     },
     {
@@ -434,8 +522,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 16,
         "y": 4
       },
       "id": 6,
