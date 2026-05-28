@@ -239,7 +239,7 @@ curl http://localhost:4238/metrics
 curl http://localhost:4251/metrics
 ```
 
-Grafana includes a **Zcash Mediator (ZEC:mainnet)** dashboard when the observability stack is enabled.
+Grafana includes chain mediator dashboards, including **Zcash Mediator (ZEC:mainnet)**, when the observability stack is enabled.
 
 ### Confirmed Resolution Without Local Zcash
 
@@ -662,6 +662,7 @@ Prometheus scrapes metrics from all services. Grafana is pre-provisioned with da
 
 - **Grafana**: http://localhost:3000 (default: `admin` / `admin`)
 - **Prometheus**: http://localhost:9090
+- Chain mediator dashboards: BTC mainnet, BTC signet, Zcash mainnet, Ethereum mainnet, Ethereum Sepolia, Solana mainnet, and Solana Devnet.
 
 Change the default Grafana credentials:
 

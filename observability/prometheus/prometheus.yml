@@ -56,3 +56,43 @@ scrape_configs:
     static_configs:
       - targets: ['zcash-mainnet-mediator:4238']
     metrics_path: '/metrics'
+
+  - job_name: 'eth-mainnet-wallet'
+    static_configs:
+      - targets: ['eth-mainnet-wallet:4255']
+    metrics_path: '/metrics'
+
+  - job_name: 'eth-mainnet-mediator'
+    static_configs:
+      - targets: ['eth-mainnet-mediator:4246']
+    metrics_path: '/metrics'
+
+  - job_name: 'eth-sepolia-wallet'
+    static_configs:
+      - targets: ['eth-sepolia-wallet:4253']
+    metrics_path: '/metrics'
+
+  - job_name: 'eth-sepolia-mediator'
+    static_configs:
+      - targets: ['eth-sepolia-mediator:4239']
+    metrics_path: '/metrics'
+
+  - job_name: 'sol-mainnet-wallet'
+    static_configs:
+      - targets: ['sol-mainnet-wallet:4257']
+    metrics_path: '/metrics'
+
+  - job_name: 'sol-mainnet-mediator'
+    static_configs:
+      - targets: ['sol-mainnet-mediator:4248']
+    metrics_path: '/metrics'
+
+  - job_name: 'sol-devnet-wallet'
+    static_configs:
+      - targets: ['sol-devnet-wallet:4263']
+    metrics_path: '/metrics'
+
+  - job_name: 'sol-devnet-mediator'
+    static_configs:
+      - targets: ['sol-devnet-mediator:4249']
+    metrics_path: '/metrics'
