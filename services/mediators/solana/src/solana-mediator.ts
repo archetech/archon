@@ -555,9 +555,12 @@ async function syncBlockCheckpoints(): Promise<void> {
             }
         }
 
+        const checkpointSlot = processedThroughSlot;
+        const checkpointHeight = maxCheckpointHeight;
+
         await jsonPersister.updateDb((db) => {
-            db.checkpointSlot = processedThroughSlot;
-            db.checkpointHeight = Math.max(db.checkpointHeight ?? 0, maxCheckpointHeight);
+            db.checkpointSlot = checkpointSlot;
+            db.checkpointHeight = Math.max(db.checkpointHeight ?? 0, checkpointHeight);
             db.currentBlockHeight = currentBlockHeight;
         });
 
