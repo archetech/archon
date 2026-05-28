@@ -32,8 +32,8 @@ export async function operationCid(gatekeeper: PinningGatekeeper, cipher: Cipher
     return gatekeeper.addJSON(canonical);
 }
 
-function pinName(fingerprint: string, registry?: string): string {
-    return `archon-${registry || 'unknown'}-${fingerprint.slice(0, 16)}`;
+function pinName(fingerprint: string): string {
+    return `archon-${fingerprint.slice(0, 16)}`;
 }
 
 export async function processPinningQueue(
@@ -72,12 +72,11 @@ export async function processPinningQueue(
                 ? await provider.getStatus(requestid)
                 : await provider.pin({
                     cid,
-                    name: pinName(fingerprint, opRegistry),
+                    name: pinName(fingerprint),
                     origins,
                     meta: {
                         archonFingerprint: fingerprint,
                         archonCid: cid,
-                        ...(opRegistry && { archonRegistry: opRegistry }),
                     },
                 });
 
