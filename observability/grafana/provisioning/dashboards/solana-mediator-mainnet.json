@@ -192,11 +192,11 @@
       "targets": [
         {
           "expr": "solana_block_height{job=\"sol-mainnet-mediator\"}",
-          "legendFormat": "Block Height",
+          "legendFormat": "Slot Cursor",
           "refId": "A"
         }
       ],
-      "title": "Block Height",
+      "title": "Slot Cursor",
       "type": "stat"
     },
     {
@@ -257,11 +257,11 @@
       "targets": [
         {
           "expr": "solana_blocks_pending{job=\"sol-mainnet-mediator\"}",
-          "legendFormat": "Pending",
+          "legendFormat": "Slot Lag",
           "refId": "A"
         }
       ],
-      "title": "Blocks Pending",
+      "title": "Slot Lag",
       "type": "stat"
     },
     {
@@ -363,16 +363,16 @@
       "targets": [
         {
           "expr": "solana_block_height{job=\"sol-mainnet-mediator\"}",
-          "legendFormat": "Scanned Height",
+          "legendFormat": "Slot Cursor",
           "refId": "A"
         },
         {
           "expr": "solana_block_count{job=\"sol-mainnet-mediator\"}",
-          "legendFormat": "Chain Height",
+          "legendFormat": "Current Slot",
           "refId": "B"
         }
       ],
-      "title": "Blockchain Scan Progress",
+      "title": "Slot Scan Progress",
       "type": "timeseries"
     },
     {
