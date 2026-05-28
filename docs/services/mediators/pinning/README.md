@@ -82,11 +82,10 @@ calls it needs. All requests carry
 ```jsonc
 {
   "cid":  "<IPFS CID>",
-  "name": "archon-<registry>-<fingerprint[0:16]>",
+  "name": "archon-<fingerprint[0:16]>",
   "meta": {
     "archonFingerprint": "<sha256 hex>",
-    "archonCid":         "<IPFS CID>",
-    "archonRegistry":    "<BTC:mainnet | ETH:sepolia | hyperswarm | …>"  // omitted if unknown
+    "archonCid":         "<IPFS CID>"
   },
   "origins": ["/dns4/.../tcp/...", ...]   // omitted when ARCHON_PIN_ORIGINS is unset
 }
