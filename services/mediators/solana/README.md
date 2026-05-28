@@ -19,7 +19,7 @@ The Solana registries use the Solana Memo program with an Archon-specific payloa
 ARCHON_BATCH_V1:{"batchHash":"0x...","batchDid":"did:cid:...","opCount":1}
 ```
 
-Every node on a canonical Solana registry should scan the same registry address and payload format. The default registry address is derived from the Memo program ID and registry name. Wallet anchors include that address as a Memo instruction signer so discovery can query a narrow address instead of the global Memo program. A future custom Solana program can replace this format under a distinct registry name or explicit non-canonical configuration.
+Every node on a canonical Solana registry should scan the same registry address and payload format. The default registry address is a deterministic ed25519 keypair derived from a SHA-256 of the literal string `archon-solana-registry-signer-v1`, the chain (e.g. `SOL:mainnet-beta` or `SOL:devnet`), and the Memo program ID; the wallet uses this keypair as a co-signer on every anchor so the address is genuinely controlled by all nodes. Wallet anchors include that address as a signer on the Memo instruction so discovery can query a narrow address instead of the global Memo program. A future custom Solana program can replace this format under a distinct registry name or explicit non-canonical configuration.
 
 ## Environment variables
 
