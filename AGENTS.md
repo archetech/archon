@@ -25,6 +25,7 @@ These rules apply to coding agents working in this repository.
 - Internal service-to-service admin auth should use `X-Archon-Admin-Key` consistently. Reserve `Authorization` for user/session/OAuth-style flows unless a file explicitly documents a different scheme.
 - For Herald agent guidance, prefer Keymaster address commands (`check-address`, `add-address`, `remove-address`, etc.) in quick starts while keeping direct API endpoint documentation available for lower-level integrations.
 - Keymaster address metadata should stay in parity across TypeScript and Python implementations; when Herald exposes a domain relay agent, store it with the address as `relay` and surface it through list/get address APIs.
+- Keymaster CLI command additions should keep `scripts/archon-cli.js`, `packages/keymaster/src/cli.ts`, and `python/keymaster/src/keymaster/cli.py` in parity; commands that only query Gatekeeper, such as registry listing, should not require an existing local wallet.
 - Publishing a Keymaster address always sets `didDocumentData.address`; it adds the `#email` service endpoint with `type: "Email"` and `serviceEndpoint: "mailto:<address>"` only when the stored address has a Herald `relay`. Unpublishing removes both the property and the service.
 - After a PR is merged, always do the standard local cleanup unless the user says otherwise: switch to `main`, fast-forward from `origin/main`, and delete the merged local branch.
 - Do not use stash-based branch juggling as the default workflow.

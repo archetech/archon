@@ -159,6 +159,7 @@ It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the
 | Wallet | `change-passphrase <new>` | Re-encrypt wallet with a new passphrase |
 | Identity | `create-id <name>` | Create a new identity |
 | Identity | `list-ids` | List all identities |
+| Identity | `list-registries` | List supported registries |
 | Identity | `use-id <name>` | Set current identity |
 | Identity | `remove-id <name>` | Delete an identity |
 | Identity | `rename-id <old> <new>` | Rename an identity |

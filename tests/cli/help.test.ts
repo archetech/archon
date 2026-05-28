@@ -32,6 +32,7 @@ describe('help', () => {
             'list-groups',
             'list-ids',
             'list-issued',
+            'list-registries',
             'list-schemas',
             'new-wallet',
             'publish-credential',

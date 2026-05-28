@@ -51,12 +51,13 @@ def _error(message: Any) -> None:
     print(str(message), file=sys.stderr)
 
 
-WALLET_CREATION_COMMANDS = {
+WALLET_OPTIONAL_COMMANDS = {
     "create-wallet",
     "new-wallet",
     "create-id",
     "import-wallet",
     "restore-wallet-file",
+    "list-registries",
 }
 
 
@@ -177,6 +178,11 @@ async def cmd_list_ids(km: Keymaster, args: argparse.Namespace) -> None:
             print(f"{name}  <<< current")
         else:
             print(name)
+
+
+async def cmd_list_registries(km: Keymaster, args: argparse.Namespace) -> None:
+    for registry in await km.list_registries():
+        print(registry)
 
 
 async def cmd_use_id(km: Keymaster, args: argparse.Namespace) -> None:
@@ -995,6 +1001,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("old_name")
     sp.add_argument("new_name")
     add("list-ids", "List IDs and show current ID", cmd_list_ids)
+    add("list-registries", "List supported registries", cmd_list_registries)
     sp = add("use-id", "Set the current ID", cmd_use_id)
     sp.add_argument("name")
     add("rotate-keys", "Generates new set of keys for current ID", cmd_rotate_keys)
@@ -1332,7 +1339,7 @@ async def _run(args: argparse.Namespace) -> int:
         data_folder=str(wallet_path_obj.parent) if wallet_path_obj.parent.as_posix() else ".",
     )
 
-    if args.command not in WALLET_CREATION_COMMANDS:
+    if args.command not in WALLET_OPTIONAL_COMMANDS:
         existing = wallet_store.load_wallet()
         if not existing:
             print(f"Error: Wallet not found at {wallet_path}", file=sys.stderr)

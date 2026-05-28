@@ -294,6 +294,22 @@ program
     });
 
 program
+    .command('list-registries')
+    .description('List supported registries')
+    .action(async () => {
+        try {
+            const registries = await keymaster.listRegistries();
+
+            for (const registry of registries) {
+                console.log(registry);
+            }
+        }
+        catch (error) {
+            console.error(error.error || error);
+        }
+    });
+
+program
     .command('use-id <name>')
     .description('Set the current ID')
     .action(async (name) => {
