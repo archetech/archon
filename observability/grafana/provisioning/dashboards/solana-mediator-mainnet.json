@@ -162,7 +162,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "none",
+          "decimals": 0
         },
         "overrides": []
       },
@@ -226,7 +227,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "none",
+          "decimals": 0
         },
         "overrides": []
       },
@@ -315,7 +317,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "none",
+          "decimals": 0
         },
         "overrides": [
           {
@@ -1053,7 +1056,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "none",
+          "decimals": 0
         },
         "overrides": []
       },
@@ -1218,8 +1222,8 @@
             "showPoints": "never",
             "spanNulls": true
           },
-          "decimals": 1,
-          "unit": "short"
+          "decimals": 0,
+          "unit": "none"
         },
         "overrides": []
       },
