@@ -110,7 +110,7 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         run: |
           if [[ "${{ github.event.inputs.version }}" == pre* ]]; then
-            npx lerna publish from-package --dist-tag ${{ github.event.inputs.preid }} --yes
+            npx lerna publish from-git --dist-tag ${{ github.event.inputs.preid }} --yes
           else
-            npx lerna publish from-package --yes
+            npx lerna publish from-git --yes
           fi
