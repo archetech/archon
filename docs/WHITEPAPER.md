@@ -1223,10 +1223,15 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 
 ### 13.2 Architectural Comparison
 
-**did:btc / did:ion**
-- Requires blockchain transaction for every operation
-- High cost and latency for creation
-- Strong finality but poor user experience
+**did:btc**
+- Anchors DID state directly to Bitcoin transactions
+- Strong finality but creation and updates inherit Bitcoin fee and confirmation constraints
+- Best suited to identities that need direct Bitcoin-level anchoring
+
+**did:ion**
+- Uses the Sidetree protocol to batch many DID operations into periodic Bitcoin anchors
+- Reduces per-operation chain cost compared with direct on-chain methods
+- Still depends on Bitcoin anchor cadence for finality
 
 **did:web**
 - Relies on DNS and HTTPS
