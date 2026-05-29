@@ -96,8 +96,10 @@ Rather than mandating a single consensus mechanism, Archon supports multiple reg
 | Registry | Confirmation Time | Cost | Finality | Best For |
 |----------|-------------------|------|----------|----------|
 | Hyperswarm | Seconds | Free | Eventual | Development, internal systems |
-| Bitcoin | ~60 minutes (6 blocks) | ~$0.001/batch | Strong | Enterprise, legal identity |
-| Signet | ~60 minutes (6 blocks) | Free | Strong | Testing, development |
+| Bitcoin-family (`BTC:mainnet`, `BTC:testnet4`, `BTC:signet`) | ~60 minutes (6 blocks) | Chain-dependent, per batch | Strong | Enterprise, legal identity, testing |
+| Zcash (`ZEC:mainnet`, `ZEC:testnet`) | Chain-dependent | Chain-dependent, per batch | Strong | Transparent Zcash anchoring |
+| Ethereum (`ETH:mainnet`, `ETH:sepolia`) | Chain-dependent | Gas per batch | Strong | EVM anchoring and contract discovery |
+| Solana (`SOL:mainnet-beta`, `SOL:devnet`) | Seconds to minutes | Low, per batch | Strong | High-throughput anchoring |
 
 Users select their registry at DID creation based on their specific requirements, enabling a spectrum of security-cost trade-offs.
 
@@ -156,7 +158,10 @@ Drawbridge is an API gateway that bridges the Archon identity layer with the Lig
 Mediators synchronize DID operations across network boundaries:
 
 - **Hyperswarm Mediator**: Distributes operations via P2P gossip protocol
-- **Satoshi Mediator**: Anchors operation batches to Bitcoin/Signet via OP_RETURN
+- **Satoshi Mediator**: Anchors operation batches to Bitcoin-family registries via OP_RETURN
+- **Zcash Mediator**: Anchors operation batches to transparent Zcash transactions
+- **Ethereum Mediator**: Anchors operation batches through canonical `ArchonRegistry` contracts
+- **Solana Mediator**: Anchors operation batches through Memo-program payloads
 
 ### 4.3 Data Flow
 
@@ -224,7 +229,8 @@ Archon supports two fundamental DID types:
     "created": "2024-01-15T10:30:00Z",
     "updated": "2024-01-15T10:30:00Z",
     "deactivated": false,
-    "versionId": 1
+    "versionId": "bafkrei...",
+    "versionSequence": "1"
   },
   "didDocumentData": {},
   "didDocumentRegistration": {
@@ -249,12 +255,18 @@ All DID state changes occur through signed operations:
     "type": "agent",
     "version": 1
   },
-  "publicJwk": { /* Public key in JWK format */ },
-  "signature": {
-    "hash": "SHA-256",
-    "signed": "2024-01-15T10:30:00Z",
-    "signer": "did:cid:bafkrei...",
-    "value": "304402..."
+  "publicJwk": {
+    "kty": "EC",
+    "crv": "secp256k1",
+    "x": "...",
+    "y": "..."
+  },
+  "proof": {
+    "type": "EcdsaSecp256k1Signature2019",
+    "created": "2024-01-15T10:30:00Z",
+    "verificationMethod": "#key-1",
+    "proofPurpose": "authentication",
+    "proofValue": "..."
   }
 }
 ```
@@ -264,10 +276,21 @@ All DID state changes occur through signed operations:
 {
   "type": "update",
   "did": "did:cid:bafkrei...",
-  "created": "2024-01-16T14:00:00Z",
-  "doc": { /* Updated document fields */ },
+  "doc": {
+    "didDocumentData": {
+      "profile": {
+        "name": "Alice"
+      }
+    }
+  },
   "previd": "bafkrei...",
-  "signature": { /* Signed by controller */ }
+  "proof": {
+    "type": "EcdsaSecp256k1Signature2019",
+    "created": "2024-01-16T14:00:00Z",
+    "verificationMethod": "did:cid:bafkrei...#key-1",
+    "proofPurpose": "authentication",
+    "proofValue": "..."
+  }
 }
 ```
 
@@ -276,9 +299,14 @@ All DID state changes occur through signed operations:
 {
   "type": "delete",
   "did": "did:cid:bafkrei...",
-  "created": "2024-01-17T09:00:00Z",
   "previd": "bafkrei...",
-  "signature": { /* Signed by controller */ }
+  "proof": {
+    "type": "EcdsaSecp256k1Signature2019",
+    "created": "2024-01-17T09:00:00Z",
+    "verificationMethod": "did:cid:bafkrei...#key-1",
+    "proofPurpose": "authentication",
+    "proofValue": "..."
+  }
 }
 ```
 
@@ -512,16 +540,10 @@ The Hyperswarm registry provides fast, peer-to-peer operation distribution:
 
 Blockchain registries provide cryptographic finality through proof-of-work:
 
-**Bitcoin (BTC)**
+**Bitcoin-family registries**
 - Confirmation time: ~60 minutes (6 blocks)
-- Cost: ~$0.001-0.01 per batch (variable with network fees)
+- Cost: variable with network fees
 - Finality: Extremely strong (computational security)
-- Ordering: Block height + transaction index
-
-**Signet (Bitcoin Testnet)**
-- Confirmation time: ~60 minutes (6 blocks at ~10 min/block)
-- Cost: Free
-- Finality: Strong
 - Ordering: Block height + transaction index
 
 **Mechanism:**
@@ -533,7 +555,7 @@ Blockchain registries provide cryptographic finality through proof-of-work:
 
 ### 7.4 Blockchain Timestamping
 
-One of Archon's most powerful features is automatic cryptographic timestamping for all DID operations registered on blockchain-based registries. When a DID operation is anchored to Bitcoin, Signet, or any other blockchain registry, it inherits an immutable, independently verifiable timestamp from the block in which it was confirmed.
+One of Archon's most powerful features is automatic cryptographic timestamping for DID operations registered on block-producing registries. When a DID operation is anchored to Bitcoin, Zcash, Ethereum, Solana, or another blockchain registry, it inherits an immutable, independently verifiable timestamp from the block in which it was confirmed.
 
 #### How Timestamping Works
 
@@ -547,10 +569,10 @@ When resolving a DID, the `didDocumentMetadata` includes timestamp information:
     "created": "2024-01-15T10:30:00Z",
     "updated": "2024-01-16T14:00:00Z",
     "versionId": "bafkrei...",
-    "version": "2",
+    "versionSequence": "2",
     "confirmed": true,
     "timestamp": {
-      "chain": "BTC",
+      "chain": "BTC:signet",
       "opid": "bafkrei...",
       "lowerBound": {
         "time": 1705312800,
@@ -594,7 +616,7 @@ When resolving a DID, the `didDocumentMetadata` includes timestamp information:
 Blockchain timestamps provide cryptographic proof of existence at a specific time. Unlike self-asserted timestamps, blockchain timestamps are:
 - Independently verifiable by any node
 - Immutable once confirmed
-- Backed by computational proof-of-work
+- Backed by the registry's consensus mechanism
 - Anchored to a globally-recognized timechain
 
 This makes them suitable for legal contexts where proving "when" something happened matters:
@@ -625,8 +647,10 @@ The timestamp system also enables proving that something *didn't* exist before a
 
 | Registry | Typical Precision | Verification |
 |----------|-------------------|--------------|
-| Bitcoin | ~10 minutes (block time) | Full node or SPV proof |
-| Signet | ~10 minutes | Full node or SPV proof |
+| Bitcoin-family | ~10 minutes (block time) | Full node or SPV proof |
+| Zcash | ~75 seconds | Zebra-backed block and transaction checks |
+| Ethereum | ~12 seconds | RPC log and block verification |
+| Solana | Seconds | RPC signature and block-height verification |
 | Hyperswarm | Sub-second (self-asserted) | Peer attestation only |
 
 #### Use Cases for Timestamps
@@ -660,8 +684,8 @@ resolveDID(did, { versionTime: "2024-01-15T10:00:00Z" })
 // Resolve a specific version number
 resolveDID(did, { versionSequence: 3 })
 
-// Resolve a specific version by its CID
-resolveDID(did, { versionId: "bafkrei..." })
+// Verify operation proofs while resolving
+resolveDID(did, { verify: true })
 ```
 
 **How It Works:**
@@ -911,9 +935,6 @@ Payments transition through states: **pending** → **settled** | **failed** | *
 Drawbridge implements the L402 protocol (formerly LSAT) to enable machine-readable, pay-per-use access to API endpoints. L402 combines HTTP 402 (Payment Required) status codes with Lightning invoices and macaroon-based authentication tokens.
 
 #### How L402 Works
-
-![L402 sequence](images/L402.png)
-
 
 1. Client requests a protected resource (any proxied Gatekeeper or Keymaster endpoint)
 2. Drawbridge returns HTTP 402 with a macaroon (containing caveats for scope, expiry, and payment hash) and a BOLT11 Lightning invoice
@@ -1302,8 +1323,8 @@ As the digital identity landscape continues to evolve, Archon's modular architec
 # Create a new identity
 ./archon create-id alice
 
-# Resolve the identity
-./archon resolve-id alice
+# Resolve the current identity
+./archon resolve-id
 
 # Back up wallet to file
 ./archon backup-wallet-file wallet-backup.json
