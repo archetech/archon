@@ -124,16 +124,19 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_ACCESS: public
         run: |
-          SUMMARY_FILE="$(mktemp)"
+          # Detect a no-op publish from lerna's own output: when there is no
+          # tagged release it prints "No changed packages to publish" and exits
+          # 0, which we must treat as a failure. (lerna 9's --summary-file is
+          # unreliable here — it stays empty even on a successful publish.)
+          set -o pipefail
+          PUBLISH_LOG="$(mktemp)"
           if [[ "${{ github.event.inputs.version }}" == pre* ]]; then
-            npx lerna publish from-git --dist-tag ${{ github.event.inputs.preid }} --yes --registry https://registry.npmjs.org --summary-file "$SUMMARY_FILE"
+            npx lerna publish from-git --dist-tag ${{ github.event.inputs.preid }} --yes --registry https://registry.npmjs.org 2>&1 | tee "$PUBLISH_LOG"
           else
-            npx lerna publish from-git --yes --registry https://registry.npmjs.org --summary-file "$SUMMARY_FILE"
+            npx lerna publish from-git --yes --registry https://registry.npmjs.org 2>&1 | tee "$PUBLISH_LOG"
           fi
 
-          if [ ! -s "$SUMMARY_FILE" ]; then
+          if ! grep -q "lerna success published" "$PUBLISH_LOG"; then
             echo "Lerna did not publish any packages."
             exit 1
           fi
-
-          cat "$SUMMARY_FILE"
