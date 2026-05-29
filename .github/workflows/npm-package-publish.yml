@@ -39,6 +39,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   publish:
@@ -99,10 +100,14 @@ jobs:
             npx lerna version ${{ github.event.inputs.version }} --yes --no-private $SCOPE_FLAG
           fi
 
+      - name: Upgrade npm for trusted publishing
+        run: npm install --global npm@11.16.0
+
       - name: Publish to NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_ACCESS: public
+          NPM_CONFIG_PROVENANCE: true
         run: |
           if [[ "${{ github.event.inputs.version }}" == pre* ]]; then
             npx lerna publish from-package --dist-tag ${{ github.event.inputs.preid }} --yes
