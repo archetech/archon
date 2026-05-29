@@ -19,6 +19,7 @@ on:
         required: true
         type: choice
         options:
+          - current
           - patch
           - minor
           - major
@@ -86,6 +87,7 @@ jobs:
         continue-on-error: false
 
       - name: Version packages
+        if: ${{ github.event.inputs.version != 'current' }}
         run: |
           SCOPE_FLAG=""
           if [ "${{ github.event.inputs.package }}" != "all" ]; then
@@ -101,9 +103,11 @@ jobs:
       - name: Publish to NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_ACCESS: public
+          NPM_CONFIG_PROVENANCE: true
         run: |
           if [[ "${{ github.event.inputs.version }}" == pre* ]]; then
-            npx lerna publish from-git --dist-tag ${{ github.event.inputs.preid }} --yes -- --provenance --access public
+            npx lerna publish from-package --dist-tag ${{ github.event.inputs.preid }} --yes
           else
-            npx lerna publish from-git --yes -- --provenance --access public
+            npx lerna publish from-package --yes
           fi
