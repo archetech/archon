@@ -96,10 +96,10 @@ Rather than mandating a single consensus mechanism, Archon supports multiple reg
 | Registry | Confirmation Time | Cost | Finality | Best For |
 |----------|-------------------|------|----------|----------|
 | Hyperswarm | Seconds | Free | Eventual | Development, internal systems |
-| Bitcoin-family (`BTC:mainnet`, `BTC:testnet4`, `BTC:signet`) | ~60 minutes (6 blocks) | Chain-dependent, per batch | Strong | Enterprise, legal identity, testing |
-| Zcash (`ZEC:mainnet`, `ZEC:testnet`) | Chain-dependent | Chain-dependent, per batch | Strong | Transparent Zcash anchoring |
-| Ethereum (`ETH:mainnet`, `ETH:sepolia`) | Chain-dependent | Gas per batch | Strong | EVM anchoring and contract discovery |
-| Solana (`SOL:mainnet-beta`, `SOL:devnet`) | Seconds to minutes | Low, per batch | Strong | High-throughput anchoring |
+| Bitcoin-family (`BTC:mainnet`, `BTC:testnet4`, `BTC:signet`) | ~60 minutes (6 blocks) | Miner fee per batch; testnet/signet use test coins | Strong proof-of-work finality | Enterprise, legal identity, testing |
+| Zcash (`ZEC:mainnet`, `ZEC:testnet`) | First confirmation in ~75 seconds | ZIP-317 conventional fee per batch; testnet uses test coins | Strong proof-of-work finality | Transparent Zcash anchoring |
+| Ethereum (`ETH:mainnet`, `ETH:sepolia`) | ~12 confirmations by default | Gas for one `ArchonRegistry` transaction per batch | Strong EVM block finality | EVM anchoring and contract discovery |
+| Solana (`SOL:mainnet-beta`, `SOL:devnet`) | Seconds at configured commitment; finalized checkpoints recorded every 100 produced blocks | Lamports for one Memo transaction per batch | Fast proof-of-stake finality | High-throughput anchoring |
 
 Users select their registry at DID creation based on their specific requirements, enabling a spectrum of security-cost trade-offs.
 
