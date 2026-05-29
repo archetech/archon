@@ -1186,6 +1186,17 @@ Track ownership and authenticity of digital assets:
 - Supply chain tracking
 - Intellectual property registration
 
+### 12.8 AI Agents
+
+Autonomous and semi-autonomous AI agents need durable identities, scoped authority, and auditable action histories:
+
+- Assign each agent a DID with verifiable keys, service endpoints, and owner/controller metadata
+- Issue credentials for capabilities, model provenance, organization membership, and delegated authority
+- Authorize actions through challenge-response flows instead of long-lived shared secrets
+- Record important decisions, tool invocations, and policy updates as signed DID-linked assets
+- Use Lightning payments and L402 for agent-to-agent service calls, paid API access, and metered compute
+- Rotate or revoke compromised agent keys without losing the agent's identity history
+
 ---
 
 ## 13. Comparison with Existing Solutions
