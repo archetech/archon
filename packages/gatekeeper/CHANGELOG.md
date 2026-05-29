@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.11](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.4.10...@didcid/gatekeeper@0.4.11) (2026-05-29)
+
+**Note:** Version bump only for package @didcid/gatekeeper
+
+
+
+
+
 ## [0.4.10](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.4.9...@didcid/gatekeeper@0.4.10) (2026-05-29)
 
 **Note:** Version bump only for package @didcid/gatekeeper

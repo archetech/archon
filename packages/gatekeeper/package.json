@@ -1,6 +1,6 @@
 {
   "name": "@didcid/gatekeeper",
-  "version": "0.4.10",
+  "version": "0.4.11",
   "description": "Archon Gatekeeper",
   "type": "module",
   "module": "./dist/esm/index.js",
@@ -114,9 +114,9 @@
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@didcid/cipher": "^0.2.10",
-    "@didcid/common": "^0.1.12",
-    "@didcid/ipfs": "^0.1.12",
+    "@didcid/cipher": "^0.2.11",
+    "@didcid/common": "^0.1.13",
+    "@didcid/ipfs": "^0.1.13",
     "axios": "^1.16.0",
     "canonicalize": "^2.0.0",
     "dotenv": "^16.4.5",
