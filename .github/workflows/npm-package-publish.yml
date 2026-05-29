@@ -89,15 +89,19 @@ jobs:
       - name: Version packages
         if: ${{ github.event.inputs.version != 'current' }}
         run: |
-          SCOPE_FLAG=""
-          if [ "${{ github.event.inputs.package }}" != "all" ]; then
-            SCOPE_FLAG="--scope ${{ github.event.inputs.package }}"
+          # A manual dispatch is a deliberate request to bump and tag, even when
+          # lerna detects no source changes since the last release tags
+          # (otherwise lerna versions nothing and `publish from-git` finds no tag).
+          if [ "${{ github.event.inputs.package }}" = "all" ]; then
+            FORCE_FLAG="--force-publish"
+          else
+            FORCE_FLAG="--force-publish ${{ github.event.inputs.package }}"
           fi
 
           if [[ "${{ github.event.inputs.version }}" == pre* ]]; then
-            npx lerna version ${{ github.event.inputs.version }} --preid ${{ github.event.inputs.preid }} --yes --no-private $SCOPE_FLAG
+            npx lerna version ${{ github.event.inputs.version }} --preid ${{ github.event.inputs.preid }} --yes --no-private $FORCE_FLAG
           else
-            npx lerna version ${{ github.event.inputs.version }} --yes --no-private $SCOPE_FLAG
+            npx lerna version ${{ github.event.inputs.version }} --yes --no-private $FORCE_FLAG
           fi
 
       - name: Checkout current release tags
