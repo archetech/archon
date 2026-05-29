@@ -38,7 +38,33 @@ python3 -m venv /tmp/archon-keymaster-install-test
   --extra-index-url https://pypi.org/simple/ \
   archon-keymaster
 /tmp/archon-keymaster-install-test/bin/keymaster --help
-/tmp/archon-keymaster-install-test/bin/python -c "import argparse; from keymaster.cli import build_parser; p=build_parser(); sp=[a for a in p._actions if isinstance(a, argparse._SubParsersAction)][0]; assert len(sp.choices)==134"
+/tmp/archon-keymaster-install-test/bin/python - <<'PY'
+import argparse
+from keymaster.cli import build_parser
+
+parser = build_parser()
+subparsers = [
+    action
+    for action in parser._actions
+    if isinstance(action, argparse._SubParsersAction)
+]
+assert subparsers, "CLI parser has no subcommands"
+
+commands = subparsers[0].choices
+required = {
+    "create-id",
+    "backup-wallet-file",
+    "create-asset",
+    "resolve-did",
+    "create-vault",
+    "add-vault-item",
+    "create-dmail",
+    "send-dmail",
+    "list-registries",
+}
+missing = sorted(required - commands.keys())
+assert not missing, f"Missing expected commands: {', '.join(missing)}"
+PY
 ```
 
 ## PyPI
