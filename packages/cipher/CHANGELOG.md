@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.10](https://github.com/archetech/archon/compare/@didcid/cipher@0.2.9...@didcid/cipher@0.2.10) (2026-05-29)
+
+**Note:** Version bump only for package @didcid/cipher
+
+
+
+
+
 ## [0.2.9](https://github.com/archetech/archon/compare/@didcid/cipher@0.1.3...@didcid/cipher@0.2.9) (2026-05-29)
 
 
