@@ -100,6 +100,22 @@ jobs:
             npx lerna version ${{ github.event.inputs.version }} --yes --no-private $SCOPE_FLAG
           fi
 
+      - name: Checkout current release tags
+        if: ${{ github.event.inputs.version == 'current' }}
+        run: |
+          PACKAGE="${{ github.event.inputs.package }}"
+          if [ "$PACKAGE" = "all" ]; then
+            PACKAGE="@didcid/common"
+          fi
+
+          PACKAGE_DIR="${PACKAGE##*/}"
+          VERSION="$(node -p "require('./packages/${PACKAGE_DIR}/package.json').version")"
+          TAG="${PACKAGE}@${VERSION}"
+          RELEASE_COMMIT="$(git rev-list -n 1 "$TAG")"
+
+          echo "Publishing from $TAG at $RELEASE_COMMIT"
+          git checkout --detach "$RELEASE_COMMIT"
+
       - name: Upgrade npm for trusted publishing
         run: npm install --global npm@11.16.0
 
@@ -109,8 +125,16 @@ jobs:
           NPM_CONFIG_ACCESS: public
           NPM_CONFIG_PROVENANCE: true
         run: |
+          SUMMARY_FILE="$(mktemp)"
           if [[ "${{ github.event.inputs.version }}" == pre* ]]; then
-            npx lerna publish from-git --dist-tag ${{ github.event.inputs.preid }} --yes
+            npx lerna publish from-git --dist-tag ${{ github.event.inputs.preid }} --yes --registry https://registry.npmjs.org --summary-file "$SUMMARY_FILE"
           else
-            npx lerna publish from-git --yes
+            npx lerna publish from-git --yes --registry https://registry.npmjs.org --summary-file "$SUMMARY_FILE"
           fi
+
+          if [ ! -s "$SUMMARY_FILE" ]; then
+            echo "Lerna did not publish any packages."
+            exit 1
+          fi
+
+          cat "$SUMMARY_FILE"
