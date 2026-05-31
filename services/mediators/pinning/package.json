@@ -1,6 +1,6 @@
 {
   "name": "pinning-mediator",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "description": "Archon generic IPFS pinning mediator",
   "main": "dist/pinning-mediator.js",

@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Archon Wallet",
     "description": "Archon Wallet",
-    "version": "0.9.0",
+    "version": "0.10.0",
     "icons": {
         "16": "icon.png",
         "48": "icon.png",
