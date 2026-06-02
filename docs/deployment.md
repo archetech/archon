@@ -692,7 +692,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 3001 | CLN REST | 3001 | -- | localhost |
 | 3002 | RTL | 3002 | `ARCHON_RTL_PORT` | localhost |
 | 5000 | LNbits | 5000 | `ARCHON_LNBITS_PORT` | localhost |
-| 9050 | Tor SOCKS | 9050 | `ARCHON_TOR_SOCKS_PORT` | configurable |
+| 9050 | Tor SOCKS | 127.0.0.1:9050 | `ARCHON_TOR_SOCKS_PORT` | localhost |
 | 38332 | BTC Signet Node RPC | 38332 | -- | localhost |
 | 4232 | Hyperswarm Metrics | 4232 | -- | localhost |
 | 4234 | BTC Mainnet Mediator Metrics | 4234 | -- | localhost |

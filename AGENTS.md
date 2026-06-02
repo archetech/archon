@@ -23,6 +23,7 @@ These rules apply to coding agents working in this repository.
 - For GitHub operations in this repo, use `gh` by default, especially for write actions and PR creation. Do not try the GitHub app first and then fall back to `gh` unless the user explicitly asks for the app or `gh` cannot perform the operation.
 - When generating or updating npm lockfiles, use the repo-pinned npm version from the root `package.json` so lockfiles stay compatible with CI.
 - Internal service-to-service admin auth should use `X-Archon-Admin-Key` consistently. Reserve `Authorization` for user/session/OAuth-style flows unless a file explicitly documents a different scheme.
+- Drawbridge's bundled Tor SOCKS host port should default to `127.0.0.1:9050`; internal services should keep using the Docker network address `tor:9050`.
 - For Herald agent guidance, prefer Keymaster address commands (`check-address`, `add-address`, `remove-address`, etc.) in quick starts while keeping direct API endpoint documentation available for lower-level integrations.
 - Keymaster address metadata should stay in parity across TypeScript and Python implementations; when Herald exposes a domain relay agent, store it with the address as `relay` and surface it through list/get address APIs.
 - Keymaster CLI command additions should keep `scripts/archon-cli.js`, `packages/keymaster/src/cli.ts`, and `python/keymaster/src/keymaster/cli.py` in parity; commands that only query Gatekeeper, such as registry listing, should not require an existing local wallet.
