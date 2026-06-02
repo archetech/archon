@@ -89,6 +89,7 @@ Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keyma
 | `COMPOSE_PROFILES` | sample default | Optional Docker Compose service profiles |
 | `ARCHON_GATEKEEPER_PORT` | `4224` | Gatekeeper API port |
 | `ARCHON_KEYMASTER_PORT` | `4226` | Keymaster API port |
+| `ARCHON_KEYMASTER_HOST_BIND` | `127.0.0.1` | Keymaster host bind address |
 | `ARCHON_GATEKEEPER_CLIENT_PORT` | `4225` | Gatekeeper client UI port |
 | `ARCHON_REACT_WALLET_PORT` | `4228` | React wallet UI port |
 | `ARCHON_GATEKEEPER_DB` | `redis` | Storage backend (`redis` or `json`) |
@@ -520,6 +521,7 @@ Enable the `lightning` profile, or enable `drawbridge`, which also starts the bu
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune used by the mediator; auto-loaded from `./data/cln-mainnet/drawbridge/rune.txt` in the bundled stack |
 | `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | `http://lnbits:5000` | LNbits base URL used by the mediator |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | *(auto)* | Public Drawbridge URL used for published invoice endpoints |
+| `ARCHON_TOR_SOCKS_PORT` | `127.0.0.1:9050` | Optional host-side Tor SOCKS bind; use `HOST_IP:HOST_PORT` such as `127.0.0.1:9051` when overriding |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX` | `100` | Max requests per window |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW` | `60` | Rate limit window in seconds |
 | `ARCHON_DRAWBRIDGE_MACAROON_SECRET` | *(auto)* | L402 macaroon signing secret (auto-generated) |
@@ -679,7 +681,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 |------|---------|---------|---------|---------|
 | 4224 | Gatekeeper | 4224 | `ARCHON_GATEKEEPER_PORT` | configurable |
 | 4225 | Gatekeeper Client | 4225 | `ARCHON_GATEKEEPER_CLIENT_PORT` | configurable |
-| 4226 | Keymaster | 4226 | `ARCHON_KEYMASTER_PORT` | configurable |
+| 4226 | Keymaster | 127.0.0.1:4226 | `ARCHON_KEYMASTER_HOST_BIND` / `ARCHON_KEYMASTER_PORT` | localhost |
 | 4227 | Keymaster Client | 4227 | `ARCHON_KEYMASTER_CLIENT_PORT` | configurable |
 | 4223 | Drawbridge Client | 4223 | `ARCHON_DRAWBRIDGE_CLIENT_PORT` | configurable |
 | 4228 | React Wallet | 4228 | `ARCHON_REACT_WALLET_PORT` | configurable |
@@ -692,7 +694,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 3001 | CLN REST | 3001 | -- | localhost |
 | 3002 | RTL | 3002 | `ARCHON_RTL_PORT` | localhost |
 | 5000 | LNbits | 5000 | `ARCHON_LNBITS_PORT` | localhost |
-| 9050 | Tor SOCKS | 9050 | `ARCHON_TOR_SOCKS_PORT` | configurable |
+| 9050 | Tor SOCKS | 127.0.0.1:9050 | `ARCHON_TOR_SOCKS_PORT` | localhost; overrides should use `HOST_IP:HOST_PORT` |
 | 38332 | BTC Signet Node RPC | 38332 | -- | localhost |
 | 4232 | Hyperswarm Metrics | 4232 | -- | localhost |
 | 4234 | BTC Mainnet Mediator Metrics | 4234 | -- | localhost |

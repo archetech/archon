@@ -28,7 +28,7 @@ services:
       - ../../data:/app/keymaster/data
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
-      - ${ARCHON_KEYMASTER_PORT}:4226
+      - "${ARCHON_KEYMASTER_HOST_BIND:-127.0.0.1}:${ARCHON_KEYMASTER_PORT:-4226}:4226"
     healthcheck:
       test:
         [
