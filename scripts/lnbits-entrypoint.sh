@@ -42,7 +42,9 @@ if [ -n "$CLNREST_URL" ]; then
     fi
 
     echo "[lnbits] Waiting for CLN REST at $CLNREST_URL/v1/listfunds..."
-    timeout=120; elapsed=0
+    timeout="${LNBITS_CLNREST_WAIT_TIMEOUT:-600}"
+    elapsed=0
+    last_error="/tmp/lnbits-clnrest-wait.err"
     while ! python3 -c "
 import urllib.request, ssl, os, json
 cafile = os.environ.get('CLNREST_CA')
@@ -63,10 +65,13 @@ req = urllib.request.Request(
 )
 with urllib.request.urlopen(req, context=ctx, timeout=3) as resp:
     json.load(resp)
-" >/dev/null 2>&1; do
+" >/dev/null 2>"$last_error"; do
         sleep 2; elapsed=$((elapsed + 2))
         if [ $elapsed -ge $timeout ]; then
             echo "[lnbits] ERROR: CLN REST not ready after ${timeout}s"
+            if [ -s "$last_error" ]; then
+                sed 's/^/[lnbits] CLN REST probe: /' "$last_error"
+            fi
             exit 1
         fi
     done

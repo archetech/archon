@@ -582,6 +582,7 @@ ARCHON_BTC_PASS=bitcoin
 | `ARCHON_RTL_PASSWORD` | `changeme` | **Change this.** RTL web UI password |
 | `ARCHON_RTL_PORT` | `3002` | RTL web UI port |
 | `ARCHON_LNBITS_PORT` | `5000` | LNbits web UI port |
+| `ARCHON_LNBITS_CLNREST_WAIT_TIMEOUT` | `600` | Seconds LNbits waits for CLN REST to accept its readonly rune during startup |
 
 ### Network Modes
 

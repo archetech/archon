@@ -211,6 +211,7 @@ services:
       - LNBITS_BACKEND_WALLET_CLASS=CLNRestWallet
       - CLNREST_URL=https://cln:3001
       - CLNREST_CA=/data/lightning/lnbits/ca.pem
+      - LNBITS_CLNREST_WAIT_TIMEOUT=${ARCHON_LNBITS_CLNREST_WAIT_TIMEOUT:-600}
       - LNBITS_DATA_FOLDER=/data/lnbits
       - FORWARDED_ALLOW_IPS=*
       - AUTH_SECRET_KEY=${ARCHON_LNBITS_AUTH_SECRET:-}
