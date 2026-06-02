@@ -521,6 +521,7 @@ Enable the `lightning` profile, or enable `drawbridge`, which also starts the bu
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune used by the mediator; auto-loaded from `./data/cln-mainnet/drawbridge/rune.txt` in the bundled stack |
 | `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | `http://lnbits:5000` | LNbits base URL used by the mediator |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | *(auto)* | Public Drawbridge URL used for published invoice endpoints |
+| `ARCHON_TOR_SOCKS_PORT` | `127.0.0.1:9050` | Optional host-side Tor SOCKS bind; use `HOST_IP:HOST_PORT` such as `127.0.0.1:9051` when overriding |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX` | `100` | Max requests per window |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW` | `60` | Rate limit window in seconds |
 | `ARCHON_DRAWBRIDGE_MACAROON_SECRET` | *(auto)* | L402 macaroon signing secret (auto-generated) |
@@ -693,7 +694,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 3001 | CLN REST | 3001 | -- | localhost |
 | 3002 | RTL | 3002 | `ARCHON_RTL_PORT` | localhost |
 | 5000 | LNbits | 5000 | `ARCHON_LNBITS_PORT` | localhost |
-| 9050 | Tor SOCKS | 127.0.0.1:9050 | `ARCHON_TOR_SOCKS_PORT` | localhost |
+| 9050 | Tor SOCKS | 127.0.0.1:9050 | `ARCHON_TOR_SOCKS_PORT` | localhost; overrides should use `HOST_IP:HOST_PORT` |
 | 38332 | BTC Signet Node RPC | 38332 | -- | localhost |
 | 4232 | Hyperswarm Metrics | 4232 | -- | localhost |
 | 4234 | BTC Mainnet Mediator Metrics | 4234 | -- | localhost |
