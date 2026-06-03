@@ -1,4 +1,4 @@
-import BtcClient, { Block, BlockHeader, MempoolEntry, RawTransactionVerbose } from 'bitcoin-core';
+import BtcClient, { Block, BlockHeader, MempoolEntry } from 'bitcoin-core';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import KeymasterClient from '@didcid/keymaster/client';
@@ -14,12 +14,12 @@ import express from 'express';
 import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 import axios from 'axios';
+import { createHash } from 'crypto';
 
 const REGISTRY = config.chain;
 
 const READ_ONLY = config.exportInterval === 0;
 const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
-const TX_FETCH_CONCURRENCY = 8;
 
 function maskUrl(url: string): string {
     try {
@@ -55,16 +55,16 @@ const fallbackBtcClient = config.fallbackRpcUrl
     ? new BtcClient({ host: config.fallbackRpcUrl })
     : undefined;
 
-type ChainReadClient = Pick<BtcClient, 'getBlockHash' | 'getBlock' | 'getBlockHeader' | 'getBlockCount' | 'getRawTransaction'>;
+type ChainReadClient = Pick<BtcClient, 'getBlockHash' | 'getBlock' | 'getBlockHeader' | 'getBlockCount'>;
 
 interface BlockchainInfo {
     pruned?: boolean;
     pruneheight?: number;
 }
 
-interface RawTransactionReadResult {
-    tx: RawTransactionVerbose;
-    usedFallback: boolean;
+interface ParsedBlockTx {
+    txid: string;
+    opReturns: string[];
 }
 
 class HistoricalBlockDataUnavailableError extends Error {
@@ -126,37 +126,168 @@ async function getChainBlockTxids(hash: string): Promise<Block> {
     return withFallback(`block ${hash}`, async (client) => await client.getBlock(hash, BlockVerbosity.JSON) as Block);
 }
 
-async function getChainRawTransaction(txid: string, blockHash: string, preferFallback = false): Promise<RawTransactionReadResult> {
-    const description = `transaction ${txid}`;
+async function getChainBlockHex(hash: string): Promise<string> {
+    return withFallback(`block ${hash}`, async (client) => await client.getBlock(hash, BlockVerbosity.HEX) as string);
+}
 
-    if (preferFallback) {
-        if (!fallbackBtcClient) {
-            throw new HistoricalBlockDataUnavailableError(description, 'primary RPC previously unavailable for this block');
+function hash256(data: Buffer): Buffer {
+    return createHash('sha256').update(createHash('sha256').update(data).digest()).digest();
+}
+
+function readVarInt(buffer: Buffer, offset: number): { value: number; offset: number } {
+    const first = buffer[offset];
+    if (first === undefined) {
+        throw new Error('Unexpected end of block while reading varint');
+    }
+
+    if (first < 0xfd) {
+        return { value: first, offset: offset + 1 };
+    }
+
+    if (first === 0xfd) {
+        return { value: buffer.readUInt16LE(offset + 1), offset: offset + 3 };
+    }
+
+    if (first === 0xfe) {
+        return { value: buffer.readUInt32LE(offset + 1), offset: offset + 5 };
+    }
+
+    const value = buffer.readBigUInt64LE(offset + 1);
+    if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new Error(`Varint ${value} exceeds safe JavaScript integer range`);
+    }
+
+    return { value: Number(value), offset: offset + 9 };
+}
+
+function readPushData(script: Buffer, offset: number): { data: Buffer; offset: number } | undefined {
+    const opcode = script[offset];
+    if (opcode === undefined) {
+        return undefined;
+    }
+
+    let length: number;
+    let dataOffset = offset + 1;
+
+    if (opcode > 0 && opcode <= 0x4b) {
+        length = opcode;
+    } else if (opcode === 0x4c) {
+        length = script.readUInt8(dataOffset);
+        dataOffset += 1;
+    } else if (opcode === 0x4d) {
+        length = script.readUInt16LE(dataOffset);
+        dataOffset += 2;
+    } else if (opcode === 0x4e) {
+        length = script.readUInt32LE(dataOffset);
+        dataOffset += 4;
+    } else {
+        return undefined;
+    }
+
+    const nextOffset = dataOffset + length;
+    if (nextOffset > script.length) {
+        return undefined;
+    }
+
+    return { data: script.subarray(dataOffset, nextOffset), offset: nextOffset };
+}
+
+function extractOpReturnPushes(script: Buffer): string[] {
+    if (script[0] !== 0x6a) {
+        return [];
+    }
+
+    const pushes: string[] = [];
+    let offset = 1;
+
+    while (offset < script.length) {
+        const push = readPushData(script, offset);
+        if (!push) {
+            break;
         }
 
-        try {
-            const tx = await fallbackBtcClient.getRawTransaction(txid, 1, blockHash) as RawTransactionVerbose;
-            return { tx, usedFallback: true };
-        } catch (fallbackError) {
-            throw new HistoricalBlockDataUnavailableError(description, 'primary RPC previously unavailable for this block', fallbackError);
+        pushes.push(push.data.toString('hex'));
+        offset = push.offset;
+    }
+
+    return pushes;
+}
+
+function parseRawTransaction(buffer: Buffer, offset: number): { tx: ParsedBlockTx; offset: number } {
+    const txStart = offset;
+    const versionEnd = txStart + 4;
+    offset = versionEnd;
+
+    const hasWitness = buffer[offset] === 0x00 && (buffer[offset + 1] ?? 0) !== 0x00;
+    if (hasWitness) {
+        offset += 2;
+    }
+
+    const vinStart = offset;
+    const vinCount = readVarInt(buffer, offset);
+    offset = vinCount.offset;
+
+    for (let input = 0; input < vinCount.value; input++) {
+        offset += 36;
+        const scriptLength = readVarInt(buffer, offset);
+        offset = scriptLength.offset + scriptLength.value + 4;
+    }
+
+    const voutCount = readVarInt(buffer, offset);
+    offset = voutCount.offset;
+    const opReturns: string[] = [];
+
+    for (let output = 0; output < voutCount.value; output++) {
+        offset += 8;
+        const scriptLength = readVarInt(buffer, offset);
+        offset = scriptLength.offset;
+        const script = buffer.subarray(offset, offset + scriptLength.value);
+        opReturns.push(...extractOpReturnPushes(script));
+        offset += scriptLength.value;
+    }
+
+    const voutEnd = offset;
+
+    if (hasWitness) {
+        for (let input = 0; input < vinCount.value; input++) {
+            const itemCount = readVarInt(buffer, offset);
+            offset = itemCount.offset;
+            for (let item = 0; item < itemCount.value; item++) {
+                const itemLength = readVarInt(buffer, offset);
+                offset = itemLength.offset + itemLength.value;
+            }
         }
     }
 
-    try {
-        const tx = await btcClient.getRawTransaction(txid, 1, blockHash) as RawTransactionVerbose;
-        return { tx, usedFallback: false };
-    } catch (error) {
-        if (!fallbackBtcClient || !isUnavailableBlockError(error)) {
-            throw error;
-        }
+    const locktimeStart = offset;
+    offset += 4;
 
-        try {
-            const tx = await fallbackBtcClient.getRawTransaction(txid, 1, blockHash) as RawTransactionVerbose;
-            return { tx, usedFallback: true };
-        } catch (fallbackError) {
-            throw new HistoricalBlockDataUnavailableError(description, error, fallbackError);
-        }
+    const noWitnessTx = hasWitness
+        ? Buffer.concat([
+            buffer.subarray(txStart, versionEnd),
+            buffer.subarray(vinStart, voutEnd),
+            buffer.subarray(locktimeStart, locktimeStart + 4),
+        ])
+        : buffer.subarray(txStart, offset);
+    const txid = Buffer.from(hash256(noWitnessTx)).reverse().toString('hex');
+
+    return { tx: { txid, opReturns }, offset };
+}
+
+function parseRawBlockTransactions(hex: string): ParsedBlockTx[] {
+    const buffer = Buffer.from(hex, 'hex');
+    let offset = 80;
+    const txCount = readVarInt(buffer, offset);
+    offset = txCount.offset;
+    const txs: ParsedBlockTx[] = [];
+
+    for (let index = 0; index < txCount.value; index++) {
+        const parsed = parseRawTransaction(buffer, offset);
+        txs.push(parsed.tx);
+        offset = parsed.offset;
     }
+
+    return txs;
 }
 
 // Wallet service API helpers
@@ -532,60 +663,32 @@ function updateDiscoveredItems(db: MediatorDb, update: DiscoveredItem): void {
 async function fetchBlock(height: number, blockCount: number): Promise<void> {
     try {
         const blockHash = await getChainBlockHash(height);
-        const block = await getChainBlockTxids(blockHash);
-        const timestamp = new Date(block.time * 1000).toISOString();
-        let useFallbackForBlockTxs = false;
+        const header = await getChainBlockHeader(blockHash);
+        const blockHex = await getChainBlockHex(blockHash);
+        const transactions = parseRawBlockTransactions(blockHex);
+        const blockTime = header.time ?? 0;
+        const timestamp = new Date(blockTime * 1000).toISOString();
 
-        for (let start = 0; start < block.tx.length; start += TX_FETCH_CONCURRENCY) {
-            const indexes = block.tx.slice(start, start + TX_FETCH_CONCURRENCY).map((_txid, offset) => start + offset);
-            const preferFallbackForBatch = useFallbackForBlockTxs;
-            const txs = await Promise.all(indexes.map(async (i) => {
-                const txid = block.tx[i];
-                const result = await getChainRawTransaction(txid, blockHash, preferFallbackForBatch);
-                return {
-                    index: i,
-                    fallbackTxid: txid,
-                    tx: result.tx,
-                    usedFallback: result.usedFallback,
-                };
-            }));
+        for (let index = 0; index < transactions.length; index++) {
+            const tx = transactions[index];
 
-            if (!useFallbackForBlockTxs && txs.some(({ usedFallback }) => usedFallback)) {
-                console.warn(`Primary RPC is missing transaction data for block ${height}; using fallback RPC ${fallbackRpcDescription()} for the remaining transactions in this block`);
-                useFallbackForBlockTxs = true;
-            }
+            console.log(height, String(index).padStart(4), tx.txid);
 
-            for (const { index, fallbackTxid, tx } of txs) {
-                const resolvedTxid = tx.txid || fallbackTxid;
+            for (const opReturn of tx.opReturns) {
+                try {
+                    const textString = Buffer.from(opReturn, 'hex').toString('utf8');
+                    if (textString.startsWith('did:cid:') && isValidDID(textString)) {
+                        await jsonPersister.updateDb((db) => {
+                            const item = { height, index, time: timestamp, txid: tx.txid, did: textString };
+                            const itemKey = discoveredKey(item);
 
-                console.log(height, String(index).padStart(4), resolvedTxid);
-
-                for (const vout of tx.vout ?? []) {
-                    const asm = vout.scriptPubKey?.asm;
-                    if (!asm) {
-                        continue;
+                            if (!db.discovered.some(discovered => discoveredKey(discovered) === itemKey)) {
+                                db.discovered.push(item);
+                            }
+                        });
                     }
-
-                    const parts = asm.split(' ');
-                    if (parts[0] !== 'OP_RETURN' || !parts[1]) {
-                        continue;
-                    }
-
-                    try {
-                        const textString = Buffer.from(parts[1], 'hex').toString('utf8');
-                        if (textString.startsWith('did:cid:') && isValidDID(textString)) {
-                            await jsonPersister.updateDb((db) => {
-                                const item = { height, index, time: timestamp, txid: resolvedTxid, did: textString };
-                                const itemKey = discoveredKey(item);
-
-                                if (!db.discovered.some(discovered => discoveredKey(discovered) === itemKey)) {
-                                    db.discovered.push(item);
-                                }
-                            });
-                        }
-                    } catch (error: any) {
-                        console.error('Error decoding OP_RETURN or updating DB:', error);
-                    }
+                } catch (error: any) {
+                    console.error('Error decoding OP_RETURN or updating DB:', error);
                 }
             }
         }
@@ -595,11 +698,11 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
             db.hash = blockHash;
             db.time = timestamp;
             db.blocksScanned = height - config.startBlock + 1;
-            db.txnsScanned += block.tx.length;
+            db.txnsScanned += transactions.length;
             db.blockCount = blockCount;
             db.blocksPending = blockCount - height;
         });
-        await addBlock(height, blockHash, block.time);
+        await addBlock(height, blockHash, blockTime);
 
     } catch (error) {
         if (isUnavailableBlockError(error)) {
