@@ -62,11 +62,25 @@ interface BlockchainInfo {
     pruneheight?: number;
 }
 
+class HistoricalBlockDataUnavailableError extends Error {
+    constructor(description: string, primaryError: unknown, fallbackError?: unknown) {
+        const fallbackMessage = fallbackError
+            ? ` Fallback RPC also failed: ${fallbackError}`
+            : '';
+        super(`${description} unavailable from primary RPC: ${primaryError}.${fallbackMessage}`);
+        this.name = 'HistoricalBlockDataUnavailableError';
+    }
+}
+
 function fallbackRpcDescription(): string | undefined {
     return config.fallbackRpcUrl ? maskUrl(config.fallbackRpcUrl) : undefined;
 }
 
 function isUnavailableBlockError(error: any): boolean {
+    if (error instanceof HistoricalBlockDataUnavailableError) {
+        return true;
+    }
+
     const message = String(error?.message || error || '');
     return message.includes('Block not available')
         || message.includes('pruned data')
@@ -83,7 +97,11 @@ async function withFallback<T>(description: string, operation: (client: ChainRea
         }
 
         console.warn(`${description} unavailable from primary RPC (${error}); retrying fallback RPC ${fallbackRpcDescription()}`);
-        return operation(fallbackBtcClient);
+        try {
+            return await operation(fallbackBtcClient);
+        } catch (fallbackError) {
+            throw new HistoricalBlockDataUnavailableError(description, error, fallbackError);
+        }
     }
 }
 
