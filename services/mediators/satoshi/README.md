@@ -16,6 +16,8 @@ The mediator has two responsibilities:
 | `ARCHON_ENCRYPTED_PASSPHRASE`      | (no default)         | If specified, the wallet will be decrypted with this passphrase |
 | `ARCHON_SAT_CHAIN`                 | BTC                  | Blockchain ticker symbol |
 | `ARCHON_SAT_NETWORK`               | mainnet              | `mainnet` or `testnet` |
+| `ARCHON_SAT_RPC_URL`               | (no default)         | Full Bitcoin JSON-RPC URL, taking precedence over host/port/user/pass |
+| `ARCHON_SAT_FALLBACK_RPC_URL`      | (no default)         | Optional JSON-RPC fallback for block data missing from a pruned primary node |
 | `ARCHON_SAT_HOST`                  | localhost            | Host where blockchain node is running |
 | `ARCHON_SAT_PORT`                  | 8332                 | Port where blockchain node is running |
 | `ARCHON_SAT_WALLET`                | (no default)         | Blockchain node wallet to use  |

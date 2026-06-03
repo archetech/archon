@@ -340,6 +340,7 @@ No `/ready`, no CORS, no admin auth. No public client-facing routes.
 | `ARCHON_SAT_CHAIN` | `BTC:mainnet` | One of `BTC:mainnet`, `BTC:testnet4`, `BTC:signet`. Becomes the registry name. |
 | `ARCHON_SAT_NETWORK` | `bitcoin` | `bitcoin` / `testnet` / `regtest`. |
 | `ARCHON_SAT_RPC_URL` | unset | Full Bitcoin JSON-RPC URL. When set, takes precedence over `ARCHON_SAT_HOST` / `ARCHON_SAT_PORT` / user / password. Useful for hosted RPC providers. |
+| `ARCHON_SAT_FALLBACK_RPC_URL` | unset | Optional full Bitcoin JSON-RPC URL used for missing/pruned historical block reads from the primary RPC. |
 | `ARCHON_SAT_HOST` | `localhost` | bitcoind RPC host. |
 | `ARCHON_SAT_PORT` | `8332` | bitcoind RPC port. |
 | `ARCHON_SAT_USER` / `ARCHON_SAT_PASS` | empty | bitcoind RPC auth. |
