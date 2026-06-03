@@ -62,6 +62,11 @@ interface BlockchainInfo {
     pruneheight?: number;
 }
 
+interface RawTransactionReadResult {
+    tx: RawTransactionVerbose;
+    usedFallback: boolean;
+}
+
 class HistoricalBlockDataUnavailableError extends Error {
     constructor(description: string, primaryError: unknown, fallbackError?: unknown) {
         const fallbackMessage = fallbackError
@@ -121,8 +126,37 @@ async function getChainBlockTxids(hash: string): Promise<Block> {
     return withFallback(`block ${hash}`, async (client) => await client.getBlock(hash, BlockVerbosity.JSON) as Block);
 }
 
-async function getChainRawTransaction(txid: string, blockHash: string): Promise<RawTransactionVerbose> {
-    return withFallback(`transaction ${txid}`, async (client) => await client.getRawTransaction(txid, 1, blockHash) as RawTransactionVerbose);
+async function getChainRawTransaction(txid: string, blockHash: string, preferFallback = false): Promise<RawTransactionReadResult> {
+    const description = `transaction ${txid}`;
+
+    if (preferFallback) {
+        if (!fallbackBtcClient) {
+            throw new HistoricalBlockDataUnavailableError(description, 'primary RPC previously unavailable for this block');
+        }
+
+        try {
+            const tx = await fallbackBtcClient.getRawTransaction(txid, 1, blockHash) as RawTransactionVerbose;
+            return { tx, usedFallback: true };
+        } catch (fallbackError) {
+            throw new HistoricalBlockDataUnavailableError(description, 'primary RPC previously unavailable for this block', fallbackError);
+        }
+    }
+
+    try {
+        const tx = await btcClient.getRawTransaction(txid, 1, blockHash) as RawTransactionVerbose;
+        return { tx, usedFallback: false };
+    } catch (error) {
+        if (!fallbackBtcClient || !isUnavailableBlockError(error)) {
+            throw error;
+        }
+
+        try {
+            const tx = await fallbackBtcClient.getRawTransaction(txid, 1, blockHash) as RawTransactionVerbose;
+            return { tx, usedFallback: true };
+        } catch (fallbackError) {
+            throw new HistoricalBlockDataUnavailableError(description, error, fallbackError);
+        }
+    }
 }
 
 // Wallet service API helpers
@@ -500,17 +534,26 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
         const blockHash = await getChainBlockHash(height);
         const block = await getChainBlockTxids(blockHash);
         const timestamp = new Date(block.time * 1000).toISOString();
+        let useFallbackForBlockTxs = false;
 
         for (let start = 0; start < block.tx.length; start += TX_FETCH_CONCURRENCY) {
             const indexes = block.tx.slice(start, start + TX_FETCH_CONCURRENCY).map((_txid, offset) => start + offset);
+            const preferFallbackForBatch = useFallbackForBlockTxs;
             const txs = await Promise.all(indexes.map(async (i) => {
                 const txid = block.tx[i];
+                const result = await getChainRawTransaction(txid, blockHash, preferFallbackForBatch);
                 return {
                     index: i,
                     fallbackTxid: txid,
-                    tx: await getChainRawTransaction(txid, blockHash),
+                    tx: result.tx,
+                    usedFallback: result.usedFallback,
                 };
             }));
+
+            if (!useFallbackForBlockTxs && txs.some(({ usedFallback }) => usedFallback)) {
+                console.warn(`Primary RPC is missing transaction data for block ${height}; using fallback RPC ${fallbackRpcDescription()} for the remaining transactions in this block`);
+                useFallbackForBlockTxs = true;
+            }
 
             for (const { index, fallbackTxid, tx } of txs) {
                 const resolvedTxid = tx.txid || fallbackTxid;
