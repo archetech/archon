@@ -54,6 +54,7 @@ const btcClient = new BtcClient({
 const fallbackBtcClient = config.fallbackRpcUrl
     ? new BtcClient({ host: config.fallbackRpcUrl })
     : undefined;
+let primaryPruneHeight: number | undefined;
 
 type ChainReadClient = Pick<BtcClient, 'getBlockHash' | 'getBlock' | 'getBlockHeader' | 'getBlockCount'>;
 
@@ -126,7 +127,15 @@ async function getChainBlockTxids(hash: string): Promise<Block> {
     return withFallback(`block ${hash}`, async (client) => await client.getBlock(hash, BlockVerbosity.JSON) as Block);
 }
 
-async function getChainBlockHex(hash: string): Promise<string> {
+async function getChainBlockHex(hash: string, height?: number): Promise<string> {
+    if (fallbackBtcClient && primaryPruneHeight !== undefined && height !== undefined && height <= primaryPruneHeight) {
+        try {
+            return await fallbackBtcClient.getBlock(hash, BlockVerbosity.HEX) as string;
+        } catch (error) {
+            throw new HistoricalBlockDataUnavailableError(`block ${hash}`, `primary RPC is pruned through height ${primaryPruneHeight}`, error);
+        }
+    }
+
     return withFallback(`block ${hash}`, async (client) => await client.getBlock(hash, BlockVerbosity.HEX) as string);
 }
 
@@ -664,15 +673,13 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
     try {
         const blockHash = await getChainBlockHash(height);
         const header = await getChainBlockHeader(blockHash);
-        const blockHex = await getChainBlockHex(blockHash);
+        const blockHex = await getChainBlockHex(blockHash, height);
         const transactions = parseRawBlockTransactions(blockHex);
         const blockTime = header.time ?? 0;
         const timestamp = new Date(blockTime * 1000).toISOString();
 
         for (let index = 0; index < transactions.length; index++) {
             const tx = transactions[index];
-
-            console.log(height, String(index).padStart(4), tx.txid);
 
             for (const opReturn of tx.opReturns) {
                 try {
@@ -1127,8 +1134,9 @@ async function waitForChain() {
             const blockchainInfo = await btcClient.getBlockchainInfo();
             console.log("Blockchain Info:", JSON.stringify(blockchainInfo, null, 4));
             const info = blockchainInfo as BlockchainInfo;
-            if (info.pruned && typeof info.pruneheight === 'number' && config.startBlock < info.pruneheight && !fallbackBtcClient) {
-                console.warn(`${config.chain} primary RPC is pruned at height ${info.pruneheight}, but start block is ${config.startBlock} and ARCHON_SAT_FALLBACK_RPC_URL is unset. Missing historical blocks will not be recoverable from this node.`);
+            primaryPruneHeight = info.pruned && typeof info.pruneheight === 'number' ? info.pruneheight : undefined;
+            if (primaryPruneHeight !== undefined && config.startBlock < primaryPruneHeight && !fallbackBtcClient) {
+                console.warn(`${config.chain} primary RPC is pruned at height ${primaryPruneHeight}, but start block is ${config.startBlock} and ARCHON_SAT_FALLBACK_RPC_URL is unset. Missing historical blocks will not be recoverable from this node.`);
             }
             isReady = true;
         } catch (error) {
