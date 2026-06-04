@@ -708,7 +708,7 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
         if (isUnavailableBlockError(error)) {
             throw new Error(`Cannot fetch block ${height}; primary RPC is missing historical block data${fallbackBtcClient ? ' and fallback RPC could not provide it' : ' and ARCHON_SAT_FALLBACK_RPC_URL is unset'}: ${error}`);
         }
-        console.error(`Error fetching block: ${error}`);
+        throw new Error(`Cannot fetch block ${height}: ${error}`);
     }
 }
 
