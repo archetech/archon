@@ -132,7 +132,7 @@ async function getChainBlockHex(hash: string, height?: number): Promise<string> 
         try {
             return await fallbackBtcClient.getBlock(hash, BlockVerbosity.HEX) as string;
         } catch (error) {
-            throw new HistoricalBlockDataUnavailableError(`block ${hash}`, `primary RPC is pruned through height ${primaryPruneHeight}`, error);
+            throw new HistoricalBlockDataUnavailableError(`block ${hash}`, `primary RPC skipped because it is pruned through height ${primaryPruneHeight}`, error);
         }
     }
 
@@ -1135,7 +1135,7 @@ async function waitForChain() {
             console.log("Blockchain Info:", JSON.stringify(blockchainInfo, null, 4));
             const info = blockchainInfo as BlockchainInfo;
             primaryPruneHeight = info.pruned && typeof info.pruneheight === 'number' ? info.pruneheight : undefined;
-            if (primaryPruneHeight !== undefined && config.startBlock < primaryPruneHeight && !fallbackBtcClient) {
+            if (primaryPruneHeight !== undefined && config.startBlock <= primaryPruneHeight && !fallbackBtcClient) {
                 console.warn(`${config.chain} primary RPC is pruned at height ${primaryPruneHeight}, but start block is ${config.startBlock} and ARCHON_SAT_FALLBACK_RPC_URL is unset. Missing historical blocks will not be recoverable from this node.`);
             }
             isReady = true;
