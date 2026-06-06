@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.14](https://github.com/archetech/archon/compare/@didcid/browser-hdkey@0.1.11...@didcid/browser-hdkey@0.1.14) (2026-06-06)
+
+**Note:** Version bump only for package @didcid/browser-hdkey
+
+
+
+
+
 ## [0.1.13](https://github.com/archetech/archon/compare/@didcid/browser-hdkey@0.1.12...@didcid/browser-hdkey@0.1.13) (2026-05-29)
 
 **Note:** Version bump only for package @didcid/browser-hdkey
