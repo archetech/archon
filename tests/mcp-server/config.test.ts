@@ -1,5 +1,4 @@
-import { loadConfig, walletLocation } from '../../packages/mcp-server/src/config';
-import { createWallet } from '../../packages/mcp-server/src/runtime';
+import { createWallet, loadConfig, walletLocation } from '@didcid/mcp-server';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';

@@ -7,7 +7,7 @@ describe('mcp server package import', () => {
         }) as never);
         const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-        const module = await import('../../packages/mcp-server/src/index');
+        const module = await import('@didcid/mcp-server');
 
         expect(module.main).toBeInstanceOf(Function);
         expect(exitSpy).not.toHaveBeenCalled();

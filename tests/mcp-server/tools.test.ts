@@ -1,6 +1,5 @@
 import { jest } from '@jest/globals';
-import { registerArchonTools } from '../../packages/mcp-server/src/tools';
-import { McpServerConfig } from '../../packages/mcp-server/src/config';
+import { registerArchonTools, McpServerConfig } from '@didcid/mcp-server';
 
 type ToolHandler = (args?: unknown) => Promise<any>;
 

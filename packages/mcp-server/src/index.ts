@@ -4,6 +4,12 @@ import { loadConfig } from './config.js';
 import { createArchonRuntime } from './runtime.js';
 import { registerArchonTools } from './tools.js';
 
+export { loadConfig, walletLocation } from './config.js';
+export type { McpServerConfig, WalletType } from './config.js';
+export { createArchonRuntime, createWallet } from './runtime.js';
+export type { ArchonRuntime } from './runtime.js';
+export { registerArchonTools } from './tools.js';
+
 export async function main(): Promise<void> {
     const config = loadConfig();
     const runtime = await createArchonRuntime(config);
