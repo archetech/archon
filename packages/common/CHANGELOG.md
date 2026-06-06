@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.15](https://github.com/archetech/archon/compare/@didcid/common@0.1.14...@didcid/common@0.1.15) (2026-06-06)
+
+**Note:** Version bump only for package @didcid/common
+
+
+
+
+
 ## [0.1.14](https://github.com/archetech/archon/compare/@didcid/common@0.1.3...@didcid/common@0.1.14) (2026-06-06)
 
 
