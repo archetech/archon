@@ -8,7 +8,8 @@ export { loadConfig, walletLocation } from './config.js';
 export type { McpServerConfig, WalletType } from './config.js';
 export { createArchonRuntime, createWallet } from './runtime.js';
 export type { ArchonRuntime } from './runtime.js';
-export { registerArchonTools } from './tools.js';
+export { ARCHON_MCP_CLI_COMMANDS, ARCHON_MCP_TOOL_DEFINITIONS, registerArchonTools } from './tools.js';
+export type { ArchonToolDefinition } from './tools.js';
 
 export async function main(): Promise<void> {
     const config = loadConfig();

@@ -1,6 +1,7 @@
-const QUOTED_SECRET_ASSIGNMENT = /\b(ARCHON_(?:ADMIN_API_KEY|PASSPHRASE|ENCRYPTED_PASSPHRASE)|api[_-]?key|apikey|token|access_token|passphrase|password)=("[^"]*"|'[^']*')/gi;
-const SPACED_SECRET_ASSIGNMENT = /\b(ARCHON_(?:PASSPHRASE|ENCRYPTED_PASSPHRASE)|passphrase|password)=([^&\r\n]*?)(?=\shttps?:\/\/|\s[A-Za-z_][A-Za-z0-9_-]*=|[&\r\n]|$)/gi;
-const SECRET_ASSIGNMENT = /\b(ARCHON_ADMIN_API_KEY|api[_-]?key|apikey|token|access_token)=([^&\s]+)/gi;
+const SECRET_KEYS = 'ARCHON_(?:ADMIN_API_KEY|PASSPHRASE|ENCRYPTED_PASSPHRASE)|api[_-]?key|apikey|token|access_token|passphrase|password|mnemonic|recovery[_-]?phrase|recoveryPhrase|nsec|bolt11|adminKey|invoiceKey';
+const QUOTED_SECRET_ASSIGNMENT = new RegExp(`\\b(${SECRET_KEYS})=("[^"]*"|'[^']*')`, 'gi');
+const SPACED_SECRET_ASSIGNMENT = /\b(ARCHON_(?:PASSPHRASE|ENCRYPTED_PASSPHRASE)|passphrase|password|mnemonic|recovery[_-]?phrase)=([^&\r\n]*?)(?=\shttps?:\/\/|\s[A-Za-z_][A-Za-z0-9_-]*=|[&\r\n]|$)/gi;
+const SECRET_ASSIGNMENT = new RegExp(`\\b(${SECRET_KEYS})=([^&\\s]+)`, 'gi');
 const URL_TEXT = /https?:\/\/[^\s"'<>]+/gi;
 const URL_SECRET_PARAMS = new Set(['api_key', 'apikey', 'access_token', 'token', 'key', 'password', 'passphrase']);
 const TOKEN_PATH_HOSTS = [
