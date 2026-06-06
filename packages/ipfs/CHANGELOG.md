@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.15](https://github.com/archetech/archon/compare/@didcid/ipfs@0.1.14...@didcid/ipfs@0.1.15) (2026-06-06)
+
+**Note:** Version bump only for package @didcid/ipfs
+
+
+
+
+
+## [0.1.14](https://github.com/archetech/archon/compare/@didcid/ipfs@0.1.3...@didcid/ipfs@0.1.14) (2026-06-06)
+
+
+### Features
+
+* stream large file uploads/downloads for multi-GB video support ([#238](https://github.com/archetech/archon/issues/238)) ([eca94a0](https://github.com/archetech/archon/commit/eca94a06c041849a181a5a072728b9fe0c22bfae)), closes [#208](https://github.com/archetech/archon/issues/208)
+
+
+
+
+
 ## [0.1.13](https://github.com/archetech/archon/compare/@didcid/ipfs@0.1.12...@didcid/ipfs@0.1.13) (2026-05-29)
 
 **Note:** Version bump only for package @didcid/ipfs

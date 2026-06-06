@@ -38,42 +38,270 @@ Example MCP client config:
 | `ARCHON_WALLET_PATH` | `./wallet.json` | Wallet file path |
 | `ARCHON_PASSPHRASE` | unset | Required for wallet-backed tools; node health tools work without it |
 | `ARCHON_DEFAULT_REGISTRY` | Keymaster default | Default registry for new DIDs |
-| `ARCHON_MCP_READ_ONLY` | `false` | Set to `true` to block mutating tools |
+| `ARCHON_MCP_READ_ONLY` | `false` | Set to `true` to omit mutating tools from `tools/list` |
 
 ## Tools
 
-Read tools:
+The MCP server maps every Keymaster CLI command to one MCP tool. Tool names use the CLI command with `archon_` prefixed and hyphens changed to underscores.
+
+MCP-only helper tools:
 
 - `archon_get_version`
 - `archon_get_status`
-- `archon_list_registries`
-- `archon_list_ids`
 - `archon_get_current_id`
-- `archon_resolve_did`
-- `archon_resolve_id`
-- `archon_list_aliases`
-- `archon_get_alias`
-- `archon_list_addresses`
-- `archon_check_address`
-- `archon_list_assets`
-- `archon_get_asset`
 
-Mutating tools:
+CLI file commands use inline data instead of arbitrary local paths. Binary/text payloads use:
 
-- `archon_use_id`
-- `archon_create_id`
-- `archon_add_alias`
-- `archon_remove_alias`
-- `archon_add_address`
-- `archon_remove_address`
-- `archon_publish_address`
-- `archon_unpublish_address`
-- `archon_create_asset_json`
-- `archon_update_asset_json`
-- `archon_transfer_asset`
+```json
+{
+  "name": "example.txt",
+  "mimeType": "text/plain",
+  "encoding": "base64",
+  "data": "aGVsbG8="
+}
+```
+
+Use `"encoding": "utf8"` when passing plain text directly. Returned file-like data uses the same shape with base64 encoding.
+
+Destructive tools require `"confirm": true`, secret-revealing tools require `"reveal": true`, and Lightning payment/broadcast tools require `"confirmPayment": true`.
 
 Set `ARCHON_MCP_READ_ONLY=true` to omit mutating tools from the advertised MCP tool list.
 
-## Intentionally omitted from v1
+## Examples
 
-The v1 server does not expose wallet creation/recovery/mnemonic/passphrase tools, Gatekeeper admin tools, credentials, vaults, dmail, Nostr, Lightning, polls, groups, schemas, or binary file/image asset tools.
+Create an ID:
+
+```json
+{
+  "name": "archon_create_id",
+  "arguments": {
+    "name": "alice",
+    "registry": "hyperswarm"
+  }
+}
+```
+
+Rotate the current ID keys:
+
+```json
+{
+  "name": "archon_rotate_keys",
+  "arguments": {
+    "confirm": true
+  }
+}
+```
+
+Create a JSON asset:
+
+```json
+{
+  "name": "archon_create_asset_json",
+  "arguments": {
+    "data": {
+      "title": "Example",
+      "status": "draft"
+    },
+    "alias": "example-asset"
+  }
+}
+```
+
+Create a file asset from inline data:
+
+```json
+{
+  "name": "archon_create_asset_file",
+  "arguments": {
+    "file": {
+      "name": "hello.txt",
+      "mimeType": "text/plain",
+      "encoding": "utf8",
+      "data": "hello"
+    },
+    "alias": "hello-file"
+  }
+}
+```
+
+Issue a credential from inline JSON:
+
+```json
+{
+  "name": "archon_issue_credential",
+  "arguments": {
+    "credential": {
+      "@context": ["https://www.w3.org/ns/credentials/v2"],
+      "type": ["VerifiableCredential"],
+      "issuer": "did:cid:issuer",
+      "credentialSubject": {
+        "id": "did:cid:subject"
+      }
+    }
+  }
+}
+```
+
+Reveal a credential in the current ID manifest:
+
+```json
+{
+  "name": "archon_reveal_credential",
+  "arguments": {
+    "did": "did:cid:credential",
+    "reveal": true
+  }
+}
+```
+
+Pay a Lightning invoice:
+
+```json
+{
+  "name": "archon_lightning_pay",
+  "arguments": {
+    "bolt11": "lnbc...",
+    "confirmPayment": true
+  }
+}
+```
+
+### Keymaster CLI mapping
+
+| CLI command | MCP tool |
+| --- | --- |
+| `create-wallet` | `archon_create_wallet` |
+| `new-wallet` | `archon_new_wallet` |
+| `change-passphrase` | `archon_change_passphrase` |
+| `check-wallet` | `archon_check_wallet` |
+| `fix-wallet` | `archon_fix_wallet` |
+| `import-wallet` | `archon_import_wallet` |
+| `show-wallet` | `archon_show_wallet` |
+| `backup-wallet-file` | `archon_backup_wallet_file` |
+| `restore-wallet-file` | `archon_restore_wallet_file` |
+| `show-mnemonic` | `archon_show_mnemonic` |
+| `backup-wallet-did` | `archon_backup_wallet_did` |
+| `recover-wallet-did` | `archon_recover_wallet_did` |
+| `create-id` | `archon_create_id` |
+| `resolve-id` | `archon_resolve_id` |
+| `backup-id` | `archon_backup_id` |
+| `recover-id` | `archon_recover_id` |
+| `remove-id` | `archon_remove_id` |
+| `rename-id` | `archon_rename_id` |
+| `list-ids` | `archon_list_ids` |
+| `list-registries` | `archon_list_registries` |
+| `use-id` | `archon_use_id` |
+| `rotate-keys` | `archon_rotate_keys` |
+| `resolve-did` | `archon_resolve_did` |
+| `resolve-did-version` | `archon_resolve_did_version` |
+| `revoke-did` | `archon_revoke_did` |
+| `change-registry` | `archon_change_registry` |
+| `encrypt-message` | `archon_encrypt_message` |
+| `encrypt-file` | `archon_encrypt_file` |
+| `decrypt-did` | `archon_decrypt_did` |
+| `decrypt-json` | `archon_decrypt_json` |
+| `sign-file` | `archon_sign_file` |
+| `verify-file` | `archon_verify_file` |
+| `create-challenge` | `archon_create_challenge` |
+| `create-challenge-cc` | `archon_create_challenge_cc` |
+| `create-response` | `archon_create_response` |
+| `verify-response` | `archon_verify_response` |
+| `bind-credential` | `archon_bind_credential` |
+| `issue-credential` | `archon_issue_credential` |
+| `list-issued` | `archon_list_issued` |
+| `update-credential` | `archon_update_credential` |
+| `revoke-credential` | `archon_revoke_credential` |
+| `accept-credential` | `archon_accept_credential` |
+| `list-credentials` | `archon_list_credentials` |
+| `get-credential` | `archon_get_credential` |
+| `view-credential` | `archon_view_credential` |
+| `publish-credential` | `archon_publish_credential` |
+| `reveal-credential` | `archon_reveal_credential` |
+| `unpublish-credential` | `archon_unpublish_credential` |
+| `add-alias` | `archon_add_alias` |
+| `get-alias` | `archon_get_alias` |
+| `remove-alias` | `archon_remove_alias` |
+| `list-aliases` | `archon_list_aliases` |
+| `list-addresses` | `archon_list_addresses` |
+| `get-address` | `archon_get_address` |
+| `import-address` | `archon_import_address` |
+| `check-address` | `archon_check_address` |
+| `add-address` | `archon_add_address` |
+| `remove-address` | `archon_remove_address` |
+| `publish-address` | `archon_publish_address` |
+| `unpublish-address` | `archon_unpublish_address` |
+| `add-nostr` | `archon_add_nostr` |
+| `import-nostr` | `archon_import_nostr` |
+| `remove-nostr` | `archon_remove_nostr` |
+| `add-lightning` | `archon_add_lightning` |
+| `remove-lightning` | `archon_remove_lightning` |
+| `lightning-balance` | `archon_lightning_balance` |
+| `lightning-decode` | `archon_lightning_decode` |
+| `lightning-invoice` | `archon_lightning_invoice` |
+| `lightning-pay` | `archon_lightning_pay` |
+| `lightning-check` | `archon_lightning_check` |
+| `publish-lightning` | `archon_publish_lightning` |
+| `unpublish-lightning` | `archon_unpublish_lightning` |
+| `lightning-zap` | `archon_lightning_zap` |
+| `lightning-payments` | `archon_lightning_payments` |
+| `create-group` | `archon_create_group` |
+| `list-groups` | `archon_list_groups` |
+| `get-group` | `archon_get_group` |
+| `add-group-member` | `archon_add_group_member` |
+| `remove-group-member` | `archon_remove_group_member` |
+| `test-group` | `archon_test_group` |
+| `create-schema` | `archon_create_schema` |
+| `list-schemas` | `archon_list_schemas` |
+| `get-schema` | `archon_get_schema` |
+| `create-schema-template` | `archon_create_schema_template` |
+| `create-asset` | `archon_create_asset` |
+| `create-asset-json` | `archon_create_asset_json` |
+| `create-asset-image` | `archon_create_asset_image` |
+| `create-asset-file` | `archon_create_asset_file` |
+| `get-asset` | `archon_get_asset` |
+| `get-asset-json` | `archon_get_asset_json` |
+| `get-asset-image` | `archon_get_asset_image` |
+| `get-asset-file` | `archon_get_asset_file` |
+| `update-asset-json` | `archon_update_asset_json` |
+| `update-asset-image` | `archon_update_asset_image` |
+| `update-asset-file` | `archon_update_asset_file` |
+| `transfer-asset` | `archon_transfer_asset` |
+| `clone-asset` | `archon_clone_asset` |
+| `get-property` | `archon_get_property` |
+| `set-property` | `archon_set_property` |
+| `list-assets` | `archon_list_assets` |
+| `create-poll-template` | `archon_create_poll_template` |
+| `create-poll` | `archon_create_poll` |
+| `add-poll-voter` | `archon_add_poll_voter` |
+| `remove-poll-voter` | `archon_remove_poll_voter` |
+| `list-poll-voters` | `archon_list_poll_voters` |
+| `view-poll` | `archon_view_poll` |
+| `vote-poll` | `archon_vote_poll` |
+| `send-poll` | `archon_send_poll` |
+| `send-ballot` | `archon_send_ballot` |
+| `view-ballot` | `archon_view_ballot` |
+| `update-poll` | `archon_update_poll` |
+| `publish-poll` | `archon_publish_poll` |
+| `reveal-poll` | `archon_reveal_poll` |
+| `unpublish-poll` | `archon_unpublish_poll` |
+| `create-vault` | `archon_create_vault` |
+| `list-vault-items` | `archon_list_vault_items` |
+| `add-vault-member` | `archon_add_vault_member` |
+| `remove-vault-member` | `archon_remove_vault_member` |
+| `list-vault-members` | `archon_list_vault_members` |
+| `add-vault-item` | `archon_add_vault_item` |
+| `remove-vault-item` | `archon_remove_vault_item` |
+| `get-vault-item` | `archon_get_vault_item` |
+| `create-dmail` | `archon_create_dmail` |
+| `update-dmail` | `archon_update_dmail` |
+| `send-dmail` | `archon_send_dmail` |
+| `get-dmail` | `archon_get_dmail` |
+| `list-dmail` | `archon_list_dmail` |
+| `file-dmail` | `archon_file_dmail` |
+| `refresh-dmail` | `archon_refresh_dmail` |
+| `import-dmail` | `archon_import_dmail` |
+| `remove-dmail` | `archon_remove_dmail` |
+| `add-dmail-attachment` | `archon_add_dmail_attachment` |
+| `remove-dmail-attachment` | `archon_remove_dmail_attachment` |
+| `get-dmail-attachment` | `archon_get_dmail_attachment` |
+| `list-dmail-attachments` | `archon_list_dmail_attachments` |
