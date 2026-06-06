@@ -19,7 +19,7 @@ Example MCP client config:
       "command": "npx",
       "args": ["-y", "@didcid/mcp-server"],
       "env": {
-        "ARCHON_NODE_URL": "http://localhost:4224",
+        "ARCHON_NODE_URL": "https://archon.technology",
         "ARCHON_WALLET_PATH": "./wallet.json",
         "ARCHON_PASSPHRASE": "your-wallet-passphrase"
       }
@@ -32,7 +32,7 @@ Example MCP client config:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `ARCHON_NODE_URL` | `http://localhost:4224` | Archon Gatekeeper/Drawbridge node URL |
+| `ARCHON_NODE_URL` | `https://archon.technology` | Archon Gatekeeper/Drawbridge node URL |
 | `ARCHON_GATEKEEPER_URL` | unset | Legacy fallback when `ARCHON_NODE_URL` is unset |
 | `ARCHON_WALLET_TYPE` | `json` | Local wallet backend: `json` or `sqlite` |
 | `ARCHON_WALLET_PATH` | `./wallet.json` | Wallet file path |

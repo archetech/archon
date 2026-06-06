@@ -9,7 +9,7 @@ describe('mcp server config', () => {
         const config = loadConfig({});
 
         expect(config).toStrictEqual({
-            nodeUrl: 'http://localhost:4224',
+            nodeUrl: 'https://archon.technology',
             walletType: 'json',
             walletPath: './wallet.json',
             passphrase: undefined,
@@ -40,7 +40,7 @@ describe('mcp server config', () => {
             ARCHON_KEYMASTER_URL: 'http://keymaster.example',
         });
 
-        expect(config.nodeUrl).toBe('http://localhost:4224');
+        expect(config.nodeUrl).toBe('https://archon.technology');
         expect(config).not.toHaveProperty('keymasterUrl');
     });
 

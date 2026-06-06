@@ -30,7 +30,7 @@ function parseBool(value: string | undefined): boolean {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpServerConfig {
     return {
-        nodeUrl: env.ARCHON_NODE_URL || env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224',
+        nodeUrl: env.ARCHON_NODE_URL || env.ARCHON_GATEKEEPER_URL || 'https://archon.technology',
         walletType: parseWalletType(env.ARCHON_WALLET_TYPE),
         walletPath: env.ARCHON_WALLET_PATH || './wallet.json',
         passphrase: env.ARCHON_PASSPHRASE,
