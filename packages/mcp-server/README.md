@@ -1,6 +1,6 @@
 # Archon MCP Server
 
-`@didcid/mcp-server` lets MCP clients work with Archon identities, aliases, addresses, and JSON assets from a local wallet. It runs as a stdio server on the user's machine, so agents can use Archon without a separate Keymaster HTTP service.
+`@didcid/mcp-server` lets MCP clients work with Archon identities, aliases, addresses, and JSON assets from a local wallet. It runs as a stdio server on the user's machine, so agents can use Archon from local MCP-compatible tools.
 
 The server uses the same wallet files and passphrase flow as the Keymaster CLI, then connects to an Archon node through Gatekeeper/Drawbridge for registry reads and writes.
 
@@ -76,4 +76,4 @@ Set `ARCHON_MCP_READ_ONLY=true` to disable all mutating tools.
 
 ## Intentionally omitted from v1
 
-The v1 server does not expose wallet creation/recovery/mnemonic/passphrase tools, Keymaster service proxy mode, Gatekeeper admin tools, credentials, vaults, dmail, Nostr, Lightning, polls, groups, schemas, or binary file/image asset tools.
+The v1 server does not expose wallet creation/recovery/mnemonic/passphrase tools, Gatekeeper admin tools, credentials, vaults, dmail, Nostr, Lightning, polls, groups, schemas, or binary file/image asset tools.
