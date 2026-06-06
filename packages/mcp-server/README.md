@@ -1,8 +1,8 @@
 # Archon MCP Server
 
-`@didcid/mcp-server` exposes a local Archon wallet runtime to MCP clients over stdio.
+`@didcid/mcp-server` lets MCP clients work with Archon identities, aliases, addresses, and JSON assets from a local wallet. It runs as a stdio server on the user's machine, so agents can use Archon without a separate Keymaster HTTP service.
 
-The server instantiates the Keymaster library directly, using the same local wallet model as the Keymaster CLI.
+The server uses the same wallet files and passphrase flow as the Keymaster CLI, then connects to an Archon node through Gatekeeper/Drawbridge for registry reads and writes.
 
 ## Usage
 
