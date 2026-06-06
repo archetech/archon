@@ -67,6 +67,105 @@ Destructive tools require `"confirm": true`, secret-revealing tools require `"re
 
 Set `ARCHON_MCP_READ_ONLY=true` to omit mutating tools from the advertised MCP tool list.
 
+## Examples
+
+Create an ID:
+
+```json
+{
+  "name": "archon_create_id",
+  "arguments": {
+    "name": "alice",
+    "registry": "hyperswarm"
+  }
+}
+```
+
+Rotate the current ID keys:
+
+```json
+{
+  "name": "archon_rotate_keys",
+  "arguments": {
+    "confirm": true
+  }
+}
+```
+
+Create a JSON asset:
+
+```json
+{
+  "name": "archon_create_asset_json",
+  "arguments": {
+    "data": {
+      "title": "Example",
+      "status": "draft"
+    },
+    "alias": "example-asset"
+  }
+}
+```
+
+Create a file asset from inline data:
+
+```json
+{
+  "name": "archon_create_asset_file",
+  "arguments": {
+    "file": {
+      "name": "hello.txt",
+      "mimeType": "text/plain",
+      "encoding": "utf8",
+      "data": "hello"
+    },
+    "alias": "hello-file"
+  }
+}
+```
+
+Issue a credential from inline JSON:
+
+```json
+{
+  "name": "archon_issue_credential",
+  "arguments": {
+    "credential": {
+      "@context": ["https://www.w3.org/ns/credentials/v2"],
+      "type": ["VerifiableCredential"],
+      "issuer": "did:cid:issuer",
+      "credentialSubject": {
+        "id": "did:cid:subject"
+      }
+    }
+  }
+}
+```
+
+Reveal a credential in the current ID manifest:
+
+```json
+{
+  "name": "archon_reveal_credential",
+  "arguments": {
+    "did": "did:cid:credential",
+    "reveal": true
+  }
+}
+```
+
+Pay a Lightning invoice:
+
+```json
+{
+  "name": "archon_lightning_pay",
+  "arguments": {
+    "bolt11": "lnbc...",
+    "confirmPayment": true
+  }
+}
+```
+
 ### Keymaster CLI mapping
 
 | CLI command | MCP tool |
