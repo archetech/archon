@@ -2,7 +2,7 @@
 
 `@didcid/mcp-server` exposes a local Archon wallet runtime to MCP clients over stdio.
 
-The server instantiates the Keymaster library directly, using the same local wallet model as the Keymaster CLI. It does not proxy to the Keymaster HTTP service and does not use `ARCHON_KEYMASTER_URL`.
+The server instantiates the Keymaster library directly, using the same local wallet model as the Keymaster CLI.
 
 ## Usage
 
