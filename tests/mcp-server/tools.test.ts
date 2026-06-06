@@ -285,6 +285,40 @@ describe('mcp server tools', () => {
         );
     });
 
+    it('returns file-like assets as inline payloads', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const fileResponse = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+        expect(parseToolResult(fileResponse)).toStrictEqual({
+            ok: true,
+            result: {
+                name: 'file.txt',
+                mimeType: 'text/plain',
+                encoding: 'base64',
+                data: Buffer.from('file').toString('base64'),
+            },
+        });
+
+        const imageResponse = await server.tools.get('archon_get_asset_image')!.handler({ id: 'did:cid:image' });
+        expect(parseToolResult(imageResponse)).toStrictEqual({
+            ok: true,
+            result: {
+                file: {
+                    name: 'image.png',
+                    mimeType: 'image/png',
+                    encoding: 'base64',
+                    data: Buffer.from('image').toString('base64'),
+                },
+                image: {
+                    width: 1,
+                    height: 1,
+                },
+            },
+        });
+    });
+
     it('redacts secrets from tool errors', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime({
@@ -302,6 +336,8 @@ describe('mcp server tools', () => {
         expect(result.error).toContain('https://<redacted>@bitcoin-mainnet.g.alchemy.com/v3/<redacted>?api_key=<redacted>');
         expect(result.error).not.toContain('secret');
         expect(result.error).not.toContain('phrase');
+        expect(result.error).not.toContain('seed');
+        expect(result.error).not.toContain('words');
         expect(result.error).not.toContain('nsec-secret');
         expect(result.error).not.toContain('lnbc-secret');
         expect(result.error).not.toContain('api-token');

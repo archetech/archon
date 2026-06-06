@@ -225,11 +225,14 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_get_asset_json', cliCommand: 'get-asset-json', description: 'Return a JSON asset as an inline object.', schema: IdSchema.merge(ResolveOptionsSchema), handler: (runtime, { id, ...options }) => requireKeymaster(runtime).resolveAsset(id, compactOptions(options)) }),
     tool({ name: 'archon_get_asset_image', cliCommand: 'get-asset-image', description: 'Return an image asset as an inline base64 payload.', schema: IdSchema, handler: async (runtime, { id }) => {
         const image = await requireKeymaster(runtime).getImage(id);
-        return image?.file?.data ? { ...image, file: { ...image.file, data: inlineDataFromBuffer(Buffer.from(image.file.data), image.file.filename, image.file.type) } } : null;
+        return image?.file?.data ? {
+            file: inlineDataFromBuffer(Buffer.from(image.file.data), image.file.filename, image.file.type),
+            image: image.image,
+        } : null;
     } }),
     tool({ name: 'archon_get_asset_file', cliCommand: 'get-asset-file', description: 'Return a file asset as an inline base64 payload.', schema: IdSchema, handler: async (runtime, { id }) => {
         const file = await requireKeymaster(runtime).getFile(id);
-        return file?.data ? { ...file, data: inlineDataFromBuffer(Buffer.from(file.data), file.filename, file.type) } : null;
+        return file?.data ? inlineDataFromBuffer(Buffer.from(file.data), file.filename, file.type) : null;
     } }),
     tool({ name: 'archon_update_asset_json', cliCommand: 'update-asset-json', description: 'Merge JSON object data into an existing asset.', schema: IdSchema.extend({ data: JsonObjectSchema }), mutates: true, handler: (runtime, { id, data }) => requireKeymaster(runtime).mergeData(id, data) }),
     tool({ name: 'archon_update_asset_image', cliCommand: 'update-asset-image', description: 'Update an image asset from an inline payload.', schema: IdSchema.extend({ file: InlineDataSchema }), mutates: true, handler: (runtime, { id, file }) => requireKeymaster(runtime).updateImage(id, bufferFromInlineData(file), compactOptions({ filename: file.name })) }),
