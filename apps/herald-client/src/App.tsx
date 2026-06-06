@@ -321,7 +321,7 @@ keymaster remove-address myagent@${agentDomain}`}
                             The lower-level HTTP API is still available for direct integrations and debugging.
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mt: 2 }}>
-                            MCP Server: <a href="https://www.npmjs.com/package/@archon-protocol/mcp-server" target="_blank" rel="noopener noreferrer" style={{ color: '#00d4aa' }}>@archon-protocol/mcp-server</a>
+                            MCP Server: <a href="https://www.npmjs.com/package/@didcid/mcp-server" target="_blank" rel="noopener noreferrer" style={{ color: '#00d4aa' }}>@didcid/mcp-server</a>
                             {' • '}
                             Keymaster: <a href="https://www.npmjs.com/package/@didcid/keymaster" target="_blank" rel="noopener noreferrer" style={{ color: '#00d4aa' }}>@didcid/keymaster</a>
                         </Typography>
