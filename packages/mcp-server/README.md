@@ -36,7 +36,7 @@ Example MCP client config:
 | `ARCHON_GATEKEEPER_URL` | unset | Legacy fallback when `ARCHON_NODE_URL` is unset |
 | `ARCHON_WALLET_TYPE` | `json` | Local wallet backend: `json` or `sqlite` |
 | `ARCHON_WALLET_PATH` | `./wallet.json` | Wallet file path |
-| `ARCHON_PASSPHRASE` | required | Passphrase for local wallet operations |
+| `ARCHON_PASSPHRASE` | unset | Required for wallet-backed tools; node health tools work without it |
 | `ARCHON_DEFAULT_REGISTRY` | Keymaster default | Default registry for new DIDs |
 | `ARCHON_MCP_READ_ONLY` | `false` | Set to `true` to block mutating tools |
 

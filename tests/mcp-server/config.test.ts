@@ -1,4 +1,8 @@
 import { loadConfig, walletLocation } from '../../packages/mcp-server/src/config';
+import { createWallet } from '../../packages/mcp-server/src/runtime';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 describe('mcp server config', () => {
     it('uses Keymaster CLI compatible defaults', () => {
@@ -62,5 +66,24 @@ describe('mcp server config', () => {
 
     it('rejects unsupported wallet types', () => {
         expect(() => loadConfig({ ARCHON_WALLET_TYPE: 'mongo' })).toThrow('Unsupported ARCHON_WALLET_TYPE');
+    });
+
+    it('creates sqlite wallets at ARCHON_WALLET_PATH instead of under default data folder', async () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'archon-mcp-wallet-'));
+        const walletPath = path.join(directory, 'wallet.db');
+        const wallet = await createWallet({
+            nodeUrl: 'http://localhost:4224',
+            walletType: 'sqlite',
+            walletPath,
+            passphrase: 'secret',
+            defaultRegistry: undefined,
+            readOnly: false,
+        }) as { disconnect?: () => Promise<void> };
+
+        await wallet.disconnect?.();
+
+        expect(fs.existsSync(walletPath)).toBe(true);
+        expect(fs.existsSync(path.join('data', walletPath))).toBe(false);
+        fs.rmSync(directory, { recursive: true, force: true });
     });
 });

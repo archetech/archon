@@ -12,11 +12,12 @@ export interface ArchonRuntime {
 }
 
 export async function createWallet(config: McpServerConfig) {
+    const { directory, file } = walletLocation(config.walletPath);
+
     if (config.walletType === 'sqlite') {
-        return WalletSQLite.create(config.walletPath);
+        return WalletSQLite.create(file, directory);
     }
 
-    const { directory, file } = walletLocation(config.walletPath);
     return new WalletJson(file, directory);
 }
 

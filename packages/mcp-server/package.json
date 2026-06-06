@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "archon-mcp-server": "./dist/index.js"
+    "archon-mcp-server": "./dist/cli.js"
   },
   "files": [
     "dist",
@@ -24,7 +24,7 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && tsc -p tsconfig.json && chmod +x dist/index.js"
+    "build": "npm run clean && tsc -p tsconfig.json && chmod +x dist/cli.js"
   },
   "keywords": [
     "archon",
