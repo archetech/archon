@@ -20,6 +20,36 @@ const baseConfig: McpServerConfig = {
     readOnly: false,
 };
 
+const mutatingTools = [
+    'archon_add_address',
+    'archon_add_alias',
+    'archon_create_asset_json',
+    'archon_create_id',
+    'archon_publish_address',
+    'archon_remove_address',
+    'archon_remove_alias',
+    'archon_transfer_asset',
+    'archon_unpublish_address',
+    'archon_update_asset_json',
+    'archon_use_id',
+];
+
+const readTools = [
+    'archon_check_address',
+    'archon_get_alias',
+    'archon_get_asset',
+    'archon_get_current_id',
+    'archon_get_status',
+    'archon_get_version',
+    'archon_list_addresses',
+    'archon_list_aliases',
+    'archon_list_assets',
+    'archon_list_ids',
+    'archon_list_registries',
+    'archon_resolve_did',
+    'archon_resolve_id',
+];
+
 function parseToolResult(response: any) {
     return JSON.parse(response.content[0].text);
 }
@@ -64,32 +94,7 @@ describe('mcp server tools', () => {
         const server = new FakeServer();
         registerArchonTools(server, mockRuntime() as any, baseConfig);
 
-        expect([...server.tools.keys()].sort()).toStrictEqual([
-            'archon_add_address',
-            'archon_add_alias',
-            'archon_check_address',
-            'archon_create_asset_json',
-            'archon_create_id',
-            'archon_get_alias',
-            'archon_get_asset',
-            'archon_get_current_id',
-            'archon_get_status',
-            'archon_get_version',
-            'archon_list_addresses',
-            'archon_list_aliases',
-            'archon_list_assets',
-            'archon_list_ids',
-            'archon_list_registries',
-            'archon_publish_address',
-            'archon_remove_address',
-            'archon_remove_alias',
-            'archon_resolve_did',
-            'archon_resolve_id',
-            'archon_transfer_asset',
-            'archon_unpublish_address',
-            'archon_update_asset_json',
-            'archon_use_id',
-        ]);
+        expect([...server.tools.keys()].sort()).toStrictEqual([...mutatingTools, ...readTools].sort());
     });
 
     it('calls read tools and returns compact JSON payloads', async () => {
@@ -103,17 +108,15 @@ describe('mcp server tools', () => {
         expect(runtime.node.listRegistries).toHaveBeenCalledTimes(1);
     });
 
-    it('blocks mutating tools in read-only mode', async () => {
+    it('does not advertise mutating tools in read-only mode', () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
         registerArchonTools(server, runtime as any, { ...baseConfig, readOnly: true });
 
-        const response = await server.tools.get('archon_create_id')!.handler({ name: 'alice' });
-
-        expect(parseToolResult(response)).toStrictEqual({
-            ok: false,
-            error: 'Tool disabled by ARCHON_MCP_READ_ONLY=true',
-        });
+        expect([...server.tools.keys()].sort()).toStrictEqual(readTools.sort());
+        for (const tool of mutatingTools) {
+            expect(server.tools.has(tool)).toBe(false);
+        }
         expect(runtime.keymaster.createId).not.toHaveBeenCalled();
     });
 
@@ -164,7 +167,7 @@ describe('mcp server tools', () => {
         const server = new FakeServer();
         const runtime = mockRuntime({
             listIds: jest.fn().mockRejectedValue(
-                new Error('failed ARCHON_PASSPHRASE=secret https://user:pass@example.com/v2/api-token?api_key=123')
+                new Error('failed ARCHON_PASSPHRASE="my secret phrase" https://user:pass@bitcoin-mainnet.g.alchemy.com/v3/api-token?api_key=123')
             ),
         });
         registerArchonTools(server, runtime as any, baseConfig);
@@ -174,8 +177,9 @@ describe('mcp server tools', () => {
 
         expect(result.ok).toBe(false);
         expect(result.error).toContain('ARCHON_PASSPHRASE=<redacted>');
-        expect(result.error).toContain('https://<redacted>@example.com/v2/<redacted>?api_key=<redacted>');
+        expect(result.error).toContain('https://<redacted>@bitcoin-mainnet.g.alchemy.com/v3/<redacted>?api_key=<redacted>');
         expect(result.error).not.toContain('secret');
+        expect(result.error).not.toContain('phrase');
         expect(result.error).not.toContain('api-token');
     });
 });

@@ -1,4 +1,5 @@
-import { createWallet, loadConfig, walletLocation } from '@didcid/mcp-server';
+import { createArchonRuntime, createWallet, loadConfig, walletLocation } from '@didcid/mcp-server';
+import { jest } from '@jest/globals';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -84,5 +85,23 @@ describe('mcp server config', () => {
         expect(fs.existsSync(walletPath)).toBe(true);
         expect(fs.existsSync(path.join('data', walletPath))).toBe(false);
         fs.rmSync(directory, { recursive: true, force: true });
+    });
+
+    it('creates runtime without blocking startup or writing to stdout', async () => {
+        const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+        const runtime = await createArchonRuntime({
+            nodeUrl: 'http://127.0.0.1:1',
+            walletType: 'json',
+            walletPath: './wallet.json',
+            passphrase: undefined,
+            defaultRegistry: undefined,
+            readOnly: false,
+        });
+
+        expect(runtime.node.url).toBe('http://127.0.0.1:1');
+        expect(runtime.keymaster).toBeUndefined();
+        expect(logSpy).not.toHaveBeenCalled();
+
+        logSpy.mockRestore();
     });
 });

@@ -1,4 +1,4 @@
-import { z, ZodTypeAny } from 'zod';
+import { z } from 'zod';
 import { McpServerConfig } from './config.js';
 import { ArchonRuntime } from './runtime.js';
 import { errorMessage } from './redact.js';
@@ -61,12 +61,16 @@ function registerTool<T>(
     handler: ToolHandler<T>,
     options: { mutates?: boolean; readOnly?: boolean } = {}
 ) {
+    if (options.mutates && options.readOnly) {
+        return;
+    }
+
     const wrapped = async (rawArgs: unknown) => {
         try {
-            const args = schema.parse(rawArgs ?? {});
             if (options.mutates && options.readOnly) {
                 throw new Error('Tool disabled by ARCHON_MCP_READ_ONLY=true');
             }
+            const args = schema.parse(rawArgs ?? {});
             return ok(await handler(args));
         } catch (error) {
             return fail(error);
@@ -169,15 +173,3 @@ export function registerArchonTools(server: RegisterableServer, runtime: ArchonR
     );
     registerTool(server, 'archon_transfer_asset', 'Transfer an asset to a new controller DID.', z.object({ id: z.string(), controller: z.string() }), async ({ id, controller }) => requireKeymaster(runtime).transferAsset(id, controller), mutating);
 }
-
-export const testExports = {
-    fail,
-    ok,
-    requireKeymaster,
-    schemas: {
-        EmptySchema,
-        ResolveOptionsSchema: ResolveOptionsSchema as ZodTypeAny,
-        JsonObjectSchema: JsonObjectSchema as ZodTypeAny,
-        AssetOptionsSchema: AssetOptionsSchema as ZodTypeAny,
-    },
-};

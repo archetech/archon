@@ -25,10 +25,6 @@ export async function createArchonRuntime(config: McpServerConfig): Promise<Arch
     const node = new DrawbridgeClient();
     await node.connect({
         url: config.nodeUrl,
-        waitUntilReady: true,
-        intervalSeconds: 3,
-        chatty: false,
-        becomeChattyAfter: 2,
     });
 
     if (!config.passphrase) {

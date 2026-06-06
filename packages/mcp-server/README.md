@@ -72,7 +72,7 @@ Mutating tools:
 - `archon_update_asset_json`
 - `archon_transfer_asset`
 
-Set `ARCHON_MCP_READ_ONLY=true` to disable all mutating tools.
+Set `ARCHON_MCP_READ_ONLY=true` to omit mutating tools from the advertised MCP tool list.
 
 ## Intentionally omitted from v1
 
