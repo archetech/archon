@@ -138,7 +138,7 @@ describe('zcash-wallet RPC-backed behavior', () => {
             },
         });
 
-        await expect(anchorData(rpc, TEST_MNEMONIC, 'mainnet', `did:mdip:${'a'.repeat(54)}`)).resolves.toEqual({
+        await expect(anchorData(rpc, TEST_MNEMONIC, 'mainnet', `did:cid:${'a'.repeat(54)}`)).resolves.toEqual({
             txid: 'broadcast-txid',
             fee: 0.0002,
         });

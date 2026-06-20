@@ -5221,7 +5221,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 onChange={(e) => setSchemaPackDID(e.target.value.trim())}
                                                 fullWidth
                                                 margin="normal"
-                                                placeholder="did:mdip:..."
+                                                placeholder="did:cid:..."
                                             />
                                         </Grid>
                                         <Grid item>

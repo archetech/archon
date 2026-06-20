@@ -25,10 +25,6 @@
     "deterministic",
     "crypto"
   ],
-  "bugs": {
-    "url": "https://github.com/KeychainMDIP/browser-hdkey/issues"
-  },
-  "homepage": "https://github.com/KeychainMDIP/browser-hdkey",
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"

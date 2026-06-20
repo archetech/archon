@@ -12,11 +12,6 @@ import type { PinningServiceProvider, ProviderPinRequest } from '../../services/
 function op(id: string, registry = 'BTC:mainnet'): Operation {
     return {
         type: 'create',
-        mdip: {
-            version: 1,
-            type: 'agent',
-            registry,
-        },
         publicJwk: { kid: id },
         registration: {
             version: 1,
