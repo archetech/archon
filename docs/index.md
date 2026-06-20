@@ -7,6 +7,7 @@ Archon is a decentralized identity protocol implementing the W3C-compliant `did:
 - [White Paper](WHITEPAPER.md) — full protocol specification (v1.1)
 - [DID Scheme](scheme.md) — the `did:cid` method specification
 - [Sidetree and Archon Comparison](sidetree-archon-comparison.md) — deep dive on Archon's Sidetree lineage and design differences
+- [DIDComm Messaging Support](didcomm-design.md) — design doc for adding standards-based DIDComm v2 messaging
 - [did:cid Technical Presentation](presentations/did-cid-technical-presentation.md) — slide outline, speaker notes, and prep checklist
 - [Gatekeeper Resolution Infographic](presentations/gatekeeper-resolution-infographic.md) — visual brief for operation import and DID document replay
 
