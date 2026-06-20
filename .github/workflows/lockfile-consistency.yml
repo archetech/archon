@@ -33,6 +33,25 @@ jobs:
             [ -z "$manifest" ] && continue
             dir="$(dirname "$manifest")"
 
+            # Skip manifests whose dependency-relevant fields are unchanged.
+            # The lockfile only tracks resolution fields (name, version,
+            # dependency maps, engines, bin, os, cpu, workspaces, overrides),
+            # so edits limited to metadata (bugs, homepage, description,
+            # keywords, scripts, ...) cannot change it and must not be gated.
+            # Added/removed manifests or parse failures fall through and are
+            # still required to update the lockfile.
+            base_manifest="$(git show "$BASE_SHA:$manifest" 2>/dev/null || true)"
+            head_manifest="$(git show "$HEAD_SHA:$manifest" 2>/dev/null || true)"
+            if [ -n "$base_manifest" ] && [ -n "$head_manifest" ]; then
+              relevant='{name, version, dependencies, devDependencies, peerDependencies, optionalDependencies, peerDependenciesMeta, bundleDependencies, bundledDependencies, workspaces, overrides, engines, bin, os, cpu}'
+              base_relevant="$(printf '%s' "$base_manifest" | jq -S "$relevant" 2>/dev/null || echo base-parse-error)"
+              head_relevant="$(printf '%s' "$head_manifest" | jq -S "$relevant" 2>/dev/null || echo head-parse-error)"
+              if [ "$base_relevant" = "$head_relevant" ]; then
+                echo "Skipping $manifest (no dependency-relevant changes)"
+                continue
+              fi
+            fi
+
             if [ "$manifest" = "package.json" ]; then
               lockfile="package-lock.json"
             elif [ -f "$dir/package-lock.json" ]; then
