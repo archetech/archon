@@ -41,9 +41,16 @@ Expected output: three `PASS` lines (anoncrypt, authcrypt, authcrypt+sign).
 
 ### Decisions locked
 
-- **Use `didcomm-node`** (not the `didcomm` package — that one is a
-  bundler/WASM target that does not load under plain Node). The adapter surface
-  is small and exactly what Phase 2 needs.
+> **Update:** decision A was later revised to **build, not buy**. Once in-browser
+> self-custody was confirmed as the primary use case, the pure-JS route (extend the
+> `cipher` package) won over shipping WASM to two browser bundlers — nothing in DIDComm
+> requires WASM. `didcomm-node` is now kept as the **interop oracle** that validates our
+> envelopes, not a runtime dependency. See
+> [docs/didcomm-design.md](../../docs/didcomm-design.md) decision A.
+
+- **`didcomm-node` is the usable Node target** (the `didcomm` package is a bundler/WASM
+  target that does not load under plain Node) — which is why it serves as the interop
+  oracle.
 - **X25519 for key agreement.** The library's encryption curves are X25519 and
   P-256 only; secp256k1 cannot do key agreement.
 - **secp256k1 keys sign DIDComm as-is** via `ES256K` — confirmed by a valid JWS

@@ -77,11 +77,13 @@ The codebase is well-positioned — much of the machinery exists already:
 
 ### Gaps
 
-1. **Standard-curve key agreement** (X25519/P-256) keys + DID-doc `keyAgreement` entries.
+1. ~~**Standard-curve key agreement** (X25519) keys + DID-doc `keyAgreement` entries.~~
+   *Done in Phase 1.*
 2. **ECDH-1PU (authcrypt)** and **key-wrapping** (`...+A256KW`) — today's JWE uses direct
-   ECDH-ES, not the wrapped/multi-recipient form DIDComm requires.
+   ECDH-ES, not the wrapped/multi-recipient form DIDComm requires. *To build in `cipher`
+   (Phase 2a).*
 3. **The DIDComm envelope pack/unpack** (JWM plaintext, signed JWS, the specific
-   encrypted-JWE shape with `kid`-addressed recipients).
+   encrypted-JWE shape with `kid`-addressed recipients). *To build in `cipher` (Phase 2a).*
 4. **A `DIDCommMessaging` service endpoint** type + an inbound message receiver.
 5. **A DID resolver that emits standard-shaped DID documents** so non-Archon agents can
    resolve `did:cid` (cross-ecosystem interop).
@@ -89,14 +91,26 @@ The codebase is well-positioned — much of the machinery exists already:
 
 ## Design decisions
 
-**A. Build the crypto, or use a library? → Use the audited
-[`didcomm`](https://www.npmjs.com/package/didcomm) library** (SICPA, Rust→WASM) for
-envelope pack/unpack, with thin Archon adapters (a `DIDResolver` backed by the gatekeeper,
-a `SecretsResolver` backed by the wallet). ECDH-1PU + key-wrapping + multi-recipient JWE
-is security-critical and easy to get subtly wrong; we'd otherwise be hand-extending
-[packages/cipher](../packages/cipher/). *Fallback* if the WASM dependency is unacceptable
-in a target runtime: extend the cipher package — feasible (the JWE/KDF scaffolding exists)
-but a real crypto-review burden.
+**A. Build the crypto, or use a library? → Build it, pure-JS, by extending
+[packages/cipher](../packages/cipher/).** DIDComm's primary target here is **in-browser
+self-custody wallets** (react-wallet, browser-extension), which hold keys locally and so
+must pack/unpack *client-side*. The audited SICPA library
+([`didcomm`](https://www.npmjs.com/package/didcomm)) is Rust→WASM — and while WASM runs
+in browsers, *nothing in DIDComm requires it*: every primitive is standard and already
+available pure-JS via `@noble`. Buying the library only saves us writing the envelope
+code, in exchange for per-bundler WASM wiring (Vite **and** Webpack), async init, a few
+hundred KB of bundle, and an MV3 `wasm-unsafe-eval` CSP allowance — all concentrated in
+the browser path we care most about. Extending `cipher` instead runs identically in Node
+and the browser (exactly as `cipher` does today, with zero WASM). The cost is owning
+three well-specified primitives — **ECDH-1PU**, **AES Key Wrap (A256KW)**, and
+**A256CBC-HS512** — plus the JWE/JWS/JWM framing, on top of the ECDH-ES + Concat-KDF + JWE
+scaffolding `cipher` already has. Correctness risk is contained by **interop-testing
+against `didcomm-node`** (kept as a dev/test oracle, never a runtime dependency): our
+`pack` must `unpack` under the library and vice-versa.
+
+*(Revised from the original "use the SICPA library" decision once in-browser
+self-custody was confirmed as the primary use case. The Phase 0 spike still stands — it
+proved the library works and gives us the interop oracle — but the runtime is pure-JS.)*
 
 **B. Which key-agreement curve? → X25519.** Mandatory-to-support, smallest/fastest, best
 supported across implementations. Derive it deterministically from the existing wallet
@@ -114,51 +128,66 @@ if Tor-based delivery is wanted early.
 ## Architecture
 
 ```
- send                                            receive
- ────                                            ───────
- plaintext JWM
-   │  resolveDID(recipient) ──▶ keyAgreement key + endpoint
-   ▼
- pack (didcomm lib)                              inbound HTTP receiver
-   • anoncrypt / authcrypt / sign                  application/didcomm-encrypted+json
-   • DIDResolver  ← gatekeeper resolveDID            │
-   • SecretsResolver ← wallet keys                   ▼
-   │                                              unpack (didcomm lib)
-   ▼                                                • DIDResolver / SecretsResolver
- deliver  ──HTTP POST──▶ recipient endpoint  ─────▶  │
-   application/didcomm-encrypted+json                ▼
-                                                  dispatch by message `type`
-                                                  (trust-ping, basic-message,
-                                                   issue-credential, …)
+ send                                                receive
+ ────                                                ───────
+ keymaster.packDidComm(to, body, {authcrypt, sign})  inbound HTTP receiver
+   │  resolveDID(to) ─▶ recipient keyAgreement pub JWK   application/didcomm-encrypted+json
+   │  derive own X25519 (+ secp256k1 signing) keys          │
+   ▼                                                         ▼
+ cipher envelope crypto  (pure-JS, browser + node)      keymaster.unpackDidComm(jwe)
+   • JWM plaintext → optional JWS (ES256K) → JWE            • own X25519 priv (from wallet)
+   • anoncrypt ECDH-ES / authcrypt ECDH-1PU, + A256KW       • resolveDID(sender) to verify
+   ▼                                                          authcrypt / JWS
+ deliver ──HTTP POST──▶ recipient endpoint  ───────────▶   ▼ cipher unpacks → plaintext + meta
+   application/didcomm-encrypted+json                     dispatch by message `type`
+                                                          (trust-ping, basic-message, …)
 ```
 
-Two adapters bridge the `didcomm` library to Archon:
+Responsibilities split along the existing `cipher` ↔ `keymaster` line (the same split as
+`encryptMessage` today):
 
-- **`DIDResolver`** — wraps the gatekeeper's `resolveDID` and normalizes a
-  [`DidCidDocument`](../packages/gatekeeper/src/types.ts) into a standard DID document
-  (exposing the X25519 `keyAgreement` verification method and the `DIDCommMessaging`
-  service).
-- **`SecretsResolver`** — exposes the agent's private keys (as JWK) from the wallet so
-  the library can decrypt/sign; private keys never leave the keymaster process.
+- **`cipher`** (pure-JS, runs in browser + node) owns the **envelope crypto** on raw JWKs:
+  build/parse the JWM plaintext, the JWS sign/verify layer, and the JWE (anoncrypt
+  ECDH-ES / authcrypt ECDH-1PU, A256KW key-wrap, A256CBC-HS512 content encryption). No DID
+  or wallet knowledge.
+- **`keymaster`** orchestrates: resolve the recipient DID → its X25519 `keyAgreement`
+  public JWK; derive the agent's own X25519 (and secp256k1 signing) keys from the wallet;
+  call `cipher` to pack; on unpack, resolve the *sender's* DID to verify authcrypt/JWS.
+  Private keys never leave the process holding the wallet — in a self-custody browser
+  wallet, that's the browser.
+- **`didcomm-node`** is used only in tests as an **interop oracle** to prove our envelopes
+  are spec-compliant; it is not shipped.
 
 ## Phased implementation plan
 
-**Phase 0 — Spike & decisions.** Validate the `didcomm` WASM library against an Archon
-DID carrying an X25519 key in a throwaway script; confirm the resolver/secrets adapter
-shape. Lock decisions A–D. *Exit:* a pack→unpack round-trip between two Archon DIDs.
+**Phase 0 — Spike & decisions. ✅ done.** Validated `didcomm-node` against Archon-shaped
+DIDs carrying X25519 keys (anoncrypt/authcrypt/`ES256K`-sign all round-trip); confirmed
+X25519 works and secp256k1 signs as-is. Locked decisions A–D (A later revised to *build*).
+The spike (`spike/didcomm-phase0`) is retained as the **interop oracle** for the build.
 
-**Phase 1 — Standard-curve keys.** Add deterministic X25519 derivation to the wallet;
-add `addDidCommKey()`/`publishDidComm()` that write a `keyAgreement` verification method +
-entry into the agent's DID document via `updateDID` (model on `publishAddress`). Files:
-[keymaster.ts](../packages/keymaster/src/keymaster.ts),
-[gatekeeper/types.ts](../packages/gatekeeper/src/types.ts). *Exit:* resolved DID docs
-carry a valid X25519 `keyAgreement` key.
+**Phase 1 — Standard-curve keys. ✅ done.** Deterministic X25519 derivation on a dedicated
+HD branch (`m/44'/0'/{account}'/1/0`); `publishDidComm`/`unpublishDidComm` write/remove a
+`keyAgreement` verification method (+ optional `DIDCommMessaging` service) via `updateDID`.
+`cipher.generateX25519Jwk` + OKP JWK types; `DidCidDocument` gains `keyAgreement`. Wired
+through interface/client/API. *Exit met:* resolved DID docs carry a valid X25519
+`keyAgreement` key.
 
-**Phase 2 — Adapters + envelope API.** Implement `DIDResolver` and `SecretsResolver`;
-add `packDidComm()` / `unpackDidComm()` to keymaster, the
-[`KeymasterInterface`](../packages/keymaster/src/types.ts), the
-[client](../packages/keymaster/src/keymaster-client.ts), and REST routes. *Exit:*
-anoncrypt + authcrypt + signed round-trips, unit-tested.
+**Phase 2 — Envelope crypto (build) + pack/unpack API.** Two sub-steps:
+
+- **2a — `cipher` envelope crypto (pure-JS).** Add the three missing primitives —
+  **ECDH-1PU**, **AES Key Wrap (A256KW)**, **A256CBC-HS512** — plus JWE general/
+  multi-recipient serialization, the JWS layer, and the JWM plaintext, as pure functions
+  over raw JWKs (building on the existing ECDH-ES + Concat-KDF + JWE code). Unit-test each
+  primitive **and interop-test against `didcomm-node`** (our `pack` → lib `unpack`, and the
+  reverse) for spec-compliance.
+- **2b — `keymaster` orchestration.** `packDidComm()` / `unpackDidComm()` that resolve the
+  recipient (and, on unpack, sender) DID, derive the agent's keys, and call `cipher`. Add
+  to the [`KeymasterInterface`](../packages/keymaster/src/types.ts),
+  [client](../packages/keymaster/src/keymaster-client.ts), and REST routes. Because the
+  crypto is pure-JS in `cipher`, this works unchanged in the browser-shared Keymaster core.
+
+*Exit:* anoncrypt + authcrypt + signed round-trips, unit-tested **and** interop-validated
+against `didcomm-node`.
 
 **Phase 3 — Transport & service endpoint.** Add the `DIDCommMessaging` service type and
 `publish`/`unpublish`; stand up the inbound HTTP receiver
@@ -185,24 +214,28 @@ docs.
   external interop is a goal rather than internal-only.
 - **Curve migration UX.** Existing identities predate key-agreement keys; need a clean
   "enable DIDComm on this ID" upgrade path (a DID-doc update, not a re-issuance).
-- **WASM dependency** across all target runtimes (browser react-wallet, Node services) —
-  validate in Phase 0.
+- **We own the envelope crypto** (ECDH-1PU, A256KW, A256CBC-HS512) rather than reusing an
+  audited library. Mitigated by interop-testing every mode against `didcomm-node` in both
+  directions, and by reusing `cipher`'s existing ECDH-ES/Concat-KDF/JWE code. Subtle spots:
+  Concat-KDF inputs for 1PU, the protected-header AAD binding, and exact base64url framing.
 - **Authcrypt vs. signed semantics.** Choose per-protocol defaults deliberately; DIDComm
   favours authcrypt over signed-then-encrypted for repudiability.
 
-## Suggested first step
+## Status & next step
 
-Combine Phase 0 + Phase 1 as one spike: a deterministic X25519 key in the wallet, written
-into a DID document, and a `didcomm`-library round-trip proving the resolver/secrets
-adapters work. That de-risks the curve strategy and the build-vs-buy decision before any
-protocol/transport build-out.
+Phases 0 and 1 are complete (spike + X25519 `keyAgreement` keys). **Next is Phase 2a:**
+extend `cipher` with the DIDComm envelope crypto (ECDH-1PU, A256KW, A256CBC-HS512 + JWM/
+JWS/JWE framing), validated against the `didcomm-node` interop oracle, then Phase 2b wires
+`packDidComm`/`unpackDidComm` through keymaster.
 
 ## References
 
 - [DIDComm Messaging v2.1](https://identity.foundation/didcomm-messaging/spec/v2.1/) ·
   [v2.0](https://identity.foundation/didcomm-messaging/spec/v2.0/)
 - [Encryption spec](https://github.com/decentralized-identity/didcomm-messaging/blob/main/docs/spec-files/encryption.md)
+  (algorithm/curve requirements) · [RFC 7518 JWA](https://www.rfc-editor.org/rfc/rfc7518)
+  (Concat-KDF, A256KW, A256CBC-HS512) · [ECDH-1PU draft](https://datatracker.ietf.org/doc/html/draft-madden-jose-ecdh-1pu-04)
 - [DIDComm book](https://didcomm.org/book/v2/whatsnew/) ·
   [Coordinate Mediation 2.0](https://didcomm.org/coordinate-mediation/2.0/)
-- [`didcomm` npm (SICPA Rust/WASM)](https://www.npmjs.com/package/didcomm) ·
-  [Credo-TS `@credo-ts/didcomm`](https://www.npmjs.com/package/@credo-ts/didcomm)
+- [`didcomm-node` npm (SICPA Rust/WASM)](https://www.npmjs.com/package/didcomm-node) — kept
+  as the dev/test interop oracle, not shipped.
