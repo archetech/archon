@@ -1,4 +1,4 @@
-import { EcdsaJwkPublic } from '@didcid/cipher/types';
+import { EcdsaJwkPublic, OkpJwkPublic } from '@didcid/cipher/types';
 import { IPFSClient } from "@didcid/ipfs/types";
 
 export interface JsonDbFile {
@@ -266,10 +266,11 @@ export interface DidCidDocument {
             id?: string,
             controller?: string,
             type?: string,
-            publicKeyJwk?: EcdsaJwkPublic,
+            publicKeyJwk?: EcdsaJwkPublic | OkpJwkPublic,
         }>,
         authentication?: string[],
         assertionMethod?: string[],
+        keyAgreement?: string[],
         service?: Array<{
             id: string;
             type: string;

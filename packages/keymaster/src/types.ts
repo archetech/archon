@@ -399,6 +399,10 @@ export interface KeymasterInterface {
     publishAddress(address?: string, name?: string): Promise<boolean>;
     unpublishAddress(name?: string): Promise<boolean>;
 
+    // DIDComm
+    publishDidComm(endpoint?: string, name?: string): Promise<boolean>;
+    unpublishDidComm(name?: string): Promise<boolean>;
+
     // Nostr
     addNostr(id?: string): Promise<NostrKeys>;
     importNostr(nsec: string, id?: string): Promise<NostrKeys>;

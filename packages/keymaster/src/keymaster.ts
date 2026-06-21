@@ -78,6 +78,7 @@ import {
     EcdsaJwkPair,
     EcdsaJwkPrivate,
     EcdsaJwkPublic,
+    OkpJwkPair,
 } from '@didcid/cipher/types';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { decryptWithPassphrase, encryptWithPassphrase } from '@didcid/cipher/passphrase';
@@ -744,6 +745,9 @@ export default class Keymaster implements KeymasterInterface {
         const publicKeyJwk = verificationMethods[0].publicKeyJwk;
         if (!publicKeyJwk) {
             throw new KeymasterError('The publicKeyJwk is missing in the first verification method.');
+        }
+        if (publicKeyJwk.kty !== 'EC') {
+            throw new KeymasterError('The first verification method is not a secp256k1 key.');
         }
         return publicKeyJwk;
     }
@@ -2271,6 +2275,85 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         return this.updateDID(did, { didDocument, didDocumentData });
+    }
+
+    // DIDComm key agreement keys are derived on a dedicated branch (change=1)
+    // so they never collide with the authentication/signing keys at change=0.
+    // The key is deterministic from the wallet seed and the identity's account,
+    // so it survives backup/recovery without storing extra material.
+    async fetchDidCommKeyPair(name?: string): Promise<OkpJwkPair> {
+        const wallet = await this.loadWallet();
+        const id = await this.fetchIdInfo(name, wallet);
+        const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
+        const path = `m/44'/0'/${id.account}'/1/0`;
+        const didkey = hdkey.derive(path);
+        return this.cipher.generateX25519Jwk(didkey.privateKey!);
+    }
+
+    async publishDidComm(endpoint?: string, name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+        const keypair = await this.fetchDidCommKeyPair(name);
+        const doc = await this.resolveDID(did);
+        const didDocument = { ...doc.didDocument! };
+
+        const vmId = `${did}#key-agreement-1`;
+        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => vm.id !== vmId);
+        verificationMethod.push({
+            id: vmId,
+            controller: did,
+            type: 'JsonWebKey2020',
+            publicKeyJwk: keypair.publicJwk,
+        });
+        didDocument.verificationMethod = verificationMethod;
+        didDocument.keyAgreement = [vmId];
+
+        const serviceId = `${did}#didcomm`;
+        const services = (didDocument.service || []).filter(s => s.id !== serviceId);
+
+        if (endpoint) {
+            services.push({
+                id: serviceId,
+                type: 'DIDCommMessaging',
+                serviceEndpoint: endpoint,
+            });
+        }
+
+        if (services.length > 0) {
+            didDocument.service = services;
+        }
+        else {
+            delete didDocument.service;
+        }
+
+        return this.updateDID(did, { didDocument });
+    }
+
+    async unpublishDidComm(name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+        const doc = await this.resolveDID(did);
+        const didDocument = { ...doc.didDocument! };
+
+        const vmId = `${did}#key-agreement-1`;
+        const serviceId = `${did}#didcomm`;
+
+        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => vm.id !== vmId);
+        if (verificationMethod.length > 0) {
+            didDocument.verificationMethod = verificationMethod;
+        }
+
+        delete didDocument.keyAgreement;
+
+        const services = (didDocument.service || []).filter(s => s.id !== serviceId);
+        if (services.length > 0) {
+            didDocument.service = services;
+        }
+        else {
+            delete didDocument.service;
+        }
+
+        return this.updateDID(did, { didDocument });
     }
 
     async addAlias(

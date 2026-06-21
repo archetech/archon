@@ -26,6 +26,21 @@ export interface EcdsaJwkPair {
     privateJwk: EcdsaJwkPrivate,
 }
 
+export interface OkpJwkPublic {
+    kty: 'OKP',
+    crv: 'X25519',
+    x: string,
+}
+
+export interface OkpJwkPrivate extends OkpJwkPublic {
+    d: string,
+}
+
+export interface OkpJwkPair {
+    publicJwk: OkpJwkPublic,
+    privateJwk: OkpJwkPrivate,
+}
+
 export interface NostrKeys {
     npub: string,
     pubkey: string,
@@ -54,6 +69,7 @@ export interface Cipher {
 
     generateJwk(privateKeyBytes: Uint8Array): EcdsaJwkPair,
     generateRandomJwk(): EcdsaJwkPair,
+    generateX25519Jwk(seedBytes: Uint8Array): OkpJwkPair,
     convertJwkToCompressedBytes(jwk: EcdsaJwkPublic): Uint8Array,
     jwkToNostr(publicJwk: EcdsaJwkPublic): NostrKeys,
     nsecToJwk(nsec: string): EcdsaJwkPair,

@@ -26,6 +26,7 @@ const Endpoints = {
     keys_decrypt_json: '/api/v1/keys/decrypt/json',
     aliases: '/api/v1/aliases',
     addresses: '/api/v1/addresses',
+    didcomm: '/api/v1/didcomm',
     nostr: '/api/v1/nostr',
     nostr_import: '/api/v1/nostr/import',
     nostr_nsec: '/api/v1/nostr/nsec',
@@ -1361,6 +1362,66 @@ describe('unpublishAddress', () => {
 
         try {
             await keymaster.unpublishAddress();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('publishDidComm', () => {
+    const mockEndpoint = 'https://relay.example/didcomm';
+
+    it('should publish didcomm key agreement', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/publish`, (body: any) => body.endpoint === mockEndpoint)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.publishDidComm(mockEndpoint);
+
+        expect(ok).toStrictEqual(true);
+    });
+
+    it('should throw exception on publishDidComm server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/publish`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.publishDidComm(mockEndpoint);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('unpublishDidComm', () => {
+    it('should unpublish didcomm key agreement', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.didcomm}/publish`)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.unpublishDidComm();
+
+        expect(ok).toStrictEqual(true);
+    });
+
+    it('should throw exception on unpublishDidComm server error', async () => {
+        nock(KeymasterURL)
+            .delete(`${Endpoints.didcomm}/publish`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.unpublishDidComm();
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

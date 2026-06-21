@@ -474,6 +474,9 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
             // TBD select the right key here, not just the first one
             const publicJwk = doc.didDocument.verificationMethod[0].publicKeyJwk;
+            if (publicJwk.kty !== 'EC') {
+                throw new InvalidOperationError('verification key is not a secp256k1 key');
+            }
             const signatureHex = base64urlToHex(operation.proof!.proofValue);
             return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
         }
@@ -520,6 +523,9 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         // TBD get the right key here, not just the first one
         const publicJwk = doc.didDocument.verificationMethod[0].publicKeyJwk;
+        if (publicJwk.kty !== 'EC') {
+            throw new InvalidOperationError('verification key is not a secp256k1 key');
+        }
         const signatureHex = base64urlToHex(proof.proofValue);
         return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
     }

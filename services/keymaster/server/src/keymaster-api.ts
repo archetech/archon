@@ -2093,6 +2093,101 @@ v1router.delete('/addresses/publish', async (req, res) => {
 
 /**
  * @swagger
+ * /didcomm/publish:
+ *   post:
+ *     summary: Publish an X25519 key-agreement key (and optional DIDComm service) to the current identity DID document.
+ *     description: Derives the identity's deterministic X25519 key-agreement key and writes it into the DID document as a `keyAgreement` verification method, enabling DIDComm v2 encrypted messaging. If an endpoint is supplied, also publishes a `DIDCommMessaging` DID service endpoint.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               endpoint:
+ *                 type: string
+ *                 description: Optional DIDComm service endpoint URI. When provided, a `DIDCommMessaging` service entry is published.
+ *               name:
+ *                 type: string
+ *                 description: Optional identity name. Defaults to the current identity.
+ *     responses:
+ *       200:
+ *         description: Indicates whether the key agreement key was successfully published.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/didcomm/publish', async (req, res) => {
+    try {
+        const { endpoint, name } = req.body || {};
+        const ok = await keymaster.publishDidComm(endpoint, name);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /didcomm/publish:
+ *   delete:
+ *     summary: Remove the DIDComm key-agreement key and service from the current identity DID document.
+ *     description: Removes the `keyAgreement` verification method and the `#didcomm` DID service endpoint from the selected identity.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Optional identity name. Defaults to the current identity.
+ *     responses:
+ *       200:
+ *         description: Indicates whether the DIDComm key was successfully unpublished.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.delete('/didcomm/publish', async (req, res) => {
+    try {
+        const { name } = req.body || {};
+        const ok = await keymaster.unpublishDidComm(name);
+        res.json({ ok });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /addresses/{address}:
  *   delete:
  *     summary: Remove the stored address for the current identity and revoke it remotely.

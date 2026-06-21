@@ -1,13 +1,14 @@
 import * as bip39 from 'bip39';
 import * as secp from '@noble/secp256k1';
 import { schnorr } from '@noble/curves/secp256k1';
+import { x25519 } from '@noble/curves/ed25519';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha256';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
 import { managedNonce } from '@noble/ciphers/webcrypto/utils'
 import { bytesToUtf8, utf8ToBytes } from '@noble/ciphers/utils';
 import { base64url } from 'multiformats/bases/base64';
-import { Cipher, HDKeyJSON, EcdsaJwkPublic, EcdsaJwkPrivate, EcdsaJwkPair, NostrKeys } from './types.js';
+import { Cipher, HDKeyJSON, EcdsaJwkPublic, EcdsaJwkPrivate, EcdsaJwkPair, OkpJwkPublic, OkpJwkPrivate, OkpJwkPair, NostrKeys } from './types.js';
 import { buildJweCompact, parseJweCompact, isJweCompact } from './jwe.js';
 import { bech32 } from 'bech32';
 import canonicalizeModule from 'canonicalize';
@@ -49,6 +50,29 @@ export default abstract class CipherBase implements Cipher {
     generateRandomJwk(): EcdsaJwkPair {
         const privKey = secp.utils.randomPrivateKey();
         return this.generateJwk(privKey);
+    }
+
+    // Derives an X25519 key-agreement keypair from 32 bytes of seed material
+    // (e.g. an HD-derived private key on a dedicated branch). The seed is used
+    // directly as the X25519 private scalar (clamping is applied internally),
+    // so the same seed always yields the same keypair. Used for DIDComm.
+    generateX25519Jwk(seedBytes: Uint8Array): OkpJwkPair {
+        if (seedBytes.length !== 32) {
+            throw new Error('X25519 seed must be 32 bytes');
+        }
+        const publicKeyBytes = x25519.getPublicKey(seedBytes);
+        const x = base64url.baseEncode(publicKeyBytes);
+        const d = base64url.baseEncode(seedBytes);
+
+        const publicJwk: OkpJwkPublic = {
+            kty: 'OKP',
+            crv: 'X25519',
+            x,
+        };
+
+        const privateJwk: OkpJwkPrivate = { ...publicJwk, d };
+
+        return { publicJwk, privateJwk };
     }
 
     convertJwkToCompressedBytes(jwk: EcdsaJwkPublic): Uint8Array {
