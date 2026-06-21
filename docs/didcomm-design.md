@@ -172,7 +172,7 @@ HD branch (`m/44'/0'/{account}'/1/0`); `publishDidComm`/`unpublishDidComm` write
 through interface/client/API. *Exit met:* resolved DID docs carry a valid X25519
 `keyAgreement` key.
 
-**Phase 2 — Envelope crypto (build) + pack/unpack API.** Two sub-steps:
+**Phase 2 — Envelope crypto (build) + pack/unpack API. ✅ done.** Two sub-steps:
 
 - **2a — `cipher` envelope crypto (pure-JS).** Add the three missing primitives —
   **ECDH-1PU**, **AES Key Wrap (A256KW)**, **A256CBC-HS512** — plus JWE general/
@@ -186,13 +186,24 @@ through interface/client/API. *Exit met:* resolved DID docs carry a valid X25519
   [client](../packages/keymaster/src/keymaster-client.ts), and REST routes. Because the
   crypto is pure-JS in `cipher`, this works unchanged in the browser-shared Keymaster core.
 
-*Exit:* anoncrypt + authcrypt + signed round-trips, unit-tested **and** interop-validated
-against `didcomm-node`.
+*Exit met:* `cipher.packDidCommMessage`/`unpackEncrypted`/`signJws` + keymaster
+`packDidComm`/`unpackDidComm` (interface/client/API). anoncrypt + authcrypt + signed
+round-trips between two real `did:cid` identities, unit-tested **and** interop-validated
+against `didcomm-node` both directions. `DIDCommMessaging` service type + publish/unpublish
+also landed in Phase 1.
 
-**Phase 3 — Transport & service endpoint.** Add the `DIDCommMessaging` service type and
-`publish`/`unpublish`; stand up the inbound HTTP receiver
-(`application/didcomm-encrypted+json`) → unpack → dispatch; outbound delivery via the
-resolved endpoint. *Exit:* two Archon nodes exchange a live message over HTTP.
+**Phase 3 — Transport.** *Reshaped by the self-custody-primary decision.* A self-custody
+wallet holds its keys client-side, so an inbound receiver **cannot** unpack on the agent's
+behalf — it can only **store** the encrypted envelope for the key-holder to fetch and
+unpack locally. So Phase 3 is a **mailbox/relay** (store-and-forward of encrypted
+envelopes, addressed by the JWE recipient `kid`), not a "receive → unpack → dispatch"
+endpoint. The sender resolves the recipient's `DIDCommMessaging` endpoint and POSTs the
+packed envelope (`application/didcomm-encrypted+json`); the recipient polls its mailbox and
+unpacks with `unpackDidComm`. This converges with the mediator work originally scoped as
+Phase 6 — for self-custody they are the same primitive. Open decisions: where the mailbox
+lives (dedicated `didcomm` service vs Drawbridge), how a recipient authenticates to fetch
+(challenge/response over its DID), and retention. *Exit:* a self-custody recipient receives
+and unpacks a message delivered to its published endpoint.
 
 **Phase 4 — Core protocols.** Trust Ping, Discover Features, Basic Message, Out-of-Band
 invitation (maps cleanly onto the existing `createChallenge`/`createResponse`). *Exit:*
@@ -223,10 +234,15 @@ docs.
 
 ## Status & next step
 
-Phases 0 and 1 are complete (spike + X25519 `keyAgreement` keys). **Next is Phase 2a:**
-extend `cipher` with the DIDComm envelope crypto (ECDH-1PU, A256KW, A256CBC-HS512 + JWM/
-JWS/JWE framing), validated against the `didcomm-node` interop oracle, then Phase 2b wires
-`packDidComm`/`unpackDidComm` through keymaster.
+Phases 0, 1, and 2 are complete: the spike + interop oracle, X25519 `keyAgreement` keys in
+DID documents, the pure-JS envelope crypto in `cipher`, and keymaster
+`packDidComm`/`unpackDidComm` — anoncrypt/authcrypt/signed all round-trip between real
+`did:cid` identities and interoperate with `didcomm-node`.
+
+**Next is Phase 3 (transport).** As noted above, the self-custody-primary decision turns it
+into a **mailbox/relay** that converges with the Phase 6 mediator. The build decisions to
+settle first: mailbox location (dedicated `didcomm` service vs Drawbridge), recipient
+fetch-authentication (challenge/response over the DID), and message retention.
 
 ## References
 
