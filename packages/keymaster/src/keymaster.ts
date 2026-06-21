@@ -87,6 +87,8 @@ import {
     unpackEncrypted,
     verifyJws,
     getEnvelopeInfo,
+    didKeyToX25519,
+    normalizeX25519PublicKey,
     type PackOptions,
     type DidCommEnc,
 } from '@didcid/cipher/didcomm';
@@ -2382,10 +2384,33 @@ export default class Keymaster implements KeymasterInterface {
         }
         const kid = refs[0];
         const vm = this.findVerificationMethod(doc, kid);
-        if (!vm?.publicKeyJwk || vm.publicKeyJwk.kty !== 'OKP') {
-            throw new KeymasterError('keyAgreement verification method is missing or not an X25519 key');
+        if (!vm) {
+            throw new KeymasterError('keyAgreement verification method not found');
         }
-        return { kid, publicJwk: vm.publicKeyJwk };
+        try {
+            return { kid, publicJwk: normalizeX25519PublicKey(vm) };
+        }
+        catch {
+            throw new KeymasterError('keyAgreement verification method is not an X25519 key');
+        }
+    }
+
+    // Resolve a DID for DIDComm, supporting foreign methods so Archon agents
+    // interoperate with non-Archon agents. did:key is resolved locally
+    // (deterministic); everything else goes through the gatekeeper, which has a
+    // universal-resolver fallback for did:web and other methods.
+    private async resolveDidForDidComm(did: string): Promise<DidCidDocument> {
+        if (did.startsWith('did:key:')) {
+            const { kid, publicJwk } = didKeyToX25519(did);
+            return {
+                didDocument: {
+                    id: did,
+                    keyAgreement: [kid],
+                    verificationMethod: [{ id: kid, controller: did, type: 'JsonWebKey2020', publicKeyJwk: publicJwk }],
+                },
+            };
+        }
+        return this.resolveDID(did);
     }
 
     async packDidComm(
@@ -2401,7 +2426,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const recipients = [];
         for (const recipientDid of recipientDids) {
-            const recipientDoc = await this.resolveDID(recipientDid);
+            const recipientDoc = await this.resolveDidForDidComm(recipientDid);
             recipients.push(this.resolveKeyAgreement(recipientDoc));
         }
 
@@ -2466,12 +2491,17 @@ export default class Keymaster implements KeymasterInterface {
 
         let senderKey: OkpJwkPublic | undefined;
         if (info.skid) {
-            const senderDoc = await this.resolveDID(info.skid.split('#')[0]);
+            const senderDoc = await this.resolveDidForDidComm(info.skid.split('#')[0]);
             const senderVm = this.findVerificationMethod(senderDoc, info.skid);
-            if (!senderVm?.publicKeyJwk || senderVm.publicKeyJwk.kty !== 'OKP') {
-                throw new KeymasterError('Sender keyAgreement key not found or not X25519');
+            if (!senderVm) {
+                throw new KeymasterError('Sender keyAgreement key not found');
             }
-            senderKey = senderVm.publicKeyJwk;
+            try {
+                senderKey = normalizeX25519PublicKey(senderVm);
+            }
+            catch {
+                throw new KeymasterError('Sender keyAgreement key is not X25519');
+            }
         }
 
         const ka = await this.fetchDidCommKeyPair(name);

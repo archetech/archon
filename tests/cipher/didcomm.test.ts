@@ -9,6 +9,8 @@ import {
     packDidCommMessage,
     unpackDidCommMessage,
     getEnvelopeInfo,
+    didKeyToX25519,
+    normalizeX25519PublicKey,
 } from '../../packages/cipher/src/didcomm.ts';
 
 const cipher = new CipherNode();
@@ -166,5 +168,40 @@ describe('getEnvelopeInfo', () => {
 
     it('detects a signed envelope', () => {
         expect(getEnvelopeInfo(signJws(enc.encode('x'), signer)).type).toBe('signed');
+    });
+});
+
+describe('did:key resolution (cross-method)', () => {
+    // W3C did:key spec vector: this Ed25519 did:key's keyAgreement is the
+    // derived X25519 key z6LSj72tK8brWgZja8NLRwPigth2T9QRiG1uH9oKZuKjdh9p.
+    const ED_DIDKEY = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
+    const X25519_FRAG = 'z6LSj72tK8brWgZja8NLRwPigth2T9QRiG1uH9oKZuKjdh9p';
+
+    it('derives the spec X25519 keyAgreement from an Ed25519 did:key', () => {
+        const { kid, publicJwk } = didKeyToX25519(ED_DIDKEY);
+        expect(kid).toBe(`${ED_DIDKEY}#${X25519_FRAG}`);
+        expect(publicJwk.kty).toBe('OKP');
+        expect(publicJwk.crv).toBe('X25519');
+    });
+
+    it('resolves a standalone X25519 did:key to the same key', () => {
+        const fromEd = didKeyToX25519(ED_DIDKEY);
+        const fromX = didKeyToX25519(`did:key:${X25519_FRAG}`);
+        expect(fromX.publicJwk.x).toBe(fromEd.publicJwk.x);
+        expect(fromX.kid).toBe(`did:key:${X25519_FRAG}#${X25519_FRAG}`);
+    });
+
+    it('rejects a non-did:key', () => {
+        expect(() => didKeyToX25519('did:cid:abc')).toThrow(/did:key/);
+    });
+
+    it('normalizes publicKeyJwk and publicKeyMultibase to the same X25519 JWK', () => {
+        const { publicJwk } = didKeyToX25519(ED_DIDKEY);
+        expect(normalizeX25519PublicKey({ publicKeyJwk: publicJwk })).toStrictEqual(publicJwk);
+        expect(normalizeX25519PublicKey({ publicKeyMultibase: X25519_FRAG })).toStrictEqual(publicJwk);
+    });
+
+    it('rejects non-X25519 JWK material', () => {
+        expect(() => normalizeX25519PublicKey({ publicKeyJwk: { kty: 'EC', crv: 'secp256k1', x: 'a', y: 'b' } })).toThrow();
     });
 });

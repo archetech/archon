@@ -10,7 +10,7 @@
 // These are pure functions over raw JWKs — no DID resolution or wallet access.
 // Keymaster resolves DIDs to keys and calls these.
 import * as secp from '@noble/secp256k1';
-import { x25519 } from '@noble/curves/ed25519';
+import { x25519, edwardsToMontgomeryPub } from '@noble/curves/ed25519';
 import { ecb, cbc, gcm } from '@noble/ciphers/aes';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
 import { sha256 } from '@noble/hashes/sha256';
@@ -18,6 +18,7 @@ import { sha512 } from '@noble/hashes/sha512';
 import { hmac } from '@noble/hashes/hmac';
 import { randomBytes } from '@noble/hashes/utils';
 import { base64url } from 'multiformats/bases/base64';
+import { base58btc } from 'multiformats/bases/base58';
 import { concatKdf } from './concat-kdf.js';
 import { OkpJwkPublic, OkpJwkPrivate, EcdsaJwkPublic, EcdsaJwkPrivate } from './types.js';
 
@@ -421,4 +422,71 @@ export function getEnvelopeInfo(packed: string): DidCommEnvelopeInfo {
         return { type: 'signed' };
     }
     return { type: 'plaintext' };
+}
+
+// ---------------------------------------------------------------------------
+// Cross-method key material: did:key resolution + multibase normalization
+// ---------------------------------------------------------------------------
+
+// Multicodec varint prefixes for the multibase key material.
+const MULTICODEC_X25519_PUB = 0xec;  // followed by 0x01
+const MULTICODEC_ED25519_PUB = 0xed; // followed by 0x01
+
+function x25519MultibaseToBytes(multibase: string): Uint8Array {
+    const decoded = base58btc.decode(multibase); // expects the leading 'z'
+    if (decoded.length < 3 || decoded[1] !== 0x01) {
+        throw new Error('Unsupported multibase key material');
+    }
+    const key = decoded.slice(2);
+    if (decoded[0] === MULTICODEC_X25519_PUB) {
+        return key;
+    }
+    if (decoded[0] === MULTICODEC_ED25519_PUB) {
+        return edwardsToMontgomeryPub(key); // Ed25519 verification key -> X25519 key agreement
+    }
+    throw new Error(`Unsupported multicodec 0x${decoded[0].toString(16)} (need X25519 or Ed25519)`);
+}
+
+const x25519BytesToMultibase = (key: Uint8Array): string =>
+    base58btc.encode(new Uint8Array([MULTICODEC_X25519_PUB, 0x01, ...key]));
+
+/** Encode an X25519 public JWK as a `did:key` (the z6LS… form). */
+export function x25519JwkToDidKey(publicJwk: OkpJwkPublic): string {
+    return `did:key:${x25519BytesToMultibase(b64uDecode(publicJwk.x))}`;
+}
+
+/**
+ * Resolve a `did:key` to its X25519 key-agreement key (the foreign-DID case for
+ * DIDComm). Supports `did:key:z6LS…` (X25519 directly) and `did:key:z6Mk…`
+ * (Ed25519, whose key-agreement key is the derived X25519 key — and whose
+ * fragment is that derived key's multibase, per the did:key method).
+ */
+export function didKeyToX25519(did: string): { kid: string; publicJwk: OkpJwkPublic } {
+    const base = did.split(/[?#]/)[0];
+    const multibase = base.slice('did:key:'.length);
+    if (!base.startsWith('did:key:') || !multibase.startsWith('z')) {
+        throw new Error('Not a did:key');
+    }
+    const x25519Key = x25519MultibaseToBytes(multibase);
+    const fragment = x25519BytesToMultibase(x25519Key);
+    return { kid: `${base}#${fragment}`, publicJwk: { kty: 'OKP', crv: 'X25519', x: b64uEncode(x25519Key) } };
+}
+
+/**
+ * Normalize a DID-document verification method's key material to an X25519 JWK,
+ * accepting `publicKeyJwk` (OKP/X25519) or `publicKeyMultibase` (X25519 or
+ * Ed25519 multicodec) — so foreign DID methods resolved via a universal
+ * resolver work, not just Archon's JWK form.
+ */
+export function normalizeX25519PublicKey(vm: { publicKeyJwk?: any; publicKeyMultibase?: string }): OkpJwkPublic {
+    if (vm.publicKeyJwk) {
+        if (vm.publicKeyJwk.kty === 'OKP' && vm.publicKeyJwk.crv === 'X25519') {
+            return vm.publicKeyJwk;
+        }
+        throw new Error('verification method is not an X25519 JWK');
+    }
+    if (vm.publicKeyMultibase) {
+        return { kty: 'OKP', crv: 'X25519', x: b64uEncode(x25519MultibaseToBytes(vm.publicKeyMultibase)) };
+    }
+    throw new Error('verification method has no supported key material');
 }

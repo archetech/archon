@@ -4,6 +4,12 @@ import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import HeliaClient from '@didcid/ipfs/helia';
+import {
+    packEncrypted,
+    unpackEncrypted,
+    didKeyToX25519,
+    x25519JwkToDidKey,
+} from '@didcid/cipher/didcomm';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -210,5 +216,57 @@ describe('packDidComm / unpackDidComm (end-to-end between two identities)', () =
 
         await expect(keymaster.unpackDidComm(packed, { name: 'Mallory' }))
             .rejects.toThrow(/not addressed to this identity/);
+    });
+});
+
+describe('packDidComm / unpackDidComm (cross-method: Archon did:cid <-> did:key)', () => {
+    const body = { text: 'cross-method hello', n: 7 };
+
+    // A non-Archon counterparty identified by a did:key, whose X25519 keypair we hold.
+    function foreignDidKey(seedByte: number) {
+        const kp = cipher.generateX25519Jwk(new Uint8Array(32).fill(seedByte));
+        const did = x25519JwkToDidKey(kp.publicJwk);
+        const { kid } = didKeyToX25519(did);
+        return { did, kid, kp };
+    }
+
+    it('Archon -> did:key (anoncrypt): the did:key holder decrypts', async () => {
+        const aliceDid = await keymaster.createId('Alice');
+        await keymaster.publishDidComm(undefined, 'Alice');
+        const bob = foreignDidKey(0x40);
+
+        const packed = await keymaster.packDidComm({ type: 'https://x/1/msg', body }, bob.did, { name: 'Alice', anoncrypt: true });
+
+        // The did:key holder unpacks with its own X25519 private key.
+        const { plaintext } = unpackEncrypted(packed, { kid: bob.kid, privateJwk: bob.kp.privateJwk });
+        const message = JSON.parse(new TextDecoder().decode(plaintext));
+        expect(message.body).toEqual(body);
+        expect(message.to).toEqual([bob.did]);
+        expect(aliceDid).toMatch(/^did:/);
+    });
+
+    it('did:key -> Archon (authcrypt): Archon resolves the foreign sender and decrypts', async () => {
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm(undefined, 'Alice');
+
+        const aliceDoc = await keymaster.resolveDID('Alice');
+        const aliceKaId = aliceDoc.didDocument!.keyAgreement![0];
+        const aliceKaVm = aliceDoc.didDocument!.verificationMethod!.find(v => v.id === aliceKaId)!;
+
+        const bob = foreignDidKey(0x41);
+        const message = { id: 'x1', typ: 'application/didcomm-plain+json', type: 'https://x/1/msg', from: bob.did, to: [aliceDoc.didDocument!.id], body };
+
+        // Foreign agent (did:key Bob) authcrypts to Alice using cipher directly.
+        const packed = packEncrypted(
+            new TextEncoder().encode(JSON.stringify(message)),
+            [{ kid: aliceKaId, publicJwk: aliceKaVm.publicKeyJwk as any }],
+            { kid: bob.kid, privateJwk: bob.kp.privateJwk },
+            'A256CBC-HS512',
+        );
+
+        const { message: out, metadata } = await keymaster.unpackDidComm(packed, { name: 'Alice' });
+        expect(out.body).toEqual(body);
+        expect(metadata.authenticated).toBe(true);
+        expect(metadata.sender).toBe(bob.kid);
     });
 });

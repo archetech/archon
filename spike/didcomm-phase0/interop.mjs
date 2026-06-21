@@ -77,6 +77,20 @@ const check = (name, cond) => results.push([name, !!cond]);
     check('lib  authcrypt+sign   -> ours', message.body.n === 42 && metadata.nonRepudiation && metadata.signer === aSig);
 }
 
+// cross-method: ours -> a did:key recipient, unpacked by the reference lib
+{
+    const k = cph.generateX25519Jwk(new Uint8Array(32).fill(0x5a));
+    const didkey = C.x25519JwkToDidKey(k.publicJwk);
+    const { kid } = C.didKeyToX25519(didkey);
+    const msg = { id: 'm1', typ: 'application/didcomm-plain+json', type: 'https://x/1/hi', to: [didkey], body: { hello: 'world', n: 42 } };
+    const packed = C.packEncrypted(enc.encode(JSON.stringify(msg)), [{ kid, publicJwk: k.publicJwk }], null, 'XC20P');
+    const dkDoc = { id: didkey, keyAgreement: [kid], authentication: [], verificationMethod: [{ id: kid, type: 'JsonWebKey2020', controller: didkey, publicKeyJwk: k.publicJwk }], service: [] };
+    const dkResolver = { async resolve(d) { return d === didkey ? dkDoc : (DOCS[d] ?? null); } };
+    const dkSecrets = secrets({ [kid]: { id: kid, type: 'JsonWebKey2020', privateKeyJwk: k.privateJwk } });
+    const [m] = await Message.unpack(packed, dkResolver, dkSecrets, {});
+    check('ours anoncrypt -> lib (did:key recipient)', m.as_value().body.n === 42);
+}
+
 let ok = true;
 for (const [n, p] of results) { console.log((p ? 'PASS' : 'FAIL').padEnd(5), n); if (!p) ok = false; }
 console.log(ok ? '\nALL INTEROP PASS' : '\nINTEROP FAILURES');

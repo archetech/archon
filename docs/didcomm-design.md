@@ -192,18 +192,38 @@ round-trips between two real `did:cid` identities, unit-tested **and** interop-v
 against `didcomm-node` both directions. `DIDCommMessaging` service type + publish/unpublish
 also landed in Phase 1.
 
-**Phase 3 — Transport.** *Reshaped by the self-custody-primary decision.* A self-custody
-wallet holds its keys client-side, so an inbound receiver **cannot** unpack on the agent's
-behalf — it can only **store** the encrypted envelope for the key-holder to fetch and
-unpack locally. So Phase 3 is a **mailbox/relay** (store-and-forward of encrypted
-envelopes, addressed by the JWE recipient `kid`), not a "receive → unpack → dispatch"
-endpoint. The sender resolves the recipient's `DIDCommMessaging` endpoint and POSTs the
-packed envelope (`application/didcomm-encrypted+json`); the recipient polls its mailbox and
-unpacks with `unpackDidComm`. This converges with the mediator work originally scoped as
-Phase 6 — for self-custody they are the same primitive. Open decisions: where the mailbox
-lives (dedicated `didcomm` service vs Drawbridge), how a recipient authenticates to fetch
-(challenge/response over its DID), and retention. *Exit:* a self-custody recipient receives
-and unpacks a message delivered to its published endpoint.
+**Requirement — cross-method interop.** Archon must exchange DIDComm with agents using
+*other* DID methods (`did:key`, `did:web`, `did:peer`, …), not just `did:cid`. This rules
+out any Archon-internal delivery shortcut (a foreign agent can't read our gatekeeper) and
+mandates standard HTTP transport + multi-method DID resolution. The Phase 2 envelopes are
+already spec-standard, so only resolution and transport are method-specific.
+
+**Phase 3 — Cross-method + transport.** Split into:
+
+- **3a — Multi-method resolution + foreign-key normalization. ✅ done.** `cipher`:
+  `didKeyToX25519` (resolves `did:key` — `z6LS…` X25519 and `z6Mk…` Ed25519 with the
+  spec-correct Ed25519→X25519 derivation, verified against the W3C vector) and
+  `normalizeX25519PublicKey` (accepts `publicKeyJwk` **or** `publicKeyMultibase`).
+  `keymaster.resolveDidForDidComm` resolves `did:key` locally and routes everything else
+  through the gatekeeper (which has a universal-resolver fallback for `did:web` etc.);
+  `pack`/`unpack` use it for recipient and sender keys. *Validated:* Archon `did:cid` ↔
+  `did:key` both directions (keymaster e2e), and our pack to a `did:key` is unpacked by the
+  reference `didcomm-node`. *Caveats:* foreign **signing** interop needs `EdDSA` verify
+  (we only verify `ES256K` today); some ecosystems use **P-256** key agreement (cipher is
+  X25519-only) — both additive later. For *others* to resolve `did:cid`, Archon needs a
+  Universal Resolver driver (separate work).
+- **3b — Transport (mailbox).** Self-custody wallets hold keys client-side, so the inbound
+  side can only **store-and-forward** encrypted envelopes (a mailbox), not unpack. The
+  sender resolves the recipient's `DIDCommMessaging` endpoint and POSTs
+  `application/didcomm-encrypted+json`; the recipient polls and unpacks with
+  `unpackDidComm`. Converges with the Phase 6 mediator. Open decisions: mailbox location
+  (dedicated `didcomm` service vs Drawbridge), recipient fetch-auth (challenge/response over
+  its DID), retention.
+- **3c — Forward/routing** for recipients behind a mediator (`serviceEndpoint` = mediator
+  DID + `routingKeys`) — required for many external agents.
+
+*Exit:* a self-custody recipient receives and unpacks a message delivered to its published
+endpoint, including from a non-Archon agent.
 
 **Phase 4 — Core protocols.** Trust Ping, Discover Features, Basic Message, Out-of-Band
 invitation (maps cleanly onto the existing `createChallenge`/`createResponse`). *Exit:*
@@ -239,10 +259,14 @@ DID documents, the pure-JS envelope crypto in `cipher`, and keymaster
 `packDidComm`/`unpackDidComm` — anoncrypt/authcrypt/signed all round-trip between real
 `did:cid` identities and interoperate with `didcomm-node`.
 
-**Next is Phase 3 (transport).** As noted above, the self-custody-primary decision turns it
-into a **mailbox/relay** that converges with the Phase 6 mediator. The build decisions to
-settle first: mailbox location (dedicated `didcomm` service vs Drawbridge), recipient
-fetch-authentication (challenge/response over the DID), and message retention.
+Phase **3a** is also done: cross-method DID resolution (`did:key` locally + universal-resolver
+fallback for the rest) and foreign-key normalization, validated by exchanging messages
+between Archon `did:cid` and `did:key` agents (including against the reference library).
+
+**Next is Phase 3b (transport/mailbox).** A store-and-forward mailbox so a self-custody
+recipient can receive over a standard HTTP `DIDCommMessaging` endpoint (it converges with
+the Phase 6 mediator). Decisions to settle: mailbox location (dedicated `didcomm` service vs
+Drawbridge), recipient fetch-authentication (challenge/response over the DID), retention.
 
 ## References
 
