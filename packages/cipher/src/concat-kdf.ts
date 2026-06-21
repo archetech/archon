@@ -10,6 +10,9 @@ import { sha256 } from '@noble/hashes/sha256';
  * @param algorithmId  - The "enc" value for ECDH-ES or "alg" for ECDH-ES+A*KW
  * @param apu          - Agreement PartyUInfo (typically empty)
  * @param apv          - Agreement PartyVInfo (typically empty)
+ * @param suppPrivInfo - SuppPrivInfo, length-prefixed when present. Empty for
+ *                       standard JWE ECDH-ES; the JWE Authentication Tag for
+ *                       ECDH-1PU + key wrapping (draft-madden-jose-ecdh-1pu).
  * @returns Derived key as Uint8Array
  */
 export function concatKdf(
@@ -18,6 +21,7 @@ export function concatKdf(
     algorithmId: string,
     apu: Uint8Array = new Uint8Array(0),
     apv: Uint8Array = new Uint8Array(0),
+    suppPrivInfo: Uint8Array = new Uint8Array(0),
 ): Uint8Array {
     const algIdBytes = new TextEncoder().encode(algorithmId);
 
@@ -26,11 +30,13 @@ export function concatKdf(
     //   PartyUInfo   = len(apu)   || apu
     //   PartyVInfo   = len(apv)   || apv
     //   SuppPubInfo  = keydatalen (32-bit BE, in bits)
+    //   SuppPrivInfo = len(tag) || tag  (only for ECDH-1PU + key wrapping)
     const otherInfo = concatBytes(
         uint32BE(algIdBytes.length), algIdBytes,
         uint32BE(apu.length), apu,
         uint32BE(apv.length), apv,
         uint32BE(keyBitLength),
+        ...(suppPrivInfo.length > 0 ? [uint32BE(suppPrivInfo.length), suppPrivInfo] : []),
     );
 
     const hashLength = 256; // SHA-256 output in bits

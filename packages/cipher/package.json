@@ -40,6 +40,11 @@
       "require": "./dist/cjs/cipher-web.cjs",
       "types": "./dist/types/cipher-web.d.ts"
     },
+    "./didcomm": {
+      "import": "./dist/esm/didcomm.js",
+      "require": "./dist/cjs/didcomm.cjs",
+      "types": "./dist/types/didcomm.d.ts"
+    },
     "./passphrase": {
       "import": "./dist/esm/passphrase.js",
       "require": "./dist/cjs/passphrase.cjs",

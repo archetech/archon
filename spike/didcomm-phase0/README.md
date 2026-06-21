@@ -20,6 +20,23 @@ node spike.mjs
 
 Expected output: three `PASS` lines (anoncrypt, authcrypt, authcrypt+sign).
 
+## Interop oracle (`interop.mjs`)
+
+Phase 2a builds the DIDComm envelope crypto in pure JS (`packages/cipher/src/didcomm.ts`).
+`interop.mjs` is the regression oracle that proves those envelopes are spec-compliant by
+round-tripping them against `didcomm-node` in **both directions** (ours→lib and lib→ours)
+for anoncrypt, authcrypt, and sign-then-encrypt:
+
+```sh
+# from the repo root, build the cipher package first:
+npm run build:esm --workspace=packages/cipher
+# then:
+cd spike/didcomm-phase0 && npm ci && node interop.mjs
+```
+
+Expected output: six `PASS` lines + `ALL INTEROP PASS`. Re-run this whenever the cipher
+DIDComm crypto changes.
+
 ## What it does
 
 - Generates X25519 key-agreement keys (Alice + Bob) and a **secp256k1** signing
