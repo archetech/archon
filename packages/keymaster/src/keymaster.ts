@@ -40,6 +40,7 @@ import {
     GroupData,
     Vault,
     VaultOptions,
+    DidCommUnpackResult,
     IDInfo,
     ImageAsset,
     ImageFileAsset,
@@ -79,7 +80,16 @@ import {
     EcdsaJwkPrivate,
     EcdsaJwkPublic,
     OkpJwkPair,
+    OkpJwkPublic,
 } from '@didcid/cipher/types';
+import {
+    packDidCommMessage,
+    unpackEncrypted,
+    verifyJws,
+    getEnvelopeInfo,
+    type PackOptions,
+    type DidCommEnc,
+} from '@didcid/cipher/didcomm';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { decryptWithPassphrase, encryptWithPassphrase } from '@didcid/cipher/passphrase';
 
@@ -2354,6 +2364,146 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         return this.updateDID(did, { didDocument });
+    }
+
+    private didCommFragment(id: string): string {
+        return id.includes('#') ? id.split('#').pop()! : id;
+    }
+
+    private findVerificationMethod(doc: DidCidDocument, kid: string) {
+        const frag = this.didCommFragment(kid);
+        return (doc.didDocument?.verificationMethod || []).find(vm => vm.id && this.didCommFragment(vm.id) === frag);
+    }
+
+    private resolveKeyAgreement(doc: DidCidDocument): { kid: string; publicJwk: OkpJwkPublic } {
+        const refs = doc.didDocument?.keyAgreement || [];
+        if (refs.length === 0) {
+            throw new KeymasterError('DID has no published keyAgreement key; call publishDidComm first');
+        }
+        const kid = refs[0];
+        const vm = this.findVerificationMethod(doc, kid);
+        if (!vm?.publicKeyJwk || vm.publicKeyJwk.kty !== 'OKP') {
+            throw new KeymasterError('keyAgreement verification method is missing or not an X25519 key');
+        }
+        return { kid, publicJwk: vm.publicKeyJwk };
+    }
+
+    async packDidComm(
+        message: Record<string, unknown>,
+        to: string | string[],
+        options: { sign?: boolean; anoncrypt?: boolean; encryption?: DidCommEnc; name?: string } = {}
+    ): Promise<string> {
+        const { sign = false, anoncrypt = false, encryption, name } = options;
+        const recipientDids = Array.isArray(to) ? to : [to];
+        if (recipientDids.length === 0) {
+            throw new KeymasterError('At least one recipient is required');
+        }
+
+        const recipients = [];
+        for (const recipientDid of recipientDids) {
+            const recipientDoc = await this.resolveDID(recipientDid);
+            recipients.push(this.resolveKeyAgreement(recipientDoc));
+        }
+
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+
+        const envelope: Record<string, unknown> = {
+            id: (message.id as string) || this.cipher.generateRandomSalt(),
+            typ: 'application/didcomm-plain+json',
+            ...message,
+            to: recipientDids,
+        };
+
+        const packOptions: PackOptions = {};
+
+        if (!anoncrypt) {
+            envelope.from = did;
+            const ownDoc = await this.resolveDID(did);
+            const ownKa = this.resolveKeyAgreement(ownDoc);
+            const ka = await this.fetchDidCommKeyPair(name);
+            packOptions.sender = { kid: ownKa.kid, privateJwk: ka.privateJwk };
+        }
+
+        if (sign) {
+            const keypair = await this.fetchKeyPair(name);
+            if (!keypair) {
+                throw new KeymasterError('Unable to resolve signing key');
+            }
+            const ownDoc = await this.resolveDID(did);
+            const sigVm = ownDoc.didDocument?.verificationMethod?.[0];
+            if (!sigVm?.id) {
+                throw new KeymasterError('DID document has no signing verification method');
+            }
+            const signerKid = sigVm.id.startsWith('#') ? `${did}${sigVm.id}` : sigVm.id;
+            packOptions.signer = { kid: signerKid, privateJwk: keypair.privateJwk };
+        }
+
+        if (encryption) {
+            packOptions.enc = encryption;
+        }
+
+        return packDidCommMessage(envelope, recipients, packOptions);
+    }
+
+    async unpackDidComm(
+        packed: string,
+        options: { name?: string } = {}
+    ): Promise<DidCommUnpackResult> {
+        const { name } = options;
+        const info = getEnvelopeInfo(packed);
+        if (info.type !== 'encrypted') {
+            throw new KeymasterError('Not a DIDComm encrypted message');
+        }
+
+        const id = await this.fetchIdInfo(name);
+        const ownDoc = await this.resolveDID(id.did);
+        const ownKa = this.resolveKeyAgreement(ownDoc);
+
+        if (!info.kids?.includes(ownKa.kid)) {
+            throw new KeymasterError('Message is not addressed to this identity');
+        }
+
+        let senderKey: OkpJwkPublic | undefined;
+        if (info.skid) {
+            const senderDoc = await this.resolveDID(info.skid.split('#')[0]);
+            const senderVm = this.findVerificationMethod(senderDoc, info.skid);
+            if (!senderVm?.publicKeyJwk || senderVm.publicKeyJwk.kty !== 'OKP') {
+                throw new KeymasterError('Sender keyAgreement key not found or not X25519');
+            }
+            senderKey = senderVm.publicKeyJwk;
+        }
+
+        const ka = await this.fetchDidCommKeyPair(name);
+        const { plaintext } = unpackEncrypted(packed, { kid: ownKa.kid, privateJwk: ka.privateJwk }, senderKey);
+        const text = new TextDecoder().decode(plaintext);
+        const inner = JSON.parse(text);
+
+        const metadata = {
+            encrypted: true,
+            authenticated: info.alg === 'ECDH-1PU+A256KW',
+            nonRepudiation: false,
+            sender: info.skid,
+            signer: undefined as string | undefined,
+        };
+
+        if (inner && inner.signatures) {
+            const jwsKid = inner.signatures[0]?.header?.kid;
+            if (!jwsKid) {
+                throw new KeymasterError('Signed message missing signer key id');
+            }
+            const signerDoc = await this.resolveDID(jwsKid.split('#')[0]);
+            const signerVm = this.findVerificationMethod(signerDoc, jwsKid);
+            if (!signerVm?.publicKeyJwk || signerVm.publicKeyJwk.kty !== 'EC') {
+                throw new KeymasterError('Signer key not found or not secp256k1');
+            }
+            const { payload } = verifyJws(text, signerVm.publicKeyJwk);
+            metadata.nonRepudiation = true;
+            metadata.signer = jwsKid;
+            return { message: JSON.parse(new TextDecoder().decode(payload)), metadata };
+        }
+
+        return { message: inner, metadata };
     }
 
     async addAlias(

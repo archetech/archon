@@ -10,6 +10,7 @@ import {
     ResolvedAddressInfo,
     CheckWalletResult,
     CreateAssetOptions,
+    DidCommUnpackResult,
     DmailItem,
     DmailMessage,
     FileAssetOptions,
@@ -559,6 +560,30 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.delete(`${this.API}/didcomm/publish`, { data: { name } });
             return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async packDidComm(
+        message: Record<string, unknown>,
+        to: string | string[],
+        options?: { sign?: boolean; anoncrypt?: boolean; encryption?: 'A256CBC-HS512' | 'XC20P' | 'A256GCM'; name?: string }
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/pack`, { message, to, options });
+            return response.data.packed;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpackDidComm(packed: string, options?: { name?: string }): Promise<DidCommUnpackResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/unpack`, { packed, options });
+            return response.data.result;
         }
         catch (error) {
             throwError(error);

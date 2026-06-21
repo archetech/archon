@@ -2188,6 +2188,123 @@ v1router.delete('/didcomm/publish', async (req, res) => {
 
 /**
  * @swagger
+ * /didcomm/pack:
+ *   post:
+ *     summary: Pack a DIDComm v2 message (encrypted, optionally signed) for one or more recipients.
+ *     description: Resolves each recipient DID's X25519 key-agreement key and produces a DIDComm encrypted (JWE) envelope. Authenticated-sender (authcrypt) by default; pass `anoncrypt` for an anonymous sender, and `sign` to add an ES256K signature (non-repudiation).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: object
+ *                 description: The DIDComm plaintext message (type, body, and optional headers). `from`/`to` are set automatically.
+ *               to:
+ *                 oneOf:
+ *                   - type: string
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *                 description: Recipient DID or array of recipient DIDs.
+ *               options:
+ *                 type: object
+ *                 properties:
+ *                   sign:
+ *                     type: boolean
+ *                   anoncrypt:
+ *                     type: boolean
+ *                   encryption:
+ *                     type: string
+ *                     enum: [A256CBC-HS512, XC20P, A256GCM]
+ *                   name:
+ *                     type: string
+ *     responses:
+ *       200:
+ *         description: The packed DIDComm message.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 packed:
+ *                   type: string
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/didcomm/pack', async (req, res) => {
+    try {
+        const { message, to, options } = req.body || {};
+        const packed = await keymaster.packDidComm(message, to, options);
+        res.json({ packed });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /didcomm/unpack:
+ *   post:
+ *     summary: Unpack (decrypt and verify) a DIDComm v2 message addressed to the current identity.
+ *     description: Decrypts the envelope with the identity's X25519 key-agreement key, verifies the authenticated sender (authcrypt) and any nested ES256K signature, and returns the plaintext message with metadata.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               packed:
+ *                 type: string
+ *                 description: The packed DIDComm message.
+ *               options:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                     description: Optional identity name. Defaults to the current identity.
+ *     responses:
+ *       200:
+ *         description: The unpacked message and metadata.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 result:
+ *                   type: object
+ *       400:
+ *         description: Bad request.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+v1router.post('/didcomm/unpack', async (req, res) => {
+    try {
+        const { packed, options } = req.body || {};
+        const result = await keymaster.unpackDidComm(packed, options);
+        res.json({ result });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /addresses/{address}:
  *   delete:
  *     summary: Remove the stored address for the current identity and revoke it remotely.

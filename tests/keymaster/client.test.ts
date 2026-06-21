@@ -1430,6 +1430,65 @@ describe('unpublishDidComm', () => {
     });
 });
 
+describe('packDidComm', () => {
+    it('should pack a didcomm message', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/pack`, (body: any) => body.to === 'did:test:bob')
+            .reply(200, { packed: '{"protected":"x"}' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const packed = await keymaster.packDidComm({ type: 'https://x/1/msg', body: {} }, 'did:test:bob');
+
+        expect(packed).toStrictEqual('{"protected":"x"}');
+    });
+
+    it('should throw exception on packDidComm server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/pack`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.packDidComm({ type: 'https://x/1/msg', body: {} }, 'did:test:bob');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('unpackDidComm', () => {
+    it('should unpack a didcomm message', async () => {
+        const result = { message: { body: { hi: 1 } }, metadata: { encrypted: true, authenticated: true, nonRepudiation: false } };
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/unpack`)
+            .reply(200, { result });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const out = await keymaster.unpackDidComm('{"protected":"x"}');
+
+        expect(out).toStrictEqual(result);
+    });
+
+    it('should throw exception on unpackDidComm server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/unpack`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.unpackDidComm('{"protected":"x"}');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('addNostr', () => {
     const mockKeys = { npub: 'npub1test', nsec: 'nsec1test' };
 

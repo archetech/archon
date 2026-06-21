@@ -141,3 +141,74 @@ describe('unpublishDidComm', () => {
         expect((doc.didDocument?.verificationMethod || []).find(v => v.id === '#key-1')).toBeDefined();
     });
 });
+
+describe('packDidComm / unpackDidComm (end-to-end between two identities)', () => {
+    async function setup() {
+        const aliceDid = await keymaster.createId('Alice');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm(undefined, 'Alice');
+        await keymaster.publishDidComm(undefined, 'Bob');
+        return { aliceDid, bobDid };
+    }
+
+    const body = { text: 'hello over didcomm', n: 99 };
+
+    it('authcrypt: Bob decrypts and sees Alice as the authenticated sender', async () => {
+        const { aliceDid, bobDid } = await setup();
+
+        const packed = await keymaster.packDidComm({ type: 'https://x/1/msg', body }, bobDid, { name: 'Alice' });
+        const { message, metadata } = await keymaster.unpackDidComm(packed, { name: 'Bob' });
+
+        expect(message.body).toEqual(body);
+        expect(message.from).toBe(aliceDid);
+        expect(message.to).toEqual([bobDid]);
+        expect(metadata.encrypted).toBe(true);
+        expect(metadata.authenticated).toBe(true);
+        expect(metadata.nonRepudiation).toBe(false);
+        expect(metadata.sender).toBe(`${aliceDid}#key-agreement-1`);
+    });
+
+    it('anoncrypt: Bob decrypts without an authenticated sender', async () => {
+        const { bobDid } = await setup();
+
+        const packed = await keymaster.packDidComm({ type: 'https://x/1/msg', body }, bobDid, { name: 'Alice', anoncrypt: true });
+        const { message, metadata } = await keymaster.unpackDidComm(packed, { name: 'Bob' });
+
+        expect(message.body).toEqual(body);
+        expect(message.from).toBeUndefined();
+        expect(metadata.authenticated).toBe(false);
+        expect(metadata.sender).toBeUndefined();
+    });
+
+    it('sign-then-encrypt: Bob verifies Alice\'s ES256K signature (non-repudiation)', async () => {
+        const { aliceDid, bobDid } = await setup();
+
+        const packed = await keymaster.packDidComm({ type: 'https://x/1/msg', body }, bobDid, { name: 'Alice', sign: true });
+        const { message, metadata } = await keymaster.unpackDidComm(packed, { name: 'Bob' });
+
+        expect(message.body).toEqual(body);
+        expect(metadata.authenticated).toBe(true);
+        expect(metadata.nonRepudiation).toBe(true);
+        expect(metadata.signer).toBe(`${aliceDid}#key-1`);
+    });
+
+    it('throws when packing to a recipient without a published keyAgreement key', async () => {
+        await keymaster.createId('Alice');
+        const carolDid = await keymaster.createId('Carol'); // no publishDidComm
+        await keymaster.setCurrentId('Alice');
+
+        await expect(keymaster.packDidComm({ type: 'https://x/1/msg', body }, carolDid, { name: 'Alice' }))
+            .rejects.toThrow(/keyAgreement/);
+    });
+
+    it('throws when an identity that is not a recipient tries to unpack', async () => {
+        const { bobDid } = await setup();
+        await keymaster.createId('Mallory');
+        await keymaster.publishDidComm(undefined, 'Mallory');
+
+        const packed = await keymaster.packDidComm({ type: 'https://x/1/msg', body }, bobDid, { name: 'Alice' });
+
+        await expect(keymaster.unpackDidComm(packed, { name: 'Mallory' }))
+            .rejects.toThrow(/not addressed to this identity/);
+    });
+});
