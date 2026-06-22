@@ -590,6 +590,30 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async sendDidComm(
+        message: Record<string, unknown>,
+        to: string | string[],
+        options?: { sign?: boolean; anoncrypt?: boolean; encryption?: 'A256CBC-HS512' | 'XC20P' | 'A256GCM'; name?: string }
+    ): Promise<string[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/send`, { message, to, options });
+            return response.data.ids;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async receiveDidComm(options?: { name?: string; endpoint?: string }): Promise<DidCommUnpackResult[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/receive`, { options });
+            return response.data.results;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async addNostr(id?: string): Promise<NostrKeys> {
         try {
             const response = await this.axios.post(`${this.API}/nostr`, { id });

@@ -2536,6 +2536,112 @@ export default class Keymaster implements KeymasterInterface {
         return { message: inner, metadata };
     }
 
+    private async resolveDidCommEndpoint(did: string): Promise<string | undefined> {
+        const doc = await this.resolveDidForDidComm(did);
+        const service = (doc.didDocument?.service || []).find(s => s.type === 'DIDCommMessaging');
+        if (!service) {
+            return undefined;
+        }
+        const endpoint = service.serviceEndpoint as unknown;
+        if (typeof endpoint === 'string') {
+            return endpoint;
+        }
+        // DIDComm spec also allows an object endpoint { uri, accept, routingKeys }
+        if (endpoint && typeof (endpoint as any).uri === 'string') {
+            return (endpoint as any).uri;
+        }
+        return undefined;
+    }
+
+    // Pack a message and deliver it to each recipient's DIDCommMessaging mailbox
+    // endpoint (store-and-forward). Returns the stored message ids per delivery.
+    async sendDidComm(
+        message: Record<string, unknown>,
+        to: string | string[],
+        options: { sign?: boolean; anoncrypt?: boolean; encryption?: DidCommEnc; name?: string } = {}
+    ): Promise<string[]> {
+        const recipientDids = Array.isArray(to) ? to : [to];
+        const packed = await this.packDidComm(message, recipientDids, options);
+
+        const ids: string[] = [];
+        for (const recipientDid of recipientDids) {
+            const endpoint = await this.resolveDidCommEndpoint(recipientDid);
+            if (!endpoint) {
+                throw new KeymasterError(`recipient ${recipientDid} has no DIDCommMessaging endpoint`);
+            }
+            const response = await fetch(`${endpoint.replace(/\/+$/, '')}/api/v1/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/didcomm-encrypted+json' },
+                body: packed,
+            });
+            if (!response.ok) {
+                throw new KeymasterError(`DIDComm delivery to ${recipientDid} failed: ${response.status}`);
+            }
+            const data = await response.json();
+            ids.push(...(data.ids || []));
+        }
+        return ids;
+    }
+
+    // Fetch queued messages from this identity's own mailbox (proving DID control
+    // with a signed challenge), unpack them, and acknowledge (remove) what unpacked.
+    async receiveDidComm(
+        options: { name?: string; endpoint?: string } = {}
+    ): Promise<DidCommUnpackResult[]> {
+        const { name } = options;
+        const id = await this.fetchIdInfo(name);
+        const endpoint = options.endpoint || await this.resolveDidCommEndpoint(id.did);
+        if (!endpoint) {
+            throw new KeymasterError('identity has no DIDCommMessaging endpoint; publishDidComm with an endpoint first');
+        }
+        const base = endpoint.replace(/\/+$/, '');
+        const keypair = await this.fetchKeyPair(name);
+        if (!keypair) {
+            throw new KeymasterError('unable to resolve signing key');
+        }
+
+        const sign = async (): Promise<{ challenge: string; signature: string }> => {
+            const challengeResponse = await fetch(`${base}/api/v1/challenge`);
+            const { challenge } = await challengeResponse.json();
+            const signature = this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk);
+            return { challenge, signature };
+        };
+
+        const auth = await sign();
+        const fetchResponse = await fetch(`${base}/api/v1/messages/fetch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ did: id.did, ...auth }),
+        });
+        if (!fetchResponse.ok) {
+            throw new KeymasterError(`DIDComm fetch failed: ${fetchResponse.status}`);
+        }
+        const { messages } = await fetchResponse.json();
+
+        const results: DidCommUnpackResult[] = [];
+        const handled: string[] = [];
+        for (const entry of messages || []) {
+            try {
+                results.push(await this.unpackDidComm(entry.message, { name }));
+                handled.push(entry.id);
+            }
+            catch {
+                // Leave messages we can't unpack on the server for inspection/retry.
+            }
+        }
+
+        if (handled.length > 0) {
+            const ackAuth = await sign();
+            await fetch(`${base}/api/v1/messages/remove`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ did: id.did, ...ackAuth, ids: handled }),
+            });
+        }
+
+        return results;
+    }
+
     async addAlias(
         alias: string,
         did: string

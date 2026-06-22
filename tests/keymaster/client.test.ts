@@ -1489,6 +1489,65 @@ describe('unpackDidComm', () => {
     });
 });
 
+describe('sendDidComm', () => {
+    it('should send a didcomm message and return ids', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/send`, (body: any) => body.to === 'did:test:bob')
+            .reply(200, { ids: ['id-1'] });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ids = await keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, 'did:test:bob');
+
+        expect(ids).toStrictEqual(['id-1']);
+    });
+
+    it('should throw exception on sendDidComm server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/send`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, 'did:test:bob');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('receiveDidComm', () => {
+    it('should receive and return unpacked messages', async () => {
+        const results = [{ message: { body: { hi: 1 } }, metadata: { encrypted: true, authenticated: true, nonRepudiation: false } }];
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/receive`)
+            .reply(200, { results });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const out = await keymaster.receiveDidComm();
+
+        expect(out).toStrictEqual(results);
+    });
+
+    it('should throw exception on receiveDidComm server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/receive`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.receiveDidComm();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('addNostr', () => {
     const mockKeys = { npub: 'npub1test', nsec: 'nsec1test' };
 

@@ -2305,6 +2305,99 @@ v1router.post('/didcomm/unpack', async (req, res) => {
 
 /**
  * @swagger
+ * /didcomm/send:
+ *   post:
+ *     summary: Pack a DIDComm message and deliver it to each recipient's DIDCommMessaging mailbox.
+ *     description: Packs the message (authcrypt by default; `anoncrypt`/`sign` options) and POSTs it to each recipient's resolved `DIDCommMessaging` endpoint. Returns the stored message ids.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: object
+ *               to:
+ *                 oneOf:
+ *                   - type: string
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *               options:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Delivered. Returns stored message ids.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ids:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *       400:
+ *         description: Bad request.
+ */
+v1router.post('/didcomm/send', async (req, res) => {
+    try {
+        const { message, to, options } = req.body || {};
+        const ids = await keymaster.sendDidComm(message, to, options);
+        res.json({ ids });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /didcomm/receive:
+ *   post:
+ *     summary: Fetch and unpack queued DIDComm messages from the current identity's mailbox.
+ *     description: Proves DID control with a signed challenge, fetches queued envelopes from the identity's `DIDCommMessaging` endpoint, unpacks them, and acknowledges (removes) the ones that unpacked.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               options:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                   endpoint:
+ *                     type: string
+ *     responses:
+ *       200:
+ *         description: The unpacked messages with metadata.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       400:
+ *         description: Bad request.
+ */
+v1router.post('/didcomm/receive', async (req, res) => {
+    try {
+        const { options } = req.body || {};
+        const results = await keymaster.receiveDidComm(options);
+        res.json({ results });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
  * /addresses/{address}:
  *   delete:
  *     summary: Remove the stored address for the current identity and revoke it remotely.

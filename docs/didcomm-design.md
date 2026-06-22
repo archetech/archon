@@ -212,13 +212,17 @@ already spec-standard, so only resolution and transport are method-specific.
   (we only verify `ES256K` today); some ecosystems use **P-256** key agreement (cipher is
   X25519-only) — both additive later. For *others* to resolve `did:cid`, Archon needs a
   Universal Resolver driver (separate work).
-- **3b — Transport (mailbox).** Self-custody wallets hold keys client-side, so the inbound
-  side can only **store-and-forward** encrypted envelopes (a mailbox), not unpack. The
-  sender resolves the recipient's `DIDCommMessaging` endpoint and POSTs
-  `application/didcomm-encrypted+json`; the recipient polls and unpacks with
-  `unpackDidComm`. Converges with the Phase 6 mediator. Open decisions: mailbox location
-  (dedicated `didcomm` service vs Drawbridge), recipient fetch-auth (challenge/response over
-  its DID), retention.
+- **3b — Transport (mailbox). ✅ done.** New `services/didcomm/server` store-and-forward
+  relay: `POST /api/v1/messages` stores an envelope by recipient DID (parsed from the JWE
+  recipient kids); `GET /api/v1/challenge` + `POST /api/v1/messages/fetch` lets a recipient
+  prove DID control with a single-use **signed challenge** (ES256K over the nonce, verified
+  via gatekeeper resolution) and retrieve its queue; `messages/remove` acks. keymaster
+  `sendDidComm` (pack → resolve the recipient's `DIDCommMessaging` endpoint → POST) and
+  `receiveDidComm` (challenge → sign → fetch → unpack → ack), wired through
+  interface/client/API. In-memory store with TTL for now (swap for redis/mongo behind the
+  `MailboxStore` interface). *Validated:* core logic unit tests + an e2e where two Archon
+  identities exchange authcrypt/signed messages through the live relay over HTTP, with a
+  forged fetch rejected. *Remaining:* Dockerfile + docker-compose wiring, redis/mongo store.
 - **3c — Forward/routing** for recipients behind a mediator (`serviceEndpoint` = mediator
   DID + `routingKeys`) — required for many external agents.
 
@@ -263,10 +267,14 @@ Phase **3a** is also done: cross-method DID resolution (`did:key` locally + univ
 fallback for the rest) and foreign-key normalization, validated by exchanging messages
 between Archon `did:cid` and `did:key` agents (including against the reference library).
 
-**Next is Phase 3b (transport/mailbox).** A store-and-forward mailbox so a self-custody
-recipient can receive over a standard HTTP `DIDCommMessaging` endpoint (it converges with
-the Phase 6 mediator). Decisions to settle: mailbox location (dedicated `didcomm` service vs
-Drawbridge), recipient fetch-authentication (challenge/response over the DID), retention.
+Phase **3b** is also done: a dedicated `services/didcomm/server` mailbox relay with
+signed-challenge fetch auth, plus keymaster `sendDidComm`/`receiveDidComm`, validated by a
+live two-identity HTTP exchange.
+
+**Next:** wire the `didcomm` service into Docker/compose and swap its in-memory store for
+redis/mongo; then **3c** (Forward/routing to mediators) and the remaining protocol phases
+(4 core protocols, 5 credential protocols, 7 parity). Plus the noted cross-method follow-ons
+(EdDSA verify, P-256 key agreement, a Universal Resolver driver for `did:cid`).
 
 ## References
 

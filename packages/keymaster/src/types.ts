@@ -419,6 +419,12 @@ export interface KeymasterInterface {
         options?: { sign?: boolean; anoncrypt?: boolean; encryption?: 'A256CBC-HS512' | 'XC20P' | 'A256GCM'; name?: string }
     ): Promise<string>;
     unpackDidComm(packed: string, options?: { name?: string }): Promise<DidCommUnpackResult>;
+    sendDidComm(
+        message: Record<string, unknown>,
+        to: string | string[],
+        options?: { sign?: boolean; anoncrypt?: boolean; encryption?: 'A256CBC-HS512' | 'XC20P' | 'A256GCM'; name?: string }
+    ): Promise<string[]>;
+    receiveDidComm(options?: { name?: string; endpoint?: string }): Promise<DidCommUnpackResult[]>;
 
     // Nostr
     addNostr(id?: string): Promise<NostrKeys>;
