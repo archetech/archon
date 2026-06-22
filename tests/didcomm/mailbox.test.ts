@@ -46,13 +46,17 @@ describe('MemoryMailboxStore', () => {
     });
 });
 
-const describeRedis = process.env.ARCHON_SKIP_REDIS ? describe.skip : describe;
+// Live-redis integration tests are opt-IN: they run only when ARCHON_REDIS_URL is
+// set (pointing at a reachable redis). By default — and in the unit-test CI, which
+// has no redis service — they are skipped. Running them against a dead redis would
+// leave ioredis reconnecting forever, leaking a handle that hangs the jest process.
+const describeRedis = process.env.ARCHON_REDIS_URL ? describe : describe.skip;
 
 describeRedis('RedisMailboxStore (live redis)', () => {
     let store: RedisMailboxStore;
 
     beforeAll(async () => {
-        store = new RedisMailboxStore(process.env.ARCHON_REDIS_URL || 'redis://localhost:6379', `didcomm-test-${Date.now()}`);
+        store = new RedisMailboxStore(process.env.ARCHON_REDIS_URL!, `didcomm-test-${Date.now()}`);
         await store.connect();
     });
 
