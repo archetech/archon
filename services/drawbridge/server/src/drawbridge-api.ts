@@ -139,6 +139,48 @@ function buildProxyBody(req: express.Request): BodyInit | undefined {
     return undefined;
 }
 
+// Generic reverse proxy to an internal service, stripping a path prefix.
+async function proxyRequest(req: express.Request, res: express.Response, baseURL: string, prefixToStrip: string) {
+    const upstreamPath = prefixToStrip
+        ? (req.originalUrl.replace(new RegExp(`^${prefixToStrip}`), '') || '/')
+        : req.originalUrl;
+    const upstreamUrl = new URL(upstreamPath, baseURL);
+
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(req.headers)) {
+        if (!value || name === 'host' || name === 'content-length') {
+            continue;
+        }
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                headers.append(name, item);
+            }
+        }
+        else {
+            headers.set(name, value);
+        }
+    }
+
+    const body = buildProxyBody(req);
+
+    const upstream = await fetch(upstreamUrl, {
+        method: req.method,
+        headers,
+        body,
+        redirect: 'manual',
+    });
+
+    res.status(upstream.status);
+    upstream.headers.forEach((value, key) => {
+        if (key === 'content-length' || key === 'transfer-encoding' || key === 'connection') {
+            return;
+        }
+        res.setHeader(key, value);
+    });
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    res.send(buffer);
+}
+
 async function proxyHeraldRequest(req: express.Request, res: express.Response, prefixToStrip = '/names') {
     const upstreamPath = prefixToStrip
         ? (req.originalUrl.replace(new RegExp(`^${prefixToStrip}`), '') || '/')
@@ -263,6 +305,8 @@ async function main() {
 
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+    // Capture DIDComm encrypted envelopes as text so they survive proxying to the relay.
+    app.use(express.text({ type: 'application/didcomm-encrypted+json', limit: '10mb' }));
     app.use(express.text({ limit: '10mb' }));
     // Skip body buffering for streaming routes — they read req directly
     const rawParser = express.raw({ type: 'application/octet-stream', limit: '10mb' });
@@ -635,6 +679,17 @@ async function main() {
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'Herald proxy error');
             res.status(502).json({ error: 'Upstream herald error' });
+        }
+    });
+
+    // Public face for the DIDComm relay (mailbox). The published
+    // DIDCommMessaging endpoint is `<drawbridge public host>/didcomm`.
+    app.use('/didcomm', async (req, res) => {
+        try {
+            await proxyRequest(req, res, config.didcommURL, '/didcomm');
+        } catch (error: any) {
+            logger.error({ err: error, path: req.originalUrl }, 'DIDComm proxy error');
+            res.status(502).json({ error: 'Upstream didcomm error' });
         }
     });
 

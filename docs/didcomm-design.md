@@ -224,7 +224,10 @@ already spec-standard, so only resolution and transport are method-specific.
   can be added the same way). *Validated:* core logic unit tests (incl. the redis store
   against a live redis) + an e2e where two Archon identities exchange authcrypt/signed
   messages through the live relay over HTTP, with a forged fetch rejected. Dockerized
-  (`docker/Dockerfile.didcomm` + the opt-in `didcomm` compose profile).
+  (`docker/Dockerfile.didcomm` + the opt-in `didcomm` compose profile, port 4236).
+  **Drawbridge** (the public gateway, with Tor) reverse-proxies `/didcomm` → the internal
+  relay, so the published `DIDCommMessaging` endpoint is `<drawbridge public host>/didcomm`
+  (or `.onion`) rather than the relay being exposed directly.
 - **3c — Forward/routing. ✅ done.** `cipher` `wrapForward` (anoncrypt a `routing/2.0/forward`
   JWM whose `body.next` is the recipient and `attachments[0].data.json` is the inner envelope,
   to the mediator's key) and `parseForward`, both interop-validated against `didcomm-node`
