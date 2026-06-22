@@ -249,8 +249,15 @@ shapes (verified against the spec) + `_oob` URL encode/decode. They compose with
 sends a Basic Message and a Trust Ping over the live relay and Bob returns a thid-correlated
 ping-response.
 
-**Phase 5 — Credential protocols.** Map Issue-Credential 3.0 / Present-Proof onto
-Archon's existing VC issue/verify. *Exit:* issue + present a VC over DIDComm.
+**Phase 5 — Credential protocols. ✅ done.** Issue-Credential 3.0 and Present-Proof 3.0
+message builders (`didcomm-protocols.ts`) carry an Archon verifiable credential/presentation
+as a DIDComm attachment (`data.json`), mapped onto the existing
+`bindCredential`/`addProof`/`verifyProof`. *Validated:* an e2e where Alice issues a signed VC
+to Bob over DIDComm (Bob verifies the issuer proof), then Carol requests a presentation, Bob
+presents a VP wrapping the VC, and Carol verifies both the holder and issuer signatures.
+*Note:* full cross-agent interop is bounded by the credential format — Archon VCs use
+`EcdsaSecp256k1Signature2019`, so interop with Aries/AnonCreds agents needs a standard
+attachment format (follow-on).
 
 **Phase 6 — Routing/mediation (optional).** Forward messages + Coordinate-Mediation so
 offline/NAT'd agents work; natural fit with Drawbridge/Tor.
@@ -286,11 +293,13 @@ against the `didcomm-node` reference library.
 | 3b — Transport (mailbox) | ✅ | `services/didcomm/server` relay (signed-challenge auth; in-memory/redis; Docker + `didcomm` compose profile, port 4236); keymaster `sendDidComm`/`receiveDidComm`; Drawbridge `/didcomm` reverse proxy |
 | 3c — Forward/routing | ✅ | `wrapForward`/`parseForward`; DID-doc `routingKeys`; `sendDidComm` mediator wrapping; `mediateDidComm` (Archon-as-mediator) |
 | 4 — Application protocols | ✅ | message builders (`didcomm-protocols.ts`) for Trust Ping, Basic Message, Discover Features, Out-of-Band (+ `_oob` URL encode/decode) — compose with `sendDidComm`/`receiveDidComm`; e2e: basic message + trust-ping request/response (thid-correlated) over the relay |
+| 5 — Credential exchange | ✅ | Issue-Credential 3.0 + Present-Proof 3.0 builders carrying an Archon VC/VP as a DIDComm attachment; maps onto `bindCredential`/`addProof`/`verifyProof`; e2e: Alice issues a VC to Bob over DIDComm (Bob verifies the issuer proof), Carol requests + Bob presents a VP, Carol verifies holder + issuer signatures |
 
-**Remaining (not started):** **5** (Issue-Credential / Present-Proof over DIDComm) and
-**7** (Python SDK + CLI parity). Plus follow-ons: EdDSA signature verify (foreign Ed25519
-signers), P-256 key agreement, a Universal Resolver driver so others can resolve `did:cid`,
-and an optional mongo mailbox backend.
+**Remaining (not started):** **7** (Python SDK + CLI parity — deferred). Plus follow-ons:
+EdDSA signature verify (foreign Ed25519 signers), P-256 key agreement, a Universal Resolver
+driver so others can resolve `did:cid`, an optional mongo mailbox backend, and a standard
+credential attachment format for cross-agent (non-Archon) VC interop (Archon VCs use
+`EcdsaSecp256k1Signature2019`).
 
 ## References
 

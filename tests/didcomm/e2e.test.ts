@@ -11,10 +11,17 @@ import {
     basicMessage,
     trustPing,
     trustPingResponse,
+    issueCredentialMessage,
+    requestPresentation,
+    presentationMessage,
+    attachedJson,
     BASIC_MESSAGE_TYPE,
     TRUST_PING_TYPE,
     TRUST_PING_RESPONSE_TYPE,
+    ISSUE_CREDENTIAL_TYPE,
+    PRESENT_PROOF_REQUEST_TYPE,
 } from '../../packages/keymaster/src/didcomm-protocols.ts';
+import { mockSchema } from '../keymaster/helper.ts';
 
 // End-to-end: two Archon identities exchange a DIDComm message through the live
 // mailbox relay (real express routes + signed-challenge auth + keymaster
@@ -145,6 +152,50 @@ describe('DIDComm relay end-to-end', () => {
         expect(aliceInbox).toHaveLength(1);
         expect(aliceInbox[0].message.type).toBe(TRUST_PING_RESPONSE_TYPE);
         expect(aliceInbox[0].message.thid).toBe(ping.message.id);
+    });
+
+    it('issues a credential and verifies a presentation over DIDComm', async () => {
+        const aliceDid = await keymaster.createId('Alice'); // issuer
+        const bobDid = await keymaster.createId('Bob');     // holder
+        const carolDid = await keymaster.createId('Carol'); // verifier
+        await keymaster.publishDidComm(endpoint, 'Alice');
+        await keymaster.publishDidComm(endpoint, 'Bob');
+        await keymaster.publishDidComm(endpoint, 'Carol');
+
+        // Alice issues a signed VC to Bob over DIDComm (issue-credential/3.0).
+        await keymaster.setCurrentId('Alice');
+        const schema = await keymaster.createSchema(mockSchema);
+        const bound = await keymaster.bindCredential(bobDid, { schema });
+        const signedVc = await keymaster.addProof(bound, 'Alice');
+        await keymaster.sendDidComm(issueCredentialMessage(signedVc, { comment: 'your credential' }), bobDid, { name: 'Alice' });
+
+        const issued = await keymaster.receiveDidComm({ name: 'Bob' });
+        expect(issued).toHaveLength(1);
+        expect(issued[0].message.type).toBe(ISSUE_CREDENTIAL_TYPE);
+        const receivedVc = attachedJson(issued[0].message);
+        expect(receivedVc.issuer).toBe(aliceDid);
+        expect(await keymaster.verifyProof(receivedVc)).toBe(true);
+
+        // Carol requests a presentation; Bob presents the VC in a VP (present-proof/3.0).
+        await keymaster.sendDidComm(requestPresentation('prove your credential'), bobDid, { name: 'Carol' });
+        const request = (await keymaster.receiveDidComm({ name: 'Bob' }))[0];
+        expect(request.message.type).toBe(PRESENT_PROOF_REQUEST_TYPE);
+
+        const vp = await keymaster.addProof({
+            '@context': ['https://www.w3.org/ns/credentials/v2'],
+            type: ['VerifiablePresentation'],
+            holder: bobDid,
+            verifiableCredential: [receivedVc],
+        }, 'Bob', 'authentication');
+        await keymaster.sendDidComm(presentationMessage(vp, { thid: request.message.id }), carolDid, { name: 'Bob' });
+
+        const presented = await keymaster.receiveDidComm({ name: 'Carol' });
+        expect(presented).toHaveLength(1);
+        const receivedVp = attachedJson(presented[0].message);
+        expect(receivedVp.holder).toBe(bobDid);
+        // Bob's holder signature and Alice's issuer signature both verify.
+        expect(await keymaster.verifyProof(receivedVp)).toBe(true);
+        expect(await keymaster.verifyProof(receivedVp.verifiableCredential[0])).toBe(true);
     });
 
     it('rejects a forged fetch (wrong key for the DID)', async () => {

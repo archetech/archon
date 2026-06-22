@@ -13,6 +13,15 @@ import {
     DISCOVER_FEATURES_QUERIES_TYPE,
     DISCOVER_FEATURES_DISCLOSE_TYPE,
     OUT_OF_BAND_INVITATION_TYPE,
+    issueCredentialMessage,
+    requestPresentation,
+    presentationMessage,
+    attachedJson,
+    ISSUE_CREDENTIAL_TYPE,
+    PRESENT_PROOF_REQUEST_TYPE,
+    PRESENT_PROOF_PRESENTATION_TYPE,
+    VC_ATTACHMENT_FORMAT,
+    VP_ATTACHMENT_FORMAT,
 } from '../../packages/keymaster/src/didcomm-protocols.ts';
 
 describe('DIDComm protocol builders', () => {
@@ -56,5 +65,32 @@ describe('DIDComm protocol builders', () => {
         // also decodes a bare _oob value (no surrounding URL)
         const bare = url.split('_oob=')[1];
         expect(decodeOutOfBandInvitation(bare).type).toBe(OUT_OF_BAND_INVITATION_TYPE);
+    });
+});
+
+describe('credential-exchange builders (issue-credential / present-proof 3.0)', () => {
+    const vc = { issuer: 'did:cid:alice', credentialSubject: { id: 'did:cid:bob' }, proof: { proofValue: 'x' } };
+
+    it('issueCredentialMessage carries the VC as a json attachment', () => {
+        const msg = issueCredentialMessage(vc, { comment: 'here you go' });
+        expect(msg.type).toBe(ISSUE_CREDENTIAL_TYPE);
+        expect((msg.body as any).comment).toBe('here you go');
+        expect((msg.body as any).formats[0].format).toBe(VC_ATTACHMENT_FORMAT);
+        expect((msg as any).attachments[0].format).toBe(VC_ATTACHMENT_FORMAT);
+        expect((msg as any).attachments[0].data.json).toEqual(vc);
+        expect(attachedJson(msg as any)).toEqual(vc);
+    });
+
+    it('requestPresentation has the right type', () => {
+        expect(requestPresentation('prove it').type).toBe(PRESENT_PROOF_REQUEST_TYPE);
+    });
+
+    it('presentationMessage carries the VP and correlates via thid', () => {
+        const vp = { type: ['VerifiablePresentation'], verifiableCredential: [vc] };
+        const msg = presentationMessage(vp, { thid: 'req-1' });
+        expect(msg.type).toBe(PRESENT_PROOF_PRESENTATION_TYPE);
+        expect(msg.thid).toBe('req-1');
+        expect((msg as any).attachments[0].format).toBe(VP_ATTACHMENT_FORMAT);
+        expect(attachedJson(msg as any)).toEqual(vp);
     });
 });

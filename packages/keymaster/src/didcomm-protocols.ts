@@ -72,3 +72,59 @@ export function decodeOutOfBandInvitation(urlOrOob: string): any {
     const oob = match ? decodeURIComponent(match[1]) : urlOrOob;
     return JSON.parse(fromBase64Url(oob));
 }
+
+// --- Issue Credential 3.0 / Present Proof 3.0 -------------------------------
+// Carry an Archon verifiable credential/presentation as a DIDComm attachment.
+
+export const ISSUE_CREDENTIAL_PROPOSE_TYPE = 'https://didcomm.org/issue-credential/3.0/propose-credential';
+export const ISSUE_CREDENTIAL_OFFER_TYPE = 'https://didcomm.org/issue-credential/3.0/offer-credential';
+export const ISSUE_CREDENTIAL_REQUEST_TYPE = 'https://didcomm.org/issue-credential/3.0/request-credential';
+export const ISSUE_CREDENTIAL_TYPE = 'https://didcomm.org/issue-credential/3.0/issue-credential';
+export const PRESENT_PROOF_PROPOSE_TYPE = 'https://didcomm.org/present-proof/3.0/propose-presentation';
+export const PRESENT_PROOF_REQUEST_TYPE = 'https://didcomm.org/present-proof/3.0/request-presentation';
+export const PRESENT_PROOF_PRESENTATION_TYPE = 'https://didcomm.org/present-proof/3.0/presentation';
+
+// Attachment format identifiers (per-format Attachment registry).
+export const VC_ATTACHMENT_FORMAT = 'aries/ld-proof-vc@v1.0';
+export const VP_ATTACHMENT_FORMAT = 'dif/presentation-exchange/submission@v1.0';
+
+function jsonAttachment(id: string, format: string, json: object) {
+    return { id, media_type: 'application/json', format, data: { json } };
+}
+
+export function offerCredential(comment?: string): DidCommPlaintext {
+    return { type: ISSUE_CREDENTIAL_OFFER_TYPE, body: comment ? { comment } : {} };
+}
+
+export function requestCredential(thid?: string, comment?: string): DidCommPlaintext {
+    return { type: ISSUE_CREDENTIAL_REQUEST_TYPE, ...(thid ? { thid } : {}), body: comment ? { comment } : {} };
+}
+
+export function issueCredentialMessage(credential: object, options: { thid?: string; comment?: string } = {}): DidCommPlaintext {
+    const attachId = 'vc-1';
+    return {
+        type: ISSUE_CREDENTIAL_TYPE,
+        ...(options.thid ? { thid: options.thid } : {}),
+        body: { ...(options.comment ? { comment: options.comment } : {}), formats: [{ attach_id: attachId, format: VC_ATTACHMENT_FORMAT }] },
+        attachments: [jsonAttachment(attachId, VC_ATTACHMENT_FORMAT, credential)],
+    };
+}
+
+export function requestPresentation(comment?: string): DidCommPlaintext {
+    return { type: PRESENT_PROOF_REQUEST_TYPE, body: comment ? { comment } : {} };
+}
+
+export function presentationMessage(presentation: object, options: { thid?: string; comment?: string } = {}): DidCommPlaintext {
+    const attachId = 'vp-1';
+    return {
+        type: PRESENT_PROOF_PRESENTATION_TYPE,
+        ...(options.thid ? { thid: options.thid } : {}),
+        body: { ...(options.comment ? { comment: options.comment } : {}), formats: [{ attach_id: attachId, format: VP_ATTACHMENT_FORMAT }] },
+        attachments: [jsonAttachment(attachId, VP_ATTACHMENT_FORMAT, presentation)],
+    };
+}
+
+// Extract the JSON payload (VC or VP) carried in a credential/proof message.
+export function attachedJson(message: { attachments?: Array<{ data?: { json?: unknown } }> }, index = 0): any {
+    return message?.attachments?.[index]?.data?.json;
+}
