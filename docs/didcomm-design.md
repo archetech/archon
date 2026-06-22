@@ -226,7 +226,13 @@ already spec-standard, so only resolution and transport are method-specific.
   messages through the live relay over HTTP, with a forged fetch rejected. Dockerized
   (`docker/Dockerfile.didcomm` + the opt-in `didcomm` compose profile).
 - **3c — Forward/routing** for recipients behind a mediator (`serviceEndpoint` = mediator
-  DID + `routingKeys`) — required for many external agents.
+  DID + `routingKeys`) — required for many external agents. *Crypto done:* `cipher`
+  `wrapForward` (anoncrypt a `routing/2.0/forward` JWM whose `body.next` is the recipient and
+  `attachments[0].data.json` is the inner envelope, to the mediator's key) and `parseForward`,
+  both interop-validated against `didcomm-node` (`wrap_in_forward`/Forward parsing) in each
+  direction. *Remaining integration:* read `routingKeys` from the recipient's DIDCommMessaging
+  service (DID-doc `serviceEndpoint` object form + `publishDidComm`), have `sendDidComm` wrap
+  when present, and an Archon mediator that unpacks a Forward and relays to `next`.
 
 *Exit:* a self-custody recipient receives and unpacks a message delivered to its published
 endpoint, including from a non-Archon agent.
@@ -276,10 +282,13 @@ live two-identity HTTP exchange.
 The `didcomm` service is Dockerized and wired into compose (opt-in `didcomm` profile), with
 in-memory and redis store backends.
 
-**Next:** **3c** (Forward/routing to mediators) and the remaining protocol phases (4 core
-protocols, 5 credential protocols, 7 parity). Plus the noted cross-method follow-ons (EdDSA
-verify, P-256 key agreement, a Universal Resolver driver for `did:cid`) and an optional
-mongo store backend.
+The **3c Forward/routing crypto** (`wrapForward`/`parseForward`) is built and
+interop-validated; what remains for 3c is the integration (DID-doc `routingKeys`,
+`sendDidComm` wrapping, an Archon mediator).
+
+**Next:** finish 3c integration, then the protocol phases (4 core protocols, 5 credential
+protocols, 7 parity). Plus the noted cross-method follow-ons (EdDSA verify, P-256 key
+agreement, a Universal Resolver driver for `did:cid`) and an optional mongo store backend.
 
 ## References
 

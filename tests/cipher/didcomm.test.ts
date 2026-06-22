@@ -11,6 +11,9 @@ import {
     getEnvelopeInfo,
     didKeyToX25519,
     normalizeX25519PublicKey,
+    wrapForward,
+    parseForward,
+    DIDCOMM_FORWARD_TYPE,
 } from '../../packages/cipher/src/didcomm.ts';
 
 const cipher = new CipherNode();
@@ -203,5 +206,31 @@ describe('did:key resolution (cross-method)', () => {
 
     it('rejects non-X25519 JWK material', () => {
         expect(() => normalizeX25519PublicKey({ publicKeyJwk: { kty: 'EC', crv: 'secp256k1', x: 'a', y: 'b' } })).toThrow();
+    });
+});
+
+describe('Forward (routing/2.0)', () => {
+    const med = cipher.generateX25519Jwk(new Uint8Array(32).fill(0x6d));
+    const medKid = 'did:cid:mediator#key-agreement-1';
+
+    it('wraps and parses a Forward, preserving the inner envelope for the recipient', () => {
+        const inner = packEncrypted(enc.encode('inner-secret'), recipients, null, 'XC20P');
+        const outer = wrapForward(inner, bKid, { kid: medKid, publicJwk: med.publicJwk });
+
+        // the mediator (only) can decrypt the outer Forward
+        const { plaintext } = unpackEncrypted(outer, { kid: medKid, privateJwk: med.privateJwk });
+        const forward = JSON.parse(dec.decode(plaintext));
+        expect(forward.type).toBe(DIDCOMM_FORWARD_TYPE);
+
+        const { next, forwardedMessage } = parseForward(dec.decode(plaintext));
+        expect(next).toBe(bKid);
+
+        // the inner envelope still decrypts for Bob (the mediator never read it)
+        const { plaintext: innerPt } = unpackEncrypted(forwardedMessage, bobPriv);
+        expect(dec.decode(innerPt)).toBe('inner-secret');
+    });
+
+    it('rejects a non-Forward plaintext', () => {
+        expect(() => parseForward(JSON.stringify({ type: 'x/other', body: {} }))).toThrow(/Forward/);
     });
 });

@@ -425,6 +425,40 @@ export function getEnvelopeInfo(packed: string): DidCommEnvelopeInfo {
 }
 
 // ---------------------------------------------------------------------------
+// Routing — DIDComm Forward protocol (routing/2.0)
+// ---------------------------------------------------------------------------
+
+export const DIDCOMM_FORWARD_TYPE = 'https://didcomm.org/routing/2.0/forward';
+
+// Wrap an already-packed envelope in a Forward message anoncrypt'd to a
+// mediator's key, so the mediator can relay it to `next` without reading it.
+// (Single hop; nest calls for multiple routing keys.)
+export function wrapForward(forwardedMessage: string, next: string, routingKey: DidCommRecipientKey): string {
+    const forward = {
+        id: b64uEncode(randomBytes(16)),
+        typ: 'application/didcomm-plain+json',
+        type: DIDCOMM_FORWARD_TYPE,
+        body: { next },
+        attachments: [{ data: { json: JSON.parse(forwardedMessage) } }],
+    };
+    return packEncrypted(ENCODER.encode(JSON.stringify(forward)), [routingKey], null, 'XC20P');
+}
+
+// Parse a decrypted Forward plaintext into the next hop and the envelope to relay.
+export function parseForward(plaintext: string | Record<string, any>): { next: string; forwardedMessage: string } {
+    const msg = typeof plaintext === 'string' ? JSON.parse(plaintext) : plaintext;
+    if (!msg || msg.type !== DIDCOMM_FORWARD_TYPE) {
+        throw new Error('not a DIDComm Forward message');
+    }
+    const next = msg.body?.next;
+    const json = msg.attachments?.[0]?.data?.json;
+    if (!next || json === undefined) {
+        throw new Error('malformed Forward message');
+    }
+    return { next, forwardedMessage: JSON.stringify(json) };
+}
+
+// ---------------------------------------------------------------------------
 // Cross-method key material: did:key resolution + multibase normalization
 // ---------------------------------------------------------------------------
 

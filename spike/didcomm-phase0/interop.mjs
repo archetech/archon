@@ -91,6 +91,32 @@ const check = (name, cond) => results.push([name, !!cond]);
     check('ours anoncrypt -> lib (did:key recipient)', m.as_value().body.n === 42);
 }
 
+// routing: Forward protocol (3c), both directions
+{
+    const med = cph.generateX25519Jwk(new Uint8Array(32).fill(0x6d));
+    const MED = 'did:cid:mediator', mKid = `${MED}#ka`;
+    const medDoc = { id: MED, keyAgreement: [mKid], authentication: [], verificationMethod: [{ id: mKid, type: 'JsonWebKey2020', controller: MED, publicKeyJwk: med.publicJwk }], service: [] };
+    const fwdResolver = { async resolve(d) { return d === MED ? medDoc : (DOCS[d] ?? null); } };
+    const medSecrets = secrets({ [mKid]: { id: mKid, type: 'JsonWebKey2020', privateKeyJwk: med.privateJwk } });
+    const inner = C.packEncrypted(enc.encode(JSON.stringify(jwm(false))), recipients, null, 'XC20P');
+
+    // ours wrap -> lib reads the Forward
+    {
+        const outer = C.wrapForward(inner, bKid, { kid: mKid, publicJwk: med.publicJwk });
+        const [m] = await Message.unpack(outer, fwdResolver, medSecrets, {});
+        const v = m.as_value();
+        check('ours wrapForward -> lib reads (next + inner)', v.type === C.DIDCOMM_FORWARD_TYPE && v.body.next === bKid);
+    }
+    // lib wrap_in_forward -> ours parses, inner still decrypts for Bob
+    {
+        const outer = await Message.wrap_in_forward(inner, {}, bKid, [mKid], 'Xc20pEcdhEsA256kw', fwdResolver);
+        const { plaintext } = C.unpackEncrypted(outer, { kid: mKid, privateJwk: med.privateJwk });
+        const { next, forwardedMessage } = C.parseForward(dec.decode(plaintext));
+        const { plaintext: innerPt } = C.unpackEncrypted(forwardedMessage, { kid: bKid, privateJwk: bobKA.privateJwk });
+        check('lib wrap_in_forward -> ours parses + inner decrypts', next === bKid && JSON.parse(dec.decode(innerPt)).body.n === 42);
+    }
+}
+
 let ok = true;
 for (const [n, p] of results) { console.log((p ? 'PASS' : 'FAIL').padEnd(5), n); if (!p) ok = false; }
 console.log(ok ? '\nALL INTEROP PASS' : '\nINTEROP FAILURES');
