@@ -241,9 +241,13 @@ already spec-standard, so only resolution and transport are method-specific.
 *Exit:* a self-custody recipient receives and unpacks a message delivered to its published
 endpoint, including from a non-Archon agent.
 
-**Phase 4 — Core protocols.** Trust Ping, Discover Features, Basic Message, Out-of-Band
-invitation (maps cleanly onto the existing `createChallenge`/`createResponse`). *Exit:*
-interop test against a reference agent (Credo-TS or didcomm.org tooling).
+**Phase 4 — Core protocols. ✅ done.** Trust Ping, Discover Features, Basic Message, and
+Out-of-Band invitation message builders (`packages/keymaster/src/didcomm-protocols.ts`,
+re-exported from `@didcid/keymaster`), with the exact `didcomm.org` type URIs and body
+shapes (verified against the spec) + `_oob` URL encode/decode. They compose with
+`sendDidComm`/`receiveDidComm`. *Validated:* builder-shape unit tests + an e2e where Alice
+sends a Basic Message and a Trust Ping over the live relay and Bob returns a thid-correlated
+ping-response.
 
 **Phase 5 — Credential protocols.** Map Issue-Credential 3.0 / Present-Proof onto
 Archon's existing VC issue/verify. *Exit:* issue + present a VC over DIDComm.
@@ -281,9 +285,9 @@ against the `didcomm-node` reference library.
 | 3a — Cross-method resolution | ✅ | `did:key` (Ed25519/X25519) + universal-resolver fallback; multibase key normalization |
 | 3b — Transport (mailbox) | ✅ | `services/didcomm/server` relay (signed-challenge auth; in-memory/redis; Docker + `didcomm` compose profile, port 4236); keymaster `sendDidComm`/`receiveDidComm`; Drawbridge `/didcomm` reverse proxy |
 | 3c — Forward/routing | ✅ | `wrapForward`/`parseForward`; DID-doc `routingKeys`; `sendDidComm` mediator wrapping; `mediateDidComm` (Archon-as-mediator) |
+| 4 — Application protocols | ✅ | message builders (`didcomm-protocols.ts`) for Trust Ping, Basic Message, Discover Features, Out-of-Band (+ `_oob` URL encode/decode) — compose with `sendDidComm`/`receiveDidComm`; e2e: basic message + trust-ping request/response (thid-correlated) over the relay |
 
-**Remaining (not started):** the protocol phases — **4** (Trust Ping / Basic Message /
-Discover Features / Out-of-Band), **5** (Issue-Credential / Present-Proof over DIDComm),
+**Remaining (not started):** **5** (Issue-Credential / Present-Proof over DIDComm) and
 **7** (Python SDK + CLI parity). Plus follow-ons: EdDSA signature verify (foreign Ed25519
 signers), P-256 key agreement, a Universal Resolver driver so others can resolve `did:cid`,
 and an optional mongo mailbox backend.

@@ -7,6 +7,14 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import HeliaClient from '@didcid/ipfs/helia';
 import { createApp } from '../../services/didcomm/server/src/didcomm-api.ts';
 import { MemoryMailboxStore } from '../../services/didcomm/server/src/store.ts';
+import {
+    basicMessage,
+    trustPing,
+    trustPingResponse,
+    BASIC_MESSAGE_TYPE,
+    TRUST_PING_TYPE,
+    TRUST_PING_RESPONSE_TYPE,
+} from '../../packages/keymaster/src/didcomm-protocols.ts';
 
 // End-to-end: two Archon identities exchange a DIDComm message through the live
 // mailbox relay (real express routes + signed-challenge auth + keymaster
@@ -110,6 +118,33 @@ describe('DIDComm relay end-to-end', () => {
         expect(received[0].message.body).toEqual(body);
         expect(received[0].message.from).toBe(aliceDid);
         expect(received[0].metadata.authenticated).toBe(true);
+    });
+
+    it('exchanges a Basic Message and a Trust Ping (with response) over the relay', async () => {
+        const aliceDid = await keymaster.createId('Alice');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm(endpoint, 'Alice');
+        await keymaster.publishDidComm(endpoint, 'Bob');
+
+        // Alice -> Bob: a basic message and a trust ping
+        await keymaster.sendDidComm(basicMessage('gm bob'), bobDid, { name: 'Alice' });
+        await keymaster.sendDidComm(trustPing(), bobDid, { name: 'Alice' });
+
+        const bobInbox = await keymaster.receiveDidComm({ name: 'Bob' });
+        expect(bobInbox).toHaveLength(2);
+        const message = bobInbox.find(m => m.message.type === BASIC_MESSAGE_TYPE)!;
+        expect(message.message.body.content).toBe('gm bob');
+        const ping = bobInbox.find(m => m.message.type === TRUST_PING_TYPE)!;
+        expect(ping.message.body.response_requested).toBe(true);
+        expect(ping.message.from).toBe(aliceDid);
+
+        // Bob responds to the ping, correlated by thid
+        await keymaster.sendDidComm(trustPingResponse(ping.message.id), aliceDid, { name: 'Bob' });
+
+        const aliceInbox = await keymaster.receiveDidComm({ name: 'Alice' });
+        expect(aliceInbox).toHaveLength(1);
+        expect(aliceInbox[0].message.type).toBe(TRUST_PING_RESPONSE_TYPE);
+        expect(aliceInbox[0].message.thid).toBe(ping.message.id);
     });
 
     it('rejects a forged fetch (wrong key for the DID)', async () => {
