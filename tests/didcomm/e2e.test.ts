@@ -20,6 +20,14 @@ import {
     TRUST_PING_RESPONSE_TYPE,
     ISSUE_CREDENTIAL_TYPE,
     PRESENT_PROOF_REQUEST_TYPE,
+    mediateRequest,
+    mediateGrant,
+    keylistUpdate,
+    keylistUpdateResponse,
+    MEDIATE_REQUEST_TYPE,
+    MEDIATE_GRANT_TYPE,
+    KEYLIST_UPDATE_TYPE,
+    KEYLIST_UPDATE_RESPONSE_TYPE,
 } from '../../packages/keymaster/src/didcomm-protocols.ts';
 import { mockSchema } from '../keymaster/helper.ts';
 
@@ -196,6 +204,54 @@ describe('DIDComm relay end-to-end', () => {
         // Bob's holder signature and Alice's issuer signature both verify.
         expect(await keymaster.verifyProof(receivedVp)).toBe(true);
         expect(await keymaster.verifyProof(receivedVp.verifiableCredential[0])).toBe(true);
+    });
+
+    it('enrolls with a mediator via Coordinate-Mediation, then routes through it', async () => {
+        const aliceDid = await keymaster.createId('Alice');
+        const mediatorDid = await keymaster.createId('Mediator');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm(endpoint, 'Alice');
+        await keymaster.publishDidComm(endpoint, 'Mediator');
+        // Bob starts with a plain endpoint (no mediator yet).
+        await keymaster.publishDidComm(endpoint, 'Bob');
+
+        // 1. Bob requests mediation from the mediator.
+        await keymaster.sendDidComm(mediateRequest(), mediatorDid, { name: 'Bob' });
+
+        // 2. Mediator grants, returning its routing_did.
+        const reqInbox = await keymaster.receiveDidComm({ name: 'Mediator' });
+        expect(reqInbox[0].message.type).toBe(MEDIATE_REQUEST_TYPE);
+        await keymaster.sendDidComm(mediateGrant(mediatorDid, reqInbox[0].message.id), bobDid, { name: 'Mediator' });
+
+        // 3. Bob receives the grant and registers his recipient DID (keylist-update).
+        const grantInbox = await keymaster.receiveDidComm({ name: 'Bob' });
+        expect(grantInbox[0].message.type).toBe(MEDIATE_GRANT_TYPE);
+        const routingDid = grantInbox[0].message.body.routing_did;
+        expect(routingDid).toBe(mediatorDid);
+        await keymaster.sendDidComm(keylistUpdate([bobDid], 'add'), mediatorDid, { name: 'Bob' });
+
+        // 4. Mediator acknowledges the keylist update.
+        const kuInbox = await keymaster.receiveDidComm({ name: 'Mediator' });
+        expect(kuInbox[0].message.type).toBe(KEYLIST_UPDATE_TYPE);
+        await keymaster.sendDidComm(
+            keylistUpdateResponse([{ recipient_did: bobDid, action: 'add', result: 'success' }], kuInbox[0].message.id),
+            bobDid, { name: 'Mediator' },
+        );
+        const kurInbox = await keymaster.receiveDidComm({ name: 'Bob' });
+        expect(kurInbox[0].message.type).toBe(KEYLIST_UPDATE_RESPONSE_TYPE);
+        expect(kurInbox[0].message.body.updated[0].result).toBe('success');
+
+        // 5. Bob re-publishes advertising the granted routing_did (now behind the mediator).
+        await keymaster.publishDidComm(endpoint, 'Bob', [routingDid]);
+
+        // 6. Alice sends to Bob -> wrapped in a Forward to the mediator; mediator relays.
+        await keymaster.sendDidComm(basicMessage('routed via coordinate-mediation'), bobDid, { name: 'Alice' });
+        expect((await keymaster.mediateDidComm({ name: 'Mediator' })).relayed).toBe(1);
+
+        const received = await keymaster.receiveDidComm({ name: 'Bob' });
+        expect(received).toHaveLength(1);
+        expect(received[0].message.body.content).toBe('routed via coordinate-mediation');
+        expect(aliceDid).toMatch(/^did:/);
     });
 
     it('rejects a forged fetch (wrong key for the DID)', async () => {

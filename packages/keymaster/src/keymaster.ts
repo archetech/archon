@@ -2574,6 +2574,17 @@ export default class Keymaster implements KeymasterInterface {
         }
     }
 
+    // A routing key (from a recipient's DIDCommMessaging service or a
+    // coordinate-mediation grant) may be a full key id (`did#frag`) or a bare
+    // DID (the `routing_did` grant form, whose key-agreement key is used).
+    private async resolveRoutingKey(routingKey: string): Promise<{ kid: string; publicJwk: OkpJwkPublic }> {
+        if (routingKey.includes('#')) {
+            return { kid: routingKey, publicJwk: await this.resolveX25519Key(routingKey) };
+        }
+        const doc = await this.resolveDidForDidComm(routingKey);
+        return this.resolveKeyAgreement(doc);
+    }
+
     // Pack a message and deliver it to each recipient's DIDCommMessaging mailbox
     // endpoint (store-and-forward). Returns the stored message ids per delivery.
     async sendDidComm(
@@ -2597,9 +2608,8 @@ export default class Keymaster implements KeymasterInterface {
             if (endpoint.routingKeys.length > 0) {
                 const recipientDoc = await this.resolveDidForDidComm(recipientDid);
                 const recipientKa = this.resolveKeyAgreement(recipientDoc);
-                const routingKid = endpoint.routingKeys[0];
-                const mediatorKey = await this.resolveX25519Key(routingKid);
-                envelope = wrapForward(packed, recipientKa.kid, { kid: routingKid, publicJwk: mediatorKey });
+                const routing = await this.resolveRoutingKey(endpoint.routingKeys[0]);
+                envelope = wrapForward(packed, recipientKa.kid, { kid: routing.kid, publicJwk: routing.publicJwk });
             }
 
             const response = await fetch(`${endpoint.uri.replace(/\/+$/, '')}/api/v1/messages`, {

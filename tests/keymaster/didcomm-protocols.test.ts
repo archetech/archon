@@ -22,6 +22,20 @@ import {
     PRESENT_PROOF_PRESENTATION_TYPE,
     VC_ATTACHMENT_FORMAT,
     VP_ATTACHMENT_FORMAT,
+    mediateRequest,
+    mediateGrant,
+    mediateDeny,
+    keylistUpdate,
+    keylistUpdateResponse,
+    keylistQuery,
+    keylist,
+    MEDIATE_REQUEST_TYPE,
+    MEDIATE_GRANT_TYPE,
+    MEDIATE_DENY_TYPE,
+    KEYLIST_UPDATE_TYPE,
+    KEYLIST_UPDATE_RESPONSE_TYPE,
+    KEYLIST_QUERY_TYPE,
+    KEYLIST_TYPE,
 } from '../../packages/keymaster/src/didcomm-protocols.ts';
 
 describe('DIDComm protocol builders', () => {
@@ -92,5 +106,34 @@ describe('credential-exchange builders (issue-credential / present-proof 3.0)', 
         expect(msg.thid).toBe('req-1');
         expect((msg as any).attachments[0].format).toBe(VP_ATTACHMENT_FORMAT);
         expect(attachedJson(msg as any)).toEqual(vp);
+    });
+});
+
+describe('coordinate-mediation 2.0 builders', () => {
+    it('mediate request / grant (routing_did) / deny', () => {
+        expect(mediateRequest().type).toBe(MEDIATE_REQUEST_TYPE);
+        const grant = mediateGrant('did:cid:mediator', 'req-1');
+        expect(grant.type).toBe(MEDIATE_GRANT_TYPE);
+        expect(grant.thid).toBe('req-1');
+        expect((grant.body as any).routing_did).toBe('did:cid:mediator');
+        expect(mediateDeny('req-1').type).toBe(MEDIATE_DENY_TYPE);
+    });
+
+    it('keylist-update and response', () => {
+        const update = keylistUpdate(['did:cid:bob'], 'add');
+        expect(update.type).toBe(KEYLIST_UPDATE_TYPE);
+        expect((update.body as any).updates[0]).toEqual({ recipient_did: 'did:cid:bob', action: 'add' });
+
+        const response = keylistUpdateResponse([{ recipient_did: 'did:cid:bob', action: 'add', result: 'success' }], 'u-1');
+        expect(response.type).toBe(KEYLIST_UPDATE_RESPONSE_TYPE);
+        expect(response.thid).toBe('u-1');
+        expect((response.body as any).updated[0].result).toBe('success');
+    });
+
+    it('keylist-query and keylist', () => {
+        expect(keylistQuery().type).toBe(KEYLIST_QUERY_TYPE);
+        const list = keylist(['did:cid:bob']);
+        expect(list.type).toBe(KEYLIST_TYPE);
+        expect((list.body as any).keys[0]).toEqual({ recipient_did: 'did:cid:bob' });
     });
 });

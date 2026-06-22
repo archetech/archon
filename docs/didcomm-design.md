@@ -259,8 +259,15 @@ presents a VP wrapping the VC, and Carol verifies both the holder and issuer sig
 `EcdsaSecp256k1Signature2019`, so interop with Aries/AnonCreds agents needs a standard
 attachment format (follow-on).
 
-**Phase 6 — Routing/mediation (optional).** Forward messages + Coordinate-Mediation so
-offline/NAT'd agents work; natural fit with Drawbridge/Tor.
+**Phase 6 — Routing/mediation. ✅ done.** Forward messages landed early in Phase 3c
+(`wrapForward`/`parseForward`, `sendDidComm` wrapping, `mediateDidComm`). Coordinate-Mediation
+2.0 adds the enrollment handshake: builders for `mediate-request`/`mediate-grant`
+(`routing_did`)/`mediate-deny`/`keylist-update`(+response)/`keylist-query`/`keylist`, plus
+`routing_did` (bare-DID) routing support in `sendDidComm`. *Validated:* an e2e where Bob
+requests mediation, the mediator grants its `routing_did` and acknowledges a keylist-update,
+Bob re-publishes advertising it, and Alice then reaches Bob through the mediator. *Note:* the
+mediator currently relays any Forward it can unpack; gating relay on the registered keylist
+is a refinement.
 
 **Phase 7 — Parity & polish.** Python SDK parity ([python/](../python/)), CLI commands,
 docs.
@@ -294,6 +301,7 @@ against the `didcomm-node` reference library.
 | 3c — Forward/routing | ✅ | `wrapForward`/`parseForward`; DID-doc `routingKeys`; `sendDidComm` mediator wrapping; `mediateDidComm` (Archon-as-mediator) |
 | 4 — Application protocols | ✅ | message builders (`didcomm-protocols.ts`) for Trust Ping, Basic Message, Discover Features, Out-of-Band (+ `_oob` URL encode/decode) — compose with `sendDidComm`/`receiveDidComm`; e2e: basic message + trust-ping request/response (thid-correlated) over the relay |
 | 5 — Credential exchange | ✅ | Issue-Credential 3.0 + Present-Proof 3.0 builders carrying an Archon VC/VP as a DIDComm attachment; maps onto `bindCredential`/`addProof`/`verifyProof`; e2e: Alice issues a VC to Bob over DIDComm (Bob verifies the issuer proof), Carol requests + Bob presents a VP, Carol verifies holder + issuer signatures |
+| 6 — Routing/mediation | ✅ | Forward messages landed in 3c (`wrapForward`/`mediateDidComm`); Coordinate-Mediation 2.0 builders (`mediate-request`/`grant`/`keylist-update`/…) + `routing_did` support in `sendDidComm`; e2e: Bob enrolls with a mediator (request→grant→keylist) and Alice then routes to him through it |
 
 **Remaining (not started):** **7** (Python SDK + CLI parity — deferred). Plus follow-ons:
 EdDSA signature verify (foreign Ed25519 signers), P-256 key agreement, a Universal Resolver

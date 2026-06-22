@@ -128,3 +128,47 @@ export function presentationMessage(presentation: object, options: { thid?: stri
 export function attachedJson(message: { attachments?: Array<{ data?: { json?: unknown } }> }, index = 0): any {
     return message?.attachments?.[index]?.data?.json;
 }
+
+// --- Coordinate Mediation 2.0 ----------------------------------------------
+// The handshake by which a recipient enrolls with a mediator: request -> grant
+// (the mediator returns its routing_did), then keylist-update registers which
+// recipient DIDs the mediator should accept Forwards for.
+
+export const MEDIATE_REQUEST_TYPE = 'https://didcomm.org/coordinate-mediation/2.0/mediate-request';
+export const MEDIATE_GRANT_TYPE = 'https://didcomm.org/coordinate-mediation/2.0/mediate-grant';
+export const MEDIATE_DENY_TYPE = 'https://didcomm.org/coordinate-mediation/2.0/mediate-deny';
+export const KEYLIST_UPDATE_TYPE = 'https://didcomm.org/coordinate-mediation/2.0/keylist-update';
+export const KEYLIST_UPDATE_RESPONSE_TYPE = 'https://didcomm.org/coordinate-mediation/2.0/keylist-update-response';
+export const KEYLIST_QUERY_TYPE = 'https://didcomm.org/coordinate-mediation/2.0/keylist-query';
+export const KEYLIST_TYPE = 'https://didcomm.org/coordinate-mediation/2.0/keylist';
+
+export type KeylistAction = 'add' | 'remove';
+export type KeylistResult = 'client_error' | 'server_error' | 'no_change' | 'success';
+
+export function mediateRequest(): DidCommPlaintext {
+    return { type: MEDIATE_REQUEST_TYPE, body: {} };
+}
+
+export function mediateGrant(routingDid: string, thid?: string): DidCommPlaintext {
+    return { type: MEDIATE_GRANT_TYPE, ...(thid ? { thid } : {}), body: { routing_did: routingDid } };
+}
+
+export function mediateDeny(thid?: string): DidCommPlaintext {
+    return { type: MEDIATE_DENY_TYPE, ...(thid ? { thid } : {}), body: {} };
+}
+
+export function keylistUpdate(recipientDids: string[], action: KeylistAction = 'add'): DidCommPlaintext {
+    return { type: KEYLIST_UPDATE_TYPE, body: { updates: recipientDids.map(recipient_did => ({ recipient_did, action })) } };
+}
+
+export function keylistUpdateResponse(updated: Array<{ recipient_did: string; action: KeylistAction; result: KeylistResult }>, thid?: string): DidCommPlaintext {
+    return { type: KEYLIST_UPDATE_RESPONSE_TYPE, ...(thid ? { thid } : {}), body: { updated } };
+}
+
+export function keylistQuery(): DidCommPlaintext {
+    return { type: KEYLIST_QUERY_TYPE, body: {} };
+}
+
+export function keylist(recipientDids: string[], thid?: string): DidCommPlaintext {
+    return { type: KEYLIST_TYPE, ...(thid ? { thid } : {}), body: { keys: recipientDids.map(recipient_did => ({ recipient_did })) } };
+}
