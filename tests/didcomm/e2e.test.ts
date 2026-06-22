@@ -81,6 +81,37 @@ describe('DIDComm relay end-to-end', () => {
         expect(received[0].metadata.signer).toBe(`${aliceDid}#key-1`);
     });
 
+    it('delivers Alice -> mediator -> Bob via the Forward protocol', async () => {
+        const aliceDid = await keymaster.createId('Alice');
+        await keymaster.createId('Mediator');
+        const bobDid = await keymaster.createId('Bob');
+
+        await keymaster.publishDidComm(endpoint, 'Alice');
+        await keymaster.publishDidComm(endpoint, 'Mediator');
+        // Bob is reachable via the mediator: advertise its routing key.
+        const medDoc = await keymaster.resolveDID('Mediator');
+        const medKid = medDoc.didDocument!.keyAgreement![0];
+        await keymaster.publishDidComm(endpoint, 'Bob', [medKid]);
+
+        const body = { text: 'routed hello', n: 8 };
+        const ids = await keymaster.sendDidComm({ type: 'https://x/1/msg', body }, bobDid, { name: 'Alice' });
+        expect(ids.length).toBe(1);
+
+        // The Forward is queued under the mediator, not Bob — Bob's box is empty.
+        expect(await keymaster.receiveDidComm({ name: 'Bob' })).toHaveLength(0);
+
+        // Mediator relays the inner envelope to Bob.
+        const relay = await keymaster.mediateDidComm({ name: 'Mediator' });
+        expect(relay.relayed).toBe(1);
+
+        // Now Bob receives the original message.
+        const received = await keymaster.receiveDidComm({ name: 'Bob' });
+        expect(received).toHaveLength(1);
+        expect(received[0].message.body).toEqual(body);
+        expect(received[0].message.from).toBe(aliceDid);
+        expect(received[0].metadata.authenticated).toBe(true);
+    });
+
     it('rejects a forged fetch (wrong key for the DID)', async () => {
         await keymaster.createId('Alice');
         await keymaster.publishDidComm(endpoint, 'Alice');

@@ -274,7 +274,9 @@ export interface DidCidDocument {
         service?: Array<{
             id: string;
             type: string;
-            serviceEndpoint: string;
+            // A plain URI string, or the DIDComm object form carrying routing keys
+            // (DIDCommMessaging services behind a mediator).
+            serviceEndpoint: string | { uri: string; accept?: string[]; routingKeys?: string[] };
         }>,
     },
     didDocumentMetadata?: DocumentMetadata,

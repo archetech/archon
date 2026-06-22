@@ -481,7 +481,10 @@ async function main(): Promise<void> {
                     return;
                 }
 
-                const url = new URL(lightningService.serviceEndpoint);
+                const lightningEndpoint = typeof lightningService.serviceEndpoint === 'string'
+                    ? lightningService.serviceEndpoint
+                    : lightningService.serviceEndpoint.uri;
+                const url = new URL(lightningEndpoint);
                 const isOnion = url.hostname.endsWith('.onion');
                 if (isOnion && url.protocol !== 'http:') {
                     res.status(400).json({ error: 'Invalid service endpoint: .onion must use http' });
@@ -497,7 +500,7 @@ async function main(): Promise<void> {
                 }
 
                 const publicHost = await getPublicHost();
-                let invoiceUrl = new URL(lightningService.serviceEndpoint);
+                let invoiceUrl = new URL(lightningEndpoint);
                 invoiceUrl.searchParams.set('amount', String(amount));
                 if (memo) {
                     invoiceUrl.searchParams.set('memo', memo);

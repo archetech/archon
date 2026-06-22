@@ -89,6 +89,8 @@ import {
     getEnvelopeInfo,
     didKeyToX25519,
     normalizeX25519PublicKey,
+    wrapForward,
+    parseForward,
     type PackOptions,
     type DidCommEnc,
 } from '@didcid/cipher/didcomm';
@@ -2302,7 +2304,7 @@ export default class Keymaster implements KeymasterInterface {
         return this.cipher.generateX25519Jwk(didkey.privateKey!);
     }
 
-    async publishDidComm(endpoint?: string, name?: string): Promise<boolean> {
+    async publishDidComm(endpoint?: string, name?: string, routingKeys?: string[]): Promise<boolean> {
         const id = await this.fetchIdInfo(name);
         const did = id.did;
         const keypair = await this.fetchDidCommKeyPair(name);
@@ -2324,10 +2326,15 @@ export default class Keymaster implements KeymasterInterface {
         const services = (didDocument.service || []).filter(s => s.id !== serviceId);
 
         if (endpoint) {
+            // When routing keys are present, advertise the DIDComm object form so
+            // senders wrap in a Forward to the mediator.
+            const serviceEndpoint = routingKeys && routingKeys.length > 0
+                ? { uri: endpoint, accept: ['didcomm/v2'], routingKeys }
+                : endpoint;
             services.push({
                 id: serviceId,
                 type: 'DIDCommMessaging',
-                serviceEndpoint: endpoint,
+                serviceEndpoint,
             });
         }
 
@@ -2536,7 +2543,7 @@ export default class Keymaster implements KeymasterInterface {
         return { message: inner, metadata };
     }
 
-    private async resolveDidCommEndpoint(did: string): Promise<string | undefined> {
+    private async resolveDidCommEndpoint(did: string): Promise<{ uri: string; routingKeys: string[] } | undefined> {
         const doc = await this.resolveDidForDidComm(did);
         const service = (doc.didDocument?.service || []).find(s => s.type === 'DIDCommMessaging');
         if (!service) {
@@ -2544,13 +2551,27 @@ export default class Keymaster implements KeymasterInterface {
         }
         const endpoint = service.serviceEndpoint as unknown;
         if (typeof endpoint === 'string') {
-            return endpoint;
+            return { uri: endpoint, routingKeys: [] };
         }
-        // DIDComm spec also allows an object endpoint { uri, accept, routingKeys }
+        // DIDComm object form: { uri, accept, routingKeys }
         if (endpoint && typeof (endpoint as any).uri === 'string') {
-            return (endpoint as any).uri;
+            return { uri: (endpoint as any).uri, routingKeys: (endpoint as any).routingKeys || [] };
         }
         return undefined;
+    }
+
+    private async resolveX25519Key(kid: string): Promise<OkpJwkPublic> {
+        const doc = await this.resolveDidForDidComm(kid.split('#')[0]);
+        const vm = this.findVerificationMethod(doc, kid);
+        if (!vm) {
+            throw new KeymasterError(`key ${kid} not found`);
+        }
+        try {
+            return normalizeX25519PublicKey(vm);
+        }
+        catch {
+            throw new KeymasterError(`key ${kid} is not an X25519 key`);
+        }
     }
 
     // Pack a message and deliver it to each recipient's DIDCommMessaging mailbox
@@ -2569,10 +2590,22 @@ export default class Keymaster implements KeymasterInterface {
             if (!endpoint) {
                 throw new KeymasterError(`recipient ${recipientDid} has no DIDCommMessaging endpoint`);
             }
-            const response = await fetch(`${endpoint.replace(/\/+$/, '')}/api/v1/messages`, {
+
+            let envelope = packed;
+            // If the recipient is behind a mediator, wrap the packed message in a
+            // Forward addressed to the mediator's routing key.
+            if (endpoint.routingKeys.length > 0) {
+                const recipientDoc = await this.resolveDidForDidComm(recipientDid);
+                const recipientKa = this.resolveKeyAgreement(recipientDoc);
+                const routingKid = endpoint.routingKeys[0];
+                const mediatorKey = await this.resolveX25519Key(routingKid);
+                envelope = wrapForward(packed, recipientKa.kid, { kid: routingKid, publicJwk: mediatorKey });
+            }
+
+            const response = await fetch(`${endpoint.uri.replace(/\/+$/, '')}/api/v1/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/didcomm-encrypted+json' },
-                body: packed,
+                body: envelope,
             });
             if (!response.ok) {
                 throw new KeymasterError(`DIDComm delivery to ${recipientDid} failed: ${response.status}`);
@@ -2590,11 +2623,11 @@ export default class Keymaster implements KeymasterInterface {
     ): Promise<DidCommUnpackResult[]> {
         const { name } = options;
         const id = await this.fetchIdInfo(name);
-        const endpoint = options.endpoint || await this.resolveDidCommEndpoint(id.did);
-        if (!endpoint) {
+        const resolved = options.endpoint ? { uri: options.endpoint } : await this.resolveDidCommEndpoint(id.did);
+        if (!resolved) {
             throw new KeymasterError('identity has no DIDCommMessaging endpoint; publishDidComm with an endpoint first');
         }
-        const base = endpoint.replace(/\/+$/, '');
+        const base = resolved.uri.replace(/\/+$/, '');
         const keypair = await this.fetchKeyPair(name);
         if (!keypair) {
             throw new KeymasterError('unable to resolve signing key');
@@ -2640,6 +2673,79 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         return results;
+    }
+
+    // Mediator role: fetch Forward messages addressed to this identity, unpack
+    // each (anoncrypt to our key agreement key), and relay the inner envelope
+    // back to the relay so it is stored for the final recipient (`next`).
+    async mediateDidComm(
+        options: { name?: string; endpoint?: string } = {}
+    ): Promise<{ relayed: number; skipped: number }> {
+        const { name } = options;
+        const id = await this.fetchIdInfo(name);
+        const resolved = options.endpoint ? { uri: options.endpoint } : await this.resolveDidCommEndpoint(id.did);
+        if (!resolved) {
+            throw new KeymasterError('mediator identity has no DIDCommMessaging endpoint');
+        }
+        const base = resolved.uri.replace(/\/+$/, '');
+        const keypair = await this.fetchKeyPair(name);
+        if (!keypair) {
+            throw new KeymasterError('unable to resolve signing key');
+        }
+        const ka = await this.fetchDidCommKeyPair(name);
+        const ownDoc = await this.resolveDID(id.did);
+        const ownKa = this.resolveKeyAgreement(ownDoc);
+
+        const sign = async (): Promise<{ challenge: string; signature: string }> => {
+            const challengeResponse = await fetch(`${base}/api/v1/challenge`);
+            const { challenge } = await challengeResponse.json();
+            return { challenge, signature: this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk) };
+        };
+
+        const fetchResponse = await fetch(`${base}/api/v1/messages/fetch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ did: id.did, ...(await sign()) }),
+        });
+        if (!fetchResponse.ok) {
+            throw new KeymasterError(`mediator fetch failed: ${fetchResponse.status}`);
+        }
+        const { messages } = await fetchResponse.json();
+
+        let relayed = 0;
+        let skipped = 0;
+        const handled: string[] = [];
+        for (const entry of messages || []) {
+            try {
+                const { plaintext } = unpackEncrypted(entry.message, { kid: ownKa.kid, privateJwk: ka.privateJwk });
+                const { forwardedMessage } = parseForward(new TextDecoder().decode(plaintext));
+                const post = await fetch(`${base}/api/v1/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/didcomm-encrypted+json' },
+                    body: forwardedMessage,
+                });
+                if (post.ok) {
+                    relayed += 1;
+                    handled.push(entry.id);
+                }
+                else {
+                    skipped += 1;
+                }
+            }
+            catch {
+                skipped += 1;
+            }
+        }
+
+        if (handled.length > 0) {
+            await fetch(`${base}/api/v1/messages/remove`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ did: id.did, ...(await sign()), ids: handled }),
+            });
+        }
+
+        return { relayed, skipped };
     }
 
     async addAlias(

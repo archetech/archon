@@ -2132,8 +2132,8 @@ v1router.delete('/addresses/publish', async (req, res) => {
  */
 v1router.post('/didcomm/publish', async (req, res) => {
     try {
-        const { endpoint, name } = req.body || {};
-        const ok = await keymaster.publishDidComm(endpoint, name);
+        const { endpoint, name, routingKeys } = req.body || {};
+        const ok = await keymaster.publishDidComm(endpoint, name, routingKeys);
         res.json({ ok });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });
@@ -2391,6 +2391,49 @@ v1router.post('/didcomm/receive', async (req, res) => {
         const { options } = req.body || {};
         const results = await keymaster.receiveDidComm(options);
         res.json({ results });
+    } catch (error: any) {
+        res.status(400).send({ error: error.toString() });
+    }
+});
+
+/**
+ * @swagger
+ * /didcomm/mediate:
+ *   post:
+ *     summary: Run the mediator relay — fetch Forward messages for this identity and relay each to its final recipient.
+ *     description: For an identity acting as a DIDComm mediator. Fetches queued Forward envelopes from its mailbox, unpacks each, and relays the inner envelope to the recipient (`next`). Returns relayed/skipped counts.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               options:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                   endpoint:
+ *                     type: string
+ *     responses:
+ *       200:
+ *         description: Relay result counts.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 result:
+ *                   type: object
+ *       400:
+ *         description: Bad request.
+ */
+v1router.post('/didcomm/mediate', async (req, res) => {
+    try {
+        const { options } = req.body || {};
+        const result = await keymaster.mediateDidComm(options);
+        res.json({ result });
     } catch (error: any) {
         res.status(400).send({ error: error.toString() });
     }

@@ -1548,6 +1548,36 @@ describe('receiveDidComm', () => {
     });
 });
 
+describe('mediateDidComm', () => {
+    it('should run the mediator relay and return counts', async () => {
+        const result = { relayed: 2, skipped: 0 };
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/mediate`)
+            .reply(200, { result });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const out = await keymaster.mediateDidComm();
+
+        expect(out).toStrictEqual(result);
+    });
+
+    it('should throw exception on mediateDidComm server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/mediate`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.mediateDidComm();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('addNostr', () => {
     const mockKeys = { npub: 'npub1test', nsec: 'nsec1test' };
 

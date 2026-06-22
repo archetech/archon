@@ -546,9 +546,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async publishDidComm(endpoint?: string, name?: string): Promise<boolean> {
+    async publishDidComm(endpoint?: string, name?: string, routingKeys?: string[]): Promise<boolean> {
         try {
-            const response = await this.axios.post(`${this.API}/didcomm/publish`, { endpoint, name });
+            const response = await this.axios.post(`${this.API}/didcomm/publish`, { endpoint, name, routingKeys });
             return response.data.ok;
         }
         catch (error) {
@@ -608,6 +608,16 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.post(`${this.API}/didcomm/receive`, { options });
             return response.data.results;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async mediateDidComm(options?: { name?: string; endpoint?: string }): Promise<{ relayed: number; skipped: number }> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/mediate`, { options });
+            return response.data.result;
         }
         catch (error) {
             throwError(error);

@@ -225,14 +225,15 @@ already spec-standard, so only resolution and transport are method-specific.
   against a live redis) + an e2e where two Archon identities exchange authcrypt/signed
   messages through the live relay over HTTP, with a forged fetch rejected. Dockerized
   (`docker/Dockerfile.didcomm` + the opt-in `didcomm` compose profile).
-- **3c — Forward/routing** for recipients behind a mediator (`serviceEndpoint` = mediator
-  DID + `routingKeys`) — required for many external agents. *Crypto done:* `cipher`
-  `wrapForward` (anoncrypt a `routing/2.0/forward` JWM whose `body.next` is the recipient and
-  `attachments[0].data.json` is the inner envelope, to the mediator's key) and `parseForward`,
-  both interop-validated against `didcomm-node` (`wrap_in_forward`/Forward parsing) in each
-  direction. *Remaining integration:* read `routingKeys` from the recipient's DIDCommMessaging
-  service (DID-doc `serviceEndpoint` object form + `publishDidComm`), have `sendDidComm` wrap
-  when present, and an Archon mediator that unpacks a Forward and relays to `next`.
+- **3c — Forward/routing. ✅ done.** `cipher` `wrapForward` (anoncrypt a `routing/2.0/forward`
+  JWM whose `body.next` is the recipient and `attachments[0].data.json` is the inner envelope,
+  to the mediator's key) and `parseForward`, both interop-validated against `didcomm-node`
+  (`wrap_in_forward`/Forward parsing) in each direction. Integration: the DID-doc
+  `serviceEndpoint` object form carries `routingKeys` (`publishDidComm(endpoint, name,
+  routingKeys)`); `sendDidComm` wraps in a Forward to the mediator when the recipient
+  advertises one; `mediateDidComm` lets an Archon identity act as a mediator — fetch Forwards
+  from its mailbox, unpack, and relay the inner envelope to `next`. *Validated:* an e2e where
+  Alice → mediator → Bob is delivered via the Forward protocol through the live relay.
 
 *Exit:* a self-custody recipient receives and unpacks a message delivered to its published
 endpoint, including from a non-Archon agent.
@@ -282,13 +283,14 @@ live two-identity HTTP exchange.
 The `didcomm` service is Dockerized and wired into compose (opt-in `didcomm` profile), with
 in-memory and redis store backends.
 
-The **3c Forward/routing crypto** (`wrapForward`/`parseForward`) is built and
-interop-validated; what remains for 3c is the integration (DID-doc `routingKeys`,
-`sendDidComm` wrapping, an Archon mediator).
+**Phase 3 is complete** (3a cross-method resolution, 3b transport/mailbox, 3c
+Forward/routing including an Archon mediator), all interop-validated against `didcomm-node`.
 
-**Next:** finish 3c integration, then the protocol phases (4 core protocols, 5 credential
-protocols, 7 parity). Plus the noted cross-method follow-ons (EdDSA verify, P-256 key
-agreement, a Universal Resolver driver for `did:cid`) and an optional mongo store backend.
+**Next:** the protocol phases — 4 (Trust Ping / Basic Message / Discover Features /
+Out-of-Band), 5 (Issue-Credential / Present-Proof over DIDComm), 7 (Python SDK + CLI
+parity). Plus follow-ons: EdDSA signature verify (for foreign Ed25519 signers), P-256 key
+agreement, a Universal Resolver driver so others can resolve `did:cid`, and an optional
+mongo mailbox backend.
 
 ## References
 

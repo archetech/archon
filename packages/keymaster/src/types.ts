@@ -411,7 +411,7 @@ export interface KeymasterInterface {
     unpublishAddress(name?: string): Promise<boolean>;
 
     // DIDComm
-    publishDidComm(endpoint?: string, name?: string): Promise<boolean>;
+    publishDidComm(endpoint?: string, name?: string, routingKeys?: string[]): Promise<boolean>;
     unpublishDidComm(name?: string): Promise<boolean>;
     packDidComm(
         message: Record<string, unknown>,
@@ -425,6 +425,7 @@ export interface KeymasterInterface {
         options?: { sign?: boolean; anoncrypt?: boolean; encryption?: 'A256CBC-HS512' | 'XC20P' | 'A256GCM'; name?: string }
     ): Promise<string[]>;
     receiveDidComm(options?: { name?: string; endpoint?: string }): Promise<DidCommUnpackResult[]>;
+    mediateDidComm(options?: { name?: string; endpoint?: string }): Promise<{ relayed: number; skipped: number }>;
 
     // Nostr
     addNostr(id?: string): Promise<NostrKeys>;
