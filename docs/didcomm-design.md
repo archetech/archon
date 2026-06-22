@@ -222,7 +222,8 @@ already spec-standard, so only resolution and transport are method-specific.
   interface/client/API. In-memory store with TTL for now (swap for redis/mongo behind the
   `MailboxStore` interface). *Validated:* core logic unit tests + an e2e where two Archon
   identities exchange authcrypt/signed messages through the live relay over HTTP, with a
-  forged fetch rejected. *Remaining:* Dockerfile + docker-compose wiring, redis/mongo store.
+  forged fetch rejected. Dockerized (`docker/Dockerfile.didcomm` + the opt-in
+  `didcomm` compose profile). *Remaining:* redis/mongo store (behind `MailboxStore`).
 - **3c — Forward/routing** for recipients behind a mediator (`serviceEndpoint` = mediator
   DID + `routingKeys`) — required for many external agents.
 
@@ -271,10 +272,12 @@ Phase **3b** is also done: a dedicated `services/didcomm/server` mailbox relay w
 signed-challenge fetch auth, plus keymaster `sendDidComm`/`receiveDidComm`, validated by a
 live two-identity HTTP exchange.
 
-**Next:** wire the `didcomm` service into Docker/compose and swap its in-memory store for
-redis/mongo; then **3c** (Forward/routing to mediators) and the remaining protocol phases
-(4 core protocols, 5 credential protocols, 7 parity). Plus the noted cross-method follow-ons
-(EdDSA verify, P-256 key agreement, a Universal Resolver driver for `did:cid`).
+The `didcomm` service is Dockerized and wired into compose (opt-in `didcomm` profile).
+
+**Next:** swap the relay's in-memory store for redis/mongo (behind `MailboxStore`); then
+**3c** (Forward/routing to mediators) and the remaining protocol phases (4 core protocols,
+5 credential protocols, 7 parity). Plus the noted cross-method follow-ons (EdDSA verify,
+P-256 key agreement, a Universal Resolver driver for `did:cid`).
 
 ## References
 
