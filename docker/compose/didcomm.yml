@@ -17,6 +17,9 @@ services:
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       - ARCHON_DIDCOMM_UPLOAD_LIMIT=${ARCHON_DIDCOMM_UPLOAD_LIMIT}
+      # Mailbox store: 'memory' (default) or 'redis'.
+      - ARCHON_DIDCOMM_DB=${ARCHON_DIDCOMM_DB:-memory}
+      - ARCHON_REDIS_URL=redis://redis:6379
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_DIDCOMM_HOST_BIND:-127.0.0.1}:${ARCHON_DIDCOMM_PORT:-4228}:4228"
@@ -38,4 +41,7 @@ services:
       start_period: 20s
     depends_on:
       gatekeeper:
+        condition: service_healthy
+      # Used only when ARCHON_DIDCOMM_DB=redis; harmless otherwise (core service).
+      redis:
         condition: service_healthy

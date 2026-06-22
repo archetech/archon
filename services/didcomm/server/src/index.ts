@@ -1,13 +1,20 @@
 import GatekeeperClient from '@didcid/gatekeeper/client';
 import CipherNode from '@didcid/cipher/node';
 import { createApp } from './didcomm-api.js';
-import { MemoryMailboxStore } from './store.js';
+import { MailboxStore, MemoryMailboxStore, RedisMailboxStore } from './store.js';
 import config from './config.js';
+
+async function createStore(): Promise<MailboxStore> {
+    if (config.db === 'redis') {
+        return RedisMailboxStore.create(config.redisURL);
+    }
+    return new MemoryMailboxStore(config.messageTtlMs);
+}
 
 async function main() {
     const resolver = await GatekeeperClient.create({ url: config.gatekeeperURL });
     const cipher = new CipherNode();
-    const store = new MemoryMailboxStore(config.messageTtlMs);
+    const store = await createStore();
     const app = createApp({ store, resolver, cipher, uploadLimit: config.uploadLimit });
 
     app.listen(config.didcommPort, config.bindAddress, () => {

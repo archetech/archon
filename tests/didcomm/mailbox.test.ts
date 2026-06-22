@@ -5,44 +5,80 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import HeliaClient from '@didcid/ipfs/helia';
 import { packEncrypted } from '@didcid/cipher/didcomm';
-import { MemoryMailboxStore } from '../../services/didcomm/server/src/store.ts';
+import { MemoryMailboxStore, RedisMailboxStore } from '../../services/didcomm/server/src/store.ts';
 import { recipientDidsFromEnvelope, verifyChallengeSignature } from '../../services/didcomm/server/src/mailbox.ts';
 
 const enc = new TextEncoder();
 
 describe('MemoryMailboxStore', () => {
-    it('adds, lists, and removes messages per recipient', () => {
+    it('adds, lists, and removes messages per recipient', async () => {
         const store = new MemoryMailboxStore();
-        store.add('did:cid:bob', 'env-1', 'id-1');
-        store.add('did:cid:bob', 'env-2', 'id-2');
-        store.add('did:cid:carol', 'env-3', 'id-3');
+        await store.add('did:cid:bob', 'env-1', 'id-1');
+        await store.add('did:cid:bob', 'env-2', 'id-2');
+        await store.add('did:cid:carol', 'env-3', 'id-3');
 
-        expect(store.list('did:cid:bob').map(m => m.id)).toEqual(['id-1', 'id-2']);
-        expect(store.list('did:cid:carol')).toHaveLength(1);
+        expect((await store.list('did:cid:bob')).map(m => m.id)).toEqual(['id-1', 'id-2']);
+        expect(await store.list('did:cid:carol')).toHaveLength(1);
 
-        expect(store.remove('did:cid:bob', ['id-1'])).toBe(1);
-        expect(store.list('did:cid:bob').map(m => m.id)).toEqual(['id-2']);
+        expect(await store.remove('did:cid:bob', ['id-1'])).toBe(1);
+        expect((await store.list('did:cid:bob')).map(m => m.id)).toEqual(['id-2']);
     });
 
-    it('prunes messages past the TTL', () => {
+    it('prunes messages past the TTL', async () => {
         let now = 1_000_000;
         const store = new MemoryMailboxStore(1000, 1000, () => now);
-        store.add('did:cid:bob', 'env', 'id-1');
+        await store.add('did:cid:bob', 'env', 'id-1');
         now += 1500; // past the 1000ms TTL
-        expect(store.list('did:cid:bob')).toHaveLength(0);
+        expect(await store.list('did:cid:bob')).toHaveLength(0);
     });
 
-    it('consumes a challenge once and rejects replays / expiry / unknowns', () => {
+    it('consumes a challenge once and rejects replays / expiry / unknowns', async () => {
         let now = 1_000_000;
         const store = new MemoryMailboxStore(1000, 1000, () => now);
-        store.issueChallenge('c1');
-        expect(store.consumeChallenge('c1')).toBe(true);
-        expect(store.consumeChallenge('c1')).toBe(false); // single-use
-        expect(store.consumeChallenge('unknown')).toBe(false);
+        await store.issueChallenge('c1');
+        expect(await store.consumeChallenge('c1')).toBe(true);
+        expect(await store.consumeChallenge('c1')).toBe(false); // single-use
+        expect(await store.consumeChallenge('unknown')).toBe(false);
 
-        store.issueChallenge('c2');
+        await store.issueChallenge('c2');
         now += 1500; // expired
-        expect(store.consumeChallenge('c2')).toBe(false);
+        expect(await store.consumeChallenge('c2')).toBe(false);
+    });
+});
+
+const describeRedis = process.env.ARCHON_SKIP_REDIS ? describe.skip : describe;
+
+describeRedis('RedisMailboxStore (live redis)', () => {
+    let store: RedisMailboxStore;
+
+    beforeAll(async () => {
+        store = new RedisMailboxStore(process.env.ARCHON_REDIS_URL || 'redis://localhost:6379', `didcomm-test-${Date.now()}`);
+        await store.connect();
+    });
+
+    afterAll(async () => {
+        if (store) {
+            await store.disconnect();
+        }
+    });
+
+    it('adds, lists, and removes messages per recipient', async () => {
+        await store.add('did:cid:bob', 'env-1', 'id-1');
+        await store.add('did:cid:bob', 'env-2', 'id-2');
+        await store.add('did:cid:carol', 'env-3', 'id-3');
+
+        expect((await store.list('did:cid:bob')).map(m => m.id).sort()).toEqual(['id-1', 'id-2']);
+        expect(await store.list('did:cid:carol')).toHaveLength(1);
+
+        expect(await store.remove('did:cid:bob', ['id-1'])).toBe(1);
+        expect((await store.list('did:cid:bob')).map(m => m.id)).toEqual(['id-2']);
+    });
+
+    it('consumes a challenge once (single-use) and rejects unknowns', async () => {
+        await store.issueChallenge('rc1');
+        expect(await store.consumeChallenge('rc1')).toBe(true);
+        expect(await store.consumeChallenge('rc1')).toBe(false);
+        expect(await store.consumeChallenge('never-issued')).toBe(false);
     });
 });
 

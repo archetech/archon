@@ -219,11 +219,12 @@ already spec-standard, so only resolution and transport are method-specific.
   via gatekeeper resolution) and retrieve its queue; `messages/remove` acks. keymaster
   `sendDidComm` (pack → resolve the recipient's `DIDCommMessaging` endpoint → POST) and
   `receiveDidComm` (challenge → sign → fetch → unpack → ack), wired through
-  interface/client/API. In-memory store with TTL for now (swap for redis/mongo behind the
-  `MailboxStore` interface). *Validated:* core logic unit tests + an e2e where two Archon
-  identities exchange authcrypt/signed messages through the live relay over HTTP, with a
-  forged fetch rejected. Dockerized (`docker/Dockerfile.didcomm` + the opt-in
-  `didcomm` compose profile). *Remaining:* redis/mongo store (behind `MailboxStore`).
+  interface/client/API. In-memory store with TTL by default, or a **redis** backend (native
+  key expiry) via `ARCHON_DIDCOMM_DB`, both behind the async `MailboxStore` interface (mongo
+  can be added the same way). *Validated:* core logic unit tests (incl. the redis store
+  against a live redis) + an e2e where two Archon identities exchange authcrypt/signed
+  messages through the live relay over HTTP, with a forged fetch rejected. Dockerized
+  (`docker/Dockerfile.didcomm` + the opt-in `didcomm` compose profile).
 - **3c — Forward/routing** for recipients behind a mediator (`serviceEndpoint` = mediator
   DID + `routingKeys`) — required for many external agents.
 
@@ -272,12 +273,13 @@ Phase **3b** is also done: a dedicated `services/didcomm/server` mailbox relay w
 signed-challenge fetch auth, plus keymaster `sendDidComm`/`receiveDidComm`, validated by a
 live two-identity HTTP exchange.
 
-The `didcomm` service is Dockerized and wired into compose (opt-in `didcomm` profile).
+The `didcomm` service is Dockerized and wired into compose (opt-in `didcomm` profile), with
+in-memory and redis store backends.
 
-**Next:** swap the relay's in-memory store for redis/mongo (behind `MailboxStore`); then
-**3c** (Forward/routing to mediators) and the remaining protocol phases (4 core protocols,
-5 credential protocols, 7 parity). Plus the noted cross-method follow-ons (EdDSA verify,
-P-256 key agreement, a Universal Resolver driver for `did:cid`).
+**Next:** **3c** (Forward/routing to mediators) and the remaining protocol phases (4 core
+protocols, 5 credential protocols, 7 parity). Plus the noted cross-method follow-ons (EdDSA
+verify, P-256 key agreement, a Universal Resolver driver for `did:cid`) and an optional
+mongo store backend.
 
 ## References
 

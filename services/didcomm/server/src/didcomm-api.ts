@@ -32,17 +32,18 @@ export function createApp(deps: AppDeps): Express {
 
     // Inbound delivery — anyone may deliver an (encrypted) envelope. Routed to
     // the recipient mailbox(es) by the JWE recipient kids.
-    v1.post('/messages', (req, res) => {
+    v1.post('/messages', async (req, res) => {
         try {
             const packed = typeof req.body === 'string' ? req.body
                 : (req.body && req.body.message) ? req.body.message
                 : JSON.stringify(req.body);
             const recipients = recipientDidsFromEnvelope(packed);
-            const ids = recipients.map(recipient => {
+            const ids: string[] = [];
+            for (const recipient of recipients) {
                 const id = crypto.randomUUID();
-                deps.store.add(recipient, packed, id);
-                return id;
-            });
+                await deps.store.add(recipient, packed, id);
+                ids.push(id);
+            }
             res.json({ ids });
         }
         catch (error: any) {
@@ -51,9 +52,9 @@ export function createApp(deps: AppDeps): Express {
     });
 
     // Single-use challenge for proving DID control on fetch/remove.
-    v1.get('/challenge', (_req, res) => {
+    v1.get('/challenge', async (_req, res) => {
         const challenge = crypto.randomBytes(32).toString('base64url');
-        deps.store.issueChallenge(challenge);
+        await deps.store.issueChallenge(challenge);
         res.json({ challenge });
     });
 
@@ -63,7 +64,7 @@ export function createApp(deps: AppDeps): Express {
             res.status(400).send({ error: 'did, challenge and signature are required' });
             return null;
         }
-        if (!deps.store.consumeChallenge(challenge)) {
+        if (!(await deps.store.consumeChallenge(challenge))) {
             res.status(401).send({ error: 'invalid or expired challenge' });
             return null;
         }
@@ -81,7 +82,7 @@ export function createApp(deps: AppDeps): Express {
             if (!did) {
                 return;
             }
-            const messages = deps.store.list(did).map(m => ({ id: m.id, message: m.envelope, received: m.received }));
+            const messages = (await deps.store.list(did)).map(m => ({ id: m.id, message: m.envelope, received: m.received }));
             res.json({ messages });
         }
         catch (error: any) {
@@ -99,7 +100,7 @@ export function createApp(deps: AppDeps): Express {
             if (!Array.isArray(ids)) {
                 return res.status(400).send({ error: 'ids array is required' });
             }
-            res.json({ removed: deps.store.remove(did, ids) });
+            res.json({ removed: await deps.store.remove(did, ids) });
         }
         catch (error: any) {
             res.status(400).send({ error: error.toString() });
