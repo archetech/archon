@@ -270,30 +270,23 @@ docs.
 
 ## Status & next step
 
-Phases 0, 1, and 2 are complete: the spike + interop oracle, X25519 `keyAgreement` keys in
-DID documents, the pure-JS envelope crypto in `cipher`, and keymaster
-`packDidComm`/`unpackDidComm` — anoncrypt/authcrypt/signed all round-trip between real
-`did:cid` identities and interoperate with `didcomm-node`.
+Implemented on branch `docs/didcomm-design` (PR #633); every layer is interop-validated
+against the `didcomm-node` reference library.
 
-Phase **3a** is also done: cross-method DID resolution (`did:key` locally + universal-resolver
-fallback for the rest) and foreign-key normalization, validated by exchanging messages
-between Archon `did:cid` and `did:key` agents (including against the reference library).
+| Phase | Status | What landed |
+|---|---|---|
+| 0 — Spike & decisions | ✅ | `spike/didcomm-phase0` + the interop oracle (`interop.mjs`) |
+| 1 — Standard-curve keys | ✅ | deterministic X25519 `keyAgreement` keys in `did:cid` docs; `publishDidComm`/`unpublishDidComm` |
+| 2 — Envelope crypto + API | ✅ | pure-JS anoncrypt/authcrypt/signed in `cipher`; keymaster `packDidComm`/`unpackDidComm` over real `did:cid` resolution |
+| 3a — Cross-method resolution | ✅ | `did:key` (Ed25519/X25519) + universal-resolver fallback; multibase key normalization |
+| 3b — Transport (mailbox) | ✅ | `services/didcomm/server` relay (signed-challenge auth; in-memory/redis; Docker + `didcomm` compose profile, port 4236); keymaster `sendDidComm`/`receiveDidComm`; Drawbridge `/didcomm` reverse proxy |
+| 3c — Forward/routing | ✅ | `wrapForward`/`parseForward`; DID-doc `routingKeys`; `sendDidComm` mediator wrapping; `mediateDidComm` (Archon-as-mediator) |
 
-Phase **3b** is also done: a dedicated `services/didcomm/server` mailbox relay with
-signed-challenge fetch auth, plus keymaster `sendDidComm`/`receiveDidComm`, validated by a
-live two-identity HTTP exchange.
-
-The `didcomm` service is Dockerized and wired into compose (opt-in `didcomm` profile), with
-in-memory and redis store backends.
-
-**Phase 3 is complete** (3a cross-method resolution, 3b transport/mailbox, 3c
-Forward/routing including an Archon mediator), all interop-validated against `didcomm-node`.
-
-**Next:** the protocol phases — 4 (Trust Ping / Basic Message / Discover Features /
-Out-of-Band), 5 (Issue-Credential / Present-Proof over DIDComm), 7 (Python SDK + CLI
-parity). Plus follow-ons: EdDSA signature verify (for foreign Ed25519 signers), P-256 key
-agreement, a Universal Resolver driver so others can resolve `did:cid`, and an optional
-mongo mailbox backend.
+**Remaining (not started):** the protocol phases — **4** (Trust Ping / Basic Message /
+Discover Features / Out-of-Band), **5** (Issue-Credential / Present-Proof over DIDComm),
+**7** (Python SDK + CLI parity). Plus follow-ons: EdDSA signature verify (foreign Ed25519
+signers), P-256 key agreement, a Universal Resolver driver so others can resolve `did:cid`,
+and an optional mongo mailbox backend.
 
 ## References
 
