@@ -34,9 +34,16 @@ export function createApp(deps: AppDeps): Express {
     // the recipient mailbox(es) by the JWE recipient kids.
     v1.post('/messages', async (req, res) => {
         try {
-            const packed = typeof req.body === 'string' ? req.body
-                : (req.body && req.body.message) ? req.body.message
-                : JSON.stringify(req.body);
+            let packed: string;
+            if (typeof req.body === 'string') {
+                packed = req.body;
+            }
+            else if (req.body && req.body.message) {
+                packed = req.body.message;
+            }
+            else {
+                packed = JSON.stringify(req.body);
+            }
             const recipients = recipientDidsFromEnvelope(packed);
             const ids: string[] = [];
             for (const recipient of recipients) {
