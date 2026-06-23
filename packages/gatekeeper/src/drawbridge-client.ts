@@ -88,6 +88,18 @@ export default class DrawbridgeClient extends GatekeeperClient implements Drawbr
         }
     }
 
+    // The node's public DIDComm relay endpoint (`<publicHost>/didcomm`), or
+    // undefined if unconfigured or the gateway doesn't expose it (e.g. a plain
+    // Gatekeeper). Used by publishDidComm to auto-discover its endpoint.
+    async getDidCommEndpoint(): Promise<string | undefined> {
+        try {
+            const response = await this.axios.get(`${this.API}/didcomm-endpoint`);
+            return response.data?.endpoint || undefined;
+        } catch {
+            return undefined;
+        }
+    }
+
     async unpublishLightning(did: string): Promise<boolean> {
         try {
             const response = await this.axios.delete(`${this.API}/lightning/publish/${encodeURIComponent(did)}`);

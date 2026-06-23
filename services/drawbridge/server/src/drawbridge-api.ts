@@ -399,6 +399,14 @@ async function main() {
         res.json({ version: serviceVersion, commit: serviceCommit });
     });
 
+    // Public DIDComm relay endpoint, derived from the configured public host, so
+    // `publishDidComm` can auto-discover it (the way publishLightning learns its
+    // public host). Returns null when no public host is configured.
+    v1router.get('/didcomm-endpoint', (_req, res) => {
+        const host = config.publicHost ? config.publicHost.replace(/\/+$/, '') : '';
+        res.json({ endpoint: host ? `${host}/didcomm` : null });
+    });
+
     v1router.get('/status', async (_req, res) => {
         try {
             const upstreamStatus = await gatekeeper.getStatus();

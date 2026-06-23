@@ -2046,7 +2046,7 @@ program
 // DIDComm v2 commands
 program
     .command('publish-didcomm [endpoint]')
-    .description('Publish an X25519 key-agreement key (and optional DIDCommMessaging service) to the current identity')
+    .description('Publish an X25519 key-agreement key (+ DIDCommMessaging service; endpoint auto-discovered from the gateway when omitted) to the current identity')
     .option('-n, --name <name>', 'identity name (defaults to current)')
     .option('--routing-keys <keys>', 'comma-separated mediator routing keys/DIDs')
     .action(async (endpoint, options) => {

@@ -2305,6 +2305,16 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async publishDidComm(endpoint?: string, name?: string, routingKeys?: string[]): Promise<boolean> {
+        // When no endpoint is given, auto-discover the node's public DIDComm
+        // relay endpoint from the gateway (as publishLightning learns its public
+        // host). A plain Gatekeeper returns nothing, so we publish the
+        // key-agreement key only — pass an explicit endpoint to override.
+        if (!endpoint) {
+            const gateway = this.gatekeeper as Partial<DrawbridgeInterface>;
+            if (typeof gateway.getDidCommEndpoint === 'function') {
+                endpoint = (await gateway.getDidCommEndpoint()) || undefined;
+            }
+        }
         const id = await this.fetchIdInfo(name);
         const did = id.did;
         const keypair = await this.fetchDidCommKeyPair(name);

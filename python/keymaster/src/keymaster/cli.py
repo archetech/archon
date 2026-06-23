@@ -1361,7 +1361,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("did")
 
     # DIDComm
-    sp = add("publish-didcomm", "Publish an X25519 key-agreement key (and optional DIDComm service) to the current ID", cmd_publish_didcomm)
+    sp = add("publish-didcomm", "Publish an X25519 key-agreement key (+ DIDComm service; endpoint auto-discovered from the gateway when omitted) to the current ID", cmd_publish_didcomm)
     sp.add_argument("endpoint", nargs="?")
     sp.add_argument("-n", "--name", help="identity name (defaults to current)")
     sp.add_argument("--routing-keys", dest="routing_keys", help="comma-separated mediator routing keys/DIDs")

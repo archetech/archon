@@ -221,6 +221,7 @@ export interface DrawbridgeInterface extends GatekeeperInterface {
     checkLightningPayment(invoiceKey: string, paymentHash: string): Promise<LightningPaymentStatus>;
     publishLightning(did: string, invoiceKey: string): Promise<{ ok: boolean; publicHost?: string }>;
     unpublishLightning(did: string): Promise<boolean>;
+    getDidCommEndpoint(): Promise<string | undefined>;
     zapLightning(adminKey: string, did: string, amount: number, memo?: string): Promise<LightningPayment>;
     getLightningPayments(adminKey: string): Promise<LightningPaymentRecord[]>;
 }

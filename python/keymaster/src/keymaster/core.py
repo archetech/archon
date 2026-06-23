@@ -3474,6 +3474,18 @@ class Keymaster:
         return dc.generate_x25519_jwk(seed)
 
     async def publish_didcomm(self, endpoint: str | None = None, name: str | None = None, routing_keys: list[str] | None = None) -> bool:
+        # When no endpoint is given, auto-discover the node's public DIDComm
+        # relay endpoint from the gateway (as publish_lightning learns its public
+        # host). A plain Gatekeeper returns nothing, so we publish the
+        # key-agreement key only — pass an explicit endpoint to override.
+        if endpoint is None:
+            getter = getattr(self.gatekeeper, "get_didcomm_endpoint", None)
+            if getter:
+                try:
+                    endpoint = await getter()
+                except Exception:
+                    endpoint = None
+
         id_info = await self.fetch_id_info(name)
         did = id_info["did"]
         keypair = await self.fetch_didcomm_key_pair(name)

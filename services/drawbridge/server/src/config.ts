@@ -9,6 +9,9 @@ const config = {
     heraldURL: process.env.ARCHON_HERALD_URL || 'http://localhost:4230',
     lightningMediatorURL: process.env.ARCHON_LIGHTNING_MEDIATOR_URL || 'http://localhost:4235',
     didcommURL: process.env.ARCHON_DIDCOMM_URL || 'http://localhost:4236',
+    // Public base URL this node is reachable at (clearnet host or Tor onion).
+    // Used to advertise the DIDComm relay endpoint (`<publicHost>/didcomm`).
+    publicHost: process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || '',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
 
     // L402

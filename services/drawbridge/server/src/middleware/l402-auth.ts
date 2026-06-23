@@ -28,7 +28,7 @@ import type {
 } from '../types.js';
 
 // Routes that bypass L402 auth
-const UNPROTECTED_PATHS = ['/ready', '/version', '/status', '/metrics'];
+const UNPROTECTED_PATHS = ['/ready', '/version', '/status', '/metrics', '/didcomm-endpoint'];
 const UNPROTECTED_PREFIXES = ['/l402/'];
 // GET-only prefixes: read operations that should be publicly accessible
 const UNPROTECTED_GET_PREFIXES = ['/did/', '/ipfs/'];

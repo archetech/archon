@@ -134,6 +134,16 @@ class GatekeeperClient:
         response.raise_for_status()
         return bool(response.json().get("ok"))
 
+    async def get_didcomm_endpoint(self) -> str | None:
+        # The node's public DIDComm relay endpoint, or None if unconfigured or
+        # the gateway doesn't expose it (e.g. a plain Gatekeeper).
+        try:
+            response = await self._client.get("/didcomm-endpoint")
+            response.raise_for_status()
+            return response.json().get("endpoint") or None
+        except Exception:
+            return None
+
     async def zap_lightning(self, admin_key: str, did: str, amount: int, memo: str | None = None) -> dict[str, Any]:
         response = await self._client.post("/lightning/zap", json={"adminKey": admin_key, "did": did, "amount": amount, "memo": memo})
         response.raise_for_status()

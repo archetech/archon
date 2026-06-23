@@ -115,6 +115,22 @@ describe('publishDidComm', () => {
         });
     });
 
+    it('auto-discovers the endpoint from the gateway when none is given', async () => {
+        const did = await keymaster.createId('Alice');
+        // Simulate a Drawbridge gateway that advertises a public DIDComm endpoint.
+        (gatekeeper as any).getDidCommEndpoint = async () => 'https://node.example/didcomm';
+
+        const ok = await keymaster.publishDidComm();
+        const doc = await keymaster.resolveDID(did);
+
+        expect(ok).toBe(true);
+        expect(doc.didDocument?.service).toContainEqual({
+            id: `${did}#didcomm`,
+            type: 'DIDCommMessaging',
+            serviceEndpoint: 'https://node.example/didcomm',
+        });
+    });
+
     it('is idempotent — re-publishing keeps a single key-agreement method', async () => {
         const did = await keymaster.createId('Alice');
 
