@@ -946,6 +946,55 @@ async def cmd_list_dmail_attachments(km: Keymaster, args: argparse.Namespace) ->
 # Parser construction
 # ---------------------------------------------------------------------------
 
+# DIDComm v2 ------------------------------------------------------------------
+
+def _didcomm_recipients(to: str) -> str | list[str]:
+    return [item.strip() for item in to.split(",")] if "," in to else to
+
+
+def _didcomm_pack_options(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "sign": getattr(args, "sign", False),
+        "anoncrypt": getattr(args, "anoncrypt", False),
+        "encryption": getattr(args, "encryption", None),
+        "name": getattr(args, "name", None),
+    }
+
+
+async def cmd_publish_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    routing_keys = [item.strip() for item in args.routing_keys.split(",")] if args.routing_keys else None
+    ok = await km.publish_didcomm(args.endpoint, args.name, routing_keys)
+    print("published" if ok else "failed")
+
+
+async def cmd_unpublish_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    ok = await km.unpublish_didcomm(args.name)
+    print("unpublished" if ok else "failed")
+
+
+async def cmd_pack_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    message = json.loads(Path(args.file).read_text(encoding="utf-8"))
+    print(await km.pack_didcomm(message, _didcomm_recipients(args.to), _didcomm_pack_options(args)))
+
+
+async def cmd_unpack_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    packed = Path(args.file).read_text(encoding="utf-8")
+    _print_json(await km.unpack_didcomm(packed, {"name": args.name}))
+
+
+async def cmd_send_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    message = json.loads(Path(args.file).read_text(encoding="utf-8"))
+    _print_json(await km.send_didcomm(message, _didcomm_recipients(args.to), _didcomm_pack_options(args)))
+
+
+async def cmd_receive_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.receive_didcomm({"name": args.name, "endpoint": args.endpoint}))
+
+
+async def cmd_mediate_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.mediate_didcomm({"name": args.name, "endpoint": args.endpoint}))
+
+
 def _add_alias_registry(p: argparse.ArgumentParser) -> None:
     p.add_argument("-a", "--alias", help="DID alias")
     p.add_argument("-r", "--registry", help="registry to use")
@@ -1310,6 +1359,37 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("file")
     sp = add("list-dmail-attachments", "List attachments of a dmail", cmd_list_dmail_attachments)
     sp.add_argument("did")
+
+    # DIDComm
+    sp = add("publish-didcomm", "Publish an X25519 key-agreement key (and optional DIDComm service) to the current ID", cmd_publish_didcomm)
+    sp.add_argument("endpoint", nargs="?")
+    sp.add_argument("-n", "--name", help="identity name (defaults to current)")
+    sp.add_argument("--routing-keys", dest="routing_keys", help="comma-separated mediator routing keys/DIDs")
+    sp = add("unpublish-didcomm", "Remove the DIDComm key-agreement key and service from the current ID", cmd_unpublish_didcomm)
+    sp.add_argument("-n", "--name", help="identity name (defaults to current)")
+    sp = add("pack-didcomm", "Pack a DIDComm v2 message (JSON file) for recipients (comma-separated DIDs)", cmd_pack_didcomm)
+    sp.add_argument("file")
+    sp.add_argument("to")
+    sp.add_argument("--sign", action="store_true", help="add an ES256K signature (non-repudiation)")
+    sp.add_argument("--anoncrypt", action="store_true", help="anonymous sender (anoncrypt instead of authcrypt)")
+    sp.add_argument("-e", "--encryption", help="content encryption: A256CBC-HS512 | XC20P | A256GCM")
+    sp.add_argument("-n", "--name", help="sender identity name (defaults to current)")
+    sp = add("unpack-didcomm", "Unpack (decrypt and verify) a DIDComm v2 message read from a file", cmd_unpack_didcomm)
+    sp.add_argument("file")
+    sp.add_argument("-n", "--name", help="recipient identity name (defaults to current)")
+    sp = add("send-didcomm", "Pack a DIDComm message (JSON file) and deliver it to each recipient mailbox", cmd_send_didcomm)
+    sp.add_argument("file")
+    sp.add_argument("to")
+    sp.add_argument("--sign", action="store_true", help="add an ES256K signature (non-repudiation)")
+    sp.add_argument("--anoncrypt", action="store_true", help="anonymous sender (anoncrypt instead of authcrypt)")
+    sp.add_argument("-e", "--encryption", help="content encryption: A256CBC-HS512 | XC20P | A256GCM")
+    sp.add_argument("-n", "--name", help="sender identity name (defaults to current)")
+    sp = add("receive-didcomm", "Fetch and unpack queued DIDComm messages from the current ID's mailbox", cmd_receive_didcomm)
+    sp.add_argument("-n", "--name", help="identity name (defaults to current)")
+    sp.add_argument("--endpoint", help="override the mailbox endpoint")
+    sp = add("mediate-didcomm", "Relay queued Forward envelopes from this ID's mailbox to their recipients (mediator role)", cmd_mediate_didcomm)
+    sp.add_argument("-n", "--name", help="mediator identity name (defaults to current)")
+    sp.add_argument("--endpoint", help="override the mailbox endpoint")
 
     return parser
 

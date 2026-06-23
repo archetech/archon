@@ -272,19 +272,25 @@ is a refinement.
 **Phase 7 — Parity & polish. ✅ done.** The full DIDComm surface is now reachable from every
 client tier, not just the in-process `Keymaster` class:
 
-- **CLI** ([cli.ts](../packages/keymaster/src/cli.ts)) — `publish-didcomm [endpoint]`,
-  `unpublish-didcomm`, `pack-didcomm <file> <to>`, `unpack-didcomm <file>`,
-  `send-didcomm <file> <to>`, `receive-didcomm`, `mediate-didcomm`. `pack`/`send` take the
-  plaintext message as a JSON file and a comma-separated recipient list, with `--sign`,
-  `--anoncrypt`, `--encryption`, and `--name` (sender identity) flags.
-- **Python SDK** ([python/keymaster_sdk](../python/keymaster_sdk/)) — `publish_didcomm`,
-  `unpublish_didcomm`, `pack_didcomm`, `unpack_didcomm`, `send_didcomm`, `receive_didcomm`,
+- **CLI (all three)** — the `publish-/unpublish-/pack-/unpack-/send-/receive-/mediate-didcomm`
+  commands now exist in parity across [cli.ts](../packages/keymaster/src/cli.ts),
+  [scripts/archon-cli.js](../scripts/archon-cli.js), and
+  [python/keymaster cli.py](../python/keymaster/src/keymaster/cli.py) (per AGENTS.md's CLI-parity
+  rule). `pack`/`send` take the plaintext as a JSON file and a comma-separated recipient list,
+  with `--sign`, `--anoncrypt`, `--encryption`, and `--name` (sender identity) flags.
+- **Python SDK** ([python/keymaster_sdk](../python/keymaster_sdk/)) — `publish_didcomm` …
   `mediate_didcomm`, mirroring the JS `KeymasterClient` (same REST endpoints/bodies). A mocked
   contract test asserts endpoint + body + return parity for all seven; a live test does a real
   authcrypt pack→unpack round-trip between two identities.
+- **Python keymaster library** ([python/keymaster](../python/keymaster/)) — a full pure-Python
+  port of the envelope crypto (`didcomm_crypto.py`: X25519, ECDH-ES/1PU+A256KW with the
+  tag-in-Concat-KDF, A256CBC-HS512/XC20P/A256GCM, ES256K JWS, did:key, Forward), the protocol
+  builders (`didcomm_protocols.py`), and the Keymaster methods, using `cryptography`/`coincurve`
+  + PyNaCl (for XChaCha20-Poly1305). **Validated byte-for-byte against the TypeScript stack in
+  both directions** — committed tests decrypt/verify JS-produced envelope vectors (JS→PY) and
+  Python round-trips were confirmed to unpack in `didcomm-node` (PY→JS) during development.
 - **REST + Swagger** were already shipped alongside the transport work (`/didcomm/publish`,
-  `/pack`, `/unpack`, `/send`, `/receive`, `/mediate`), so this phase only wired the two
-  remaining surfaces (CLI, Python) on top of them.
+  `/pack`, `/unpack`, `/send`, `/receive`, `/mediate`).
 
 ## Risks & open questions
 
@@ -316,7 +322,7 @@ against the `didcomm-node` reference library.
 | 4 — Application protocols | ✅ | message builders (`didcomm-protocols.ts`) for Trust Ping, Basic Message, Discover Features, Out-of-Band (+ `_oob` URL encode/decode) — compose with `sendDidComm`/`receiveDidComm`; e2e: basic message + trust-ping request/response (thid-correlated) over the relay |
 | 5 — Credential exchange | ✅ | Issue-Credential 3.0 + Present-Proof 3.0 builders carrying an Archon VC/VP as a DIDComm attachment; maps onto `bindCredential`/`addProof`/`verifyProof`; e2e: Alice issues a VC to Bob over DIDComm (Bob verifies the issuer proof), Carol requests + Bob presents a VP, Carol verifies holder + issuer signatures |
 | 6 — Routing/mediation | ✅ | Forward messages landed in 3c (`wrapForward`/`mediateDidComm`); Coordinate-Mediation 2.0 builders (`mediate-request`/`grant`/`keylist-update`/…) + `routing_did` support in `sendDidComm`; e2e: Bob enrolls with a mediator (request→grant→keylist) and Alice then routes to him through it |
-| 7 — Parity & polish | ✅ | CLI commands (`publish-/unpublish-/pack-/unpack-/send-/receive-/mediate-didcomm`); Python SDK functions (`publish_didcomm`/`unpublish_didcomm`/`pack_didcomm`/`unpack_didcomm`/`send_didcomm`/`receive_didcomm`/`mediate_didcomm`) mirroring `KeymasterClient`; mocked contract parity test (all 7) + live pack/unpack round-trip; REST routes + Swagger already shipped in 3a/3b |
+| 7 — Parity & polish | ✅ | CLI commands across all three CLIs (cli.ts / archon-cli.js / Python cli.py); Python SDK functions mirroring `KeymasterClient`; **full pure-Python port** of the envelope crypto + protocols + Keymaster methods in the standalone `python/keymaster` library, interop-validated byte-for-byte vs the TypeScript stack (JS-produced vectors decrypt in Python; Python round-trips unpack in `didcomm-node`); MCP tools; REST routes + Swagger shipped in 3a/3b |
 
 **Remaining (not started):** none. Follow-ons (nice-to-have, not blocking):
 EdDSA signature verify (foreign Ed25519 signers), P-256 key agreement, a Universal Resolver

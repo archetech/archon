@@ -36,6 +36,7 @@ from .crypto import (
     ub64url,
     verify_sig,
 )
+from . import didcomm_crypto as dc
 
 
 LOGGER = logging.getLogger(__name__)
@@ -3389,3 +3390,348 @@ class Keymaster:
         response["match"] = len(matched_vps) == len(requests)
         response["responder"] = response_doc.get("didDocument", {}).get("controller")
         return response
+
+    # --- DIDComm v2 ----------------------------------------------------------
+    # Port of the TypeScript Keymaster DIDComm surface (see keymaster.ts). The
+    # envelope crypto lives in didcomm_crypto (dc); these methods resolve DIDs to
+    # keys and call it, and speak the mailbox-relay HTTP protocol.
+
+    @staticmethod
+    def _didcomm_fragment(kid: str) -> str:
+        return kid.split("#")[-1] if "#" in kid else kid
+
+    def _find_verification_method(self, doc: dict[str, Any], kid: str) -> dict[str, Any] | None:
+        frag = self._didcomm_fragment(kid)
+        for vm in doc.get("didDocument", {}).get("verificationMethod") or []:
+            if vm.get("id") and self._didcomm_fragment(vm["id"]) == frag:
+                return vm
+        return None
+
+    def _resolve_key_agreement(self, doc: dict[str, Any]) -> dict[str, Any]:
+        refs = doc.get("didDocument", {}).get("keyAgreement") or []
+        if not refs:
+            raise KeymasterError("DID has no published keyAgreement key; call publish_didcomm first")
+        kid = refs[0]
+        vm = self._find_verification_method(doc, kid)
+        if not vm:
+            raise KeymasterError("keyAgreement verification method not found")
+        try:
+            return {"kid": kid, "publicJwk": dc.normalize_x25519_public_key(vm)}
+        except Exception as error:
+            raise KeymasterError("keyAgreement verification method is not an X25519 key") from error
+
+    async def _resolve_did_for_didcomm(self, did: str) -> dict[str, Any]:
+        # did:key is resolved locally (deterministic); other methods go through
+        # the gatekeeper, which has a universal-resolver fallback.
+        if did.startswith("did:key:"):
+            resolved = dc.did_key_to_x25519(did)
+            return {
+                "didDocument": {
+                    "id": did,
+                    "keyAgreement": [resolved["kid"]],
+                    "verificationMethod": [
+                        {"id": resolved["kid"], "controller": did, "type": "JsonWebKey2020", "publicKeyJwk": resolved["publicJwk"]}
+                    ],
+                }
+            }
+        return await self.resolve_did(did)
+
+    async def _resolve_didcomm_endpoint(self, did: str) -> dict[str, Any] | None:
+        doc = await self._resolve_did_for_didcomm(did)
+        service = next((s for s in doc.get("didDocument", {}).get("service") or [] if s.get("type") == "DIDCommMessaging"), None)
+        if not service:
+            return None
+        endpoint = service.get("serviceEndpoint")
+        if isinstance(endpoint, str):
+            return {"uri": endpoint, "routingKeys": []}
+        if isinstance(endpoint, dict) and isinstance(endpoint.get("uri"), str):
+            return {"uri": endpoint["uri"], "routingKeys": endpoint.get("routingKeys") or []}
+        return None
+
+    async def _resolve_x25519_key(self, kid: str) -> dict[str, str]:
+        doc = await self._resolve_did_for_didcomm(kid.split("#")[0])
+        vm = self._find_verification_method(doc, kid)
+        if not vm:
+            raise KeymasterError(f"key {kid} not found")
+        try:
+            return dc.normalize_x25519_public_key(vm)
+        except Exception as error:
+            raise KeymasterError(f"key {kid} is not an X25519 key") from error
+
+    async def _resolve_routing_key(self, routing_key: str) -> dict[str, Any]:
+        # A routing key may be a full key id (did#frag) or a bare DID (the
+        # coordinate-mediation routing_did grant form, whose keyAgreement is used).
+        if "#" in routing_key:
+            return {"kid": routing_key, "publicJwk": await self._resolve_x25519_key(routing_key)}
+        doc = await self._resolve_did_for_didcomm(routing_key)
+        return self._resolve_key_agreement(doc)
+
+    async def fetch_didcomm_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]]:
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(name, wallet)
+        root = await self._root_node(wallet)
+        seed = derive_private_key_bytes(root, f"m/44'/0'/{id_info['account']}'/1/0")
+        return dc.generate_x25519_jwk(seed)
+
+    async def publish_didcomm(self, endpoint: str | None = None, name: str | None = None, routing_keys: list[str] | None = None) -> bool:
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        keypair = await self.fetch_didcomm_key_pair(name)
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+
+        vm_id = f"{did}#key-agreement-1"
+        verification_method = [vm for vm in did_document.get("verificationMethod") or [] if vm.get("id") != vm_id]
+        verification_method.append({"id": vm_id, "controller": did, "type": "JsonWebKey2020", "publicKeyJwk": keypair["publicJwk"]})
+        did_document["verificationMethod"] = verification_method
+        did_document["keyAgreement"] = [vm_id]
+
+        service_id = f"{did}#didcomm"
+        services = [s for s in did_document.get("service") or [] if s.get("id") != service_id]
+        if endpoint:
+            service_endpoint: Any = (
+                {"uri": endpoint, "accept": ["didcomm/v2"], "routingKeys": routing_keys}
+                if routing_keys else endpoint
+            )
+            services.append({"id": service_id, "type": "DIDCommMessaging", "serviceEndpoint": service_endpoint})
+        if services:
+            did_document["service"] = services
+        else:
+            did_document.pop("service", None)
+
+        return await self.update_did(did, {"didDocument": did_document})
+
+    async def unpublish_didcomm(self, name: str | None = None) -> bool:
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+
+        vm_id = f"{did}#key-agreement-1"
+        service_id = f"{did}#didcomm"
+        verification_method = [vm for vm in did_document.get("verificationMethod") or [] if vm.get("id") != vm_id]
+        if verification_method:
+            did_document["verificationMethod"] = verification_method
+        did_document.pop("keyAgreement", None)
+
+        services = [s for s in did_document.get("service") or [] if s.get("id") != service_id]
+        if services:
+            did_document["service"] = services
+        else:
+            did_document.pop("service", None)
+
+        return await self.update_did(did, {"didDocument": did_document})
+
+    async def pack_didcomm(self, message: dict[str, Any], to: str | list[str], options: dict[str, Any] | None = None) -> str:
+        options = options or {}
+        recipient_dids = to if isinstance(to, list) else [to]
+        if not recipient_dids:
+            raise KeymasterError("At least one recipient is required")
+
+        recipients = []
+        for recipient_did in recipient_dids:
+            recipient_doc = await self._resolve_did_for_didcomm(recipient_did)
+            recipients.append(self._resolve_key_agreement(recipient_doc))
+
+        id_info = await self.fetch_id_info(options.get("name"))
+        did = id_info["did"]
+        envelope = {
+            "id": message.get("id") or b64url(os.urandom(16)),
+            "typ": "application/didcomm-plain+json",
+            **message,
+            "to": recipient_dids,
+        }
+
+        sender = None
+        if not options.get("anoncrypt"):
+            envelope["from"] = did
+            own_doc = await self.resolve_did(did)
+            own_ka = self._resolve_key_agreement(own_doc)
+            ka = await self.fetch_didcomm_key_pair(options.get("name"))
+            sender = {"kid": own_ka["kid"], "privateJwk": ka["privateJwk"]}
+
+        signer = None
+        if options.get("sign"):
+            keypair = await self.fetch_key_pair(options.get("name"))
+            if not keypair:
+                raise KeymasterError("Unable to resolve signing key")
+            own_doc = await self.resolve_did(did)
+            sig_vm = next(iter(own_doc.get("didDocument", {}).get("verificationMethod") or []), None)
+            if not sig_vm or not sig_vm.get("id"):
+                raise KeymasterError("DID document has no signing verification method")
+            signer_kid = f"{did}{sig_vm['id']}" if sig_vm["id"].startswith("#") else sig_vm["id"]
+            signer = {"kid": signer_kid, "privateJwk": keypair["privateJwk"]}
+
+        return dc.pack_didcomm_message(envelope, recipients, sender=sender, signer=signer, enc=options.get("encryption"))
+
+    async def unpack_didcomm(self, packed: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        options = options or {}
+        name = options.get("name")
+        info = dc.get_envelope_info(packed)
+        if info["type"] != "encrypted":
+            raise KeymasterError("Not a DIDComm encrypted message")
+
+        id_info = await self.fetch_id_info(name)
+        own_doc = await self.resolve_did(id_info["did"])
+        own_ka = self._resolve_key_agreement(own_doc)
+        if own_ka["kid"] not in (info.get("kids") or []):
+            raise KeymasterError("Message is not addressed to this identity")
+
+        sender_key = None
+        if info.get("skid"):
+            sender_doc = await self._resolve_did_for_didcomm(info["skid"].split("#")[0])
+            sender_vm = self._find_verification_method(sender_doc, info["skid"])
+            if not sender_vm:
+                raise KeymasterError("Sender keyAgreement key not found")
+            try:
+                sender_key = dc.normalize_x25519_public_key(sender_vm)
+            except Exception as error:
+                raise KeymasterError("Sender keyAgreement key is not X25519") from error
+
+        ka = await self.fetch_didcomm_key_pair(name)
+        plaintext, _ = dc.unpack_encrypted(packed, {"kid": own_ka["kid"], "privateJwk": ka["privateJwk"]}, sender_key)
+        text = plaintext.decode("utf-8")
+        inner = json.loads(text)
+
+        metadata = {
+            "encrypted": True,
+            "authenticated": info.get("alg") == "ECDH-1PU+A256KW",
+            "nonRepudiation": False,
+            "sender": info.get("skid"),
+            "signer": None,
+        }
+
+        if isinstance(inner, dict) and inner.get("signatures"):
+            jws_kid = (inner["signatures"][0].get("header") or {}).get("kid")
+            if not jws_kid:
+                raise KeymasterError("Signed message missing signer key id")
+            signer_doc = await self.resolve_did(jws_kid.split("#")[0])
+            signer_vm = self._find_verification_method(signer_doc, jws_kid)
+            public_jwk = signer_vm.get("publicKeyJwk") if signer_vm else None
+            if not public_jwk or public_jwk.get("kty") != "EC":
+                raise KeymasterError("Signer key not found or not secp256k1")
+            result = dc.verify_jws(text, public_jwk)
+            metadata["nonRepudiation"] = True
+            metadata["signer"] = jws_kid
+            return {"message": json.loads(result["payload"].decode("utf-8")), "metadata": metadata}
+
+        return {"message": inner, "metadata": metadata}
+
+    async def _didcomm_challenge_auth(self, client: httpx.AsyncClient, base: str, keypair: dict[str, dict[str, str]]) -> dict[str, str]:
+        response = await client.get(f"{base}/api/v1/challenge")
+        challenge = response.json()["challenge"]
+        return {"challenge": challenge, "signature": sign_hash(hash_message(challenge), keypair["privateJwk"])}
+
+    async def send_didcomm(self, message: dict[str, Any], to: str | list[str], options: dict[str, Any] | None = None) -> list[str]:
+        options = options or {}
+        recipient_dids = to if isinstance(to, list) else [to]
+        packed = await self.pack_didcomm(message, recipient_dids, options)
+
+        ids: list[str] = []
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            for recipient_did in recipient_dids:
+                endpoint = await self._resolve_didcomm_endpoint(recipient_did)
+                if not endpoint:
+                    raise KeymasterError(f"recipient {recipient_did} has no DIDCommMessaging endpoint")
+
+                envelope = packed
+                # If the recipient is behind a mediator, wrap in a Forward to the routing key.
+                if endpoint["routingKeys"]:
+                    recipient_doc = await self._resolve_did_for_didcomm(recipient_did)
+                    recipient_ka = self._resolve_key_agreement(recipient_doc)
+                    routing = await self._resolve_routing_key(endpoint["routingKeys"][0])
+                    envelope = dc.wrap_forward(packed, recipient_ka["kid"], {"kid": routing["kid"], "publicJwk": routing["publicJwk"]})
+
+                base = endpoint["uri"].rstrip("/")
+                response = await client.post(
+                    f"{base}/api/v1/messages",
+                    content=envelope,
+                    headers={"Content-Type": "application/didcomm-encrypted+json"},
+                )
+                if response.status_code >= 400:
+                    raise KeymasterError(f"DIDComm delivery to {recipient_did} failed: {response.status_code}")
+                ids.extend(response.json().get("ids") or [])
+        return ids
+
+    async def receive_didcomm(self, options: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        options = options or {}
+        name = options.get("name")
+        id_info = await self.fetch_id_info(name)
+        resolved = {"uri": options["endpoint"]} if options.get("endpoint") else await self._resolve_didcomm_endpoint(id_info["did"])
+        if not resolved:
+            raise KeymasterError("identity has no DIDCommMessaging endpoint; publish_didcomm with an endpoint first")
+        base = resolved["uri"].rstrip("/")
+        keypair = await self.fetch_key_pair(name)
+        if not keypair:
+            raise KeymasterError("unable to resolve signing key")
+
+        results: list[dict[str, Any]] = []
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            auth = await self._didcomm_challenge_auth(client, base, keypair)
+            fetch_response = await client.post(f"{base}/api/v1/messages/fetch", json={"did": id_info["did"], **auth})
+            if fetch_response.status_code >= 400:
+                raise KeymasterError(f"DIDComm fetch failed: {fetch_response.status_code}")
+            messages = fetch_response.json().get("messages") or []
+
+            handled: list[str] = []
+            for entry in messages:
+                try:
+                    results.append(await self.unpack_didcomm(entry["message"], {"name": name}))
+                    handled.append(entry["id"])
+                except Exception:
+                    # Leave messages we can't unpack on the server for inspection/retry.
+                    pass
+
+            if handled:
+                ack = await self._didcomm_challenge_auth(client, base, keypair)
+                await client.post(f"{base}/api/v1/messages/remove", json={"did": id_info["did"], **ack, "ids": handled})
+        return results
+
+    async def mediate_didcomm(self, options: dict[str, Any] | None = None) -> dict[str, int]:
+        options = options or {}
+        name = options.get("name")
+        id_info = await self.fetch_id_info(name)
+        resolved = {"uri": options["endpoint"]} if options.get("endpoint") else await self._resolve_didcomm_endpoint(id_info["did"])
+        if not resolved:
+            raise KeymasterError("mediator identity has no DIDCommMessaging endpoint")
+        base = resolved["uri"].rstrip("/")
+        keypair = await self.fetch_key_pair(name)
+        if not keypair:
+            raise KeymasterError("unable to resolve signing key")
+        ka = await self.fetch_didcomm_key_pair(name)
+        own_doc = await self.resolve_did(id_info["did"])
+        own_ka = self._resolve_key_agreement(own_doc)
+
+        relayed = 0
+        skipped = 0
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            fetch_response = await client.post(
+                f"{base}/api/v1/messages/fetch",
+                json={"did": id_info["did"], **(await self._didcomm_challenge_auth(client, base, keypair))},
+            )
+            if fetch_response.status_code >= 400:
+                raise KeymasterError(f"mediator fetch failed: {fetch_response.status_code}")
+            messages = fetch_response.json().get("messages") or []
+
+            handled: list[str] = []
+            for entry in messages:
+                try:
+                    plaintext, _ = dc.unpack_encrypted(entry["message"], {"kid": own_ka["kid"], "privateJwk": ka["privateJwk"]})
+                    forwarded = dc.parse_forward(plaintext.decode("utf-8"))["forwardedMessage"]
+                    post = await client.post(
+                        f"{base}/api/v1/messages",
+                        content=forwarded,
+                        headers={"Content-Type": "application/didcomm-encrypted+json"},
+                    )
+                    if post.status_code < 400:
+                        relayed += 1
+                        handled.append(entry["id"])
+                    else:
+                        skipped += 1
+                except Exception:
+                    skipped += 1
+
+            if handled:
+                ack = await self._didcomm_challenge_auth(client, base, keypair)
+                await client.post(f"{base}/api/v1/messages/remove", json={"did": id_info["did"], **ack, "ids": handled})
+        return {"relayed": relayed, "skipped": skipped}
