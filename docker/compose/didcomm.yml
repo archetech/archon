@@ -1,8 +1,8 @@
 # DIDComm relay (mailbox) service. Pulled into docker-compose.yml via the
 # `include:` directive. Optional — enable with the `didcomm` profile
 # (COMPOSE_PROFILES=didcomm). Stores encrypted envelopes addressed by recipient
-# DID until the key-holder fetches them; uses an in-memory store (no redis/mongo
-# dependency yet).
+# DID until the key-holder fetches them. Backend is in-memory by default; set
+# ARCHON_DIDCOMM_DB=redis to use the redis service for shared/persistent storage.
 services:
   didcomm:
     build:
