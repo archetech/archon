@@ -269,8 +269,22 @@ Bob re-publishes advertising it, and Alice then reaches Bob through the mediator
 mediator currently relays any Forward it can unpack; gating relay on the registered keylist
 is a refinement.
 
-**Phase 7 — Parity & polish.** Python SDK parity ([python/](../python/)), CLI commands,
-docs.
+**Phase 7 — Parity & polish. ✅ done.** The full DIDComm surface is now reachable from every
+client tier, not just the in-process `Keymaster` class:
+
+- **CLI** ([cli.ts](../packages/keymaster/src/cli.ts)) — `publish-didcomm [endpoint]`,
+  `unpublish-didcomm`, `pack-didcomm <file> <to>`, `unpack-didcomm <file>`,
+  `send-didcomm <file> <to>`, `receive-didcomm`, `mediate-didcomm`. `pack`/`send` take the
+  plaintext message as a JSON file and a comma-separated recipient list, with `--sign`,
+  `--anoncrypt`, `--encryption`, and `--name` (sender identity) flags.
+- **Python SDK** ([python/keymaster_sdk](../python/keymaster_sdk/)) — `publish_didcomm`,
+  `unpublish_didcomm`, `pack_didcomm`, `unpack_didcomm`, `send_didcomm`, `receive_didcomm`,
+  `mediate_didcomm`, mirroring the JS `KeymasterClient` (same REST endpoints/bodies). A mocked
+  contract test asserts endpoint + body + return parity for all seven; a live test does a real
+  authcrypt pack→unpack round-trip between two identities.
+- **REST + Swagger** were already shipped alongside the transport work (`/didcomm/publish`,
+  `/pack`, `/unpack`, `/send`, `/receive`, `/mediate`), so this phase only wired the two
+  remaining surfaces (CLI, Python) on top of them.
 
 ## Risks & open questions
 
@@ -302,8 +316,9 @@ against the `didcomm-node` reference library.
 | 4 — Application protocols | ✅ | message builders (`didcomm-protocols.ts`) for Trust Ping, Basic Message, Discover Features, Out-of-Band (+ `_oob` URL encode/decode) — compose with `sendDidComm`/`receiveDidComm`; e2e: basic message + trust-ping request/response (thid-correlated) over the relay |
 | 5 — Credential exchange | ✅ | Issue-Credential 3.0 + Present-Proof 3.0 builders carrying an Archon VC/VP as a DIDComm attachment; maps onto `bindCredential`/`addProof`/`verifyProof`; e2e: Alice issues a VC to Bob over DIDComm (Bob verifies the issuer proof), Carol requests + Bob presents a VP, Carol verifies holder + issuer signatures |
 | 6 — Routing/mediation | ✅ | Forward messages landed in 3c (`wrapForward`/`mediateDidComm`); Coordinate-Mediation 2.0 builders (`mediate-request`/`grant`/`keylist-update`/…) + `routing_did` support in `sendDidComm`; e2e: Bob enrolls with a mediator (request→grant→keylist) and Alice then routes to him through it |
+| 7 — Parity & polish | ✅ | CLI commands (`publish-/unpublish-/pack-/unpack-/send-/receive-/mediate-didcomm`); Python SDK functions (`publish_didcomm`/`unpublish_didcomm`/`pack_didcomm`/`unpack_didcomm`/`send_didcomm`/`receive_didcomm`/`mediate_didcomm`) mirroring `KeymasterClient`; mocked contract parity test (all 7) + live pack/unpack round-trip; REST routes + Swagger already shipped in 3a/3b |
 
-**Remaining (not started):** **7** (Python SDK + CLI parity — deferred). Plus follow-ons:
+**Remaining (not started):** none. Follow-ons (nice-to-have, not blocking):
 EdDSA signature verify (foreign Ed25519 signers), P-256 key agreement, a Universal Resolver
 driver so others can resolve `did:cid`, an optional mongo mailbox backend, and a standard
 credential attachment format for cross-agent (non-Archon) VC interop (Archon VCs use

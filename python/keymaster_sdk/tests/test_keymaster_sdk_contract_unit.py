@@ -282,3 +282,48 @@ def test_create_returns_configured_sdk_module(monkeypatch):
 
     assert created is sdk
     assert connect_calls == [{"url": "http://unit.test", "apiKey": "secret"}]
+
+
+def test_didcomm_wrappers_forward_expected_requests(monkeypatch):
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_proxy_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if url.endswith("/didcomm/publish"):
+            return {"ok": True}
+        if url.endswith("/didcomm/pack"):
+            return {"packed": "PACKED"}
+        if url.endswith("/didcomm/unpack"):
+            return {"result": {"message": {"body": {"content": "hi"}}, "metadata": {"encrypted": True}}}
+        if url.endswith("/didcomm/send"):
+            return {"ids": ["id-1", "id-2"]}
+        if url.endswith("/didcomm/receive"):
+            return {"results": [{"message": {"body": {"content": "hi"}}}]}
+        if url.endswith("/didcomm/mediate"):
+            return {"result": {"relayed": 2, "skipped": 1}}
+        raise AssertionError(url)
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    assert sdk.publish_didcomm("https://relay.example/didcomm", "Alice", ["did:test:mediator"]) is True
+    assert sdk.unpublish_didcomm("Alice") is True
+    assert sdk.pack_didcomm({"type": "t", "body": {}}, "did:test:bob", {"sign": True}) == "PACKED"
+    assert sdk.unpack_didcomm("PACKED", {"name": "Bob"})["message"]["body"]["content"] == "hi"
+    assert sdk.send_didcomm({"type": "t", "body": {}}, ["did:test:bob"], {"anoncrypt": True}) == ["id-1", "id-2"]
+    assert sdk.receive_didcomm({"name": "Bob"})[0]["message"]["body"]["content"] == "hi"
+    assert sdk.mediate_didcomm({"name": "Mediator"}) == {"relayed": 2, "skipped": 1}
+
+    assert calls == [
+        ("POST", "http://unit.test/api/v1/didcomm/publish",
+         {"json": {"endpoint": "https://relay.example/didcomm", "name": "Alice", "routingKeys": ["did:test:mediator"]}}),
+        ("DELETE", "http://unit.test/api/v1/didcomm/publish", {"json": {"name": "Alice"}}),
+        ("POST", "http://unit.test/api/v1/didcomm/pack",
+         {"json": {"message": {"type": "t", "body": {}}, "to": "did:test:bob", "options": {"sign": True}}}),
+        ("POST", "http://unit.test/api/v1/didcomm/unpack",
+         {"json": {"packed": "PACKED", "options": {"name": "Bob"}}}),
+        ("POST", "http://unit.test/api/v1/didcomm/send",
+         {"json": {"message": {"type": "t", "body": {}}, "to": ["did:test:bob"], "options": {"anoncrypt": True}}}),
+        ("POST", "http://unit.test/api/v1/didcomm/receive", {"json": {"options": {"name": "Bob"}}}),
+        ("POST", "http://unit.test/api/v1/didcomm/mediate", {"json": {"options": {"name": "Mediator"}}}),
+    ]

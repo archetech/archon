@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import Keymaster from './keymaster.js';
 import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
 import CipherNode from '@didcid/cipher/node';
+import type { DidCommEnc } from '@didcid/cipher/didcomm';
 import WalletJson from './db/json.js';
 import WalletSQLite from './db/sqlite.js';
 
@@ -2036,6 +2037,132 @@ program
         try {
             const attachments = await keymaster.listDmailAttachments(did);
             console.log(JSON.stringify(attachments, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+// DIDComm v2 commands
+program
+    .command('publish-didcomm [endpoint]')
+    .description('Publish an X25519 key-agreement key (and optional DIDCommMessaging service) to the current identity')
+    .option('-n, --name <name>', 'identity name (defaults to current)')
+    .option('--routing-keys <keys>', 'comma-separated mediator routing keys/DIDs')
+    .action(async (endpoint, options) => {
+        try {
+            const routingKeys = options.routingKeys
+                ? options.routingKeys.split(',').map((s: string) => s.trim())
+                : undefined;
+            const ok = await keymaster.publishDidComm(endpoint, options.name, routingKeys);
+            console.log(ok ? 'published' : 'failed');
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('unpublish-didcomm')
+    .description('Remove the DIDComm key-agreement key and service from the current identity')
+    .option('-n, --name <name>', 'identity name (defaults to current)')
+    .action(async (options) => {
+        try {
+            const ok = await keymaster.unpublishDidComm(options.name);
+            console.log(ok ? 'unpublished' : 'failed');
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('pack-didcomm <file> <to>')
+    .description('Pack a DIDComm v2 message (JSON file) for one or more recipients (comma-separated DIDs)')
+    .option('--sign', 'add an ES256K signature (non-repudiation)')
+    .option('--anoncrypt', 'anonymous sender (anoncrypt instead of authcrypt)')
+    .option('-e, --encryption <alg>', 'content encryption: A256CBC-HS512 | XC20P | A256GCM')
+    .option('-n, --name <name>', 'sender identity name (defaults to current)')
+    .action(async (file, to, options) => {
+        try {
+            const message = JSON.parse(fs.readFileSync(file).toString());
+            const recipients = to.includes(',') ? to.split(',').map((s: string) => s.trim()) : to;
+            const packed = await keymaster.packDidComm(message, recipients, {
+                sign: options.sign,
+                anoncrypt: options.anoncrypt,
+                encryption: options.encryption as DidCommEnc | undefined,
+                name: options.name,
+            });
+            console.log(packed);
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('unpack-didcomm <file>')
+    .description('Unpack (decrypt and verify) a DIDComm v2 message read from a file')
+    .option('-n, --name <name>', 'recipient identity name (defaults to current)')
+    .action(async (file, options) => {
+        try {
+            const packed = fs.readFileSync(file).toString();
+            const result = await keymaster.unpackDidComm(packed, { name: options.name });
+            console.log(JSON.stringify(result, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('send-didcomm <file> <to>')
+    .description('Pack a DIDComm message (JSON file) and deliver it to each recipient mailbox (comma-separated DIDs)')
+    .option('--sign', 'add an ES256K signature (non-repudiation)')
+    .option('--anoncrypt', 'anonymous sender (anoncrypt instead of authcrypt)')
+    .option('-e, --encryption <alg>', 'content encryption: A256CBC-HS512 | XC20P | A256GCM')
+    .option('-n, --name <name>', 'sender identity name (defaults to current)')
+    .action(async (file, to, options) => {
+        try {
+            const message = JSON.parse(fs.readFileSync(file).toString());
+            const recipients = to.includes(',') ? to.split(',').map((s: string) => s.trim()) : to;
+            const ids = await keymaster.sendDidComm(message, recipients, {
+                sign: options.sign,
+                anoncrypt: options.anoncrypt,
+                encryption: options.encryption as DidCommEnc | undefined,
+                name: options.name,
+            });
+            console.log(JSON.stringify(ids, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('receive-didcomm')
+    .description('Fetch and unpack queued DIDComm messages from the current identity mailbox')
+    .option('-n, --name <name>', 'identity name (defaults to current)')
+    .option('--endpoint <url>', 'override the mailbox endpoint')
+    .action(async (options) => {
+        try {
+            const results = await keymaster.receiveDidComm({ name: options.name, endpoint: options.endpoint });
+            console.log(JSON.stringify(results, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('mediate-didcomm')
+    .description('Relay queued Forward envelopes from this identity mailbox to their recipients (mediator role)')
+    .option('-n, --name <name>', 'mediator identity name (defaults to current)')
+    .option('--endpoint <url>', 'override the mailbox endpoint')
+    .action(async (options) => {
+        try {
+            const result = await keymaster.mediateDidComm({ name: options.name, endpoint: options.endpoint });
+            console.log(JSON.stringify(result, null, 4));
         }
         catch (error: any) {
             console.error(error.error || error.message || error);

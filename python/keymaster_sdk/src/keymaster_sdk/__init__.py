@@ -150,4 +150,11 @@ from .keymaster_sdk import (
     view_poll,
     vote_poll,
     zap_lightning,
+    publish_didcomm,
+    unpublish_didcomm,
+    pack_didcomm,
+    unpack_didcomm,
+    send_didcomm,
+    receive_didcomm,
+    mediate_didcomm,
 )

@@ -1367,3 +1367,79 @@ def get_lightning_payments(id=None):
         json={"id": id},
     )
     return response["payments"]
+
+
+# DIDComm v2
+
+
+def publish_didcomm(endpoint=None, name=None, routing_keys=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/didcomm/publish",
+        json={"endpoint": endpoint, "name": name, "routingKeys": routing_keys},
+    )
+    return response["ok"]
+
+
+def unpublish_didcomm(name=None):
+    response = proxy_request(
+        "DELETE",
+        f"{_keymaster_api}/didcomm/publish",
+        json={"name": name},
+    )
+    return response["ok"]
+
+
+def pack_didcomm(message, to, options=None):
+    if options is None:
+        options = {}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/didcomm/pack",
+        json={"message": message, "to": to, "options": options},
+    )
+    return response["packed"]
+
+
+def unpack_didcomm(packed, options=None):
+    if options is None:
+        options = {}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/didcomm/unpack",
+        json={"packed": packed, "options": options},
+    )
+    return response["result"]
+
+
+def send_didcomm(message, to, options=None):
+    if options is None:
+        options = {}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/didcomm/send",
+        json={"message": message, "to": to, "options": options},
+    )
+    return response["ids"]
+
+
+def receive_didcomm(options=None):
+    if options is None:
+        options = {}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/didcomm/receive",
+        json={"options": options},
+    )
+    return response["results"]
+
+
+def mediate_didcomm(options=None):
+    if options is None:
+        options = {}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/didcomm/mediate",
+        json={"options": options},
+    )
+    return response["result"]

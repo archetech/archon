@@ -58,7 +58,7 @@ jobs:
         env:
           ARCHON_KEYMASTER_URL: http://localhost:4226
         run: |
-          pytest -q tests/test_keymaster_sdk.py
+          pytest -q tests/test_keymaster_sdk.py tests/test_keymaster_sdk_contract_unit.py
 
       - name: Grab logs
         if: always()

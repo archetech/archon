@@ -256,6 +256,36 @@ def test_encrypt_decrypt_message():
     assert_equal(response, msg)
 
 
+def test_didcomm_pack_unpack_roundtrip():
+    alice = generate_id()
+    bob = generate_id()
+    alice_id = keymaster.create_id(alice, local_options)
+    bob_id = keymaster.create_id(bob, local_options)
+
+    # Both identities publish an X25519 key-agreement key. No endpoint is needed
+    # for pack/unpack (only send/receive require a DIDCommMessaging mailbox).
+    assert_equal(keymaster.publish_didcomm(name=alice), True)
+    assert_equal(keymaster.publish_didcomm(name=bob), True)
+
+    message = {
+        "type": "https://didcomm.org/basicmessage/2.0/message",
+        "body": {"content": "Hi Bob"},
+    }
+
+    # Alice authcrypts a message to Bob; Bob decrypts and verifies the sender.
+    packed = keymaster.pack_didcomm(message, bob_id, {"name": alice})
+    assert isinstance(packed, str) and len(packed) > 0
+
+    result = keymaster.unpack_didcomm(packed, {"name": bob})
+    assert_equal(result["message"]["body"]["content"], "Hi Bob")
+    assert_equal(result["message"]["from"], alice_id)
+    assert_equal(result["metadata"]["encrypted"], True)
+    assert_equal(result["metadata"]["authenticated"], True)
+
+    keymaster.unpublish_didcomm(name=alice)
+    keymaster.unpublish_didcomm(name=bob)
+
+
 def test_aliases():
     alice = generate_id()
     alice_id = keymaster.create_id(alice, local_options)
