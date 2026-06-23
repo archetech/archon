@@ -39,6 +39,7 @@ const RevealSchema = z.object({ reveal: z.literal(true) });
 const ConfirmPaymentSchema = z.object({ confirmPayment: z.literal(true) });
 const JsonObjectSchema = z.record(z.unknown());
 const JsonValueSchema = z.unknown();
+const DidCommEncSchema = z.enum(['A256CBC-HS512', 'XC20P', 'A256GCM']);
 const InlineDataSchema = z.object({
     name: z.string().optional(),
     mimeType: z.string().optional(),
@@ -286,6 +287,14 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
         return buffer ? inlineDataFromBuffer(Buffer.from(buffer), name) : null;
     } }),
     tool({ name: 'archon_list_dmail_attachments', cliCommand: 'list-dmail-attachments', description: 'List attachments of a dmail.', schema: DidSchema.merge(ResolveOptionsSchema), handler: (runtime, { did, ...options }) => requireKeymaster(runtime).listDmailAttachments(did, compactOptions(options)) }),
+
+    tool({ name: 'archon_publish_didcomm', cliCommand: 'publish-didcomm', description: 'Publish an X25519 key-agreement key (and optional DIDCommMessaging service) to the current ID.', schema: z.object({ endpoint: z.string().optional(), name: z.string().optional(), routingKeys: z.array(z.string()).optional() }), mutates: true, handler: (runtime, { endpoint, name, routingKeys }) => requireKeymaster(runtime).publishDidComm(endpoint, name, routingKeys) }),
+    tool({ name: 'archon_unpublish_didcomm', cliCommand: 'unpublish-didcomm', description: 'Remove the DIDComm key-agreement key and service from the current ID.', schema: z.object({ name: z.string().optional() }), mutates: true, handler: (runtime, { name }) => requireKeymaster(runtime).unpublishDidComm(name) }),
+    tool({ name: 'archon_pack_didcomm', cliCommand: 'pack-didcomm', description: 'Pack a DIDComm v2 message (encrypted, optionally signed) for one or more recipient DIDs.', schema: z.object({ message: JsonObjectSchema, to: z.union([z.string(), z.array(z.string())]), sign: z.boolean().optional(), anoncrypt: z.boolean().optional(), encryption: DidCommEncSchema.optional(), name: z.string().optional() }), handler: (runtime, { message, to, sign, anoncrypt, encryption, name }) => requireKeymaster(runtime).packDidComm(message, to, compactOptions({ sign, anoncrypt, encryption, name })) }),
+    tool({ name: 'archon_unpack_didcomm', cliCommand: 'unpack-didcomm', description: 'Unpack (decrypt and verify) a DIDComm v2 message addressed to the current ID.', schema: z.object({ packed: z.string(), name: z.string().optional() }), handler: (runtime, { packed, name }) => requireKeymaster(runtime).unpackDidComm(packed, compactOptions({ name })) }),
+    tool({ name: 'archon_send_didcomm', cliCommand: 'send-didcomm', description: 'Pack a DIDComm message and deliver it to each recipient DID\'s mailbox.', schema: z.object({ message: JsonObjectSchema, to: z.union([z.string(), z.array(z.string())]), sign: z.boolean().optional(), anoncrypt: z.boolean().optional(), encryption: DidCommEncSchema.optional(), name: z.string().optional() }), mutates: true, handler: (runtime, { message, to, sign, anoncrypt, encryption, name }) => requireKeymaster(runtime).sendDidComm(message, to, compactOptions({ sign, anoncrypt, encryption, name })) }),
+    tool({ name: 'archon_receive_didcomm', cliCommand: 'receive-didcomm', description: 'Fetch and unpack queued DIDComm messages from the current ID\'s mailbox.', schema: z.object({ name: z.string().optional(), endpoint: z.string().optional() }), mutates: true, handler: (runtime, { name, endpoint }) => requireKeymaster(runtime).receiveDidComm(compactOptions({ name, endpoint })) }),
+    tool({ name: 'archon_mediate_didcomm', cliCommand: 'mediate-didcomm', description: 'Relay queued Forward envelopes from this ID\'s mailbox to their recipients (mediator role).', schema: z.object({ name: z.string().optional(), endpoint: z.string().optional() }), mutates: true, handler: (runtime, { name, endpoint }) => requireKeymaster(runtime).mediateDidComm(compactOptions({ name, endpoint })) }),
 ];
 
 export const ARCHON_MCP_CLI_COMMANDS = ARCHON_MCP_TOOL_DEFINITIONS
