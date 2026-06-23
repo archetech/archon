@@ -71,6 +71,16 @@ durable backend. Run **at most one per node**; they do not coordinate.
 
 ---
 
+## Messaging
+
+Optional. Enable with the `didcomm` compose profile.
+
+| Spec | Role |
+| --- | --- |
+| [DIDComm relay](didcomm/README.md) | Store-and-forward mailbox for DIDComm v2 encrypted envelopes. Holds mail addressed by recipient DID until the key-holder fetches it (signed-challenge auth); carries no keys. Fronted by Drawbridge at `/didcomm`. |
+
+---
+
 ## OpenAPI references
 
 - [Gatekeeper API](../gatekeeper-api.html) (browsable) — [raw OpenAPI](../gatekeeper-api.json)
