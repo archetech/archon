@@ -2110,6 +2110,11 @@ v1router.delete('/addresses/publish', async (req, res) => {
  *               name:
  *                 type: string
  *                 description: Optional identity name. Defaults to the current identity.
+ *               routingKeys:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Optional mediator routing keys or DIDs. When present, the published `DIDCommMessaging` service advertises the object form (uri/accept/routingKeys) so senders wrap messages in a Forward to the mediator.
  *     responses:
  *       200:
  *         description: Indicates whether the key agreement key was successfully published.

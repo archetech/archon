@@ -3512,6 +3512,8 @@ class Keymaster:
         verification_method = [vm for vm in did_document.get("verificationMethod") or [] if vm.get("id") != vm_id]
         if verification_method:
             did_document["verificationMethod"] = verification_method
+        else:
+            did_document.pop("verificationMethod", None)
         did_document.pop("keyAgreement", None)
 
         services = [s for s in did_document.get("service") or [] if s.get("id") != service_id]
@@ -3535,12 +3537,16 @@ class Keymaster:
 
         id_info = await self.fetch_id_info(options.get("name"))
         did = id_info["did"]
+        # Spread the caller's message first, then force the protocol-controlled
+        # headers so a caller can't override typ/to (or smuggle a `from` into an
+        # anoncrypt envelope). `from` is set below only for authcrypt.
         envelope = {
+            **message,
             "id": message.get("id") or b64url(os.urandom(16)),
             "typ": "application/didcomm-plain+json",
-            **message,
             "to": recipient_dids,
         }
+        envelope.pop("from", None)
 
         sender = None
         if not options.get("anoncrypt"):

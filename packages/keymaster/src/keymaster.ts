@@ -2361,6 +2361,9 @@ export default class Keymaster implements KeymasterInterface {
         if (verificationMethod.length > 0) {
             didDocument.verificationMethod = verificationMethod;
         }
+        else {
+            delete didDocument.verificationMethod;
+        }
 
         delete didDocument.keyAgreement;
 
@@ -2440,12 +2443,16 @@ export default class Keymaster implements KeymasterInterface {
         const id = await this.fetchIdInfo(name);
         const did = id.did;
 
+        // Spread the caller's message first, then force the protocol-controlled
+        // headers so a caller can't override `typ`/`to` (or smuggle a `from` into
+        // an anoncrypt envelope). `from` is set below only for authcrypt.
         const envelope: Record<string, unknown> = {
+            ...message,
             id: (message.id as string) || this.cipher.generateRandomSalt(),
             typ: 'application/didcomm-plain+json',
-            ...message,
             to: recipientDids,
         };
+        delete envelope.from;
 
         const packOptions: PackOptions = {};
 
