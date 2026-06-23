@@ -12,6 +12,9 @@ const config = {
     // Public base URL this node is reachable at (clearnet host or Tor onion).
     // Used to advertise the DIDComm relay endpoint (`<publicHost>/didcomm`).
     publicHost: process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || '',
+    // When publicHost is unset, the DIDComm endpoint falls back to the Tor onion
+    // fronting this Drawbridge, read from this shared hidden-service hostname file.
+    torHostnameFile: process.env.ARCHON_DRAWBRIDGE_TOR_HOSTNAME_FILE || '/data/tor/hostname',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
 
     // L402

@@ -105,6 +105,9 @@ services:
     volumes:
       - ../../scripts/drawbridge-entrypoint.sh:/scripts/drawbridge-entrypoint.sh:ro
       - ../../data/drawbridge:/data/drawbridge
+      # Read-only onion hostname (shared with tor), to advertise <onion>/didcomm
+      # when ARCHON_DRAWBRIDGE_PUBLIC_HOST is unset.
+      - tor-hostname:/data/tor:ro
     healthcheck:
       test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4222/api/v1/ready',res=>{let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>process.exit(res.statusCode===200&&(body.trim()==='true'||body.includes('\"ready\":true'))?0:1));});req.on('error',()=>process.exit(1));"]
       interval: 15s

@@ -266,10 +266,12 @@ SIGTERM/SIGINT closes the HTTP listener; the Redis backend disconnects on
   A DID advertises its mailbox by publishing a `DIDCommMessaging` service
   endpoint (via `publishDidComm`) pointing at that public URL; `sendDidComm`
   posts to `<endpoint>/api/v1/messages`. `publishDidComm` with no explicit
-  endpoint auto-discovers `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/didcomm` from the
-  gateway (`GET /api/v1/didcomm-endpoint`), the same way `publishLightning`
-  learns its public host; pass an endpoint explicitly to override (standalone
-  relay, a different proxy, an onion, etc.).
+  endpoint auto-discovers the endpoint from the gateway
+  (`GET /api/v1/didcomm-endpoint`), the same way `publishLightning` learns its
+  public host: it uses `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/didcomm`, falling back to
+  `http://<onion>:<port>/didcomm` resolved from the Tor hidden-service hostname
+  fronting Drawbridge when no public host is set. Pass an endpoint explicitly to
+  override (standalone relay, a different proxy, etc.).
 - **Tor / NAT.** Because the recipient *pulls* its mail (it never needs an
   inbound connection), the relay works for offline/NAT'd agents and pairs
   naturally with a Tor hidden service.

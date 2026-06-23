@@ -64,6 +64,33 @@ readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
     drawbridgeVersionInfo.set({ version: 'unknown', commit: serviceCommit }, 1);
 });
 
+// Public DIDComm relay endpoint advertised by publishDidComm: an explicit
+// public host, else the Tor onion that fronts this Drawbridge (the same hidden
+// service used for the Lightning endpoint). Cached on first success; returns
+// null until resolvable (the onion hostname file may not exist yet).
+let cachedDidCommEndpoint: string | undefined;
+
+async function resolveDidCommEndpoint(): Promise<string | null> {
+    if (cachedDidCommEndpoint) {
+        return cachedDidCommEndpoint;
+    }
+    if (config.publicHost) {
+        cachedDidCommEndpoint = `${config.publicHost.replace(/\/+$/, '')}/didcomm`;
+        return cachedDidCommEndpoint;
+    }
+    try {
+        const onion = (await readFile(config.torHostnameFile, 'utf-8')).trim();
+        if (onion) {
+            cachedDidCommEndpoint = `http://${onion}:${config.port}/didcomm`;
+            return cachedDidCommEndpoint;
+        }
+    }
+    catch {
+        // Tor hostname not published yet — retry on a later request.
+    }
+    return null;
+}
+
 function normalizePath(path: string): string {
     return path
         .replace(/\/did\/(?:did:[^/]+|did%3[aA][^/]+)/, '/did/:did')
@@ -399,12 +426,11 @@ async function main() {
         res.json({ version: serviceVersion, commit: serviceCommit });
     });
 
-    // Public DIDComm relay endpoint, derived from the configured public host, so
-    // `publishDidComm` can auto-discover it (the way publishLightning learns its
-    // public host). Returns null when no public host is configured.
-    v1router.get('/didcomm-endpoint', (_req, res) => {
-        const host = config.publicHost ? config.publicHost.replace(/\/+$/, '') : '';
-        res.json({ endpoint: host ? `${host}/didcomm` : null });
+    // Public DIDComm relay endpoint, so `publishDidComm` can auto-discover it
+    // (the way publishLightning learns its public host): an explicit public host,
+    // else the Tor onion fronting this Drawbridge. Null when neither is available.
+    v1router.get('/didcomm-endpoint', async (_req, res) => {
+        res.json({ endpoint: await resolveDidCommEndpoint() });
     });
 
     v1router.get('/status', async (_req, res) => {
