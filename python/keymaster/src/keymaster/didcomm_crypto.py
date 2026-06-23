@@ -20,6 +20,7 @@ import hashlib
 import hmac as hmaclib
 import json
 import os
+import struct
 from typing import Any
 
 from bip_utils import Base58Decoder, Base58Encoder
@@ -28,14 +29,9 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PublicKey,
 )
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM, ChaCha20Poly1305
 from cryptography.hazmat.primitives.keywrap import aes_key_unwrap, aes_key_wrap
 from cryptography.hazmat.primitives.padding import PKCS7
-from nacl.bindings import (
-    crypto_aead_xchacha20poly1305_ietf_decrypt as _xchacha_decrypt,
-    crypto_aead_xchacha20poly1305_ietf_encrypt as _xchacha_encrypt,
-    crypto_sign_ed25519_pk_to_curve25519 as _ed25519_pk_to_x25519,
-)
 
 from .crypto import b64url, sign_hash, ub64url, verify_sig
 
@@ -57,6 +53,67 @@ def _b64u_json(obj: Any) -> str:
 
 def _sha256(data: bytes) -> bytes:
     return hashlib.sha256(data).digest()
+
+
+# --- XChaCha20-Poly1305 (no libsodium/PyNaCl) -------------------------------
+# XChaCha20-Poly1305-IETF: derive a subkey with HChaCha20 over the first 16
+# nonce bytes, then run IETF ChaCha20-Poly1305 (from `cryptography`) with the
+# subkey and a 12-byte nonce of (0x00000000 || last 8 nonce bytes). Matches
+# libsodium's crypto_aead_xchacha20poly1305_ietf and @noble/ciphers' xchacha.
+
+_CHACHA_CONSTANTS = (0x61707865, 0x3320646E, 0x79622D32, 0x6B206574)
+
+
+def _rotl32(value: int, count: int) -> int:
+    return ((value << count) & 0xFFFFFFFF) | (value >> (32 - count))
+
+
+def _quarter_round(state: list[int], a: int, b: int, c: int, d: int) -> None:
+    state[a] = (state[a] + state[b]) & 0xFFFFFFFF
+    state[d] = _rotl32(state[d] ^ state[a], 16)
+    state[c] = (state[c] + state[d]) & 0xFFFFFFFF
+    state[b] = _rotl32(state[b] ^ state[c], 12)
+    state[a] = (state[a] + state[b]) & 0xFFFFFFFF
+    state[d] = _rotl32(state[d] ^ state[a], 8)
+    state[c] = (state[c] + state[d]) & 0xFFFFFFFF
+    state[b] = _rotl32(state[b] ^ state[c], 7)
+
+
+def _hchacha20(key: bytes, nonce16: bytes) -> bytes:
+    state = list(_CHACHA_CONSTANTS) + list(struct.unpack("<8I", key)) + list(struct.unpack("<4I", nonce16))
+    for _ in range(10):
+        _quarter_round(state, 0, 4, 8, 12)
+        _quarter_round(state, 1, 5, 9, 13)
+        _quarter_round(state, 2, 6, 10, 14)
+        _quarter_round(state, 3, 7, 11, 15)
+        _quarter_round(state, 0, 5, 10, 15)
+        _quarter_round(state, 1, 6, 11, 12)
+        _quarter_round(state, 2, 7, 8, 13)
+        _quarter_round(state, 3, 4, 9, 14)
+    return struct.pack("<8I", *(state[0:4] + state[12:16]))
+
+
+def _xchacha_nonce12(nonce24: bytes) -> bytes:
+    return b"\x00\x00\x00\x00" + nonce24[16:24]
+
+
+def _xchacha_encrypt(message: bytes, aad: bytes, nonce24: bytes, key: bytes) -> bytes:
+    return ChaCha20Poly1305(_hchacha20(key, nonce24[:16])).encrypt(_xchacha_nonce12(nonce24), message, aad)
+
+
+def _xchacha_decrypt(ciphertext_and_tag: bytes, aad: bytes, nonce24: bytes, key: bytes) -> bytes:
+    return ChaCha20Poly1305(_hchacha20(key, nonce24[:16])).decrypt(_xchacha_nonce12(nonce24), ciphertext_and_tag, aad)
+
+
+# --- Ed25519 -> X25519 public key (birational map, no libsodium) ------------
+# Edwards y -> Montgomery u = (1 + y) / (1 - y) mod p, p = 2^255 - 19. Matches
+# libsodium's crypto_sign_ed25519_pk_to_curve25519 for well-formed keys.
+
+def _ed25519_pk_to_x25519(ed_public: bytes) -> bytes:
+    p = (1 << 255) - 19
+    y = int.from_bytes(ed_public, "little") & ((1 << 255) - 1)  # drop the sign bit
+    u = ((1 + y) * pow((1 - y) % p, p - 2, p)) % p
+    return u.to_bytes(32, "little")
 
 
 def _x25519_public(seed: bytes) -> bytes:

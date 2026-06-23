@@ -28,7 +28,6 @@ dependencies = [
   "bolt11==2.2.0",
   "coincurve==21.0.0",
   "cryptography==46.0.7",
-  "pynacl==1.5.0",
   "redis==5.2.1",
   "rfc8785==0.1.4"
 ]
