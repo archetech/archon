@@ -3684,6 +3684,8 @@ class Keymaster:
                 # Authenticated hand-off to the service (signed challenge proving
                 # control of sender_did); it delivers the opaque envelope.
                 challenge_response = await client.get(f"{service_base}/api/v1/challenge")
+                if challenge_response.status_code >= 400:
+                    raise KeymasterError(f"DIDComm delivery to {recipient_did} failed: gateway challenge request returned {challenge_response.status_code}")
                 challenge = challenge_response.json()["challenge"]
                 signature = sign_hash(hash_message(challenge), keypair["privateJwk"])
                 response = await client.post(

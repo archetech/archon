@@ -2653,6 +2653,9 @@ export default class Keymaster implements KeymasterInterface {
             // Authenticated hand-off to the service (signed challenge proving we
             // control senderDid), which delivers the opaque envelope to the recipient.
             const challengeResponse = await fetch(`${serviceBase}/api/v1/challenge`);
+            if (!challengeResponse.ok) {
+                throw new KeymasterError(`DIDComm delivery to ${recipientDid} failed: gateway challenge request returned ${challengeResponse.status}`);
+            }
             const { challenge } = await challengeResponse.json();
             const signature = this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk);
             const response = await fetch(`${serviceBase}/api/v1/deliver`, {
