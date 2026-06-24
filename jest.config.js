@@ -48,7 +48,11 @@ const config = {
         "/node_modules/",
         "/kc-app/",
         "/client/",
-        "/tests/cli/"
+        "/tests/cli/",
+        // In-process HTTP e2e (boots the relay + makes real fetches). Belongs in the
+        // CLI/docker e2e suite, not the unit run — it leaves undici sockets that trip
+        // Jest's "import after teardown". Migration to tests/cli/ tracked in #644.
+        "/tests/didcomm/e2e\\.test\\.ts$"
     ]
 };
 
