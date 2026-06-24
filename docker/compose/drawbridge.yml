@@ -91,6 +91,9 @@ services:
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       - ARCHON_LIGHTNING_MEDIATOR_URL=http://lightning-mediator:4235
       - ARCHON_DIDCOMM_URL=http://didcomm:4236
+      # Public base URL advertised by GET /api/v1/didcomm-endpoint (used by
+      # publish-didcomm). Without this the endpoint falls back to the Tor onion.
+      - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
       - ARCHON_REDIS_URL=redis://redis:6379
       - ARCHON_DRAWBRIDGE_L402_ENABLED=${ARCHON_DRAWBRIDGE_L402_ENABLED:-false}
       - ARCHON_DRAWBRIDGE_MACAROON_SECRET=${ARCHON_DRAWBRIDGE_MACAROON_SECRET:-}
