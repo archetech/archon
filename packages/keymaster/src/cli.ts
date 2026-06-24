@@ -2233,7 +2233,7 @@ async function run() {
         }
 
         // Initialize keymaster
-        keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase });
+        keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase, didcommServiceURL: process.env.ARCHON_DIDCOMM_SERVICE_URL });
 
         program.parse(process.argv);
     }

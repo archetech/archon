@@ -1443,6 +1443,7 @@ async def _run(args: argparse.Namespace) -> int:
             wallet_store=wallet_store,
             passphrase=passphrase,
             default_registry=default_registry or "hyperswarm",
+            didcomm_service_url=os.environ.get("ARCHON_DIDCOMM_SERVICE_URL"),
         )
 
         try:

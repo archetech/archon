@@ -13,6 +13,8 @@ const config = {
     defaultRegistry: process.env.ARCHON_DEFAULT_REGISTRY,
     uploadLimit: process.env.ARCHON_KEYMASTER_UPLOAD_LIMIT || '10mb',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
+    // DIDComm service used for outbound delivery (egress + Tor); required for sendDidComm.
+    didcommServiceURL: process.env.ARCHON_DIDCOMM_SERVICE_URL || '',
 };
 
 export default config;

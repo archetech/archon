@@ -301,6 +301,9 @@ export interface KeymasterOptions {
     cipher: Cipher;
     defaultRegistry?: string;
     maxAliasLength?: number;
+    // Base URL of the DIDComm service that performs outbound delivery (egress +
+    // Tor). Required for sendDidComm — the keymaster never dials recipients itself.
+    didcommServiceURL?: string;
 }
 
 export interface EncryptedMessage {

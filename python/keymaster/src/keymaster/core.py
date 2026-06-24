@@ -116,6 +116,7 @@ class Keymaster:
         default_registry: str = "hyperswarm",
         ephemeral_registry: str = "hyperswarm",
         max_alias_length: int = 32,
+        didcomm_service_url: str | None = None,
     ):
         self.gatekeeper = gatekeeper
         self.wallet_store = wallet_store
@@ -123,6 +124,8 @@ class Keymaster:
         self.default_registry = default_registry or "hyperswarm"
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
+        # DIDComm service used for outbound delivery (egress + Tor); required for send_didcomm.
+        self.didcomm_service_url = didcomm_service_url
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache = None
@@ -3641,9 +3644,20 @@ class Keymaster:
         return {"challenge": challenge, "signature": sign_hash(hash_message(challenge), keypair["privateJwk"])}
 
     async def send_didcomm(self, message: dict[str, Any], to: str | list[str], options: dict[str, Any] | None = None) -> list[str]:
+        # Pack + resolve + Forward-wrap here (crypto), then hand each sealed
+        # envelope to the DIDComm service for delivery (egress + Tor). A configured
+        # service is REQUIRED — no direct-dial fallback.
         options = options or {}
+        if not self.didcomm_service_url:
+            raise KeymasterError("no DIDComm service configured for sending (set ARCHON_DIDCOMM_SERVICE_URL)")
+        service_base = self.didcomm_service_url.rstrip("/")
         recipient_dids = to if isinstance(to, list) else [to]
         packed = await self.pack_didcomm(message, recipient_dids, options)
+
+        keypair = await self.fetch_key_pair(options.get("name"))
+        if not keypair:
+            raise KeymasterError("unable to resolve signing key")
+        sender_did = (await self.fetch_id_info(options.get("name")))["did"]
 
         ids: list[str] = []
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -3660,11 +3674,14 @@ class Keymaster:
                     routing = await self._resolve_routing_key(endpoint["routingKeys"][0])
                     envelope = dc.wrap_forward(packed, recipient_ka["kid"], {"kid": routing["kid"], "publicJwk": routing["publicJwk"]})
 
-                base = endpoint["uri"].rstrip("/")
+                # Authenticated hand-off to the service (signed challenge proving
+                # control of sender_did); it delivers the opaque envelope.
+                challenge_response = await client.get(f"{service_base}/api/v1/challenge")
+                challenge = challenge_response.json()["challenge"]
+                signature = sign_hash(hash_message(challenge), keypair["privateJwk"])
                 response = await client.post(
-                    f"{base}/api/v1/messages",
-                    content=envelope,
-                    headers={"Content-Type": "application/didcomm-encrypted+json"},
+                    f"{service_base}/api/v1/deliver",
+                    json={"did": sender_did, "challenge": challenge, "signature": signature, "endpoint": endpoint["uri"], "message": envelope},
                 )
                 if response.status_code >= 400:
                     raise KeymasterError(f"DIDComm delivery to {recipient_did} failed: {response.status_code}")

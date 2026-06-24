@@ -20,6 +20,9 @@ services:
       # Mailbox store: 'memory' (default) or 'redis'.
       - ARCHON_DIDCOMM_DB=${ARCHON_DIDCOMM_DB:-memory}
       - ARCHON_REDIS_URL=redis://redis:6379
+      # Outbound egress (POST /deliver): dial .onion recipients via Tor (needs
+      # the drawbridge profile's tor service). Clearnet delivery needs no proxy.
+      - ARCHON_DIDCOMM_TOR_PROXY=${ARCHON_DIDCOMM_TOR_PROXY:-tor:9050}
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_DIDCOMM_HOST_BIND:-127.0.0.1}:${ARCHON_DIDCOMM_PORT:-4236}:4236"

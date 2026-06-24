@@ -56,12 +56,16 @@ beforeEach(async () => {
     const db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm'] });
     cipher = new CipherNode();
-    keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass' });
 
-    const app = createApp({ store: new MemoryMailboxStore(), resolver: gatekeeper, cipher });
+    // allowPrivateEgress: the relay both stores mail and (Phase 8) performs
+    // outbound delivery; tests deliver to the same localhost relay.
+    const app = createApp({ store: new MemoryMailboxStore(), resolver: gatekeeper, cipher, allowPrivateEgress: true });
     await new Promise<void>(resolve => { server = app.listen(0, resolve); });
     const port = (server.address() as any).port;
     endpoint = `http://localhost:${port}`;
+
+    // The keymaster sends through the DIDComm service (here, the same relay).
+    keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass', didcommServiceURL: endpoint });
 });
 
 afterEach(async () => {

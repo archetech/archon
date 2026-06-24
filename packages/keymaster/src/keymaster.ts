@@ -176,6 +176,7 @@ export default class Keymaster implements KeymasterInterface {
     private readonly ephemeralRegistry: string;
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
+    private readonly didcommServiceURL?: string;
     private _walletCache?: WalletFile;
     private _hdkeyCache?: any;
 
@@ -197,6 +198,8 @@ export default class Keymaster implements KeymasterInterface {
         this.gatekeeper = options.gatekeeper;
         this.db = options.wallet;
         this.cipher = options.cipher;
+
+        this.didcommServiceURL = options.didcommServiceURL;
 
         this.defaultRegistry = options.defaultRegistry || 'hyperswarm';
         this.ephemeralRegistry = 'hyperswarm';
@@ -2602,15 +2605,29 @@ export default class Keymaster implements KeymasterInterface {
         return this.resolveKeyAgreement(doc);
     }
 
-    // Pack a message and deliver it to each recipient's DIDCommMessaging mailbox
-    // endpoint (store-and-forward). Returns the stored message ids per delivery.
+    // Pack a message and hand each sealed envelope to the DIDComm service for
+    // delivery. The keymaster does crypto only (pack, resolve, Forward-wrap); the
+    // service owns transport — egress, retries, and Tor for `.onion` recipients —
+    // so this never dials recipients directly. A configured service is REQUIRED;
+    // there is no direct-dial fallback (set didcommServiceURL / ARCHON_DIDCOMM_SERVICE_URL).
+    // Returns the stored message ids per delivery.
     async sendDidComm(
         message: Record<string, unknown>,
         to: string | string[],
         options: { sign?: boolean; anoncrypt?: boolean; encryption?: DidCommEnc; name?: string } = {}
     ): Promise<string[]> {
+        if (!this.didcommServiceURL) {
+            throw new KeymasterError('no DIDComm service configured for sending (set didcommServiceURL / ARCHON_DIDCOMM_SERVICE_URL)');
+        }
+        const serviceBase = this.didcommServiceURL.replace(/\/+$/, '');
         const recipientDids = Array.isArray(to) ? to : [to];
         const packed = await this.packDidComm(message, recipientDids, options);
+
+        const keypair = await this.fetchKeyPair(options.name);
+        if (!keypair) {
+            throw new KeymasterError('unable to resolve signing key');
+        }
+        const senderDid = (await this.fetchIdInfo(options.name)).did;
 
         const ids: string[] = [];
         for (const recipientDid of recipientDids) {
@@ -2621,7 +2638,7 @@ export default class Keymaster implements KeymasterInterface {
 
             let envelope = packed;
             // If the recipient is behind a mediator, wrap the packed message in a
-            // Forward addressed to the mediator's routing key.
+            // Forward addressed to the mediator's routing key (crypto, so it stays here).
             if (endpoint.routingKeys.length > 0) {
                 const recipientDoc = await this.resolveDidForDidComm(recipientDid);
                 const recipientKa = this.resolveKeyAgreement(recipientDoc);
@@ -2629,10 +2646,15 @@ export default class Keymaster implements KeymasterInterface {
                 envelope = wrapForward(packed, recipientKa.kid, { kid: routing.kid, publicJwk: routing.publicJwk });
             }
 
-            const response = await fetch(`${endpoint.uri.replace(/\/+$/, '')}/api/v1/messages`, {
+            // Authenticated hand-off to the service (signed challenge proving we
+            // control senderDid), which delivers the opaque envelope to the recipient.
+            const challengeResponse = await fetch(`${serviceBase}/api/v1/challenge`);
+            const { challenge } = await challengeResponse.json();
+            const signature = this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk);
+            const response = await fetch(`${serviceBase}/api/v1/deliver`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/didcomm-encrypted+json' },
-                body: envelope,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ did: senderDid, challenge, signature, endpoint: endpoint.uri, message: envelope }),
             });
             if (!response.ok) {
                 throw new KeymasterError(`DIDComm delivery to ${recipientDid} failed: ${response.status}`);

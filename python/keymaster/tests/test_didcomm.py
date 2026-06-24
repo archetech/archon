@@ -151,6 +151,18 @@ def test_credential_and_presentation_builders():
     assert pres["thid"] == "req-1" and p.attached_json(pres) == vp
 
 
+def test_send_didcomm_requires_a_configured_service():
+    # No didcomm_service_url -> send_didcomm errors before touching the network
+    # (the keymaster never dials recipients directly; there is no fallback).
+    import asyncio
+    import pytest
+    from keymaster.core import Keymaster, KeymasterError
+
+    km = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass")
+    with pytest.raises(KeymasterError):
+        asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
+
+
 def test_coordinate_mediation_builders():
     assert p.mediate_request()["type"] == p.MEDIATE_REQUEST_TYPE
     grant = p.mediate_grant("did:cid:mediator", "req-1")
