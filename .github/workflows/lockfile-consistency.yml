@@ -54,7 +54,10 @@ jobs:
 
             if [ "$manifest" = "package.json" ]; then
               lockfile="package-lock.json"
-            elif [ -f "$dir/package-lock.json" ]; then
+            elif [ -f "$dir/package-lock.json" ] || git show "$BASE_SHA:$dir/package-lock.json" >/dev/null 2>&1; then
+              # Nested package with its own lockfile (present now, or in base —
+              # the latter covers a package removed together with its lockfile,
+              # which must map to the sibling lockfile, not the root one).
               lockfile="$dir/package-lock.json"
             else
               lockfile="package-lock.json"

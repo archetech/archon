@@ -109,8 +109,9 @@ against `didcomm-node`** (kept as a dev/test oracle, never a runtime dependency)
 `pack` must `unpack` under the library and vice-versa.
 
 *(Revised from the original "use the SICPA library" decision once in-browser
-self-custody was confirmed as the primary use case. The Phase 0 spike still stands — it
-proved the library works and gives us the interop oracle — but the runtime is pure-JS.)*
+self-custody was confirmed as the primary use case. The Phase 0 spike proved the library
+works; the runtime is pure-JS, and interop is now locked in by committed cross-language
+test vectors rather than a live oracle.)*
 
 **B. Which key-agreement curve? → X25519.** Mandatory-to-support, smallest/fastest, best
 supported across implementations. Derive it deterministically from the existing wallet
@@ -163,7 +164,9 @@ Responsibilities split along the existing `cipher` ↔ `keymaster` line (the sam
 **Phase 0 — Spike & decisions. ✅ done.** Validated `didcomm-node` against Archon-shaped
 DIDs carrying X25519 keys (anoncrypt/authcrypt/`ES256K`-sign all round-trip); confirmed
 X25519 works and secp256k1 signs as-is. Locked decisions A–D (A later revised to *build*).
-The spike (`spike/didcomm-phase0`) is retained as the **interop oracle** for the build.
+The throwaway spike has since been removed; interop is held by committed cross-language
+vectors in the cipher/keymaster and Python test suites (JS-produced envelopes that must
+decrypt in Python, and vice-versa).
 
 **Phase 1 — Standard-curve keys. ✅ done.** Deterministic X25519 derivation on a dedicated
 HD branch (`m/44'/0'/{account}'/1/0`); `publishDidComm`/`unpublishDidComm` write/remove a
@@ -313,7 +316,7 @@ against the `didcomm-node` reference library.
 
 | Phase | Status | What landed |
 |---|---|---|
-| 0 — Spike & decisions | ✅ | `spike/didcomm-phase0` + the interop oracle (`interop.mjs`) |
+| 0 — Spike & decisions | ✅ | Validated decisions against `didcomm-node`; interop now locked in by committed cross-language test vectors (the throwaway spike has been removed) |
 | 1 — Standard-curve keys | ✅ | deterministic X25519 `keyAgreement` keys in `did:cid` docs; `publishDidComm`/`unpublishDidComm` |
 | 2 — Envelope crypto + API | ✅ | pure-JS anoncrypt/authcrypt/signed in `cipher`; keymaster `packDidComm`/`unpackDidComm` over real `did:cid` resolution |
 | 3a — Cross-method resolution | ✅ | `did:key` (Ed25519/X25519) + universal-resolver fallback; multibase key normalization |
