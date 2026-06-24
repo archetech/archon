@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { getGlobalDispatcher, setGlobalDispatcher, Agent } from 'undici';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -47,6 +48,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+    // Close client-side keep-alive sockets (the keymaster's fetches and the
+    // relay's own outbound /deliver fetch both use the global undici dispatcher).
+    // Otherwise undici lazy-imports during socket cleanup after Jest tears the
+    // environment down → "import after teardown". Swap in a fresh dispatcher so
+    // later suites in the same --runInBand process keep working.
+    const previousDispatcher = getGlobalDispatcher();
+    setGlobalDispatcher(new Agent());
+    await previousDispatcher.close().catch(() => undefined);
+
     if (ipfs) {
         await ipfs.stop();
     }
@@ -56,16 +66,26 @@ beforeEach(async () => {
     const db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm'] });
     cipher = new CipherNode();
-    keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass' });
 
-    const app = createApp({ store: new MemoryMailboxStore(), resolver: gatekeeper, cipher });
+    // allowPrivateEgress: the relay both stores mail and (Phase 8) performs
+    // outbound delivery; tests deliver to the same localhost relay.
+    const app = createApp({ store: new MemoryMailboxStore(), resolver: gatekeeper, cipher, allowPrivateEgress: true });
     await new Promise<void>(resolve => { server = app.listen(0, resolve); });
     const port = (server.address() as any).port;
     endpoint = `http://localhost:${port}`;
+
+    // The keymaster sends through the DIDComm service (here, the same relay).
+    keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass', didcommServiceURL: endpoint });
 });
 
 afterEach(async () => {
-    await new Promise<void>(resolve => server.close(() => resolve()));
+    // Phase 8 sends fan out extra round-trips (challenge + deliver + the relay's
+    // own outbound delivery), leaving keep-alive sockets that can fire after the
+    // Jest env tears down ("import after teardown"). Force them closed.
+    await new Promise<void>(resolve => {
+        server.close(() => resolve());
+        server.closeAllConnections?.();
+    });
 });
 
 describe('DIDComm relay end-to-end', () => {

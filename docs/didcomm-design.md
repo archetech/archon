@@ -289,11 +289,37 @@ client tier, not just the in-process `Keymaster` class:
   port of the envelope crypto (`didcomm_crypto.py`: X25519, ECDH-ES/1PU+A256KW with the
   tag-in-Concat-KDF, A256CBC-HS512/XC20P/A256GCM, ES256K JWS, did:key, Forward), the protocol
   builders (`didcomm_protocols.py`), and the Keymaster methods, using `cryptography`/`coincurve`
-  + PyNaCl (for XChaCha20-Poly1305). **Validated byte-for-byte against the TypeScript stack in
-  both directions** — committed tests decrypt/verify JS-produced envelope vectors (JS→PY) and
-  Python round-trips were confirmed to unpack in `didcomm-node` (PY→JS) during development.
+  — XChaCha20-Poly1305 (XC20P) and the Ed25519→X25519 did:key map are implemented inline, with
+  **no PyNaCl** (removed to clear a moderate libsodium Dependency-Review advisory). **Validated
+  byte-for-byte against the TypeScript stack in both directions** — committed tests decrypt/verify
+  JS-produced envelope vectors (JS→PY) and Python round-trips were confirmed to unpack in
+  `didcomm-node` (PY→JS) during development.
 - **REST + Swagger** were already shipped alongside the transport work (`/didcomm/publish`,
   `/pack`, `/unpack`, `/send`, `/receive`, `/mediate`).
+
+**Phase 8 — Outbound delivery through the service (Tor egress). ✅ done.** Sends no longer dial
+recipients from the keymaster — **all outbound delivery goes through the DIDComm service**, which
+is the single egress point (and the only component with Tor access). The split:
+
+- *keymaster = crypto* — `sendDidComm`/`send_didcomm` pack, resolve the recipient, Forward-wrap
+  for mediated recipients, then hand the **sealed envelope + destination URL** to the gateway.
+  The egress is reached at **`<nodeURL>/didcomm`** (Drawbridge's `/didcomm` proxy), **derived from
+  the single node URL the keymaster already uses** (`gatekeeper.url`) — exactly as
+  `publishLightning` derives its endpoint. There is **no dedicated config / env var**: the keymaster
+  knows only its node URL, never the relay directly.
+- *didcomm service = transport* — `POST /api/v1/deliver` (reached via Drawbridge's `/didcomm`
+  mount, which already proxies it; authenticated by a **signed challenge** proving the sender
+  controls a DID; SSRF-guarded — clearnet must be https + non-private) delivers the opaque envelope
+  to `<endpoint>/api/v1/messages`, dialing `.onion` over a SOCKS5 Tor proxy (`fetch-socks` →
+  `ARCHON_DIDCOMM_TOR_PROXY`, default `tor:9050`, the lightning-mediator pattern).
+
+A node URL is **required** — `sendDidComm` with no gateway to reach is a hard error; there is **no
+direct-dial fallback**. (As with Lightning, sends work only when the keymaster's node URL is the
+gateway/Drawbridge, not a bare gatekeeper.) This lets the CLI and in-browser wallet reach `.onion`
+recipients (they delegate transport) and keeps the keymaster free of network egress. *Validated:*
+the relay e2e routes every send through `/deliver`; a unit test asserts the no-gateway hard error.
+Privacy: the service sees recipient DIDs + timing, not content. (`ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS=true`
+permits loopback destinations for dev/test.)
 
 ## Risks & open questions
 
@@ -326,6 +352,7 @@ against the `didcomm-node` reference library.
 | 5 — Credential exchange | ✅ | Issue-Credential 3.0 + Present-Proof 3.0 builders carrying an Archon VC/VP as a DIDComm attachment; maps onto `bindCredential`/`addProof`/`verifyProof`; e2e: Alice issues a VC to Bob over DIDComm (Bob verifies the issuer proof), Carol requests + Bob presents a VP, Carol verifies holder + issuer signatures |
 | 6 — Routing/mediation | ✅ | Forward messages landed in 3c (`wrapForward`/`mediateDidComm`); Coordinate-Mediation 2.0 builders (`mediate-request`/`grant`/`keylist-update`/…) + `routing_did` support in `sendDidComm`; e2e: Bob enrolls with a mediator (request→grant→keylist) and Alice then routes to him through it |
 | 7 — Parity & polish | ✅ | CLI commands across all three CLIs (cli.ts / archon-cli.js / Python cli.py); Python SDK functions mirroring `KeymasterClient`; **full pure-Python port** of the envelope crypto + protocols + Keymaster methods in the standalone `python/keymaster` library, interop-validated byte-for-byte vs the TypeScript stack (JS-produced vectors decrypt in Python; Python round-trips unpack in `didcomm-node`); MCP tools; REST routes + Swagger shipped in 3a/3b |
+| 8 — Outbound delivery / Tor egress | ✅ | all sends routed through the DIDComm service's `POST /api/v1/deliver` (signed-challenge auth + SSRF guard + `.onion` via `fetch-socks`/Tor); keymaster = crypto, service = transport; service required, no direct-dial fallback; both keymaster flavors + CLIs + compose wired |
 
 **Remaining (not started):** none. Follow-ons (nice-to-have, not blocking):
 EdDSA signature verify (foreign Ed25519 signers), P-256 key agreement, a Universal Resolver

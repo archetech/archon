@@ -15,7 +15,14 @@ async function main() {
     const resolver = await GatekeeperClient.create({ url: config.gatekeeperURL });
     const cipher = new CipherNode();
     const store = await createStore();
-    const app = createApp({ store, resolver, cipher, uploadLimit: config.uploadLimit });
+    const app = createApp({
+        store,
+        resolver,
+        cipher,
+        uploadLimit: config.uploadLimit,
+        torProxy: config.torProxy,
+        allowPrivateEgress: config.allowPrivateEgress,
+    });
 
     app.listen(config.didcommPort, config.bindAddress, () => {
         // eslint-disable-next-line no-console

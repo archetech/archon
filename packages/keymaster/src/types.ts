@@ -301,6 +301,10 @@ export interface KeymasterOptions {
     cipher: Cipher;
     defaultRegistry?: string;
     maxAliasLength?: number;
+    // Explicit override for the DIDComm egress base used by sendDidComm. Normally
+    // unset — the egress is derived from the node URL (`gatekeeper.url`) as
+    // `<node>/didcomm`. Used by in-process/test callers whose gatekeeper has no url.
+    didcommServiceURL?: string;
 }
 
 export interface EncryptedMessage {

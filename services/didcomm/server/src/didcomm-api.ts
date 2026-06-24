@@ -5,6 +5,7 @@
 import crypto from 'crypto';
 import express, { type Express } from 'express';
 import cors from 'cors';
+import { socksDispatcher } from 'fetch-socks';
 import type { Cipher } from '@didcid/cipher/types';
 import { MailboxStore } from './store.js';
 import { recipientDidsFromEnvelope, verifyChallengeSignature, type Resolver } from './mailbox.js';
@@ -14,6 +15,15 @@ export interface AppDeps {
     resolver: Resolver;
     cipher: Cipher;
     uploadLimit?: string;
+    // Outbound egress (POST /deliver): SOCKS5 Tor proxy for .onion destinations,
+    // and whether to permit private/loopback destinations (dev/test only).
+    torProxy?: string;
+    allowPrivateEgress?: boolean;
+}
+
+// SSRF guard: block loopback/private/link-local hosts for clearnet egress.
+function isPrivateHost(hostname: string): boolean {
+    return /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|0\.0\.0\.0|\[?::1\]?$)/.test(hostname);
 }
 
 export function createApp(deps: AppDeps): Express {
@@ -111,6 +121,65 @@ export function createApp(deps: AppDeps): Express {
         }
         catch (error: any) {
             res.status(400).send({ error: error.toString() });
+        }
+    });
+
+    // Outbound egress. An authenticated sender (signed challenge proving control
+    // of `did`) hands us a sealed envelope + the recipient's mailbox endpoint;
+    // we deliver it, dialing `.onion` over Tor. This is the single egress path —
+    // the keymaster never POSTs to recipients directly.
+    v1.post('/deliver', async (req, res) => {
+        try {
+            const did = await authorize(req, res);
+            if (!did) {
+                return;
+            }
+            const { endpoint, message } = req.body || {};
+            if (typeof endpoint !== 'string' || typeof message !== 'string') {
+                return res.status(400).send({ error: 'endpoint and message are required' });
+            }
+
+            let url: URL;
+            try {
+                url = new URL(endpoint);
+            }
+            catch {
+                return res.status(400).send({ error: 'invalid endpoint URL' });
+            }
+            const onion = url.hostname.endsWith('.onion');
+
+            if (!onion && !deps.allowPrivateEgress) {
+                if (url.protocol !== 'https:') {
+                    return res.status(400).send({ error: 'clearnet endpoint must use https' });
+                }
+                if (isPrivateHost(url.hostname)) {
+                    return res.status(400).send({ error: 'private/loopback endpoint not allowed' });
+                }
+            }
+
+            const fetchOptions: any = {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/didcomm-encrypted+json' },
+                body: message,
+            };
+            if (onion) {
+                if (!deps.torProxy) {
+                    return res.status(502).send({ error: 'onion endpoint requires a Tor proxy (set ARCHON_DIDCOMM_TOR_PROXY)' });
+                }
+                const [host, port] = deps.torProxy.split(':');
+                fetchOptions.dispatcher = socksDispatcher({ type: 5, host: host || 'localhost', port: parseInt(port || '9050', 10) });
+            }
+
+            const target = `${endpoint.replace(/\/+$/, '')}/api/v1/messages`;
+            const response = await fetch(target, fetchOptions);
+            if (!response.ok) {
+                return res.status(502).send({ error: `delivery to ${url.host} failed: ${response.status}` });
+            }
+            const data: any = await response.json().catch(() => ({}));
+            res.json({ ids: data.ids || [] });
+        }
+        catch (error: any) {
+            res.status(502).send({ error: error.toString() });
         }
     });
 
