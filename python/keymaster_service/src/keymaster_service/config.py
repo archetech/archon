@@ -21,7 +21,6 @@ class Settings:
     passphrase: str = os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE", "")
     wallet_cache: bool = os.environ.get("ARCHON_WALLET_CACHE", "false").lower() == "true"
     default_registry: str = os.environ.get("ARCHON_DEFAULT_REGISTRY", "hyperswarm") or "hyperswarm"
-    didcomm_service_url: str = os.environ.get("ARCHON_DIDCOMM_SERVICE_URL", "")
     upload_limit: str = os.environ.get("ARCHON_KEYMASTER_UPLOAD_LIMIT", "10mb")
     admin_api_key: str = os.environ.get("ARCHON_ADMIN_API_KEY", "")
     node_id: str = os.environ.get("ARCHON_NODE_ID", "")

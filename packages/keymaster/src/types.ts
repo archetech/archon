@@ -301,8 +301,9 @@ export interface KeymasterOptions {
     cipher: Cipher;
     defaultRegistry?: string;
     maxAliasLength?: number;
-    // Base URL of the DIDComm service that performs outbound delivery (egress +
-    // Tor). Required for sendDidComm — the keymaster never dials recipients itself.
+    // Explicit override for the DIDComm egress base used by sendDidComm. Normally
+    // unset — the egress is derived from the node URL (`gatekeeper.url`) as
+    // `<node>/didcomm`. Used by in-process/test callers whose gatekeeper has no url.
     didcommServiceURL?: string;
 }
 

@@ -124,7 +124,9 @@ class Keymaster:
         self.default_registry = default_registry or "hyperswarm"
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
-        # DIDComm service used for outbound delivery (egress + Tor); required for send_didcomm.
+        # Explicit override for the DIDComm egress base. Normally None — send_didcomm
+        # derives it from the node URL (gatekeeper.url) as <node>/didcomm. For
+        # in-process/test callers whose gatekeeper has no url.
         self.didcomm_service_url = didcomm_service_url
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
@@ -3644,13 +3646,18 @@ class Keymaster:
         return {"challenge": challenge, "signature": sign_hash(hash_message(challenge), keypair["privateJwk"])}
 
     async def send_didcomm(self, message: dict[str, Any], to: str | list[str], options: dict[str, Any] | None = None) -> list[str]:
-        # Pack + resolve + Forward-wrap here (crypto), then hand each sealed
-        # envelope to the DIDComm service for delivery (egress + Tor). A configured
-        # service is REQUIRED — no direct-dial fallback.
+        # Pack + resolve + Forward-wrap here (crypto), then hand each sealed envelope
+        # to the DIDComm service for delivery (egress + Tor). The egress is reached
+        # through the node's gateway (Drawbridge's /didcomm proxy), derived from the
+        # node URL the keymaster already uses — like publish_lightning — so there is
+        # no dedicated config. (didcomm_service_url is an explicit override for
+        # in-process / test use.)
         options = options or {}
-        if not self.didcomm_service_url:
-            raise KeymasterError("no DIDComm service configured for sending (set ARCHON_DIDCOMM_SERVICE_URL)")
-        service_base = self.didcomm_service_url.rstrip("/")
+        node_url = getattr(self.gatekeeper, "url", None)
+        service_base = self.didcomm_service_url or (f"{node_url}/didcomm" if node_url else None)
+        if not service_base:
+            raise KeymasterError("cannot send DIDComm: no node URL to reach the DIDComm gateway")
+        service_base = service_base.rstrip("/")
         recipient_dids = to if isinstance(to, list) else [to]
         packed = await self.pack_didcomm(message, recipient_dids, options)
 

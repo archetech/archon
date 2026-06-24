@@ -8118,7 +8118,7 @@ const server = app.listen(port, config.bindAddress, async () => {
     const wallet = await initWallet();
     const cipher = new CipherNode();
     const defaultRegistry = config.defaultRegistry;
-    keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase: config.keymasterPassphrase, didcommServiceURL: config.didcommServiceURL || undefined });
+    keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase: config.keymasterPassphrase });
     console.log(`Keymaster server v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
     if (config.adminApiKey) {

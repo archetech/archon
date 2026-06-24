@@ -26,7 +26,6 @@ class KeymasterService:
             wallet_store=wallet_store,
             passphrase=settings.passphrase,
             default_registry=settings.default_registry or "hyperswarm",
-            didcomm_service_url=settings.didcomm_service_url or None,
         )
         self.server_ready = False
         self._node_id_task: asyncio.Task[None] | None = None

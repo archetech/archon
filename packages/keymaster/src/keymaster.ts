@@ -2608,18 +2608,22 @@ export default class Keymaster implements KeymasterInterface {
     // Pack a message and hand each sealed envelope to the DIDComm service for
     // delivery. The keymaster does crypto only (pack, resolve, Forward-wrap); the
     // service owns transport — egress, retries, and Tor for `.onion` recipients —
-    // so this never dials recipients directly. A configured service is REQUIRED;
-    // there is no direct-dial fallback (set didcommServiceURL / ARCHON_DIDCOMM_SERVICE_URL).
+    // so this never dials recipients directly. The egress is reached through the
+    // node's gateway (Drawbridge's `/didcomm` proxy), derived from the node URL the
+    // keymaster already uses — exactly as publishLightning derives its endpoint —
+    // so there is no dedicated config. (didcommServiceURL is an explicit override
+    // for in-process / test use, where the gatekeeper has no url.)
     // Returns the stored message ids per delivery.
     async sendDidComm(
         message: Record<string, unknown>,
         to: string | string[],
         options: { sign?: boolean; anoncrypt?: boolean; encryption?: DidCommEnc; name?: string } = {}
     ): Promise<string[]> {
-        if (!this.didcommServiceURL) {
-            throw new KeymasterError('no DIDComm service configured for sending (set didcommServiceURL / ARCHON_DIDCOMM_SERVICE_URL)');
+        const nodeUrl = (this.gatekeeper as { url?: string }).url;
+        const serviceBase = (this.didcommServiceURL ?? (nodeUrl ? `${nodeUrl}/didcomm` : undefined))?.replace(/\/+$/, '');
+        if (!serviceBase) {
+            throw new KeymasterError('cannot send DIDComm: no node URL to reach the DIDComm gateway');
         }
-        const serviceBase = this.didcommServiceURL.replace(/\/+$/, '');
         const recipientDids = Array.isArray(to) ? to : [to];
         const packed = await this.packDidComm(message, recipientDids, options);
 

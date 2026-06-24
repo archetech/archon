@@ -302,19 +302,24 @@ recipients from the keymaster — **all outbound delivery goes through the DIDCo
 is the single egress point (and the only component with Tor access). The split:
 
 - *keymaster = crypto* — `sendDidComm`/`send_didcomm` pack, resolve the recipient, Forward-wrap
-  for mediated recipients, then hand the **sealed envelope + destination URL** to the service.
-- *didcomm service = transport* — `POST /api/v1/deliver` (authenticated by a **signed challenge**
-  proving the sender controls a DID; SSRF-guarded — clearnet must be https + non-private) delivers
-  the opaque envelope to `<endpoint>/api/v1/messages`, dialing `.onion` over a SOCKS5 Tor proxy
-  (`fetch-socks` → `ARCHON_DIDCOMM_TOR_PROXY`, default `tor:9050`, the lightning-mediator pattern).
+  for mediated recipients, then hand the **sealed envelope + destination URL** to the gateway.
+  The egress is reached at **`<nodeURL>/didcomm`** (Drawbridge's `/didcomm` proxy), **derived from
+  the single node URL the keymaster already uses** (`gatekeeper.url`) — exactly as
+  `publishLightning` derives its endpoint. There is **no dedicated config / env var**: the keymaster
+  knows only its node URL, never the relay directly.
+- *didcomm service = transport* — `POST /api/v1/deliver` (reached via Drawbridge's `/didcomm`
+  mount, which already proxies it; authenticated by a **signed challenge** proving the sender
+  controls a DID; SSRF-guarded — clearnet must be https + non-private) delivers the opaque envelope
+  to `<endpoint>/api/v1/messages`, dialing `.onion` over a SOCKS5 Tor proxy (`fetch-socks` →
+  `ARCHON_DIDCOMM_TOR_PROXY`, default `tor:9050`, the lightning-mediator pattern).
 
-A configured service is **required** — `sendDidComm` with no `didcommServiceURL` /
-`ARCHON_DIDCOMM_SERVICE_URL` is a hard error; there is **no direct-dial fallback**. This lets the
-CLI and in-browser wallet reach `.onion` recipients (they delegate transport) and keeps the
-keymaster free of network egress. *Validated:* the relay e2e routes every send through `/deliver`;
-a unit test asserts the no-service hard error. Privacy: the service sees recipient DIDs + timing,
-not content. (`ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS=true` permits loopback destinations for
-dev/test.)
+A node URL is **required** — `sendDidComm` with no gateway to reach is a hard error; there is **no
+direct-dial fallback**. (As with Lightning, sends work only when the keymaster's node URL is the
+gateway/Drawbridge, not a bare gatekeeper.) This lets the CLI and in-browser wallet reach `.onion`
+recipients (they delegate transport) and keeps the keymaster free of network egress. *Validated:*
+the relay e2e routes every send through `/deliver`; a unit test asserts the no-gateway hard error.
+Privacy: the service sees recipient DIDs + timing, not content. (`ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS=true`
+permits loopback destinations for dev/test.)
 
 ## Risks & open questions
 

@@ -69,7 +69,13 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-    await new Promise<void>(resolve => server.close(() => resolve()));
+    // Phase 8 sends fan out extra round-trips (challenge + deliver + the relay's
+    // own outbound delivery), leaving keep-alive sockets that can fire after the
+    // Jest env tears down ("import after teardown"). Force them closed.
+    await new Promise<void>(resolve => {
+        server.close(() => resolve());
+        server.closeAllConnections?.();
+    });
 });
 
 describe('DIDComm relay end-to-end', () => {

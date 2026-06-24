@@ -151,9 +151,10 @@ def test_credential_and_presentation_builders():
     assert pres["thid"] == "req-1" and p.attached_json(pres) == vp
 
 
-def test_send_didcomm_requires_a_configured_service():
-    # No didcomm_service_url -> send_didcomm errors before touching the network
-    # (the keymaster never dials recipients directly; there is no fallback).
+def test_send_didcomm_requires_a_node_gateway():
+    # A gatekeeper with no `url` (and no override) means no node gateway to reach
+    # the DIDComm service -> send_didcomm errors before any network/crypto work.
+    # (The keymaster never dials recipients directly; there is no fallback.)
     import asyncio
     import pytest
     from keymaster.core import Keymaster, KeymasterError
