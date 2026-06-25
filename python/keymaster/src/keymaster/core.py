@@ -3647,14 +3647,14 @@ class Keymaster:
         # must NOT use our published public endpoint (it may be an unreachable .onion).
         # An explicit endpoint wins; didcomm_service_url is an in-process / test override.
         node_url = getattr(self.gatekeeper, "url", None)
-        base = override or self.didcomm_service_url or (f"{node_url}/didcomm" if node_url else None)
+        base = override or self.didcomm_service_url or (f"{node_url.rstrip('/')}/didcomm" if node_url else None)
         if not base:
             raise KeymasterError("cannot reach the DIDComm gateway: no node URL configured")
         return base.rstrip("/")
 
     async def _didcomm_challenge_auth(self, client: httpx.AsyncClient, base: str, keypair: dict[str, dict[str, str]]) -> dict[str, str]:
         response = await client.get(f"{base}/api/v1/challenge")
-        if response.status_code >= 400:
+        if not response.is_success:
             raise KeymasterError(f"DIDComm gateway challenge request returned {response.status_code}")
         challenge = response.json()["challenge"]
         return {"challenge": challenge, "signature": sign_hash(hash_message(challenge), keypair["privateJwk"])}
@@ -3694,7 +3694,7 @@ class Keymaster:
                 # Authenticated hand-off to the service (signed challenge proving
                 # control of sender_did); it delivers the opaque envelope.
                 challenge_response = await client.get(f"{service_base}/api/v1/challenge")
-                if challenge_response.status_code >= 400:
+                if not challenge_response.is_success:
                     raise KeymasterError(f"DIDComm delivery to {recipient_did} failed: gateway challenge request returned {challenge_response.status_code}")
                 challenge = challenge_response.json()["challenge"]
                 signature = sign_hash(hash_message(challenge), keypair["privateJwk"])

@@ -2615,7 +2615,7 @@ export default class Keymaster implements KeymasterInterface {
     // wins; didcommServiceURL is an in-process / test override (gatekeeper has no url).
     private didcommGatewayBase(override?: string): string {
         const nodeUrl = (this.gatekeeper as { url?: string }).url;
-        const base = (override ?? this.didcommServiceURL ?? (nodeUrl ? `${nodeUrl}/didcomm` : undefined))?.replace(/\/+$/, '');
+        const base = (override ?? this.didcommServiceURL ?? (nodeUrl ? `${nodeUrl.replace(/\/+$/, '')}/didcomm` : undefined))?.replace(/\/+$/, '');
         if (!base) {
             throw new KeymasterError('cannot reach the DIDComm gateway: no node URL configured');
         }
