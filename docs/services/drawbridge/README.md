@@ -468,7 +468,7 @@ shared with the reference TypeScript service.
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Upstream Gatekeeper. |
 | `ARCHON_HERALD_URL` | `http://localhost:4230` | Upstream Herald (for `/.well-known/*` and `/names/*`). Set **empty** to disable name resolution (capability `names:false`, `/names` → 501). |
 | `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://localhost:4235` | Upstream for Lightning routes + L402 invoice/pending storage. Set **empty** to disable Lightning (capability `lightning:false`, `/lightning` + `/invoice/:did` → 501). |
-| `ARCHON_DIDCOMM_URL` | `http://localhost:4236` | Upstream DIDComm relay proxied at `/didcomm`. Set **empty** to disable DIDComm (capability `didcomm:false`, `/didcomm` → 501). |
+| `ARCHON_DIDCOMM_URL` | `http://localhost:4236` | Upstream DIDComm relay proxied at `/didcomm`. Set **empty** to disable DIDComm (capability `didcomm:false`, `/didcomm` → 501). *The bundled compose defaults this **empty** (DIDComm is opt-in, off by default); enabling requires the `didcomm` profile **and** setting this URL.* |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Public base URL this node is reachable at (clearnet host or Tor onion). Used by `/didcomm-endpoint` to advertise `<host>/didcomm`. |
 | `ARCHON_DRAWBRIDGE_TOR_HOSTNAME_FILE` | `/data/tor/hostname` | When `PUBLIC_HOST` is empty, `/didcomm-endpoint` falls back to the Tor onion read from this shared hidden-service hostname file. |
 | `ARCHON_REDIS_URL` | `redis://localhost:6379` | Macaroon/payment/rate-limit store. |

@@ -89,8 +89,13 @@ services:
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
       - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
-      - ARCHON_LIGHTNING_MEDIATOR_URL=http://lightning-mediator:4235
-      - ARCHON_DIDCOMM_URL=http://didcomm:4236
+      # Optional-service URLs use ${VAR-default} (single dash): an explicitly EMPTY
+      # value disables the service (capability false + 501), while unset keeps the
+      # default. didcomm defaults EMPTY (off) — it's opt-in, not in the default
+      # COMPOSE_PROFILES; to enable, add `didcomm` to COMPOSE_PROFILES AND set
+      # ARCHON_DIDCOMM_URL=http://didcomm:4236.
+      - ARCHON_LIGHTNING_MEDIATOR_URL=${ARCHON_LIGHTNING_MEDIATOR_URL-http://lightning-mediator:4235}
+      - ARCHON_DIDCOMM_URL=${ARCHON_DIDCOMM_URL-}
       # Public base URL advertised by GET /api/v1/didcomm-endpoint (used by
       # publish-didcomm). Without this the endpoint falls back to the Tor onion.
       - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
@@ -101,7 +106,7 @@ services:
       - ARCHON_DRAWBRIDGE_INVOICE_EXPIRY=${ARCHON_DRAWBRIDGE_INVOICE_EXPIRY:-3600}
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX=${ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX:-100}
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW:-60}
-      - ARCHON_HERALD_URL=http://herald:4230
+      - ARCHON_HERALD_URL=${ARCHON_HERALD_URL-http://herald:4230}
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_DRAWBRIDGE_PORT:-4222}:4222
