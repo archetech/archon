@@ -426,6 +426,20 @@ async function main() {
         res.json({ version: serviceVersion, commit: serviceCommit });
     });
 
+    // Advertise which optional services this node offers, so clients can gate
+    // features and fail clearly instead of discovering absence via transport
+    // errors. A service is "offered" when its downstream URL is configured
+    // (non-empty); an operator opts out by setting the URL empty. This reflects
+    // node *intent*, not live health — a configured-but-down service still
+    // surfaces a runtime error to the caller.
+    v1router.get('/capabilities', (_req, res) => {
+        res.json({
+            didcomm: config.didcommURL !== '',
+            lightning: config.lightningMediatorURL !== '',
+            names: config.heraldURL !== '',
+        });
+    });
+
     // Public DIDComm relay endpoint, so `publishDidComm` can auto-discover it
     // (the way publishLightning learns its public host): an explicit public host,
     // else the Tor onion fronting this Drawbridge. Null when neither is available.
@@ -680,6 +694,10 @@ async function main() {
     // --- Lightning routes proxied to lightning-mediator ---
 
     v1router.use('/lightning', async (req, res) => {
+        if (config.lightningMediatorURL === '') {
+            res.status(501).json({ error: 'Lightning is not enabled on this node' });
+            return;
+        }
         try {
             await proxyLightningMediatorRequest(req, res, req.originalUrl);
         } catch (error: any) {
@@ -690,6 +708,10 @@ async function main() {
 
     // Public invoice endpoint — no auth required
     app.get('/invoice/:did', async (req, res) => {
+        if (config.lightningMediatorURL === '') {
+            res.status(501).json({ error: 'Lightning is not enabled on this node' });
+            return;
+        }
         try {
             await proxyLightningMediatorRequest(req, res, req.originalUrl);
         } catch (error: any) {
@@ -708,6 +730,10 @@ async function main() {
     });
 
     app.use('/names', async (req, res) => {
+        if (config.heraldURL === '') {
+            res.status(501).json({ error: 'Name resolution is not enabled on this node' });
+            return;
+        }
         try {
             await proxyHeraldRequest(req, res);
         } catch (error: any) {
@@ -718,7 +744,13 @@ async function main() {
 
     // Public face for the DIDComm relay (mailbox). The published
     // DIDCommMessaging endpoint is `<drawbridge public host>/didcomm`.
+    // Optional service: when the relay URL is unconfigured the node does not
+    // offer DIDComm — say so clearly (501) rather than proxying to nothing (502).
     app.use('/didcomm', async (req, res) => {
+        if (config.didcommURL === '') {
+            res.status(501).json({ error: 'DIDComm is not enabled on this node' });
+            return;
+        }
         try {
             await proxyRequest(req, res, config.didcommURL, '/didcomm');
         } catch (error: any) {

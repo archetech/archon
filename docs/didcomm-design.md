@@ -329,6 +329,21 @@ your own relay (and fails outright on a client with no Tor — the original symp
 now share one derivation (`didcommGatewayBase` / `_didcomm_gateway_base`); an explicit `--endpoint` still
 overrides for ad-hoc use.
 
+**DIDComm is an optional node service, advertised via a capability manifest.** Drawbridge serves
+`GET /api/v1/capabilities` → `{ didcomm, lightning, names }`, where each flag reflects whether the
+downstream service URL is configured (an operator opts a service *out* by setting its URL empty, e.g.
+`ARCHON_DIDCOMM_URL=`; an unset var keeps the default). When off, the corresponding proxy mount
+(`/didcomm`, `/lightning`, `/names`) returns **501** rather than proxying to nothing. The keymaster
+fetches the manifest once (memoized) and gates the relevant verbs: `send`/`receive`/`mediate`/`publishDidComm`
+on `didcomm`, all Lightning ops on `lightning` (via the single `getLightningConfig` chokepoint). A node
+that explicitly disables a service yields a clear *"this node does not offer …"* error; a node with **no
+manifest** (older node, or a node URL that is a bare gatekeeper) is treated **permissively** — the
+operation proceeds and fails later with a transport error, so existing nodes never regress. `publishDidComm`
+on a DIDComm-less node publishes **key-only** (no dead `DIDCommMessaging` endpoint advertised). The flag
+reflects node *intent*, not live health — a configured-but-crashed service still surfaces a runtime error
+(an unreachable gateway now reports *"could not reach the DIDComm gateway at …"* instead of a bare
+`fetch failed`). *Wallet/CLI UI feature-gating off this manifest is a tracked follow-up.*
+
 ## Risks & open questions
 
 - **Cross-ecosystem resolution.** External agents must resolve `did:cid`. Archon-to-Archon

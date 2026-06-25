@@ -286,3 +286,36 @@ describe('packDidComm / unpackDidComm (cross-method: Archon did:cid <-> did:key)
         expect(metadata.sender).toBe(bob.kid);
     });
 });
+
+describe('node capability gating', () => {
+    // The capability manifest is fetched once and memoized in _nodeCapabilities;
+    // preset it here so the gate resolves without a network call.
+    it('blocks sendDidComm when the node does not offer DIDComm', async () => {
+        await keymaster.createId('Alice');
+        (gatekeeper as any).url = 'http://node.test';
+        (keymaster as any)._nodeCapabilities = { didcomm: false, lightning: true };
+
+        await expect(
+            keymaster.sendDidComm({ type: 'x', body: {} } as any, 'did:cid:bob')
+        ).rejects.toThrow(/does not offer DIDComm/);
+    });
+
+    it('blocks Lightning when the node does not offer it', async () => {
+        await keymaster.createId('Alice');
+        (gatekeeper as any).url = 'http://node.test';
+        (gatekeeper as any).createLightningWallet = async () => ({}); // pass requireDrawbridge
+        (keymaster as any)._nodeCapabilities = { didcomm: true, lightning: false };
+
+        await expect(keymaster.getLightningBalance()).rejects.toThrow(/does not offer Lightning/);
+    });
+
+    it('proceeds lazily when the node exposes no manifest', async () => {
+        const alice = await keymaster.createId('Alice');
+        (gatekeeper as any).url = 'http://node.test';
+        (keymaster as any)._nodeCapabilities = null; // no manifest -> permissive
+
+        // Gets past the gate, then fails for a different reason (unresolvable recipient).
+        const err = await keymaster.sendDidComm({ type: 'x', body: {} } as any, alice).catch(e => e);
+        expect(String(err)).not.toMatch(/does not offer/);
+    });
+});

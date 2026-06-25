@@ -164,6 +164,48 @@ def test_send_didcomm_requires_a_node_gateway():
         asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
 
 
+def test_capability_gating_blocks_unavailable_services():
+    # When the node's manifest says a service is off, the relevant verb fails with
+    # a clear "does not offer …" error (before any network/crypto/wallet work).
+    import asyncio
+    import pytest
+    from keymaster.core import Keymaster, KeymasterError
+
+    class _Gw:
+        url = "http://node.test"
+
+        async def create_lightning_wallet(self, name):  # lets require_drawbridge pass
+            return {}
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    km._node_capabilities = {"didcomm": False, "lightning": False}  # preset cache, no fetch
+
+    with pytest.raises(KeymasterError, match="does not offer DIDComm"):
+        asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
+    with pytest.raises(KeymasterError, match="does not offer Lightning"):
+        asyncio.run(km.get_lightning_config())
+
+
+def test_capability_gating_permissive_when_manifest_absent():
+    # No manifest (older node / bare gatekeeper) -> the gate is permissive; the verb
+    # proceeds and fails later for a different reason, never "does not offer".
+    import asyncio
+    import pytest
+    from keymaster.core import Keymaster, KeymasterError
+
+    class _Gw:
+        url = "http://node.test"
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    km._node_capabilities = None  # node exposes no manifest
+
+    # Gets past the gate, then fails at crypto/resolve against the bare fake gateway —
+    # the point is the error is NOT the capability gate.
+    with pytest.raises(Exception) as exc:
+        asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
+    assert "does not offer" not in str(exc.value)
+
+
 def test_coordinate_mediation_builders():
     assert p.mediate_request()["type"] == p.MEDIATE_REQUEST_TYPE
     grant = p.mediate_grant("did:cid:mediator", "req-1")

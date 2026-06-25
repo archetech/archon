@@ -2,8 +2,9 @@
 
 Language-agnostic contract for **Drawbridge** — the public-facing API
 gateway that fronts the [Gatekeeper](../gatekeeper/README.md), the
-[Lightning mediator](../mediators/lightning/README.md), and the
-[Herald](../herald/README.md) name service. It enforces an
+[Lightning mediator](../mediators/lightning/README.md), the
+[Herald](../herald/README.md) name service, and the
+[DIDComm relay](../didcomm/README.md). It enforces an
 [L402](https://docs.lightning.engineering/the-lightning-network/l402)
 ("Lightning HTTP 402") paywall and a subscription-credential
 alternative on every protected route, then proxies the request upstream.
@@ -37,11 +38,29 @@ has three jobs:
    (`/api/v1/did`, `/dids`, `/ipfs/*`, `/block/*`, `/search`, `/query`)
    are forwarded to the local Gatekeeper. Lightning routes are
    forwarded to the local Lightning mediator. Herald routes
-   (`/.well-known/*`, `/names/*`) are forwarded to the local Herald.
+   (`/.well-known/*`, `/names/*`) are forwarded to the local Herald. The
+   DIDComm relay is fronted at `/didcomm/*` (not paywalled — DIDComm has
+   its own signed-challenge auth).
 3. **Public surface for the Lightning + name layers.** A few unprotected
    endpoints exist for clients that need to learn about the node before
-   authenticating: `/ready`, `/version`, `/status`, `/invoice/:did`,
-   the Herald well-known endpoints.
+   authenticating: `/ready`, `/version`, `/status`, `/capabilities`,
+   `/didcomm-endpoint`, `/invoice/:did`, the Herald well-known endpoints.
+
+### Optional services
+
+DIDComm, Lightning, and Herald name resolution are **optional** — a node
+may not deploy them. Each is "offered" iff its downstream URL is
+configured (see [§8.2](#82-environment-variables)); an operator opts a
+service *out* by setting its URL **empty** (e.g. `ARCHON_DIDCOMM_URL=`).
+When a service is off:
+
+- `GET /api/v1/capabilities` reports it `false`, and
+- its proxy mount (`/didcomm`, `/api/v1/lightning`, `/invoice/:did`,
+  `/names`) returns **HTTP 501** `{ "error": "<service> is not enabled
+  on this node" }` rather than proxying to an absent upstream.
+
+Clients (e.g. keymaster) read the manifest once and fail fast with a
+clear message instead of discovering absence via a transport error.
 
 It carries no key material. The macaroon root secret
 (`ARCHON_DRAWBRIDGE_MACAROON_SECRET`) is the only sensitive material on
@@ -61,11 +80,14 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 | --- | --- | --- |
 | `GET` | `/api/v1/ready` | Returns `<bool>` — proxies upstream Gatekeeper readiness. `false` on connect failure. |
 | `GET` | `/api/v1/version` | `{ version, commit }` (commit is `GIT_COMMIT` sliced to 7 chars; the sentinel string `"unknown"` is returned when `GIT_COMMIT` is unset). |
+| `GET` | `/api/v1/capabilities` | `{ didcomm, lightning, names }` — which optional services this node offers (each `true` iff its downstream URL is configured). Reflects node *intent* (config), not live health. See [Optional services](#optional-services). |
 | `GET` | `/api/v1/status` | `{ service: "drawbridge", upstream: GatekeeperStatus, uptime: <seconds>, memoryUsage: <node memUsage> }`. HTTP 502 if Gatekeeper is unreachable. |
+| `GET` | `/api/v1/didcomm-endpoint` | `{ endpoint: <string\|null> }` — this node's public DIDComm relay endpoint for `publish-didcomm` auto-discovery: `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/didcomm`, else the Tor onion fronting this node, else `null`. |
 | `POST` | `/api/v1/l402/pay` | Final step of L402 flow. Body: `{ paymentHash }`. Marks the matching macaroon as paid + returns the bearer credential. See [§4.4](#44-payment-completion). |
-| `GET` | `/invoice/:did` | Forwarded to lightning-mediator's `/invoice/:did`. Returns `{ paymentRequest, paymentHash, ... }`. Used by external zappers to pay any DID that has published a Lightning service. |
+| `GET` | `/invoice/:did` | Forwarded to lightning-mediator's `/invoice/:did`. Returns `{ paymentRequest, paymentHash, ... }`. Used by external zappers to pay any DID that has published a Lightning service. **501** if Lightning is disabled. |
+| `*` | `/didcomm/**` | Forwarded to the local DIDComm relay (path prefix `/didcomm` stripped). Carries the relay's own routes (mailbox `messages/*`, signed-`challenge`, egress `deliver`). Not paywalled — DIDComm authenticates with its own signed challenge. **501** if DIDComm is disabled. `application/didcomm-encrypted+json` bodies are captured as text and forwarded verbatim. |
 | `GET` | `/.well-known/*` | Forwarded to Herald (e.g. `lnurlp/<name>`, `webfinger`, `names`). |
-| `GET\|POST\|PUT\|DELETE` | `/names/*` | Forwarded to Herald (`/api/*`). |
+| `GET\|POST\|PUT\|DELETE` | `/names/*` | Forwarded to Herald (`/api/*`). **501** if name resolution is disabled. |
 | `GET` | `/metrics` | Prometheus exposition. |
 
 ### 2.2 L402 admin routes
@@ -124,9 +146,11 @@ The path tail is appended onto the upstream URL untouched. See the
 ### 2.4 Body limits
 
 Global Express limits (`json`, `urlencoded`, `text`, `raw` for
-`application/octet-stream`): **10 MB** each. The IPFS stream POST
-(`/api/v1/ipfs/stream`) explicitly bypasses the raw parser so the
-upstream Kubo client can stream the request body directly.
+`application/octet-stream`): **10 MB** each. A dedicated `text` parser
+for `application/didcomm-encrypted+json` (also 10 MB) captures DIDComm
+envelopes so they survive proxying to the relay byte-for-byte. The IPFS
+stream POST (`/api/v1/ipfs/stream`) explicitly bypasses the raw parser
+so the upstream Kubo client can stream the request body directly.
 
 ### 2.5 CORS
 
@@ -146,7 +170,9 @@ status codes:
 - `402` — L402 challenge (with `WWW-Authenticate` header)
 - `403` — admin not configured / scope insufficient
 - `429` — rate-limited
-- `502` — upstream Gatekeeper / Lightning / Herald unreachable
+- `501` — the requested optional service (DIDComm / Lightning / names) is not enabled on this node
+- `502` — upstream Gatekeeper / Lightning / Herald / DIDComm unreachable
+- `503` — Lightning service unavailable (L402 invoice creation failed)
 
 ### 2.7 Route-normalization for metrics
 
@@ -193,13 +219,17 @@ The L402 middleware (mounted on the `/api/v1` router) has a hard-coded
 bypass list for paths that should never be paywalled. Paths are matched
 against the request path with the `/api/v1` prefix stripped:
 
-- Exact matches (any method): `/ready`, `/version`, `/status`, `/metrics`
+- Exact matches (any method): `/ready`, `/version`, `/status`, `/metrics`, `/capabilities`, `/didcomm-endpoint`
 - Prefix matches (any method): anything under `/l402/`
 - GET-only prefix matches: anything under `/did/` or `/ipfs/`
 
+(Auth is also applied per-route — only the protected proxy routes spread
+the auth middleware into their handler chain — so the public routes
+above carry no auth regardless; the bypass list is belt-and-suspenders.)
+
 All other routes are handled outside this router and so are not subject
-to the L402 middleware at all (e.g. `/invoice/:did`, `/.well-known/*`,
-`/names/*`).
+to the L402 middleware at all (e.g. `/invoice/:did`, `/didcomm/*`,
+`/.well-known/*`, `/names/*`).
 
 Implementations MUST honor this list — clients depend on at least
 `/ready`, `/version`, and the GET DID/IPFS read paths being free.
@@ -436,8 +466,11 @@ shared with the reference TypeScript service.
 | `ARCHON_DRAWBRIDGE_PORT` | `4222` | HTTP listen port. |
 | `ARCHON_BIND_ADDRESS` | `0.0.0.0` | |
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Upstream Gatekeeper. |
-| `ARCHON_HERALD_URL` | `http://localhost:4230` | Upstream Herald (for `/.well-known/*` and `/names/*`). |
-| `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://localhost:4235` | Upstream for Lightning routes + L402 invoice/pending storage. |
+| `ARCHON_HERALD_URL` | `http://localhost:4230` | Upstream Herald (for `/.well-known/*` and `/names/*`). Set **empty** to disable name resolution (capability `names:false`, `/names` → 501). |
+| `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://localhost:4235` | Upstream for Lightning routes + L402 invoice/pending storage. Set **empty** to disable Lightning (capability `lightning:false`, `/lightning` + `/invoice/:did` → 501). |
+| `ARCHON_DIDCOMM_URL` | `http://localhost:4236` | Upstream DIDComm relay proxied at `/didcomm`. Set **empty** to disable DIDComm (capability `didcomm:false`, `/didcomm` → 501). *The bundled compose defaults this **empty** (DIDComm is opt-in, off by default); enabling requires the `didcomm` profile **and** setting this URL.* |
+| `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Public base URL this node is reachable at (clearnet host or Tor onion). Used by `/didcomm-endpoint` to advertise `<host>/didcomm`. |
+| `ARCHON_DRAWBRIDGE_TOR_HOSTNAME_FILE` | `/data/tor/hostname` | When `PUBLIC_HOST` is empty, `/didcomm-endpoint` falls back to the Tor onion read from this shared hidden-service hostname file. |
 | `ARCHON_REDIS_URL` | `redis://localhost:6379` | Macaroon/payment/rate-limit store. |
 | `ARCHON_ADMIN_API_KEY` | empty | Required for L402 admin routes. Empty → admin routes 403. |
 | `ARCHON_DRAWBRIDGE_L402_ENABLED` | `false` | When `false`, all proxy routes open. |
@@ -450,6 +483,13 @@ shared with the reference TypeScript service.
 | `ARCHON_DRAWBRIDGE_PRICE_RESOLVE_DID` | unset | Sats price for `resolveDID` (must be `> 0`). |
 | `ARCHON_DRAWBRIDGE_PRICING` | unset | JSON pricing override; `{ "operations": { "<scope>": { "amountSat": <n>, "description": "..." } } }`. Merged on top of the per-operation env vars. |
 | `GIT_COMMIT` | `unknown` | Build commit. |
+
+> **Off-switch semantics.** The optional-service URLs
+> (`ARCHON_DIDCOMM_URL`, `ARCHON_LIGHTNING_MEDIATOR_URL`,
+> `ARCHON_HERALD_URL`) are read with `??`, not `||`: an **unset** var
+> falls back to the default (service on), while an **explicitly empty**
+> value disables the service. This is what drives `/capabilities` and
+> the 501 gating.
 
 ### 8.3 Shutdown
 
@@ -504,6 +544,10 @@ A conformant third implementation MUST:
 - Honor the route table in [§2](#2-http-api-contract) including the
   bypass list in [§3.1](#31-bypass-routes), the body limits, and the
   Herald-CORS exception.
+- Serve `GET /api/v1/capabilities` and apply the optional-service
+  off-switch + 501 gating ([§1 Optional services](#optional-services)):
+  a service whose downstream URL is empty reports `false` and its proxy
+  mount returns 501.
 - Validate the macaroon secret length and exit on failure.
 - Implement the L402 challenge wire format exactly: HTTP 402,
   `WWW-Authenticate: L402 macaroon="...", invoice="..."`, JSON body

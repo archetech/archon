@@ -91,6 +91,10 @@ beforeEach(() => {
     keymaster = new Keymaster({
         gatekeeper, wallet, cipher, passphrase: 'passphrase',
     });
+    // The stubbed gatekeeper.url is a black-hole host; preset the memoized node
+    // capability manifest so the gating fetch doesn't hit the network (a real node
+    // offering Lightning would return this).
+    (keymaster as any)._nodeCapabilities = { didcomm: true, lightning: true };
 });
 
 describe('addLightning', () => {
