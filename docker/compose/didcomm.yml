@@ -23,9 +23,6 @@ services:
       # Outbound egress (POST /deliver): dial .onion recipients via Tor (needs
       # the drawbridge profile's tor service). Clearnet delivery needs no proxy.
       - ARCHON_DIDCOMM_TOR_PROXY=${ARCHON_DIDCOMM_TOR_PROXY:-tor:9050}
-      # Allow delivery to private/loopback/http hosts. Off in production (SSRF
-      # guard); set true only for dev/CI where recipients are in-cluster.
-      - ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS=${ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS:-false}
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_DIDCOMM_HOST_BIND:-127.0.0.1}:${ARCHON_DIDCOMM_PORT:-4236}:4236"

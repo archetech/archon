@@ -42,16 +42,6 @@ ARCHON_DISABLE_SEARCH=true
 ARCHON_GATEKEEPER_URL=http://localhost:4224
 ARCHON_KEYMASTER_URL=http://localhost:4226
 
-# Drawbridge + DIDComm (for tests/cli/didcomm.test.ts). The cli reaches DIDComm
-# through Drawbridge's /didcomm proxy; in-cluster delivery is http+private, so
-# the relay's SSRF guard is relaxed for CI.
-ARCHON_DRAWBRIDGE_MACAROON_SECRET=ci-test-macaroon-secret-not-for-production
-ARCHON_DRAWBRIDGE_L402_ENABLED=false
-ARCHON_DRAWBRIDGE_PUBLIC_HOST=http://drawbridge:4222
-ARCHON_DIDCOMM_URL=http://didcomm:4236
-ARCHON_DIDCOMM_DB=redis
-ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS=true
-
 # Hyperswarm
 ARCHON_HYPR_EXPORT_INTERVAL=2
 ARCHON_PROTOCOL=/ARCHON/testing

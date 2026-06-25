@@ -57,7 +57,7 @@ jobs:
       - name: Grab logs
         if: always()
         run: |
-          docker compose logs --no-color keymaster cli gatekeeper redis drawbridge didcomm lightning-mediator > docker-compose-logs.txt
+          docker compose logs --no-color keymaster cli gatekeeper redis > docker-compose-logs.txt
           cat docker-compose-logs.txt
 
       - name: Teardown Docker

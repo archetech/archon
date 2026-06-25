@@ -34,15 +34,34 @@ export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 echo $ARCHON_GATEKEEPER_URL
 
 docker compose down
-# Build the core CLI stack plus the DIDComm path: Drawbridge fronts the relay at
-# /didcomm (drawbridge pulls in lightning-mediator + tor via its deps).
-docker compose build cli gatekeeper keymaster ipfs redis mongodb drawbridge didcomm lightning-mediator
+docker compose build cli gatekeeper keymaster ipfs redis mongodb
+docker compose up -d cli
 
-echo "Bringing up cli + drawbridge + didcomm (and their deps), waiting for health..."
-# --wait blocks until every started service (and dependency) is healthy / its
-# init has completed; --wait-timeout bounds it so a stuck service fails the run
-# instead of hanging.
-docker compose up -d --wait --wait-timeout 300 cli drawbridge didcomm
+echo "Waiting for all services to be 'Up'..."
 
-echo "✅ Stack is up:"
-docker compose ps
+MAX_RETRIES=30
+RETRY_INTERVAL=5
+RETRY_COUNT=0
+
+while true; do
+  # Count total services defined
+  TOTAL_SERVICES="6"
+
+  # Count lines with 'Up' in status
+  UP_COUNT=$(docker compose ps | grep 'Up' | wc -l)
+
+  if [[ "$UP_COUNT" -eq "$TOTAL_SERVICES" ]]; then
+    echo "✅ All containers are 'Up'"
+    break
+  fi
+
+  if [[ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]]; then
+    echo "❌ Timed out waiting for containers to be 'Up'"
+    docker compose ps
+    exit 1
+  fi
+
+  echo "⏳ Waiting... ($RETRY_COUNT/$MAX_RETRIES)"
+  sleep "$RETRY_INTERVAL"
+  ((RETRY_COUNT++))
+done
