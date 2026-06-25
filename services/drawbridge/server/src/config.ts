@@ -6,9 +6,11 @@ const config = {
     port: process.env.ARCHON_DRAWBRIDGE_PORT ? parseInt(process.env.ARCHON_DRAWBRIDGE_PORT) : 4222,
     bindAddress: process.env.ARCHON_BIND_ADDRESS || '0.0.0.0',
     gatekeeperURL: process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224',
-    heraldURL: process.env.ARCHON_HERALD_URL || 'http://localhost:4230',
-    lightningMediatorURL: process.env.ARCHON_LIGHTNING_MEDIATOR_URL || 'http://localhost:4235',
-    didcommURL: process.env.ARCHON_DIDCOMM_URL || 'http://localhost:4236',
+    // `??` (not `||`) so an explicitly-empty value disables the optional service
+    // (the capability off-switch), while an unset var falls back to the default.
+    heraldURL: process.env.ARCHON_HERALD_URL ?? 'http://localhost:4230',
+    lightningMediatorURL: process.env.ARCHON_LIGHTNING_MEDIATOR_URL ?? 'http://localhost:4235',
+    didcommURL: process.env.ARCHON_DIDCOMM_URL ?? 'http://localhost:4236',
     // Public base URL this node is reachable at (clearnet host or Tor onion).
     // Used to advertise the DIDComm relay endpoint (`<publicHost>/didcomm`).
     publicHost: process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || '',

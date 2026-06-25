@@ -69,6 +69,10 @@ class PollItems:
     RESULTS = "results"
 
 
+# Sentinel distinguishing "capabilities not yet fetched" from "node has no manifest" (None).
+_UNFETCHED = object()
+
+
 class KeymasterError(Exception):
     pass
 
@@ -132,6 +136,10 @@ class Keymaster:
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache = None
         self._lock = asyncio.Lock()
+        # Node capability manifest (<nodeURL>/api/v1/capabilities), fetched once and
+        # memoized. _UNFETCHED until first read; None = node has no manifest (older
+        # node / not a gateway) → callers proceed lazily rather than regress.
+        self._node_capabilities: Any = _UNFETCHED
 
     def _upgrade_wallet(self, wallet: dict[str, Any]) -> dict[str, Any]:
         version = wallet.get("version")
@@ -559,6 +567,10 @@ class Keymaster:
 
     async def get_lightning_config(self, name: str | None = None) -> dict[str, Any]:
         drawbridge = self.require_drawbridge()
+        # Single chokepoint for every Lightning network op (balance/invoice/pay/
+        # check/zap/publish/add all route through here): fail clearly if the node
+        # doesn't offer Lightning, before reporting a missing wallet.
+        await self._require_node_capability("lightning", "Lightning")
         url = drawbridge.url
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
@@ -3483,13 +3495,17 @@ class Keymaster:
         # relay endpoint from the gateway (as publish_lightning learns its public
         # host). A plain Gatekeeper returns nothing, so we publish the
         # key-agreement key only — pass an explicit endpoint to override.
+        # If the node doesn't offer DIDComm, don't advertise a dead endpoint:
+        # publish key-only (an explicit endpoint still overrides this).
         if endpoint is None:
-            getter = getattr(self.gatekeeper, "get_didcomm_endpoint", None)
-            if getter:
-                try:
-                    endpoint = await getter()
-                except Exception:
-                    endpoint = None
+            caps = await self._get_node_capabilities()
+            if caps is None or caps.get("didcomm") is not False:
+                getter = getattr(self.gatekeeper, "get_didcomm_endpoint", None)
+                if getter:
+                    try:
+                        endpoint = await getter()
+                    except Exception:
+                        endpoint = None
 
         id_info = await self.fetch_id_info(name)
         did = id_info["did"]
@@ -3652,8 +3668,36 @@ class Keymaster:
             raise KeymasterError("cannot reach the DIDComm gateway: no node URL configured")
         return base.rstrip("/")
 
+    async def _get_node_capabilities(self) -> dict[str, bool] | None:
+        # Fetch (once, memoized) the node's capability manifest. None when the node
+        # exposes no manifest (older node, or node URL is a bare gatekeeper) — callers
+        # then proceed lazily so we never regress against existing nodes.
+        if self._node_capabilities is not _UNFETCHED:
+            return self._node_capabilities
+        node_url = getattr(self.gatekeeper, "url", None)
+        if not node_url:
+            self._node_capabilities = None
+            return None
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{node_url.rstrip('/')}/api/v1/capabilities")
+            self._node_capabilities = response.json() if response.is_success else None
+        except Exception:
+            self._node_capabilities = None
+        return self._node_capabilities
+
+    async def _require_node_capability(self, capability: str, human_name: str) -> None:
+        # Throw clearly when the node explicitly does not offer a capability. Unknown
+        # (no manifest) is permissive — the op proceeds and fails later if truly absent.
+        caps = await self._get_node_capabilities()
+        if caps is not None and caps.get(capability) is False:
+            raise KeymasterError(f"this node does not offer {human_name}")
+
     async def _didcomm_challenge_auth(self, client: httpx.AsyncClient, base: str, keypair: dict[str, dict[str, str]]) -> dict[str, str]:
-        response = await client.get(f"{base}/api/v1/challenge")
+        try:
+            response = await client.get(f"{base}/api/v1/challenge")
+        except (httpx.HTTPError, OSError):
+            raise KeymasterError(f"could not reach the DIDComm gateway at {base}")
         if not response.is_success:
             raise KeymasterError(f"DIDComm gateway challenge request returned {response.status_code}")
         challenge = response.json()["challenge"]
@@ -3668,6 +3712,8 @@ class Keymaster:
         # in-process / test use.)
         options = options or {}
         service_base = self._didcomm_gateway_base()
+        if not self.didcomm_service_url:
+            await self._require_node_capability("didcomm", "DIDComm messaging")
         recipient_dids = to if isinstance(to, list) else [to]
         packed = await self.pack_didcomm(message, recipient_dids, options)
 
@@ -3693,7 +3739,10 @@ class Keymaster:
 
                 # Authenticated hand-off to the service (signed challenge proving
                 # control of sender_did); it delivers the opaque envelope.
-                challenge_response = await client.get(f"{service_base}/api/v1/challenge")
+                try:
+                    challenge_response = await client.get(f"{service_base}/api/v1/challenge")
+                except (httpx.HTTPError, OSError):
+                    raise KeymasterError(f"DIDComm delivery to {recipient_did} failed: could not reach the DIDComm gateway at {service_base}")
                 if not challenge_response.is_success:
                     raise KeymasterError(f"DIDComm delivery to {recipient_did} failed: gateway challenge request returned {challenge_response.status_code}")
                 challenge = challenge_response.json()["challenge"]
@@ -3714,6 +3763,8 @@ class Keymaster:
         # Read our own mailbox through the local gateway, not our published public
         # endpoint (which may be an unreachable .onion). endpoint option still overrides.
         base = self._didcomm_gateway_base(options.get("endpoint"))
+        if not self.didcomm_service_url and not options.get("endpoint"):
+            await self._require_node_capability("didcomm", "DIDComm messaging")
         keypair = await self.fetch_key_pair(name)
         if not keypair:
             raise KeymasterError("unable to resolve signing key")
@@ -3746,6 +3797,8 @@ class Keymaster:
         id_info = await self.fetch_id_info(name)
         # Mediators read their own mailbox through the local gateway too. endpoint option overrides.
         base = self._didcomm_gateway_base(options.get("endpoint"))
+        if not self.didcomm_service_url and not options.get("endpoint"):
+            await self._require_node_capability("didcomm", "DIDComm messaging")
         keypair = await self.fetch_key_pair(name)
         if not keypair:
             raise KeymasterError("unable to resolve signing key")

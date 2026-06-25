@@ -177,6 +177,10 @@ export default class Keymaster implements KeymasterInterface {
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
     private readonly didcommServiceURL?: string;
+    // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
+    // memoized. `undefined` = not yet fetched; `null` = node has no manifest
+    // (older node / not a gateway) → callers proceed lazily rather than regress.
+    private _nodeCapabilities?: Record<string, boolean> | null;
     private _walletCache?: WalletFile;
     private _hdkeyCache?: any;
 
@@ -2312,10 +2316,15 @@ export default class Keymaster implements KeymasterInterface {
         // relay endpoint from the gateway (as publishLightning learns its public
         // host). A plain Gatekeeper returns nothing, so we publish the
         // key-agreement key only — pass an explicit endpoint to override.
+        // If the node doesn't offer DIDComm, don't advertise a dead endpoint:
+        // publish key-only (an explicit endpoint still overrides this).
         if (!endpoint) {
-            const gateway = this.gatekeeper as Partial<DrawbridgeInterface>;
-            if (typeof gateway.getDidCommEndpoint === 'function') {
-                endpoint = (await gateway.getDidCommEndpoint()) || undefined;
+            const caps = await this.getNodeCapabilities();
+            if (!caps || caps.didcomm !== false) {
+                const gateway = this.gatekeeper as Partial<DrawbridgeInterface>;
+                if (typeof gateway.getDidCommEndpoint === 'function') {
+                    endpoint = (await gateway.getDidCommEndpoint()) || undefined;
+                }
             }
         }
         const id = await this.fetchIdInfo(name);
@@ -2605,6 +2614,58 @@ export default class Keymaster implements KeymasterInterface {
         return this.resolveKeyAgreement(doc);
     }
 
+    // Fetch (once, memoized) the node's capability manifest. Returns null when the
+    // node exposes no manifest (older node, or the node URL is a bare gatekeeper) —
+    // callers then proceed lazily so we never regress against existing nodes.
+    private async getNodeCapabilities(): Promise<Record<string, boolean> | null> {
+        if (this._nodeCapabilities !== undefined) {
+            return this._nodeCapabilities;
+        }
+        const nodeUrl = (this.gatekeeper as { url?: string }).url;
+        if (!nodeUrl) {
+            this._nodeCapabilities = null;
+            return null;
+        }
+        try {
+            // Timeout so a slow/black-hole node fails fast to "unknown" (permissive)
+            // rather than stalling every gated op on this extra preflight.
+            const response = await fetch(`${nodeUrl.replace(/\/+$/, '')}/api/v1/capabilities`, {
+                signal: AbortSignal.timeout(5000),
+            });
+            this._nodeCapabilities = response.ok ? await response.json() : null;
+        }
+        catch {
+            this._nodeCapabilities = null;
+        }
+        return this._nodeCapabilities ?? null;
+    }
+
+    // Throw a clear error when the node explicitly does not offer a capability.
+    // Unknown (no manifest) is permissive — the operation proceeds and fails later
+    // with a transport error if the service really is absent.
+    private async requireNodeCapability(capability: string, humanName: string): Promise<void> {
+        const caps = await this.getNodeCapabilities();
+        if (caps && caps[capability] === false) {
+            throw new KeymasterError(`this node does not offer ${humanName}`);
+        }
+    }
+
+    // GET a challenge from the DIDComm gateway, turning an unreachable gateway into
+    // a clear error (not undici's bare "fetch failed") and a non-2xx into a status.
+    private async fetchDidCommChallenge(base: string, context: string): Promise<string> {
+        let response: Response;
+        try {
+            response = await fetch(`${base}/api/v1/challenge`);
+        }
+        catch {
+            throw new KeymasterError(`${context}: could not reach the DIDComm gateway at ${base}`);
+        }
+        if (!response.ok) {
+            throw new KeymasterError(`${context}: gateway challenge request returned ${response.status}`);
+        }
+        return (await response.json()).challenge;
+    }
+
     // The local DIDComm gateway: Drawbridge's `/didcomm` proxy in front of the
     // relay, derived from the node URL the keymaster already uses — exactly as
     // publishLightning derives its endpoint — so there is no dedicated config.
@@ -2633,6 +2694,9 @@ export default class Keymaster implements KeymasterInterface {
         options: { sign?: boolean; anoncrypt?: boolean; encryption?: DidCommEnc; name?: string } = {}
     ): Promise<string[]> {
         const serviceBase = this.didcommGatewayBase();
+        if (!this.didcommServiceURL) {
+            await this.requireNodeCapability('didcomm', 'DIDComm messaging');
+        }
         const recipientDids = Array.isArray(to) ? to : [to];
         const packed = await this.packDidComm(message, recipientDids, options);
 
@@ -2661,11 +2725,7 @@ export default class Keymaster implements KeymasterInterface {
 
             // Authenticated hand-off to the service (signed challenge proving we
             // control senderDid), which delivers the opaque envelope to the recipient.
-            const challengeResponse = await fetch(`${serviceBase}/api/v1/challenge`);
-            if (!challengeResponse.ok) {
-                throw new KeymasterError(`DIDComm delivery to ${recipientDid} failed: gateway challenge request returned ${challengeResponse.status}`);
-            }
-            const { challenge } = await challengeResponse.json();
+            const challenge = await this.fetchDidCommChallenge(serviceBase, `DIDComm delivery to ${recipientDid} failed`);
             const signature = this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk);
             const response = await fetch(`${serviceBase}/api/v1/deliver`, {
                 method: 'POST',
@@ -2691,17 +2751,16 @@ export default class Keymaster implements KeymasterInterface {
         // Read our own mailbox through the local gateway, not our published public
         // endpoint (which may be an unreachable `.onion`). --endpoint still overrides.
         const base = this.didcommGatewayBase(options.endpoint);
+        if (!this.didcommServiceURL && !options.endpoint) {
+            await this.requireNodeCapability('didcomm', 'DIDComm messaging');
+        }
         const keypair = await this.fetchKeyPair(name);
         if (!keypair) {
             throw new KeymasterError('unable to resolve signing key');
         }
 
         const sign = async (): Promise<{ challenge: string; signature: string }> => {
-            const challengeResponse = await fetch(`${base}/api/v1/challenge`);
-            if (!challengeResponse.ok) {
-                throw new KeymasterError(`DIDComm receive failed: gateway challenge request returned ${challengeResponse.status}`);
-            }
-            const { challenge } = await challengeResponse.json();
+            const challenge = await this.fetchDidCommChallenge(base, 'DIDComm receive failed');
             const signature = this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk);
             return { challenge, signature };
         };
@@ -2751,6 +2810,9 @@ export default class Keymaster implements KeymasterInterface {
         const id = await this.fetchIdInfo(name);
         // Mediators read their own mailbox through the local gateway too. --endpoint overrides.
         const base = this.didcommGatewayBase(options.endpoint);
+        if (!this.didcommServiceURL && !options.endpoint) {
+            await this.requireNodeCapability('didcomm', 'DIDComm messaging');
+        }
         const keypair = await this.fetchKeyPair(name);
         if (!keypair) {
             throw new KeymasterError('unable to resolve signing key');
@@ -2760,11 +2822,7 @@ export default class Keymaster implements KeymasterInterface {
         const ownKa = this.resolveKeyAgreement(ownDoc);
 
         const sign = async (): Promise<{ challenge: string; signature: string }> => {
-            const challengeResponse = await fetch(`${base}/api/v1/challenge`);
-            if (!challengeResponse.ok) {
-                throw new KeymasterError(`mediator fetch failed: gateway challenge request returned ${challengeResponse.status}`);
-            }
-            const { challenge } = await challengeResponse.json();
+            const challenge = await this.fetchDidCommChallenge(base, 'mediator fetch failed');
             return { challenge, signature: this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk) };
         };
 
@@ -2970,6 +3028,10 @@ export default class Keymaster implements KeymasterInterface {
 
     private async getLightningConfig(name?: string): Promise<LightningConfig> {
         const drawbridge = this.requireDrawbridge();
+        // Single chokepoint for every Lightning network op (balance/invoice/pay/
+        // check/zap/publish/addLightning all route through here): fail clearly if
+        // the node doesn't offer Lightning, before reporting a missing wallet.
+        await this.requireNodeCapability('lightning', 'Lightning');
         const url = drawbridge.url;
         let wallet = await this.loadWallet();
         let idInfo = await this.fetchIdInfo(name, wallet);
