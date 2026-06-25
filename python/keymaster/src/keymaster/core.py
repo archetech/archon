@@ -3679,7 +3679,7 @@ class Keymaster:
             self._node_capabilities = None
             return None
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=5.0) as client:  # fail-fast, matches the JS client
                 response = await client.get(f"{node_url.rstrip('/')}/api/v1/capabilities")
             self._node_capabilities = response.json() if response.is_success else None
         except Exception:

@@ -2626,16 +2626,24 @@ export default class Keymaster implements KeymasterInterface {
             this._nodeCapabilities = null;
             return null;
         }
+        // Timeout so a slow/black-hole node fails fast to "unknown" (permissive)
+        // rather than stalling every gated op on this extra preflight. Use
+        // AbortController + setTimeout (not AbortSignal.timeout, which is missing in
+        // some browser/WebView runtimes this package targets) and clear the timer so
+        // it never keeps the event loop alive.
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
         try {
-            // Timeout so a slow/black-hole node fails fast to "unknown" (permissive)
-            // rather than stalling every gated op on this extra preflight.
             const response = await fetch(`${nodeUrl.replace(/\/+$/, '')}/api/v1/capabilities`, {
-                signal: AbortSignal.timeout(5000),
+                signal: controller.signal,
             });
             this._nodeCapabilities = response.ok ? await response.json() : null;
         }
         catch {
             this._nodeCapabilities = null;
+        }
+        finally {
+            clearTimeout(timer);
         }
         return this._nodeCapabilities ?? null;
     }
