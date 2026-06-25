@@ -112,11 +112,10 @@ jobs:
           path: dist
 
       - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:
           packages-dir: dist/
           repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
 
       - name: Smoke test TestPyPI install
         run: |
@@ -129,11 +128,14 @@ jobs:
 
           python -m venv /tmp/archon-keymaster-install-test
           /tmp/archon-keymaster-install-test/bin/python -m pip install --upgrade pip
+          rm -rf /tmp/archon-keymaster-testpypi-dist
+          mkdir -p /tmp/archon-keymaster-testpypi-dist
 
           for attempt in {1..12}; do
-            if /tmp/archon-keymaster-install-test/bin/python -m pip install \
+            if /tmp/archon-keymaster-install-test/bin/python -m pip download \
+              --no-deps \
+              --dest /tmp/archon-keymaster-testpypi-dist \
               --index-url https://test.pypi.org/simple/ \
-              --extra-index-url https://pypi.org/simple/ \
               "archon-keymaster==${VERSION}"; then
               break
             fi
@@ -144,6 +146,13 @@ jobs:
             sleep 10
           done
 
+          WHEEL="$(find /tmp/archon-keymaster-testpypi-dist -maxdepth 1 -name 'archon_keymaster-*.whl' -print -quit)"
+          if [ -z "$WHEEL" ]; then
+            echo "Downloaded TestPyPI package did not include a wheel" >&2
+            exit 1
+          fi
+
+          /tmp/archon-keymaster-install-test/bin/python -m pip install "$WHEEL"
           /tmp/archon-keymaster-install-test/bin/keymaster --help > /dev/null
           /tmp/archon-keymaster-install-test/bin/python - <<'PY'
           import argparse
@@ -190,6 +199,6 @@ jobs:
           path: dist
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:
           packages-dir: dist/
