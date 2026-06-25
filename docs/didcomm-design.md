@@ -321,6 +321,14 @@ the relay e2e routes every send through `/deliver`; a unit test asserts the no-g
 Privacy: the service sees recipient DIDs + timing, not content. (`ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS=true`
 permits loopback destinations for dev/test.)
 
+**Reading your own mailbox uses the same local gateway.** `receiveDidComm`/`mediateDidComm`
+(challenge → fetch → unpack → ack) connect to **`<nodeURL>/didcomm`** as well — *not* the identity's
+published `DIDCommMessaging` endpoint. That published endpoint is for *others sending to you* and may
+be a `.onion`; dialing it from the client to read your own mailbox would route out through Tor to reach
+your own relay (and fails outright on a client with no Tor — the original symptom). All three operations
+now share one derivation (`didcommGatewayBase` / `_didcomm_gateway_base`); an explicit `--endpoint` still
+overrides for ad-hoc use.
+
 ## Risks & open questions
 
 - **Cross-ecosystem resolution.** External agents must resolve `did:cid`. Archon-to-Archon

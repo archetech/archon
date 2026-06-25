@@ -3640,8 +3640,22 @@ class Keymaster:
 
         return {"message": inner, "metadata": metadata}
 
+    def _didcomm_gateway_base(self, override: str | None = None) -> str:
+        # The local DIDComm gateway: Drawbridge's /didcomm proxy in front of the relay,
+        # derived from the node URL the keymaster already uses (like publish_lightning) —
+        # no dedicated config. Used for sending AND for reading our own mailbox; reading
+        # must NOT use our published public endpoint (it may be an unreachable .onion).
+        # An explicit endpoint wins; didcomm_service_url is an in-process / test override.
+        node_url = getattr(self.gatekeeper, "url", None)
+        base = override or self.didcomm_service_url or (f"{node_url}/didcomm" if node_url else None)
+        if not base:
+            raise KeymasterError("cannot reach the DIDComm gateway: no node URL configured")
+        return base.rstrip("/")
+
     async def _didcomm_challenge_auth(self, client: httpx.AsyncClient, base: str, keypair: dict[str, dict[str, str]]) -> dict[str, str]:
         response = await client.get(f"{base}/api/v1/challenge")
+        if response.status_code >= 400:
+            raise KeymasterError(f"DIDComm gateway challenge request returned {response.status_code}")
         challenge = response.json()["challenge"]
         return {"challenge": challenge, "signature": sign_hash(hash_message(challenge), keypair["privateJwk"])}
 
@@ -3653,11 +3667,7 @@ class Keymaster:
         # no dedicated config. (didcomm_service_url is an explicit override for
         # in-process / test use.)
         options = options or {}
-        node_url = getattr(self.gatekeeper, "url", None)
-        service_base = self.didcomm_service_url or (f"{node_url}/didcomm" if node_url else None)
-        if not service_base:
-            raise KeymasterError("cannot send DIDComm: no node URL to reach the DIDComm gateway")
-        service_base = service_base.rstrip("/")
+        service_base = self._didcomm_gateway_base()
         recipient_dids = to if isinstance(to, list) else [to]
         packed = await self.pack_didcomm(message, recipient_dids, options)
 
@@ -3701,10 +3711,9 @@ class Keymaster:
         options = options or {}
         name = options.get("name")
         id_info = await self.fetch_id_info(name)
-        resolved = {"uri": options["endpoint"]} if options.get("endpoint") else await self._resolve_didcomm_endpoint(id_info["did"])
-        if not resolved:
-            raise KeymasterError("identity has no DIDCommMessaging endpoint; publish_didcomm with an endpoint first")
-        base = resolved["uri"].rstrip("/")
+        # Read our own mailbox through the local gateway, not our published public
+        # endpoint (which may be an unreachable .onion). endpoint option still overrides.
+        base = self._didcomm_gateway_base(options.get("endpoint"))
         keypair = await self.fetch_key_pair(name)
         if not keypair:
             raise KeymasterError("unable to resolve signing key")
@@ -3735,10 +3744,8 @@ class Keymaster:
         options = options or {}
         name = options.get("name")
         id_info = await self.fetch_id_info(name)
-        resolved = {"uri": options["endpoint"]} if options.get("endpoint") else await self._resolve_didcomm_endpoint(id_info["did"])
-        if not resolved:
-            raise KeymasterError("mediator identity has no DIDCommMessaging endpoint")
-        base = resolved["uri"].rstrip("/")
+        # Mediators read their own mailbox through the local gateway too. endpoint option overrides.
+        base = self._didcomm_gateway_base(options.get("endpoint"))
         keypair = await self.fetch_key_pair(name)
         if not keypair:
             raise KeymasterError("unable to resolve signing key")

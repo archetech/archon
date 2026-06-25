@@ -2605,25 +2605,34 @@ export default class Keymaster implements KeymasterInterface {
         return this.resolveKeyAgreement(doc);
     }
 
+    // The local DIDComm gateway: Drawbridge's `/didcomm` proxy in front of the
+    // relay, derived from the node URL the keymaster already uses — exactly as
+    // publishLightning derives its endpoint — so there is no dedicated config.
+    // Every gateway interaction (sending, and reading your own mailbox) goes here.
+    // Reading your mailbox must NOT use your published public endpoint: that may be
+    // a `.onion` the client can't dial directly, and routing out through Tor to
+    // reach your own relay is nonsense. An explicit endpoint (e.g. CLI --endpoint)
+    // wins; didcommServiceURL is an in-process / test override (gatekeeper has no url).
+    private didcommGatewayBase(override?: string): string {
+        const nodeUrl = (this.gatekeeper as { url?: string }).url;
+        const base = (override ?? this.didcommServiceURL ?? (nodeUrl ? `${nodeUrl}/didcomm` : undefined))?.replace(/\/+$/, '');
+        if (!base) {
+            throw new KeymasterError('cannot reach the DIDComm gateway: no node URL configured');
+        }
+        return base;
+    }
+
     // Pack a message and hand each sealed envelope to the DIDComm service for
     // delivery. The keymaster does crypto only (pack, resolve, Forward-wrap); the
     // service owns transport — egress, retries, and Tor for `.onion` recipients —
-    // so this never dials recipients directly. The egress is reached through the
-    // node's gateway (Drawbridge's `/didcomm` proxy), derived from the node URL the
-    // keymaster already uses — exactly as publishLightning derives its endpoint —
-    // so there is no dedicated config. (didcommServiceURL is an explicit override
-    // for in-process / test use, where the gatekeeper has no url.)
+    // so this never dials recipients directly.
     // Returns the stored message ids per delivery.
     async sendDidComm(
         message: Record<string, unknown>,
         to: string | string[],
         options: { sign?: boolean; anoncrypt?: boolean; encryption?: DidCommEnc; name?: string } = {}
     ): Promise<string[]> {
-        const nodeUrl = (this.gatekeeper as { url?: string }).url;
-        const serviceBase = (this.didcommServiceURL ?? (nodeUrl ? `${nodeUrl}/didcomm` : undefined))?.replace(/\/+$/, '');
-        if (!serviceBase) {
-            throw new KeymasterError('cannot send DIDComm: no node URL to reach the DIDComm gateway');
-        }
+        const serviceBase = this.didcommGatewayBase();
         const recipientDids = Array.isArray(to) ? to : [to];
         const packed = await this.packDidComm(message, recipientDids, options);
 
@@ -2679,11 +2688,9 @@ export default class Keymaster implements KeymasterInterface {
     ): Promise<DidCommUnpackResult[]> {
         const { name } = options;
         const id = await this.fetchIdInfo(name);
-        const resolved = options.endpoint ? { uri: options.endpoint } : await this.resolveDidCommEndpoint(id.did);
-        if (!resolved) {
-            throw new KeymasterError('identity has no DIDCommMessaging endpoint; publishDidComm with an endpoint first');
-        }
-        const base = resolved.uri.replace(/\/+$/, '');
+        // Read our own mailbox through the local gateway, not our published public
+        // endpoint (which may be an unreachable `.onion`). --endpoint still overrides.
+        const base = this.didcommGatewayBase(options.endpoint);
         const keypair = await this.fetchKeyPair(name);
         if (!keypair) {
             throw new KeymasterError('unable to resolve signing key');
@@ -2691,6 +2698,9 @@ export default class Keymaster implements KeymasterInterface {
 
         const sign = async (): Promise<{ challenge: string; signature: string }> => {
             const challengeResponse = await fetch(`${base}/api/v1/challenge`);
+            if (!challengeResponse.ok) {
+                throw new KeymasterError(`DIDComm receive failed: gateway challenge request returned ${challengeResponse.status}`);
+            }
             const { challenge } = await challengeResponse.json();
             const signature = this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk);
             return { challenge, signature };
@@ -2739,11 +2749,8 @@ export default class Keymaster implements KeymasterInterface {
     ): Promise<{ relayed: number; skipped: number }> {
         const { name } = options;
         const id = await this.fetchIdInfo(name);
-        const resolved = options.endpoint ? { uri: options.endpoint } : await this.resolveDidCommEndpoint(id.did);
-        if (!resolved) {
-            throw new KeymasterError('mediator identity has no DIDCommMessaging endpoint');
-        }
-        const base = resolved.uri.replace(/\/+$/, '');
+        // Mediators read their own mailbox through the local gateway too. --endpoint overrides.
+        const base = this.didcommGatewayBase(options.endpoint);
         const keypair = await this.fetchKeyPair(name);
         if (!keypair) {
             throw new KeymasterError('unable to resolve signing key');
@@ -2754,6 +2761,9 @@ export default class Keymaster implements KeymasterInterface {
 
         const sign = async (): Promise<{ challenge: string; signature: string }> => {
             const challengeResponse = await fetch(`${base}/api/v1/challenge`);
+            if (!challengeResponse.ok) {
+                throw new KeymasterError(`mediator fetch failed: gateway challenge request returned ${challengeResponse.status}`);
+            }
             const { challenge } = await challengeResponse.json();
             return { challenge, signature: this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk) };
         };
