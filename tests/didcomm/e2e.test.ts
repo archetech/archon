@@ -1,5 +1,4 @@
 import type { Server } from 'http';
-import { getGlobalDispatcher, setGlobalDispatcher, Agent } from 'undici';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -48,15 +47,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    // Close client-side keep-alive sockets (the keymaster's fetches and the
-    // relay's own outbound /deliver fetch both use the global undici dispatcher).
-    // Otherwise undici lazy-imports during socket cleanup after Jest tears the
-    // environment down → "import after teardown". Swap in a fresh dispatcher so
-    // later suites in the same --runInBand process keep working.
-    const previousDispatcher = getGlobalDispatcher();
-    setGlobalDispatcher(new Agent());
-    await previousDispatcher.close().catch(() => undefined);
-
     if (ipfs) {
         await ipfs.stop();
     }

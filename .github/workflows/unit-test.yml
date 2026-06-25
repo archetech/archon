@@ -33,6 +33,11 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      # In-process DIDComm relay e2e, run isolated (out of the unit suite) so its
+      # real sockets can't trip "import after teardown" in the shared run.
+      - name: Run DIDComm relay e2e (isolated)
+        run: npm run test:didcomm-e2e
+
       - name: Generate Code Coverage report
         id: code-coverage
         uses: barecheck/code-coverage-action@d92cdaec187f89f0886ccec37acf11e2a6a85f70

@@ -49,9 +49,11 @@ const config = {
         "/kc-app/",
         "/client/",
         "/tests/cli/",
-        // In-process HTTP e2e (boots the relay + makes real fetches). Belongs in the
-        // CLI/docker e2e suite, not the unit run — it leaves undici sockets that trip
-        // Jest's "import after teardown". Migration to tests/cli/ tracked in #644.
+        // In-process HTTP e2e (boots the relay + makes real fetches) — excluded from
+        // the unit run because it leaves undici sockets that trip Jest's "import after
+        // teardown". It runs isolated via `npm run test:didcomm-e2e`
+        // (jest.config.didcomm-e2e.js, --forceExit); core send/receive is also covered
+        // against docker by tests/cli/didcomm.test.ts.
         "/tests/didcomm/e2e\\.test\\.ts$"
     ]
 };
