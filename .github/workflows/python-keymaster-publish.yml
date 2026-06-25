@@ -1,0 +1,195 @@
+name: Publish Python Keymaster to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Publish target"
+        required: true
+        default: check
+        type: choice
+        options:
+          - check
+          - testpypi
+          - pypi
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Build archon-keymaster
+        working-directory: ./python/keymaster
+        run: |
+          python -m build
+
+      - name: Check distributions
+        working-directory: ./python/keymaster
+        run: |
+          python -m twine check dist/*
+
+      - name: Install package from wheel
+        working-directory: ./python/keymaster
+        run: |
+          python -m pip install dist/*.whl
+
+      - name: Smoke test keymaster CLI
+        run: |
+          keymaster --help > /dev/null
+          python - <<'PY'
+          import argparse
+          from keymaster.cli import build_parser
+
+          parser = build_parser()
+          subparsers = [
+              action
+              for action in parser._actions
+              if isinstance(action, argparse._SubParsersAction)
+          ]
+          assert subparsers, "CLI parser has no subcommands"
+
+          commands = subparsers[0].choices
+          required = {
+              "create-id",
+              "backup-wallet-file",
+              "create-asset",
+              "resolve-did",
+              "create-vault",
+              "add-vault-item",
+              "create-dmail",
+              "send-dmail",
+              "list-registries",
+          }
+          missing = sorted(required - commands.keys())
+          assert not missing, f"Missing expected commands: {', '.join(missing)}"
+          PY
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: archon-keymaster-dist
+          path: python/keymaster/dist/*
+          if-no-files-found: error
+
+  publish_testpypi:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event.inputs.target == 'testpypi' }}
+    environment: testpypi
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12"
+
+      - name: Download distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: archon-keymaster-dist
+          path: dist
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+      - name: Smoke test TestPyPI install
+        run: |
+          VERSION="$(python - <<'PY'
+          import tomllib
+          with open("python/keymaster/pyproject.toml", "rb") as f:
+              print(tomllib.load(f)["project"]["version"])
+          PY
+          )"
+
+          python -m venv /tmp/archon-keymaster-install-test
+          /tmp/archon-keymaster-install-test/bin/python -m pip install --upgrade pip
+
+          for attempt in {1..12}; do
+            if /tmp/archon-keymaster-install-test/bin/python -m pip install \
+              --index-url https://test.pypi.org/simple/ \
+              --extra-index-url https://pypi.org/simple/ \
+              "archon-keymaster==${VERSION}"; then
+              break
+            fi
+            if [ "$attempt" -eq 12 ]; then
+              echo "archon-keymaster ${VERSION} was not installable from TestPyPI" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+          /tmp/archon-keymaster-install-test/bin/keymaster --help > /dev/null
+          /tmp/archon-keymaster-install-test/bin/python - <<'PY'
+          import argparse
+          from keymaster.cli import build_parser
+
+          parser = build_parser()
+          subparsers = [
+              action
+              for action in parser._actions
+              if isinstance(action, argparse._SubParsersAction)
+          ]
+          assert subparsers, "CLI parser has no subcommands"
+
+          commands = subparsers[0].choices
+          required = {
+              "create-id",
+              "backup-wallet-file",
+              "create-asset",
+              "resolve-did",
+              "create-vault",
+              "add-vault-item",
+              "create-dmail",
+              "send-dmail",
+              "list-registries",
+          }
+          missing = sorted(required - commands.keys())
+          assert not missing, f"Missing expected commands: {', '.join(missing)}"
+          PY
+
+  publish_pypi:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event.inputs.target == 'pypi' }}
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: archon-keymaster-dist
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
