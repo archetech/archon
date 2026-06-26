@@ -24,6 +24,15 @@ describe('MemoryMailboxStore', () => {
         expect((await store.list('did:cid:bob')).map(m => m.id)).toEqual(['id-2']);
     });
 
+    it('removes the recipient inbox after the last message is deleted', async () => {
+        const store = new MemoryMailboxStore();
+        await store.add('did:cid:bob', 'env-1', 'id-1');
+
+        expect(await store.remove('did:cid:bob', ['id-1'])).toBe(1);
+        expect(await store.list('did:cid:bob')).toStrictEqual([]);
+        expect(await store.remove('did:cid:bob', ['missing'])).toBe(0);
+    });
+
     it('prunes messages past the TTL', async () => {
         let now = 1_000_000;
         const store = new MemoryMailboxStore(1000, 1000, () => now);
@@ -83,6 +92,23 @@ describeRedis('RedisMailboxStore (live redis)', () => {
         expect(await store.consumeChallenge('rc1')).toBe(true);
         expect(await store.consumeChallenge('rc1')).toBe(false);
         expect(await store.consumeChallenge('never-issued')).toBe(false);
+    });
+});
+
+describe('RedisMailboxStore connection guards', () => {
+    it('throws a clear error when used before connecting', async () => {
+        const store = new RedisMailboxStore('redis://localhost:6379');
+
+        await expect(store.add('did:cid:bob', 'env', 'id-1')).rejects.toThrow('Redis is not connected');
+        await expect(store.list('did:cid:bob')).rejects.toThrow('Redis is not connected');
+        await expect(store.issueChallenge('challenge')).rejects.toThrow('Redis is not connected');
+        await expect(store.consumeChallenge('challenge')).rejects.toThrow('Redis is not connected');
+    });
+
+    it('does not require a Redis connection to remove an empty id list', async () => {
+        const store = new RedisMailboxStore('redis://localhost:6379');
+
+        await expect(store.remove('did:cid:bob', [])).resolves.toBe(0);
     });
 });
 
