@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.3.0](https://github.com/archetech/archon/compare/@didcid/ipfs@0.2.0...@didcid/ipfs@0.3.0) (2026-06-26)
+
+**Note:** Version bump only for package @didcid/ipfs
+
+
+
+
+
 # [0.2.0](https://github.com/archetech/archon/compare/@didcid/ipfs@0.1.3...@didcid/ipfs@0.2.0) (2026-06-26)
 
 

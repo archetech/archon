@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.6.0](https://github.com/archetech/archon/compare/@didcid/keymaster@0.5.0...@didcid/keymaster@0.6.0) (2026-06-26)
+
+**Note:** Version bump only for package @didcid/keymaster
+
+
+
+
+
 # [0.5.0](https://github.com/archetech/archon/compare/@didcid/keymaster@0.2.0...@didcid/keymaster@0.5.0) (2026-06-26)
 
 
