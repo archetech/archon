@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.2.0](https://github.com/archetech/archon/compare/@didcid/browser-hdkey@0.1.11...@didcid/browser-hdkey@0.2.0) (2026-06-26)
+
+
+### Features
+
+* expand MCP server toward Keymaster CLI parity ([#606](https://github.com/archetech/archon/issues/606)) ([8021d44](https://github.com/archetech/archon/commit/8021d4486d28003408234c2f33993389965d1dd1))
+
+
+
+
+
 ## [0.1.15](https://github.com/archetech/archon/compare/@didcid/browser-hdkey@0.1.14...@didcid/browser-hdkey@0.1.15) (2026-06-06)
 
 **Note:** Version bump only for package @didcid/browser-hdkey
