@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "archon-keymaster"
-version = "0.4.11"
+version = "0.6.0"
 description = "Reusable Python Keymaster core library for Archon"
 readme = "README.md"
 requires-python = ">=3.12"
