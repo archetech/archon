@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Gatekeeper API",
-    "version": "0.10.0",
+    "version": "0.11.0",
     "description": "Documentation for Keymaster API"
   },
   "paths": {
@@ -523,7 +523,7 @@
     "/did/{did}": {
       "get": {
         "summary": "Resolve a DID Document",
-        "description": "Resolves a DID Document from the local database. If local resolution fails, falls back to a configurable universal resolver (default: https://dev.uniresolver.io). Set `ARCHON_GATEKEEPER_FALLBACK_URL` to override the resolver URL (empty string disables fallback). Set `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` to override the timeout in milliseconds (default: 5000).\n",
+        "description": "Resolves a DID Document from the local database. If local resolution fails, falls back to a configurable universal resolver (default: https://dev.uniresolver.io). Set `ARCHON_GATEKEEPER_FALLBACK_URL` to override the resolver URL (empty string disables fallback). Set `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` to override the timeout in milliseconds (default: 5000). Set `ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL` to delegate unconfirmed `confirm=true` responses to another Gatekeeper node (empty string disables fallback).\n",
         "parameters": [
           {
             "in": "path",
@@ -697,12 +697,7 @@
                         },
                         "registry": {
                           "type": "string",
-                          "enum": [
-                            "local",
-                            "hyperswarm",
-                            "BTC:testnet4",
-                            "BTC:signet"
-                          ],
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9:_-]*$",
                           "description": "Registry in which this DID is maintained."
                         },
                         "version": {
@@ -1422,7 +1417,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "The name of the registry whose queue is being retrieved. Valid values may include \"local\", \"hyperswarm\", \"BTC:testnet4\", \"BTC:signet\", etc.\n"
+            "description": "The name of the registry whose queue is being retrieved. Registry names must match `[A-Za-z0-9][A-Za-z0-9:_-]*`.\n"
           }
         ],
         "responses": {

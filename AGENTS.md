@@ -22,6 +22,7 @@ These rules apply to coding agents working in this repository.
 - Keep `apps/gatekeeper-client/src/KeymasterUI.jsx` and `apps/keymaster-client/src/KeymasterUI.jsx` identical. When one changes, update the other to match rather than maintaining intentional drift.
 - For GitHub operations in this repo, use `gh` by default, especially for write actions and PR creation. Do not try the GitHub app first and then fall back to `gh` unless the user explicitly asks for the app or `gh` cannot perform the operation.
 - When generating or updating npm lockfiles, use the repo-pinned npm version from the root `package.json` so lockfiles stay compatible with CI.
+- For repo-wide version sweeps, search tracked files with `git ls-files` rather than raw filesystem traversal so local `node_modules`, `data`, and build outputs cannot pollute the bump.
 - Internal service-to-service admin auth should use `X-Archon-Admin-Key` consistently. Reserve `Authorization` for user/session/OAuth-style flows unless a file explicitly documents a different scheme.
 - Drawbridge's bundled Tor SOCKS host port should default to `127.0.0.1:9050`; internal services should keep using the Docker network address `tor:9050`.
 - Keymaster's Docker host port should default to localhost via `ARCHON_KEYMASTER_HOST_BIND=127.0.0.1`; internal services should keep using `keymaster:4226`.

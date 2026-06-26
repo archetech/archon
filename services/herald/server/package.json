@@ -1,6 +1,6 @@
 {
   "name": "herald-server",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "type": "module",
   "description": "Archon naming service",
   "main": "dist/index.js",
