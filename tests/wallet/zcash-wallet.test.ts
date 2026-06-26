@@ -1,12 +1,19 @@
 import { jest } from '@jest/globals';
 import {
     anchorData,
+    bumpTransactionFee,
     estimateZip317TransparentFeeZats,
     estimateFee,
     getBalance,
     getReceiveAddress,
+    getTransaction,
+    getTransactions,
     getUtxos,
+    getWalletStatus,
+    sendZec,
     setupTransparentWallet,
+    validateOpReturnData,
+    zecToZats,
 } from '../../services/mediators/zcash-wallet/src/zcash-wallet';
 import { deriveTransparentAddress } from '../../services/mediators/zcash-wallet/src/derivation';
 import type { RpcClient } from '../../services/mediators/zcash-wallet/src/zcash-rpc';
@@ -77,6 +84,16 @@ describe('zcash-wallet RPC-backed behavior', () => {
         await expect(getReceiveAddress(rpc, TEST_MNEMONIC, 'mainnet')).resolves.toBe(FIRST_ADDRESS);
     });
 
+    it('falls back to the last receive address when the gap range is used', async () => {
+        const rpc = createRpcMock({
+            getaddresstxids: ['used-txid'],
+        });
+
+        await expect(getReceiveAddress(rpc, TEST_MNEMONIC, 'mainnet')).resolves.toBe(
+            deriveTransparentAddress(TEST_MNEMONIC, 'mainnet', 0, 19)
+        );
+    });
+
     it('reports balance in ZEC from address-index zats', async () => {
         const rpc = createRpcMock({
             getaddressbalance: { balance: 123_456_789, received: 123_466_789 },
@@ -97,6 +114,65 @@ describe('zcash-wallet RPC-backed behavior', () => {
             feerate: 0.0001,
             blocks: 3,
         });
+    });
+
+    it('reports wallet status from required Zebra address-index RPCs', async () => {
+        const readyRpc = createRpcMock();
+        const missingRpc = createRpcMock({ getaddressbalance: new Error('Method not found') });
+
+        await expect(getWalletStatus(readyRpc, TEST_MNEMONIC, 'mainnet')).resolves.toMatchObject({
+            network: 'mainnet',
+            ready: true,
+            descriptorCount: 2,
+            addressCount: 40,
+        });
+        await expect(getWalletStatus(missingRpc, TEST_MNEMONIC, 'mainnet')).resolves.toMatchObject({
+            network: 'mainnet',
+            ready: false,
+            descriptorCount: 0,
+            addressCount: 0,
+        });
+    });
+
+    it('maps raw transactions and filters failed transaction lookups', async () => {
+        const rpc = createRpcMock({
+            getaddresstxids: ['tx-a', 'tx-b', 'tx-a'],
+            getrawtransaction: (params?: any[]) => {
+                const txid = params?.[0];
+                if (txid === 'tx-b') {
+                    throw new Error('missing transaction');
+                }
+                return {
+                    txid,
+                    confirmations: 2,
+                    blockhash: 'block-hash',
+                    blocktime: 1_700_000_000,
+                    time: 1_700_000_001,
+                    fee: -0.00001,
+                    vout: [{
+                        n: 0,
+                        value: 0.25,
+                        scriptPubKey: { addresses: [FIRST_ADDRESS] },
+                    }],
+                };
+            },
+        });
+
+        await expect(getTransaction(rpc, 'tx-a')).resolves.toStrictEqual({
+            txid: 'tx-a',
+            confirmations: 2,
+            blockhash: 'block-hash',
+            blocktime: 1_700_000_000,
+            time: 1_700_000_001,
+            fee: -0.00001,
+            details: [{
+                address: FIRST_ADDRESS,
+                category: 'receive',
+                amount: 0.25,
+                vout: 0,
+            }],
+        });
+        await expect(getTransactions(rpc, TEST_MNEMONIC, 'mainnet', 2, 0)).resolves.toHaveLength(1);
     });
 
     it('normalizes UTXOs and confirmations', async () => {
@@ -142,5 +218,15 @@ describe('zcash-wallet RPC-backed behavior', () => {
             txid: 'broadcast-txid',
             fee: 0.0002,
         });
+    });
+
+    it('validates send and anchor request inputs before broadcasting', async () => {
+        const rpc = createRpcMock();
+
+        expect(validateOpReturnData('hello')).toStrictEqual(Buffer.from('hello'));
+        await expect(anchorData(rpc, TEST_MNEMONIC, 'mainnet', 'x'.repeat(81))).rejects.toThrow('OP_RETURN data exceeds 80 byte limit');
+        await expect(sendZec(rpc, TEST_MNEMONIC, 'mainnet', 'not-an-address', 1)).rejects.toThrow('Invalid address for mainnet');
+        expect(() => zecToZats(Number.POSITIVE_INFINITY)).toThrow('Amount must be a finite number');
+        await expect(bumpTransactionFee()).rejects.toThrow('not supported');
     });
 });

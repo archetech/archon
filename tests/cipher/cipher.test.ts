@@ -9,6 +9,16 @@ const mockObject = {
     age: 42
 };
 
+describe('HD key helpers', () => {
+    it('restores an HD key from its JSON form', () => {
+        const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+        const hdkey = cipher.generateHDKey(mnemonic);
+
+        expect(cipher.generateHDKeyJSON(hdkey.toJSON()).publicExtendedKey)
+            .toBe(hdkey.publicExtendedKey);
+    });
+});
+
 describe('addProofOfWork', () => {
     it('should add valid PoW to an object', async () => {
         const difficulty = 8;
@@ -81,4 +91,3 @@ describe('checkProofOfWork', () => {
         expect(result).toBe(false);
     });
 });
-

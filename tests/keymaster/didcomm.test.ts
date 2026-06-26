@@ -1,4 +1,5 @@
 import Gatekeeper from '@didcid/gatekeeper';
+import { jest } from '@jest/globals';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
@@ -35,6 +36,22 @@ beforeEach(() => {
     cipher = new CipherNode();
     keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
 });
+
+afterEach(() => {
+    jest.restoreAllMocks();
+});
+
+function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
+function useDidCommGateway(base = 'https://gateway.example/didcomm'): string {
+    keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase', didcommServiceURL: base });
+    return base;
+}
 
 describe('fetchDidCommKeyPair', () => {
     it('derives a deterministic X25519 keypair for an identity', async () => {
@@ -284,6 +301,146 @@ describe('packDidComm / unpackDidComm (cross-method: Archon did:cid <-> did:key)
         expect(out.body).toEqual(body);
         expect(metadata.authenticated).toBe(true);
         expect(metadata.sender).toBe(bob.kid);
+    });
+});
+
+describe('DIDComm gateway transport helpers', () => {
+    it('delivers routed messages as Forward envelopes and mediates the valid ones', async () => {
+        const base = useDidCommGateway();
+        await keymaster.createId('Alice');
+        const mediatorDid = await keymaster.createId('Mediator');
+        const bobDid = await keymaster.createId('Bob');
+
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://mediator.example/didcomm', 'Mediator');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob', [mediatorDid]);
+
+        const deliveries: any[] = [];
+        let challengeCount = 0;
+        const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                challengeCount += 1;
+                return jsonResponse({ challenge: `challenge-${challengeCount}` });
+            }
+            if (url === `${base}/api/v1/deliver`) {
+                deliveries.push(JSON.parse(String(init?.body)));
+                return jsonResponse({ ids: ['queued-forward'] });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        const ids = await keymaster.sendDidComm(
+            { type: 'https://x/1/msg', body: { text: 'routed' } },
+            bobDid,
+            { name: 'Alice' }
+        );
+
+        expect(ids).toEqual(['queued-forward']);
+        expect(deliveries).toHaveLength(1);
+        expect(deliveries[0].endpoint).toBe('https://bob.example/didcomm');
+        expect(deliveries[0].did).toMatch(/^did:/);
+        expect(deliveries[0].message).toContain('protected');
+
+        const removeBodies: any[] = [];
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                challengeCount += 1;
+                return jsonResponse({ challenge: `challenge-${challengeCount}` });
+            }
+            if (url === `${base}/api/v1/messages/fetch`) {
+                return jsonResponse({
+                    messages: [
+                        { id: 'forward-1', message: deliveries[0].message },
+                        { id: 'not-forward', message: 'not json' },
+                    ],
+                });
+            }
+            if (url === `${base}/api/v1/messages`) {
+                expect(init?.headers).toEqual({ 'Content-Type': 'application/didcomm-encrypted+json' });
+                expect(String(init?.body)).toContain('protected');
+                return jsonResponse({ id: 'relayed' });
+            }
+            if (url === `${base}/api/v1/messages/remove`) {
+                removeBodies.push(JSON.parse(String(init?.body)));
+                return jsonResponse({ ok: true });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        const result = await keymaster.mediateDidComm({ name: 'Mediator' });
+
+        expect(result).toEqual({ relayed: 1, skipped: 1 });
+        expect(removeBodies).toHaveLength(1);
+        expect(removeBodies[0].ids).toEqual(['forward-1']);
+    });
+
+    it('receives only decryptable mailbox messages and acknowledges handled ids', async () => {
+        const base = useDidCommGateway();
+        const aliceDid = await keymaster.createId('Alice');
+        await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+
+        const packed = await keymaster.packDidComm(
+            { type: 'https://x/1/msg', body: { text: 'hello alice' } },
+            aliceDid,
+            { name: 'Bob' }
+        );
+
+        const requests: any[] = [];
+        let challengeCount = 0;
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+            const url = String(input);
+            requests.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+            if (url === `${base}/api/v1/challenge`) {
+                challengeCount += 1;
+                return jsonResponse({ challenge: `mailbox-${challengeCount}` });
+            }
+            if (url === `${base}/api/v1/messages/fetch`) {
+                return jsonResponse({
+                    messages: [
+                        { id: 'msg-ok', message: packed },
+                        { id: 'msg-bad', message: 'not an encrypted envelope' },
+                    ],
+                });
+            }
+            if (url === `${base}/api/v1/messages/remove`) {
+                return jsonResponse({ ok: true });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        const received = await keymaster.receiveDidComm({ name: 'Alice' });
+
+        expect(received).toHaveLength(1);
+        expect(received[0].message.body).toEqual({ text: 'hello alice' });
+        expect(received[0].metadata.authenticated).toBe(true);
+
+        const fetchBody = requests.find(r => r.url.endsWith('/messages/fetch'))?.body;
+        const removeBody = requests.find(r => r.url.endsWith('/messages/remove'))?.body;
+        expect(fetchBody.did).toBe(aliceDid);
+        expect(removeBody.ids).toEqual(['msg-ok']);
+    });
+
+    it('surfaces DIDComm gateway challenge failures clearly', async () => {
+        const base = useDidCommGateway();
+        await keymaster.createId('Alice');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            if (String(input) === `${base}/api/v1/challenge`) {
+                throw new TypeError('fetch failed');
+            }
+            throw new Error(`unexpected fetch ${String(input)}`);
+        });
+
+        await expect(
+            keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, bobDid, { name: 'Alice' })
+        ).rejects.toThrow(/could not reach the DIDComm gateway/);
     });
 });
 

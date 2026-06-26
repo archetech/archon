@@ -24,6 +24,15 @@ describe('MemoryMailboxStore', () => {
         expect((await store.list('did:cid:bob')).map(m => m.id)).toEqual(['id-2']);
     });
 
+    it('removes the recipient inbox after the last message is deleted', async () => {
+        const store = new MemoryMailboxStore();
+        await store.add('did:cid:bob', 'env-1', 'id-1');
+
+        expect(await store.remove('did:cid:bob', ['id-1'])).toBe(1);
+        expect(await store.list('did:cid:bob')).toStrictEqual([]);
+        expect(await store.remove('did:cid:bob', ['missing'])).toBe(0);
+    });
+
     it('prunes messages past the TTL', async () => {
         let now = 1_000_000;
         const store = new MemoryMailboxStore(1000, 1000, () => now);
@@ -83,6 +92,147 @@ describeRedis('RedisMailboxStore (live redis)', () => {
         expect(await store.consumeChallenge('rc1')).toBe(true);
         expect(await store.consumeChallenge('rc1')).toBe(false);
         expect(await store.consumeChallenge('never-issued')).toBe(false);
+    });
+});
+
+describe('RedisMailboxStore connection guards', () => {
+    it('throws a clear error when used before connecting', async () => {
+        const store = new RedisMailboxStore('redis://localhost:6379');
+
+        await expect(store.add('did:cid:bob', 'env', 'id-1')).rejects.toThrow('Redis is not connected');
+        await expect(store.list('did:cid:bob')).rejects.toThrow('Redis is not connected');
+        await expect(store.issueChallenge('challenge')).rejects.toThrow('Redis is not connected');
+        await expect(store.consumeChallenge('challenge')).rejects.toThrow('Redis is not connected');
+    });
+
+    it('does not require a Redis connection to remove an empty id list', async () => {
+        const store = new RedisMailboxStore('redis://localhost:6379');
+
+        await expect(store.remove('did:cid:bob', [])).resolves.toBe(0);
+    });
+});
+
+describe('RedisMailboxStore command mapping', () => {
+    class FakeRedis {
+        values = new Map<string, string>();
+        sets = new Map<string, Set<string>>();
+        calls: any[][] = [];
+
+        multi() {
+            const ops: (() => void)[] = [];
+            const chain = {
+                set: (key: string, value: string, mode: string, ttl: number) => {
+                    this.calls.push(['set', key, value, mode, ttl]);
+                    ops.push(() => this.values.set(key, value));
+                    return chain;
+                },
+                sadd: (key: string, id: string) => {
+                    this.calls.push(['sadd', key, id]);
+                    ops.push(() => {
+                        const set = this.sets.get(key) || new Set<string>();
+                        set.add(id);
+                        this.sets.set(key, set);
+                    });
+                    return chain;
+                },
+                expire: (key: string, ttl: number) => {
+                    this.calls.push(['expire', key, ttl]);
+                    return chain;
+                },
+                exec: async () => {
+                    ops.forEach(op => op());
+                    return [];
+                },
+            };
+            return chain;
+        }
+
+        async smembers(key: string) {
+            return [...(this.sets.get(key) || [])];
+        }
+
+        async mget(keys: string[]) {
+            return keys.map(key => this.values.get(key) ?? null);
+        }
+
+        async srem(key: string, ...ids: string[]) {
+            this.calls.push(['srem', key, ...ids]);
+            const set = this.sets.get(key);
+            ids.forEach(id => set?.delete(id));
+            return ids.length;
+        }
+
+        async del(...keys: string[]) {
+            this.calls.push(['del', ...keys]);
+            let removed = 0;
+            keys.forEach(key => {
+                if (this.values.delete(key)) {
+                    removed += 1;
+                }
+            });
+            return removed;
+        }
+
+        async set(key: string, value: string, mode: string, ttl: number) {
+            this.calls.push(['set', key, value, mode, ttl]);
+            this.values.set(key, value);
+        }
+
+        async getdel(key: string) {
+            const value = this.values.get(key) ?? null;
+            this.values.delete(key);
+            return value;
+        }
+
+        async quit() {
+            this.calls.push(['quit']);
+        }
+    }
+
+    function redisStore(prefix = 'unit') {
+        const store = new RedisMailboxStore('redis://unused', prefix, 2000, 3000);
+        const redis = new FakeRedis();
+        (store as any).redis = redis;
+        return { store, redis };
+    }
+
+    it('stores messages with TTLs, prunes expired ids while listing, and removes by id', async () => {
+        const { store, redis } = redisStore();
+
+        const message = await store.add('did:cid:bob', 'env-1', 'id-1');
+        expect(message).toMatchObject({ id: 'id-1', recipient: 'did:cid:bob', envelope: 'env-1' });
+        expect(redis.calls).toContainEqual(['set', 'unit:msg:did:cid:bob:id-1', expect.any(String), 'EX', 2]);
+        expect(redis.calls).toContainEqual(['sadd', 'unit:inbox:did:cid:bob', 'id-1']);
+        expect(redis.calls).toContainEqual(['expire', 'unit:inbox:did:cid:bob', 2]);
+
+        redis.sets.get('unit:inbox:did:cid:bob')!.add('expired');
+        const listed = await store.list('did:cid:bob');
+        expect(listed).toHaveLength(1);
+        expect(listed[0].id).toBe('id-1');
+        expect(redis.calls).toContainEqual(['srem', 'unit:inbox:did:cid:bob', 'expired']);
+
+        expect(await store.remove('did:cid:bob', ['id-1', 'missing'])).toBe(1);
+        expect(redis.calls).toContainEqual([
+            'del',
+            'unit:msg:did:cid:bob:id-1',
+            'unit:msg:did:cid:bob:missing',
+        ]);
+        expect(redis.calls).toContainEqual(['srem', 'unit:inbox:did:cid:bob', 'id-1', 'missing']);
+    });
+
+    it('returns an empty inbox without mget, consumes challenges once, and disconnects cleanly', async () => {
+        const { store, redis } = redisStore('challenge');
+
+        expect(await store.list('did:cid:empty')).toEqual([]);
+
+        await store.issueChallenge('c1');
+        expect(redis.calls).toContainEqual(['set', 'challenge:challenge:c1', '1', 'PX', 3000]);
+        expect(await store.consumeChallenge('c1')).toBe(true);
+        expect(await store.consumeChallenge('c1')).toBe(false);
+
+        await store.disconnect();
+        expect(redis.calls).toContainEqual(['quit']);
+        await expect(store.list('did:cid:empty')).rejects.toThrow('Redis is not connected');
     });
 });
 
@@ -153,5 +303,35 @@ describe('verifyChallengeSignature', () => {
 
         const ok = await verifyChallengeSignature({ resolver: gatekeeper, cipher }, { did: aliceDid, challenge, signature: mallorySig });
         expect(ok).toBe(false);
+    });
+
+    it('rejects unresolved DIDs, non-signing keys, and verifier errors', async () => {
+        await expect(verifyChallengeSignature(
+            { resolver: { resolveDID: async () => { throw new Error('not found'); } }, cipher },
+            { did: 'did:cid:missing', challenge: 'challenge', signature: 'sig' }
+        )).resolves.toBe(false);
+
+        await expect(verifyChallengeSignature(
+            {
+                resolver: {
+                    resolveDID: async () => ({
+                        didDocument: {
+                            id: 'did:cid:x25519',
+                            verificationMethod: [{ id: '#key-1', type: 'JsonWebKey2020', publicKeyJwk: { kty: 'OKP', crv: 'X25519', x: 'x' } }],
+                        },
+                    }),
+                },
+                cipher,
+            },
+            { did: 'did:cid:x25519', challenge: 'challenge', signature: 'sig' }
+        )).resolves.toBe(false);
+
+        await expect(verifyChallengeSignature(
+            {
+                resolver: gatekeeper,
+                cipher: { ...cipher, verifySig: () => { throw new Error('bad signature'); } },
+            },
+            { did: await keymaster.createId('VerifierError'), challenge: 'challenge', signature: 'sig' }
+        )).resolves.toBe(false);
     });
 });

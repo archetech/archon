@@ -87,6 +87,24 @@ describe('mcp server config', () => {
         fs.rmSync(directory, { recursive: true, force: true });
     });
 
+    it('creates json wallets from ARCHON_WALLET_PATH', async () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'archon-mcp-json-wallet-'));
+        const walletPath = path.join(directory, 'wallet.json');
+        const wallet = await createWallet({
+            nodeUrl: 'http://localhost:4224',
+            walletType: 'json',
+            walletPath,
+            passphrase: 'secret',
+            defaultRegistry: undefined,
+            readOnly: false,
+        });
+
+        await wallet.saveWallet({ version: 2, seed: {}, counter: 0, ids: {} });
+
+        expect(fs.existsSync(walletPath)).toBe(true);
+        fs.rmSync(directory, { recursive: true, force: true });
+    });
+
     it('creates runtime without blocking startup or writing to stdout', async () => {
         const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
         const runtime = await createArchonRuntime({
@@ -103,5 +121,21 @@ describe('mcp server config', () => {
         expect(logSpy).not.toHaveBeenCalled();
 
         logSpy.mockRestore();
+    });
+
+    it('creates runtime with a Keymaster when a passphrase is configured', async () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'archon-mcp-runtime-wallet-'));
+        const runtime = await createArchonRuntime({
+            nodeUrl: 'http://127.0.0.1:1',
+            walletType: 'json',
+            walletPath: path.join(directory, 'wallet.json'),
+            passphrase: 'secret',
+            defaultRegistry: 'hyperswarm',
+            readOnly: false,
+        });
+
+        expect(runtime.node.url).toBe('http://127.0.0.1:1');
+        expect(runtime.keymaster).toBeDefined();
+        fs.rmSync(directory, { recursive: true, force: true });
     });
 });
