@@ -22,9 +22,90 @@ const baseConfig: McpServerConfig = {
 
 const mutatingTools = ARCHON_MCP_TOOL_DEFINITIONS.filter(definition => definition.mutates).map(definition => definition.name);
 const readTools = ARCHON_MCP_TOOL_DEFINITIONS.filter(definition => !definition.mutates).map(definition => definition.name);
+const inlineFile = {
+    name: 'hello.txt',
+    mimeType: 'text/plain',
+    data: Buffer.from('hello').toString('base64'),
+};
+
+const defaultToolArgs = {
+    address: 'alice@example.com',
+    alias: 'alice-alias',
+    amount: 21,
+    anoncrypt: true,
+    attachment: inlineFile,
+    ballot: 'did:cid:ballot',
+    bolt11: 'lnbc...',
+    challenge: { prompt: 'prove it' },
+    claims: { name: 'Alice' },
+    config: { title: 'Poll', options: ['yes', 'no'] },
+    confirm: true,
+    confirmPayment: true,
+    controller: 'did:cid:bob',
+    credential: { type: ['VerifiableCredential'] },
+    data: { hello: 'world' },
+    did: 'did:cid:alice',
+    domain: 'example.com',
+    encryption: 'XC20P',
+    endpoint: 'https://example.com/didcomm',
+    file: inlineFile,
+    group: 'did:cid:group',
+    groupName: 'Friends',
+    id: 'did:cid:asset',
+    includeIds: true,
+    issuer: 'did:cid:issuer',
+    item: inlineFile,
+    key: 'hello',
+    member: 'did:cid:member',
+    memo: 'coffee',
+    message: { body: 'hello' },
+    name: 'Alice',
+    newName: 'Alicia',
+    newPassphrase: 'new secret',
+    nsec: 'nsec1example',
+    object: { hello: 'world' },
+    oldName: 'Alice',
+    owner: 'did:cid:alice',
+    packed: 'packed-message',
+    paymentHash: 'hash',
+    poll: 'did:cid:poll',
+    recoveryPhrase: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
+    registry: 'hyperswarm',
+    recipient: 'did:cid:bob',
+    response: 'did:cid:response',
+    reveal: true,
+    routingKeys: ['did:cid:mediator#key-agreement-1'],
+    schema: { type: 'object' },
+    sign: true,
+    subject: 'did:cid:subject',
+    tags: ['inbox'],
+    to: 'did:cid:bob',
+    validFrom: '2026-01-01T00:00:00.000Z',
+    validUntil: '2026-12-31T00:00:00.000Z',
+    value: 'world',
+    version: 1,
+    vote: 1,
+    wallet: { version: 2, ids: {} },
+};
+
+const toolArgOverrides: Record<string, Record<string, unknown>> = {
+    archon_bind_credential: { schema: 'did:cid:schema' },
+    archon_create_response: { challenge: 'did:cid:challenge' },
+    archon_create_schema_template: { schema: 'did:cid:schema' },
+    archon_encrypt_message: { message: 'hello' },
+    archon_remove_vault_item: { item: 'hello.txt' },
+    archon_get_vault_item: { item: 'hello.txt' },
+};
 
 function parseToolResult(response: any) {
     return JSON.parse(response.content[0].text);
+}
+
+function argsForTool(name: string) {
+    return {
+        ...defaultToolArgs,
+        ...(toolArgOverrides[name] || {}),
+    };
 }
 
 function mockRuntime(overrides: Record<string, unknown> = {}) {
@@ -151,6 +232,13 @@ function mockRuntime(overrides: Record<string, unknown> = {}) {
         removeDmailAttachment: jest.fn().mockResolvedValue(true),
         getDmailAttachment: jest.fn().mockResolvedValue(Buffer.from('attachment')),
         listDmailAttachments: jest.fn().mockResolvedValue({}),
+        publishDidComm: jest.fn().mockResolvedValue(true),
+        unpublishDidComm: jest.fn().mockResolvedValue(true),
+        packDidComm: jest.fn().mockResolvedValue('packed'),
+        unpackDidComm: jest.fn().mockResolvedValue({ body: 'hello' }),
+        sendDidComm: jest.fn().mockResolvedValue(['msg-1']),
+        receiveDidComm: jest.fn().mockResolvedValue([{ body: 'hello' }]),
+        mediateDidComm: jest.fn().mockResolvedValue({ forwarded: 1 }),
         ...overrides,
     };
 
@@ -181,6 +269,21 @@ describe('mcp server tools', () => {
 
         expect(parseToolResult(response)).toStrictEqual({ ok: true, result: ['hyperswarm'] });
         expect(runtime.node.listRegistries).toHaveBeenCalledTimes(1);
+    });
+
+    it('executes every registered tool with representative valid inputs', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        for (const definition of ARCHON_MCP_TOOL_DEFINITIONS) {
+            const response = await server.tools.get(definition.name)!.handler(argsForTool(definition.name));
+            const result = parseToolResult(response);
+            if (!result.ok) {
+                throw new Error(`${definition.name}: ${result.error}`);
+            }
+            expect(result.ok).toBe(true);
+        }
     });
 
     it('does not advertise mutating tools in read-only mode', () => {

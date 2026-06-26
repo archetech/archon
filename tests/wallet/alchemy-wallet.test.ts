@@ -30,6 +30,44 @@ describe('Alchemy wallet backend', () => {
         ]);
     });
 
+    it('normalizes alternate hosted API wrapper shapes', () => {
+        expect(normalizeHostedUtxos({
+            data: [
+                { hash: 'data-tx', n: 3, valueSats: 4000, confirmations: 2.9 },
+            ],
+        })).toEqual([
+            { txid: 'data-tx', vout: 3, valueSats: 4000, confirmations: 2 },
+        ]);
+
+        expect(normalizeHostedUtxos({
+            result: {
+                utxos: [
+                    { txId: 'result-utxos-tx', outputIndex: 4, value_sat: 5000n, confirmations: -1 },
+                ],
+            },
+        })).toEqual([
+            { txid: 'result-utxos-tx', vout: 4, valueSats: 5000, confirmations: 0 },
+        ]);
+
+        expect(normalizeHostedUtxos({
+            outputs: [
+                { txid: 'outputs-tx', vout: 5, amount: 0.00006 },
+            ],
+        })).toEqual([
+            { txid: 'outputs-tx', vout: 5, valueSats: 6000, confirmations: 0 },
+        ]);
+    });
+
+    it('normalizes a bare result array', () => {
+        expect(normalizeHostedUtxos({
+            result: [
+                { transactionHash: 'result-array-tx', index: 6, value: '7000', confirmations: 1 },
+            ],
+        })).toEqual([
+            { txid: 'result-array-tx', vout: 6, valueSats: 7000, confirmations: 1 },
+        ]);
+    });
+
     it('ignores incomplete or zero-value UTXOs', () => {
         expect(normalizeHostedUtxos([
             { txid: 'missing-vout', value: 1000 },

@@ -2,12 +2,14 @@ import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
+import nock from 'nock';
 import CipherNode from '@didcid/cipher/node';
 import type { Operation } from '@didcid/gatekeeper/types';
 import { JsonPinStore } from '../../services/mediators/pinning/src/state.ts';
 import { fingerprintOperation, processPinningQueue, type PinningGatekeeper } from '../../services/mediators/pinning/src/sync.ts';
-import { pinPayload } from '../../services/mediators/pinning/src/provider.ts';
+import { normalizeStatus, pinPayload, providerError } from '../../services/mediators/pinning/src/provider.ts';
 import type { PinningServiceProvider, ProviderPinRequest } from '../../services/mediators/pinning/src/provider.ts';
+import { PinningServiceProvider as PinningServiceProviderClass } from '../../services/mediators/pinning/src/provider.ts';
 
 function op(id: string, registry = 'BTC:mainnet'): Operation {
     return {
@@ -287,5 +289,68 @@ describe('pinning mediator queue processing', () => {
             name: 'archon-test',
             meta: {},
         });
+    });
+});
+
+describe('pinning service provider helpers', () => {
+    it('requires an API token', () => {
+        expect(() => new PinningServiceProviderClass('pinata', 'https://pinning.example', undefined))
+            .toThrow('ARCHON_PIN_API_TOKEN is required');
+    });
+
+    it('submits pins and checks status through the Pinning Service API', async () => {
+        nock('https://pinning.example')
+            .post('/pins', {
+                cid: 'bagaaieraexample',
+                name: 'archon-test',
+                meta: { archonFingerprint: 'fingerprint' },
+                origins: ['https://gateway.example/ipfs/bagaaieraexample'],
+            })
+            .matchHeader('authorization', 'Bearer secret-token')
+            .reply(202, { requestid: 'request-1', status: 'queued' })
+            .get('/pins/request-1')
+            .matchHeader('authorization', 'Bearer secret-token')
+            .reply(200, { requestid: 'request-1', status: 'pinned' });
+
+        const provider = new PinningServiceProviderClass('pinata', 'https://pinning.example/', 'secret-token');
+
+        expect(provider.name).toBe('pinata');
+        expect(await provider.pin({
+            cid: 'bagaaieraexample',
+            name: 'archon-test',
+            meta: { archonFingerprint: 'fingerprint' },
+            origins: ['https://gateway.example/ipfs/bagaaieraexample'],
+        })).toStrictEqual({
+            requestid: 'request-1',
+            status: 'queued',
+            response: { requestid: 'request-1', status: 'queued' },
+        });
+        expect(await provider.getStatus('request-1')).toStrictEqual({
+            requestid: 'request-1',
+            status: 'pinned',
+            response: { requestid: 'request-1', status: 'pinned' },
+        });
+    });
+
+    it('normalizes unknown or malformed provider status responses', () => {
+        expect(normalizeStatus({ requestid: 123, status: 'surprising' })).toStrictEqual({
+            requestid: undefined,
+            status: 'pinning',
+            response: { requestid: 123, status: 'surprising' },
+        });
+        expect(normalizeStatus(null)).toStrictEqual({
+            requestid: undefined,
+            status: 'pinning',
+            response: null,
+        });
+    });
+
+    it('extracts useful provider error messages', () => {
+        expect(providerError({ response: { data: { error: { details: 'bad cid' } } } })).toBe('bad cid');
+        expect(providerError({ response: { data: { error: { reason: 'quota exceeded' } } } })).toBe('quota exceeded');
+        expect(providerError({ response: { data: { error: 'plain error' } } })).toBe('plain error');
+        expect(providerError({ response: { data: { message: 'message error' } } })).toBe('message error');
+        expect(providerError(new Error('network down'))).toBe('network down');
+        expect(providerError('string failure')).toBe('string failure');
     });
 });
