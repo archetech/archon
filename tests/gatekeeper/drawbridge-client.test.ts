@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import nock from 'nock';
 import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
 import { ExpectedExceptionError } from '@didcid/common/errors';
@@ -133,6 +134,19 @@ describe('DrawbridgeClient', () => {
         }
         catch (error: any) {
             expect(error.message).toBe(ServerError.message);
+        }
+    });
+
+    it('throws non-HTTP error messages unchanged', async () => {
+        const client = await DrawbridgeClient.create({ url: DrawbridgeURL });
+        (client as any).axios.post = jest.fn().mockRejectedValue(new Error('socket down'));
+
+        try {
+            await client.getLightningBalance('invoice');
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error).toBe('socket down');
         }
     });
 });
