@@ -117,10 +117,10 @@
     "@didcid/cipher": "^0.4.0",
     "@didcid/common": "^0.3.0",
     "@didcid/ipfs": "^0.3.0",
-    "axios": "^1.18.0",
+    "axios": "^1.18.1",
     "canonicalize": "^2.0.0",
     "dotenv": "^16.4.5",
-    "ioredis": "^5.4.1",
+    "ioredis": "^5.11.1",
     "mongodb": "^6.5.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"
