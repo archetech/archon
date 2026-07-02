@@ -320,6 +320,15 @@ mod tests {
             normalize_path("/1.0/identifiers/did:cid:bagaaieratest/registration?versionSequence=2"),
             "/1.0/identifiers/:did/registration"
         );
+        // Percent-encoded colon must still collapse (parity with the TS normalizer).
+        assert_eq!(
+            normalize_path("/1.0/identifiers/did%3Acid%3Abagaaieratest/data"),
+            "/1.0/identifiers/:did/data"
+        );
+        assert_eq!(
+            normalize_path("/api/v1/did/did%3Acid%3Abagaaieratest"),
+            "/api/v1/did/:did"
+        );
     }
 
     #[test]

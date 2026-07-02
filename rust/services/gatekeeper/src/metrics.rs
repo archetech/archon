@@ -53,9 +53,15 @@ pub(crate) fn normalize_path(path: &str) -> String {
         .filter(|segment| !segment.is_empty())
         .collect::<Vec<_>>();
 
+    // A DID path segment, either literal ("did:...") or with the colon
+    // percent-encoded ("did%3A..."), matching the TypeScript normalizer.
+    let is_did_segment = |value: &str| {
+        value.starts_with("did:") || value.to_ascii_lowercase().starts_with("did%3a")
+    };
+
     if let Some(index) = segments.iter().position(|segment| *segment == "did") {
         if let Some(value) = segments.get(index + 1) {
-            if value.starts_with("did:") {
+            if is_did_segment(value) {
                 let mut normalized = segments.clone();
                 normalized[index + 1] = ":did";
                 return format!("/{}", normalized.join("/"));
@@ -67,7 +73,7 @@ pub(crate) fn normalize_path(path: &str) -> String {
     // segment; any /data or /registration suffix is preserved.
     if let Some(index) = segments.iter().position(|segment| *segment == "identifiers") {
         if let Some(value) = segments.get(index + 1) {
-            if value.starts_with("did:") {
+            if is_did_segment(value) {
                 let mut normalized = segments.clone();
                 normalized[index + 1] = ":did";
                 return format!("/{}", normalized.join("/"));

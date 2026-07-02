@@ -636,9 +636,15 @@ by the DID Resolution data model:
 
 ```jsonc
 {
-  "didDocument": { ... },
+  "didDocument": { /* ... */ },
   "didResolutionMetadata": { "retrieved": "<RFC 3339>" },
-  "didDocumentMetadata": { "created", "versionId", "versionSequence", "confirmed", ... }
+  "didDocumentMetadata": {
+    "created": "<RFC 3339>",
+    "versionId": "<CID>",
+    "versionSequence": "1",
+    "confirmed": true
+    // ...plus updated / deleted / deactivated / canonicalId when applicable
+  }
 }
 ```
 
