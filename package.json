@@ -37,6 +37,7 @@
     "@types/jest": "^29.5.14",
     "@types/mock-fs": "^4.13.4",
     "@types/node": "^22.18.11",
+    "@types/supertest": "^7.2.0",
     "eslint": "^8.57.0",
     "eslint-config-react-app": "^7.0.1",
     "eslint-plugin-only-warn": "^1.1.0",
@@ -47,6 +48,7 @@
     "lerna": "^9.0.3",
     "mock-fs": "^5.2.0",
     "nock": "^14.0.0",
+    "supertest": "^7.2.2",
     "swagger-jsdoc": "^6.2.8",
     "ts-jest": "^29.2.6",
     "typescript": "^5.8.2"
