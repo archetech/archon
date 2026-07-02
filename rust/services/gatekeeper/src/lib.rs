@@ -308,6 +308,18 @@ mod tests {
             normalize_path("/api/v1/block/BTC:signet/latest"),
             "/api/v1/block/:registry/latest"
         );
+        assert_eq!(
+            normalize_path("/1.0/identifiers/did:cid:bagaaieratest"),
+            "/1.0/identifiers/:did"
+        );
+        assert_eq!(
+            normalize_path("/1.0/identifiers/did:cid:bagaaieratest/data"),
+            "/1.0/identifiers/:did/data"
+        );
+        assert_eq!(
+            normalize_path("/1.0/identifiers/did:cid:bagaaieratest/registration?versionSequence=2"),
+            "/1.0/identifiers/:did/registration"
+        );
     }
 
     #[test]

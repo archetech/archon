@@ -1190,6 +1190,180 @@ pub(crate) async fn resolve_did(
     Json(local_doc).into_response()
 }
 
+// Shared resolution for the conformant /1.0/identifiers surface. confirm/verify are not DID
+// Core parameters, so they are not accepted here; the surface always resolves confirmed,
+// cryptographically verified state (only the standard version selectors are honored).
+// Returns the resolved document, or an (HTTP status, DID Resolution error value) pair.
+async fn resolve_conformant(
+    state: &AppState,
+    did: &str,
+    query: &HashMap<String, String>,
+) -> std::result::Result<Value, (StatusCode, String)> {
+    let options = ResolveOptions {
+        version_time: query.get("versionTime").cloned(),
+        version_sequence: query
+            .get("versionSequence")
+            .and_then(|value| value.parse::<usize>().ok()),
+        confirm: true,
+        verify: true,
+    };
+
+    let classify = |error_kind: &str| -> (StatusCode, String) {
+        let status = if error_kind == "invalidDid" {
+            StatusCode::BAD_REQUEST
+        } else {
+            StatusCode::NOT_FOUND
+        };
+        (status, error_kind.to_string())
+    };
+
+    match resolve_local_doc_async(state, did, options).await {
+        Ok(doc) => {
+            if let Some(error_kind) = doc
+                .get("didResolutionMetadata")
+                .and_then(|value| value.get("error"))
+                .and_then(Value::as_str)
+            {
+                return Err(classify(error_kind));
+            }
+            Ok(doc)
+        }
+        Err(_) => {
+            let error_kind = if did.starts_with("did:") {
+                "notFound"
+            } else {
+                "invalidDid"
+            };
+            Err(classify(error_kind))
+        }
+    }
+}
+
+// GET /1.0/identifiers/:did — standards-conformant DID resolution. Returns only the DID
+// Resolution triple (didDocument, didResolutionMetadata, didDocumentMetadata); the
+// method-specific data/registration objects are dereferenced separately.
+pub(crate) async fn conformant_resolve_did(
+    State(state): State<AppState>,
+    Path(did): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let start = Instant::now();
+    match resolve_conformant(&state, &did, &query).await {
+        Ok(doc) => {
+            let triple = json!({
+                "didDocument": doc.get("didDocument").cloned().unwrap_or(Value::Null),
+                "didResolutionMetadata": doc
+                    .get("didResolutionMetadata")
+                    .cloned()
+                    .unwrap_or_else(|| json!({})),
+                "didDocumentMetadata": doc
+                    .get("didDocumentMetadata")
+                    .cloned()
+                    .unwrap_or_else(|| json!({}))
+            });
+            record_metrics(
+                &state,
+                "GET",
+                "/1.0/identifiers/:did",
+                200,
+                start.elapsed().as_secs_f64(),
+            );
+            Json(triple).into_response()
+        }
+        Err((status, error_kind)) => {
+            record_metrics(
+                &state,
+                "GET",
+                "/1.0/identifiers/:did",
+                status.as_u16(),
+                start.elapsed().as_secs_f64(),
+            );
+            // Errors are reported in didResolutionMetadata, keeping the result triple-shaped.
+            (
+                status,
+                Json(json!({
+                    "didDocument": Value::Null,
+                    "didResolutionMetadata": { "error": error_kind },
+                    "didDocumentMetadata": {}
+                })),
+            )
+                .into_response()
+        }
+    }
+}
+
+// GET /1.0/identifiers/:did/data — dereferences the method-specific data resource
+// (did:cid:<cid>/data), returned as the raw resource (empty object for agent DIDs).
+pub(crate) async fn conformant_dereference_data(
+    State(state): State<AppState>,
+    Path(did): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let start = Instant::now();
+    match resolve_conformant(&state, &did, &query).await {
+        Ok(doc) => {
+            let data = doc
+                .get("didDocumentData")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            record_metrics(
+                &state,
+                "GET",
+                "/1.0/identifiers/:did/data",
+                200,
+                start.elapsed().as_secs_f64(),
+            );
+            Json(data).into_response()
+        }
+        Err((status, error_kind)) => {
+            record_metrics(
+                &state,
+                "GET",
+                "/1.0/identifiers/:did/data",
+                status.as_u16(),
+                start.elapsed().as_secs_f64(),
+            );
+            (status, error_json(&error_kind)).into_response()
+        }
+    }
+}
+
+// GET /1.0/identifiers/:did/registration — dereferences the method-specific
+// registration/anchoring provenance resource (did:cid:<cid>/registration).
+pub(crate) async fn conformant_dereference_registration(
+    State(state): State<AppState>,
+    Path(did): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let start = Instant::now();
+    match resolve_conformant(&state, &did, &query).await {
+        Ok(doc) => {
+            let registration = doc
+                .get("didDocumentRegistration")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            record_metrics(
+                &state,
+                "GET",
+                "/1.0/identifiers/:did/registration",
+                200,
+                start.elapsed().as_secs_f64(),
+            );
+            Json(registration).into_response()
+        }
+        Err((status, error_kind)) => {
+            record_metrics(
+                &state,
+                "GET",
+                "/1.0/identifiers/:did/registration",
+                status.as_u16(),
+                start.elapsed().as_secs_f64(),
+            );
+            (status, error_json(&error_kind)).into_response()
+        }
+    }
+}
+
 pub(crate) async fn ipfs_add_json(
     State(state): State<AppState>,
     Json(payload): Json<Value>,

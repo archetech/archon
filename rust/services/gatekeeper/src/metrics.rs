@@ -37,7 +37,7 @@ pub(crate) fn record_metrics(
 }
 
 fn qualify_route(route: &str) -> String {
-    if route.starts_with("/api/") || route == "/metrics" {
+    if route.starts_with("/api/") || route == "/metrics" || route.starts_with("/1.0/") {
         return route.to_string();
     }
     if route.starts_with('/') {
@@ -54,6 +54,18 @@ pub(crate) fn normalize_path(path: &str) -> String {
         .collect::<Vec<_>>();
 
     if let Some(index) = segments.iter().position(|segment| *segment == "did") {
+        if let Some(value) = segments.get(index + 1) {
+            if value.starts_with("did:") {
+                let mut normalized = segments.clone();
+                normalized[index + 1] = ":did";
+                return format!("/{}", normalized.join("/"));
+            }
+        }
+    }
+
+    // Conformant surface: /1.0/identifiers/<did>[/data|/registration]. Collapse the DID
+    // segment; any /data or /registration suffix is preserved.
+    if let Some(index) = segments.iter().position(|segment| *segment == "identifiers") {
         if let Some(value) = segments.get(index + 1) {
             if value.starts_with("did:") {
                 let mut normalized = segments.clone();
