@@ -188,6 +188,14 @@ Shared behavior:
   `did:cid:<cid>/registration`), retrieved by content address. They are NOT
   part of the resolution result and are returned as the raw resource value
   (not wrapped in a named envelope).
+- **Local-only (no fallback delegation):** unlike `/api/v1/did/:did`, this
+  surface resolves solely from local state — it MUST NOT delegate to the
+  universal-resolver `fallbackURL` or the confirmed-Gatekeeper peer on a local
+  miss, and returns `notFound` instead. This is deliberate: `/1.0/identifiers`
+  is the node's own Universal Resolver *driver* surface, so delegating to the
+  configured `fallbackURL` (itself a Universal Resolver by default) could form
+  a resolution loop and would return an external resolver's representation.
+  Clients that want fallback/import-propagation behavior use `/api/v1/did/:did`.
 - **Errors:**
   - `invalidDid` -> HTTP 400; `notFound` -> HTTP 404.
   - For `/:did`, errors are reported in `didResolutionMetadata.error` and the
