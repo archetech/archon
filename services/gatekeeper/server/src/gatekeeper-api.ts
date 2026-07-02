@@ -9,6 +9,7 @@ import DbRedis from '@didcid/gatekeeper/db/redis';
 import DbSqlite from '@didcid/gatekeeper/db/sqlite';
 import DbMongo from '@didcid/gatekeeper/db/mongo';
 import { CheckDIDsResult, ResolveDIDOptions, Operation, DidCidDocument } from '@didcid/gatekeeper/types';
+import { InvalidOperationError } from '@didcid/common/errors';
 import KuboClient from '@didcid/ipfs/kubo';
 import config from './config.js';
 import {
@@ -902,6 +903,18 @@ async function resolveConformant(
     return { ok: true, doc };
 }
 
+// Classify an error thrown during conformant resolution/dereferencing. A validation failure
+// in the DID's own operation chain (e.g. a bad proof surfaced by verify) is a property of the
+// DID, not a server fault, so it resolves to a 4xx "notFound"; anything else is an internal
+// error. resolveConformant() already handles the expected invalidDid/notFound cases, so this
+// only ever sees thrown exceptions.
+function classifyResolveError(error: unknown): { status: number; resolutionError: string } {
+    if (error instanceof InvalidOperationError) {
+        return { status: 404, resolutionError: 'notFound' };
+    }
+    return { status: 500, resolutionError: 'internalError' };
+}
+
 /**
  * @swagger
  * /1.0/identifiers/{did}:
@@ -976,7 +989,16 @@ identifiersRouter.get('/:did', async (req, res) => {
         const { didDocument, didResolutionMetadata, didDocumentMetadata } = result.doc;
         res.json({ didDocument, didResolutionMetadata, didDocumentMetadata });
     } catch (error: any) {
-        res.status(404).send({ error: 'DID not found' });
+        const { status, resolutionError } = classifyResolveError(error);
+        if (status >= 500) {
+            logger.error({ did: req.params.did, error }, 'DID resolution failed');
+        }
+        // Errors are reported in didResolutionMetadata, keeping the result triple-shaped.
+        res.status(status).json({
+            didDocument: null,
+            didResolutionMetadata: { error: resolutionError },
+            didDocumentMetadata: {},
+        });
     }
 });
 
@@ -1054,7 +1076,11 @@ identifiersRouter.get('/:did/data', async (req, res) => {
         // Not part of the DID resolution result — returned as the resource itself.
         res.json(result.doc.didDocumentData ?? {});
     } catch (error: any) {
-        res.status(404).send({ error: 'DID not found' });
+        const { status, resolutionError } = classifyResolveError(error);
+        if (status >= 500) {
+            logger.error({ did: req.params.did, error }, 'DID dereferencing failed');
+        }
+        res.status(status).json({ error: resolutionError });
     }
 });
 
@@ -1131,7 +1157,11 @@ identifiersRouter.get('/:did/registration', async (req, res) => {
         // Not part of the DID resolution result — returned as the resource itself.
         res.json(result.doc.didDocumentRegistration ?? {});
     } catch (error: any) {
-        res.status(404).send({ error: 'DID not found' });
+        const { status, resolutionError } = classifyResolveError(error);
+        if (status >= 500) {
+            logger.error({ did: req.params.did, error }, 'DID dereferencing failed');
+        }
+        res.status(status).json({ error: resolutionError });
     }
 });
 

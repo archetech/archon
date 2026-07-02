@@ -228,7 +228,7 @@ For registries such as BTC with non-trivial transaction costs, it is expected th
 
 ## DID Revocation
 
-Revoking a DID is a special kind of Update that results in the termination of the DID. Revoked DIDs cannot be updated because they have no current controller, therefore they cannot be recovered once revoked. Revoked DIDs can be resolved without error, but resolvers will return a result with the `didDocumentMetadata.deactivated` property set to `true`. The `didDocument` is set to empty, and the DID's data resource (dereferenced at `/data`) is empty.
+Revoking a DID is a special kind of Update that results in the termination of the DID. Revoked DIDs cannot be updated because they have no current controller, therefore they cannot be recovered once revoked. Revoked DIDs can be resolved without error, but resolvers will return a result with the `didDocumentMetadata.deactivated` property set to `true`. The `didDocument` is reduced to just its `id`, and the DID's data resource (dereferenced at `/data`) is empty.
 
 To revoke a DID, the client must sign and submit a `delete` operation to a node.
 
