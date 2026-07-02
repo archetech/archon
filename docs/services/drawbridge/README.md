@@ -88,6 +88,7 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 | `*` | `/didcomm/**` | Forwarded to the local DIDComm relay (path prefix `/didcomm` stripped). Carries the relay's own routes (mailbox `messages/*`, signed-`challenge`, egress `deliver`). Not paywalled — DIDComm authenticates with its own signed challenge. **501** if DIDComm is disabled. `application/didcomm-encrypted+json` bodies are captured as text and forwarded verbatim. |
 | `GET` | `/.well-known/*` | Forwarded to Herald (e.g. `lnurlp/<name>`, `webfinger`, `names`). |
 | `GET\|POST\|PUT\|DELETE` | `/names/*` | Forwarded to Herald (`/api/*`). **501** if name resolution is disabled. |
+| `*` | `/1.0/identifiers/**` | Forwarded verbatim to the Gatekeeper's standards-conformant DID resolution / dereferencing surface (`/1.0/identifiers/:did`, `/:did/data`, `/:did/registration`; see [Gatekeeper spec §2.6](../gatekeeper/README.md)). **Not paywalled** — public DID resolution for interop with universal resolvers, which do not speak L402. Proxied unchanged (no prefix stripped), so the Gatekeeper's resolution triple, raw dereferenced resources, and status/error shapes pass through intact. |
 | `GET` | `/metrics` | Prometheus exposition. |
 
 ### 2.2 L402 admin routes

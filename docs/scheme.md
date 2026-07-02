@@ -3,7 +3,7 @@
 
 ## Abstract
 
-The `did:cid` method specification conforms to the requirements specified in the [DID specification](https://www.w3.org/TR/did-core/) currently published by the W3C Credentials Community Group. For more information about DIDs and DID method specifications, please see the [DID Primer](https://w3c-ccg.github.io/did-primer/).
+The `did:cid` method specification conforms to the requirements specified in [DID Core 1.0](https://www.w3.org/TR/did-core/), a W3C Recommendation. For more information about DIDs and DID method specifications, please see the [DID Primer](https://w3c-ccg.github.io/did-primer/).
 
 ## Introduction
 
@@ -11,18 +11,32 @@ The `did:cid` method is designed to support a P2P identity layer with secure dec
 
 ## DID Format
 
-DIDs using this method have the following format:
+A `did:cid` DID has the following format:
 
 ```
-did-cid           = "did:cid:" cid-identifier
-                   [ ";" did-service ] [ "/" did-path ]
-                   [ "?" did-query ] [ "#" did-fragment ]
-cid-identifier    = CID v1 in standard base32 encoding
+did-cid        = "did:cid:" cid-identifier
+cid-identifier = CID v1 in standard base32 encoding
 ```
 
 ### Example
 
 `did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m`
+
+### DID URL Syntax
+
+A `did:cid` DID URL extends the DID with the standard URI components defined by the W3C [DID Core 1.0](https://www.w3.org/TR/did-core/#did-url-syntax) DID URL grammar:
+
+```
+did-url = did-cid path-abempty [ "?" query ] [ "#" fragment ]
+```
+
+| Component | Purpose in `did:cid` |
+|-----------|----------------------|
+| `path` (`/…`) | Selects a method-specific dereferenceable resource of the DID. This method defines `/data` and `/registration` (see [DID URL Dereferencing](#did-url-dereferencing)). |
+| `query` (`?…`) | Selects a version to resolve or dereference. This method honors `versionTime` and `versionSequence`. |
+| `fragment` (`#…`) | Identifies a node within the DID document (e.g. `#key-1`), resolved client-side against the resolved document. |
+
+> **Note (DID Core 1.0):** Earlier drafts of the DID specification allowed a `;`-delimited service matrix parameter (`did:cid:<cid>;service=…`). DID Core 1.0 removed this form; service selection, where supported, uses the registered `service` and `relativeRef` **query** parameters. The `did:cid` method does not use the `;service` matrix-parameter form.
 
 ## DID Lifecycle
 
@@ -214,7 +228,7 @@ For registries such as BTC with non-trivial transaction costs, it is expected th
 
 ## DID Revocation
 
-Revoking a DID is a special kind of Update that results in the termination of the DID. Revoked DIDs cannot be updated because they have no current controller, therefore they cannot be recovered once revoked. Revoked DIDs can be resolved without error, but resolvers will return a document set with the `didDocumentMetadata.deactivated` property set to `true`. The `didDocument` and `didDocumentData` properties will be set to empty.
+Revoking a DID is a special kind of Update that results in the termination of the DID. Revoked DIDs cannot be updated because they have no current controller, therefore they cannot be recovered once revoked. Revoked DIDs can be resolved without error, but resolvers will return a result with the `didDocumentMetadata.deactivated` property set to `true`. The `didDocument` is reduced to just its `id`, and the DID's data resource (dereferenced at `/data`) is empty.
 
 To revoke a DID, the client must sign and submit a `delete` operation to a node.
 
@@ -248,11 +262,14 @@ Upon receiving the operation the node must:
 1. Verify the previd is identical to the latest version's operation CID.
 1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
 
-After revocation is confirmed on the DID's registry, resolving the DID will result in response like this:
+After revocation is confirmed on the DID's registry, resolving the DID returns a result like this:
 ```json
 {
     "didDocument": {
         "id": "did:cid:bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha"
+    },
+    "didResolutionMetadata": {
+        "retrieved": "2026-01-14T19:36:09.115Z"
     },
     "didDocumentMetadata": {
         "deactivated": true,
@@ -260,26 +277,16 @@ After revocation is confirmed on the DID's registry, resolving the DID will resu
         "deleted": "2026-01-14T19:34:33Z",
         "versionId": "bagaaierats6ttxvpx2l3tat25ota7z7335akfd2iup5loajsdlqcwismkgpq",
         "versionSequence": "2",
-        "confirmed": true,
-        "isOwned": false
-    },
-    "didDocumentData": {},
-    "didDocumentRegistration": {
-        "version": 1,
-        "type": "asset",
-        "registry": "hyperswarm"
-    },
-    "didResolutionMetadata": {
-        "retrieved": "2026-01-14T19:36:09.115Z"
+        "confirmed": true
     }
 }
 ```
 
-The metadata has a deactivated field set to true to conform to the [W3C specification](https://www.w3.org/TR/did-core/#did-document-metadata).
+The metadata has a `deactivated` field set to `true` to conform to the [W3C specification](https://www.w3.org/TR/did-core/#did-document-metadata).
 
 ## DID Resolution
 
-Resolution is the operation of responding to a DID with a DID Document. If you think of the DID as a secure reference or pointer, then resolution is equivalent to dereferencing.
+Resolution is the operation of returning a DID Document and its metadata for a given DID. It is distinct from *dereferencing*, which returns a resource identified by a DID URL (see [DID URL Dereferencing](#did-url-dereferencing)).
 
 Given a DID and an optional resolution time, the resolver retrieves the associated document seed from IPFS using the DID suffix as the CID, parsing it as plaintext JSON.
 If the data cannot be retrieved, then the resolver should delegate the resolution request to a fallback node.
@@ -320,6 +327,49 @@ function resolveDid(did, versionTime=now):
             apply update to DID document
     return DID document
 ```
+
+### Resolution Result
+
+A conformant resolution returns only the three members defined by the W3C [DID Resolution](https://www.w3.org/TR/did-core/#did-resolution) data model:
+
+- `didDocument`
+- `didResolutionMetadata`
+- `didDocumentMetadata`
+
+The method-specific data and registration objects are **not** part of the resolution result; they are exposed as dereferenceable resources (see [DID URL Dereferencing](#did-url-dereferencing)). Standard document metadata — `created`, `updated`, `versionId`, `versionSequence`, `deactivated`, `canonicalId`, `confirmed` — is carried in `didDocumentMetadata`.
+
+### Endpoints
+
+The conformant resolution and dereferencing surface follows the [Universal Resolver](https://github.com/decentralized-identity/universal-resolver) driver convention:
+
+| DID URL | HTTP | Returns |
+|---------|------|---------|
+| `did:cid:<cid>` | `GET /1.0/identifiers/<did>` | DID Resolution result (the triple) |
+| `did:cid:<cid>/data` | `GET /1.0/identifiers/<did>/data` | The data resource |
+| `did:cid:<cid>/registration` | `GET /1.0/identifiers/<did>/registration` | The registration resource |
+
+This surface always returns confirmed, cryptographically verified state. The legacy `/api/v1/did/<did>` endpoint remains available for backwards compatibility; it returns the richer internal document set (with `didDocumentData` and `didDocumentRegistration` inline) and can return unconfirmed or unverified state.
+
+## DID URL Dereferencing
+
+Dereferencing a `did:cid` DID URL returns a *resource* associated with the DID, as distinct from resolution (which returns the DID document and its metadata). Because `did:cid` is content-addressed, these resources are retrieved by content rather than from an external location.
+
+### Path resources
+
+This method defines two dereferenceable resources, selected by the DID URL path:
+
+- **`/data`** — `did:cid:<cid>/data` dereferences to the DID's data resource (`didDocumentData` in the internal document set). Agent DIDs have an empty data resource; asset DIDs return their attached data.
+- **`/registration`** — `did:cid:<cid>/registration` dereferences to the DID's registration/anchoring provenance (registry, type, validity, version). This is method-specific provenance, not W3C DID document metadata, which is why it is dereferenced rather than embedded in `didDocumentMetadata`.
+
+Neither resource is part of the DID resolution result. Both honor the `versionTime` and `versionSequence` version selectors.
+
+### Fragments
+
+A fragment identifies a node within the DID document — for example `did:cid:<cid>#key-1` dereferences to the verification method whose `id` matches. Per the DID Core processing model, the fragment is applied **client-side** to the resolved DID document (it is not transmitted to the resolver over HTTP); the node whose fully-qualified `id` matches the DID URL is returned.
+
+### Service dereferencing (future)
+
+The registered `service` and `relativeRef` query parameters — used to construct external service-endpoint URLs — are not currently implemented. If added they would be additive, and would change neither the resolution result nor the path resources above.
 
 ## Proof Verification
 

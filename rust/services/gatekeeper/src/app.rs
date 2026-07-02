@@ -23,12 +23,14 @@ use tracing::{info, warn};
 
 use crate::{
     api::{
-        add_block, api_not_found, clear_queue, create_did, db_reset, db_verify, export_batch,
-        export_dids, generate_did, get_block_by_id, get_latest_block, get_metrics, get_queue,
-        import_batch, import_batch_by_cids, import_dids, ipfs_add_data, ipfs_add_json,
-        ipfs_add_stream, ipfs_add_text, ipfs_get_data, ipfs_get_json, ipfs_get_stream,
-        ipfs_get_text, list_dids, not_found, process_events_route, query_docs, ready, registries,
-        remove_dids, resolve_did, search_docs, status, version,
+        add_block, api_not_found, clear_queue, conformant_dereference_data,
+        conformant_dereference_registration, conformant_not_found, conformant_resolve_did,
+        create_did, db_reset,
+        db_verify, export_batch, export_dids, generate_did, get_block_by_id, get_latest_block,
+        get_metrics, get_queue, import_batch, import_batch_by_cids, import_dids, ipfs_add_data,
+        ipfs_add_json, ipfs_add_stream, ipfs_add_text, ipfs_get_data, ipfs_get_json,
+        ipfs_get_stream, ipfs_get_text, list_dids, not_found, process_events_route, query_docs,
+        ready, registries, remove_dids, resolve_did, search_docs, status, version,
     },
     build_search_index, log_status_snapshot, refresh_metrics_snapshot, start_background_tasks,
     CheckDidsResult, Config, EventRecord, JsonDb, Metrics, SearchIndex,
@@ -225,9 +227,19 @@ fn build_router(state: AppState) -> Router {
         .route("/query", post(query_docs))
         .layer(DefaultBodyLimit::max(json_limit));
 
+    // Standards-conformant DID resolution / dereferencing surface, following the Universal
+    // Resolver driver convention (/1.0/identifiers). Distinct from the internal /api/v1/did
+    // family, which is preserved for backwards compatibility.
+    let identifiers = Router::new()
+        .route("/:did", get(conformant_resolve_did))
+        .route("/:did/data", get(conformant_dereference_data))
+        .route("/:did/registration", get(conformant_dereference_registration))
+        .fallback(conformant_not_found);
+
     Router::new()
         .route("/metrics", get(get_metrics))
         .nest("/api/v1", streaming.merge(upload).merge(json))
+        .nest("/1.0/identifiers", identifiers)
         .nest("/api", Router::new().fallback(api_not_found))
         .fallback(not_found)
         .layer(middleware::from_fn(log_http))

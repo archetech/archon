@@ -82,6 +82,13 @@ server {
         proxy_pass http://gatekeeper;
     }
 
+    # Standards-conformant DID resolution / dereferencing (public, no auth):
+    # /1.0/identifiers/{did}, /{did}/data, /{did}/registration
+    location ~ ^/1\.0/identifiers/ {
+        limit_req zone=api_general burst=30 nodelay;
+        proxy_pass http://gatekeeper;
+    }
+
     # DID listing/query
     location = /api/v1/dids {
         limit_req zone=api_general burst=20 nodelay;
