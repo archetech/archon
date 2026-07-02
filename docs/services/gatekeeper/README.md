@@ -55,6 +55,7 @@ It is responsible for:
 - generating deterministic DIDs from create operations
 - verifying cryptographic proofs (secp256k1 ECDSA over SHA-256 of canonical JSON)
 - resolving DIDs into `didDocument` + `didDocumentMetadata` per the DID Core spec
+- exposing a standards-conformant DID resolution and dereferencing surface (`/1.0/identifiers`) per the DID Resolution data model
 - managing the import queue for events received from other nodes
 - exposing IPFS read/write through HTTP for clients without their own Kubo
 - serving Prometheus metrics and a small set of admin/operational endpoints
@@ -70,9 +71,11 @@ It is **not** responsible for:
 ## 2. HTTP API contract
 
 The service binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_GATEKEEPER_PORT}`
-(default `0.0.0.0:4224`). All API routes live under `/api/v1`. Two
-non-versioned routes exist: `/metrics` for Prometheus and an `/api/*`
-catch-all for unhandled paths.
+(default `0.0.0.0:4224`). Most API routes live under `/api/v1`. A
+standards-conformant DID resolution surface lives under `/1.0/identifiers`
+(see [§2.6](#26-conformant-did-resolution-surface)). Two other non-versioned
+routes exist: `/metrics` for Prometheus and an `/api/*` catch-all for
+unhandled paths.
 
 ### 2.1 Routes
 
@@ -84,7 +87,7 @@ catch-all for unhandled paths.
 | `GET` | `/api/v1/registries` | no | JSON array of supported registry names. |
 | `POST` | `/api/v1/did` | no | Submit a `create`, `update`, or `delete` operation. Create returns the new DID string; update/delete return `true`. See [§7](#7-did-create--update--delete-validation). |
 | `POST` | `/api/v1/did/generate` | no | Deterministic DID generation without persistence. Body: `Operation`. Returns: DID string. |
-| `GET` | `/api/v1/did/:did` | no | Resolve a DID. Query params: `versionTime` (ISO 8601), `versionSequence` (int), `confirm` (`"true"`/`"false"`), `verify` (`"true"`/`"false"`). See [§6](#6-did-resolution-algorithm). |
+| `GET` | `/api/v1/did/:did` | no | Resolve a DID (internal resolver; returns the full document set incl. `didDocumentData`/`didDocumentRegistration`, see [§3.7](#37-didciddocument-resolution-result)). Query params: `versionTime` (ISO 8601), `versionSequence` (int), `confirm` (`"true"`/`"false"`), `verify` (`"true"`/`"false"`). See [§6](#6-did-resolution-algorithm). For the standards-conformant surface see [§2.6](#26-conformant-did-resolution-surface). |
 | `POST` | `/api/v1/dids/` | no | List DIDs. Body: `GetDIDOptions`. Only `/dids/` is registered explicitly; Express matches both `/dids` and `/dids/`. |
 | `POST` | `/api/v1/dids/remove` | yes | Body: array of DIDs. Returns boolean. |
 | `POST` | `/api/v1/dids/export` | no | Body: `{ "dids": string[] | undefined }`. Returns `GatekeeperEvent[][]` (one inner array per DID). |
@@ -153,6 +156,48 @@ Limit strings parse case-insensitively as `<digits>(b|kb|mb)?`.
     listed in [§2.1](#21-routes).
 - The unhandled-route fallback returns `{"message":"Endpoint not found"}`.
 - Any uncaught panic / exception SHOULD return HTTP 500 and SHOULD be logged.
+
+### 2.6 Conformant DID resolution surface
+
+In addition to the internal `/api/v1/did/:did` resolver, the service MUST
+expose a standards-conformant DID resolution and dereferencing surface under
+the [Universal Resolver](https://github.com/decentralized-identity/universal-resolver)
+driver convention `/1.0/identifiers`. This surface satisfies the W3C
+[DID Resolution](https://www.w3.org/TR/did-core/#did-resolution) data model,
+which permits only three top-level members in a resolution result.
+
+| Method | Path | Returns |
+| --- | --- | --- |
+| `GET` | `/1.0/identifiers/:did` | The DID Resolution result: exactly `didDocument`, `didResolutionMetadata`, `didDocumentMetadata`. See [§6.5](#65-conformant-resolution-result). |
+| `GET` | `/1.0/identifiers/:did/data` | The DID's data resource (`didDocumentData`), returned as the raw resource (empty object for agents). |
+| `GET` | `/1.0/identifiers/:did/registration` | The DID's registration/anchoring provenance (`didDocumentRegistration`), returned as the raw resource. |
+
+Shared behavior:
+
+- **Query params:** `versionTime` (ISO 8601) and `versionSequence` (int) only.
+  Unlike `/api/v1/did/:did`, the non-standard `confirm`/`verify` params are
+  NOT accepted; this surface always resolves with `confirm: true, verify:
+  true` (confirmed, cryptographically verified state). Clients needing raw or
+  unconfirmed state use `/api/v1/did/:did`.
+- **Routing:** `:did` is a bare DID (a single path segment); the
+  dereference resources are selected by the `/data` and `/registration`
+  sub-paths, so DID-URL path parsing is handled by routing rather than the
+  DID validator.
+- **Dereferenceable resources:** `/data` and `/registration` are method-specific
+  dereferenceable resources of the DID (the DID URLs `did:cid:<cid>/data` and
+  `did:cid:<cid>/registration`), retrieved by content address. They are NOT
+  part of the resolution result and are returned as the raw resource value
+  (not wrapped in a named envelope).
+- **Errors:**
+  - `invalidDid` -> HTTP 400; `notFound` -> HTTP 404.
+  - For `/:did`, errors are reported in `didResolutionMetadata.error` and the
+    body remains triple-shaped (`didDocument: null`, `didDocumentMetadata:
+    {}`).
+  - For the dereference resources, the body is `{"error":"<value>"}`.
+  - A validation failure in the DID's own operation chain (surfaced by the
+    forced `verify`) MUST be treated as `notFound` (HTTP 404), not an internal
+    error. Unexpected failures MUST return HTTP 500 with error value
+    `internalError` (triple-shaped for `/:did`) and SHOULD be logged.
 
 ---
 
@@ -241,6 +286,14 @@ omitted from the JSON object; required fields MUST be present unless noted.
 ```
 
 ### 3.7 `DidCidDocument` (resolution result)
+
+This is the **full internal document set** returned by `/api/v1/did/:did` and
+used throughout the protocol (including update operation payloads). The
+standards-conformant `/1.0/identifiers/:did` surface returns only the
+`didDocument` / `didResolutionMetadata` / `didDocumentMetadata` subset;
+`didDocumentData` and `didDocumentRegistration` are dereferenced separately
+(see [§2.6](#26-conformant-did-resolution-surface) and
+[§6.5](#65-conformant-resolution-result)).
 
 ```jsonc
 {
@@ -569,6 +622,29 @@ Before returning, implementations MUST:
 - omit `didDocumentMetadata.canonicalId` unless set
 - always emit `didDocumentMetadata.versionId`, `versionSequence` (string),
   `confirmed`, `created`
+
+### 6.5 Conformant resolution result
+
+The `/1.0/identifiers` surface ([§2.6](#26-conformant-did-resolution-surface))
+reshapes the resolver output at the HTTP boundary; the resolution algorithm
+itself is unchanged (it always runs with `confirm: true, verify: true` for
+this surface). The conformant result contains only the three members defined
+by the DID Resolution data model:
+
+```jsonc
+{
+  "didDocument": { ... },
+  "didResolutionMetadata": { "retrieved": "<RFC 3339>" },
+  "didDocumentMetadata": { "created", "versionId", "versionSequence", "confirmed", ... }
+}
+```
+
+`didDocumentData` and `didDocumentRegistration` (present inline in the
+internal [`DidCidDocument`](#37-didciddocument-resolution-result)) MUST be
+omitted here and instead exposed via the `/data` and `/registration`
+dereference resources. Standard document metadata (`created`, `updated`,
+`versionId`, `versionSequence`, `deactivated`, `canonicalId`, `confirmed`)
+remains in `didDocumentMetadata`.
 
 ---
 
@@ -962,16 +1038,19 @@ The `route` label MUST collapse dynamic path segments to placeholder names
 so cardinality stays bounded. Required normalizations:
 
 ```
-/api/v1/did/did:...        -> /api/v1/did/:did
-/api/v1/block/<r>/latest   -> /api/v1/block/:registry/latest
-/api/v1/block/<r>/<id>     -> /api/v1/block/:registry/<id>
-/api/v1/queue/<r>/clear    -> /api/v1/queue/:registry/clear
-/api/v1/queue/<r>          -> /api/v1/queue/:registry
-/api/v1/events/<x>         -> /api/v1/events/:registry
-/api/v1/dids/<x>           -> /api/v1/dids/:prefix
+/api/v1/did/did:...          -> /api/v1/did/:did
+/api/v1/block/<r>/latest     -> /api/v1/block/:registry/latest
+/api/v1/block/<r>/<id>       -> /api/v1/block/:registry/<id>
+/api/v1/queue/<r>/clear      -> /api/v1/queue/:registry/clear
+/api/v1/queue/<r>            -> /api/v1/queue/:registry
+/api/v1/events/<x>           -> /api/v1/events/:registry
+/api/v1/dids/<x>             -> /api/v1/dids/:prefix
+/1.0/identifiers/did:...     -> /1.0/identifiers/:did   (the /data and /registration suffixes are preserved)
 ```
 
-The label MUST include the `/api/v1` prefix.
+The label MUST retain each route's own prefix (`/api/v1` for the versioned
+API, `/1.0/identifiers` for the conformant surface); only the dynamic DID /
+registry segments are collapsed.
 
 ### 13.2 Counter semantics
 
