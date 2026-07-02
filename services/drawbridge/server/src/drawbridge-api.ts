@@ -94,6 +94,7 @@ async function resolveDidCommEndpoint(): Promise<string | null> {
 function normalizePath(path: string): string {
     return path
         .replace(/\/did\/(?:did:[^/]+|did%3[aA][^/]+)/, '/did/:did')
+        .replace(/\/identifiers\/(?:did:[^/]+|did%3[aA][^/]+)/, '/identifiers/:did')
         .replace(/\/invoice\/(?:did:[^/]+|did%3[aA][^/]+)/, '/invoice/:did')
         .replace(/\/ipfs\/json\/[^/]+/, '/ipfs/json/:cid')
         .replace(/\/ipfs\/text\/[^/]+/, '/ipfs/text/:cid')
@@ -756,6 +757,20 @@ async function main() {
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'DIDComm proxy error');
             res.status(502).json({ error: 'Upstream didcomm error' });
+        }
+    });
+
+    // Standards-conformant DID resolution / dereferencing surface (Universal Resolver
+    // driver convention). Proxied verbatim to the gatekeeper so its conformant output —
+    // the resolution triple, raw dereferenced resources, and status/error shapes — is
+    // preserved unchanged. Intentionally open (no L402): public DID resolution for interop
+    // with universal resolvers, which do not speak L402.
+    app.use('/1.0/identifiers', async (req, res) => {
+        try {
+            await proxyRequest(req, res, config.gatekeeperURL, '');
+        } catch (error: any) {
+            logger.error({ err: error, path: req.originalUrl }, 'Gatekeeper conformant proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
         }
     });
 
