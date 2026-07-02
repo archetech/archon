@@ -8,7 +8,7 @@ import DbJsonCache from '@didcid/gatekeeper/db/json-cache';
 import DbRedis from '@didcid/gatekeeper/db/redis';
 import DbSqlite from '@didcid/gatekeeper/db/sqlite';
 import DbMongo from '@didcid/gatekeeper/db/mongo';
-import { CheckDIDsResult, ResolveDIDOptions, Operation } from '@didcid/gatekeeper/types';
+import { CheckDIDsResult, ResolveDIDOptions, Operation, DidCidDocument } from '@didcid/gatekeeper/types';
 import KuboClient from '@didcid/ipfs/kubo';
 import config from './config.js';
 import {
@@ -868,6 +868,118 @@ v1router.get('/did/:did', async (req, res) => {
     }
 });
 
+// Shared resolution for the conformant /1.0/identifiers surface.
+//
+// confirm/verify are not DID Core parameters, so they are not exposed here; the surface
+// always returns confirmed, cryptographically verified state (callers needing raw or
+// unconfirmed state use the internal /api/v1/did/:did endpoint). Only the standard version
+// selectors are honored. Returns the resolved document, or an HTTP status + resolution
+// metadata carrying the error.
+async function resolveConformant(
+    req: express.Request
+): Promise<{ ok: true; doc: DidCidDocument } | { ok: false; status: number; didResolutionMetadata: any }> {
+    const options: ResolveDIDOptions = { confirm: true, verify: true };
+    const { versionTime, versionSequence } = req.query;
+
+    if (typeof versionTime === 'string') {
+        options.versionTime = versionTime;
+    }
+
+    if (typeof versionSequence === 'string') {
+        const parsed = parseInt(versionSequence, 10);
+        if (!isNaN(parsed)) {
+            options.versionSequence = parsed;
+        }
+    }
+
+    const doc = await gatekeeper.resolveDID(req.params.did, options);
+
+    if (doc.didResolutionMetadata?.error) {
+        const status = doc.didResolutionMetadata.error === 'invalidDid' ? 400 : 404;
+        return { ok: false, status, didResolutionMetadata: doc.didResolutionMetadata };
+    }
+
+    return { ok: true, doc };
+}
+
+/**
+ * @swagger
+ * /1.0/identifiers/{did}:
+ *   get:
+ *     summary: Resolve a DID (standards-conformant)
+ *     description: >
+ *       Resolves a DID following the DID Resolution data model, returning only the standard
+ *       result triple (`didDocument`, `didResolutionMetadata`, `didDocumentMetadata`). Follows
+ *       the Universal Resolver driver convention. The method-specific `didDocumentData` and
+ *       `didDocumentRegistration` objects are NOT part of this result — they are exposed as
+ *       dereferenceable resources at `/1.0/identifiers/{did}/data` and
+ *       `/1.0/identifiers/{did}/registration`. Always returns confirmed, cryptographically
+ *       verified state; the internal `/api/v1/did/{did}` endpoint remains available for raw or
+ *       unconfirmed state.
+ *     parameters:
+ *       - in: path
+ *         name: did
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The DID to resolve.
+ *       - in: query
+ *         name: versionTime
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Resolve the state of the DID as of this specific time.
+ *       - in: query
+ *         name: versionSequence
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Resolve a specific version of the DID Document.
+ *     responses:
+ *       200:
+ *         description: The DID Resolution result (standard triple).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 didDocument:
+ *                   type: object
+ *                 didResolutionMetadata:
+ *                   type: object
+ *                 didDocumentMetadata:
+ *                   type: object
+ *       400:
+ *         description: The DID is syntactically invalid (error in didResolutionMetadata).
+ *       404:
+ *         description: The DID does not exist or cannot be resolved (error in didResolutionMetadata).
+ *       500:
+ *         description: Internal Server Error.
+ */
+identifiersRouter.get('/:did', async (req, res) => {
+    try {
+        const result = await resolveConformant(req);
+
+        if (!result.ok) {
+            // DID Resolution: errors are reported in didResolutionMetadata.
+            res.status(result.status).json({
+                didDocument: null,
+                didResolutionMetadata: result.didResolutionMetadata,
+                didDocumentMetadata: {},
+            });
+            return;
+        }
+
+        // Conformant result: only the standard triple. The method-specific data and
+        // registration objects are dereferenced via their own resource paths.
+        const { didDocument, didResolutionMetadata, didDocumentMetadata } = result.doc;
+        res.json({ didDocument, didResolutionMetadata, didDocumentMetadata });
+    } catch (error: any) {
+        res.status(404).send({ error: 'DID not found' });
+    }
+});
+
 /**
  * @swagger
  * /1.0/identifiers/{did}/data:
@@ -931,35 +1043,93 @@ v1router.get('/did/:did', async (req, res) => {
  */
 identifiersRouter.get('/:did/data', async (req, res) => {
     try {
-        // confirm/verify are not DID Core parameters. The conformant surface always
-        // returns confirmed, cryptographically verified state; callers needing raw or
-        // unconfirmed state use the internal /api/v1/did/:did endpoint.
-        const options: ResolveDIDOptions = { confirm: true, verify: true };
-        const { versionTime, versionSequence } = req.query;
+        const result = await resolveConformant(req);
 
-        if (typeof versionTime === 'string') {
-            options.versionTime = versionTime;
-        }
-
-        if (typeof versionSequence === 'string') {
-            const parsed = parseInt(versionSequence, 10);
-            if (!isNaN(parsed)) {
-                options.versionSequence = parsed;
-            }
-        }
-
-        const doc = await gatekeeper.resolveDID(req.params.did, options);
-
-        if (doc.didResolutionMetadata?.error) {
-            const error = doc.didResolutionMetadata.error;
-            const status = error === 'invalidDid' ? 400 : 404;
-            res.status(status).json({ error });
+        if (!result.ok) {
+            res.status(result.status).json({ error: result.didResolutionMetadata.error });
             return;
         }
 
         // Dereference the method-specific data resource (did:cid:<cid>/data).
         // Not part of the DID resolution result — returned as the resource itself.
-        res.json(doc.didDocumentData ?? {});
+        res.json(result.doc.didDocumentData ?? {});
+    } catch (error: any) {
+        res.status(404).send({ error: 'DID not found' });
+    }
+});
+
+/**
+ * @swagger
+ * /1.0/identifiers/{did}/registration:
+ *   get:
+ *     summary: Dereference the registration resource of a DID
+ *     description: >
+ *       Dereferences the method-specific registration/anchoring resource associated with a DID
+ *       (the DID URL `did:cid:<cid>/registration`). This is provenance about how and where the
+ *       DID was registered and anchored — it is NOT DID Core metadata and NOT part of the DID
+ *       resolution result. Standard document metadata (created, versionId, deactivated, etc.)
+ *       remains in `didDocumentMetadata` on the resolution result.
+ *     parameters:
+ *       - in: path
+ *         name: did
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The DID whose registration resource is dereferenced.
+ *       - in: query
+ *         name: versionTime
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Dereference the registration as of this specific time.
+ *       - in: query
+ *         name: versionSequence
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Dereference the registration at a specific version of the DID Document.
+ *     responses:
+ *       200:
+ *         description: The dereferenced registration resource.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               description: Method-specific anchoring/provenance data.
+ *       400:
+ *         description: The DID is syntactically invalid.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       404:
+ *         description: The DID does not exist or cannot be resolved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       500:
+ *         description: Internal Server Error.
+ */
+identifiersRouter.get('/:did/registration', async (req, res) => {
+    try {
+        const result = await resolveConformant(req);
+
+        if (!result.ok) {
+            res.status(result.status).json({ error: result.didResolutionMetadata.error });
+            return;
+        }
+
+        // Dereference the method-specific registration resource (did:cid:<cid>/registration).
+        // Not part of the DID resolution result — returned as the resource itself.
+        res.json(result.doc.didDocumentRegistration ?? {});
     } catch (error: any) {
         res.status(404).send({ error: 'DID not found' });
     }
