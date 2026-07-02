@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Logger } from 'pino';
 import type Gatekeeper from '@didcid/gatekeeper';
-import { ResolveDIDOptions, DidCidDocument } from '@didcid/gatekeeper/types';
+import type { ResolveDIDOptions, DidCidDocument } from '@didcid/gatekeeper/types';
 import { InvalidOperationError } from '@didcid/common/errors';
 
 // Classify an error thrown during conformant resolution/dereferencing. A validation failure
