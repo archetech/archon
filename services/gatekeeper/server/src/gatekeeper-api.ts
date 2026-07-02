@@ -85,6 +85,7 @@ function normalizePath(path: string): string {
     // Normalize known dynamic segments
     return basePath
         .replace(/\/did\/(?:did:[^/]+|did%3[aA][^/]+)/g, '/did/:did')
+        .replace(/\/identifiers\/(?:did:[^/]+|did%3[aA][^/]+)/g, '/identifiers/:did')
         .replace(/\/block\/[^/]+\/latest/g, '/block/:registry/latest')
         .replace(/\/block\/[^/]+/g, '/block/:registry')
         .replace(/\/queue\/[^/]+\/clear/g, '/queue/:registry/clear')
@@ -136,6 +137,10 @@ const startTime = new Date();
 const app = express();
 const v1router = express.Router();
 const adminRouter = express.Router();
+// Standards-conformant DID resolution / dereferencing surface, following the
+// Universal Resolver driver convention (/1.0/identifiers/:did). Distinct from the
+// internal /api/v1/did/:did family, which is preserved for backwards compatibility.
+const identifiersRouter = express.Router();
 const ARCHON_ADMIN_HEADER = 'x-archon-admin-key';
 
 // Admin API key middleware — when ARCHON_ADMIN_API_KEY is set, admin
@@ -858,6 +863,120 @@ v1router.get('/did/:did', async (req, res) => {
         }
 
         res.json(doc);
+    } catch (error: any) {
+        res.status(404).send({ error: 'DID not found' });
+    }
+});
+
+/**
+ * @swagger
+ * /1.0/identifiers/{did}/data:
+ *   get:
+ *     summary: Dereference the data resource of a DID
+ *     description: >
+ *       Dereferences the data resource associated with a DID, per the did:cid method-specific
+ *       DID URL dereferencing rules (the DID URL `did:cid:<cid>/data`). Because the DID is
+ *       content-addressed, the resource is retrieved by content rather than by an external
+ *       location. This is distinct from DID resolution (`/1.0/identifiers/{did}`): it returns
+ *       the associated data resource itself, not the DID Document + metadata triple. Agent DIDs
+ *       return an empty object; asset DIDs return their attached data.
+ *     parameters:
+ *       - in: path
+ *         name: did
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The DID whose data resource is dereferenced.
+ *       - in: query
+ *         name: versionTime
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Dereference the data as of this specific time.
+ *       - in: query
+ *         name: versionSequence
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Dereference the data at a specific version of the DID Document.
+ *       - in: query
+ *         name: confirm
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: If `true`, dereferences only if the DID is fully confirmed.
+ *       - in: query
+ *         name: verify
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: If `true`, verifies the signature(s) of the DID operation(s) first.
+ *     responses:
+ *       200:
+ *         description: The dereferenced data resource.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               description: Arbitrary data attached to the DID (empty object for agent DIDs).
+ *       400:
+ *         description: The DID is syntactically invalid.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       404:
+ *         description: The DID does not exist or cannot be resolved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       500:
+ *         description: Internal Server Error.
+ */
+identifiersRouter.get('/:did/data', async (req, res) => {
+    try {
+        const options: ResolveDIDOptions = {};
+        const { versionTime, versionSequence, confirm, verify } = req.query;
+
+        if (typeof versionTime === 'string') {
+            options.versionTime = versionTime;
+        }
+
+        if (typeof versionSequence === 'string') {
+            const parsed = parseInt(versionSequence, 10);
+            if (!isNaN(parsed)) {
+                options.versionSequence = parsed;
+            }
+        }
+
+        if (confirm) {
+            options.confirm = confirm === 'true';
+        }
+
+        if (verify) {
+            options.verify = verify === 'true';
+        }
+
+        const doc = await gatekeeper.resolveDID(req.params.did, options);
+
+        if (doc.didResolutionMetadata?.error) {
+            const error = doc.didResolutionMetadata.error;
+            const status = error === 'invalidDid' ? 400 : 404;
+            res.status(status).json({ error });
+            return;
+        }
+
+        // Dereference the method-specific data resource (did:cid:<cid>/data).
+        // Not part of the DID resolution result — returned as the resource itself.
+        res.json(doc.didDocumentData ?? {});
     } catch (error: any) {
         res.status(404).send({ error: 'DID not found' });
     }
@@ -2238,6 +2357,7 @@ v1router.post('/query', async (req, res) => {
 });
 
 app.use('/api/v1', v1router);
+app.use('/1.0/identifiers', identifiersRouter);
 
 app.use('/api', (req, res) => {
     console.warn(`Warning: Unhandled API endpoint - ${req.method} ${req.originalUrl}`);

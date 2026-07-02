@@ -741,6 +741,106 @@
         }
       }
     },
+    "/1.0/identifiers/{did}/data": {
+      "get": {
+        "summary": "Dereference the data resource of a DID",
+        "description": "Dereferences the data resource associated with a DID, per the did:cid method-specific DID URL dereferencing rules (the DID URL `did:cid:<cid>/data`). Because the DID is content-addressed, the resource is retrieved by content rather than by an external location. This is distinct from DID resolution (`/1.0/identifiers/{did}`): it returns the associated data resource itself, not the DID Document + metadata triple. Agent DIDs return an empty object; asset DIDs return their attached data.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "did",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The DID whose data resource is dereferenced."
+          },
+          {
+            "in": "query",
+            "name": "versionTime",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Dereference the data as of this specific time."
+          },
+          {
+            "in": "query",
+            "name": "versionSequence",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Dereference the data at a specific version of the DID Document."
+          },
+          {
+            "in": "query",
+            "name": "confirm",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "If `true`, dereferences only if the DID is fully confirmed."
+          },
+          {
+            "in": "query",
+            "name": "verify",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "If `true`, verifies the signature(s) of the DID operation(s) first."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The dereferenced data resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Arbitrary data attached to the DID (empty object for agent DIDs)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The DID is syntactically invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The DID does not exist or cannot be resolved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error."
+          }
+        }
+      }
+    },
     "/dids/": {
       "post": {
         "summary": "Retrieve a list of DIDs or DID Documents.",
