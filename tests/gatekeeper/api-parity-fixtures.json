@@ -161,5 +161,12 @@
     "path": "/1.0/identifiers/did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m/registration",
     "expectedStatus": 404,
     "compareMode": "json"
+  },
+  {
+    "name": "conformant-unsupported-path",
+    "method": "GET",
+    "path": "/1.0/identifiers/did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m/bogus",
+    "expectedStatus": 404,
+    "compareMode": "json"
   }
 ]

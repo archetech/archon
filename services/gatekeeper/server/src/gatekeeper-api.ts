@@ -1165,6 +1165,13 @@ identifiersRouter.get('/:did/registration', async (req, res) => {
     }
 });
 
+// Any other path under /1.0/identifiers is not a supported DID URL resource for this method.
+// Return a structured JSON 404 (not Express's default HTML) so the conformant surface stays
+// consistent and matches the Rust implementation.
+identifiersRouter.use((req, res) => {
+    res.status(404).json({ error: 'notFound' });
+});
+
 /**
  * @swagger
  * /dids/:

@@ -202,6 +202,10 @@ Shared behavior:
     body remains triple-shaped (`didDocument: null`, `didDocumentMetadata:
     {}`).
   - For the dereference resources, the body is `{"error":"<value>"}`.
+  - Any other path under `/1.0/identifiers` (an unsupported DID URL resource,
+    e.g. `/1.0/identifiers/<did>/bogus`) MUST return HTTP 404
+    `{"error":"notFound"}` — a structured JSON body, not a framework-default
+    HTML 404.
   - A validation failure in the DID's own operation chain (surfaced by the
     forced `verify`) MUST be treated as `notFound` (HTTP 404), not an internal
     error. Unexpected failures SHOULD return HTTP 500 with error value

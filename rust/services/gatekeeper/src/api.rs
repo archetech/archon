@@ -1364,6 +1364,19 @@ pub(crate) async fn conformant_dereference_registration(
     }
 }
 
+// Any other path under /1.0/identifiers is not a supported DID URL resource for this method.
+// Return a structured JSON 404 so the conformant surface stays consistent (matches the TS
+// implementation) instead of the generic top-level "Endpoint not found" fallback.
+pub(crate) async fn conformant_not_found(
+    State(state): State<AppState>,
+    request: Request,
+) -> Response {
+    let method = request.method().clone();
+    let route = normalize_path(request.uri().path());
+    record_metrics(&state, method.as_str(), &route, 404, 0.0);
+    (StatusCode::NOT_FOUND, error_json("notFound")).into_response()
+}
+
 pub(crate) async fn ipfs_add_json(
     State(state): State<AppState>,
     Json(payload): Json<Value>,

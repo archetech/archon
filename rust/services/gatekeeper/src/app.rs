@@ -24,7 +24,8 @@ use tracing::{info, warn};
 use crate::{
     api::{
         add_block, api_not_found, clear_queue, conformant_dereference_data,
-        conformant_dereference_registration, conformant_resolve_did, create_did, db_reset,
+        conformant_dereference_registration, conformant_not_found, conformant_resolve_did,
+        create_did, db_reset,
         db_verify, export_batch, export_dids, generate_did, get_block_by_id, get_latest_block,
         get_metrics, get_queue, import_batch, import_batch_by_cids, import_dids, ipfs_add_data,
         ipfs_add_json, ipfs_add_stream, ipfs_add_text, ipfs_get_data, ipfs_get_json,
@@ -232,7 +233,8 @@ fn build_router(state: AppState) -> Router {
     let identifiers = Router::new()
         .route("/:did", get(conformant_resolve_did))
         .route("/:did/data", get(conformant_dereference_data))
-        .route("/:did/registration", get(conformant_dereference_registration));
+        .route("/:did/registration", get(conformant_dereference_registration))
+        .fallback(conformant_not_found);
 
     Router::new()
         .route("/metrics", get(get_metrics))
