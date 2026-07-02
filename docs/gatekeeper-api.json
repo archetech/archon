@@ -773,24 +773,6 @@
               "type": "integer"
             },
             "description": "Dereference the data at a specific version of the DID Document."
-          },
-          {
-            "in": "query",
-            "name": "confirm",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            },
-            "description": "If `true`, dereferences only if the DID is fully confirmed."
-          },
-          {
-            "in": "query",
-            "name": "verify",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            },
-            "description": "If `true`, verifies the signature(s) of the DID operation(s) first."
           }
         ],
         "responses": {

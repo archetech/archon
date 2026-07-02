@@ -900,18 +900,6 @@ v1router.get('/did/:did', async (req, res) => {
  *         schema:
  *           type: integer
  *         description: Dereference the data at a specific version of the DID Document.
- *       - in: query
- *         name: confirm
- *         required: false
- *         schema:
- *           type: boolean
- *         description: If `true`, dereferences only if the DID is fully confirmed.
- *       - in: query
- *         name: verify
- *         required: false
- *         schema:
- *           type: boolean
- *         description: If `true`, verifies the signature(s) of the DID operation(s) first.
  *     responses:
  *       200:
  *         description: The dereferenced data resource.
@@ -943,8 +931,11 @@ v1router.get('/did/:did', async (req, res) => {
  */
 identifiersRouter.get('/:did/data', async (req, res) => {
     try {
-        const options: ResolveDIDOptions = {};
-        const { versionTime, versionSequence, confirm, verify } = req.query;
+        // confirm/verify are not DID Core parameters. The conformant surface always
+        // returns confirmed, cryptographically verified state; callers needing raw or
+        // unconfirmed state use the internal /api/v1/did/:did endpoint.
+        const options: ResolveDIDOptions = { confirm: true, verify: true };
+        const { versionTime, versionSequence } = req.query;
 
         if (typeof versionTime === 'string') {
             options.versionTime = versionTime;
@@ -955,14 +946,6 @@ identifiersRouter.get('/:did/data', async (req, res) => {
             if (!isNaN(parsed)) {
                 options.versionSequence = parsed;
             }
-        }
-
-        if (confirm) {
-            options.confirm = confirm === 'true';
-        }
-
-        if (verify) {
-            options.verify = verify === 'true';
         }
 
         const doc = await gatekeeper.resolveDID(req.params.did, options);
