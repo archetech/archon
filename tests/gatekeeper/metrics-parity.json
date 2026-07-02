@@ -16,6 +16,9 @@
     "/queue/:registry/clear",
     "/queue/:registry",
     "/events/:registry",
-    "/dids/"
+    "/dids/",
+    "/1.0/identifiers/:did",
+    "/1.0/identifiers/:did/data",
+    "/1.0/identifiers/:did/registration"
   ]
 }

@@ -140,5 +140,26 @@
         "bafyreicidplaceholder"
       ]
     }
+  },
+  {
+    "name": "conformant-resolve-not-found",
+    "method": "GET",
+    "path": "/1.0/identifiers/did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m",
+    "expectedStatus": 404,
+    "compareMode": "json"
+  },
+  {
+    "name": "conformant-dereference-data-not-found",
+    "method": "GET",
+    "path": "/1.0/identifiers/did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m/data",
+    "expectedStatus": 404,
+    "compareMode": "json"
+  },
+  {
+    "name": "conformant-dereference-registration-not-found",
+    "method": "GET",
+    "path": "/1.0/identifiers/did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m/registration",
+    "expectedStatus": 404,
+    "compareMode": "json"
   }
 ]
