@@ -208,11 +208,8 @@ Shared behavior:
     HTML 404.
   - A validation failure in the DID's own operation chain (surfaced by the
     forced `verify`) MUST be treated as `notFound` (HTTP 404), not an internal
-    error. Unexpected failures SHOULD return HTTP 500 with error value
-    `internalError` (triple-shaped for `/:did`) and SHOULD be logged.
-    (The TypeScript reference does this; implementations whose resolver returns
-    type-erased errors, like the Rust port, MAY instead report them as
-    `notFound`.)
+    error. Unexpected failures (I/O, storage, crypto) MUST return HTTP 500 with
+    error value `internalError` (triple-shaped for `/:did`) and SHOULD be logged.
 
 ---
 

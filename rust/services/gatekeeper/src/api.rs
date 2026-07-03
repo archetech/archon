@@ -20,9 +20,9 @@ use serde_json::{json, Value};
 use tracing::error;
 
 use crate::{
-    build_search_index, chrono_like_now, clear_search_index, delete_search_doc,
-    generate_did_from_operation, handle_did_operation, import_batch_impl, normalize_path,
-    process_events_impl, query_docs_impl, record_metrics, refresh_metrics_snapshot,
+    build_search_index, chrono_like_now, classify_conformant_error, clear_search_index,
+    delete_search_doc, generate_did_from_operation, handle_did_operation, import_batch_impl,
+    normalize_path, process_events_impl, query_docs_impl, record_metrics, refresh_metrics_snapshot,
     resolve_local_doc_async, search_docs_impl, verify_db_impl, AppState, BlockLookup,
     GatekeeperDb, ResolveOptions,
 };
@@ -1208,13 +1208,12 @@ async fn resolve_conformant(
         verify: true,
     };
 
-    let classify = |error_kind: &str| -> (StatusCode, String) {
-        let status = if error_kind == "invalidDid" {
-            StatusCode::BAD_REQUEST
-        } else {
-            StatusCode::NOT_FOUND
-        };
-        (status, error_kind.to_string())
+    let status_for = |error_kind: &str| -> StatusCode {
+        match error_kind {
+            "invalidDid" => StatusCode::BAD_REQUEST,
+            "internalError" => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => StatusCode::NOT_FOUND,
+        }
     };
 
     match resolve_local_doc_async(state, did, options).await {
@@ -1224,17 +1223,16 @@ async fn resolve_conformant(
                 .and_then(|value| value.get("error"))
                 .and_then(Value::as_str)
             {
-                return Err(classify(error_kind));
+                return Err((status_for(error_kind), error_kind.to_string()));
             }
             Ok(doc)
         }
-        Err(_) => {
-            let error_kind = if did.starts_with("did:") {
-                "notFound"
-            } else {
-                "invalidDid"
-            };
-            Err(classify(error_kind))
+        Err(error) => {
+            // Distinguish DID-level failures (notFound/invalidDid -> 4xx) from genuine internal
+            // failures (I/O, crypto -> 500 internalError).
+            let (code, error_kind) = classify_conformant_error(did, &error);
+            let status = StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            Err((status, error_kind.to_string()))
         }
     }
 }

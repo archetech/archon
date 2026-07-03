@@ -23,11 +23,13 @@ pub(crate) use proofs::{
     verify_update_operation_impl,
 };
 pub(crate) use resolver::{
-    build_search_index, clear_search_index, delete_search_doc, log_status_snapshot,
-    query_docs_impl, refresh_metrics_snapshot, resolve_local_doc_async, search_docs_impl,
-    start_background_tasks, update_search_doc, verify_db_impl,
+    build_search_index, classify_conformant_error, clear_search_index, delete_search_doc,
+    log_status_snapshot, query_docs_impl, refresh_metrics_snapshot, resolve_local_doc_async,
+    search_docs_impl, start_background_tasks, update_search_doc, verify_db_impl,
     CheckDidsResult,
 };
+#[cfg(test)]
+pub(crate) use resolver::ResolveError;
 #[cfg(test)]
 pub(crate) use resolver::check_dids_impl;
 pub(crate) use search_index::SearchIndex;
@@ -328,6 +330,38 @@ mod tests {
         assert_eq!(
             normalize_path("/api/v1/did/did%3Acid%3Abagaaieratest"),
             "/api/v1/did/:did"
+        );
+    }
+
+    #[test]
+    fn classify_conformant_error_distinguishes_did_failures_from_internal() {
+        // Malformed DID syntax -> 400 invalidDid (regardless of the underlying error).
+        assert_eq!(
+            classify_conformant_error("notadid", &anyhow::anyhow!("boom")),
+            (400, "invalidDid")
+        );
+        // A tagged resolution failure -> 404 notFound.
+        assert_eq!(
+            classify_conformant_error("did:cid:bagaaieratest", &ResolveError::NotFound.into()),
+            (404, "notFound")
+        );
+        assert_eq!(
+            classify_conformant_error(
+                "did:cid:bagaaieratest",
+                &ResolveError::InvalidOperation.into()
+            ),
+            (404, "notFound")
+        );
+        // A ResolveError anywhere in the cause chain is still recognized (e.g. wrapped by context).
+        let wrapped = anyhow::Error::from(ResolveError::NotFound).context("while resolving");
+        assert_eq!(
+            classify_conformant_error("did:cid:bagaaieratest", &wrapped),
+            (404, "notFound")
+        );
+        // An untagged error (I/O, crypto, unexpected) -> 500 internalError.
+        assert_eq!(
+            classify_conformant_error("did:cid:bagaaieratest", &anyhow::anyhow!("db unreachable")),
+            (500, "internalError")
         );
     }
 
