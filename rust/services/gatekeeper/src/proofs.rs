@@ -16,13 +16,12 @@ pub(crate) fn is_valid_did(did: &str) -> bool {
     if !did.starts_with("did:") {
         return false;
     }
-    let parts: Vec<&str> = did.split(':').collect();
-    if parts.len() < 3 {
+    if did.split(':').count() < 3 {
         return false;
     }
-    parts
-        .last()
-        .map(|suffix| Cid::try_from(*suffix).is_ok())
+    did.rsplit(':')
+        .next()
+        .map(|suffix| Cid::try_from(suffix).is_ok())
         .unwrap_or(false)
 }
 
