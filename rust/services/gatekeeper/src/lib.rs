@@ -560,8 +560,11 @@ mod tests {
         assert!(verify_event_shape(&valid_update));
         assert!(verify_event_shape(&valid_delete));
 
+        // Registry-name validation is a *format* check (spec §8.5: `[A-Za-z0-9][A-Za-z0-9:_-]*`),
+        // not a supported-registry lookup. "not-a-registry" is format-valid (hyphens are allowed),
+        // so use a name that actually violates the format — here, one containing a space.
         let mut invalid_registry = valid_create.clone();
-        invalid_registry["registry"] = Value::String("not-a-registry".to_string());
+        invalid_registry["registry"] = Value::String("not a registry".to_string());
         assert!(!verify_event_shape(&invalid_registry));
 
         let mut missing_time = valid_create.clone();
