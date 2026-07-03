@@ -19,7 +19,7 @@ pub(crate) use events::{
 pub(crate) use metrics::{normalize_path, record_metrics, Metrics};
 pub(crate) use proofs::{
     ensure_event_opid, generate_did_from_operation, generate_json_cid, infer_event_did,
-    verify_create_operation_impl, verify_event_shape, verify_operation_impl,
+    is_valid_did, verify_create_operation_impl, verify_event_shape, verify_operation_impl,
     verify_update_operation_impl,
 };
 pub(crate) use resolver::{
@@ -334,20 +334,39 @@ mod tests {
     }
 
     #[test]
+    fn is_valid_did_requires_a_parseable_cid_suffix() {
+        assert!(is_valid_did(
+            "did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m"
+        ));
+        // Not a DID / too few segments.
+        assert!(!is_valid_did("notadid"));
+        assert!(!is_valid_did("did:cid"));
+        // did: prefix but a malformed CID suffix.
+        assert!(!is_valid_did("did:cid:xyz"));
+        assert!(!is_valid_did("did:cid:not-a-valid-cid"));
+    }
+
+    #[test]
     fn classify_conformant_error_distinguishes_did_failures_from_internal() {
         // Malformed DID syntax -> 400 invalidDid (regardless of the underlying error).
         assert_eq!(
             classify_conformant_error("notadid", &anyhow::anyhow!("boom")),
             (400, "invalidDid")
         );
+        // A `did:` DID whose CID suffix is malformed is invalidDid (400), not notFound — even
+        // though resolution would fail as notFound, the DID-syntax check takes precedence (#686).
+        assert_eq!(
+            classify_conformant_error("did:cid:xyz", &ResolveError::NotFound.into()),
+            (400, "invalidDid")
+        );
         // A tagged resolution failure -> 404 notFound.
         assert_eq!(
-            classify_conformant_error("did:cid:bagaaieratest", &ResolveError::NotFound.into()),
+            classify_conformant_error("did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m", &ResolveError::NotFound.into()),
             (404, "notFound")
         );
         assert_eq!(
             classify_conformant_error(
-                "did:cid:bagaaieratest",
+                "did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m",
                 &ResolveError::InvalidOperation.into()
             ),
             (404, "notFound")
@@ -355,21 +374,21 @@ mod tests {
         // A ResolveError anywhere in the cause chain is still recognized (e.g. wrapped by context).
         let wrapped = anyhow::Error::from(ResolveError::NotFound).context("while resolving");
         assert_eq!(
-            classify_conformant_error("did:cid:bagaaieratest", &wrapped),
+            classify_conformant_error("did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m", &wrapped),
             (404, "notFound")
         );
         // A verify-layer validation error carrying the "Invalid operation" convention (no typed
         // ResolveError, e.g. a malformed proof value surfaced from proofs.rs) is still DID-level.
         assert_eq!(
             classify_conformant_error(
-                "did:cid:bagaaieratest",
+                "did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m",
                 &anyhow::anyhow!("Invalid operation: proof")
             ),
             (404, "notFound")
         );
         // An untagged error (I/O, crypto, unexpected) -> 500 internalError.
         assert_eq!(
-            classify_conformant_error("did:cid:bagaaieratest", &anyhow::anyhow!("db unreachable")),
+            classify_conformant_error("did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m", &anyhow::anyhow!("db unreachable")),
             (500, "internalError")
         );
     }

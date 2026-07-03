@@ -8,8 +8,8 @@ use tracing::info;
 
 use crate::store::ResolvedDoc;
 use crate::{
-    chrono_like_now, generate_json_cid, verify_create_operation_impl, verify_update_operation_impl,
-    AppState, EventRecord, GatekeeperDb, ResolveOptions,
+    chrono_like_now, generate_json_cid, is_valid_did, verify_create_operation_impl,
+    verify_update_operation_impl, AppState, EventRecord, GatekeeperDb, ResolveOptions,
 };
 
 /// Typed classes for resolution failures that are the DID's own problem (a missing DID or an
@@ -59,7 +59,7 @@ pub(crate) fn classify_conformant_error(did: &str, error: &anyhow::Error) -> (u1
         cause.is::<ResolveError>() || cause.to_string().starts_with("Invalid operation")
     });
 
-    if !did.starts_with("did:") {
+    if !is_valid_did(did) {
         (400, "invalidDid")
     } else if is_did_level {
         (404, "notFound")
