@@ -988,6 +988,12 @@ async function replaceByFee(): Promise<boolean> {
             if (db.pending?.txids) {
                 db.pending.txids.push(newTxid);
             }
+            // RBF just superseded `txid`. Re-point the registered anchor at the live txid so
+            // registered[] stays ground truth and doesn't retain orphaned RBF-dropped txids.
+            const registeredEntry = db.registered?.find((r) => r.txid === txid);
+            if (registeredEntry) {
+                registeredEntry.txid = newTxid;
+            }
         });
     }
 
