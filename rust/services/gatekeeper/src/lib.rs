@@ -358,6 +358,15 @@ mod tests {
             classify_conformant_error("did:cid:bagaaieratest", &wrapped),
             (404, "notFound")
         );
+        // A verify-layer validation error carrying the "Invalid operation" convention (no typed
+        // ResolveError, e.g. a malformed proof value surfaced from proofs.rs) is still DID-level.
+        assert_eq!(
+            classify_conformant_error(
+                "did:cid:bagaaieratest",
+                &anyhow::anyhow!("Invalid operation: proof")
+            ),
+            (404, "notFound")
+        );
         // An untagged error (I/O, crypto, unexpected) -> 500 internalError.
         assert_eq!(
             classify_conformant_error("did:cid:bagaaieratest", &anyhow::anyhow!("db unreachable")),

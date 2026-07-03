@@ -242,8 +242,12 @@ fn public_jwk_to_sec1_bytes(public_jwk: &Value) -> Result<Vec<u8>> {
 
 fn verify_sig(msg_hash_hex: &str, proof_value: &str, public_jwk: &Value) -> Result<bool> {
     let msg_hash = hex_to_bytes(msg_hash_hex)?;
-    let sig_bytes = base64url_to_bytes(proof_value)?;
-    let compressed_key = public_jwk_to_sec1_bytes(public_jwk)?;
+    // proof_value and the JWK are caller-supplied data; a parse failure is a validation error,
+    // not an internal fault. Carry the "Invalid operation" convention so it classifies as such.
+    let sig_bytes =
+        base64url_to_bytes(proof_value).with_context(|| "Invalid operation: proof")?;
+    let compressed_key =
+        public_jwk_to_sec1_bytes(public_jwk).with_context(|| "Invalid operation: publicJwk")?;
     let verifying_key = VerifyingKey::from_sec1_bytes(&compressed_key)
         .with_context(|| "Invalid operation: publicJwk")?;
     let signature =

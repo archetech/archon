@@ -12,9 +12,10 @@ use crate::{
     AppState, EventRecord, GatekeeperDb, ResolveOptions,
 };
 
-/// Error classes the conformant `/1.0/identifiers` surface distinguishes. A resolution failure
-/// that is the DID's own problem maps to a 4xx (notFound); anything not tagged as one of these is
-/// treated as an internal server error (500) — see `classify_conformant_error`.
+/// Typed classes for resolution failures that are the DID's own problem (a missing DID or an
+/// invalid operation chain). These are attached to the specific error message via `.context()`
+/// (see `not_found`/`invalid_operation`) so the original diagnostic is preserved while the type
+/// drives HTTP classification on the conformant `/1.0/identifiers` surface.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ResolveError {
     /// The DID does not exist, or its operation chain does not yield a valid document.
@@ -26,7 +27,6 @@ pub(crate) enum ResolveError {
 impl std::fmt::Display for ResolveError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            // Preserve the historical messages so existing logs/readers are unchanged.
             ResolveError::NotFound => write!(f, "DID not found"),
             ResolveError::InvalidOperation => write!(f, "Invalid operation"),
         }
@@ -35,29 +35,33 @@ impl std::fmt::Display for ResolveError {
 
 impl std::error::Error for ResolveError {}
 
-/// Normalize an error surfaced by the verify layer during resolution. A recursive resolve (e.g.
-/// resolving an asset's controller) already carries a typed `ResolveError` — keep it. The verify
-/// functions' own "Invalid operation: ..." bails are validation failures (the error convention
-/// also used by events.rs), so tag them as such. Anything else is a genuine internal failure
-/// (I/O, crypto) and propagates untyped so the conformant surface reports it as 500.
-fn tag_verify_error(error: anyhow::Error) -> anyhow::Error {
-    if error.chain().any(|cause| cause.is::<ResolveError>()) {
-        error
-    } else if error.to_string().starts_with("Invalid operation") {
-        ResolveError::InvalidOperation.into()
-    } else {
-        error
-    }
+/// A not-found resolution failure carrying a specific diagnostic message on top of the typed error.
+pub(crate) fn not_found(detail: &'static str) -> anyhow::Error {
+    anyhow::Error::from(ResolveError::NotFound).context(detail)
+}
+
+/// An invalid-operation resolution failure carrying a specific diagnostic message.
+pub(crate) fn invalid_operation(detail: &'static str) -> anyhow::Error {
+    anyhow::Error::from(ResolveError::InvalidOperation).context(detail)
 }
 
 /// Classify an error from `resolve_local_doc_async` for the conformant `/1.0/identifiers` surface:
-/// malformed DID syntax -> 400 `invalidDid`; a tagged resolution failure (`ResolveError`, anywhere
-/// in the cause chain) -> 404 `notFound`; anything else (I/O, crypto, unexpected) -> 500
-/// `internalError`. Returned as a raw status code to keep this module free of the HTTP layer.
+/// malformed DID syntax -> 400 `invalidDid`; a DID-level resolution/validation failure -> 404
+/// `notFound`; anything else (I/O, storage, crypto, unexpected) -> 500 `internalError`. Returned as
+/// a raw status code to keep this module free of the HTTP layer.
+///
+/// A failure is DID-level if any cause in the chain is a typed `ResolveError`, OR any cause matches
+/// the codebase's "Invalid operation" validation convention (also used by proofs.rs / events.rs) —
+/// this catches validation errors surfaced from the verify stack (e.g. a malformed proof value)
+/// without those layers needing to depend on this module.
 pub(crate) fn classify_conformant_error(did: &str, error: &anyhow::Error) -> (u16, &'static str) {
+    let is_did_level = error.chain().any(|cause| {
+        cause.is::<ResolveError>() || cause.to_string().starts_with("Invalid operation")
+    });
+
     if !did.starts_with("did:") {
         (400, "invalidDid")
-    } else if error.chain().any(|cause| cause.is::<ResolveError>()) {
+    } else if is_did_level {
         (404, "notFound")
     } else {
         (500, "internalError")
@@ -111,23 +115,23 @@ pub(crate) async fn resolve_local_doc_async(
         store.get_events(did)
     };
     if events.is_empty() {
-        anyhow::bail!(ResolveError::NotFound);
+        return Err(not_found("DID not found"));
     }
 
-    let anchor = events.first().ok_or(ResolveError::NotFound)?;
+    let anchor = events.first().ok_or_else(|| not_found("did has no events"))?;
     let anchor_operation = &anchor.operation;
     if anchor_operation.get("type").and_then(Value::as_str) != Some("create") {
-        anyhow::bail!(ResolveError::NotFound);
+        return Err(not_found("first operation must be create"));
     }
 
     let registration = anchor_operation
         .get("registration")
         .and_then(Value::as_object)
-        .ok_or(ResolveError::NotFound)?;
+        .ok_or_else(|| not_found("missing registration"))?;
     let did_type = registration
         .get("type")
         .and_then(Value::as_str)
-        .ok_or(ResolveError::NotFound)?;
+        .ok_or_else(|| not_found("missing registration.type"))?;
     let created = anchor_operation
         .get("created")
         .and_then(Value::as_str)
@@ -158,7 +162,7 @@ pub(crate) async fn resolve_local_doc_async(
             "id": did,
             "controller": anchor_operation.get("controller").cloned().unwrap_or(Value::Null)
         }),
-        _ => anyhow::bail!(ResolveError::NotFound),
+        _ => return Err(not_found("unsupported registration.type")),
     };
 
     let canonical_id = anchor_operation
@@ -201,11 +205,9 @@ pub(crate) async fn resolve_local_doc_async(
             .build_timestamp(registry, &resolved.version_id, anchor);
     }
 
-    let anchor_valid = verify_create_operation_impl(state, anchor_operation)
-        .await
-        .map_err(tag_verify_error)?;
+    let anchor_valid = verify_create_operation_impl(state, anchor_operation).await?;
     if !anchor_valid {
-        anyhow::bail!(ResolveError::InvalidOperation);
+        return Err(invalid_operation("Invalid operation: proof"));
     }
 
     for event in events.iter().skip(1) {
@@ -250,14 +252,12 @@ pub(crate) async fn resolve_local_doc_async(
             "didDocumentRegistration": resolved.did_document_registration
         });
 
-        let valid = verify_update_operation_impl(state, operation, &current_doc)
-            .await
-            .map_err(tag_verify_error)?;
+        let valid = verify_update_operation_impl(state, operation, &current_doc).await?;
         if !valid {
-            anyhow::bail!(ResolveError::InvalidOperation);
+            return Err(invalid_operation("Invalid operation: proof"));
         }
         if operation.get("previd").and_then(Value::as_str) != Some(resolved.version_id.as_str()) {
-            anyhow::bail!(ResolveError::InvalidOperation);
+            return Err(invalid_operation("Invalid operation: previd"));
         }
 
         let registry_for_timestamp = resolved

@@ -1229,8 +1229,12 @@ async fn resolve_conformant(
         }
         Err(error) => {
             // Distinguish DID-level failures (notFound/invalidDid -> 4xx) from genuine internal
-            // failures (I/O, crypto -> 500 internalError).
+            // failures (I/O, storage, crypto -> 500 internalError).
             let (code, error_kind) = classify_conformant_error(did, &error);
+            if code >= 500 {
+                // Surface the underlying cause for operators; the client only sees "internalError".
+                error!("conformant resolution failed for {did}: {error:?}");
+            }
             let status = StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
             Err((status, error_kind.to_string()))
         }
