@@ -19,7 +19,10 @@ const gatekeeperOptions = {
             title: 'Gatekeeper API'
         }
     },
-    apis: ['services/gatekeeper/server/src/gatekeeper-api.ts']
+    apis: [
+        'services/gatekeeper/server/src/gatekeeper-api.ts',
+        'services/gatekeeper/server/src/identifiers-router.ts'
+    ]
 };
 
 const keymasterOptions = {
