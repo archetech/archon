@@ -8,6 +8,23 @@ use serde_json::Value;
 
 use crate::{is_valid_registry, resolve_local_doc_async, AppState, Config, ResolveOptions};
 
+/// Validate a `did:<method>:<cid>` DID, mirroring the TypeScript `isValidDID`: the string must
+/// start with `did:`, have at least three `:`-separated segments, and its final segment must parse
+/// as a valid CID. Lets the conformant surface return 400 `invalidDid` (rather than 404) for a
+/// syntactically-`did:` DID whose CID suffix is malformed.
+pub(crate) fn is_valid_did(did: &str) -> bool {
+    if !did.starts_with("did:") {
+        return false;
+    }
+    if did.split(':').count() < 3 {
+        return false;
+    }
+    did.rsplit(':')
+        .next()
+        .map(|suffix| Cid::try_from(suffix).is_ok())
+        .unwrap_or(false)
+}
+
 pub(crate) fn infer_event_did(config: &Config, event: &Value) -> Result<String> {
     if let Some(did) = event.get("did").and_then(Value::as_str) {
         return Ok(did.to_string());
