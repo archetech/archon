@@ -1,7 +1,12 @@
+# Shared CLN image. The node and its one-shot rune-init containers (drawbridge-init,
+# rtl-init, lnbits-init) MUST run the same image so the init `lightning-cli` always
+# matches the running lightningd. Bump ARCHON_CLN_VERSION to move all of them together.
+x-cln-image: &cln-image ghcr.io/lightning-goats/cl-hive-node:${ARCHON_CLN_VERSION:-3.4.0}
+
 services:
   cln-mainnet-node:
     profiles: ["lightning", "drawbridge"]
-    image: ghcr.io/lightning-goats/cl-hive-node:${ARCHON_CLN_VERSION:-3.4.0}
+    image: *cln-image
     environment:
       - NETWORK=bitcoin
       - ALIAS=${ARCHON_CLN_ALIAS:-archon}
@@ -32,7 +37,7 @@ services:
 
   drawbridge-init:
     profiles: ["lightning", "drawbridge"]
-    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-2.13.2}
+    image: *cln-image
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -76,7 +81,7 @@ services:
 
   rtl-init:
     profiles: ["lightning", "drawbridge"]
-    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-2.13.2}
+    image: *cln-image
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -140,7 +145,7 @@ services:
 
   lnbits-init:
     profiles: ["lightning", "drawbridge"]
-    image: ghcr.io/archetech/cl-hive-node:${ARCHON_CLN_VERSION:-2.13.2}
+    image: *cln-image
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
