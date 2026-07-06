@@ -303,7 +303,8 @@ export interface KeymasterOptions {
     maxAliasLength?: number;
     // Explicit override for the DIDComm egress base used by sendDidComm. Normally
     // unset — the egress is derived from the node URL (`gatekeeper.url`) as
-    // `<node>/didcomm`. Used by in-process/test callers whose gatekeeper has no url.
+    // `<node>/didcomm`. Services can set this when their Gatekeeper URL is raw
+    // Gatekeeper rather than Drawbridge.
     didcommServiceURL?: string;
 }
 

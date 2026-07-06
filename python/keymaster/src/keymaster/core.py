@@ -129,8 +129,8 @@ class Keymaster:
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
         # Explicit override for the DIDComm egress base. Normally None — send_didcomm
-        # derives it from the node URL (gatekeeper.url) as <node>/didcomm. For
-        # in-process/test callers whose gatekeeper has no url.
+        # derives it from the node URL (gatekeeper.url) as <node>/didcomm. Services
+        # set this when their Gatekeeper URL is raw Gatekeeper rather than Drawbridge.
         self.didcomm_service_url = didcomm_service_url
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
@@ -3657,11 +3657,12 @@ class Keymaster:
         return {"message": inner, "metadata": metadata}
 
     def _didcomm_gateway_base(self, override: str | None = None) -> str:
-        # The local DIDComm gateway: Drawbridge's /didcomm proxy in front of the relay,
-        # derived from the node URL the keymaster already uses (like publish_lightning) —
-        # no dedicated config. Used for sending AND for reading our own mailbox; reading
+        # The local DIDComm gateway: Drawbridge's /didcomm proxy in front of the
+        # relay. By default this is derived from the node URL the keymaster already
+        # uses, but services can override it when their node URL is raw Gatekeeper.
+        # Used for sending AND for reading our own mailbox; reading
         # must NOT use our published public endpoint (it may be an unreachable .onion).
-        # An explicit endpoint wins; didcomm_service_url is an in-process / test override.
+        # An explicit endpoint wins; didcomm_service_url is an explicit service/test override.
         node_url = getattr(self.gatekeeper, "url", None)
         base = override or self.didcomm_service_url or (f"{node_url.rstrip('/')}/didcomm" if node_url else None)
         if not base:
@@ -3707,9 +3708,7 @@ class Keymaster:
         # Pack + resolve + Forward-wrap here (crypto), then hand each sealed envelope
         # to the DIDComm service for delivery (egress + Tor). The egress is reached
         # through the node's gateway (Drawbridge's /didcomm proxy), derived from the
-        # node URL the keymaster already uses — like publish_lightning — so there is
-        # no dedicated config. (didcomm_service_url is an explicit override for
-        # in-process / test use.)
+        # node URL the keymaster already uses unless didcomm_service_url is configured.
         options = options or {}
         service_base = self._didcomm_gateway_base()
         if not self.didcomm_service_url:

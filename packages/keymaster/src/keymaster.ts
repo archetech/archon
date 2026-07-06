@@ -2675,13 +2675,13 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     // The local DIDComm gateway: Drawbridge's `/didcomm` proxy in front of the
-    // relay, derived from the node URL the keymaster already uses — exactly as
-    // publishLightning derives its endpoint — so there is no dedicated config.
+    // relay. By default this is derived from the node URL the keymaster already
+    // uses, but services can override it when their node URL is raw Gatekeeper.
     // Every gateway interaction (sending, and reading your own mailbox) goes here.
     // Reading your mailbox must NOT use your published public endpoint: that may be
     // a `.onion` the client can't dial directly, and routing out through Tor to
     // reach your own relay is nonsense. An explicit endpoint (e.g. CLI --endpoint)
-    // wins; didcommServiceURL is an in-process / test override (gatekeeper has no url).
+    // wins; didcommServiceURL is an explicit service/test override.
     private didcommGatewayBase(override?: string): string {
         const nodeUrl = (this.gatekeeper as { url?: string }).url;
         const base = (override ?? this.didcommServiceURL ?? (nodeUrl ? `${nodeUrl.replace(/\/+$/, '')}/didcomm` : undefined))?.replace(/\/+$/, '');

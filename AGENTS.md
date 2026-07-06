@@ -26,6 +26,7 @@ These rules apply to coding agents working in this repository.
 - Internal service-to-service admin auth should use `X-Archon-Admin-Key` consistently. Reserve `Authorization` for user/session/OAuth-style flows unless a file explicitly documents a different scheme.
 - Drawbridge's bundled Tor SOCKS host port should default to `127.0.0.1:9050`; internal services should keep using the Docker network address `tor:9050`.
 - Keymaster's Docker host port should default to localhost via `ARCHON_KEYMASTER_HOST_BIND=127.0.0.1`; internal services should keep using `keymaster:4226`.
+- Server-side Keymaster should keep `ARCHON_GATEKEEPER_URL` pointed at raw Gatekeeper for full API coverage; when DIDComm is enabled, set `ARCHON_DIDCOMM_GATEWAY_URL` to Drawbridge's `/didcomm` gateway for send/receive egress.
 - For Herald agent guidance, prefer Keymaster address commands (`check-address`, `add-address`, `remove-address`, etc.) in quick starts while keeping direct API endpoint documentation available for lower-level integrations.
 - Bundled LNbits may start before CLN REST is ready after CLN startup or sync; keep the CLN REST startup wait configurable and long enough for cold starts.
 - Keymaster address metadata should stay in parity across TypeScript and Python implementations; when Herald exposes a domain relay agent, store it with the address as `relay` and surface it through list/get address APIs.

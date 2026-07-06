@@ -980,6 +980,7 @@ labels.
 | `ARCHON_KEYMASTER_PORT` | `4226` | HTTP listen port. |
 | `ARCHON_BIND_ADDRESS` | `0.0.0.0` | HTTP bind address. |
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Gatekeeper base URL. |
+| `ARCHON_DIDCOMM_GATEWAY_URL` | empty | Optional Drawbridge `/didcomm` gateway for server-side DIDComm send/receive egress. |
 | `ARCHON_NODE_ID` | empty | Required. Name of the canonical agent ID this server provisions on startup. |
 | `ARCHON_KEYMASTER_DB` | `json` | Storage backend (`json`, `sqlite`, `redis`, `mongodb`). |
 | `ARCHON_ENCRYPTED_PASSPHRASE` | empty | Wallet passphrase. Empty enables `/login` dev mode (returns admin key without checking). |
