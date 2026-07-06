@@ -17,7 +17,7 @@ class Settings:
     bind_address: str = os.environ.get("ARCHON_BIND_ADDRESS", "0.0.0.0")
     keymaster_port: int = int(os.environ.get("ARCHON_KEYMASTER_PORT", "4226"))
     gatekeeper_url: str = os.environ.get("ARCHON_GATEKEEPER_URL", "http://localhost:4224")
-    didcomm_gateway_url: str = os.environ.get("ARCHON_DIDCOMM_GATEWAY_URL", "")
+    node_url: str = os.environ.get("ARCHON_NODE_URL", "")
     keymaster_db: str = os.environ.get("ARCHON_KEYMASTER_DB", "json") or "json"
     passphrase: str = os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE", "")
     wallet_cache: bool = os.environ.get("ARCHON_WALLET_CACHE", "false").lower() == "true"

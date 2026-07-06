@@ -301,10 +301,13 @@ export interface KeymasterOptions {
     cipher: Cipher;
     defaultRegistry?: string;
     maxAliasLength?: number;
-    // Explicit override for the DIDComm egress base used by sendDidComm. Normally
-    // unset — the egress is derived from the node URL (`gatekeeper.url`) as
-    // `<node>/didcomm`. Services can set this when their Gatekeeper URL is raw
-    // Gatekeeper rather than Drawbridge.
+    // Optional node facade URL used for gateway features and capability checks.
+    // Browser wallets commonly set gatekeeper.url to Drawbridge already; services
+    // can keep gatekeeper on raw Gatekeeper and pass Drawbridge here.
+    nodeURL?: string;
+    // Explicit override for the DIDComm egress base used by sendDidComm. Prefer
+    // nodeURL for service Drawbridge routing; this remains for callers that need
+    // to address the DIDComm gateway directly.
     didcommServiceURL?: string;
 }
 

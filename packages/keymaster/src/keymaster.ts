@@ -176,6 +176,7 @@ export default class Keymaster implements KeymasterInterface {
     private readonly ephemeralRegistry: string;
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
+    private readonly nodeURL?: string;
     private readonly didcommServiceURL?: string;
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
     // memoized. `undefined` = not yet fetched; `null` = node has no manifest
@@ -203,6 +204,7 @@ export default class Keymaster implements KeymasterInterface {
         this.db = options.wallet;
         this.cipher = options.cipher;
 
+        this.nodeURL = options.nodeURL?.replace(/\/+$/, '');
         this.didcommServiceURL = options.didcommServiceURL;
 
         this.defaultRegistry = options.defaultRegistry || 'hyperswarm';
@@ -2621,7 +2623,7 @@ export default class Keymaster implements KeymasterInterface {
         if (this._nodeCapabilities !== undefined) {
             return this._nodeCapabilities;
         }
-        const nodeUrl = (this.gatekeeper as { url?: string }).url;
+        const nodeUrl = this.nodeBaseURL();
         if (!nodeUrl) {
             this._nodeCapabilities = null;
             return null;
@@ -2634,7 +2636,7 @@ export default class Keymaster implements KeymasterInterface {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 5000);
         try {
-            const response = await fetch(`${nodeUrl.replace(/\/+$/, '')}/api/v1/capabilities`, {
+            const response = await fetch(`${nodeUrl}/api/v1/capabilities`, {
                 signal: controller.signal,
             });
             this._nodeCapabilities = response.ok ? await response.json() : null;
@@ -2674,17 +2676,22 @@ export default class Keymaster implements KeymasterInterface {
         return (await response.json()).challenge;
     }
 
+    private nodeBaseURL(): string | undefined {
+        return this.nodeURL ?? (this.gatekeeper as { url?: string }).url?.replace(/\/+$/, '');
+    }
+
     // The local DIDComm gateway: Drawbridge's `/didcomm` proxy in front of the
     // relay. By default this is derived from the node URL the keymaster already
-    // uses, but services can override it when their node URL is raw Gatekeeper.
+    // uses, but services can pass a Drawbridge node URL when their Gatekeeper
+    // client points at raw Gatekeeper.
     // Every gateway interaction (sending, and reading your own mailbox) goes here.
     // Reading your mailbox must NOT use your published public endpoint: that may be
     // a `.onion` the client can't dial directly, and routing out through Tor to
     // reach your own relay is nonsense. An explicit endpoint (e.g. CLI --endpoint)
     // wins; didcommServiceURL is an explicit service/test override.
     private didcommGatewayBase(override?: string): string {
-        const nodeUrl = (this.gatekeeper as { url?: string }).url;
-        const base = (override ?? this.didcommServiceURL ?? (nodeUrl ? `${nodeUrl.replace(/\/+$/, '')}/didcomm` : undefined))?.replace(/\/+$/, '');
+        const nodeUrl = this.nodeBaseURL();
+        const base = (override ?? this.didcommServiceURL ?? (nodeUrl ? `${nodeUrl}/didcomm` : undefined))?.replace(/\/+$/, '');
         if (!base) {
             throw new KeymasterError('cannot reach the DIDComm gateway: no node URL configured');
         }

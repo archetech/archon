@@ -442,6 +442,39 @@ describe('DIDComm gateway transport helpers', () => {
             keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, bobDid, { name: 'Alice' })
         ).rejects.toThrow(/could not reach the DIDComm gateway/);
     });
+
+    it('derives DIDComm gateway from nodeURL while Gatekeeper stays raw', async () => {
+        const nodeURL = 'https://drawbridge.example';
+        keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase', nodeURL });
+        (gatekeeper as any).url = 'http://gatekeeper:4224';
+        await keymaster.createId('Alice');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+
+        const requests: string[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+            const url = String(input);
+            requests.push(url);
+            if (url === `${nodeURL}/api/v1/capabilities`) {
+                return jsonResponse({ didcomm: true });
+            }
+            if (url === `${nodeURL}/didcomm/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'node-url-challenge' });
+            }
+            if (url === `${nodeURL}/didcomm/api/v1/deliver`) {
+                expect(JSON.parse(String(init?.body)).endpoint).toBe('https://bob.example/didcomm');
+                return jsonResponse({ ids: ['node-url-msg'] });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        await expect(
+            keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, bobDid, { name: 'Alice' })
+        ).resolves.toEqual(['node-url-msg']);
+        expect(requests).toContain(`${nodeURL}/api/v1/capabilities`);
+        expect(requests).toContain(`${nodeURL}/didcomm/api/v1/challenge`);
+    });
 });
 
 describe('node capability gating', () => {

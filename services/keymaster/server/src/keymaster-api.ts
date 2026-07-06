@@ -8124,7 +8124,7 @@ const server = app.listen(port, config.bindAddress, async () => {
         cipher,
         defaultRegistry,
         passphrase: config.keymasterPassphrase,
-        didcommServiceURL: config.didcommGatewayURL || undefined,
+        nodeURL: config.nodeURL || undefined,
     });
     console.log(`Keymaster server v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
