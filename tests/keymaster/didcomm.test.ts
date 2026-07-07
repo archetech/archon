@@ -48,9 +48,10 @@ function jsonResponse(body: unknown, status = 200): Response {
     });
 }
 
-function useDidCommGateway(base = 'https://gateway.example/didcomm'): string {
-    keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase', didcommServiceURL: base });
-    return base;
+function useDidCommGateway(nodeURL = 'https://gateway.example'): string {
+    keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase', nodeURL });
+    (keymaster as any)._nodeCapabilities = { didcomm: true };
+    return `${nodeURL}/didcomm`;
 }
 
 describe('fetchDidCommKeyPair', () => {

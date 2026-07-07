@@ -305,10 +305,6 @@ export interface KeymasterOptions {
     // Browser wallets commonly set gatekeeper.url to Drawbridge already; services
     // can keep gatekeeper on raw Gatekeeper and pass Drawbridge here.
     nodeURL?: string;
-    // Explicit override for the DIDComm egress base used by sendDidComm. Prefer
-    // nodeURL for service Drawbridge routing; this remains for callers that need
-    // to address the DIDComm gateway directly.
-    didcommServiceURL?: string;
 }
 
 export interface EncryptedMessage {

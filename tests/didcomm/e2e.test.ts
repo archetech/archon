@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import express from 'express';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -59,13 +60,16 @@ beforeEach(async () => {
 
     // allowPrivateEgress: the relay both stores mail and (Phase 8) performs
     // outbound delivery; tests deliver to the same localhost relay.
-    const app = createApp({ store: new MemoryMailboxStore(), resolver: gatekeeper, cipher, allowPrivateEgress: true });
+    const app = express();
+    app.use('/didcomm', createApp({ store: new MemoryMailboxStore(), resolver: gatekeeper, cipher, allowPrivateEgress: true }));
     await new Promise<void>(resolve => { server = app.listen(0, resolve); });
     const port = (server.address() as any).port;
-    endpoint = `http://localhost:${port}`;
+    const nodeURL = `http://localhost:${port}`;
+    endpoint = `${nodeURL}/didcomm`;
 
     // The keymaster sends through the DIDComm service (here, the same relay).
-    keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass', didcommServiceURL: endpoint });
+    keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass', nodeURL });
+    (keymaster as any)._nodeCapabilities = { didcomm: true };
 });
 
 afterEach(async () => {

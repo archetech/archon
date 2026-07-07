@@ -177,7 +177,6 @@ export default class Keymaster implements KeymasterInterface {
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
     private readonly nodeURL?: string;
-    private readonly didcommServiceURL?: string;
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
     // memoized. `undefined` = not yet fetched; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
@@ -205,7 +204,6 @@ export default class Keymaster implements KeymasterInterface {
         this.cipher = options.cipher;
 
         this.nodeURL = options.nodeURL?.replace(/\/+$/, '');
-        this.didcommServiceURL = options.didcommServiceURL;
 
         this.defaultRegistry = options.defaultRegistry || 'hyperswarm';
         this.ephemeralRegistry = 'hyperswarm';
@@ -2688,10 +2686,10 @@ export default class Keymaster implements KeymasterInterface {
     // Reading your mailbox must NOT use your published public endpoint: that may be
     // a `.onion` the client can't dial directly, and routing out through Tor to
     // reach your own relay is nonsense. An explicit endpoint (e.g. CLI --endpoint)
-    // wins; didcommServiceURL is an explicit service/test override.
+    // wins.
     private didcommGatewayBase(override?: string): string {
         const nodeUrl = this.nodeBaseURL();
-        const base = (override ?? this.didcommServiceURL ?? (nodeUrl ? `${nodeUrl}/didcomm` : undefined))?.replace(/\/+$/, '');
+        const base = (override ?? (nodeUrl ? `${nodeUrl}/didcomm` : undefined))?.replace(/\/+$/, '');
         if (!base) {
             throw new KeymasterError('cannot reach the DIDComm gateway: no node URL configured');
         }
@@ -2709,9 +2707,7 @@ export default class Keymaster implements KeymasterInterface {
         options: { sign?: boolean; anoncrypt?: boolean; encryption?: DidCommEnc; name?: string } = {}
     ): Promise<string[]> {
         const serviceBase = this.didcommGatewayBase();
-        if (!this.didcommServiceURL) {
-            await this.requireNodeCapability('didcomm', 'DIDComm messaging');
-        }
+        await this.requireNodeCapability('didcomm', 'DIDComm messaging');
         const recipientDids = Array.isArray(to) ? to : [to];
         const packed = await this.packDidComm(message, recipientDids, options);
 
@@ -2766,7 +2762,7 @@ export default class Keymaster implements KeymasterInterface {
         // Read our own mailbox through the local gateway, not our published public
         // endpoint (which may be an unreachable `.onion`). --endpoint still overrides.
         const base = this.didcommGatewayBase(options.endpoint);
-        if (!this.didcommServiceURL && !options.endpoint) {
+        if (!options.endpoint) {
             await this.requireNodeCapability('didcomm', 'DIDComm messaging');
         }
         const keypair = await this.fetchKeyPair(name);
@@ -2825,7 +2821,7 @@ export default class Keymaster implements KeymasterInterface {
         const id = await this.fetchIdInfo(name);
         // Mediators read their own mailbox through the local gateway too. --endpoint overrides.
         const base = this.didcommGatewayBase(options.endpoint);
-        if (!this.didcommServiceURL && !options.endpoint) {
+        if (!options.endpoint) {
             await this.requireNodeCapability('didcomm', 'DIDComm messaging');
         }
         const keypair = await this.fetchKeyPair(name);
