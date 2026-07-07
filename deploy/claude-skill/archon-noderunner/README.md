@@ -8,7 +8,7 @@ A Claude Code skill for provisioning an Archon DID node on a fresh Ubuntu VPS in
 curl -fsSL https://4tress.org/install.sh | bash
 ```
 
-The bootstrap script installs Node.js, Claude Code, clones this repo, and symlinks the skill into `~/.claude/skills/`. Then:
+The canonical source lives in this repo at [`deploy/install.sh`](../install.sh); `https://4tress.org/install.sh` mirrors it for the pre-Claude bootstrap URL. The script installs Node.js, Claude Code, clones this repo, and symlinks the skill into `~/.claude/skills/`. Then:
 
 ```
 claude                                              # auth via URL
