@@ -31,6 +31,7 @@ Later stages, added one at a time:
 | `add-didcomm` | DIDComm v2 messaging |
 | `add-email` | Herald email-challenge flow (needs SMTP) |
 | `add-pinning` | IPFS pinning-mediator (needs Pinata JWT or alt backend) |
+| `add-observability` | Prometheus + Grafana (Tailscale-only exposure) |
 
 Drawbridge, Herald, and Tor SOCKS ride along with `add-lightning` — the `drawbridge` compose profile shares service declarations with `lightning`, so enabling one enables the other. If you don't want Lightning, you don't get drawbridge/L402/onion either. Stage 0 without add-lightning is Caddy-direct-to-gatekeeper.
 
@@ -64,7 +65,8 @@ archon-noderunner/
     ├── add-lightning.md
     ├── add-didcomm.md
     ├── add-email.md
-    └── add-pinning.md
+    ├── add-pinning.md
+    └── add-observability.md
 ```
 
 ## Status

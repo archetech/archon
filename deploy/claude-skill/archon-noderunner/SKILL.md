@@ -37,6 +37,9 @@ Enable Herald email-challenge flow. Human checkpoint: SMTP relay credentials (Po
 ### `add-pinning`
 Enable pinning-mediator. Human checkpoint: Pinata JWT (or configure a different backend).
 
+### `add-observability`
+Enable Prometheus + Grafana. Checkpoint: confirm Tailscale-only exposure — admin UIs never go on the public Caddyfile.
+
 ### `status`
 Show which stages are enabled, current `.env` summary, container health, writer-funding audit.
 
@@ -79,6 +82,7 @@ Each add-stage has its own instruction file under `stages/` that this skill load
 - `stages/add-registry.md`
 - `stages/add-email.md`
 - `stages/add-pinning.md`
+- `stages/add-observability.md`
 
 Read the relevant stage file when its subcommand is invoked. Do not embed those procedures here.
 
