@@ -120,7 +120,6 @@ class Keymaster:
         default_registry: str = "hyperswarm",
         ephemeral_registry: str = "hyperswarm",
         max_alias_length: int = 32,
-        didcomm_service_url: str | None = None,
     ):
         self.gatekeeper = gatekeeper
         self.wallet_store = wallet_store
@@ -128,10 +127,6 @@ class Keymaster:
         self.default_registry = default_registry or "hyperswarm"
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
-        # Explicit override for the DIDComm egress base. Normally None — send_didcomm
-        # derives it from the node URL (gatekeeper.url) as <node>/didcomm. For
-        # in-process/test callers whose gatekeeper has no url.
-        self.didcomm_service_url = didcomm_service_url
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache = None
@@ -3657,13 +3652,14 @@ class Keymaster:
         return {"message": inner, "metadata": metadata}
 
     def _didcomm_gateway_base(self, override: str | None = None) -> str:
-        # The local DIDComm gateway: Drawbridge's /didcomm proxy in front of the relay,
-        # derived from the node URL the keymaster already uses (like publish_lightning) —
-        # no dedicated config. Used for sending AND for reading our own mailbox; reading
+        # The local DIDComm gateway: Drawbridge's /didcomm proxy in front of the
+        # relay, derived from the node URL the keymaster already uses.
+        # Used for sending AND for reading our own mailbox; reading
         # must NOT use our published public endpoint (it may be an unreachable .onion).
-        # An explicit endpoint wins; didcomm_service_url is an in-process / test override.
+        # An explicit endpoint wins.
         node_url = getattr(self.gatekeeper, "url", None)
-        base = override or self.didcomm_service_url or (f"{node_url.rstrip('/')}/didcomm" if node_url else None)
+        node_url = node_url.rstrip("/") if node_url else None
+        base = override or (f"{node_url}/didcomm" if node_url else None)
         if not base:
             raise KeymasterError("cannot reach the DIDComm gateway: no node URL configured")
         return base.rstrip("/")
@@ -3675,12 +3671,13 @@ class Keymaster:
         if self._node_capabilities is not _UNFETCHED:
             return self._node_capabilities
         node_url = getattr(self.gatekeeper, "url", None)
+        node_url = node_url.rstrip("/") if node_url else None
         if not node_url:
             self._node_capabilities = None
             return None
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:  # fail-fast, matches the JS client
-                response = await client.get(f"{node_url.rstrip('/')}/api/v1/capabilities")
+                response = await client.get(f"{node_url}/api/v1/capabilities")
             self._node_capabilities = response.json() if response.is_success else None
         except Exception:
             self._node_capabilities = None
@@ -3707,13 +3704,10 @@ class Keymaster:
         # Pack + resolve + Forward-wrap here (crypto), then hand each sealed envelope
         # to the DIDComm service for delivery (egress + Tor). The egress is reached
         # through the node's gateway (Drawbridge's /didcomm proxy), derived from the
-        # node URL the keymaster already uses — like publish_lightning — so there is
-        # no dedicated config. (didcomm_service_url is an explicit override for
-        # in-process / test use.)
+        # node URL the keymaster already uses.
         options = options or {}
         service_base = self._didcomm_gateway_base()
-        if not self.didcomm_service_url:
-            await self._require_node_capability("didcomm", "DIDComm messaging")
+        await self._require_node_capability("didcomm", "DIDComm messaging")
         recipient_dids = to if isinstance(to, list) else [to]
         packed = await self.pack_didcomm(message, recipient_dids, options)
 
@@ -3763,7 +3757,7 @@ class Keymaster:
         # Read our own mailbox through the local gateway, not our published public
         # endpoint (which may be an unreachable .onion). endpoint option still overrides.
         base = self._didcomm_gateway_base(options.get("endpoint"))
-        if not self.didcomm_service_url and not options.get("endpoint"):
+        if not options.get("endpoint"):
             await self._require_node_capability("didcomm", "DIDComm messaging")
         keypair = await self.fetch_key_pair(name)
         if not keypair:
@@ -3797,7 +3791,7 @@ class Keymaster:
         id_info = await self.fetch_id_info(name)
         # Mediators read their own mailbox through the local gateway too. endpoint option overrides.
         base = self._didcomm_gateway_base(options.get("endpoint"))
-        if not self.didcomm_service_url and not options.get("endpoint"):
+        if not options.get("endpoint"):
             await self._require_node_capability("didcomm", "DIDComm messaging")
         keypair = await self.fetch_key_pair(name)
         if not keypair:

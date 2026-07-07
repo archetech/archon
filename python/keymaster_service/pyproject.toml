@@ -8,7 +8,7 @@ version = "0.11.0"
 description = "Native Python Keymaster service for Archon"
 readme = "README.md"
 dependencies = [
-  "archon-keymaster==0.4.8",
+  "archon-keymaster==0.6.0",
   "fastapi==0.115.12",
   "uvicorn[standard]==0.34.2",
   "prometheus-client==0.21.1",
