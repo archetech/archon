@@ -31,7 +31,8 @@ Later stages, added one at a time:
 | `add-didcomm` | DIDComm v2 messaging |
 | `add-email` | Herald email-challenge flow (needs SMTP) |
 | `add-pinning` | IPFS pinning-mediator (needs Pinata JWT or alt backend) |
-| `add-tor` | Tor SOCKS proxy for outbound clearnet privacy |
+
+Tor SOCKS (127.0.0.1:9050) and drawbridge's onion hidden service ship as part of stage 0's `drawbridge` profile — no separate add-stage.
 
 Each add-stage has its own human checkpoints (funding, credentials, channel opens). The skill will not cross them without explicit confirmation.
 
@@ -63,8 +64,7 @@ archon-noderunner/
     ├── add-lightning.md
     ├── add-didcomm.md
     ├── add-email.md
-    ├── add-pinning.md
-    └── add-tor.md
+    └── add-pinning.md
 ```
 
 ## Status

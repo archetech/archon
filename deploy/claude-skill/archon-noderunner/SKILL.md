@@ -33,9 +33,6 @@ Enable Herald email-challenge flow. Human checkpoint: SMTP relay credentials (Po
 ### `add-pinning`
 Enable pinning-mediator. Human checkpoint: Pinata JWT (or configure a different backend).
 
-### `add-tor`
-Enable Tor SOCKS (bound to 127.0.0.1 by default per security feedback).
-
 ### `status`
 Show which stages are enabled, current `.env` summary, container health, writer-funding audit.
 
@@ -78,9 +75,13 @@ Each add-stage has its own instruction file under `stages/` that this skill load
 - `stages/add-registry.md`
 - `stages/add-email.md`
 - `stages/add-pinning.md`
-- `stages/add-tor.md`
 
 Read the relevant stage file when its subcommand is invoked. Do not embed those procedures here.
+
+## What stage 0 already includes (no separate add-stage)
+
+- **Tor SOCKS proxy at 127.0.0.1:9050**, provided by the `tor` service in the `drawbridge` compose profile. The `ARCHON_TOR_SOCKS_PORT` env var defaults to `127.0.0.1:9050` — do not override to `0.0.0.0`, this would expose an open proxy (see gondor incident, upstream issue #589, fix `be1dc357`). Verify with `docker port archon-tor-1` post-install; refuse to declare stage 0 healthy if it binds `0.0.0.0`.
+- **Drawbridge onion hostname** — published to `data/tor-drawbridge/`; the DIDComm and other services can advertise the `.onion` endpoint as a fallback when the operator's public clearnet host is unset. Prefer clearnet advertising: set `ARCHON_DRAWBRIDGE_PUBLIC_HOST=<domain>` during stage 0 install.
 
 ## Ongoing operations
 
