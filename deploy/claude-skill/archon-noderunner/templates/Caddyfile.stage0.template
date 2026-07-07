@@ -1,15 +1,19 @@
 # Archon Noderunner — stage 0 Caddyfile template
 # Placeholders filled at install time.
+#
+# Stage 0 reverse-proxies directly to the gatekeeper (port 4224). No drawbridge
+# is running yet — L402 authentication, invoice routes, herald name service, and
+# tor SOCKS all come online when the operator runs add-lightning.
 
 {{DOMAIN}} {
 	handle /api/* {
-		reverse_proxy localhost:4222
+		reverse_proxy localhost:4224
 	}
 	handle /1.0/* {
-		reverse_proxy localhost:4222
+		reverse_proxy localhost:4224
 	}
 	handle /.well-known/* {
-		reverse_proxy localhost:4222
+		reverse_proxy localhost:4224
 	}
 	handle {
 		root * /var/www/{{DOMAIN}}
@@ -22,6 +26,10 @@ wallet.{{DOMAIN}} {
 }
 
 # --- Additional handlers appended by add-* subcommands ---
-# add-lightning:  handle /invoice/* { reverse_proxy localhost:4222 }
-# add-didcomm:    handle /didcomm/* { reverse_proxy localhost:4222 }
+# add-lightning:  handle /invoice/*  { reverse_proxy localhost:4222 }
+#                 (add-lightning also flips /api/* and /1.0/* to localhost:4222
+#                  so L402-guarded routes are handled by drawbridge instead of
+#                  hitting gatekeeper directly)
+# add-didcomm:    handle /didcomm/*  { reverse_proxy localhost:4222 } (post-lightning)
+#                 or                  { reverse_proxy localhost:4236 } (pre-lightning)
 # add-email:      names.{{DOMAIN}} { reverse_proxy localhost:4231 }

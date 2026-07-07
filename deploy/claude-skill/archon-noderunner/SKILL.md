@@ -18,6 +18,8 @@ You are a guided installer for Archon DID nodes. Your job is to bring up a worki
 ### `install --domain <dom> --node-name <name> --node-id <id>`
 Bring up **stage 0**: minimal hyperswarm node delegating chain resolution to an upstream Archon (default `https://4tress.org`). No funding, no external RPC keys required. Produces a working `https://<dom>/` public surface with the react-wallet on `wallet.<dom>`.
 
+Container set (~9): `gatekeeper`, `keymaster`, `redis`, `mongodb`, `ipfs`, `hyperswarm-mediator`, `gatekeeper-client`, `keymaster-client`, `react-wallet`. Caddy reverse-proxies public traffic straight to the gatekeeper on port 4224 (no drawbridge, no L402 auth, no Lightning, no Tor SOCKS — those all land together as part of `add-lightning`).
+
 ### `add-registry <CHAIN:net>`
 Add a chain-writer mediator. Values: `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet`, `SOL:mainnet-beta`. Each has its own funding checkpoint and RPC endpoint prompt.
 
@@ -78,10 +80,16 @@ Each add-stage has its own instruction file under `stages/` that this skill load
 
 Read the relevant stage file when its subcommand is invoked. Do not embed those procedures here.
 
-## What stage 0 already includes (no separate add-stage)
+## Profile coupling to be aware of
 
-- **Tor SOCKS proxy at 127.0.0.1:9050**, provided by the `tor` service in the `drawbridge` compose profile. The `ARCHON_TOR_SOCKS_PORT` env var defaults to `127.0.0.1:9050` — do not override to `0.0.0.0`, this would expose an open proxy (see gondor incident, upstream issue #589, fix `be1dc357`). Verify with `docker port archon-tor-1` post-install; refuse to declare stage 0 healthy if it binds `0.0.0.0`.
-- **Drawbridge onion hostname** — published to `data/tor-drawbridge/`; the DIDComm and other services can advertise the `.onion` endpoint as a fallback when the operator's public clearnet host is unset. Prefer clearnet advertising: set `ARCHON_DRAWBRIDGE_PUBLIC_HOST=<domain>` during stage 0 install.
+The `drawbridge` compose profile shares service declarations with the full Lightning stack — enabling `drawbridge` also brings up `cln-mainnet-node`, `lnbits`, `rtl`, and `lightning-mediator` (they declare `profiles: ['lightning', 'drawbridge']`). Because of this coupling:
+
+- **Stage 0 deliberately does NOT enable `drawbridge`** — Caddy proxies directly to the gatekeeper at port 4224.
+- **`add-lightning` is the stage that flips on `drawbridge`** — and with it, Herald, the drawbridge reverse-proxy, drawbridge-client, and the Tor SOCKS daemon. It also switches Caddy's `/api/*` and `/1.0/*` handlers from `localhost:4224` (gatekeeper direct) to `localhost:4222` (drawbridge, which then adds L402 auth).
+- **Tor SOCKS security posture, once `add-lightning` has run:** `ARCHON_TOR_SOCKS_PORT` defaults to `127.0.0.1:9050`; do not override to `0.0.0.0` (open-proxy footgun documented in archon issue #589, fix `be1dc357`). Verify with `docker port archon-tor-1` post-install and refuse to declare the stage healthy if it binds `0.0.0.0`.
+- **Drawbridge onion hostname** — once enabled, published to `data/tor-drawbridge/`; DIDComm and other services can advertise the `.onion` endpoint as a fallback when the operator's public clearnet host is unset. Prefer clearnet: set `ARCHON_DRAWBRIDGE_PUBLIC_HOST=<domain>` at add-lightning time.
+
+If upstream ever splits the compose profiles so `drawbridge` can run without the Lightning containers, revisit this — stage 0 could then re-adopt drawbridge for cleaner routing.
 
 ## Ongoing operations
 

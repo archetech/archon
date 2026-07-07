@@ -17,7 +17,7 @@ claude                                              # auth via URL
 
 ## Stages
 
-Stage 0 (`install`) brings up a **minimal delegated node**: hyperswarm mediator + gatekeeper + keymaster + react-wallet, no chain writers, no Lightning. Chain-anchored DID resolution is delegated to an upstream Archon (defaults to `https://4tress.org`). This node participates in the mesh and can host DIDs but doesn't anchor them itself.
+Stage 0 (`install`) brings up a **minimal delegated node** (~9 containers): hyperswarm mediator + gatekeeper + keymaster + react-wallet + core (redis/mongodb/ipfs). Caddy proxies public traffic directly to gatekeeper on port 4224. No chain writers, no Lightning, no drawbridge/L402, no Tor. Chain-anchored DID resolution is delegated to an upstream Archon (defaults to `https://4tress.org`). This node participates in the mesh and can host DIDs but doesn't anchor them itself.
 
 Later stages, added one at a time:
 
@@ -27,12 +27,12 @@ Later stages, added one at a time:
 | `add-registry ZEC:mainnet` | Zcash mainnet anchor writer |
 | `add-registry ETH:mainnet` | Ethereum mainnet anchor writer |
 | `add-registry SOL:mainnet-beta` | Solana mainnet anchor writer |
-| `add-lightning` | CLN + LNbits + Lightning-mediator + drawbridge L402 |
+| `add-lightning` | CLN + LNbits + Lightning-mediator + drawbridge + Herald + Tor SOCKS (drawbridge profile shares services with lightning) |
 | `add-didcomm` | DIDComm v2 messaging |
 | `add-email` | Herald email-challenge flow (needs SMTP) |
 | `add-pinning` | IPFS pinning-mediator (needs Pinata JWT or alt backend) |
 
-Tor SOCKS (127.0.0.1:9050) and drawbridge's onion hidden service ship as part of stage 0's `drawbridge` profile — no separate add-stage.
+Drawbridge, Herald, and Tor SOCKS ride along with `add-lightning` — the `drawbridge` compose profile shares service declarations with `lightning`, so enabling one enables the other. If you don't want Lightning, you don't get drawbridge/L402/onion either. Stage 0 without add-lightning is Caddy-direct-to-gatekeeper.
 
 Each add-stage has its own human checkpoints (funding, credentials, channel opens). The skill will not cross them without explicit confirmation.
 

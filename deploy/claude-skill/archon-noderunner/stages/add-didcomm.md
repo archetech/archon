@@ -15,13 +15,17 @@ No human checkpoint required — this is the smoothest add-stage. Free to run wi
    ```
    Append `didcomm` to `COMPOSE_PROFILES`.
 
-2. **Caddy** — append handler inside the `{{DOMAIN}}` block:
+2. **Caddy** — append handler inside the `{{DOMAIN}}` block. Target depends on whether `add-lightning` has already run:
+   - **If drawbridge is enabled** (post-add-lightning): `reverse_proxy localhost:4222`
+   - **If not** (stage 0 only, no lightning yet): `reverse_proxy localhost:4236` (the didcomm container's direct port)
    ```
    handle /didcomm/* {
-       reverse_proxy localhost:4222
+       reverse_proxy localhost:4222   # or :4236 if pre-lightning
    }
    ```
    Back up the Caddyfile as `Caddyfile.bak-pre-didcomm-<timestamp>`. Reload with `sudo systemctl reload caddy`.
+
+   If the operator later runs `add-lightning`, the didcomm route target must be flipped from `:4236` to `:4222` as part of add-lightning's Caddy transition — track this in the add-lightning procedure.
 
 3. **Bring up** the didcomm container. Wait for `GET /didcomm/health` → 200.
 

@@ -2,6 +2,14 @@
 
 Enable CLN + LNbits + lightning-mediator + drawbridge L402 authentication.
 
+**Note on profile coupling:** the `drawbridge` compose profile shares service declarations with `lightning` in upstream archon (`profiles: ['lightning', 'drawbridge']`). This stage enables BOTH profiles, which is why it also brings up Herald, drawbridge, drawbridge-client, and the Tor SOCKS daemon in addition to the Lightning-proper services. Stage 0 deliberately does not enable drawbridge, so this stage is the first place any of those come online.
+
+Once this stage completes:
+- Caddy's `/api/*` and `/1.0/*` handlers switch from `localhost:4224` (gatekeeper direct) to `localhost:4222` (drawbridge → gatekeeper). Public API calls now go through drawbridge's L402 auth layer.
+- `/invoice/*` is added at `localhost:4222` for Lightning invoice endpoints.
+- Tor SOCKS becomes available at `127.0.0.1:9050` for mediator outbound.
+- Drawbridge publishes an onion hostname at `data/tor-drawbridge/drawbridge/hostname`.
+
 ## Prereqs
 
 - `BTC:mainnet` registry MUST already be enabled (`add-registry BTC:mainnet` first). CLN needs a bitcoind backing source. If BTC isn't enabled, refuse and instruct the operator to add it first.
