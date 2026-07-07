@@ -17,7 +17,7 @@ claude                                              # auth via URL
 
 ## Stages
 
-Stage 0 (`install`) brings up a **minimal delegated node** (~9 containers): hyperswarm mediator + gatekeeper + keymaster + react-wallet + core (redis/mongodb/ipfs). Caddy proxies public traffic directly to gatekeeper on port 4224. No chain writers, no Lightning, no drawbridge/L402, no Tor. Chain-anchored DID resolution is delegated to an upstream Archon (defaults to `https://4tress.org`). This node participates in the mesh and can host DIDs but doesn't anchor them itself.
+Stage 0 (`install`) brings up a **minimal delegated node** (7 containers): hyperswarm mediator + react-wallet + core (gatekeeper, keymaster, redis, mongodb, ipfs). Caddy proxies public traffic directly to gatekeeper on port 4224. No chain writers, no Lightning, no drawbridge/L402, no Tor, no admin SPAs. Chain-anchored DID resolution is delegated to an upstream Archon (defaults to `https://4tress.org`). This node participates in the mesh and can host DIDs but doesn't anchor them itself.
 
 Later stages, added one at a time:
 

@@ -18,7 +18,9 @@ You are a guided installer for Archon DID nodes. Your job is to bring up a worki
 ### `install --domain <dom> --node-name <name> --node-id <id>`
 Bring up **stage 0**: minimal hyperswarm node delegating chain resolution to an upstream Archon (default `https://4tress.org`). No funding, no external RPC keys required. Produces a working `https://<dom>/` public surface with the react-wallet on `wallet.<dom>`.
 
-Container set (~9): `gatekeeper`, `keymaster`, `redis`, `mongodb`, `ipfs`, `hyperswarm-mediator`, `gatekeeper-client`, `keymaster-client`, `react-wallet`. Caddy reverse-proxies public traffic straight to the gatekeeper on port 4224 (no drawbridge, no L402 auth, no Lightning, no Tor SOCKS — those all land together as part of `add-lightning`).
+Container set (7): `gatekeeper`, `keymaster`, `redis`, `mongodb`, `ipfs` (always-on core), plus `hyperswarm-mediator` and `react-wallet` from the two stage-0 compose profiles. Caddy reverse-proxies public traffic straight to the gatekeeper on port 4224 (no drawbridge, no L402 auth, no Lightning, no Tor SOCKS — those all land together as part of `add-lightning`).
+
+Deliberately NOT in stage 0: `gatekeeper-client` and `keymaster-client`. These are admin/dev SPAs, not runtime dependencies. Per operator preference (admin UIs should be Tailscale-only), stage 0 leaves them out. An operator wanting them can append `gatekeeper-client,keymaster-client` to `COMPOSE_PROFILES` and expose them via Tailscale rather than the public Caddyfile.
 
 ### `add-registry <CHAIN:net>`
 Add a chain-writer mediator. Values: `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet`, `SOL:mainnet-beta`. Each has its own funding checkpoint and RPC endpoint prompt.
