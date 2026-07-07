@@ -301,10 +301,6 @@ export interface KeymasterOptions {
     cipher: Cipher;
     defaultRegistry?: string;
     maxAliasLength?: number;
-    // Optional node facade URL used for gateway features and capability checks.
-    // Browser wallets commonly set gatekeeper.url to Drawbridge already; services
-    // can keep gatekeeper on raw Gatekeeper and pass Drawbridge here.
-    nodeURL?: string;
 }
 
 export interface EncryptedMessage {

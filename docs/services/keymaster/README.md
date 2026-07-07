@@ -980,7 +980,7 @@ labels.
 | `ARCHON_KEYMASTER_PORT` | `4226` | HTTP listen port. |
 | `ARCHON_BIND_ADDRESS` | `0.0.0.0` | HTTP bind address. |
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Gatekeeper base URL. |
-| `ARCHON_NODE_URL` | empty | Optional Drawbridge node facade URL for gateway features such as server-side DIDComm send/receive egress. |
+| `ARCHON_KEYMASTER_GATEKEEPER_URL` | unset | Compose-only override for Keymaster's internal `ARCHON_GATEKEEPER_URL`; set to `http://drawbridge:4222` when server-side DIDComm should use Drawbridge's `/didcomm` gateway. |
 | `ARCHON_NODE_ID` | empty | Required. Name of the canonical agent ID this server provisions on startup. |
 | `ARCHON_KEYMASTER_DB` | `json` | Storage backend (`json`, `sqlite`, `redis`, `mongodb`). |
 | `ARCHON_ENCRYPTED_PASSPHRASE` | empty | Wallet passphrase. Empty enables `/login` dev mode (returns admin key without checking). |

@@ -176,7 +176,6 @@ export default class Keymaster implements KeymasterInterface {
     private readonly ephemeralRegistry: string;
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
-    private readonly nodeURL?: string;
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
     // memoized. `undefined` = not yet fetched; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
@@ -202,8 +201,6 @@ export default class Keymaster implements KeymasterInterface {
         this.gatekeeper = options.gatekeeper;
         this.db = options.wallet;
         this.cipher = options.cipher;
-
-        this.nodeURL = options.nodeURL?.replace(/\/+$/, '');
 
         this.defaultRegistry = options.defaultRegistry || 'hyperswarm';
         this.ephemeralRegistry = 'hyperswarm';
@@ -2621,7 +2618,7 @@ export default class Keymaster implements KeymasterInterface {
         if (this._nodeCapabilities !== undefined) {
             return this._nodeCapabilities;
         }
-        const nodeUrl = this.nodeBaseURL();
+        const nodeUrl = (this.gatekeeper as { url?: string }).url?.replace(/\/+$/, '');
         if (!nodeUrl) {
             this._nodeCapabilities = null;
             return null;
@@ -2674,21 +2671,15 @@ export default class Keymaster implements KeymasterInterface {
         return (await response.json()).challenge;
     }
 
-    private nodeBaseURL(): string | undefined {
-        return this.nodeURL ?? (this.gatekeeper as { url?: string }).url?.replace(/\/+$/, '');
-    }
-
     // The local DIDComm gateway: Drawbridge's `/didcomm` proxy in front of the
-    // relay. By default this is derived from the node URL the keymaster already
-    // uses, but services can pass a Drawbridge node URL when their Gatekeeper
-    // client points at raw Gatekeeper.
+    // relay, derived from the node URL the keymaster already uses.
     // Every gateway interaction (sending, and reading your own mailbox) goes here.
     // Reading your mailbox must NOT use your published public endpoint: that may be
     // a `.onion` the client can't dial directly, and routing out through Tor to
     // reach your own relay is nonsense. An explicit endpoint (e.g. CLI --endpoint)
     // wins.
     private didcommGatewayBase(override?: string): string {
-        const nodeUrl = this.nodeBaseURL();
+        const nodeUrl = (this.gatekeeper as { url?: string }).url?.replace(/\/+$/, '');
         const base = (override ?? (nodeUrl ? `${nodeUrl}/didcomm` : undefined))?.replace(/\/+$/, '');
         if (!base) {
             throw new KeymasterError('cannot reach the DIDComm gateway: no node URL configured');

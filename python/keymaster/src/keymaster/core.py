@@ -120,7 +120,6 @@ class Keymaster:
         default_registry: str = "hyperswarm",
         ephemeral_registry: str = "hyperswarm",
         max_alias_length: int = 32,
-        node_url: str | None = None,
     ):
         self.gatekeeper = gatekeeper
         self.wallet_store = wallet_store
@@ -128,7 +127,6 @@ class Keymaster:
         self.default_registry = default_registry or "hyperswarm"
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
-        self.node_url = node_url.rstrip("/") if node_url else None
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache = None
@@ -3655,13 +3653,12 @@ class Keymaster:
 
     def _didcomm_gateway_base(self, override: str | None = None) -> str:
         # The local DIDComm gateway: Drawbridge's /didcomm proxy in front of the
-        # relay. By default this is derived from the node URL the keymaster already
-        # uses, but services can pass a Drawbridge node URL when their Gatekeeper
-        # client points at raw Gatekeeper.
+        # relay, derived from the node URL the keymaster already uses.
         # Used for sending AND for reading our own mailbox; reading
         # must NOT use our published public endpoint (it may be an unreachable .onion).
         # An explicit endpoint wins.
-        node_url = self._node_base_url()
+        node_url = getattr(self.gatekeeper, "url", None)
+        node_url = node_url.rstrip("/") if node_url else None
         base = override or (f"{node_url}/didcomm" if node_url else None)
         if not base:
             raise KeymasterError("cannot reach the DIDComm gateway: no node URL configured")
@@ -3673,7 +3670,8 @@ class Keymaster:
         # then proceed lazily so we never regress against existing nodes.
         if self._node_capabilities is not _UNFETCHED:
             return self._node_capabilities
-        node_url = self._node_base_url()
+        node_url = getattr(self.gatekeeper, "url", None)
+        node_url = node_url.rstrip("/") if node_url else None
         if not node_url:
             self._node_capabilities = None
             return None
@@ -3691,10 +3689,6 @@ class Keymaster:
         caps = await self._get_node_capabilities()
         if caps is not None and caps.get(capability) is False:
             raise KeymasterError(f"this node does not offer {human_name}")
-
-    def _node_base_url(self) -> str | None:
-        node_url = self.node_url or getattr(self.gatekeeper, "url", None)
-        return node_url.rstrip("/") if node_url else None
 
     async def _didcomm_challenge_auth(self, client: httpx.AsyncClient, base: str, keypair: dict[str, dict[str, str]]) -> dict[str, str]:
         try:
