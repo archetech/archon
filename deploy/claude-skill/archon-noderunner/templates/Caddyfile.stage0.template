@@ -1,0 +1,27 @@
+# Archon Noderunner — stage 0 Caddyfile template
+# Placeholders filled at install time.
+
+{{DOMAIN}} {
+	handle /api/* {
+		reverse_proxy localhost:4222
+	}
+	handle /1.0/* {
+		reverse_proxy localhost:4222
+	}
+	handle /.well-known/* {
+		reverse_proxy localhost:4222
+	}
+	handle {
+		root * /var/www/{{DOMAIN}}
+		file_server
+	}
+}
+
+wallet.{{DOMAIN}} {
+	reverse_proxy localhost:4228
+}
+
+# --- Additional handlers appended by add-* subcommands ---
+# add-lightning:  handle /invoice/* { reverse_proxy localhost:4222 }
+# add-didcomm:    handle /didcomm/* { reverse_proxy localhost:4222 }
+# add-email:      names.{{DOMAIN}} { reverse_proxy localhost:4231 }
