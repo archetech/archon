@@ -2316,7 +2316,23 @@
           "200": {
             "description": "The DID Resolution result (standard triple).",
             "content": {
-              "application/json": {
+              "application/did+ld+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "didDocument": {
+                      "type": "object"
+                    },
+                    "didResolutionMetadata": {
+                      "type": "object"
+                    },
+                    "didDocumentMetadata": {
+                      "type": "object"
+                    }
+                  }
+                }
+              },
+              "application/did+json": {
                 "schema": {
                   "type": "object",
                   "properties": {
