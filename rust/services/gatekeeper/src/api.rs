@@ -1247,17 +1247,29 @@ async fn resolve_conformant(
 pub(crate) async fn conformant_resolve_did(
     State(state): State<AppState>,
     Path(did): Path<String>,
+    headers: HeaderMap,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     let start = Instant::now();
     match resolve_conformant(&state, &did, &query).await {
         Ok(doc) => {
+            let content_type = preferred_did_content_type(&headers);
+            let mut did_resolution_metadata = doc
+                .get("didResolutionMetadata")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            if let Some(metadata) = did_resolution_metadata.as_object_mut() {
+                metadata.remove("retrieved");
+                metadata.insert(
+                    "contentType".to_string(),
+                    Value::String(content_type.to_string()),
+                );
+            } else {
+                did_resolution_metadata = json!({ "contentType": content_type });
+            }
             let triple = json!({
                 "didDocument": doc.get("didDocument").cloned().unwrap_or(Value::Null),
-                "didResolutionMetadata": doc
-                    .get("didResolutionMetadata")
-                    .cloned()
-                    .unwrap_or_else(|| json!({})),
+                "didResolutionMetadata": did_resolution_metadata,
                 "didDocumentMetadata": doc
                     .get("didDocumentMetadata")
                     .cloned()
@@ -1270,7 +1282,7 @@ pub(crate) async fn conformant_resolve_did(
                 200,
                 start.elapsed().as_secs_f64(),
             );
-            Json(triple).into_response()
+            json_response_with_content_type(StatusCode::OK, triple, content_type)
         }
         Err((status, error_kind)) => {
             record_metrics(
@@ -1290,6 +1302,86 @@ pub(crate) async fn conformant_resolve_did(
                 })),
             )
                 .into_response()
+        }
+    }
+}
+
+fn preferred_did_content_type(headers: &HeaderMap) -> &'static str {
+    const DID_LD_JSON: &str = "application/did+ld+json";
+    const DID_JSON: &str = "application/did+json";
+
+    let Some(accept) = headers
+        .get(header::ACCEPT)
+        .and_then(|value| value.to_str().ok())
+    else {
+        return DID_LD_JSON;
+    };
+
+    let ld = accept_quality(accept, DID_LD_JSON);
+    let json = accept_quality(accept, DID_JSON);
+
+    match (ld, json) {
+        (Some((ld_q, ld_order)), Some((json_q, json_order))) => {
+            if json_q > ld_q || (json_q == ld_q && json_order < ld_order) {
+                DID_JSON
+            } else {
+                DID_LD_JSON
+            }
+        }
+        (Some(_), None) => DID_LD_JSON,
+        (None, Some(_)) => DID_JSON,
+        (None, None) => DID_LD_JSON,
+    }
+}
+
+fn accept_quality(accept: &str, candidate: &str) -> Option<(f32, usize)> {
+    let mut best = None;
+
+    for (order, part) in accept.split(',').enumerate() {
+        let mut media = "";
+        let mut q = 1.0_f32;
+
+        for (index, segment) in part.split(';').enumerate() {
+            let segment = segment.trim();
+            if index == 0 {
+                media = segment;
+                continue;
+            }
+            if let Some(raw_q) = segment.strip_prefix("q=") {
+                q = raw_q.parse::<f32>().unwrap_or(0.0);
+            }
+        }
+
+        let matches = media == candidate || media == "application/*" || media == "*/*";
+        if !matches || q <= 0.0 {
+            continue;
+        }
+
+        if best
+            .map(|(best_q, best_order)| q > best_q || (q == best_q && order < best_order))
+            .unwrap_or(true)
+        {
+            best = Some((q, order));
+        }
+    }
+
+    best
+}
+
+fn json_response_with_content_type(
+    status: StatusCode,
+    value: Value,
+    content_type: &'static str,
+) -> Response {
+    match serde_json::to_vec(&value) {
+        Ok(body) => Response::builder()
+            .status(status)
+            .header(header::CONTENT_TYPE, content_type)
+            .body(Body::from(body))
+            .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response()),
+        Err(error) => {
+            error!("failed to serialize JSON response: {error}");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
 }

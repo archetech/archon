@@ -646,7 +646,7 @@ by the DID Resolution data model:
 ```jsonc
 {
   "didDocument": { /* ... */ },
-  "didResolutionMetadata": { "retrieved": "<RFC 3339>" },
+  "didResolutionMetadata": { "contentType": "application/did+ld+json" },
   "didDocumentMetadata": {
     "created": "<RFC 3339>",
     "versionId": "<CID>",
@@ -656,6 +656,13 @@ by the DID Resolution data model:
   }
 }
 ```
+
+`Accept: application/did+json` and `Accept: application/did+ld+json` are
+honored for successful resolution responses. The selected representation is
+returned as both the HTTP `Content-Type` and
+`didResolutionMetadata.contentType`. Volatile fields such as
+`didResolutionMetadata.retrieved` are omitted from this surface so generated
+W3C DID test-suite fixtures remain stable.
 
 `didDocumentData` and `didDocumentRegistration` (present inline in the
 internal [`DidCidDocument`](#37-didciddocument-resolution-result)) MUST be
