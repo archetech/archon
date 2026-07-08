@@ -149,6 +149,13 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
             .and_then(|value| value.to_str().ok()),
         Some("application/did+ld+json")
     );
+    assert_eq!(
+        response
+            .headers()
+            .get("vary")
+            .and_then(|value| value.to_str().ok()),
+        Some("Accept")
+    );
     let doc = response.json::<Value>().await?;
     let object = doc.as_object().unwrap();
     assert_eq!(object.len(), 3);
@@ -165,7 +172,7 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
     let response = service
         .client
         .get(format!("{}/1.0/identifiers/{did}", service.root_url))
-        .header("accept", "application/did+json")
+        .header("accept", "Application/DID+JSON;Q=1, application/did+ld+json;q=0.5")
         .send()
         .await?;
     assert!(response.status().is_success());
@@ -175,6 +182,13 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
             .get("content-type")
             .and_then(|value| value.to_str().ok()),
         Some("application/did+json")
+    );
+    assert_eq!(
+        response
+            .headers()
+            .get("vary")
+            .and_then(|value| value.to_str().ok()),
+        Some("Accept")
     );
     let doc = response.json::<Value>().await?;
     assert_eq!(

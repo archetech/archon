@@ -42,15 +42,16 @@ function preferredDidContentType(req: express.Request): typeof DID_LD_JSON | typ
 
 function acceptQuality(accept: string, candidate: string): { quality: number; order: number } | undefined {
     let best: { quality: number; order: number } | undefined;
+    const normalizedCandidate = candidate.toLowerCase();
 
     accept.split(',').forEach((part, order) => {
         const [rawMedia, ...params] = part.split(';');
-        const media = rawMedia.trim();
+        const media = rawMedia.trim().toLowerCase();
         let quality = 1;
 
         for (const param of params) {
             const trimmed = param.trim();
-            if (trimmed.startsWith('q=')) {
+            if (trimmed.toLowerCase().startsWith('q=')) {
                 quality = Number.parseFloat(trimmed.slice(2));
                 if (Number.isNaN(quality)) {
                     quality = 0;
@@ -58,7 +59,7 @@ function acceptQuality(accept: string, candidate: string): { quality: number; or
             }
         }
 
-        const matches = media === candidate || media === 'application/*' || media === '*/*';
+        const matches = media === normalizedCandidate || media === 'application/*' || media === '*/*';
         if (!matches || quality <= 0) {
             return;
         }
@@ -73,6 +74,7 @@ function acceptQuality(accept: string, candidate: string): { quality: number; or
 
 function sendDidResolutionJson(res: express.Response, contentType: string, body: unknown): void {
     res.set('Content-Type', contentType);
+    res.vary('Accept');
     res.end(JSON.stringify(body));
 }
 
@@ -160,7 +162,17 @@ export function createIdentifiersRouter(
      *       200:
      *         description: The DID Resolution result (standard triple).
      *         content:
-     *           application/json:
+     *           application/did+ld+json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 didDocument:
+     *                   type: object
+     *                 didResolutionMetadata:
+     *                   type: object
+     *                 didDocumentMetadata:
+     *                   type: object
+     *           application/did+json:
      *             schema:
      *               type: object
      *               properties:

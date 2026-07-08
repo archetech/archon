@@ -1336,23 +1336,28 @@ fn preferred_did_content_type(headers: &HeaderMap) -> &'static str {
 
 fn accept_quality(accept: &str, candidate: &str) -> Option<(f32, usize)> {
     let mut best = None;
+    let normalized_candidate = candidate.to_ascii_lowercase();
 
     for (order, part) in accept.split(',').enumerate() {
-        let mut media = "";
+        let mut media = String::new();
         let mut q = 1.0_f32;
 
         for (index, segment) in part.split(';').enumerate() {
             let segment = segment.trim();
             if index == 0 {
-                media = segment;
+                media = segment.to_ascii_lowercase();
                 continue;
             }
-            if let Some(raw_q) = segment.strip_prefix("q=") {
+            if let Some(raw_q) = segment
+                .strip_prefix("q=")
+                .or_else(|| segment.strip_prefix("Q="))
+            {
                 q = raw_q.parse::<f32>().unwrap_or(0.0);
             }
         }
 
-        let matches = media == candidate || media == "application/*" || media == "*/*";
+        let matches =
+            media == normalized_candidate || media == "application/*" || media == "*/*";
         if !matches || q <= 0.0 {
             continue;
         }
@@ -1377,6 +1382,7 @@ fn json_response_with_content_type(
         Ok(body) => Response::builder()
             .status(status)
             .header(header::CONTENT_TYPE, content_type)
+            .header(header::VARY, "Accept")
             .body(Body::from(body))
             .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response()),
         Err(error) => {
