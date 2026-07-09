@@ -78,9 +78,9 @@ function sendDidResolutionJson(res: express.Response, contentType: string, body:
     res.end(JSON.stringify(body));
 }
 
-function normalizeDidCoreDatetime(value: unknown): unknown {
-    if (typeof value !== 'string') {
-        return value;
+function normalizeDidCoreDatetime(value?: string): string | undefined {
+    if (value === undefined) {
+        return undefined;
     }
 
     const date = new Date(value);
