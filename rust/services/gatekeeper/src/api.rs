@@ -1270,10 +1270,11 @@ pub(crate) async fn conformant_resolve_did(
             let triple = json!({
                 "didDocument": doc.get("didDocument").cloned().unwrap_or(Value::Null),
                 "didResolutionMetadata": did_resolution_metadata,
-                "didDocumentMetadata": doc
-                    .get("didDocumentMetadata")
-                    .cloned()
-                    .unwrap_or_else(|| json!({}))
+                "didDocumentMetadata": normalize_did_document_metadata(
+                    doc.get("didDocumentMetadata")
+                        .cloned()
+                        .unwrap_or_else(|| json!({}))
+                )
             });
             record_metrics(
                 &state,
@@ -1304,6 +1305,30 @@ pub(crate) async fn conformant_resolve_did(
                 .into_response()
         }
     }
+}
+
+fn normalize_did_core_datetime(value: &str) -> Option<String> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|datetime| {
+            datetime
+                .with_timezone(&chrono::Utc)
+                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+        })
+}
+
+fn normalize_did_document_metadata(mut metadata: Value) -> Value {
+    for field in ["created", "updated", "deleted"] {
+        if let Some(normalized) = metadata
+            .get(field)
+            .and_then(Value::as_str)
+            .and_then(normalize_did_core_datetime)
+        {
+            metadata[field] = Value::String(normalized);
+        }
+    }
+
+    metadata
 }
 
 fn preferred_did_content_type(headers: &HeaderMap) -> &'static str {

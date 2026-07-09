@@ -78,6 +78,32 @@ function sendDidResolutionJson(res: express.Response, contentType: string, body:
     res.end(JSON.stringify(body));
 }
 
+function normalizeDidCoreDatetime(value?: string): string | undefined {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function normalizeDidDocumentMetadata(metadata: DidCidDocument['didDocumentMetadata']) {
+    if (!metadata) {
+        return metadata;
+    }
+
+    return {
+        ...metadata,
+        created: normalizeDidCoreDatetime(metadata.created),
+        updated: normalizeDidCoreDatetime(metadata.updated),
+        deleted: normalizeDidCoreDatetime(metadata.deleted),
+    };
+}
+
 /**
  * Build the standards-conformant DID resolution / dereferencing router, mounted at
  * `/1.0/identifiers` following the Universal Resolver driver convention. Extracted into a
@@ -214,7 +240,7 @@ export function createIdentifiersRouter(
             sendDidResolutionJson(res, contentType, {
                 didDocument,
                 didResolutionMetadata: stableDidResolutionMetadata,
-                didDocumentMetadata,
+                didDocumentMetadata: normalizeDidDocumentMetadata(didDocumentMetadata),
             });
         } catch (error: any) {
             const { status, resolutionError } = classifyResolveError(error);
