@@ -41,6 +41,7 @@ These rules apply to coding agents working in this repository.
 - Prefer a clean branch cut over moving changes around after the fact.
 - If branch state becomes confusing, stop and cleanly reestablish scope before making more commits.
 - When adding Prometheus HTTP route labels, normalize dynamic path segments like DIDs, hashes, txids, and CIDs before recording metrics so dashboards do not create one time series per identifier.
+- Gatekeeper HTTP route tests should import `createGatekeeperApp` from `services/gatekeeper/server/src/gatekeeper-api.ts` or `createV1Router` from `services/gatekeeper/server/src/v1-router.ts` and inject fake dependencies; keep production DB/IPFS startup behind `main()` so imports remain testable.
 - Nostr event IDs in Python parity code must use compact JSON serialization (`separators=(",", ":")`) to match the TypeScript `JSON.stringify` hashing/signing contract.
 - Python Lightning invoice parity should only surface `expiry` and `expires` when the BOLT11 invoice actually includes an expiry tag; the `bolt11` library exposes a default expiry even when the tag is absent.
 - Python keymaster flavor runs in CLI CI use `ARCHON_KEYMASTER_DB=redis` exactly like the TypeScript service; no override is needed.
