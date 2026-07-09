@@ -80,7 +80,7 @@ router.get('/ready', async (req, res) => {
 
 /**
  * @swagger
- * /api/v1/version:
+ * /version:
  *   get:
  *     summary: Retrieve the API version
  *     responses:

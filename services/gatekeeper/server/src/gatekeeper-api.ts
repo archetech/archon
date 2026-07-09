@@ -137,6 +137,25 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
         next();
     });
 
+    /**
+     * @swagger
+     * /metrics:
+     *   get:
+     *     summary: Retrieve Prometheus metrics
+     *     responses:
+     *       200:
+     *         description: Prometheus text exposition metrics.
+     *         content:
+     *           text/plain:
+     *             schema:
+     *               type: string
+     *       500:
+     *         description: Internal Server Error.
+     *         content:
+     *           text/plain:
+     *             schema:
+     *               type: string
+     */
     // Prometheus metrics endpoint
     app.get('/metrics', async (req, res) => {
         try {
