@@ -106,253 +106,253 @@ export interface CreateGatekeeperAppOptions {
 }
 
 export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
-const gatekeeper = options.gatekeeper;
-const config = options.config ?? defaultConfig;
-const logger = options.logger ?? defaultLogger;
-const startTime = new Date();
-const app = express();
+    const gatekeeper = options.gatekeeper;
+    const config = options.config ?? defaultConfig;
+    const logger = options.logger ?? defaultLogger;
+    const startTime = new Date();
+    const app = express();
 
-app.use(cors());
-app.options('*', cors());
+    app.use(cors());
+    app.options('*', cors());
 
-// HTTP request logging - use pino in production, morgan in development
-if (options.httpLogging ?? process.env.NODE_ENV !== 'test') {
-    if (process.env.NODE_ENV === 'production') {
-        app.use(pinoHttp({ logger }));
-    } else {
-        app.use(morgan('dev'));
+    // HTTP request logging - use pino in production, morgan in development
+    if (options.httpLogging ?? process.env.NODE_ENV !== 'test') {
+        if (process.env.NODE_ENV === 'production') {
+            app.use(pinoHttp({ logger }));
+        } else {
+            app.use(morgan('dev'));
+        }
     }
-}
-app.use(express.json({ limit: config.jsonLimit }));
+    app.use(express.json({ limit: config.jsonLimit }));
 
-// Metrics middleware - track HTTP requests
-app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-        const duration = (Date.now() - start) / 1000;
-        const route = normalizePath(req.path);
-        httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
-        httpRequestDuration.observe({ method: req.method, route, status: res.statusCode }, duration);
+    // Metrics middleware - track HTTP requests
+    app.use((req, res, next) => {
+        const start = Date.now();
+        res.on('finish', () => {
+            const duration = (Date.now() - start) / 1000;
+            const route = normalizePath(req.path);
+            httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
+            httpRequestDuration.observe({ method: req.method, route, status: res.statusCode }, duration);
+        });
+        next();
     });
-    next();
-});
 
-// Prometheus metrics endpoint
-app.get('/metrics', async (req, res) => {
-    try {
-        res.set('Content-Type', register.contentType);
-        res.end(await register.metrics());
-    } catch (error: any) {
-        res.status(500).end(error.toString());
-    }
-});
-
-let serverReady = options.ready ?? false;
-
-const v1router = createV1Router({
-    gatekeeper,
-    config,
-    logger,
-    isReady: () => serverReady,
-    getStatus,
-    didOperationsTotal,
-});
-app.use('/api/v1', v1router);
-// Standards-conformant DID resolution / dereferencing surface, following the Universal
-// Resolver driver convention. Distinct from the internal /api/v1/did/:did family (preserved
-// for backwards compat). Built by a factory so it can be HTTP-tested with an in-memory Gatekeeper.
-app.use('/1.0/identifiers', createIdentifiersRouter(gatekeeper, logger));
-
-app.use('/api', (req, res) => {
-    console.warn(`Warning: Unhandled API endpoint - ${req.method} ${req.originalUrl}`);
-    res.status(404).json({ message: 'Endpoint not found' });
-});
-
-async function gcLoop() {
-    try {
-        const response = await gatekeeper.verifyDb();
-        console.log(`DID garbage collection: ${JSON.stringify(response)} waiting ${config.gcInterval} minutes...`);
-        await checkDids();
-    }
-    catch (error: any) {
-        console.error(`Error in DID garbage collection: ${error}`);
-    }
-    setTimeout(gcLoop, config.gcInterval * 60 * 1000);
-}
-
-let didCheck: CheckDIDsResult = options.didCheck ?? {
-    total: 0,
-    byType: {
-        agents: 0,
-        assets: 0,
-        confirmed: 0,
-        unconfirmed: 0,
-        ephemeral: 0,
-        invalid: 0,
-    },
-    byRegistry: {},
-    byVersion: {},
-    eventsQueue: [],
-};
-
-async function checkDids() {
-    console.time('checkDIDs');
-    didCheck = await gatekeeper.checkDIDs();
-    console.timeEnd('checkDIDs');
-
-    // Update events queue metrics - reset first to clear stale data
-    eventsQueueGauge.reset();
-    if (didCheck.eventsQueue) {
-        const queueByRegistry: Record<string, number> = {};
-        for (const event of didCheck.eventsQueue) {
-            const registry = event.registry || 'unknown';
-            queueByRegistry[registry] = (queueByRegistry[registry] || 0) + 1;
+    // Prometheus metrics endpoint
+    app.get('/metrics', async (req, res) => {
+        try {
+            res.set('Content-Type', register.contentType);
+            res.end(await register.metrics());
+        } catch (error: any) {
+            res.status(500).end(error.toString());
         }
-        for (const [registry, count] of Object.entries(queueByRegistry)) {
-            eventsQueueGauge.set({ registry }, count);
+    });
+
+    let serverReady = options.ready ?? false;
+
+    const v1router = createV1Router({
+        gatekeeper,
+        config,
+        logger,
+        isReady: () => serverReady,
+        getStatus,
+        didOperationsTotal,
+    });
+    app.use('/api/v1', v1router);
+    // Standards-conformant DID resolution / dereferencing surface, following the Universal
+    // Resolver driver convention. Distinct from the internal /api/v1/did/:did family (preserved
+    // for backwards compat). Built by a factory so it can be HTTP-tested with an in-memory Gatekeeper.
+    app.use('/1.0/identifiers', createIdentifiersRouter(gatekeeper, logger));
+
+    app.use('/api', (req, res) => {
+        console.warn(`Warning: Unhandled API endpoint - ${req.method} ${req.originalUrl}`);
+        res.status(404).json({ message: 'Endpoint not found' });
+    });
+
+    async function gcLoop() {
+        try {
+            const response = await gatekeeper.verifyDb();
+            console.log(`DID garbage collection: ${JSON.stringify(response)} waiting ${config.gcInterval} minutes...`);
+            await checkDids();
         }
+        catch (error: any) {
+            console.error(`Error in DID garbage collection: ${error}`);
+        }
+        setTimeout(gcLoop, config.gcInterval * 60 * 1000);
     }
 
-    // Update DID count gauges
-    didsTotalGauge.set(didCheck.total || 0);
-
-    didsByTypeGauge.reset();
-    if (didCheck.byType) {
-        for (const [type, count] of Object.entries(didCheck.byType)) {
-            didsByTypeGauge.set({ type }, count as number);
-        }
-    }
-
-    didsByRegistryGauge.reset();
-    if (didCheck.byRegistry) {
-        for (const [registry, count] of Object.entries(didCheck.byRegistry)) {
-            didsByRegistryGauge.set({ registry }, count as number);
-        }
-    }
-}
-
-async function getStatus() {
-    return {
-        uptimeSeconds: Math.round((Date.now() - startTime.getTime()) / 1000),
-        dids: didCheck,
-        memoryUsage: process.memoryUsage()
+    let didCheck: CheckDIDsResult = options.didCheck ?? {
+        total: 0,
+        byType: {
+            agents: 0,
+            assets: 0,
+            confirmed: 0,
+            unconfirmed: 0,
+            ephemeral: 0,
+            invalid: 0,
+        },
+        byRegistry: {},
+        byVersion: {},
+        eventsQueue: [],
     };
-}
 
-async function reportStatus() {
-    await checkDids();
-    const status = await getStatus();
+    async function checkDids() {
+        console.time('checkDIDs');
+        didCheck = await gatekeeper.checkDIDs();
+        console.timeEnd('checkDIDs');
 
-    console.log('Status -----------------------------');
-
-    console.log(`DID Database (${config.db}):`);
-    console.log(`  Total: ${status.dids.total}`);
-
-    if (status.dids.total > 0) {
-        console.log(`  By type:`);
-        console.log(`    Agents: ${status.dids.byType.agents}`);
-        console.log(`    Assets: ${status.dids.byType.assets}`);
-        console.log(`    Confirmed: ${status.dids.byType.confirmed}`);
-        console.log(`    Unconfirmed: ${status.dids.byType.unconfirmed}`);
-        console.log(`    Ephemeral: ${status.dids.byType.ephemeral}`);
-        console.log(`    Invalid: ${status.dids.byType.invalid}`);
-
-        console.log(`  By registry:`);
-        const registries = Object.keys(status.dids.byRegistry).sort();
-        for (let registry of registries) {
-            console.log(`    ${registry}: ${status.dids.byRegistry[registry]}`);
+        // Update events queue metrics - reset first to clear stale data
+        eventsQueueGauge.reset();
+        if (didCheck.eventsQueue) {
+            const queueByRegistry: Record<string, number> = {};
+            for (const event of didCheck.eventsQueue) {
+                const registry = event.registry || 'unknown';
+                queueByRegistry[registry] = (queueByRegistry[registry] || 0) + 1;
+            }
+            for (const [registry, count] of Object.entries(queueByRegistry)) {
+                eventsQueueGauge.set({ registry }, count);
+            }
         }
 
-        console.log(`  By version:`);
-        let count = 0;
-        for (let version of [1, 2, 3, 4, 5]) {
-            const num = status.dids.byVersion[version] || 0;
-            console.log(`    ${version}: ${num}`);
-            count += num;
+        // Update DID count gauges
+        didsTotalGauge.set(didCheck.total || 0);
+
+        didsByTypeGauge.reset();
+        if (didCheck.byType) {
+            for (const [type, count] of Object.entries(didCheck.byType)) {
+                didsByTypeGauge.set({ type }, count as number);
+            }
         }
-        console.log(`    6+: ${status.dids.total - count}`);
+
+        didsByRegistryGauge.reset();
+        if (didCheck.byRegistry) {
+            for (const [registry, count] of Object.entries(didCheck.byRegistry)) {
+                didsByRegistryGauge.set({ registry }, count as number);
+            }
+        }
     }
 
-    console.log(`Events Queue: ${status.dids.eventsQueue.length} pending`);
+    async function getStatus() {
+        return {
+            uptimeSeconds: Math.round((Date.now() - startTime.getTime()) / 1000),
+            dids: didCheck,
+            memoryUsage: process.memoryUsage()
+        };
+    }
 
-    console.log(`Memory Usage Report:`);
-    console.log(`  RSS: ${formatBytes(status.memoryUsage.rss)} (Resident Set Size - total memory allocated for the process)`);
-    console.log(`  Heap Total: ${formatBytes(status.memoryUsage.heapTotal)} (Total heap allocated)`);
-    console.log(`  Heap Used: ${formatBytes(status.memoryUsage.heapUsed)} (Heap actually used)`);
-    console.log(`  External: ${formatBytes(status.memoryUsage.external)} (Memory used by C++ objects bound to JavaScript)`);
-    console.log(`  Array Buffers: ${formatBytes(status.memoryUsage.arrayBuffers)} (Memory used by ArrayBuffer and SharedArrayBuffer)`);
+    async function reportStatus() {
+        await checkDids();
+        const status = await getStatus();
 
-    console.log(`Uptime: ${status.uptimeSeconds}s (${formatDuration(status.uptimeSeconds)})`);
+        console.log('Status -----------------------------');
 
-    console.log('------------------------------------');
-}
+        console.log(`DID Database (${config.db}):`);
+        console.log(`  Total: ${status.dids.total}`);
 
-function formatDuration(seconds: number) {
-    const secPerMin = 60;
-    const secPerHour = secPerMin * 60;
-    const secPerDay = secPerHour * 24;
+        if (status.dids.total > 0) {
+            console.log(`  By type:`);
+            console.log(`    Agents: ${status.dids.byType.agents}`);
+            console.log(`    Assets: ${status.dids.byType.assets}`);
+            console.log(`    Confirmed: ${status.dids.byType.confirmed}`);
+            console.log(`    Unconfirmed: ${status.dids.byType.unconfirmed}`);
+            console.log(`    Ephemeral: ${status.dids.byType.ephemeral}`);
+            console.log(`    Invalid: ${status.dids.byType.invalid}`);
 
-    const days = Math.floor(seconds / secPerDay);
-    seconds %= secPerDay;
+            console.log(`  By registry:`);
+            const registries = Object.keys(status.dids.byRegistry).sort();
+            for (let registry of registries) {
+                console.log(`    ${registry}: ${status.dids.byRegistry[registry]}`);
+            }
 
-    const hours = Math.floor(seconds / secPerHour);
-    seconds %= secPerHour;
+            console.log(`  By version:`);
+            let count = 0;
+            for (let version of [1, 2, 3, 4, 5]) {
+                const num = status.dids.byVersion[version] || 0;
+                console.log(`    ${version}: ${num}`);
+                count += num;
+            }
+            console.log(`    6+: ${status.dids.total - count}`);
+        }
 
-    const minutes = Math.floor(seconds / secPerMin);
-    seconds %= secPerMin;
+        console.log(`Events Queue: ${status.dids.eventsQueue.length} pending`);
 
-    let duration = "";
+        console.log(`Memory Usage Report:`);
+        console.log(`  RSS: ${formatBytes(status.memoryUsage.rss)} (Resident Set Size - total memory allocated for the process)`);
+        console.log(`  Heap Total: ${formatBytes(status.memoryUsage.heapTotal)} (Total heap allocated)`);
+        console.log(`  Heap Used: ${formatBytes(status.memoryUsage.heapUsed)} (Heap actually used)`);
+        console.log(`  External: ${formatBytes(status.memoryUsage.external)} (Memory used by C++ objects bound to JavaScript)`);
+        console.log(`  Array Buffers: ${formatBytes(status.memoryUsage.arrayBuffers)} (Memory used by ArrayBuffer and SharedArrayBuffer)`);
 
-    if (days > 0) {
-        if (days > 1) {
-            duration += `${days} days, `;
+        console.log(`Uptime: ${status.uptimeSeconds}s (${formatDuration(status.uptimeSeconds)})`);
+
+        console.log('------------------------------------');
+    }
+
+    function formatDuration(seconds: number) {
+        const secPerMin = 60;
+        const secPerHour = secPerMin * 60;
+        const secPerDay = secPerHour * 24;
+
+        const days = Math.floor(seconds / secPerDay);
+        seconds %= secPerDay;
+
+        const hours = Math.floor(seconds / secPerHour);
+        seconds %= secPerHour;
+
+        const minutes = Math.floor(seconds / secPerMin);
+        seconds %= secPerMin;
+
+        let duration = "";
+
+        if (days > 0) {
+            if (days > 1) {
+                duration += `${days} days, `;
+            } else {
+                duration += `1 day, `;
+            }
+        }
+
+        if (hours > 0) {
+            if (hours > 1) {
+                duration += `${hours} hours, `;
+            } else {
+                duration += `1 hour, `;
+            }
+        }
+
+        if (minutes > 0) {
+            if (minutes > 1) {
+                duration += `${minutes} minutes, `;
+            } else {
+                duration += `1 minute, `;
+            }
+        }
+
+        if (seconds === 1) {
+            duration += `1 second`;
         } else {
-            duration += `1 day, `;
+            duration += `${seconds} seconds`;
         }
+
+        return duration;
     }
 
-    if (hours > 0) {
-        if (hours > 1) {
-            duration += `${hours} hours, `;
-        } else {
-            duration += `1 hour, `;
-        }
+    function formatBytes(bytes: number) {
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        if (bytes === 0) return '0 Byte';
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
     }
 
-    if (minutes > 0) {
-        if (minutes > 1) {
-            duration += `${minutes} minutes, `;
-        } else {
-            duration += `1 minute, `;
-        }
-    }
-
-    if (seconds === 1) {
-        duration += `1 second`;
-    } else {
-        duration += `${seconds} seconds`;
-    }
-
-    return duration;
-}
-
-function formatBytes(bytes: number) {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 Byte';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
-}
-
-return {
-    app,
-    checkDids,
-    gcLoop,
-    getStatus,
-    reportStatus,
-    setReady(value: boolean) {
-        serverReady = value;
-    },
-};
+    return {
+        app,
+        checkDids,
+        gcLoop,
+        getStatus,
+        reportStatus,
+        setReady(value: boolean) {
+            serverReady = value;
+        },
+    };
 }
 
 async function createDb(config: GatekeeperApiConfig) {
