@@ -1819,6 +1819,33 @@ router.get('/ipfs/data/:cid', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /ipfs/stream:
+ *   post:
+ *     summary: Add streamed binary data to IPFS
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/octet-stream:
+ *           schema:
+ *             type: string
+ *             format: binary
+ *       description: A streaming request body to store in IPFS.
+ *     responses:
+ *       200:
+ *         description: A CID for the added streamed data.
+ *         content:
+ *           text/plain:
+ *             schema:
+ *               type: string
+ *       500:
+ *         description: Internal Server Error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: string
+ */
 router.post('/ipfs/stream', async (req, res) => {
     try {
         const cid = await gatekeeper.addDataStream(req);
@@ -1828,6 +1855,46 @@ router.post('/ipfs/stream', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /ipfs/stream/{cid}:
+ *   get:
+ *     summary: Retrieve streamed data from IPFS
+ *     parameters:
+ *       - in: path
+ *         name: cid
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The CID of the streamed data to retrieve.
+ *       - in: query
+ *         name: type
+ *         required: false
+ *         schema:
+ *           type: string
+ *           default: application/octet-stream
+ *         description: Optional response content type.
+ *       - in: query
+ *         name: filename
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Optional download filename for the Content-Disposition header.
+ *     responses:
+ *       200:
+ *         description: The streamed data.
+ *         content:
+ *           application/octet-stream:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       500:
+ *         description: Internal Server Error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: string
+ */
 router.get('/ipfs/stream/:cid', async (req, res) => {
     try {
         const contentType = (req.query.type as string) || 'application/octet-stream';
