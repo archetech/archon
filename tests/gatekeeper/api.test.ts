@@ -108,6 +108,38 @@ describe('GET /1.0/identifiers/:did (conformant resolution)', () => {
         expect(res.body.didDocumentMetadata.versionSequence).toBe('1');
     });
 
+    it('normalizes DID Core metadata datetimes on current and historical responses', async () => {
+        const resolveDID = async (_did: string, options: any) => ({
+            didDocument: { id: agentDid },
+            didResolutionMetadata: {},
+            didDocumentMetadata: options.versionSequence === 1
+                ? {
+                    created: '2026-01-28T21:29:32.495Z',
+                    versionSequence: '1',
+                }
+                : {
+                    created: '2026-01-28T21:29:32.495Z',
+                    updated: '2026-05-28T16:47:27.000Z',
+                    deleted: '2026-06-01T10:11:12.999Z',
+                    versionSequence: '2',
+                },
+        });
+        const stubApp = express();
+        stubApp.use('/1.0/identifiers', createIdentifiersRouter({ resolveDID } as any, mockLogger));
+
+        const current = await request(stubApp).get(`/1.0/identifiers/${agentDid}`);
+        expect(current.status).toBe(200);
+        expect(current.body.didDocumentMetadata.created).toBe('2026-01-28T21:29:32Z');
+        expect(current.body.didDocumentMetadata.updated).toBe('2026-05-28T16:47:27Z');
+        expect(current.body.didDocumentMetadata.deleted).toBe('2026-06-01T10:11:12Z');
+
+        const historical = await request(stubApp).get(`/1.0/identifiers/${agentDid}?versionSequence=1`);
+        expect(historical.status).toBe(200);
+        expect(historical.body.didDocumentMetadata.created).toBe('2026-01-28T21:29:32Z');
+        expect(historical.body.didDocumentMetadata.updated).toBeUndefined();
+        expect(historical.body.didDocumentMetadata.deleted).toBeUndefined();
+    });
+
     it('returns 400 invalidDid in didResolutionMetadata for a malformed DID', async () => {
         const res = await request(app).get('/1.0/identifiers/notadid');
 

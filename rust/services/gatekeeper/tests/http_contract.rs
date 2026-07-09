@@ -119,7 +119,7 @@ async fn http_contract_covers_ready_version_status_admin_and_metrics() -> Result
 #[tokio::test]
 async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result() -> Result<()> {
     let service = spawn_json().await?;
-    let create = create_agent_operation(21, "2026-04-11T12:03:00Z", "local");
+    let create = create_agent_operation(21, "2026-04-11T12:03:00.495Z", "local");
 
     let response = service
         .client
@@ -134,6 +134,33 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
         .as_str()
         .unwrap()
         .to_string();
+
+    let response = service
+        .client
+        .get(format!("{}/did/{did}", service.base_url))
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    let mut latest_doc = response.json::<Value>().await?;
+    let version_id = latest_doc["didDocumentMetadata"]["versionId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    latest_doc["didDocumentData"] = json!({ "hello": "world" });
+    let update = create_update_operation(
+        21,
+        &did,
+        Some(&version_id),
+        "2026-05-28T16:47:27.000Z",
+        latest_doc,
+    );
+    let response = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&update)
+        .send()
+        .await?;
+    assert!(response.status().is_success());
 
     let response = service
         .client
@@ -166,8 +193,26 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
     );
     assert!(doc["didResolutionMetadata"].get("retrieved").is_none());
     assert_eq!(doc["didDocumentMetadata"]["confirmed"], true);
+    assert_eq!(doc["didDocumentMetadata"]["created"], "2026-04-11T12:03:00Z");
+    assert_eq!(doc["didDocumentMetadata"]["updated"], "2026-05-28T16:47:27Z");
     assert!(doc.get("didDocumentData").is_none());
     assert!(doc.get("didDocumentRegistration").is_none());
+
+    let response = service
+        .client
+        .get(format!(
+            "{}/1.0/identifiers/{did}?versionSequence=1",
+            service.root_url
+        ))
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    let historical = response.json::<Value>().await?;
+    assert_eq!(
+        historical["didDocumentMetadata"]["created"],
+        "2026-04-11T12:03:00Z"
+    );
+    assert!(historical["didDocumentMetadata"].get("updated").is_none());
 
     let response = service
         .client
