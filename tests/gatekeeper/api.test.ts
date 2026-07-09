@@ -62,7 +62,8 @@ describe('GET /1.0/identifiers/:did (conformant resolution)', () => {
         expect(res.body.didDocumentData).toBeUndefined();
         expect(res.body.didDocumentRegistration).toBeUndefined();
         expect(res.body.didDocument.id).toBe(agentDid);
-        expect(res.body.didDocumentMetadata.confirmed).toBe(true);
+        expect(res.body.didDocumentMetadata.confirmed).toBeUndefined();
+        expect(res.body.didDocumentMetadata.timestamp).toBeUndefined();
         expect(res.body.didResolutionMetadata.contentType).toBe('application/did+ld+json');
         expect(res.body.didResolutionMetadata.retrieved).toBeUndefined();
         expect(res.headers.vary).toContain('Accept');
@@ -122,7 +123,19 @@ describe('GET /1.0/identifiers/:did (conformant resolution)', () => {
                     updated: '2026-05-28T16:47:27.000Z',
                     deleted: '2026-06-01T10:11:12.999Z',
                     versionSequence: '2',
+                    confirmed: true,
+                    timestamp: {
+                        chain: 'BTC:mainnet',
+                        opid: 'mock-opid',
+                        lowerBound: null,
+                        upperBound: { height: 101 },
+                    },
                 },
+            didDocumentRegistration: {
+                version: 1,
+                type: 'agent',
+                registry: 'BTC:mainnet',
+            },
         });
         const stubApp = express();
         stubApp.use('/1.0/identifiers', createIdentifiersRouter({ resolveDID } as any, mockLogger));
@@ -132,12 +145,29 @@ describe('GET /1.0/identifiers/:did (conformant resolution)', () => {
         expect(current.body.didDocumentMetadata.created).toBe('2026-01-28T21:29:32Z');
         expect(current.body.didDocumentMetadata.updated).toBe('2026-05-28T16:47:27Z');
         expect(current.body.didDocumentMetadata.deleted).toBe('2026-06-01T10:11:12Z');
+        expect(current.body.didDocumentMetadata.confirmed).toBeUndefined();
+        expect(current.body.didDocumentMetadata.timestamp).toBeUndefined();
 
         const historical = await request(stubApp).get(`/1.0/identifiers/${agentDid}?versionSequence=1`);
         expect(historical.status).toBe(200);
         expect(historical.body.didDocumentMetadata.created).toBe('2026-01-28T21:29:32Z');
         expect(historical.body.didDocumentMetadata.updated).toBeUndefined();
         expect(historical.body.didDocumentMetadata.deleted).toBeUndefined();
+
+        const registration = await request(stubApp).get(`/1.0/identifiers/${agentDid}/registration`);
+        expect(registration.status).toBe(200);
+        expect(registration.body).toMatchObject({
+            version: 1,
+            type: 'agent',
+            registry: 'BTC:mainnet',
+            confirmed: true,
+            timestamp: {
+                chain: 'BTC:mainnet',
+                opid: 'mock-opid',
+                lowerBound: null,
+                upperBound: { height: 101 },
+            },
+        });
     });
 
     it('returns 400 invalidDid in didResolutionMetadata for a malformed DID', async () => {
@@ -196,6 +226,7 @@ describe('GET /1.0/identifiers/:did/registration (dereference)', () => {
         expect(res.body.type).toBe('agent');
         expect(res.body.registry).toBe('local');
         expect(res.body.version).toBe(1);
+        expect(res.body.confirmed).toBe(true);
     });
 
     it('returns 404 { error: notFound } for an unknown DID', async () => {

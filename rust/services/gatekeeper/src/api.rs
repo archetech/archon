@@ -1328,7 +1328,38 @@ fn normalize_did_document_metadata(mut metadata: Value) -> Value {
         }
     }
 
+    if let Some(object) = metadata.as_object_mut() {
+        object.remove("confirmed");
+        object.remove("timestamp");
+    }
+
     metadata
+}
+
+fn build_registration_resource(doc: &Value) -> Value {
+    let mut registration = doc
+        .get("didDocumentRegistration")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+
+    if let Some(object) = registration.as_object_mut() {
+        if let Some(confirmed) = doc
+            .get("didDocumentMetadata")
+            .and_then(|metadata| metadata.get("confirmed"))
+            .cloned()
+        {
+            object.insert("confirmed".to_string(), confirmed);
+        }
+        if let Some(timestamp) = doc
+            .get("didDocumentMetadata")
+            .and_then(|metadata| metadata.get("timestamp"))
+            .cloned()
+        {
+            object.insert("timestamp".to_string(), timestamp);
+        }
+    }
+
+    registration
 }
 
 fn preferred_did_content_type(headers: &HeaderMap) -> &'static str {
@@ -1463,10 +1494,7 @@ pub(crate) async fn conformant_dereference_registration(
     let start = Instant::now();
     match resolve_conformant(&state, &did, &query).await {
         Ok(doc) => {
-            let registration = doc
-                .get("didDocumentRegistration")
-                .cloned()
-                .unwrap_or_else(|| json!({}));
+            let registration = build_registration_resource(&doc);
             record_metrics(
                 &state,
                 "GET",

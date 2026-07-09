@@ -192,11 +192,34 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
         "application/did+ld+json"
     );
     assert!(doc["didResolutionMetadata"].get("retrieved").is_none());
-    assert_eq!(doc["didDocumentMetadata"]["confirmed"], true);
-    assert_eq!(doc["didDocumentMetadata"]["created"], "2026-04-11T12:03:00Z");
-    assert_eq!(doc["didDocumentMetadata"]["updated"], "2026-05-28T16:47:27Z");
+    assert!(doc["didDocumentMetadata"].get("confirmed").is_none());
+    assert!(doc["didDocumentMetadata"].get("timestamp").is_none());
+    assert_eq!(
+        doc["didDocumentMetadata"]["created"],
+        "2026-04-11T12:03:00Z"
+    );
+    assert_eq!(
+        doc["didDocumentMetadata"]["updated"],
+        "2026-05-28T16:47:27Z"
+    );
     assert!(doc.get("didDocumentData").is_none());
     assert!(doc.get("didDocumentRegistration").is_none());
+
+    let response = service
+        .client
+        .get(format!(
+            "{}/1.0/identifiers/{did}/registration",
+            service.root_url
+        ))
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    let registration = response.json::<Value>().await?;
+    assert_eq!(registration["version"], 1);
+    assert_eq!(registration["type"], "agent");
+    assert_eq!(registration["registry"], "local");
+    assert_eq!(registration["confirmed"], true);
+    assert!(registration.get("timestamp").is_none());
 
     let response = service
         .client

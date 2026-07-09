@@ -170,7 +170,7 @@ which permits only three top-level members in a resolution result.
 | --- | --- | --- |
 | `GET` | `/1.0/identifiers/:did` | The DID Resolution result: exactly `didDocument`, `didResolutionMetadata`, `didDocumentMetadata`. See [§6.5](#65-conformant-resolution-result). |
 | `GET` | `/1.0/identifiers/:did/data` | The DID's data resource (`didDocumentData`), returned as the raw resource (empty object for agents). |
-| `GET` | `/1.0/identifiers/:did/registration` | The DID's registration/anchoring provenance (`didDocumentRegistration`), returned as the raw resource. |
+| `GET` | `/1.0/identifiers/:did/registration` | The DID's registration/anchoring provenance (`didDocumentRegistration` plus confirmation/timestamp provenance), returned as the raw resource. |
 
 Shared behavior:
 
@@ -188,6 +188,10 @@ Shared behavior:
   `did:cid:<cid>/registration`), retrieved by content address. They are NOT
   part of the resolution result and are returned as the raw resource value
   (not wrapped in a named envelope).
+- **Anchoring provenance:** confirmation state and block timestamp bounds are
+  method-specific provenance. The conformant resolution result omits
+  `didDocumentMetadata.confirmed` and `didDocumentMetadata.timestamp`; use
+  `/registration` for those details.
 - **Local-only (no fallback delegation):** unlike `/api/v1/did/:did`, this
   surface resolves solely from local state — it MUST NOT delegate to the
   universal-resolver `fallbackURL` or the confirmed-Gatekeeper peer on a local
@@ -326,8 +330,8 @@ standards-conformant `/1.0/identifiers/:did` surface returns only the
     "canonicalId": "<DID>",                   // present iff registration.prefix was overridden
     "versionId": "<CID of latest event>",
     "versionSequence": "<int as string>",      // "1" for create, increments on update/delete
-    "confirmed": true | false,
-    "timestamp": {                             // when registration registry has block info
+    "confirmed": true | false,                 // internal/API provenance; omitted from /1.0/identifiers
+    "timestamp": {                             // internal/API provenance; omitted from /1.0/identifiers
       "chain": "BTC:signet",
       "opid": "<CID>",
       "lowerBound": { time, timeISO, blockid, height } | null,
@@ -650,8 +654,7 @@ by the DID Resolution data model:
   "didDocumentMetadata": {
     "created": "<RFC 3339>",
     "versionId": "<CID>",
-    "versionSequence": "1",
-    "confirmed": true
+    "versionSequence": "1"
     // ...plus updated / deleted / deactivated / canonicalId when applicable
   }
 }
@@ -668,8 +671,9 @@ W3C DID test-suite fixtures remain stable.
 internal [`DidCidDocument`](#37-didciddocument-resolution-result)) MUST be
 omitted here and instead exposed via the `/data` and `/registration`
 dereference resources. Standard document metadata (`created`, `updated`,
-`versionId`, `versionSequence`, `deactivated`, `canonicalId`, `confirmed`)
-remains in `didDocumentMetadata`.
+`versionId`, `versionSequence`, `deactivated`, `canonicalId`) remains in
+`didDocumentMetadata`. Method-specific anchoring provenance (`confirmed` and
+`timestamp`) is omitted here and exposed by `/registration`.
 
 ---
 

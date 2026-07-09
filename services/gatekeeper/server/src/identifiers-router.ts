@@ -96,12 +96,29 @@ function normalizeDidDocumentMetadata(metadata: DidCidDocument['didDocumentMetad
         return metadata;
     }
 
+    const standardMetadata = { ...metadata };
+    delete standardMetadata.confirmed;
+    delete standardMetadata.timestamp;
+
     return {
-        ...metadata,
-        created: normalizeDidCoreDatetime(metadata.created),
-        updated: normalizeDidCoreDatetime(metadata.updated),
-        deleted: normalizeDidCoreDatetime(metadata.deleted),
+        ...standardMetadata,
+        created: normalizeDidCoreDatetime(standardMetadata.created),
+        updated: normalizeDidCoreDatetime(standardMetadata.updated),
+        deleted: normalizeDidCoreDatetime(standardMetadata.deleted),
     };
+}
+
+function buildRegistrationResource(doc: DidCidDocument) {
+    const registration = { ...(doc.didDocumentRegistration ?? {}) } as Record<string, unknown>;
+
+    if (doc.didDocumentMetadata?.confirmed !== undefined) {
+        registration.confirmed = doc.didDocumentMetadata.confirmed;
+    }
+    if (doc.didDocumentMetadata?.timestamp !== undefined) {
+        registration.timestamp = doc.didDocumentMetadata.timestamp;
+    }
+
+    return registration;
 }
 
 /**
@@ -163,7 +180,9 @@ export function createIdentifiersRouter(
      *       dereferenceable resources at `/1.0/identifiers/{did}/data` and
      *       `/1.0/identifiers/{did}/registration`. Always returns confirmed, cryptographically
      *       verified state; the internal `/api/v1/did/{did}` endpoint remains available for raw or
-     *       unconfirmed state.
+     *       unconfirmed state. Method-specific anchoring provenance such as confirmation state and
+     *       block timestamp bounds is exposed by `/1.0/identifiers/{did}/registration`, not in
+     *       `didDocumentMetadata`.
      *     parameters:
      *       - in: path
      *         name: did
@@ -348,7 +367,8 @@ export function createIdentifiersRouter(
      *       (the DID URL `did:cid:<cid>/registration`). This is provenance about how and where the
      *       DID was registered and anchored — it is NOT DID Core metadata and NOT part of the DID
      *       resolution result. Standard document metadata (created, versionId, deactivated, etc.)
-     *       remains in `didDocumentMetadata` on the resolution result.
+     *       remains in `didDocumentMetadata` on the resolution result. Confirmation state and block
+     *       timestamp bounds are included here when known.
      *     parameters:
      *       - in: path
      *         name: did
@@ -409,7 +429,7 @@ export function createIdentifiersRouter(
 
             // Dereference the method-specific registration resource (did:cid:<cid>/registration).
             // Not part of the DID resolution result — returned as the resource itself.
-            res.json(result.doc.didDocumentRegistration ?? {});
+            res.json(buildRegistrationResource(result.doc));
         } catch (error: any) {
             const { status, resolutionError } = classifyResolveError(error);
             if (status >= 500) {

@@ -2281,7 +2281,7 @@
     "/1.0/identifiers/{did}": {
       "get": {
         "summary": "Resolve a DID (standards-conformant)",
-        "description": "Resolves a DID following the DID Resolution data model, returning only the standard result triple (`didDocument`, `didResolutionMetadata`, `didDocumentMetadata`). Follows the Universal Resolver driver convention. The method-specific `didDocumentData` and `didDocumentRegistration` objects are NOT part of this result — they are exposed as dereferenceable resources at `/1.0/identifiers/{did}/data` and `/1.0/identifiers/{did}/registration`. Always returns confirmed, cryptographically verified state; the internal `/api/v1/did/{did}` endpoint remains available for raw or unconfirmed state.\n",
+        "description": "Resolves a DID following the DID Resolution data model, returning only the standard result triple (`didDocument`, `didResolutionMetadata`, `didDocumentMetadata`). Follows the Universal Resolver driver convention. The method-specific `didDocumentData` and `didDocumentRegistration` objects are NOT part of this result — they are exposed as dereferenceable resources at `/1.0/identifiers/{did}/data` and `/1.0/identifiers/{did}/registration`. Always returns confirmed, cryptographically verified state; the internal `/api/v1/did/{did}` endpoint remains available for raw or unconfirmed state. Method-specific anchoring provenance such as confirmation state and block timestamp bounds is exposed by `/1.0/identifiers/{did}/registration`, not in `didDocumentMetadata`.\n",
         "parameters": [
           {
             "in": "path",
@@ -2447,7 +2447,7 @@
     "/1.0/identifiers/{did}/registration": {
       "get": {
         "summary": "Dereference the registration resource of a DID",
-        "description": "Dereferences the method-specific registration/anchoring resource associated with a DID (the DID URL `did:cid:<cid>/registration`). This is provenance about how and where the DID was registered and anchored — it is NOT DID Core metadata and NOT part of the DID resolution result. Standard document metadata (created, versionId, deactivated, etc.) remains in `didDocumentMetadata` on the resolution result.\n",
+        "description": "Dereferences the method-specific registration/anchoring resource associated with a DID (the DID URL `did:cid:<cid>/registration`). This is provenance about how and where the DID was registered and anchored — it is NOT DID Core metadata and NOT part of the DID resolution result. Standard document metadata (created, versionId, deactivated, etc.) remains in `didDocumentMetadata` on the resolution result. Confirmation state and block timestamp bounds are included here when known.\n",
         "parameters": [
           {
             "in": "path",
