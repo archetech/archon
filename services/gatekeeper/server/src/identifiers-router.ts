@@ -16,6 +16,68 @@ function classifyResolveError(error: unknown): { status: number; resolutionError
     return { status: 500, resolutionError: 'internalError' };
 }
 
+const DID_LD_JSON = 'application/did+ld+json';
+const DID_JSON = 'application/did+json';
+
+function preferredDidContentType(req: express.Request): typeof DID_LD_JSON | typeof DID_JSON {
+    const accept = req.get('accept');
+
+    if (!accept) {
+        return DID_LD_JSON;
+    }
+
+    const ld = acceptQuality(accept, DID_LD_JSON);
+    const json = acceptQuality(accept, DID_JSON);
+
+    if (ld && json) {
+        return json.quality > ld.quality || (json.quality === ld.quality && json.order < ld.order)
+            ? DID_JSON
+            : DID_LD_JSON;
+    }
+    if (json) {
+        return DID_JSON;
+    }
+    return DID_LD_JSON;
+}
+
+function acceptQuality(accept: string, candidate: string): { quality: number; order: number } | undefined {
+    let best: { quality: number; order: number } | undefined;
+    const normalizedCandidate = candidate.toLowerCase();
+
+    accept.split(',').forEach((part, order) => {
+        const [rawMedia, ...params] = part.split(';');
+        const media = rawMedia.trim().toLowerCase();
+        let quality = 1;
+
+        for (const param of params) {
+            const trimmed = param.trim();
+            if (trimmed.toLowerCase().startsWith('q=')) {
+                quality = Number.parseFloat(trimmed.slice(2));
+                if (Number.isNaN(quality)) {
+                    quality = 0;
+                }
+            }
+        }
+
+        const matches = media === normalizedCandidate || media === 'application/*' || media === '*/*';
+        if (!matches || quality <= 0) {
+            return;
+        }
+
+        if (!best || quality > best.quality || (quality === best.quality && order < best.order)) {
+            best = { quality, order };
+        }
+    });
+
+    return best;
+}
+
+function sendDidResolutionJson(res: express.Response, contentType: string, body: unknown): void {
+    res.set('Content-Type', contentType);
+    res.vary('Accept');
+    res.end(JSON.stringify(body));
+}
+
 /**
  * Build the standards-conformant DID resolution / dereferencing router, mounted at
  * `/1.0/identifiers` following the Universal Resolver driver convention. Extracted into a
@@ -100,7 +162,17 @@ export function createIdentifiersRouter(
      *       200:
      *         description: The DID Resolution result (standard triple).
      *         content:
-     *           application/json:
+     *           application/did+ld+json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 didDocument:
+     *                   type: object
+     *                 didResolutionMetadata:
+     *                   type: object
+     *                 didDocumentMetadata:
+     *                   type: object
+     *           application/did+json:
      *             schema:
      *               type: object
      *               properties:
@@ -134,7 +206,16 @@ export function createIdentifiersRouter(
             // Conformant result: only the standard triple. The method-specific data and
             // registration objects are dereferenced via their own resource paths.
             const { didDocument, didResolutionMetadata, didDocumentMetadata } = result.doc;
-            res.json({ didDocument, didResolutionMetadata, didDocumentMetadata });
+            const contentType = preferredDidContentType(req);
+            const stableDidResolutionMetadata = { ...(didResolutionMetadata ?? {}) };
+            delete stableDidResolutionMetadata.retrieved;
+            stableDidResolutionMetadata.contentType = contentType;
+
+            sendDidResolutionJson(res, contentType, {
+                didDocument,
+                didResolutionMetadata: stableDidResolutionMetadata,
+                didDocumentMetadata,
+            });
         } catch (error: any) {
             const { status, resolutionError } = classifyResolveError(error);
             if (status >= 500) {

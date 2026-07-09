@@ -117,6 +117,89 @@ async fn http_contract_covers_ready_version_status_admin_and_metrics() -> Result
 }
 
 #[tokio::test]
+async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result() -> Result<()> {
+    let service = spawn_json().await?;
+    let create = create_agent_operation(21, "2026-04-11T12:03:00Z", "local");
+
+    let response = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&create)
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    let did = response
+        .json::<Value>()
+        .await?
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header("accept", "application/did+ld+json")
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("application/did+ld+json")
+    );
+    assert_eq!(
+        response
+            .headers()
+            .get("vary")
+            .and_then(|value| value.to_str().ok()),
+        Some("Accept")
+    );
+    let doc = response.json::<Value>().await?;
+    let object = doc.as_object().unwrap();
+    assert_eq!(object.len(), 3);
+    assert_eq!(doc["didDocument"]["id"], did);
+    assert_eq!(
+        doc["didResolutionMetadata"]["contentType"],
+        "application/did+ld+json"
+    );
+    assert!(doc["didResolutionMetadata"].get("retrieved").is_none());
+    assert_eq!(doc["didDocumentMetadata"]["confirmed"], true);
+    assert!(doc.get("didDocumentData").is_none());
+    assert!(doc.get("didDocumentRegistration").is_none());
+
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header("accept", "Application/DID+JSON;Q=1, application/did+ld+json;q=0.5")
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("application/did+json")
+    );
+    assert_eq!(
+        response
+            .headers()
+            .get("vary")
+            .and_then(|value| value.to_str().ok()),
+        Some("Accept")
+    );
+    let doc = response.json::<Value>().await?;
+    assert_eq!(
+        doc["didResolutionMetadata"]["contentType"],
+        "application/did+json"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn http_contract_matches_resolution_error_and_supported_registry_semantics() -> Result<()> {
     let service = spawn_json().await?;
 

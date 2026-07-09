@@ -63,6 +63,31 @@ describe('GET /1.0/identifiers/:did (conformant resolution)', () => {
         expect(res.body.didDocumentRegistration).toBeUndefined();
         expect(res.body.didDocument.id).toBe(agentDid);
         expect(res.body.didDocumentMetadata.confirmed).toBe(true);
+        expect(res.body.didResolutionMetadata.contentType).toBe('application/did+ld+json');
+        expect(res.body.didResolutionMetadata.retrieved).toBeUndefined();
+        expect(res.headers.vary).toContain('Accept');
+    });
+
+    it('honors DID JSON and JSON-LD Accept headers in successful resolution metadata', async () => {
+        const jsonLd = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', 'application/did+ld+json');
+
+        expect(jsonLd.status).toBe(200);
+        expect(jsonLd.headers['content-type']).toBe('application/did+ld+json');
+        expect(jsonLd.headers.vary).toContain('Accept');
+        expect(jsonLd.body.didResolutionMetadata.contentType).toBe('application/did+ld+json');
+        expect(jsonLd.body.didResolutionMetadata.retrieved).toBeUndefined();
+
+        const didJson = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', 'Application/DID+JSON;Q=1, application/did+ld+json;q=0.5');
+
+        expect(didJson.status).toBe(200);
+        expect(didJson.headers['content-type']).toBe('application/did+json');
+        expect(didJson.headers.vary).toContain('Accept');
+        expect(didJson.body.didResolutionMetadata.contentType).toBe('application/did+json');
+        expect(didJson.body.didResolutionMetadata.retrieved).toBeUndefined();
     });
 
     it('resolves an asset to the triple only (no inline data/registration)', async () => {
