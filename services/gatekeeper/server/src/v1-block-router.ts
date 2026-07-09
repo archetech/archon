@@ -9,7 +9,7 @@ export function createBlockRouter(options: CreateV1RouterOptions): express.Route
 
     /**
      * @swagger
-     * /block/{registry}/latest:
+     * /api/v1/block/{registry}/latest:
      *   get:
      *     summary: Retrieve the latest block for a specific registry
      *     parameters:
@@ -55,7 +55,7 @@ export function createBlockRouter(options: CreateV1RouterOptions): express.Route
     
     /**
      * @swagger
-     * /block/{registry}/{blockId}:
+     * /api/v1/block/{registry}/{blockId}:
      *   get:
      *     summary: Retrieve a specific block for a given registry
      *     parameters:
@@ -117,7 +117,7 @@ export function createBlockRouter(options: CreateV1RouterOptions): express.Route
     
     /**
      * @swagger
-     * /block/{registry}:
+     * /api/v1/block/{registry}:
      *   post:
      *     summary: Add a new block to a specific registry
      *     parameters:

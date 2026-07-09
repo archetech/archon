@@ -12,6 +12,12 @@ const routeFiles = [
 ];
 
 const mounts: Record<string, string> = {
+    'services/gatekeeper/server/src/v1-health-router.ts': '/api/v1',
+    'services/gatekeeper/server/src/v1-did-router.ts': '/api/v1',
+    'services/gatekeeper/server/src/v1-sync-router.ts': '/api/v1',
+    'services/gatekeeper/server/src/v1-ipfs-router.ts': '/api/v1',
+    'services/gatekeeper/server/src/v1-block-router.ts': '/api/v1',
+    'services/gatekeeper/server/src/v1-search-router.ts': '/api/v1',
     'services/gatekeeper/server/src/identifiers-router.ts': '/1.0/identifiers',
 };
 

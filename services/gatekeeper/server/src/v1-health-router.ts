@@ -12,14 +12,14 @@ export function createHealthRouter(options: CreateV1RouterOptions): express.Rout
 
     /**
      * @swagger
-     * /ready:
+     * /api/v1/ready:
      *   get:
      *     summary: Check if the Gatekeeper service is ready.
      *     responses:
      *       200:
      *         description: Gatekeeper service is ready.
      *         content:
-     *           text/plain:
+     *           application/json:
      *             schema:
      *               type: boolean
      */
@@ -33,7 +33,7 @@ export function createHealthRouter(options: CreateV1RouterOptions): express.Rout
     
     /**
      * @swagger
-     * /version:
+     * /api/v1/version:
      *   get:
      *     summary: Retrieve the API version
      *     responses:
@@ -57,7 +57,7 @@ export function createHealthRouter(options: CreateV1RouterOptions): express.Rout
     
     /**
      * @swagger
-     * /status:
+     * /api/v1/status:
      *   get:
      *     summary: Retrieve server status
      *     responses:

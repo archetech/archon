@@ -9,7 +9,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
 
     /**
      * @swagger
-     * /batch/export:
+     * /api/v1/batch/export:
      *   post:
      *     summary: Export non-local DID events in a single sorted batch
      *
@@ -89,7 +89,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /batch/import:
+     * /api/v1/batch/import:
      *   post:
      *     summary: Import a batch of DID events
      *
@@ -186,7 +186,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /batch/import/cids:
+     * /api/v1/batch/import/cids:
      *   post:
      *     summary: Import a batch of DID operations by their CIDs
      *
@@ -253,7 +253,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /queue/{registry}:
+     * /api/v1/queue/{registry}:
      *   get:
      *     summary: Retrieve the queued events for a specific registry
      *
@@ -329,7 +329,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /queue/{registry}/clear:
+     * /api/v1/queue/{registry}/clear:
      *   post:
      *     summary: Remove specified DIDs from the queue
      *
@@ -404,7 +404,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /registries:
+     * /api/v1/registries:
      *   get:
      *     summary: Retrieve supported registries
      *     responses:
@@ -435,7 +435,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /db/reset:
+     * /api/v1/db/reset:
      *   get:
      *     summary: Reset the database
      *
@@ -468,7 +468,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /db/verify:
+     * /api/v1/db/verify:
      *   get:
      *     summary: Verify all DIDs in the database
      *
@@ -510,7 +510,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /events/process:
+     * /api/v1/events/process:
      *   post:
      *     summary: Process queued events
      *     description: >

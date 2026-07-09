@@ -7,7 +7,7 @@ export function createSearchRouter(options: CreateV1RouterOptions): express.Rout
 
     /**
      * @swagger
-     * /search:
+     * /api/v1/search:
      *   get:
      *     summary: Search DIDs by text query
      *     parameters:
@@ -46,7 +46,7 @@ export function createSearchRouter(options: CreateV1RouterOptions): express.Rout
     
     /**
      * @swagger
-     * /query:
+     * /api/v1/query:
      *   post:
      *     summary: Query DIDs using structured MongoDB-style query
      *     requestBody:

@@ -33,14 +33,14 @@
         }
       }
     },
-    "/ready": {
+    "/api/v1/ready": {
       "get": {
         "summary": "Check if the Gatekeeper service is ready.",
         "responses": {
           "200": {
             "description": "Gatekeeper service is ready.",
             "content": {
-              "text/plain": {
+              "application/json": {
                 "schema": {
                   "type": "boolean"
                 }
@@ -50,7 +50,7 @@
         }
       }
     },
-    "/version": {
+    "/api/v1/version": {
       "get": {
         "summary": "Retrieve the API version",
         "responses": {
@@ -78,7 +78,7 @@
         }
       }
     },
-    "/status": {
+    "/api/v1/status": {
       "get": {
         "summary": "Retrieve server status",
         "responses": {
@@ -188,7 +188,7 @@
         }
       }
     },
-    "/did": {
+    "/api/v1/did": {
       "post": {
         "summary": "Create, update, or delete a DID",
         "requestBody": {
@@ -431,7 +431,7 @@
         }
       }
     },
-    "/did/generate": {
+    "/api/v1/did/generate": {
       "post": {
         "summary": "Generate a DID from an operation (no persistence)",
         "requestBody": {
@@ -547,7 +547,7 @@
         }
       }
     },
-    "/did/{did}": {
+    "/api/v1/did/{did}": {
       "get": {
         "summary": "Resolve a DID Document",
         "description": "Resolves a DID Document from the local database. If local resolution fails, falls back to a configurable universal resolver (default: https://dev.uniresolver.io). Set `ARCHON_GATEKEEPER_FALLBACK_URL` to override the resolver URL (empty string disables fallback). Set `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` to override the timeout in milliseconds (default: 5000). Set `ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL` to delegate unconfirmed `confirm=true` responses to another Gatekeeper node (empty string disables fallback).\n",
@@ -768,7 +768,7 @@
         }
       }
     },
-    "/dids/": {
+    "/api/v1/dids/": {
       "post": {
         "summary": "Retrieve a list of DIDs or DID Documents.",
         "requestBody": {
@@ -866,7 +866,7 @@
         }
       }
     },
-    "/dids/remove": {
+    "/api/v1/dids/remove": {
       "post": {
         "summary": "Remove one or more DIDs",
         "requestBody": {
@@ -907,7 +907,7 @@
         }
       }
     },
-    "/dids/export": {
+    "/api/v1/dids/export": {
       "post": {
         "summary": "Export events for one or more DIDs",
         "requestBody": {
@@ -996,7 +996,7 @@
         }
       }
     },
-    "/dids/import": {
+    "/api/v1/dids/import": {
       "post": {
         "summary": "Import one or more DIDs",
         "requestBody": {
@@ -1127,7 +1127,7 @@
         }
       }
     },
-    "/batch/export": {
+    "/api/v1/batch/export": {
       "post": {
         "summary": "Export non-local DID events in a single sorted batch",
         "requestBody": {
@@ -1225,7 +1225,7 @@
         }
       }
     },
-    "/batch/import": {
+    "/api/v1/batch/import": {
       "post": {
         "summary": "Import a batch of DID events",
         "requestBody": {
@@ -1349,7 +1349,7 @@
         }
       }
     },
-    "/batch/import/cids": {
+    "/api/v1/batch/import/cids": {
       "post": {
         "summary": "Import a batch of DID operations by their CIDs",
         "requestBody": {
@@ -1433,7 +1433,7 @@
         }
       }
     },
-    "/queue/{registry}": {
+    "/api/v1/queue/{registry}": {
       "get": {
         "summary": "Retrieve the queued events for a specific registry",
         "parameters": [
@@ -1523,7 +1523,7 @@
         }
       }
     },
-    "/queue/{registry}/clear": {
+    "/api/v1/queue/{registry}/clear": {
       "post": {
         "summary": "Remove specified DIDs from the queue",
         "parameters": [
@@ -1607,7 +1607,7 @@
         }
       }
     },
-    "/registries": {
+    "/api/v1/registries": {
       "get": {
         "summary": "Retrieve supported registries",
         "responses": {
@@ -1637,7 +1637,7 @@
         }
       }
     },
-    "/db/reset": {
+    "/api/v1/db/reset": {
       "get": {
         "summary": "Reset the database",
         "responses": {
@@ -1664,7 +1664,7 @@
         }
       }
     },
-    "/db/verify": {
+    "/api/v1/db/verify": {
       "get": {
         "summary": "Verify all DIDs in the database",
         "responses": {
@@ -1709,7 +1709,7 @@
         }
       }
     },
-    "/events/process": {
+    "/api/v1/events/process": {
       "post": {
         "summary": "Process queued events",
         "description": "Iterates over all queued events, importing them if they are valid (adding or merging). Continues until no more new events can be processed. If `processEvents` is already running, it may return `{ busy: true }` to indicate that processing is in progress.\n",
@@ -1768,7 +1768,7 @@
         }
       }
     },
-    "/ipfs/json": {
+    "/api/v1/ipfs/json": {
       "post": {
         "summary": "Adds a JSON object to the IPFS",
         "requestBody": {
@@ -1807,7 +1807,7 @@
         }
       }
     },
-    "/ipfs/json/{cid}": {
+    "/api/v1/ipfs/json/{cid}": {
       "get": {
         "summary": "Retrieve a JSON object from the IPFS",
         "parameters": [
@@ -1856,7 +1856,7 @@
         }
       }
     },
-    "/ipfs/text": {
+    "/api/v1/ipfs/text": {
       "post": {
         "summary": "Adds text to the IPFS",
         "requestBody": {
@@ -1895,7 +1895,7 @@
         }
       }
     },
-    "/ipfs/text/{cid}": {
+    "/api/v1/ipfs/text/{cid}": {
       "get": {
         "summary": "Retrieve text from the IPFS",
         "parameters": [
@@ -1944,7 +1944,7 @@
         }
       }
     },
-    "/ipfs/data": {
+    "/api/v1/ipfs/data": {
       "post": {
         "summary": "Adds an octet-stream to the IPFS",
         "requestBody": {
@@ -1984,7 +1984,7 @@
         }
       }
     },
-    "/ipfs/data/{cid}": {
+    "/api/v1/ipfs/data/{cid}": {
       "get": {
         "summary": "Retrieve data from the IPFS",
         "parameters": [
@@ -2034,7 +2034,7 @@
         }
       }
     },
-    "/ipfs/stream": {
+    "/api/v1/ipfs/stream": {
       "post": {
         "summary": "Add streamed binary data to IPFS",
         "requestBody": {
@@ -2073,7 +2073,7 @@
         }
       }
     },
-    "/ipfs/stream/{cid}": {
+    "/api/v1/ipfs/stream/{cid}": {
       "get": {
         "summary": "Retrieve streamed data from IPFS",
         "parameters": [
@@ -2131,7 +2131,7 @@
         }
       }
     },
-    "/block/{registry}/latest": {
+    "/api/v1/block/{registry}/latest": {
       "get": {
         "summary": "Retrieve the latest block for a specific registry",
         "parameters": [
@@ -2183,7 +2183,7 @@
         }
       }
     },
-    "/block/{registry}/{blockId}": {
+    "/api/v1/block/{registry}/{blockId}": {
       "get": {
         "summary": "Retrieve a specific block for a given registry",
         "parameters": [
@@ -2258,7 +2258,7 @@
         }
       }
     },
-    "/block/{registry}": {
+    "/api/v1/block/{registry}": {
       "post": {
         "summary": "Add a new block to a specific registry",
         "parameters": [
@@ -2326,7 +2326,7 @@
         }
       }
     },
-    "/search": {
+    "/api/v1/search": {
       "get": {
         "summary": "Search DIDs by text query",
         "parameters": [
@@ -2360,7 +2360,7 @@
         }
       }
     },
-    "/query": {
+    "/api/v1/query": {
       "post": {
         "summary": "Query DIDs using structured MongoDB-style query",
         "requestBody": {

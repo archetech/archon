@@ -15,7 +15,7 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
 
     /**
      * @swagger
-     * /did:
+     * /api/v1/did:
      *   post:
      *     summary: Create, update, or delete a DID
      *
@@ -190,7 +190,7 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
     
     /**
      * @swagger
-     * /did/generate:
+     * /api/v1/did/generate:
      *   post:
      *     summary: Generate a DID from an operation (no persistence)
      *
@@ -285,7 +285,7 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
     
     /**
      * @swagger
-     * /did/{did}:
+     * /api/v1/did/{did}:
      *   get:
      *     summary: Resolve a DID Document
      *     description: >
@@ -544,7 +544,7 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
     
     /**
      * @swagger
-     * /dids/:
+     * /api/v1/dids/:
      *   post:
      *     summary: Retrieve a list of DIDs or DID Documents.
      *
@@ -623,7 +623,7 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
     
     /**
      * @swagger
-     * /dids/remove:
+     * /api/v1/dids/remove:
      *   post:
      *     summary: Remove one or more DIDs
      *
@@ -664,7 +664,7 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
     
     /**
      * @swagger
-     * /dids/export:
+     * /api/v1/dids/export:
      *   post:
      *     summary: Export events for one or more DIDs
      *
@@ -738,7 +738,7 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
     
     /**
      * @swagger
-     * /dids/import:
+     * /api/v1/dids/import:
      *   post:
      *     summary: Import one or more DIDs
      *

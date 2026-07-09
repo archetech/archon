@@ -7,7 +7,7 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
 
     /**
      * @swagger
-     * /ipfs/json:
+     * /api/v1/ipfs/json:
      *   post:
      *     summary: Adds a JSON object to the IPFS
      *     requestBody:
@@ -46,7 +46,7 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /ipfs/json/{cid}:
+     * /api/v1/ipfs/json/{cid}:
      *   get:
      *     summary: Retrieve a JSON object from the IPFS
      *     parameters:
@@ -88,7 +88,7 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /ipfs/text:
+     * /api/v1/ipfs/text:
      *   post:
      *     summary: Adds text to the IPFS
      *     requestBody:
@@ -127,7 +127,7 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /ipfs/text/{cid}:
+     * /api/v1/ipfs/text/{cid}:
      *   get:
      *     summary: Retrieve text from the IPFS
      *     parameters:
@@ -169,7 +169,7 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /ipfs/data:
+     * /api/v1/ipfs/data:
      *   post:
      *     summary: Adds an octet-stream to the IPFS
      *     requestBody:
@@ -210,7 +210,7 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /ipfs/data/{cid}:
+     * /api/v1/ipfs/data/{cid}:
      *   get:
      *     summary: Retrieve data from the IPFS
      *     parameters:
@@ -254,7 +254,7 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /ipfs/stream:
+     * /api/v1/ipfs/stream:
      *   post:
      *     summary: Add streamed binary data to IPFS
      *     requestBody:
@@ -290,7 +290,7 @@ export function createIpfsRouter(options: CreateV1RouterOptions): express.Router
     
     /**
      * @swagger
-     * /ipfs/stream/{cid}:
+     * /api/v1/ipfs/stream/{cid}:
      *   get:
      *     summary: Retrieve streamed data from IPFS
      *     parameters:

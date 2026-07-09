@@ -3,7 +3,8 @@ import morgan from 'morgan';
 import cors from 'cors';
 import { createRequire } from 'module';
 import { EventEmitter } from 'events';
-import { pathToFileURL } from 'url';
+import { resolve as resolvePath } from 'path';
+import { fileURLToPath } from 'url';
 import type Gatekeeper from '@didcid/gatekeeper';
 import { CheckDIDsResult } from '@didcid/gatekeeper/types';
 import { createIdentifiersRouter } from './identifiers-router.js';
@@ -481,7 +482,9 @@ async function main() {
     process.on('SIGINT', shutdown);
 }
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isMain = process.argv[1]
+    ? fileURLToPath(import.meta.url) === resolvePath(process.argv[1])
+    : false;
 
 if (isMain) {
     main();
