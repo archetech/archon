@@ -21,7 +21,12 @@ const gatekeeperOptions = {
     },
     apis: [
         'services/gatekeeper/server/src/gatekeeper-api.ts',
-        'services/gatekeeper/server/src/v1-router.ts',
+        'services/gatekeeper/server/src/v1-health-router.ts',
+        'services/gatekeeper/server/src/v1-did-router.ts',
+        'services/gatekeeper/server/src/v1-sync-router.ts',
+        'services/gatekeeper/server/src/v1-ipfs-router.ts',
+        'services/gatekeeper/server/src/v1-block-router.ts',
+        'services/gatekeeper/server/src/v1-search-router.ts',
         'services/gatekeeper/server/src/identifiers-router.ts'
     ]
 };
