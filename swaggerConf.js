@@ -54,7 +54,7 @@ const keymasterOptions = {
         'services/keymaster/server/src/keymaster-group-router.ts',
         'services/keymaster/server/src/keymaster-schema-router.ts',
         'services/keymaster/server/src/keymaster-agent-router.ts',
-        'services/keymaster/server/src/keymaster-credential-workflow-router.ts',
+        'services/keymaster/server/src/keymaster-credential-router.ts',
         'services/keymaster/server/src/keymaster-key-router.ts',
         'services/keymaster/server/src/keymaster-schema-template-router.ts',
         'services/keymaster/server/src/keymaster-asset-router.ts',

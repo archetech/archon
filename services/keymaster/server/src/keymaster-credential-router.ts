@@ -1,7 +1,7 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
 
-export function createCredentialWorkflowRouter(options: CreateKeymasterRouterOptions): express.Router {
+export function createCredentialRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
     const router = express.Router();
 
