@@ -47,7 +47,6 @@ const keymasterOptions = {
         'services/keymaster/server/src/keymaster-identity-router.ts',
         'services/keymaster/server/src/keymaster-address-router.ts',
         'services/keymaster/server/src/keymaster-didcomm-router.ts',
-        'services/keymaster/server/src/keymaster-address-tail-router.ts',
         'services/keymaster/server/src/keymaster-nostr-router.ts',
         'services/keymaster/server/src/keymaster-lightning-router.ts',
         'services/keymaster/server/src/keymaster-challenge-router.ts',
