@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import KeymasterClient from '@didcid/keymaster/client';
+import KeymasterClient from '@didcid/clients/keymaster';
 import KeymasterUI from './KeymasterUI.jsx';
 import LoginModal from './LoginModal.jsx';
 import './App.css';

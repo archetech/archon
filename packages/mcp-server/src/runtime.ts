@@ -1,6 +1,6 @@
 import path from 'path';
 import CipherNode from '@didcid/cipher/node';
-import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
+import DrawbridgeClient from '@didcid/clients/drawbridge';
 import Keymaster from '@didcid/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import WalletSQLite from '@didcid/keymaster/wallet/sqlite';

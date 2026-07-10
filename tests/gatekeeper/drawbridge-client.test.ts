@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import nock from 'nock';
-import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
+import DrawbridgeClient from '@didcid/clients/drawbridge';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 
 const DrawbridgeURL = 'http://drawbridge.org';

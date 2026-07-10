@@ -1,7 +1,7 @@
 import type { Block, BlockVerbose, BlockHeader } from 'bitcoin-core';
 import CipherNode from '@didcid/cipher/node';
-import GatekeeperClient from '@didcid/gatekeeper/client';
-import KeymasterClient from '@didcid/keymaster/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
+import KeymasterClient from '@didcid/clients/keymaster';
 import JsonFile from './db/jsonfile.js';
 import JsonRedis from './db/redis.js';
 import JsonMongo from './db/mongo.js';

@@ -1,7 +1,7 @@
 // Subpath import example
 // import Keymaster from '@didcid/keymaster';
-// import KeymasterClient from '@didcid/keymaster/client';
-// import GatekeeperClient from '@didcid/gatekeeper/client';
+// import KeymasterClient from '@didcid/clients/keymaster';
+// import GatekeeperClient from '@didcid/clients/gatekeeper';
 // import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 // import CipherNode from '@didcid/cipher/node';
 

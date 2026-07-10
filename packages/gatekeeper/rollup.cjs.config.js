@@ -4,10 +4,12 @@ import json from '@rollup/plugin-json';
 
 import pkg from './package.json' with { type: 'json' };
 
-const external = [
+const externalPackages = [
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.peerDependencies || {})
 ];
+
+const external = id => externalPackages.some(name => id === name || id.startsWith(`${name}/`));
 
 const config = {
     input: {

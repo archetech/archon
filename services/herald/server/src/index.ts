@@ -11,9 +11,9 @@ import cors from 'cors';
 import { socksDispatcher } from 'fetch-socks';
 
 import CipherNode from '@didcid/cipher/node';
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import Keymaster from '@didcid/keymaster';
-import KeymasterClient from '@didcid/keymaster/client';
+import KeymasterClient from '@didcid/clients/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { DatabaseInterface, User } from './db/interfaces.js';
 import { DbJson } from './db/json.js';

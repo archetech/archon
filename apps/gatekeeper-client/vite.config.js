@@ -16,7 +16,7 @@ export default defineConfig({
         alias: {
             "@didcid/cipher/passphrase": path.resolve(__dirname, "../../packages/cipher/dist/esm/passphrase.js"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),
-            "@didcid/gatekeeper/drawbridge": path.resolve(__dirname, "../../packages/gatekeeper/dist/esm/drawbridge-client.js"),
+            "@didcid/clients/drawbridge": path.resolve(__dirname, "../../packages/clients/dist/esm/drawbridge-client.js"),
             "@didcid/keymaster/wallet/web": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/web.js"),
             "@didcid/keymaster/wallet/json-memory": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/json-memory.js"),
             "@didcid/keymaster/wallet/cache": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/cache.js"),

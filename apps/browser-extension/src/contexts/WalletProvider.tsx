@@ -9,7 +9,7 @@ import React, {
     useState,
 } from "react";
 
-import DrawbridgeClient from "@didcid/gatekeeper/drawbridge";
+import DrawbridgeClient from "@didcid/clients/drawbridge";
 import Keymaster from "@didcid/keymaster";
 import CipherWeb from "@didcid/cipher/web";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";

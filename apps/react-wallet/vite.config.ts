@@ -17,7 +17,7 @@ export default defineConfig({
             "@didcid/cipher/passphrase": path.resolve(__dirname, "../../packages/cipher/dist/esm/passphrase.js"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),
             "@didcid/common/errors": path.resolve(__dirname, "../../packages/common/dist/esm/errors.js"),
-            "@didcid/gatekeeper/client": path.resolve(__dirname, "../../packages/gatekeeper/dist/esm/gatekeeper-client.js"),
+            "@didcid/clients/gatekeeper": path.resolve(__dirname, "../../packages/clients/dist/esm/gatekeeper-client.js"),
             "@didcid/gatekeeper/types": path.resolve(__dirname, "../../packages/gatekeeper/dist/types/types.d.js"),
             "@didcid/keymaster/wallet/web": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/web.js"),
             "@didcid/keymaster/wallet/json-memory": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/json-memory.js"),

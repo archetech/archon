@@ -1,0 +1,1972 @@
+import {
+    DidCidDocument,
+    ResolveDIDOptions,
+} from './gatekeeper-types.js';
+import {
+    Challenge,
+    ChallengeResponse,
+    AddressInfo,
+    AddressCheckResult,
+    ResolvedAddressInfo,
+    CheckWalletResult,
+    CreateAssetOptions,
+    DidCommUnpackResult,
+    DmailItem,
+    DmailMessage,
+    FileAssetOptions,
+    CreateResponseOptions,
+    EncryptOptions,
+    FileAsset,
+    FixWalletResult,
+    Group,
+    Vault,
+    VaultOptions,
+    ImageFileAsset,
+    IssueCredentialsOptions,
+    KeymasterClientOptions,
+    KeymasterInterface,
+    LightningConfig,
+    LightningBalance,
+    LightningInvoice,
+    LightningPayment,
+    LightningPaymentRecord,
+    LightningPaymentStatus,
+    DecodedLightningInvoice,
+    NostrKeys,
+    NostrEvent,
+    NoticeMessage,
+    PollConfig,
+    StoredWallet,
+    VerifiableCredential,
+    ViewBallotResult,
+    ViewPollResult,
+    WaitUntilReadyOptions,
+    WalletFile,
+    WalletEncFile,
+} from './keymaster-types.js'
+
+import { Buffer } from 'buffer';
+import axiosModule, { AxiosError, type AxiosInstance, type AxiosStatic } from 'axios';
+
+export * from './keymaster-types.js';
+
+const axios =
+    (axiosModule as AxiosStatic & { default?: AxiosInstance })?.default ??
+    (axiosModule as AxiosInstance);
+
+const VERSION = '/api/v1';
+const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
+
+function throwError(error: AxiosError | any): never {
+    if (error.response) {
+        throw error.response.data;
+    }
+
+    throw error;
+}
+
+export default class KeymasterClient implements KeymasterInterface {
+    private API: string = "/api/v1";
+    private axios: AxiosInstance;
+
+    constructor() {
+        this.axios = axios.create();
+    }
+
+    // Factory method
+    static async create(options: KeymasterClientOptions): Promise<KeymasterClient> {
+        const keymaster = new KeymasterClient();
+        await keymaster.connect(options);
+        return keymaster;
+    }
+
+    addCustomHeader(header: string, value: string): void {
+        this.axios.defaults.headers.common[header] = value;
+    }
+
+    removeCustomHeader(header: string): void {
+        delete this.axios.defaults.headers.common[header];
+    }
+
+    async connect(options: KeymasterClientOptions = {}): Promise<void> {
+        if (options.url) {
+            this.API = `${options.url}${VERSION}`;
+        }
+
+        if (options.apiKey) {
+            this.addCustomHeader(ARCHON_ADMIN_HEADER, options.apiKey);
+        }
+
+        // Only used for unit testing
+        // TBD replace console with a real logging package
+        if (options.console) {
+            // eslint-disable-next-line
+            console = options.console;
+        }
+
+        if (options.waitUntilReady) {
+            await this.waitUntilReady(options);
+        }
+    }
+
+    async waitUntilReady(options: WaitUntilReadyOptions = {}): Promise<void> {
+        let { intervalSeconds = 5, chatty = false, becomeChattyAfter = 0, maxRetries = 0 } = options;
+        let ready = false;
+        let retries = 0;
+
+        if (chatty) {
+            console.log(`Connecting to Keymaster at ${this.API}`);
+        }
+
+        while (!ready) {
+            ready = await this.isReady();
+
+            if (!ready) {
+                if (chatty) {
+                    console.log('Waiting for Keymaster to be ready...');
+                }
+                // wait for 1 second before checking again
+                await new Promise(resolve => setTimeout(resolve, intervalSeconds * 1000));
+            }
+
+            retries += 1;
+
+            if (maxRetries > 0 && retries > maxRetries) {
+                return;
+            }
+
+            if (!chatty && becomeChattyAfter > 0 && retries > becomeChattyAfter) {
+                console.log(`Connecting to Keymaster at ${this.API}`);
+                chatty = true;
+            }
+        }
+
+        if (chatty) {
+            console.log('Keymaster service is ready!');
+        }
+    }
+
+    async getVersion(): Promise<{ version: string; commit: string }> {
+        try {
+            const response = await this.axios.get(`${this.API}/version`);
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async isReady(): Promise<boolean> {
+        try {
+            const response = await this.axios.get(`${this.API}/ready`);
+            return response.data.ready;
+        }
+        catch (error) {
+            return false;
+        }
+    }
+
+    async loadWallet(): Promise<WalletFile> {
+        try {
+            const response = await this.axios.get(`${this.API}/wallet`);
+            return response.data.wallet;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async saveWallet(
+        wallet: StoredWallet
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/wallet`, { wallet });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async newWallet(
+        mnemonic?: string,
+        overwrite = false
+    ): Promise<WalletFile> {
+        try {
+            const response = await this.axios.post(`${this.API}/wallet/new`, { mnemonic, overwrite });
+            return response.data.wallet;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async backupWallet(): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/wallet/backup`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async recoverWallet(): Promise<WalletFile> {
+        try {
+            const response = await this.axios.post(`${this.API}/wallet/recover`);
+            return response.data.wallet;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async checkWallet(): Promise<CheckWalletResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/wallet/check`);
+            return response.data.check;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async fixWallet(): Promise<FixWalletResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/wallet/fix`);
+            return response.data.fix;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async decryptMnemonic(): Promise<string> {
+        try {
+            const response = await this.axios.get(`${this.API}/wallet/mnemonic`);
+            return response.data.mnemonic;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async changePassphrase(newPassphrase: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/wallet/passphrase`, { passphrase: newPassphrase });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listRegistries(): Promise<string[]> {
+        try {
+            const response = await this.axios.get(`${this.API}/registries`);
+            return response.data.registries;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getCurrentId(): Promise<string | undefined> {
+        try {
+            const response = await this.axios.get(`${this.API}/ids/current`);
+            return response.data.current;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async setCurrentId(name: string): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/ids/current`, { name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listIds(): Promise<string[]> {
+        try {
+            const response = await this.axios.get(`${this.API}/ids`);
+            return response.data.ids;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async rotateKeys(): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/keys/rotate`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async encryptMessage(
+        msg: string,
+        receiver: string,
+        options: EncryptOptions = {}
+    ) {
+        try {
+            const response = await this.axios.post(`${this.API}/keys/encrypt/message`, { msg, receiver, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async decryptMessage(did: string): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/keys/decrypt/message`, { did });
+            return response.data.message;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async encryptJSON(
+        json: unknown,
+        receiver: string,
+        options?: EncryptOptions
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/keys/encrypt/json`, { json, receiver, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async decryptJSON(did: string): Promise<unknown> {
+        try {
+            const response = await this.axios.post(`${this.API}/keys/decrypt/json`, { did });
+            return response.data.json;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createId(
+        name: string,
+        options?: { registry?: string }
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/ids`, { name, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    public async removeId(id: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/ids/${id}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async renameId(
+        id: string,
+        name: string
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/ids/${id}/rename`, { name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async changeRegistry(id: string, registry: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/ids/${id}/change-registry`, { registry });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async backupId(id?: string): Promise<boolean> {
+        try {
+            if (!id) {
+                id = await this.getCurrentId();
+            }
+            const response = await this.axios.post(`${this.API}/ids/${id}/backup`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async recoverId(did: string): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/ids/${did}/recover`);
+            return response.data.recovered;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listAliases(): Promise<Record<string, string>> {
+        try {
+            const response = await this.axios.get(`${this.API}/aliases`);
+            return response.data.aliases;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addAlias(alias: string, did: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/aliases`, { alias, did });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getAlias(alias: string): Promise<string | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/aliases/${alias}`);
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeAlias(alias: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/aliases/${alias}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listAddresses(): Promise<Record<string, AddressInfo>> {
+        try {
+            const response = await this.axios.get(`${this.API}/addresses`);
+            return response.data.addresses;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getAddress(domain: string): Promise<ResolvedAddressInfo | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/addresses/${encodeURIComponent(domain)}`);
+            return response.data.address;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async importAddress(domain: string): Promise<Record<string, AddressInfo>> {
+        try {
+            const response = await this.axios.post(`${this.API}/addresses/import`, { domain });
+            return response.data.addresses;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async checkAddress(address: string): Promise<AddressCheckResult> {
+        try {
+            const response = await this.axios.get(`${this.API}/addresses/check/${encodeURIComponent(address)}`);
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addAddress(address: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/addresses`, { address });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeAddress(address: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/addresses/${encodeURIComponent(address)}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async publishAddress(address?: string, name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/addresses/publish`, { address, name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpublishAddress(name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/addresses/publish`, { data: { name } });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async publishDidComm(endpoint?: string, name?: string, routingKeys?: string[]): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/publish`, { endpoint, name, routingKeys });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpublishDidComm(name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/didcomm/publish`, { data: { name } });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async packDidComm(
+        message: Record<string, unknown>,
+        to: string | string[],
+        options?: { sign?: boolean; anoncrypt?: boolean; encryption?: 'A256CBC-HS512' | 'XC20P' | 'A256GCM'; name?: string }
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/pack`, { message, to, options });
+            return response.data.packed;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpackDidComm(packed: string, options?: { name?: string }): Promise<DidCommUnpackResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/unpack`, { packed, options });
+            return response.data.result;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async sendDidComm(
+        message: Record<string, unknown>,
+        to: string | string[],
+        options?: { sign?: boolean; anoncrypt?: boolean; encryption?: 'A256CBC-HS512' | 'XC20P' | 'A256GCM'; name?: string }
+    ): Promise<string[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/send`, { message, to, options });
+            return response.data.ids;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async receiveDidComm(options?: { name?: string; endpoint?: string }): Promise<DidCommUnpackResult[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/receive`, { options });
+            return response.data.results;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async mediateDidComm(options?: { name?: string; endpoint?: string }): Promise<{ relayed: number; skipped: number }> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/mediate`, { options });
+            return response.data.result;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addNostr(id?: string): Promise<NostrKeys> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr`, { id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async importNostr(nsec: string, id?: string): Promise<NostrKeys> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr/import`, { nsec, id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeNostr(id?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/nostr`, { data: { id } });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async exportNsec(id?: string): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr/nsec`, { id });
+            return response.data.nsec;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async signNostrEvent(event: NostrEvent): Promise<NostrEvent> {
+        try {
+            const response = await this.axios.post(`${this.API}/nostr/sign`, { event });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    // Lightning
+
+    async addLightning(id?: string): Promise<LightningConfig> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning`, { id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeLightning(id?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/lightning`, { data: { id } });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getLightningBalance(id?: string): Promise<LightningBalance> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/balance`, { id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createLightningInvoice(amount: number, memo: string, id?: string): Promise<LightningInvoice> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/invoice`, { amount, memo, id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async payLightningInvoice(bolt11: string, id?: string): Promise<LightningPayment> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/pay`, { bolt11, id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async checkLightningPayment(paymentHash: string, id?: string): Promise<LightningPaymentStatus> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/payment`, { paymentHash, id });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async decodeLightningInvoice(bolt11: string): Promise<DecodedLightningInvoice> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/decode`, { bolt11 });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async publishLightning(name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/publish`, { id: name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpublishLightning(name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/unpublish`, { id: name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async zapLightning(did: string, amount: number, memo?: string, name?: string): Promise<LightningPayment> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/zap`, { did, amount, memo, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getLightningPayments(name?: string): Promise<LightningPaymentRecord[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/lightning/payments`, { id: name });
+            return response.data.payments;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async resolveDID(
+        id: string,
+        options?: ResolveDIDOptions
+    ): Promise<DidCidDocument> {
+        try {
+            if (options) {
+                const queryParams = new URLSearchParams(options as Record<string, string>);
+                const response = await this.axios.get(`${this.API}/did/${id}?${queryParams.toString()}`);
+                return response.data.docs;
+            }
+            else {
+                const response = await this.axios.get(`${this.API}/did/${id}`);
+                return response.data.docs;
+            }
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updateDID(id: string, doc: DidCidDocument): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/did/${id}`, { doc });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async revokeDID(id: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/did/${id}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createAsset(
+        data: unknown,
+        options?: CreateAssetOptions
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/assets`, { data, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async cloneAsset(
+        id: string,
+        options?: CreateAssetOptions
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/assets/${id}/clone`, { options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listAssets(): Promise<string[]> {
+        try {
+            const response = await this.axios.get(`${this.API}/assets`);
+            return response.data.assets;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async resolveAsset(id: string, options?: ResolveDIDOptions): Promise<unknown | null> {
+        try {
+            if (options) {
+                const queryParams = new URLSearchParams(options as Record<string, string>);
+                const response = await this.axios.get(`${this.API}/assets/${id}?${queryParams.toString()}`);
+                return response.data.asset;
+            }
+            else {
+                const response = await this.axios.get(`${this.API}/assets/${id}`);
+                return response.data.asset;
+            }
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async mergeData(id: string, data: Record<string, unknown>): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/assets/${id}`, { data });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async transferAsset(id: string, controller: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/assets/${id}/transfer`, { controller });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createChallenge(challenge: Challenge = {}, options: { registry?: string; validUntil?: string } = {}) {
+        try {
+            const response = await this.axios.post(`${this.API}/challenge`, { challenge, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createResponse(
+        challenge: string,
+        options?: CreateResponseOptions
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/response`, { challenge, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async verifyResponse(
+        responseDID: string,
+        options?: { retries?: number; delay?: number }
+    ): Promise<ChallengeResponse> {
+        try {
+            const response = await this.axios.post(`${this.API}/response/verify`, { response: responseDID, options });
+            return response.data.verify;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createGroup(
+        name: string,
+        options?: CreateAssetOptions
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/groups`, { name, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getGroup(group: string): Promise<Group | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/groups/${group}`);
+            return response.data.group;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    public async addGroupMember(
+        group: string,
+        member: string
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/groups/${group}/add`, { member });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeGroupMember(
+        group: string,
+        member: string
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/groups/${group}/remove`, { member });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async testGroup(
+        group: string,
+        member?: string
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/groups/${group}/test`, { member });
+            return response.data.test;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listGroups(owner?: string): Promise<string[]> {
+        try {
+            if (owner) {
+                const response = await this.axios.get(`${this.API}/groups?owner=${owner}`);
+                return response.data.groups;
+            }
+            else {
+                const response = await this.axios.get(`${this.API}/groups`);
+                return response.data.groups;
+            }
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createSchema(
+        schema?: unknown,
+        options?: CreateAssetOptions
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/schemas`, { schema, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getSchema(id: string): Promise<unknown | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/schemas/${id}`);
+            return response.data.schema;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async setSchema(
+        id: string,
+        schema: unknown
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/schemas/${id}`, { schema });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async testSchema(id: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/schemas/${id}/test`);
+            return response.data.test;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listSchemas(owner?: string): Promise<string[]> {
+        try {
+            if (owner) {
+                const response = await this.axios.get(`${this.API}/schemas?owner=${owner}`);
+                return response.data.schemas;
+            }
+            else {
+                const response = await this.axios.get(`${this.API}/schemas`);
+                return response.data.schemas;
+            }
+
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createTemplate(schemaId: string): Promise<Record<string, unknown>> {
+        try {
+            const response = await this.axios.post(`${this.API}/schemas/${schemaId}/template`);
+            return response.data.template;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async testAgent(id: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/agents/${id}/test`);
+            return response.data.test;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async bindCredential(
+        subject: string,
+        options?: {
+            schema?: string;
+            validFrom?: string;
+            validUntil?: string;
+            claims?: Record<string, unknown>;
+            types?: string[];
+        }
+    ): Promise<VerifiableCredential> {
+        try {
+            const response = await this.axios.post(`${this.API}/credentials/bind`, { subject, options });
+            return response.data.credential;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async issueCredential(
+        credential: Partial<VerifiableCredential>,
+        options?: IssueCredentialsOptions
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/credentials/issued`, { credential, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async sendCredential(
+        did: string,
+        options?: CreateAssetOptions
+    ): Promise<string | null> {
+        try {
+            const response = await this.axios.post(`${this.API}/credentials/issued/${did}/send`, { options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updateCredential(
+        did: string,
+        credential: VerifiableCredential
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/credentials/issued/${did}`, { credential });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listCredentials(): Promise<string[]> {
+        try {
+            const response = await this.axios.get(`${this.API}/credentials/held`);
+            return response.data.held;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async acceptCredential(did: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/credentials/held`, { did });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getCredential(did: string): Promise<VerifiableCredential | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/credentials/held/${did}`);
+            return response.data.credential;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeCredential(did: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/credentials/held/${did}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async publishCredential(
+        did: string,
+        options?: { reveal?: boolean }
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/credentials/held/${did}/publish`, { options });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpublishCredential(did: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/credentials/held/${did}/unpublish`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listIssued(): Promise<string[]> {
+        try {
+            const response = await this.axios.get(`${this.API}/credentials/issued`);
+            return response.data.issued;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async revokeCredential(did: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/credentials/issued/${did}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async pollTemplate(): Promise<PollConfig> {
+        try {
+            const response = await this.axios.get(`${this.API}/templates/poll`);
+            return response.data.template;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createPoll(
+        config: PollConfig,
+        options?: VaultOptions
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/polls`, { poll: config, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    public async getPoll(pollId: string): Promise<PollConfig | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/polls/${pollId}`);
+            return response.data.poll;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async testPoll(id: string): Promise<boolean> {
+        try {
+            const response = await this.axios.get(`${this.API}/polls/${id}/test`);
+            return response.data.test;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listPolls(owner?: string): Promise<string[]> {
+        try {
+            const response = await this.axios.get(`${this.API}/polls`, { params: { owner } });
+            return response.data.polls;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async viewPoll(pollId: string): Promise<ViewPollResult> {
+        try {
+            const response = await this.axios.get(`${this.API}/polls/${pollId}/view`);
+            return response.data.poll;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async votePoll(
+        pollId: string,
+        vote: number,
+        options?: {
+            registry?: string;
+            validUntil?: string
+        }
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/polls/${pollId}/vote`, { vote, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async sendPoll(pollId: string): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/polls/${pollId}/send`);
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async sendBallot(ballotDid: string, pollId: string): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/polls/ballot/send`, { ballot: ballotDid, poll: pollId });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async viewBallot(ballotDid: string): Promise<ViewBallotResult> {
+        try {
+            const response = await this.axios.get(`${this.API}/polls/ballot/${ballotDid}`);
+            return response.data.ballot;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updatePoll(ballot: string): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/polls/update`, { ballot });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async publishPoll(
+        pollId: string,
+        options?: { reveal?: boolean }
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/polls/${pollId}/publish`, { options });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpublishPoll(pollId: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/polls/${pollId}/unpublish`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addPollVoter(pollId: string, memberId: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/polls/${pollId}/voters`, { memberId });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removePollVoter(pollId: string, memberId: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/polls/${pollId}/voters/${memberId}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listPollVoters(pollId: string): Promise<Record<string, any>> {
+        try {
+            const response = await this.axios.get(`${this.API}/polls/${pollId}/voters`);
+            return response.data.voters;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createImage(
+        data: Buffer,
+        options: FileAssetOptions = {}
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/images`, data, {
+                headers: {
+                    // eslint-disable-next-line
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify(options),
+                }
+            });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updateImage(
+        id: string,
+        data: Buffer,
+        options: FileAssetOptions = {}
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/images/${id}`, data, {
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify(options),
+                }
+            });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getImage(id: string): Promise<ImageFileAsset | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/images/${id}`, {
+                responseType: 'arraybuffer',
+                headers: { 'Accept': 'application/octet-stream' }
+            });
+            const metadata = JSON.parse(response.headers['x-metadata']);
+            return {
+                file: {
+                    ...metadata.file,
+                    data: Buffer.from(response.data),
+                },
+                image: metadata.image,
+            };
+        }
+        catch (error) {
+            const axiosError = error as AxiosError;
+            if (axiosError.response?.status === 404) {
+                return null;
+            }
+            if (axiosError.response?.data instanceof Uint8Array) {
+                const textDecoder = new TextDecoder();
+                axiosError.response.data = JSON.parse(textDecoder.decode(axiosError.response.data));
+            }
+            throwError(axiosError);
+        }
+    }
+
+    async testImage(id: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/images/${id}/test`);
+            return response.data.test;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createFile(
+        data: Buffer,
+        options: FileAssetOptions = {}
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/files`, data, {
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify(options),
+                }
+            });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createFileStream(
+        stream: AsyncIterable<Uint8Array>,
+        options: FileAssetOptions = {}
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/files`, stream, {
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify(options),
+                },
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity,
+            });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updateFile(
+        id: string,
+        data: Buffer,
+        options: FileAssetOptions = {}
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/files/${id}`, data, {
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify(options),
+                }
+            });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updateFileStream(
+        id: string,
+        stream: AsyncIterable<Uint8Array>,
+        options: FileAssetOptions = {}
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/files/${id}`, stream, {
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify(options),
+                },
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity,
+            });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getFile(id: string): Promise<FileAsset | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/files/${id}`, {
+                responseType: 'arraybuffer',
+                headers: { 'Accept': 'application/octet-stream' }
+            });
+            const metadata = JSON.parse(response.headers['x-metadata']);
+            return {
+                ...metadata,
+                data: Buffer.from(response.data),
+            };
+        }
+        catch (error) {
+            const axiosError = error as AxiosError;
+            if (axiosError.response?.status === 404) {
+                return null;
+            }
+            if (axiosError.response?.data instanceof Uint8Array) {
+                const textDecoder = new TextDecoder();
+                axiosError.response.data = JSON.parse(textDecoder.decode(axiosError.response.data));
+            }
+            throwError(axiosError);
+        }
+    }
+
+    async testFile(id: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/files/${id}/test`);
+            return response.data.test;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createVault(options: VaultOptions = {}): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/vaults`, { options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getVault(id: string, options?: ResolveDIDOptions): Promise<Vault> {
+        try {
+            if (options) {
+                const queryParams = new URLSearchParams(options as Record<string, string>);
+                const response = await this.axios.get(`${this.API}/vaults/${id}?${queryParams.toString()}`);
+                return response.data.vault;
+            }
+            else {
+                const response = await this.axios.get(`${this.API}/vaults/${id}`);
+                return response.data.vault;
+            }
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async testVault(id: string, options?: ResolveDIDOptions): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/vaults/${id}/test`, { options });
+            return response.data.test;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addVaultMember(
+        vaultId: string,
+        memberId: string
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/vaults/${vaultId}/members`, { memberId });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeVaultMember(
+        vaultId: string,
+        memberId: string
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/vaults/${vaultId}/members/${memberId}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listVaultMembers(vaultId: string): Promise<Record<string, any>> {
+        try {
+            const response = await this.axios.get(`${this.API}/vaults/${vaultId}/members`);
+            return response.data.members;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addVaultItem(
+        vaultId: string,
+        name: string,
+        buffer: Buffer
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/vaults/${vaultId}/items`, buffer, {
+                headers: {
+                    // eslint-disable-next-line
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify({ name }), // Pass name as a custom header
+                }
+            });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeVaultItem(
+        vaultId: string,
+        name: string
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/vaults/${vaultId}/items/${name}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listVaultItems(vaultId: string, options?: ResolveDIDOptions): Promise<Record<string, any>> {
+        try {
+            if (options) {
+                const queryParams = new URLSearchParams(options as Record<string, string>);
+                const response = await this.axios.get(`${this.API}/vaults/${vaultId}/items?${queryParams.toString()}`);
+                return response.data.items;
+            }
+            else {
+                const response = await this.axios.get(`${this.API}/vaults/${vaultId}/items`);
+                return response.data.items;
+            }
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getVaultItem(vaultId: string, name: string, options?: ResolveDIDOptions): Promise<Buffer | null> {
+        try {
+            let url = `${this.API}/vaults/${vaultId}/items/${name}`;
+            if (options) {
+                const queryParams = new URLSearchParams(options as Record<string, string>);
+                url += `?${queryParams.toString()}`;
+            }
+
+            const response = await this.axios.get(url, {
+                responseType: 'arraybuffer'
+            });
+
+            if (!response.data || (Buffer.isBuffer(response.data) && response.data.length === 0)) {
+                return null;
+            }
+
+            return Buffer.from(response.data);
+        } catch (error) {
+            const axiosError = error as AxiosError;
+
+            // Return null for 404 Not Found
+            if (axiosError.response && axiosError.response.status === 404) {
+                return null;
+            }
+
+            if (axiosError.response && axiosError.response.data instanceof Uint8Array) {
+                const textDecoder = new TextDecoder();
+                const errorMessage = textDecoder.decode(axiosError.response.data);
+                axiosError.response.data = JSON.parse(errorMessage);
+            }
+            throwError(axiosError);
+        }
+    }
+
+    async listDmail(): Promise<Record<string, DmailItem>> {
+        try {
+            const response = await this.axios.get(`${this.API}/dmail`);
+            return response.data.dmail;
+        } catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createDmail(
+        message: DmailMessage,
+        options: VaultOptions = {}
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/dmail`, { message, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updateDmail(
+        did: string,
+        message: DmailMessage
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/dmail/${did}`, { message });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async sendDmail(did: string): Promise<string | null> {
+        try {
+            const response = await this.axios.post(`${this.API}/dmail/${did}/send`);
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async fileDmail(
+        did: string,
+        tags: string[]
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/dmail/${did}/file`, { tags });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeDmail(did: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/dmail/${did}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getDmailMessage(did: string, options?: ResolveDIDOptions): Promise<DmailMessage | null> {
+        try {
+            if (options) {
+                const queryParams = new URLSearchParams(options as Record<string, string>);
+                const response = await this.axios.get(`${this.API}/dmail/${did}?${queryParams.toString()}`);
+                return response.data.message;
+            }
+            else {
+                const response = await this.axios.get(`${this.API}/dmail/${did}`);
+                return response.data.message;
+            }
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listDmailAttachments(did: string, options?: ResolveDIDOptions): Promise<Record<string, any>> {
+        try {
+            if (options) {
+                const queryParams = new URLSearchParams(options as Record<string, string>);
+                const response = await this.axios.get(`${this.API}/dmail/${did}/attachments?${queryParams.toString()}`);
+                return response.data.attachments;
+            }
+            else {
+                const response = await this.axios.get(`${this.API}/dmail/${did}/attachments`);
+                return response.data.attachments;
+            }
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addDmailAttachment(did: string, name: string, buffer: Buffer): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/dmail/${did}/attachments`, buffer, {
+                headers: {
+                    // eslint-disable-next-line
+                    'Content-Type': 'application/octet-stream',
+                    'X-Options': JSON.stringify({ name }), // Pass name as a custom header
+                }
+            });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeDmailAttachment(did: string, name: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/dmail/${did}/attachments/${name}`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getDmailAttachment(did: string, name: string): Promise<Buffer | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/dmail/${did}/attachments/${name}`, {
+                responseType: 'arraybuffer'
+            });
+
+            if (!response.data || (Buffer.isBuffer(response.data) && response.data.length === 0)) {
+                return null;
+            }
+
+            return Buffer.from(response.data);
+        } catch (error) {
+            const axiosError = error as AxiosError;
+
+            // Return null for 404 Not Found
+            if (axiosError.response && axiosError.response.status === 404) {
+                return null;
+            }
+
+            if (axiosError.response && axiosError.response.data instanceof Uint8Array) {
+                const textDecoder = new TextDecoder();
+                const errorMessage = textDecoder.decode(axiosError.response.data);
+                axiosError.response.data = JSON.parse(errorMessage);
+            }
+            throwError(axiosError);
+        }
+    }
+
+    async importDmail(did: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/dmail/import`, { did });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createNotice(
+        message: NoticeMessage,
+        options: CreateAssetOptions = {}
+    ): Promise<string> {
+        try {
+            const response = await this.axios.post(`${this.API}/notices`, { message, options });
+            return response.data.did;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async updateNotice(
+        did: string,
+        message: NoticeMessage
+    ): Promise<boolean> {
+        try {
+            const response = await this.axios.put(`${this.API}/notices/${did}`, { message });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async refreshNotices(): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/notices/refresh`);
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async exportEncryptedWallet(): Promise<WalletEncFile> {
+        try {
+            const response = await this.axios.get(`${this.API}/export/wallet/encrypted`);
+            return response.data.wallet;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+}

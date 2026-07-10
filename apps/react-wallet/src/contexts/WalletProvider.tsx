@@ -8,7 +8,7 @@ import {
     useRef,
     useState,
 } from "react";
-import DrawbridgeClient from "@didcid/gatekeeper/drawbridge";
+import DrawbridgeClient from "@didcid/clients/drawbridge";
 import Keymaster from "@didcid/keymaster";
 import { WalletBase, StoredWallet } from '@didcid/keymaster/types';
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';

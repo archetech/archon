@@ -19,6 +19,7 @@ These rules apply to coding agents working in this repository.
 
 - Always save lessons learned in this file or another persistent repo instruction file. Do not rely on session memory for process corrections.
 - Herald avatar/image handlers that use `KeymasterClient` should normalize JSON-serialized Buffer payloads (`{ type: "Buffer", data: [...] }`) back into real `Buffer` instances before sending binary responses.
+- Keep Gatekeeper, Drawbridge, and Keymaster HTTP clients and their wire contracts in `@didcid/clients`; do not make that package depend on the Gatekeeper, Keymaster, Cipher, or IPFS runtimes. Keymaster should consume the Drawbridge contract from this lightweight package rather than depending on Gatekeeper.
 - Keep `apps/gatekeeper-client/src/KeymasterUI.jsx` and `apps/keymaster-client/src/KeymasterUI.jsx` identical. When one changes, update the other to match rather than maintaining intentional drift.
 - For GitHub operations in this repo, use `gh` by default, especially for write actions and PR creation. Do not try the GitHub app first and then fall back to `gh` unless the user explicitly asks for the app or `gh` cannot perform the operation.
 - When generating or updating npm lockfiles, use the repo-pinned npm version from the root `package.json` so lockfiles stay compatible with CI.

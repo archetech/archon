@@ -2,6 +2,7 @@ import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
+import { CID } from 'multiformats/cid';
 import {
     InvalidDIDError,
     InvalidParameterError,
@@ -19,7 +20,7 @@ import {
     Operation,
     Proof,
     ProofPurpose,
-} from '@didcid/gatekeeper/types';
+} from '@didcid/clients/gatekeeper-types';
 import {
     Challenge,
     ChallengeResponse,
@@ -94,7 +95,6 @@ import {
     type PackOptions,
     type DidCommEnc,
 } from '@didcid/cipher/didcomm';
-import { isValidDID } from '@didcid/ipfs/utils';
 import { decryptWithPassphrase, encryptWithPassphrase } from '@didcid/cipher/passphrase';
 
 function hexToBase64url(hex: string): string {
@@ -105,6 +105,30 @@ function hexToBase64url(hex: string): string {
 function base64urlToHex(b64: string): string {
     const bytes = base64url.baseDecode(b64);
     return Buffer.from(bytes).toString('hex');
+}
+
+function isValidDID(did: string): boolean {
+    if (typeof did !== 'string' || !did.startsWith('did:')) {
+        return false;
+    }
+
+    const parts = did.split(':');
+    if (parts.length < 3) {
+        return false;
+    }
+
+    const suffix = parts.pop();
+    if (!suffix) {
+        return false;
+    }
+
+    try {
+        CID.parse(suffix);
+        return true;
+    }
+    catch {
+        return false;
+    }
 }
 
 function isPrivateHostname(hostname: string): boolean {

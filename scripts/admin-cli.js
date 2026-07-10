@@ -2,7 +2,7 @@ import { program } from 'commander';
 import fs from 'fs';
 import dotenv from 'dotenv';
 
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import CipherNode from '@didcid/cipher/node';
 
 dotenv.config();

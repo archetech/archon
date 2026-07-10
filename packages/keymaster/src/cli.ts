@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
 import Keymaster from './keymaster.js';
-import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
+import DrawbridgeClient from '@didcid/clients/drawbridge';
 import CipherNode from '@didcid/cipher/node';
 import type { DidCommEnc } from '@didcid/cipher/didcomm';
 import WalletJson from './db/json.js';

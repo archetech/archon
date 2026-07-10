@@ -4,7 +4,7 @@ import pino from 'pino';
 import { readFile } from 'fs/promises';
 import { timingSafeEqual } from 'crypto';
 import { Counter, Gauge, collectDefaultMetrics, register } from 'prom-client';
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import { socksDispatcher } from 'fetch-socks';
 import { Redis } from 'ioredis';
 

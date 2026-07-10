@@ -1,4 +1,4 @@
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import CipherNode from '@didcid/cipher/node';

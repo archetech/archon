@@ -14,7 +14,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            "@didcid/keymaster/client": path.resolve(__dirname, "../../packages/keymaster/dist/esm/keymaster-client.js"),
+            "@didcid/clients/keymaster": path.resolve(__dirname, "../../packages/clients/dist/esm/keymaster-client.js"),
             buffer: 'buffer',
         }
     },

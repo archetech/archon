@@ -1,5 +1,5 @@
 import nock from 'nock';
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 
 const GatekeeperURL = 'http://gatekeeper.org';

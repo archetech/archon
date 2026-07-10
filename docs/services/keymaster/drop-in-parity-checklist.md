@@ -7,7 +7,7 @@ implementation.
 Source of truth:
 
 - Service contract: `services/keymaster/server/src/keymaster-api.ts`
-- Client contract: `packages/keymaster/src/keymaster-client.ts`
+- Client contract: `packages/clients/src/keymaster-client.ts`
 - Behavioral coverage: `tests/keymaster/*.test.ts`
 
 ## Completion criteria
