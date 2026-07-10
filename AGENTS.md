@@ -46,6 +46,7 @@ These rules apply to coding agents working in this repository.
 - When splitting Keymaster route files, preserve the public `/ready`, `/version`, and `/login` routes before `createRequireAdminKey(config)`, then mount protected domain routers intentionally so the admin boundary does not move. Keep address, DIDComm, Nostr, and Lightning routes in their own Keymaster routers rather than folding them back into identity routes.
 - Keep Keymaster credential routes split by route family (challenge, response, groups, schemas, agents, credentials, keys, schema-template tail) and list those files in `swaggerConf.js` in mount order.
 - Keep Keymaster content routes split by route family (assets, polls, images, files/IPFS, vaults, dmail, notices) and list those files in `swaggerConf.js` in mount order.
+- When verifying Keymaster Swagger coverage, compare all mounted router methods against `docs/keymaster-api.json`; public routes such as `/login` need generated OpenAPI coverage too.
 - Nostr event IDs in Python parity code must use compact JSON serialization (`separators=(",", ":")`) to match the TypeScript `JSON.stringify` hashing/signing contract.
 - Python Lightning invoice parity should only surface `expiry` and `expires` when the BOLT11 invoice actually includes an expiry tag; the `bolt11` library exposes a default expiry even when the tag is absent.
 - Python keymaster flavor runs in CLI CI use `ARCHON_KEYMASTER_DB=redis` exactly like the TypeScript service; no override is needed.

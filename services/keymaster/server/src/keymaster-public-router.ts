@@ -61,6 +61,42 @@ export function createPublicRouter(options: CreateKeymasterRouterOptions): expre
         res.json({ version: getServiceVersion(), commit: serviceCommit });
     });
 
+    /**
+     * @swagger
+     * /login:
+     *   post:
+     *     summary: Authenticate to retrieve the admin API key.
+     *     description: Returns the configured admin API key when the supplied passphrase matches the Keymaster passphrase. In development mode without a passphrase, returns the admin API key directly.
+     *     requestBody:
+     *       required: false
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               passphrase:
+     *                 type: string
+     *                 description: Keymaster passphrase configured for API login.
+     *     responses:
+     *       200:
+     *         description: Admin API key response.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 adminApiKey:
+     *                   type: string
+     *       401:
+     *         description: Incorrect passphrase.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 error:
+     *                   type: string
+     */
     router.post('/login', async (req, res) => {
         const { passphrase } = req.body;
 
