@@ -4,9 +4,9 @@ import type {
     BlockInfo,
     GatekeeperEvent,
     Operation,
-} from '@didcid/clients/gatekeeper';
+} from '@didcid/clients/gatekeeper-types';
 
-export * from '@didcid/clients/gatekeeper';
+export type * from '@didcid/clients/gatekeeper-types';
 
 export interface JsonDbFile {
     dids: Record<string, GatekeeperEvent[]>;

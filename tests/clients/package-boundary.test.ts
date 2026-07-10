@@ -32,6 +32,14 @@ describe('@didcid/clients package boundary', () => {
         expect(mcpServer.dependencies).toHaveProperty('@didcid/clients');
     });
 
+    test('keeps compatibility type modules runtime-empty', () => {
+        const gatekeeperTypes = readFileSync(resolve(process.cwd(), 'packages/gatekeeper/src/types.ts'), 'utf8');
+        const keymasterTypes = readFileSync(resolve(process.cwd(), 'packages/keymaster/src/types.ts'), 'utf8');
+
+        expect(gatekeeperTypes).toContain("export type * from '@didcid/clients/gatekeeper-types';");
+        expect(keymasterTypes).toContain("export type * from '@didcid/clients/keymaster-types';");
+    });
+
     test('preserves legacy client entry points', () => {
         expect(LegacyGatekeeperClient).toBe(GatekeeperClient);
         expect(LegacyDrawbridgeClient).toBe(DrawbridgeClient);
