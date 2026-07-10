@@ -2,7 +2,7 @@ import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
 
 export function createFileRouter(options: CreateKeymasterRouterOptions): express.Router {
-    const { getKeymaster, getGatekeeper, config } = options;
+    const { getKeymaster, getGatekeeper } = options;
     const router = express.Router();
 
     /**
