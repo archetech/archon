@@ -69,6 +69,60 @@
         }
       }
     },
+    "/login": {
+      "post": {
+        "summary": "Authenticate to retrieve the admin API key.",
+        "description": "Returns the configured admin API key when the supplied passphrase matches the Keymaster passphrase. In development mode without a passphrase, returns the admin API key directly.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "passphrase": {
+                    "type": "string",
+                    "description": "Keymaster passphrase configured for API login."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Admin API key response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "adminApiKey": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Incorrect passphrase.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/registries": {
       "get": {
         "summary": "List the available registries.",
@@ -2309,6 +2363,54 @@
         }
       }
     },
+    "/addresses/{address}": {
+      "delete": {
+        "summary": "Remove the stored address for the current identity and revoke it remotely.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "URL-encoded `name@domain` address to remove."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Indicates whether the address was successfully removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/didcomm/publish": {
       "post": {
         "summary": "Publish an X25519 key-agreement key (and optional DIDComm service) to the current identity DID document.",
@@ -2736,54 +2838,6 @@
           },
           "400": {
             "description": "Bad request."
-          }
-        }
-      }
-    },
-    "/addresses/{address}": {
-      "delete": {
-        "summary": "Remove the stored address for the current identity and revoke it remotely.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "URL-encoded `name@domain` address to remove."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Indicates whether the address was successfully removed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
           }
         }
       }
