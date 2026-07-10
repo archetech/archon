@@ -44,6 +44,7 @@ These rules apply to coding agents working in this repository.
 - Gatekeeper HTTP route tests should import `createGatekeeperApp` from `services/gatekeeper/server/src/gatekeeper-api.ts` or `createV1Router` from `services/gatekeeper/server/src/v1-router.ts` and inject fake dependencies; keep production DB/IPFS startup behind `main()` so imports remain testable.
 - When splitting Gatekeeper route files, keep `swaggerConf.js` route sources explicit and ordered so regenerated OpenAPI does not churn path ordering.
 - When splitting Keymaster route files, preserve the public `/ready`, `/version`, and `/login` routes before `createRequireAdminKey(config)`, then mount protected domain routers in the original order so the admin boundary does not move. Keep address, DIDComm, Nostr, and Lightning routes in their own Keymaster routers rather than folding them back into identity routes.
+- Keep Keymaster content routes split by route family (assets, polls, images, files/IPFS, vaults, dmail, notices) and list those files in `swaggerConf.js` in mount order.
 - Nostr event IDs in Python parity code must use compact JSON serialization (`separators=(",", ":")`) to match the TypeScript `JSON.stringify` hashing/signing contract.
 - Python Lightning invoice parity should only surface `expiry` and `expires` when the BOLT11 invoice actually includes an expiry tag; the `bolt11` library exposes a default expiry even when the tag is absent.
 - Python keymaster flavor runs in CLI CI use `ARCHON_KEYMASTER_DB=redis` exactly like the TypeScript service; no override is needed.

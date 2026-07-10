@@ -51,7 +51,13 @@ const keymasterOptions = {
         'services/keymaster/server/src/keymaster-nostr-router.ts',
         'services/keymaster/server/src/keymaster-lightning-router.ts',
         'services/keymaster/server/src/keymaster-credential-router.ts',
-        'services/keymaster/server/src/keymaster-content-router.ts'
+        'services/keymaster/server/src/keymaster-asset-router.ts',
+        'services/keymaster/server/src/keymaster-poll-router.ts',
+        'services/keymaster/server/src/keymaster-image-router.ts',
+        'services/keymaster/server/src/keymaster-file-router.ts',
+        'services/keymaster/server/src/keymaster-vault-router.ts',
+        'services/keymaster/server/src/keymaster-dmail-router.ts',
+        'services/keymaster/server/src/keymaster-notice-router.ts'
     ]
 };
 
