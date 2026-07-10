@@ -40,7 +40,14 @@ const keymasterOptions = {
             title: 'Keymaster API'
         }
     },
-    apis: ['services/keymaster/server/src/keymaster-api.ts']
+    apis: [
+        'services/keymaster/server/src/keymaster-api.ts',
+        'services/keymaster/server/src/keymaster-public-router.ts',
+        'services/keymaster/server/src/keymaster-core-router.ts',
+        'services/keymaster/server/src/keymaster-identity-router.ts',
+        'services/keymaster/server/src/keymaster-credential-router.ts',
+        'services/keymaster/server/src/keymaster-content-router.ts'
+    ]
 };
 
 const gatekeeperSpec = swaggerJsdoc(gatekeeperOptions);
