@@ -52,8 +52,8 @@ structure mirrors the logical layering, which is itself a good sign.
    ┌──────────────────────────────────────────────────────────┐
    │              Interface Adapters                            │
    │  services/*/server/src/*-api.ts   (HTTP controllers)       │
-   │  packages/keymaster/src/keymaster-client.ts (REST gateway) │
-   │  packages/gatekeeper/src/gatekeeper-client.ts              │
+   │  packages/clients/src/keymaster-client.ts   (REST gateway) │
+   │  packages/clients/src/gatekeeper-client.ts                 │
    │  packages/*/src/db/*.ts           (storage gateways)       │
    │  packages/ipfs/src/{kubo,helia}-client.ts                  │
    │   ┌────────────────────────────────────────────────────┐  │
@@ -209,7 +209,7 @@ Archon's package layout is a good fit for Martin's component principles.
   genuine *architectural boundary*, not just an abstraction for testing: the
   identical interface is satisfied by an in-process object *and* a
   network-crossing client. `KeymasterClient`
-  ([keymaster-client.ts:65](../packages/keymaster/src/keymaster-client.ts))
+  ([keymaster-client.ts:68](../packages/clients/src/keymaster-client.ts))
   implements `KeymasterInterface` by marshalling each call over HTTP, so a
   consumer (CLI, React wallet, Python SDK) is agnostic to whether the policy
   runs locally or behind a server. This is the "full-fledged boundary" Martin

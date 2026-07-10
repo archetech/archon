@@ -18,7 +18,7 @@
     "test:didcomm-e2e": "node --experimental-vm-modules node_modules/.bin/jest --config jest.config.didcomm-e2e.js --runInBand --forceExit",
     "generate-openapi": "node swaggerConf.js",
     "lint": "eslint .",
-    "build": "npm run build -w @didcid/browser-hdkey && npm run build -w @didcid/common && npm run build -w @didcid/ipfs && npm run build -w @didcid/cipher && npm run build -w @didcid/gatekeeper && npm run build -w @didcid/keymaster && npm run build -w @didcid/mcp-server"
+    "build": "npm run build -w @didcid/browser-hdkey && npm run build -w @didcid/common && npm run build -w @didcid/ipfs && npm run build -w @didcid/cipher && npm run build -w @didcid/clients && npm run build -w @didcid/gatekeeper && npm run build -w @didcid/keymaster && npm run build -w @didcid/mcp-server"
   },
   "author": "",
   "license": "ISC",

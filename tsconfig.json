@@ -16,6 +16,24 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
+      "@didcid/clients": [
+        "packages/clients/src/index.ts"
+      ],
+      "@didcid/clients/gatekeeper": [
+        "packages/clients/src/gatekeeper-client.ts"
+      ],
+      "@didcid/clients/drawbridge": [
+        "packages/clients/src/drawbridge-client.ts"
+      ],
+      "@didcid/clients/keymaster": [
+        "packages/clients/src/keymaster-client.ts"
+      ],
+      "@didcid/clients/gatekeeper-types": [
+        "packages/clients/src/gatekeeper-types.ts"
+      ],
+      "@didcid/clients/keymaster-types": [
+        "packages/clients/src/keymaster-types.ts"
+      ],
       "@didcid/cipher/node": [
         "packages/cipher/src/cipher-node.ts"
       ],

@@ -12,7 +12,7 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { requestBrowserRefresh } from "../utils/utils";
 import CopyDID from "./CopyDID";
-import GatekeeperClient from "@didcid/gatekeeper/client";
+import GatekeeperClient from "@didcid/clients/gatekeeper";
 import type { FileAsset, ImageAsset } from "@didcid/keymaster/types";
 
 const gatekeeper = new GatekeeperClient();

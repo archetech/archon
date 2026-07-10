@@ -117,7 +117,7 @@ For example, `POST /api/v1/wallet/backup` currently returns the backup DID in
 objects rather than a single nested payload key.
 
 A new implementation MUST honor every key the existing
-[`KeymasterClient`](../../../packages/keymaster/src/keymaster-client.ts)
+[`KeymasterClient`](../../../packages/clients/src/keymaster-client.ts)
 parses (search the file for `response.data.<key>` to enumerate). The full
 key inventory, including routes that return unwrapped objects, is the
 contract.
@@ -1067,7 +1067,7 @@ requests, close the wallet backend, exit. The TS reference uses
 - Cipher primitives: [packages/cipher/](../../../packages/cipher/)
 - Image: `ghcr.io/archetech/keymaster`
 - HTTP client (any language can mirror this surface):
-  [packages/keymaster/src/keymaster-client.ts](../../../packages/keymaster/src/keymaster-client.ts)
+  [packages/clients/src/keymaster-client.ts](../../../packages/clients/src/keymaster-client.ts)
 - Python SDK (parity-tested): [python/keymaster_sdk/](../../../python/keymaster_sdk/)
 
 ### 17.2 Conformance tests

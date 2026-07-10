@@ -43,7 +43,7 @@ The GatekeeperClient is used to communicate with a Gatekeeper REST API service.
 
 ```js
 // Import using subpaths
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 
 // Non-subpath imports
 import { GatekeeperClient } from '@didcid/gatekeeper';

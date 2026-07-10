@@ -1,4 +1,4 @@
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import CipherNode from '@didcid/cipher/node';
 import { createApp } from './didcomm-api.js';
 import { MailboxStore, MemoryMailboxStore, RedisMailboxStore } from './store.js';

@@ -10,7 +10,7 @@ import TextInputModal from "../modals/TextInputModal";
 import SelectInputModal from "../modals/SelectInputModal";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import type { AddressCheckResult, AddressInfo, FileAsset, ImageAsset, NostrKeys } from "@didcid/keymaster/types";
-import GatekeeperClient from "@didcid/gatekeeper/client";
+import GatekeeperClient from "@didcid/clients/gatekeeper";
 import {
     DEFAULT_GATEKEEPER_URL,
     GATEKEEPER_KEY

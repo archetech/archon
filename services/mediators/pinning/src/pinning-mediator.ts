@@ -3,7 +3,7 @@ import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 
 import CipherNode from '@didcid/cipher/node';
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import config from './config.js';
 import { createProvider } from './provider.js';
 import { JsonPinStore } from './state.js';

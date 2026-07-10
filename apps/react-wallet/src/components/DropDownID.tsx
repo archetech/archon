@@ -11,7 +11,7 @@ import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import CopyDID from "./CopyDID";
-import GatekeeperClient from "@didcid/gatekeeper/client";
+import GatekeeperClient from "@didcid/clients/gatekeeper";
 import type { FileAsset, ImageAsset } from "@didcid/keymaster/types";
 import {
     DEFAULT_GATEKEEPER_URL,

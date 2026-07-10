@@ -1,5 +1,5 @@
 import nock from 'nock';
-import KeymasterClient from '@didcid/keymaster/client';
+import KeymasterClient from '@didcid/clients/keymaster';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import {Seed, WalletEncFile, WalletFile} from "@didcid/keymaster/types";
 

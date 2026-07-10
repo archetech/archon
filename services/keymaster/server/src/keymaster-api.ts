@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 
-import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
+import DrawbridgeClient from '@didcid/clients/drawbridge';
 import Keymaster from '@didcid/keymaster';
 import { WalletBase } from '@didcid/keymaster/types';
 import WalletJson from '@didcid/keymaster/wallet/json';

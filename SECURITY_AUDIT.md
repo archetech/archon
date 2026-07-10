@@ -746,11 +746,11 @@ sudo nginx -t && sudo systemctl reload nginx
 - `packages/cipher/src/types.ts`
 - `packages/cipher/package.json`
 - `packages/gatekeeper/src/gatekeeper.ts`
-- `packages/gatekeeper/src/gatekeeper-client.ts`
+- `packages/clients/src/gatekeeper-client.ts`
 - `packages/gatekeeper/src/db/` (all DB implementations)
 - `packages/gatekeeper/package.json`
 - `packages/keymaster/src/keymaster.ts`
-- `packages/keymaster/src/keymaster-client.ts`
+- `packages/clients/src/keymaster-client.ts`
 - `packages/keymaster/src/encryption.ts`
 - `packages/keymaster/src/db/` (all DB implementations)
 - `packages/keymaster/package.json`

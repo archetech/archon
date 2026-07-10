@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
-import KeymasterClient from '@didcid/keymaster/client';
+import KeymasterClient from '@didcid/clients/keymaster';
 
 dotenv.config();
 

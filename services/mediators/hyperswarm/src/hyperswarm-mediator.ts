@@ -8,8 +8,8 @@ import express from 'express';
 import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 
-import GatekeeperClient from '@didcid/gatekeeper/client';
-import KeymasterClient from '@didcid/keymaster/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
+import KeymasterClient from '@didcid/clients/keymaster';
 import KuboClient from '@didcid/ipfs/kubo';
 import { Operation } from '@didcid/gatekeeper/types';
 import CipherNode from '@didcid/cipher/node';

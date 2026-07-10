@@ -6,7 +6,7 @@ import pinoHttp from 'pino-http';
 import { register, Counter, Gauge, Histogram, collectDefaultMetrics } from 'prom-client';
 import { readFile } from 'fs/promises';
 import { timingSafeEqual } from 'crypto';
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 
 import config from './config.js';
 import { RedisStore } from './store.js';

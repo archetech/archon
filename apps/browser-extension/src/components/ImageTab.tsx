@@ -7,7 +7,7 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { ImageFileAsset, FileAsset, ImageAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
-import GatekeeperClient from "@didcid/gatekeeper/client";
+import GatekeeperClient from "@didcid/clients/gatekeeper";
 import VersionNavigator from "./VersionNavigator";
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";

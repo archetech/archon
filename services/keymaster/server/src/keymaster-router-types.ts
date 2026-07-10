@@ -1,4 +1,4 @@
-import type DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
+import type DrawbridgeClient from '@didcid/clients/drawbridge';
 import type Keymaster from '@didcid/keymaster';
 import type promClient from 'prom-client';
 import type defaultConfig from './config.js';

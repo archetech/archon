@@ -71,7 +71,7 @@ The codebase is well-positioned — much of the machinery exists already:
 | Sign + verify | `addProof` / `verifyProof` | [packages/keymaster/src/keymaster.ts](../packages/keymaster/src/keymaster.ts) |
 | Service endpoints in DID docs | `service[]`; `publishAddress`/`publishLightning` write them | [packages/gatekeeper/src/types.ts](../packages/gatekeeper/src/types.ts), [keymaster.ts](../packages/keymaster/src/keymaster.ts) |
 | A messaging + notification layer | **Dmail** + **Notices** | [packages/keymaster/src/keymaster.ts](../packages/keymaster/src/keymaster.ts), [types.ts](../packages/keymaster/src/types.ts) |
-| HTTP transport + client | Express APIs + axios `KeymasterClient` | [services/keymaster/server/src/keymaster-api.ts](../services/keymaster/server/src/keymaster-api.ts), [keymaster-client.ts](../packages/keymaster/src/keymaster-client.ts) |
+| HTTP transport + client | Express APIs + axios `KeymasterClient` | [services/keymaster/server/src/keymaster-api.ts](../services/keymaster/server/src/keymaster-api.ts), [keymaster-client.ts](../packages/clients/src/keymaster-client.ts) |
 | Connection/proof handshake | `createChallenge`/`createResponse`/`verifyResponse` | [packages/keymaster/src/keymaster.ts](../packages/keymaster/src/keymaster.ts) |
 | Verifiable Credentials | W3C VC issue/verify | [packages/keymaster/src/keymaster.ts](../packages/keymaster/src/keymaster.ts) |
 
@@ -186,7 +186,7 @@ through interface/client/API. *Exit met:* resolved DID docs carry a valid X25519
 - **2b — `keymaster` orchestration.** `packDidComm()` / `unpackDidComm()` that resolve the
   recipient (and, on unpack, sender) DID, derive the agent's keys, and call `cipher`. Add
   to the [`KeymasterInterface`](../packages/keymaster/src/types.ts),
-  [client](../packages/keymaster/src/keymaster-client.ts), and REST routes. Because the
+  [client](../packages/clients/src/keymaster-client.ts), and REST routes. Because the
   crypto is pure-JS in `cipher`, this works unchanged in the browser-shared Keymaster core.
 
 *Exit met:* `cipher.packDidCommMessage`/`unpackEncrypted`/`signJws` + keymaster

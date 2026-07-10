@@ -1,7 +1,7 @@
 import { Buffer } from 'buffer';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import DrawbridgeClient from '@didcid/gatekeeper/drawbridge';
+import DrawbridgeClient from '@didcid/clients/drawbridge';
 import CipherWeb from '@didcid/cipher/web';
 import Keymaster from '@didcid/keymaster';
 import WalletWeb from '@didcid/keymaster/wallet/web';

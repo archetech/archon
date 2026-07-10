@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import JsonViewer from "./components/JsonViewer.js";
 import Events from "./components/Events.js";
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import {
     Alert,

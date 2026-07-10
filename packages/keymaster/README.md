@@ -22,7 +22,7 @@ The library must be configured by calling the start function with 3 dependencies
 
 ```js
 // Import using subpaths
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import CipherNode from '@didcid/cipher/node';
 import Keymaster from '@didcid/keymaster';
@@ -56,7 +56,7 @@ const newId = await keymaster.createId('Bob');
 
 ```js
 // Import using subpaths
-import GatekeeperClient from '@didcid/gatekeeper/client';
+import GatekeeperClient from '@didcid/clients/gatekeeper';
 import WalletWeb from '@didcid/keymaster/wallet/web';
 import CipherWeb from '@didcid/cipher/web';
 import Keymaster from '@didcid/keymaster';
@@ -273,7 +273,7 @@ The KeymasterClient is used to communicate with a keymaster REST API service.
 
 ```js
 // Import using subpaths
-import KeymasterClient from '@didcid/keymaster/client';
+import KeymasterClient from '@didcid/clients/keymaster';
 
 // Non-subpath imports
 import { KeymasterClient } from '@didcid/keymaster';

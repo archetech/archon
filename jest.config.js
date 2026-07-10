@@ -13,6 +13,12 @@ const config = {
     testEnvironment: 'node',
     moduleFileExtensions: ['ts', 'js', 'mjs'],
     moduleNameMapper: {
+        '^@didcid/clients$': '<rootDir>/packages/clients/src/index.ts',
+        '^@didcid/clients/gatekeeper$': '<rootDir>/packages/clients/src/gatekeeper-client.ts',
+        '^@didcid/clients/drawbridge$': '<rootDir>/packages/clients/src/drawbridge-client.ts',
+        '^@didcid/clients/keymaster$': '<rootDir>/packages/clients/src/keymaster-client.ts',
+        '^@didcid/clients/gatekeeper-types$': '<rootDir>/packages/clients/src/gatekeeper-types.ts',
+        '^@didcid/clients/keymaster-types$': '<rootDir>/packages/clients/src/keymaster-types.ts',
         '^@didcid/cipher/node$': '<rootDir>/packages/cipher/src/cipher-node.ts',
         '^@didcid/cipher/types': '<rootDir>/packages/cipher/src/types.ts',
         '^@didcid/common/errors$': '<rootDir>/packages/common/src/errors.ts',
