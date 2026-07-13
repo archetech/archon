@@ -66,14 +66,14 @@ jobs:
 
       - name: Upload docker logs
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: docker-compose-logs-${{ matrix.gatekeeper }}-${{ matrix.keymaster }}
           path: docker-compose-logs.txt
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: E2E Artifacts (${{ matrix.gatekeeper }}, ${{ matrix.keymaster }})
           path: e2e-results.xml
