@@ -97,8 +97,35 @@ const toolArgOverrides: Record<string, Record<string, unknown>> = {
     archon_get_vault_item: { item: 'hello.txt' },
 };
 
-function parseToolResult(response: any) {
-    return JSON.parse(response.content[0].text);
+// Asserts a spec-shaped success: no isError, and structuredContent (when the result is a
+// JSON object) mirrors the serialized text block. Returns the payload.
+function expectOk(response: any) {
+    if (response.isError) {
+        throw new Error(`unexpected tool error: ${response.content[0].text}`);
+    }
+
+    const text = response.content[0].text;
+    const payload = text === '' ? undefined : JSON.parse(text);
+
+    if (isJsonObject(payload)) {
+        expect(response.structuredContent).toStrictEqual(payload);
+    } else {
+        expect(response.structuredContent).toBeUndefined();
+    }
+
+    return payload;
+}
+
+// Asserts a spec-shaped tool execution error. Returns the message.
+function expectFail(response: any): string {
+    expect(response.isError).toBe(true);
+    expect(response.structuredContent).toBeUndefined();
+
+    return response.content[0].text;
+}
+
+function isJsonObject(value: unknown) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function argsForTool(name: string) {
@@ -267,7 +294,7 @@ describe('mcp server tools', () => {
 
         const response = await server.tools.get('archon_list_registries')!.handler({});
 
-        expect(parseToolResult(response)).toStrictEqual({ ok: true, result: ['hyperswarm'] });
+        expect(expectOk(response)).toStrictEqual(['hyperswarm']);
         expect(runtime.node.listRegistries).toHaveBeenCalledTimes(1);
     });
 
@@ -278,12 +305,38 @@ describe('mcp server tools', () => {
 
         for (const definition of ARCHON_MCP_TOOL_DEFINITIONS) {
             const response = await server.tools.get(definition.name)!.handler(argsForTool(definition.name));
-            const result = parseToolResult(response);
-            if (!result.ok) {
-                throw new Error(`${definition.name}: ${result.error}`);
+            if (response.isError) {
+                throw new Error(`${definition.name}: ${response.content[0].text}`);
             }
-            expect(result.ok).toBe(true);
+            expectOk(response);
         }
+    });
+
+    it('carries object results in structuredContent, mirrored by the text block', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response = await server.tools.get('archon_resolve_did')!.handler({ did: 'did:cid:alice' });
+
+        expect(response.isError).toBeUndefined();
+        expect(response.structuredContent).toStrictEqual({ didDocument: { id: 'did:cid:alice' } });
+        expect(JSON.parse(response.content[0].text)).toStrictEqual(response.structuredContent);
+    });
+
+    it('omits structuredContent for non-object results', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        // MCP requires structuredContent to be a JSON object, so an array result rides the text block alone.
+        const listResponse = await server.tools.get('archon_list_ids')!.handler({});
+        expect(listResponse.structuredContent).toBeUndefined();
+        expect(JSON.parse(listResponse.content[0].text)).toStrictEqual(['alice']);
+
+        const stringResponse = await server.tools.get('archon_create_id')!.handler({ name: 'Alice' });
+        expect(stringResponse.structuredContent).toBeUndefined();
+        expect(JSON.parse(stringResponse.content[0].text)).toBe('did:cid:new');
     });
 
     it('does not advertise mutating tools in read-only mode', () => {
@@ -304,10 +357,8 @@ describe('mcp server tools', () => {
         registerArchonTools(server, runtime as any, baseConfig);
 
         const response = await server.tools.get('archon_revoke_did')!.handler({ did: 'did:cid:alice' });
-        const result = parseToolResult(response);
 
-        expect(result.ok).toBe(false);
-        expect(result.error).toContain('Invalid literal value');
+        expect(expectFail(response)).toContain('Invalid literal value');
         expect(runtime.keymaster.revokeDID).not.toHaveBeenCalled();
     });
 
@@ -317,23 +368,19 @@ describe('mcp server tools', () => {
         registerArchonTools(server, runtime as any, baseConfig);
 
         const response = await server.tools.get('archon_show_mnemonic')!.handler({});
-        const result = parseToolResult(response);
 
-        expect(result.ok).toBe(false);
-        expect(result.error).toContain('Invalid literal value');
+        expect(expectFail(response)).toContain('Invalid literal value');
         expect(runtime.keymaster.decryptMnemonic).not.toHaveBeenCalled();
     });
 
-    it('returns a clear passphrase error for wallet-backed tools without keymaster runtime', async () => {
+    it('flags a locked wallet as a tool execution error', async () => {
         const server = new FakeServer();
         registerArchonTools(server, { node: mockRuntime().node } as any, { ...baseConfig, passphrase: undefined });
 
         const response = await server.tools.get('archon_list_ids')!.handler({});
 
-        expect(parseToolResult(response)).toStrictEqual({
-            ok: false,
-            error: 'ARCHON_PASSPHRASE is required for wallet-backed MCP tools',
-        });
+        expect(response.isError).toBe(true);
+        expect(expectFail(response)).toBe('ARCHON_PASSPHRASE is required for wallet-backed MCP tools');
     });
 
     it('validates required inputs', async () => {
@@ -342,10 +389,8 @@ describe('mcp server tools', () => {
         registerArchonTools(server, runtime as any, baseConfig);
 
         const response = await server.tools.get('archon_create_id')!.handler({});
-        const result = parseToolResult(response);
 
-        expect(result.ok).toBe(false);
-        expect(result.error).toContain('Required');
+        expect(expectFail(response)).toContain('Required');
         expect(runtime.keymaster.createId).not.toHaveBeenCalled();
     });
 
@@ -360,7 +405,7 @@ describe('mcp server tools', () => {
             registry: 'hyperswarm',
         });
 
-        expect(parseToolResult(response)).toStrictEqual({ ok: true, result: 'did:cid:asset' });
+        expect(expectOk(response)).toBe('did:cid:asset');
         expect(runtime.keymaster.createAsset).toHaveBeenCalledWith(
             { hello: 'world' },
             { alias: 'hello', registry: 'hyperswarm' }
@@ -381,7 +426,7 @@ describe('mcp server tools', () => {
             alias: 'hello',
         });
 
-        expect(parseToolResult(response)).toStrictEqual({ ok: true, result: 'did:cid:file' });
+        expect(expectOk(response)).toBe('did:cid:file');
         expect(runtime.keymaster.createFile).toHaveBeenCalledWith(
             Buffer.from('hello'),
             { alias: 'hello', filename: 'hello.txt', contentType: 'text/plain' }
@@ -394,30 +439,24 @@ describe('mcp server tools', () => {
         registerArchonTools(server, runtime as any, baseConfig);
 
         const fileResponse = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
-        expect(parseToolResult(fileResponse)).toStrictEqual({
-            ok: true,
-            result: {
-                name: 'file.txt',
-                mimeType: 'text/plain',
-                encoding: 'base64',
-                data: Buffer.from('file').toString('base64'),
-            },
+        expect(expectOk(fileResponse)).toStrictEqual({
+            name: 'file.txt',
+            mimeType: 'text/plain',
+            encoding: 'base64',
+            data: Buffer.from('file').toString('base64'),
         });
 
         const imageResponse = await server.tools.get('archon_get_asset_image')!.handler({ id: 'did:cid:image' });
-        expect(parseToolResult(imageResponse)).toStrictEqual({
-            ok: true,
-            result: {
-                file: {
-                    name: 'image.png',
-                    mimeType: 'image/png',
-                    encoding: 'base64',
-                    data: Buffer.from('image').toString('base64'),
-                },
-                image: {
-                    width: 1,
-                    height: 1,
-                },
+        expect(expectOk(imageResponse)).toStrictEqual({
+            file: {
+                name: 'image.png',
+                mimeType: 'image/png',
+                encoding: 'base64',
+                data: Buffer.from('image').toString('base64'),
+            },
+            image: {
+                width: 1,
+                height: 1,
             },
         });
     });
@@ -432,17 +471,16 @@ describe('mcp server tools', () => {
         registerArchonTools(server, runtime as any, baseConfig);
 
         const response = await server.tools.get('archon_list_ids')!.handler({});
-        const result = parseToolResult(response);
+        const error = expectFail(response);
 
-        expect(result.ok).toBe(false);
-        expect(result.error).toContain('ARCHON_PASSPHRASE=<redacted>');
-        expect(result.error).toContain('https://<redacted>@bitcoin-mainnet.g.alchemy.com/v3/<redacted>?api_key=<redacted>');
-        expect(result.error).not.toContain('secret');
-        expect(result.error).not.toContain('phrase');
-        expect(result.error).not.toContain('seed');
-        expect(result.error).not.toContain('words');
-        expect(result.error).not.toContain('nsec-secret');
-        expect(result.error).not.toContain('lnbc-secret');
-        expect(result.error).not.toContain('api-token');
+        expect(error).toContain('ARCHON_PASSPHRASE=<redacted>');
+        expect(error).toContain('https://<redacted>@bitcoin-mainnet.g.alchemy.com/v3/<redacted>?api_key=<redacted>');
+        expect(error).not.toContain('secret');
+        expect(error).not.toContain('phrase');
+        expect(error).not.toContain('seed');
+        expect(error).not.toContain('words');
+        expect(error).not.toContain('nsec-secret');
+        expect(error).not.toContain('lnbc-secret');
+        expect(error).not.toContain('api-token');
     });
 });
