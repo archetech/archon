@@ -55,20 +55,26 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
 // MCP requires structuredContent to be a JSON object, so array and scalar results
 // are carried by the text block alone rather than in an invented wrapper object.
 function ok(result: unknown): CallToolResult {
-    const text = result === undefined ? '' : JSON.stringify(result);
+    const json = result === undefined ? undefined : JSON.stringify(result);
     const response: CallToolResult = {
         content: [
             {
                 type: 'text',
-                text,
+                text: json ?? '',
             },
         ],
     };
 
-    if (isJsonObject(result)) {
-        // Round-trip through the serialized text so structuredContent is exactly the JSON
-        // mirrored in the text block: keys with undefined values are dropped by both, not one.
-        response.structuredContent = JSON.parse(text);
+    if (json !== undefined) {
+        // Gate on the serialized payload rather than the raw result: a value can be a JS
+        // object yet serialize to a JSON scalar (a Date, or any toJSON() returning a
+        // non-object). This also keeps structuredContent exactly the JSON mirrored in the
+        // text block -- keys with undefined values are dropped by both, not one.
+        const payload = JSON.parse(json);
+
+        if (isJsonObject(payload)) {
+            response.structuredContent = payload;
+        }
     }
 
     return response;

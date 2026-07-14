@@ -339,6 +339,25 @@ describe('mcp server tools', () => {
         expect(JSON.parse(stringResponse.content[0].text)).toBe('did:cid:new');
     });
 
+    it('omits structuredContent for objects that serialize to a JSON scalar', async () => {
+        const server = new FakeServer();
+        // A Date is a JS object but serializes to a JSON string, as is anything with a
+        // toJSON() returning a non-object. structuredContent must stay a JSON object.
+        const runtime = mockRuntime({
+            resolveDID: jest.fn().mockResolvedValue(new Date('2026-01-01T00:00:00.000Z')),
+            getCredential: jest.fn().mockResolvedValue({ toJSON: () => 'did:cid:credential' }),
+        });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const dateResponse = await server.tools.get('archon_resolve_did')!.handler({ did: 'did:cid:alice' });
+        expect(dateResponse.structuredContent).toBeUndefined();
+        expect(JSON.parse(dateResponse.content[0].text)).toBe('2026-01-01T00:00:00.000Z');
+
+        const toJsonResponse = await server.tools.get('archon_get_credential')!.handler({ did: 'did:cid:credential' });
+        expect(toJsonResponse.structuredContent).toBeUndefined();
+        expect(JSON.parse(toJsonResponse.content[0].text)).toBe('did:cid:credential');
+    });
+
     it('does not advertise mutating tools in read-only mode', () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
