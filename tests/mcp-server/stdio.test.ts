@@ -3,8 +3,12 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { execFileSync } from 'child_process';
 import { ARCHON_MCP_TOOL_DEFINITIONS } from '@didcid/mcp-server';
 
-function parseToolResult(response: any) {
-    return JSON.parse(response.content[0].text);
+// A spec-compliant client detects failure from isError alone; the message is the text block.
+function expectToolError(response: any): string {
+    expect(response.isError).toBe(true);
+    expect(response.structuredContent).toBeUndefined();
+
+    return (response.content as any[])[0].text;
 }
 
 describe('mcp server stdio smoke', () => {
@@ -38,23 +42,23 @@ describe('mcp server stdio smoke', () => {
             expect(toolNames).toContain('archon_create_id');
             expect(toolNames.length).toBe(ARCHON_MCP_TOOL_DEFINITIONS.length);
 
-            const readResult = parseToolResult(await client.callTool({
+            const readResult = await client.callTool({
                 name: 'archon_list_ids',
                 arguments: {},
-            }));
-            expect(readResult).toStrictEqual({
-                ok: false,
-                error: 'ARCHON_PASSPHRASE is required for wallet-backed MCP tools',
             });
+            expect(expectToolError(readResult)).toBe('ARCHON_PASSPHRASE is required for wallet-backed MCP tools');
 
-            const writeResult = parseToolResult(await client.callTool({
+            const writeResult = await client.callTool({
                 name: 'archon_create_id',
                 arguments: { name: 'alice' },
-            }));
-            expect(writeResult).toStrictEqual({
-                ok: false,
-                error: 'ARCHON_PASSPHRASE is required for wallet-backed MCP tools',
             });
+            expect(expectToolError(writeResult)).toBe('ARCHON_PASSPHRASE is required for wallet-backed MCP tools');
+
+            const invalidArgsResult = await client.callTool({
+                name: 'archon_create_id',
+                arguments: {},
+            });
+            expect(expectToolError(invalidArgsResult)).toContain('Required');
         } finally {
             await client.close();
         }

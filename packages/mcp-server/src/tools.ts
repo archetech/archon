@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { McpServerConfig } from './config.js';
 import { ArchonRuntime } from './runtime.js';
 import { errorMessage } from './redact.js';
@@ -47,23 +48,48 @@ const InlineDataSchema = z.object({
     data: z.string(),
 });
 
-function jsonResult(result: unknown) {
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// MCP requires structuredContent to be a JSON object, so array and scalar results
+// are carried by the text block alone rather than in an invented wrapper object.
+function ok(result: unknown): CallToolResult {
+    const json = result === undefined ? undefined : JSON.stringify(result);
+    const response: CallToolResult = {
+        content: [
+            {
+                type: 'text',
+                text: json ?? '',
+            },
+        ],
+    };
+
+    if (json !== undefined) {
+        // Gate on the serialized payload rather than the raw result: a value can be a JS
+        // object yet serialize to a JSON scalar (a Date, or any toJSON() returning a
+        // non-object). This also keeps structuredContent exactly the JSON mirrored in the
+        // text block -- keys with undefined values are dropped by both, not one.
+        const payload = JSON.parse(json);
+
+        if (isJsonObject(payload)) {
+            response.structuredContent = payload;
+        }
+    }
+
+    return response;
+}
+
+function fail(error: unknown): CallToolResult {
     return {
         content: [
             {
                 type: 'text',
-                text: JSON.stringify(result),
+                text: errorMessage(error),
             },
         ],
+        isError: true,
     };
-}
-
-function ok(result: unknown) {
-    return jsonResult({ ok: true, result });
-}
-
-function fail(error: unknown) {
-    return jsonResult({ ok: false, error: errorMessage(error) });
 }
 
 function requireKeymaster(runtime: ArchonRuntime) {

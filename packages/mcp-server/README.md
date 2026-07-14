@@ -67,6 +67,32 @@ Destructive tools require `"confirm": true`, secret-revealing tools require `"re
 
 Set `ARCHON_MCP_READ_ONLY=true` to omit mutating tools from the advertised MCP tool list.
 
+## Tool results
+
+Results follow the MCP specification.
+
+On success, the result is serialized as JSON into a text content block. When the result is a JSON object it is also returned in `structuredContent`:
+
+```json
+{
+  "content": [{ "type": "text", "text": "{\"didDocument\":{\"id\":\"did:cid:alice\"}}" }],
+  "structuredContent": { "didDocument": { "id": "did:cid:alice" } }
+}
+```
+
+MCP requires `structuredContent` to be a JSON object, so tools returning an array or a scalar (for example `archon_list_ids`, or the DID returned by `archon_create_id`) return the text content block only.
+
+Failures — including input validation, a locked wallet, and node errors — are reported as MCP tool execution errors, with `isError: true` and the message in a text content block:
+
+```json
+{
+  "content": [{ "type": "text", "text": "ARCHON_PASSPHRASE is required for wallet-backed MCP tools" }],
+  "isError": true
+}
+```
+
+Error messages are redacted of secrets (passphrases, recovery phrases, nsec keys, credentialed URLs).
+
 ## Examples
 
 Create an ID:
