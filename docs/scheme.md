@@ -269,20 +269,19 @@ After revocation is confirmed on the DID's registry, resolving the DID returns a
         "id": "did:cid:bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha"
     },
     "didResolutionMetadata": {
-        "retrieved": "2026-01-14T19:36:09.115Z"
+        "contentType": "application/did+ld+json"
     },
     "didDocumentMetadata": {
         "deactivated": true,
         "created": "2026-01-14T19:32:24Z",
         "deleted": "2026-01-14T19:34:33Z",
         "versionId": "bagaaierats6ttxvpx2l3tat25ota7z7335akfd2iup5loajsdlqcwismkgpq",
-        "versionSequence": "2",
-        "confirmed": true
+        "versionSequence": "2"
     }
 }
 ```
 
-The metadata has a `deactivated` field set to `true` to conform to the [W3C specification](https://www.w3.org/TR/did-core/#did-document-metadata).
+The metadata has a `deactivated` field set to `true` to conform to the [W3C specification](https://www.w3.org/TR/did-core/#did-document-metadata). The revoked DID's data resource, dereferenced at `/data`, is empty.
 
 ## DID Resolution
 
@@ -336,7 +335,36 @@ A conformant resolution returns only the three members defined by the W3C [DID R
 - `didResolutionMetadata`
 - `didDocumentMetadata`
 
-The method-specific data and registration objects are **not** part of the resolution result; they are exposed as dereferenceable resources (see [DID URL Dereferencing](#did-url-dereferencing)). Standard document metadata — `created`, `updated`, `versionId`, `versionSequence`, `deactivated`, `canonicalId`, `confirmed` — is carried in `didDocumentMetadata`.
+The method-specific data and registration objects are **not** part of the resolution result; they are exposed as dereferenceable resources (see [DID URL Dereferencing](#did-url-dereferencing)). Standard document metadata — `created`, `updated`, `deleted`, `deactivated`, `versionId`, `versionSequence`, `canonicalId` — is carried in `didDocumentMetadata`.
+
+The method-specific `confirmed` and `timestamp` fields are **not** DID Core document metadata, so the conformant surface does not carry them in `didDocumentMetadata`; they are anchoring provenance, returned with the registration resource at `/registration`. The legacy `/api/v1/did/<did>` endpoint continues to include both inline in `didDocumentMetadata`.
+
+`didResolutionMetadata` carries `contentType` — the media type of the returned representation. It does **not** carry the `retrieved` timestamp that the legacy endpoint returns, since that value changes on every call and is not part of the DID Core resolution metadata.
+
+```json
+{
+  "didDocument": { "id": "did:cid:<cid>", "...": "..." },
+  "didResolutionMetadata": {
+    "contentType": "application/did+ld+json"
+  },
+  "didDocumentMetadata": {
+    "created": "2026-01-14T19:32:24Z",
+    "versionId": "bagaaiera...",
+    "versionSequence": "1"
+  }
+}
+```
+
+### Representations
+
+The resolver negotiates the DID document representation from the `Accept` request header, and echoes the selected media type in both the `Content-Type` response header and `didResolutionMetadata.contentType`:
+
+| `Accept` | Representation |
+|----------|----------------|
+| `application/did+ld+json` (or absent) | JSON-LD — the default |
+| `application/did+json` | Plain JSON |
+
+Responses set `Vary: Accept`. This applies to the resolution result only; the `/data` and `/registration` resources are plain `application/json`.
 
 ### Endpoints
 
@@ -358,10 +386,27 @@ Dereferencing a `did:cid` DID URL returns a *resource* associated with the DID, 
 
 This method defines two dereferenceable resources, selected by the DID URL path:
 
-- **`/data`** — `did:cid:<cid>/data` dereferences to the DID's data resource (`didDocumentData` in the internal document set). Agent DIDs have an empty data resource; asset DIDs return their attached data.
-- **`/registration`** — `did:cid:<cid>/registration` dereferences to the DID's registration/anchoring provenance (registry, type, validity, version). This is method-specific provenance, not W3C DID document metadata, which is why it is dereferenced rather than embedded in `didDocumentMetadata`.
+- **`/data`** — `did:cid:<cid>/data` dereferences to the DID's data resource: the bare `didDocumentData` object from the internal document set. Agent DIDs have an empty data resource (`{}`); asset DIDs return their attached data. A revoked DID's data resource is empty.
+- **`/registration`** — `did:cid:<cid>/registration` dereferences to the DID's registration/anchoring provenance: the `didDocumentRegistration` object (registry, type, validity, version), plus the anchoring state `confirmed` and, where the registry anchors to a blockchain, `timestamp`. This is method-specific provenance, not W3C DID document metadata, which is why it is dereferenced rather than embedded in `didDocumentMetadata`.
 
-Neither resource is part of the DID resolution result. Both honor the `versionTime` and `versionSequence` version selectors.
+```json
+{
+  "registry": "BTC:mainnet",
+  "type": "agent",
+  "version": 1,
+  "confirmed": true,
+  "timestamp": {
+    "chain": "BTC:mainnet",
+    "opid": "bagaaiera...",
+    "lowerBound": { "time": 1768424000, "timeISO": "2026-01-14T19:33:20Z", "blockid": "0000...", "height": 878123 },
+    "upperBound": { "time": 1768425200, "timeISO": "2026-01-14T19:53:20Z", "blockid": "0000...", "height": 878125, "txid": "…", "txidx": 3 }
+  }
+}
+```
+
+`timestamp` is present only when the DID's registry anchors to a blockchain and the anchoring block is known; registries such as `hyperswarm` return the registration fields and `confirmed` alone.
+
+Neither resource is part of the DID resolution result. Both honor the `versionTime` and `versionSequence` version selectors, and both are returned as plain `application/json`.
 
 ### Fragments
 
