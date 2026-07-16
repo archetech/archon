@@ -27,7 +27,15 @@ async function readAsset(runtime: ArchonRuntime, uri: URL): Promise<ReadResource
     // fallback below pays a second.
     const file = await keymaster.getFile(did);
 
-    if (file?.data) {
+    if (file) {
+        // getFile returns the file WITHOUT data when the gatekeeper cannot fetch its CID,
+        // and returns null only when the asset is not a file asset at all. Those are
+        // different failures and must not collapse: falling back to JSON here would answer
+        // a request for bytes with metadata, reporting an unavailable CID as a success.
+        if (!file.data) {
+            throw new Error(`Asset data is unavailable for ${did}`);
+        }
+
         return {
             contents: [{
                 uri: did,
@@ -37,8 +45,8 @@ async function readAsset(runtime: ArchonRuntime, uri: URL): Promise<ReadResource
         };
     }
 
-    // Any other asset is readable as its JSON data, so a did:cid URI resolves to something
-    // sensible rather than erroring based on which flavour of asset it happens to be.
+    // Not a file or image asset. Any other asset is readable as its JSON data, so a did:cid
+    // URI resolves to something sensible rather than erroring on the flavour of asset.
     const asset = await keymaster.resolveAsset(did);
 
     return {

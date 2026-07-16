@@ -73,6 +73,18 @@ describe('mcp server resources', () => {
         }]);
     });
 
+    it('errors rather than answering with metadata when asset bytes are unavailable', async () => {
+        const keymaster = mockKeymaster();
+        // What getFile really returns when the gatekeeper cannot fetch the CID: the file
+        // asset, minus its data. Distinct from null, which means "not a file asset".
+        keymaster.getFile.mockResolvedValue({ filename: 'hello.txt', type: 'text/plain', cid: 'bafy...' });
+        const client = await connect(keymaster);
+
+        await expect(client.readResource({ uri: FILE_DID })).rejects.toThrow(/unavailable/i);
+        // Must not silently degrade into a JSON read of the asset's metadata.
+        expect(keymaster.resolveAsset).not.toHaveBeenCalled();
+    });
+
     it('does not enumerate wallet assets', async () => {
         const keymaster = mockKeymaster();
         const client = await connect(keymaster);
