@@ -101,8 +101,11 @@ const WalletFileSchema = z.object({
     current: z.string().optional(),
     aliases: z.record(z.string()).optional(),
 }).passthrough();
-// StoredWallet is a union: restore accepts an encrypted backup or a plaintext wallet, and
-// saveWallet decrypts the former. The branches are NOT disjoint -- both passthrough, so an
+// StoredWallet is a union: restore accepts an encrypted backup (WalletEncFile) or a wallet
+// whose metadata is unencrypted (WalletFile), and saveWallet decrypts the former. Neither
+// form carries a plaintext secret -- both guards require seed.mnemonicEnc, the
+// passphrase-encrypted mnemonic; `enc` covers only counter/ids/aliases.
+// The branches are NOT disjoint -- both passthrough, so an
 // object carrying `enc` alongside `counter`/`ids` satisfies either. Order therefore matters
 // and encrypted must come first, which is what keymaster does too: isWalletEncFile keys on
 // `enc` being a string, and isWalletFile explicitly requires !('enc' in obj). So a hybrid
@@ -341,7 +344,7 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_import_wallet', cliCommand: 'import-wallet', description: 'Create a new wallet from a recovery phrase.', schema: z.object({ recoveryPhrase: z.string() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { recoveryPhrase }) => requireKeymaster(runtime).newWallet(recoveryPhrase, true) }),
     tool({ name: 'archon_show_wallet', cliCommand: 'show-wallet', description: 'Show the decrypted local wallet.', schema: RevealSchema, handler: runtime => requireKeymaster(runtime).loadWallet() }),
     tool({ name: 'archon_backup_wallet_file', cliCommand: 'backup-wallet-file', description: 'Return the encrypted wallet backup payload.', schema: RevealSchema, handler: runtime => requireKeymaster(runtime).exportEncryptedWallet() }),
-    tool({ name: 'archon_restore_wallet_file', cliCommand: 'restore-wallet-file', description: 'Restore the local wallet from a wallet payload, either an encrypted backup or a plaintext wallet.', schema: z.object({ wallet: StoredWalletSchema }).merge(ConfirmSchema), mutates: true, handler: (runtime, { wallet }) => requireKeymaster(runtime).saveWallet(wallet, true) }),
+    tool({ name: 'archon_restore_wallet_file', cliCommand: 'restore-wallet-file', description: 'Restore the local wallet from a wallet payload, either an encrypted backup or a wallet whose metadata is unencrypted. The seed is passphrase-encrypted in both, and the current passphrase must match.', schema: z.object({ wallet: StoredWalletSchema }).merge(ConfirmSchema), mutates: true, handler: (runtime, { wallet }) => requireKeymaster(runtime).saveWallet(wallet, true) }),
     tool({ name: 'archon_show_mnemonic', cliCommand: 'show-mnemonic', description: 'Reveal the wallet recovery phrase.', schema: RevealSchema, handler: runtime => requireKeymaster(runtime).decryptMnemonic() }),
     tool({ name: 'archon_backup_wallet_did', cliCommand: 'backup-wallet-did', description: 'Backup wallet to an encrypted DID and seed bank.', schema: ConfirmSchema, mutates: true, handler: runtime => requireKeymaster(runtime).backupWallet() }),
     tool({ name: 'archon_recover_wallet_did', cliCommand: 'recover-wallet-did', description: 'Recover wallet from seed bank or encrypted DID.', schema: z.object({ did: z.string().optional() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { did }) => requireKeymaster(runtime).recoverWallet(did) }),

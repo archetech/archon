@@ -529,19 +529,21 @@ describe('mcp server tools', () => {
         );
     });
 
-    it('accepts either an encrypted or a plaintext wallet on restore', async () => {
+    it('accepts both wallet forms on restore', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
         registerArchonTools(server, runtime as any, baseConfig);
 
-        // StoredWallet is a union; saveWallet decrypts the encrypted form itself.
+        // StoredWallet is a union; saveWallet decrypts the encrypted form itself. Neither
+        // form holds a plaintext secret -- the seed is passphrase-encrypted in both, and only
+        // the metadata (counter/ids/aliases) differs in whether it is wrapped in `enc`.
         const encrypted = { version: 2, seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } }, enc: 'ciphertext' };
         expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: encrypted, confirm: true }));
         expect(runtime.keymaster.saveWallet).toHaveBeenCalledWith(encrypted, true);
 
-        const plaintext = { version: 2, seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } }, counter: 1, ids: {} };
-        expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: plaintext, confirm: true }));
-        expect(runtime.keymaster.saveWallet).toHaveBeenLastCalledWith(plaintext, true);
+        const unencryptedMetadata = { version: 2, seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } }, counter: 1, ids: {} };
+        expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: unencryptedMetadata, confirm: true }));
+        expect(runtime.keymaster.saveWallet).toHaveBeenLastCalledWith(unencryptedMetadata, true);
 
         // Neither branch matches, so the union rejects rather than guessing.
         expect(expectFail(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: { seed: {} }, confirm: true }))).toMatch(/enc|counter|ids|mnemonicEnc/);
