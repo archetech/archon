@@ -91,7 +91,7 @@ const defaultToolArgs = {
     value: 'world',
     version: 1,
     vote: 1,
-    wallet: { version: 2, seed: {}, counter: 0, ids: {} },
+    wallet: { version: 2, seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } }, counter: 0, ids: {} },
 };
 
 const toolArgOverrides: Record<string, Record<string, unknown>> = {
@@ -453,7 +453,7 @@ describe('mcp server tools', () => {
         registerArchonTools(server, runtime as any, baseConfig);
 
         const wallet = {
-            version: 2,
+            version: 2 as const,
             seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' }, customSeedField: 'keep' },
             counter: 4,
             ids: { alice: { did: 'did:cid:alice', account: 0, index: 1, owned: ['did:cid:asset'], customIdField: 'keep' } },
@@ -539,12 +539,37 @@ describe('mcp server tools', () => {
         expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: encrypted, confirm: true }));
         expect(runtime.keymaster.saveWallet).toHaveBeenCalledWith(encrypted, true);
 
-        const plaintext = { version: 2, seed: {}, counter: 1, ids: {} };
+        const plaintext = { version: 2, seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } }, counter: 1, ids: {} };
         expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: plaintext, confirm: true }));
         expect(runtime.keymaster.saveWallet).toHaveBeenLastCalledWith(plaintext, true);
 
         // Neither branch matches, so the union rejects rather than guessing.
-        expect(expectFail(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: { seed: {} }, confirm: true }))).toMatch(/enc|counter|ids/);
+        expect(expectFail(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: { seed: {} }, confirm: true }))).toMatch(/enc|counter|ids|mnemonicEnc/);
+    });
+
+    it('accepts a v1 wallet and preserves its legacy names field', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        // keymaster's upgradeWallet renames `names` to `aliases` for v1 wallets, so the
+        // schema must not drop `names` before it ever gets there -- passthrough carries it.
+        const v1 = {
+            version: 1,
+            seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } },
+            counter: 2,
+            ids: {},
+            names: { bob: 'did:cid:bob' },
+        };
+
+        expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: v1, confirm: true }));
+        expect(runtime.keymaster.saveWallet).toHaveBeenCalledWith(v1, true);
+
+        // Both guards require version 1|2, so a v3 wallet is rejected at the boundary
+        // rather than reaching keymaster's "Unsupported wallet version." deeper in.
+        expect(expectFail(await server.tools.get('archon_restore_wallet_file')!.handler({
+            wallet: { ...v1, version: 3 }, confirm: true,
+        }))).toMatch(/version/);
     });
 
     it('passes inline base64 payloads to file-like tools', async () => {
