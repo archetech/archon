@@ -105,7 +105,7 @@ Tools returning binary assets use the content block types the protocol defines f
 }
 ```
 
-`archon_get_asset_file` returns an embedded `resource` block identified by the asset's DID:
+`archon_get_asset_file` returns an embedded `resource` block identified by the asset's DID, which is a URI the server also serves as an MCP resource — see [Resources](#resources):
 
 ```json
 {
@@ -143,6 +143,23 @@ They are declared selectively rather than everywhere, by design:
 So the bar is: the result is an object the tool always returns, and something downstream consumes a field from it. Schemas describe the nesting a caller must navigate — leaves are intentionally loose, and fields typed `unknown` at the source (such as `didDocumentData`) stay unknown.
 
 If you add one, it must be a `.passthrough()` object. A plain zod object serializes to `additionalProperties: false`, which makes clients reject any field the schema doesn't enumerate.
+
+## Resources
+
+The server implements the MCP `resources` capability. An Archon asset DID is already a URI, so it is the resource URI verbatim — the same one `archon_get_asset_file` puts in its embedded `resource` block. `resources/read` on that URI returns the asset:
+
+```json
+{
+  "uri": "did:cid:z3v8Auah...",
+  "contents": [{ "uri": "did:cid:z3v8Auah...", "mimeType": "text/plain", "blob": "<base64>" }]
+}
+```
+
+File and image assets return their bytes; any other asset returns its JSON data with `mimeType: "application/json"`. URIs that are not `did:cid:` are not matched.
+
+**`resources/list` is empty by design.** Enumerating every asset in the wallet would disclose its contents to any connected client, whether or not it ever reads one. Reads are by a DID the caller already holds, which reveals nothing that resolving that DID wouldn't. `resources/templates/list` advertises `did:cid:{id}`, so the read path is still discoverable. What a filtered list should expose is an open question.
+
+Resource reads are wallet-backed and require `ARCHON_PASSPHRASE`, the same as the equivalent tools. They are reads, so `ARCHON_MCP_READ_ONLY` does not affect them.
 
 ## Examples
 

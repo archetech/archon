@@ -3,13 +3,15 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { loadConfig } from './config.js';
 import { createArchonRuntime } from './runtime.js';
 import { registerArchonTools } from './tools.js';
+import { registerArchonResources } from './resources.js';
 
 export { loadConfig, walletLocation } from './config.js';
 export type { McpServerConfig, WalletType } from './config.js';
-export { createArchonRuntime, createWallet } from './runtime.js';
+export { createArchonRuntime, createWallet, requireKeymaster } from './runtime.js';
 export type { ArchonRuntime } from './runtime.js';
 export { ARCHON_MCP_CLI_COMMANDS, ARCHON_MCP_TOOL_DEFINITIONS, registerArchonTools } from './tools.js';
 export type { ArchonToolDefinition } from './tools.js';
+export { ARCHON_ASSET_URI_TEMPLATE, registerArchonResources } from './resources.js';
 
 export async function main(): Promise<void> {
     const config = loadConfig();
@@ -20,6 +22,7 @@ export async function main(): Promise<void> {
     });
 
     registerArchonTools(server as any, runtime, config);
+    registerArchonResources(server as any, runtime);
 
     const transport = new StdioServerTransport();
     await server.connect(transport);

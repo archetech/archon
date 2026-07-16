@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { McpServerConfig } from './config.js';
-import { ArchonRuntime } from './runtime.js';
+import { ArchonRuntime, requireKeymaster } from './runtime.js';
 import { errorMessage } from './redact.js';
 
 type RegisterableServer = {
@@ -291,14 +291,6 @@ function fail(error: unknown): CallToolResult {
         ],
         isError: true,
     };
-}
-
-function requireKeymaster(runtime: ArchonRuntime) {
-    if (!runtime.keymaster) {
-        throw new Error('ARCHON_PASSPHRASE is required for wallet-backed MCP tools');
-    }
-
-    return runtime.keymaster;
 }
 
 function compactOptions<T extends Record<string, unknown>>(options: T): Partial<T> | undefined {

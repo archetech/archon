@@ -11,6 +11,16 @@ export interface ArchonRuntime {
     keymaster?: Keymaster;
 }
 
+// Shared by tools and resources: both surfaces are wallet-backed and must fail the same
+// way when the server was started without a passphrase.
+export function requireKeymaster(runtime: ArchonRuntime): Keymaster {
+    if (!runtime.keymaster) {
+        throw new Error('ARCHON_PASSPHRASE is required for wallet-backed MCP tools');
+    }
+
+    return runtime.keymaster;
+}
+
 export async function createWallet(config: McpServerConfig) {
     const { directory, file } = walletLocation(config.walletPath);
 
