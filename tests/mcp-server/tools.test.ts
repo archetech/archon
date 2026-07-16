@@ -494,7 +494,11 @@ describe('mcp server tools', () => {
             { type: 'text', text: JSON.stringify({ name: 'file.txt', mimeType: 'text/plain' }) },
         ]);
         expect(response.structuredContent).toStrictEqual({ name: 'file.txt', mimeType: 'text/plain' });
+        // Resolved once, then getFile is handed the DID rather than the alias: getFile
+        // resolves internally too, and resolving an alias decrypts the wallet.
+        expect(runtime.keymaster.lookupDID).toHaveBeenCalledTimes(1);
         expect(runtime.keymaster.lookupDID).toHaveBeenCalledWith('file-alias');
+        expect(runtime.keymaster.getFile).toHaveBeenCalledWith('did:cid:file');
     });
 
     it('defaults the mimeType and drops absent metadata from both mirrors', async () => {
