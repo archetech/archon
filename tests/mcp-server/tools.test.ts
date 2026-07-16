@@ -98,13 +98,15 @@ const toolArgOverrides: Record<string, Record<string, unknown>> = {
 };
 
 // Asserts a spec-shaped success: no isError, and structuredContent (when the result is a
-// JSON object) mirrors the serialized text block. Returns the payload.
+// JSON object) mirrors the serialized text block. Returns the payload. Tools that emit
+// image/resource blocks carry their metadata in a trailing text block, so this looks the
+// text block up by type rather than assuming it comes first.
 function expectOk(response: any) {
     if (response.isError) {
         throw new Error(`unexpected tool error: ${response.content[0].text}`);
     }
 
-    const text = response.content[0].text;
+    const text = response.content.find((block: any) => block.type === 'text').text;
     const payload = text === '' ? undefined : JSON.parse(text);
 
     if (isJsonObject(payload)) {
@@ -220,6 +222,7 @@ function mockRuntime(overrides: Record<string, unknown> = {}) {
         resolveAsset: jest.fn().mockResolvedValue({ hello: 'world' }),
         getImage: jest.fn().mockResolvedValue({ file: { filename: 'image.png', type: 'image/png', data: Buffer.from('image') }, image: { width: 1, height: 1 } }),
         getFile: jest.fn().mockResolvedValue({ filename: 'file.txt', type: 'text/plain', data: Buffer.from('file') }),
+        lookupDID: jest.fn().mockResolvedValue('did:cid:file'),
         mergeData: jest.fn().mockResolvedValue(true),
         updateImage: jest.fn().mockResolvedValue(true),
         updateFile: jest.fn().mockResolvedValue(true),
@@ -452,32 +455,53 @@ describe('mcp server tools', () => {
         );
     });
 
-    it('returns file-like assets as inline payloads', async () => {
+    it('returns an image asset as an image content block', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
         registerArchonTools(server, runtime as any, baseConfig);
 
-        const fileResponse = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
-        expect(expectOk(fileResponse)).toStrictEqual({
-            name: 'file.txt',
-            mimeType: 'text/plain',
-            encoding: 'base64',
-            data: Buffer.from('file').toString('base64'),
-        });
+        const response: any = await server.tools.get('archon_get_asset_image')!.handler({ id: 'did:cid:image' });
 
-        const imageResponse = await server.tools.get('archon_get_asset_image')!.handler({ id: 'did:cid:image' });
-        expect(expectOk(imageResponse)).toStrictEqual({
-            file: {
-                name: 'image.png',
-                mimeType: 'image/png',
-                encoding: 'base64',
-                data: Buffer.from('image').toString('base64'),
+        expect(response.isError).toBeUndefined();
+        expect(response.content).toStrictEqual([
+            { type: 'image', data: Buffer.from('image').toString('base64'), mimeType: 'image/png' },
+            { type: 'text', text: JSON.stringify({ name: 'image.png', image: { width: 1, height: 1 } }) },
+        ]);
+        expect(response.structuredContent).toStrictEqual({ name: 'image.png', image: { width: 1, height: 1 } });
+    });
+
+    it('returns a file asset as an embedded resource content block', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'file-alias' });
+
+        expect(response.isError).toBeUndefined();
+        expect(response.content).toStrictEqual([
+            {
+                type: 'resource',
+                resource: {
+                    uri: 'did:cid:file',
+                    mimeType: 'text/plain',
+                    blob: Buffer.from('file').toString('base64'),
+                },
             },
-            image: {
-                width: 1,
-                height: 1,
-            },
-        });
+            { type: 'text', text: JSON.stringify({ name: 'file.txt', mimeType: 'text/plain' }) },
+        ]);
+        expect(response.structuredContent).toStrictEqual({ name: 'file.txt', mimeType: 'text/plain' });
+        expect(runtime.keymaster.lookupDID).toHaveBeenCalledWith('file-alias');
+    });
+
+    it('returns null for file-like assets with no data', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        runtime.keymaster.getImage.mockResolvedValue(null);
+        runtime.keymaster.getFile.mockResolvedValue(null);
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        expect(expectOk(await server.tools.get('archon_get_asset_image')!.handler({ id: 'did:cid:image' }))).toBeNull();
+        expect(expectOk(await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' }))).toBeNull();
     });
 
     it('redacts secrets from tool errors', async () => {

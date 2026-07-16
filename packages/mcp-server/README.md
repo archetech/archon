@@ -61,7 +61,7 @@ CLI file commands use inline data instead of arbitrary local paths. Binary/text 
 }
 ```
 
-Use `"encoding": "utf8"` when passing plain text directly. Returned file-like data uses the same shape with base64 encoding.
+Use `"encoding": "utf8"` when passing plain text directly. This inline shape is for tool *arguments*; returned binary data uses MCP content blocks instead — see [Tool results](#tool-results).
 
 Destructive tools require `"confirm": true`, secret-revealing tools require `"reveal": true`, and Lightning payment/broadcast tools require `"confirmPayment": true`.
 
@@ -81,6 +81,32 @@ On success, the result is serialized as JSON into a text content block. When the
 ```
 
 MCP requires `structuredContent` to be a JSON object, so tools returning an array or a scalar (for example `archon_list_ids`, or the DID returned by `archon_create_id`) return the text content block only.
+
+Tools returning binary assets use the content block types the protocol defines for them, so clients can render them natively. `archon_get_asset_image` returns an `image` block plus a text block carrying the filename and dimensions:
+
+```json
+{
+  "content": [
+    { "type": "image", "data": "<base64>", "mimeType": "image/png" },
+    { "type": "text", "text": "{\"name\":\"image.png\",\"image\":{\"width\":1,\"height\":1}}" }
+  ],
+  "structuredContent": { "name": "image.png", "image": { "width": 1, "height": 1 } }
+}
+```
+
+`archon_get_asset_file` returns an embedded `resource` block identified by the asset's DID:
+
+```json
+{
+  "content": [
+    { "type": "resource", "resource": { "uri": "did:cid:file", "mimeType": "text/plain", "blob": "<base64>" } },
+    { "type": "text", "text": "{\"name\":\"file.txt\",\"mimeType\":\"text/plain\"}" }
+  ],
+  "structuredContent": { "name": "file.txt", "mimeType": "text/plain" }
+}
+```
+
+Both return `null` when the asset carries no data.
 
 Failures — including input validation, a locked wallet, and node errors — are reported as MCP tool execution errors, with `isError: true` and the message in a text content block:
 
