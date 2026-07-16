@@ -106,7 +106,10 @@ function expectOk(response: any) {
         throw new Error(`unexpected tool error: ${response.content[0].text}`);
     }
 
-    const text = response.content.find((block: any) => block.type === 'text').text;
+    const textBlock = response.content.find((block: any) => block.type === 'text');
+    expect(textBlock).toBeDefined();
+
+    const text = textBlock.text;
     const payload = text === '' ? undefined : JSON.parse(text);
 
     if (isJsonObject(payload)) {
@@ -463,11 +466,12 @@ describe('mcp server tools', () => {
         const response: any = await server.tools.get('archon_get_asset_image')!.handler({ id: 'did:cid:image' });
 
         expect(response.isError).toBeUndefined();
+        const metadata = { name: 'image.png', mimeType: 'image/png', image: { width: 1, height: 1 } };
         expect(response.content).toStrictEqual([
             { type: 'image', data: Buffer.from('image').toString('base64'), mimeType: 'image/png' },
-            { type: 'text', text: JSON.stringify({ name: 'image.png', image: { width: 1, height: 1 } }) },
+            { type: 'text', text: JSON.stringify(metadata) },
         ]);
-        expect(response.structuredContent).toStrictEqual({ name: 'image.png', image: { width: 1, height: 1 } });
+        expect(response.structuredContent).toStrictEqual(metadata);
     });
 
     it('returns a file asset as an embedded resource content block', async () => {
@@ -491,6 +495,21 @@ describe('mcp server tools', () => {
         ]);
         expect(response.structuredContent).toStrictEqual({ name: 'file.txt', mimeType: 'text/plain' });
         expect(runtime.keymaster.lookupDID).toHaveBeenCalledWith('file-alias');
+    });
+
+    it('defaults the mimeType and drops absent metadata from both mirrors', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        runtime.keymaster.getFile.mockResolvedValue({ data: Buffer.from('file') });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+
+        expect((response.content[0] as any).resource.mimeType).toBe('application/octet-stream');
+        // structuredContent must be exactly the text block's payload: an absent filename
+        // is dropped by both, not left as an undefined key on one side.
+        expect(response.structuredContent).toStrictEqual({ mimeType: 'application/octet-stream' });
+        expect(JSON.parse(response.content[1].text)).toStrictEqual(response.structuredContent);
     });
 
     it('returns null for file-like assets with no data', async () => {
