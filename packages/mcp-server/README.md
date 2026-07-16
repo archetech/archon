@@ -67,6 +67,17 @@ Destructive tools require `"confirm": true`, secret-revealing tools require `"re
 
 Set `ARCHON_MCP_READ_ONLY=true` to omit mutating tools from the advertised MCP tool list.
 
+### Structured inputs
+
+Tools whose argument is a specific object — `archon_restore_wallet_file` (a wallet), `archon_update_credential` (a credential), `archon_create_poll` (a poll config), `archon_create_dmail` / `archon_update_dmail` (a message) — declare that object's real shape, so the advertised input schema tells a client what to send and malformed input is rejected at the tool boundary rather than failing deeper inside Keymaster.
+
+Two rules apply when adding or changing one:
+
+- **Passthrough wherever the underlying type has an index signature.** Zod *strips* unknown keys rather than rejecting them, so a schema that omits an extension point silently deletes data — a wallet's custom metadata, or a credential's claims. Use a plain object only where the type is closed (`PollConfig`, `DmailMessage`), so junk fields are dropped instead of stored.
+- **Never be stricter than the Keymaster method behind the tool**, or the tool rejects input the CLI and REST API accept. Poll deadlines stay plain strings rather than ISO date-times because Keymaster accepts anything `new Date()` parses.
+
+Keymaster remains authoritative and re-validates everything. Semantic rules it enforces that a JSON Schema cannot express — a deadline must be in the future, a recipient must resolve to an agent — are not duplicated here; only constraints a client can act on before calling are.
+
 ## Tool results
 
 Results follow the MCP specification.

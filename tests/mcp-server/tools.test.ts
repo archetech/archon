@@ -38,11 +38,17 @@ const defaultToolArgs = {
     bolt11: 'lnbc...',
     challenge: { prompt: 'prove it' },
     claims: { name: 'Alice' },
-    config: { title: 'Poll', options: ['yes', 'no'] },
+    config: { version: 2, name: 'Poll', description: 'Best option?', options: ['yes', 'no'], deadline: '2099-01-01T00:00:00Z' },
     confirm: true,
     confirmPayment: true,
     controller: 'did:cid:bob',
-    credential: { type: ['VerifiableCredential'] },
+    credential: {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
+        issuer: 'did:cid:issuer',
+        validFrom: '2026-01-01T00:00:00Z',
+        credentialSubject: { id: 'did:cid:alice', name: 'Alice' },
+    },
     data: { hello: 'world' },
     did: 'did:cid:alice',
     domain: 'example.com',
@@ -58,7 +64,7 @@ const defaultToolArgs = {
     key: 'hello',
     member: 'did:cid:member',
     memo: 'coffee',
-    message: { body: 'hello' },
+    message: { to: ['did:cid:bob'], cc: [], subject: 'hi', body: 'hello' },
     name: 'Alice',
     newName: 'Alicia',
     newPassphrase: 'new secret',
@@ -85,7 +91,7 @@ const defaultToolArgs = {
     value: 'world',
     version: 1,
     vote: 1,
-    wallet: { version: 2, ids: {} },
+    wallet: { version: 2, seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } }, counter: 0, ids: {} },
 };
 
 const toolArgOverrides: Record<string, Record<string, unknown>> = {
@@ -435,6 +441,137 @@ describe('mcp server tools', () => {
             { hello: 'world' },
             { alias: 'hello', registry: 'hyperswarm' }
         );
+    });
+
+    // Zod strips unknown keys on parse, so a schema that omits an extension point does not
+    // reject data -- it silently deletes it. These two tools carry types that declare
+    // `[key: string]: any`, and losing those keys would corrupt a restored wallet or erase
+    // a credential's claims, so the schemas must passthrough.
+    it('preserves custom metadata when restoring a wallet', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const wallet = {
+            version: 2 as const,
+            seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' }, customSeedField: 'keep' },
+            counter: 4,
+            ids: { alice: { did: 'did:cid:alice', account: 0, index: 1, owned: ['did:cid:asset'], customIdField: 'keep' } },
+            current: 'alice',
+            aliases: { bob: 'did:cid:bob' },
+            customWalletField: 'keep',
+        };
+
+        expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet, confirm: true }));
+
+        // Byte-identical: nothing added, nothing dropped.
+        expect(runtime.keymaster.saveWallet).toHaveBeenCalledWith(wallet, true);
+    });
+
+    it('preserves credential claims when updating a credential', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const credential = {
+            '@context': ['https://www.w3.org/ns/credentials/v2'],
+            type: ['VerifiableCredential'],
+            issuer: 'did:cid:issuer',
+            validFrom: '2026-01-01T00:00:00Z',
+            credentialSubject: { id: 'did:cid:alice', name: 'Alice', age: 30 },
+            proof: { type: 'SomeOtherSignature2030', proofValue: 'z1' },
+        };
+
+        expectOk(await server.tools.get('archon_update_credential')!.handler({ did: 'did:cid:vc', credential }));
+
+        // The claims under credentialSubject survive, and so does an unmodelled proof --
+        // updateCredential deletes and re-signs it, so constraining it would reject
+        // credentials keymaster accepts.
+        expect(runtime.keymaster.updateCredential).toHaveBeenCalledWith('did:cid:vc', credential);
+    });
+
+    it('rejects malformed input at the tool boundary', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const poll = server.tools.get('archon_create_poll')!.handler;
+        const base = { version: 2 as const, name: 'Poll', description: 'd', options: ['a', 'b'], deadline: '2099-01-01' };
+
+        expect(expectFail(await poll({ config: { ...base, options: ['only-one'] } }))).toMatch(/options/);
+        expect(expectFail(await poll({ config: { ...base, version: 1 } }))).toMatch(/version/);
+        expect(expectFail(await poll({ config: { ...base, name: '' } }))).toMatch(/name/);
+
+        // Previously accepted and passed to keymaster, which failed deeper in.
+        expect(expectFail(await poll({ config: { title: 'Poll', options: ['yes', 'no'] } }))).toMatch(/version|name|description|deadline/);
+        expect(runtime.keymaster.createPoll).not.toHaveBeenCalled();
+
+        const dmail = server.tools.get('archon_create_dmail')!.handler;
+        expect(expectFail(await dmail({ message: { to: [], subject: 's', body: 'b' } }))).toMatch(/to/);
+        expect(expectFail(await dmail({ message: { to: ['did:cid:bob'], subject: '', body: 'b' } }))).toMatch(/subject/);
+    });
+
+    it('defaults an omitted dmail cc to an empty list', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        // keymaster's verifyRecipientList throws InvalidParameterError('list') on a missing
+        // cc, which reads as a bug rather than a missing field. Defaulting is strictly more
+        // permissive than the old behaviour, so nothing that worked before breaks.
+        expectOk(await server.tools.get('archon_create_dmail')!.handler({
+            message: { to: ['did:cid:bob'], subject: 'hi', body: 'hello' },
+        }));
+
+        expect(runtime.keymaster.createDmail).toHaveBeenCalledWith(
+            { to: ['did:cid:bob'], cc: [], subject: 'hi', body: 'hello' },
+            undefined
+        );
+    });
+
+    it('accepts both wallet forms on restore', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        // StoredWallet is a union; saveWallet decrypts the encrypted form itself. Neither
+        // form holds a plaintext secret -- the seed is passphrase-encrypted in both, and only
+        // the metadata (counter/ids/aliases) differs in whether it is wrapped in `enc`.
+        const encrypted = { version: 2, seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } }, enc: 'ciphertext' };
+        expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: encrypted, confirm: true }));
+        expect(runtime.keymaster.saveWallet).toHaveBeenCalledWith(encrypted, true);
+
+        const unencryptedMetadata = { version: 2, seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } }, counter: 1, ids: {} };
+        expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: unencryptedMetadata, confirm: true }));
+        expect(runtime.keymaster.saveWallet).toHaveBeenLastCalledWith(unencryptedMetadata, true);
+
+        // Neither branch matches, so the union rejects rather than guessing.
+        expect(expectFail(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: { seed: {} }, confirm: true }))).toMatch(/enc|counter|ids|mnemonicEnc/);
+    });
+
+    it('accepts a v1 wallet and preserves its legacy names field', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        // keymaster's upgradeWallet renames `names` to `aliases` for v1 wallets, so the
+        // schema must not drop `names` before it ever gets there -- passthrough carries it.
+        const v1 = {
+            version: 1,
+            seed: { mnemonicEnc: { salt: 's', iv: 'i', data: 'd' } },
+            counter: 2,
+            ids: {},
+            names: { bob: 'did:cid:bob' },
+        };
+
+        expectOk(await server.tools.get('archon_restore_wallet_file')!.handler({ wallet: v1, confirm: true }));
+        expect(runtime.keymaster.saveWallet).toHaveBeenCalledWith(v1, true);
+
+        // Both guards require version 1|2, so a v3 wallet is rejected at the boundary
+        // rather than reaching keymaster's "Unsupported wallet version." deeper in.
+        expect(expectFail(await server.tools.get('archon_restore_wallet_file')!.handler({
+            wallet: { ...v1, version: 3 }, confirm: true,
+        }))).toMatch(/version/);
     });
 
     it('passes inline base64 payloads to file-like tools', async () => {

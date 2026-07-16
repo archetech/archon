@@ -53,6 +53,98 @@ const ConfirmSchema = z.object({ confirm: z.literal(true) });
 const RevealSchema = z.object({ reveal: z.literal(true) });
 const ConfirmPaymentSchema = z.object({ confirmPayment: z.literal(true) });
 const JsonObjectSchema = z.record(z.unknown());
+
+// Input schemas for tools whose keymaster method needs a specific shape. Two rules learned
+// the hard way, both about .passthrough():
+//
+//   1. Where the source type declares an index signature (`[key: string]: any`), the schema
+//      MUST passthrough. Zod STRIPS unknown keys on parse, so a plain object here would
+//      silently delete a wallet's custom metadata on restore, or a credential's claims on
+//      update -- data loss, not a validation error. Passthrough is used exactly where the
+//      source type declares an extension point, and omitted where the type is closed
+//      (PollConfig, DmailMessage), so junk fields are dropped rather than stored.
+//   2. Never be stricter than the keymaster method behind the tool, or the tool rejects
+//      input the rest of the codebase accepts. Deadlines stay z.string() rather than
+//      .datetime() because keymaster accepts anything `new Date()` parses ('2026-12-01').
+//
+// Semantic rules that JSON Schema cannot express (a deadline in the future, a recipient
+// resolving to an agent) stay in keymaster, which is authoritative and enforces them for
+// CLI and REST callers too. What is mirrored here is only what a client can act on before
+// calling; keymaster re-validates everything regardless.
+// keymaster's isWalletEncFile/isWalletFile guards (db/typeGuards.ts) are what actually gate
+// a restore, and they are the contract mirrored here -- not the WalletFile type, which
+// disagrees with them (it marks `version` optional; the guards require it). Both guards
+// demand version 1|2 and seed.mnemonicEnc, so requiring those rejects at the boundary
+// exactly what keymaster would reject with "Unsupported wallet version.".
+const WalletVersionSchema = z.union([z.literal(1), z.literal(2)]);
+const SeedSchema = z.object({
+    mnemonicEnc: z.object({ salt: z.string(), iv: z.string(), data: z.string() }).passthrough(),
+}).passthrough();
+const WalletEncFileSchema = z.object({
+    version: WalletVersionSchema,
+    seed: SeedSchema,
+    enc: z.string(),
+}).passthrough();
+const WalletFileSchema = z.object({
+    version: WalletVersionSchema,
+    seed: SeedSchema,
+    // The one place stricter than the runtime guard, which checks neither: the WalletFile
+    // type declares both, and newWallet always writes them, so a wallet without them is
+    // malformed regardless. A v1 wallet's `names` (renamed to `aliases` by upgradeWallet)
+    // survives via passthrough.
+    counter: z.number(),
+    ids: z.record(z.object({
+        did: z.string(),
+        account: z.number(),
+        index: z.number(),
+    }).passthrough()),
+    current: z.string().optional(),
+    aliases: z.record(z.string()).optional(),
+}).passthrough();
+// StoredWallet is a union: restore accepts an encrypted backup (WalletEncFile) or a wallet
+// whose metadata is unencrypted (WalletFile), and saveWallet decrypts the former. Neither
+// form carries a plaintext secret -- both guards require seed.mnemonicEnc, the
+// passphrase-encrypted mnemonic; `enc` covers only counter/ids/aliases.
+// The branches are NOT disjoint -- both passthrough, so an
+// object carrying `enc` alongside `counter`/`ids` satisfies either. Order therefore matters
+// and encrypted must come first, which is what keymaster does too: isWalletEncFile keys on
+// `enc` being a string, and isWalletFile explicitly requires !('enc' in obj). So a hybrid
+// is treated as encrypted by both this schema and the method behind it.
+const StoredWalletSchema = z.union([WalletEncFileSchema, WalletFileSchema]);
+const VerifiableCredentialSchema = z.object({
+    '@context': z.array(z.string()),
+    type: z.array(z.string()),
+    issuer: z.string(),
+    validFrom: z.string(),
+    validUntil: z.string().optional(),
+    credentialSchema: z.object({ id: z.string(), type: z.literal('JsonSchema') }).optional(),
+    // Required here even though the type marks it optional: updateCredential rejects a
+    // credential without credentialSubject.id, and it replaces rather than merges, so a
+    // partial credential would overwrite a good one with a broken one. Passthrough because
+    // the claims live here as arbitrary keys -- stripping them would erase the credential.
+    credentialSubject: z.object({ id: z.string() }).passthrough(),
+    // `proof` is deliberately unconstrained rather than modelled: updateCredential deletes
+    // it and re-signs, so any proof is acceptable and typing it would reject credentials
+    // keymaster accepts. Passthrough carries it in, keymaster drops it.
+}).passthrough();
+const PollConfigSchema = z.object({
+    version: z.literal(2),
+    name: z.string().min(1),
+    description: z.string().min(1),
+    // 2..10 mirrors keymaster, which re-checks it. Worth stating because it is the one
+    // constraint a client cannot guess and JSON Schema can express (minItems/maxItems).
+    options: z.array(z.string()).min(2).max(10),
+    deadline: z.string(),
+});
+const DmailMessageSchema = z.object({
+    to: z.array(z.string()).min(1),
+    // Defaulted rather than required: keymaster throws InvalidParameterError('list') when
+    // cc is absent, which is a confusing failure for an omitted optional-looking field.
+    cc: z.array(z.string()).default([]),
+    subject: z.string().min(1),
+    body: z.string().min(1),
+    reference: z.string().optional(),
+});
 const JsonValueSchema = z.unknown();
 const DidCommEncSchema = z.enum(['A256CBC-HS512', 'XC20P', 'A256GCM']);
 const InlineDataSchema = z.object({
@@ -227,15 +319,6 @@ function inlineDataFromBuffer(buffer: Buffer, name?: string, mimeType?: string) 
     };
 }
 
-// Marks the tools whose declared input is a loose JSON object (JsonObjectSchema) while
-// the keymaster method behind them expects a specific shape. The cast is what the old
-// blanket `any` on requireKeymaster() did implicitly at every call site; naming it keeps
-// the remaining gaps visible and greppable. Authoring real input schemas for these is
-// tracked separately -- doing it here would change which inputs the tools accept.
-function unvalidatedShape<T>(value: object): T {
-    return value as T;
-}
-
 function signableJson(input: unknown): object {
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
         throw new Error('object must be a JSON object');
@@ -261,7 +344,7 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_import_wallet', cliCommand: 'import-wallet', description: 'Create a new wallet from a recovery phrase.', schema: z.object({ recoveryPhrase: z.string() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { recoveryPhrase }) => requireKeymaster(runtime).newWallet(recoveryPhrase, true) }),
     tool({ name: 'archon_show_wallet', cliCommand: 'show-wallet', description: 'Show the decrypted local wallet.', schema: RevealSchema, handler: runtime => requireKeymaster(runtime).loadWallet() }),
     tool({ name: 'archon_backup_wallet_file', cliCommand: 'backup-wallet-file', description: 'Return the encrypted wallet backup payload.', schema: RevealSchema, handler: runtime => requireKeymaster(runtime).exportEncryptedWallet() }),
-    tool({ name: 'archon_restore_wallet_file', cliCommand: 'restore-wallet-file', description: 'Restore the local wallet from an encrypted wallet payload.', schema: z.object({ wallet: JsonObjectSchema }).merge(ConfirmSchema), mutates: true, handler: (runtime, { wallet }) => requireKeymaster(runtime).saveWallet(unvalidatedShape(wallet), true) }),
+    tool({ name: 'archon_restore_wallet_file', cliCommand: 'restore-wallet-file', description: 'Restore the local wallet from a wallet payload, either an encrypted backup or a wallet whose metadata is unencrypted. The seed is passphrase-encrypted in both, and the current passphrase must match.', schema: z.object({ wallet: StoredWalletSchema }).merge(ConfirmSchema), mutates: true, handler: (runtime, { wallet }) => requireKeymaster(runtime).saveWallet(wallet, true) }),
     tool({ name: 'archon_show_mnemonic', cliCommand: 'show-mnemonic', description: 'Reveal the wallet recovery phrase.', schema: RevealSchema, handler: runtime => requireKeymaster(runtime).decryptMnemonic() }),
     tool({ name: 'archon_backup_wallet_did', cliCommand: 'backup-wallet-did', description: 'Backup wallet to an encrypted DID and seed bank.', schema: ConfirmSchema, mutates: true, handler: runtime => requireKeymaster(runtime).backupWallet() }),
     tool({ name: 'archon_recover_wallet_did', cliCommand: 'recover-wallet-did', description: 'Recover wallet from seed bank or encrypted DID.', schema: z.object({ did: z.string().optional() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { did }) => requireKeymaster(runtime).recoverWallet(did) }),
@@ -303,7 +386,7 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_bind_credential', cliCommand: 'bind-credential', description: 'Create a bound credential for a subject.', schema: z.object({ schema: z.string(), subject: z.string(), claims: JsonObjectSchema.optional(), validFrom: z.string().optional(), validUntil: z.string().optional() }), handler: (runtime, { subject, schema, claims, validFrom, validUntil }) => requireKeymaster(runtime).bindCredential(subject, compactOptions({ schema, claims, validFrom, validUntil })) }),
     tool({ name: 'archon_issue_credential', cliCommand: 'issue-credential', description: 'Sign and encrypt a bound credential.', schema: z.object({ credential: JsonObjectSchema, alias: z.string().optional(), registry: z.string().optional() }), mutates: true, handler: (runtime, { credential, alias, registry }) => requireKeymaster(runtime).issueCredential(credential, compactOptions({ alias, registry })) }),
     tool({ name: 'archon_list_issued', cliCommand: 'list-issued', description: 'List issued credentials.', schema: z.object({ issuer: z.string().optional() }), handler: (runtime, { issuer }) => requireKeymaster(runtime).listIssued(issuer) }),
-    tool({ name: 'archon_update_credential', cliCommand: 'update-credential', description: 'Update an issued credential.', schema: z.object({ did: z.string(), credential: JsonObjectSchema }), mutates: true, handler: (runtime, { did, credential }) => requireKeymaster(runtime).updateCredential(did, unvalidatedShape(credential)) }),
+    tool({ name: 'archon_update_credential', cliCommand: 'update-credential', description: 'Update an issued credential.', schema: z.object({ did: z.string(), credential: VerifiableCredentialSchema }), mutates: true, handler: (runtime, { did, credential }) => requireKeymaster(runtime).updateCredential(did, credential) }),
     tool({ name: 'archon_revoke_credential', cliCommand: 'revoke-credential', description: 'Revoke a verifiable credential.', schema: DidSchema.merge(ConfirmSchema), mutates: true, handler: (runtime, { did }) => requireKeymaster(runtime).revokeCredential(did) }),
     tool({ name: 'archon_accept_credential', cliCommand: 'accept-credential', description: 'Save a verifiable credential for the current ID.', schema: DidSchema.extend({ alias: z.string().optional() }), mutates: true, handler: async (runtime, { did, alias }) => {
         const keymaster = requireKeymaster(runtime);
@@ -409,12 +492,18 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_update_asset_file', cliCommand: 'update-asset-file', description: 'Update a file asset from an inline payload.', schema: IdSchema.extend({ file: InlineDataSchema }), mutates: true, handler: (runtime, { id, file }) => requireKeymaster(runtime).updateFile(id, bufferFromInlineData(file), compactOptions({ filename: file.name, contentType: file.mimeType })) }),
     tool({ name: 'archon_transfer_asset', cliCommand: 'transfer-asset', description: 'Transfer an asset to a new controller DID.', schema: IdSchema.extend({ controller: z.string() }), mutates: true, handler: (runtime, { id, controller }) => requireKeymaster(runtime).transferAsset(id, controller) }),
     tool({ name: 'archon_clone_asset', cliCommand: 'clone-asset', description: 'Clone an asset.', schema: IdSchema.merge(AliasOptionsSchema), mutates: true, handler: (runtime, { id, alias, registry }) => requireKeymaster(runtime).cloneAsset(id, compactOptions({ alias, registry })) }),
-    tool({ name: 'archon_get_property', cliCommand: 'get-property', description: 'Get a property from a DID document data object.', schema: IdSchema.extend({ key: z.string() }), handler: async (runtime, { id, key }) => unvalidatedShape<Record<string, unknown>>((await requireKeymaster(runtime).resolveDID(id)).didDocumentData ?? {})[key] }),
+    tool({ name: 'archon_get_property', cliCommand: 'get-property', description: 'Get a property from a DID document data object.', schema: IdSchema.extend({ key: z.string() }), handler: async (runtime, { id, key }) => {
+        // didDocumentData is `unknown` and is routinely not an object -- an asset's data can
+        // be an array or a scalar, which has no property to get. Guarding also stops an
+        // index into a string or array returning a nonsense "property".
+        const { didDocumentData } = await requireKeymaster(runtime).resolveDID(id);
+        return isJsonObject(didDocumentData) ? didDocumentData[key] : undefined;
+    } }),
     tool({ name: 'archon_set_property', cliCommand: 'set-property', description: 'Set a property on a DID document data object.', schema: IdSchema.extend({ key: z.string(), value: JsonValueSchema.nullable().optional() }), mutates: true, handler: (runtime, { id, key, value }) => requireKeymaster(runtime).mergeData(id, { [key]: value ?? null }) }),
     tool({ name: 'archon_list_assets', cliCommand: 'list-assets', description: 'List assets owned by an ID.', schema: z.object({ owner: z.string().optional() }), handler: (runtime, { owner }) => requireKeymaster(runtime).listAssets(owner) }),
 
     tool({ name: 'archon_create_poll_template', cliCommand: 'create-poll-template', description: 'Create a poll config template.', schema: EmptySchema, handler: runtime => requireKeymaster(runtime).pollTemplate() }),
-    tool({ name: 'archon_create_poll', cliCommand: 'create-poll', description: 'Create a poll from inline JSON config.', schema: z.object({ config: JsonObjectSchema }).merge(VaultOptionsSchema), mutates: true, handler: (runtime, { config, ...options }) => requireKeymaster(runtime).createPoll(unvalidatedShape(config), compactOptions(options)) }),
+    tool({ name: 'archon_create_poll', cliCommand: 'create-poll', description: 'Create a poll from inline JSON config.', schema: z.object({ config: PollConfigSchema }).merge(VaultOptionsSchema), mutates: true, handler: (runtime, { config, ...options }) => requireKeymaster(runtime).createPoll(config, compactOptions(options)) }),
     tool({ name: 'archon_add_poll_voter', cliCommand: 'add-poll-voter', description: 'Add a voter to a poll.', schema: z.object({ poll: z.string(), member: z.string() }), mutates: true, handler: (runtime, { poll, member }) => requireKeymaster(runtime).addPollVoter(poll, member) }),
     tool({ name: 'archon_remove_poll_voter', cliCommand: 'remove-poll-voter', description: 'Remove a voter from a poll.', schema: z.object({ poll: z.string(), member: z.string() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { poll, member }) => requireKeymaster(runtime).removePollVoter(poll, member) }),
     tool({ name: 'archon_list_poll_voters', cliCommand: 'list-poll-voters', description: 'List eligible voters in a poll.', schema: z.object({ poll: z.string() }), handler: (runtime, { poll }) => requireKeymaster(runtime).listPollVoters(poll) }),
@@ -440,8 +529,8 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
         return buffer ? inlineDataFromBuffer(Buffer.from(buffer), item) : null;
     } }),
 
-    tool({ name: 'archon_create_dmail', cliCommand: 'create-dmail', description: 'Create a dmail from inline JSON.', schema: z.object({ message: JsonObjectSchema }).merge(VaultOptionsSchema), mutates: true, handler: (runtime, { message, ...options }) => requireKeymaster(runtime).createDmail(unvalidatedShape(message), compactOptions(options)) }),
-    tool({ name: 'archon_update_dmail', cliCommand: 'update-dmail', description: 'Update an existing dmail from inline JSON.', schema: DidSchema.extend({ message: JsonObjectSchema }), mutates: true, handler: (runtime, { did, message }) => requireKeymaster(runtime).updateDmail(did, unvalidatedShape(message)) }),
+    tool({ name: 'archon_create_dmail', cliCommand: 'create-dmail', description: 'Create a dmail from inline JSON.', schema: z.object({ message: DmailMessageSchema }).merge(VaultOptionsSchema), mutates: true, handler: (runtime, { message, ...options }) => requireKeymaster(runtime).createDmail(message, compactOptions(options)) }),
+    tool({ name: 'archon_update_dmail', cliCommand: 'update-dmail', description: 'Update an existing dmail from inline JSON.', schema: DidSchema.extend({ message: DmailMessageSchema }), mutates: true, handler: (runtime, { did, message }) => requireKeymaster(runtime).updateDmail(did, message) }),
     tool({ name: 'archon_send_dmail', cliCommand: 'send-dmail', description: 'Send a dmail and return the notice DID.', schema: DidSchema, mutates: true, handler: (runtime, { did }) => requireKeymaster(runtime).sendDmail(did) }),
     tool({ name: 'archon_get_dmail', cliCommand: 'get-dmail', description: 'Get a dmail message by DID.', schema: DidSchema.merge(ResolveOptionsSchema), handler: (runtime, { did, ...options }) => requireKeymaster(runtime).getDmailMessage(did, compactOptions(options)) }),
     tool({ name: 'archon_list_dmail', cliCommand: 'list-dmail', description: 'List dmails for the current ID.', schema: EmptySchema, handler: runtime => requireKeymaster(runtime).listDmail() }),
