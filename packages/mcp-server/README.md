@@ -82,15 +82,15 @@ On success, the result is serialized as JSON into a text content block. When the
 
 MCP requires `structuredContent` to be a JSON object, so tools returning an array or a scalar (for example `archon_list_ids`, or the DID returned by `archon_create_id`) return the text content block only.
 
-Tools returning binary assets use the content block types the protocol defines for them, so clients can render them natively. `archon_get_asset_image` returns an `image` block plus a text block carrying the filename and dimensions:
+Tools returning binary assets use the content block types the protocol defines for them, so clients can render them natively. `archon_get_asset_image` returns an `image` block plus a text block carrying the filename, mimeType, and dimensions:
 
 ```json
 {
   "content": [
     { "type": "image", "data": "<base64>", "mimeType": "image/png" },
-    { "type": "text", "text": "{\"name\":\"image.png\",\"image\":{\"width\":1,\"height\":1}}" }
+    { "type": "text", "text": "{\"name\":\"image.png\",\"mimeType\":\"image/png\",\"image\":{\"width\":1,\"height\":1}}" }
   ],
-  "structuredContent": { "name": "image.png", "image": { "width": 1, "height": 1 } }
+  "structuredContent": { "name": "image.png", "mimeType": "image/png", "image": { "width": 1, "height": 1 } }
 }
 ```
 

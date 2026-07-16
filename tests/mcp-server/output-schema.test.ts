@@ -71,9 +71,10 @@ describe('mcp server output schemas', () => {
         expect(advertised.length).toBeGreaterThan(0);
     });
 
-    // The SDK validates structuredContent against the declared schema on the server AND
-    // re-validates on the client, so a wrong schema throws rather than degrading. These
-    // calls fail loudly if a declared shape does not match what keymaster really returns.
+    // The SDK validates structuredContent against the declared schema on the server, and a
+    // client re-validates against the published JSON Schema. These calls therefore fail if
+    // a declared shape does not match what keymaster really returns -- see the next test
+    // for the shape that failure takes.
     it('round-trips every declared tool through a real client without validation errors', async () => {
         const client = await connect(mockKeymaster());
 

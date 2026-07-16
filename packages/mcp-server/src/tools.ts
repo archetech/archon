@@ -384,7 +384,12 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
         );
     } }),
     tool({ name: 'archon_get_asset_file', cliCommand: 'get-asset-file', description: 'Return a file asset as an embedded resource content block.', schema: IdSchema, handler: async (runtime, { id }) => {
-        const file = await requireKeymaster(runtime).getFile(id);
+        // Resolve once and hand getFile the DID: it resolves internally too, and for an
+        // alias each resolution decrypts the wallet. lookupDID short-circuits on a DID.
+        // The asset DID is itself a URI, so the resource block is named by a real
+        // identifier rather than an invented scheme.
+        const uri = await requireKeymaster(runtime).lookupDID(id);
+        const file = await requireKeymaster(runtime).getFile(uri);
 
         if (!file?.data) {
             return null;
@@ -394,13 +399,7 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
         return contentResult(
             [{
                 type: 'resource',
-                resource: {
-                    // The asset DID is itself a URI, so the resource is named by a real
-                    // identifier rather than an invented scheme.
-                    uri: await requireKeymaster(runtime).lookupDID(id),
-                    mimeType,
-                    blob: Buffer.from(file.data).toString('base64'),
-                },
+                resource: { uri, mimeType, blob: Buffer.from(file.data).toString('base64') },
             }],
             { name: file.filename, mimeType }
         );
