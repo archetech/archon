@@ -119,6 +119,20 @@ Failures — including input validation, a locked wallet, and node errors — ar
 
 Error messages are redacted of secrets (passphrases, recovery phrases, nsec keys, credentialed URLs).
 
+### Output schemas
+
+A few tools declare an `outputSchema`, so a client knows the result shape from `listTools` without having to call the tool first: `archon_resolve_did`, `archon_resolve_did_version`, `archon_check_wallet`, `archon_fix_wallet`, `archon_view_poll`, and `archon_view_ballot`.
+
+They are declared selectively rather than everywhere, by design:
+
+- **Declaring one is binding.** Per the spec, a tool with an output schema MUST return conforming structured results. The SDK enforces it — a mismatch, or a missing `structuredContent`, turns a working call into a failed one.
+- **Most tools can't have one.** MCP requires `structuredContent` to be a JSON object, and the majority of these tools return a DID string, a boolean, or a string array. Tools that can return `null` (`archon_get_asset_image`, `archon_get_credential`, and others) are excluded for the same reason.
+- **Schemas aren't free.** Every declared schema is sent to every client on every `listTools`, competing for context with the work itself.
+
+So the bar is: the result is an object the tool always returns, and something downstream consumes a field from it. Schemas describe the nesting a caller must navigate — leaves are intentionally loose, and fields typed `unknown` at the source (such as `didDocumentData`) stay unknown.
+
+If you add one, it must be a `.passthrough()` object. A plain zod object serializes to `additionalProperties: false`, which makes clients reject any field the schema doesn't enumerate.
+
 ## Examples
 
 Create an ID:
