@@ -830,6 +830,33 @@ describe('mcp server tools', () => {
         expect(message).toContain('bafyUNPINNED');
     });
 
+    it('names the CID that was actually fetched, not the one resolved earlier', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        // getFile resolves the asset again, and an asset is mutable, so the document can
+        // change between the two resolves. The CID whose fetch failed is getFile's.
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafySTALE', filename: 'gone.txt', type: 'text/plain', bytes: 4 } });
+        runtime.keymaster.getFile.mockResolvedValue({ filename: 'gone.txt', type: 'text/plain', cid: 'bafyCURRENT' });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const message = expectFail(await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' }));
+
+        expect(message).toContain('bafyCURRENT');
+        expect(message).not.toContain('bafySTALE');
+    });
+
+    it('falls back to the resolved CID when getFile returns nothing', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        // The same race the other way: the asset stopped being a file asset between the
+        // resolves, so getFile has no CID to offer.
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafySTALE', filename: 'gone.txt', type: 'text/plain', bytes: 4 } });
+        runtime.keymaster.getFile.mockResolvedValue(null);
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        expect(expectFail(await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' }))).toContain('bafySTALE');
+    });
+
     it('errors when an image asset\'s bytes cannot be fetched', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();

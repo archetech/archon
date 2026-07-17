@@ -524,12 +524,17 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
         const file = await keymaster.getFile(uri);
 
         // Reaching here means the asset IS a file asset -- summary.cid was checked above --
-        // so getFile cannot return null and missing data can only mean the fetch failed.
-        // Returning null would report that as "this asset has no data", and would make the
-        // same broken asset behave differently either side of the inline limit: linked
-        // above it (erroring later at resources/read), silently empty below.
+        // so missing data means the fetch failed. Returning null would report that as "this
+        // asset has no data", and would make the same broken asset behave differently either
+        // side of the inline limit: linked above it (erroring later at resources/read),
+        // silently empty below.
+        //
+        // Name the CID getFile actually tried, not the one from the resolve above: getFile
+        // resolves the asset again, and an asset is mutable (updateFile), so the two can
+        // disagree if the document changed in between. summary.cid is the fallback for the
+        // same race turning it into a non-file asset, which makes getFile return null.
         if (!file?.data) {
-            throw assetDataUnavailable(uri, summary.cid);
+            throw assetDataUnavailable(uri, file?.cid ?? summary.cid);
         }
 
         return contentResult(
