@@ -61,7 +61,7 @@ CLI file commands use inline data instead of arbitrary local paths. Binary/text 
 }
 ```
 
-Use `"encoding": "utf8"` when passing plain text directly. This inline shape is for tool *arguments*; returned binary data uses MCP content blocks instead — see [Tool results](#tool-results).
+Use `"encoding": "utf8"` when passing plain text directly. This inline shape is for tool *arguments* only — MCP defines content blocks for results, not arguments, and file paths aren't usable in an MCP server context. No tool *returns* this shape; returned binary data uses MCP content blocks — see [Tool results](#tool-results).
 
 Destructive tools require `"confirm": true`, secret-revealing tools require `"reveal": true`, and Lightning payment/broadcast tools require `"confirmPayment": true`.
 
@@ -119,6 +119,20 @@ Tools returning binary assets use the content block types the protocol defines f
 
 Both return `null` when the asset carries no data.
 
+`archon_get_vault_item` and `archon_get_dmail_attachment` return an embedded `resource` block the same way, identified by the container's DID plus the item name as a fragment, with the mimeType the vault recorded when the item was written — the same value `archon_list_vault_items` reports:
+
+```json
+{
+  "content": [
+    { "type": "resource", "resource": { "uri": "did:cid:z3v8Auah...#notes.txt", "mimeType": "text/plain", "blob": "<base64>" } },
+    { "type": "text", "text": "{\"name\":\"notes.txt\",\"mimeType\":\"text/plain\"}" }
+  ],
+  "structuredContent": { "name": "notes.txt", "mimeType": "text/plain" }
+}
+```
+
+Both return `null` when the item does not exist.
+
 Failures — including input validation, a locked wallet, and node errors — are reported as MCP tool execution errors, with `isError: true` and the message in a text content block:
 
 ```json
@@ -156,6 +170,14 @@ The server implements the MCP `resources` capability. An Archon asset DID is alr
 ```
 
 File and image assets return their bytes; any other asset returns its JSON data with `mimeType: "application/json"`. URIs that are not `did:cid:` are not matched.
+
+A vault item — or a dmail attachment, which is the same thing, since a dmail is a vault — has no DID of its own. It's a named entry keyed by (container DID, name), so it's addressed as a DID URL fragment, which is also the URI `archon_get_vault_item` and `archon_get_dmail_attachment` put in their resource blocks:
+
+```
+did:cid:z3v8Auah...#notes.txt
+```
+
+Item names may contain any printable character, including `#` and spaces, so the fragment is percent-encoded (`#my%20notes%20%232.txt`).
 
 **`resources/list` is empty by design.** Enumerating every asset in the wallet would disclose its contents to any connected client, whether or not it ever reads one. Reads are by a DID the caller already holds, which reveals nothing that resolving that DID wouldn't. `resources/templates/list` advertises `did:cid:{id}`, so the read path is still discoverable. What a filtered list should expose is an open question.
 
