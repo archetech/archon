@@ -799,15 +799,47 @@ describe('mcp server tools', () => {
         expect(response.content[0].type).toBe('resource');
     });
 
-    it('returns null for file-like assets with no data', async () => {
+    // null now means one thing only: the DID is not that kind of asset. It is no longer
+    // also how an unfetchable CID is reported -- see the next two tests.
+    it('returns null when the DID is not a file or image asset', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
         runtime.keymaster.getImage.mockResolvedValue(null);
         runtime.keymaster.getFile.mockResolvedValue(null);
+        runtime.keymaster.resolveAsset.mockResolvedValue({ hello: 'world' });
         registerArchonTools(server, runtime as any, baseConfig);
 
         expect(expectOk(await server.tools.get('archon_get_asset_image')!.handler({ id: 'did:cid:image' }))).toBeNull();
         expect(expectOk(await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' }))).toBeNull();
+    });
+
+    it('errors when a file asset\'s bytes cannot be fetched', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        // The asset IS a file asset and small enough to inline, but the gatekeeper cannot
+        // fetch its CID: getFile hands back the file minus its data.
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafyUNPINNED', filename: 'gone.txt', type: 'text/plain', bytes: 4 } });
+        runtime.keymaster.getFile.mockResolvedValue({ filename: 'gone.txt', type: 'text/plain', cid: 'bafyUNPINNED' });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const message = expectFail(await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' }));
+
+        // Reported as a failure rather than as "this asset has no data", and the CID is
+        // named so the failure is diagnosable.
+        expect(message).toMatch(/unavailable/i);
+        expect(message).toContain('bafyUNPINNED');
+    });
+
+    it('errors when an image asset\'s bytes cannot be fetched', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        runtime.keymaster.getImage.mockResolvedValue({ file: { filename: 'gone.png', type: 'image/png', cid: 'bafyGONE' }, image: { width: 1, height: 1 } });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const message = expectFail(await server.tools.get('archon_get_asset_image')!.handler({ id: 'did:cid:image' }));
+
+        expect(message).toMatch(/unavailable/i);
+        expect(message).toContain('bafyGONE');
     });
 
     it('redacts secrets from tool errors', async () => {

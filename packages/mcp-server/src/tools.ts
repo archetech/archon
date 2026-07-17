@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { McpServerConfig } from './config.js';
 import { ArchonRuntime, requireKeymaster } from './runtime.js';
-import { vaultItemUri } from './resources.js';
+import { assetDataUnavailable, vaultItemUri } from './resources.js';
 import { errorMessage } from './redact.js';
 
 type RegisterableServer = {
@@ -466,8 +466,15 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_get_asset_image', cliCommand: 'get-asset-image', description: 'Return an image asset as an image content block.', schema: IdSchema, handler: async (runtime, { id }) => {
         const image = await requireKeymaster(runtime).getImage(id);
 
-        if (!image?.file?.data) {
+        // getImage returns null only when this is not an image asset. When it cannot fetch
+        // the CID it returns the file WITHOUT data, which is a failure to report rather
+        // than an absence to shrug at -- the bytes exist, we just could not get them.
+        if (!image) {
             return null;
+        }
+
+        if (!image.file?.data) {
+            throw assetDataUnavailable(id, image.file?.cid);
         }
 
         const mimeType = image.file.type ?? 'application/octet-stream';
@@ -516,8 +523,13 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
 
         const file = await keymaster.getFile(uri);
 
+        // Reaching here means the asset IS a file asset -- summary.cid was checked above --
+        // so getFile cannot return null and missing data can only mean the fetch failed.
+        // Returning null would report that as "this asset has no data", and would make the
+        // same broken asset behave differently either side of the inline limit: linked
+        // above it (erroring later at resources/read), silently empty below.
         if (!file?.data) {
-            return null;
+            throw assetDataUnavailable(uri, summary.cid);
         }
 
         return contentResult(

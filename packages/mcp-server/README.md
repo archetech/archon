@@ -118,7 +118,7 @@ Tools returning binary assets use the content block types the protocol defines f
 }
 ```
 
-Both return `null` when the asset carries no data.
+Both return `null` when the DID is not a file or image asset — that is the only thing `null` means here. If the asset's bytes cannot be fetched from the node (unpinned data, or a gateway that is down), that is reported as a tool error naming the CID, not as an empty result: the bytes exist, they just could not be retrieved, and the two are not the same answer. `resources/read` and `archon_get_vault_item` fail the same way.
 
 ### Large files are linked, not inlined
 
