@@ -15,7 +15,20 @@ describe('mcp server config', () => {
             passphrase: undefined,
             defaultRegistry: undefined,
             readOnly: false,
+            inlineLimit: 16 * 1024,
         });
+    });
+
+    it('parses ARCHON_MCP_INLINE_LIMIT and rejects nonsense', () => {
+        expect(loadConfig({ ARCHON_MCP_INLINE_LIMIT: '65536' }).inlineLimit).toBe(65536);
+        // 0 links everything; a huge value inlines everything, which is the escape hatch
+        // for a client that does not follow resource links.
+        expect(loadConfig({ ARCHON_MCP_INLINE_LIMIT: '0' }).inlineLimit).toBe(0);
+        expect(loadConfig({ ARCHON_MCP_INLINE_LIMIT: '' }).inlineLimit).toBe(16 * 1024);
+
+        expect(() => loadConfig({ ARCHON_MCP_INLINE_LIMIT: 'lots' })).toThrow(/non-negative integer/);
+        expect(() => loadConfig({ ARCHON_MCP_INLINE_LIMIT: '-1' })).toThrow(/non-negative integer/);
+        expect(() => loadConfig({ ARCHON_MCP_INLINE_LIMIT: '1.5' })).toThrow(/non-negative integer/);
     });
 
     it('uses ARCHON_NODE_URL before legacy ARCHON_GATEKEEPER_URL', () => {

@@ -24,7 +24,7 @@ type ToolDefinitionBase = {
 // What tool() accepts: the handler's args are tied to this tool's own input schema.
 type TypedToolDefinition<S extends z.ZodTypeAny> = ToolDefinitionBase & {
     schema: S;
-    handler: (runtime: ArchonRuntime, args: z.infer<S>) => Promise<unknown> | unknown;
+    handler: (runtime: ArchonRuntime, args: z.infer<S>, config: McpServerConfig) => Promise<unknown> | unknown;
 };
 
 // What the registry holds. The per-tool arg type can't survive into a homogeneous list
@@ -32,7 +32,7 @@ type TypedToolDefinition<S extends z.ZodTypeAny> = ToolDefinitionBase & {
 // at authoring time by tool() instead. Args reaching a handler are schema.parse() output.
 export type ArchonToolDefinition = ToolDefinitionBase & {
     schema: z.ZodTypeAny;
-    handler: (runtime: ArchonRuntime, args: any) => Promise<unknown> | unknown;
+    handler: (runtime: ArchonRuntime, args: any, config: McpServerConfig) => Promise<unknown> | unknown;
 };
 
 const EmptySchema = z.object({});
@@ -476,19 +476,45 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
             { name: image.file.filename, mimeType, image: image.image }
         );
     } }),
-    tool({ name: 'archon_get_asset_file', cliCommand: 'get-asset-file', description: 'Return a file asset as an embedded resource content block.', schema: IdSchema, handler: async (runtime, { id }) => {
-        // Resolve once and hand getFile the DID: it resolves internally too, and for an
-        // alias each resolution decrypts the wallet. lookupDID short-circuits on a DID.
+    tool({ name: 'archon_get_asset_file', cliCommand: 'get-asset-file', description: 'Return a file asset. Small files come back as an embedded resource block; larger ones as a resource_link the client can read on demand.', schema: IdSchema, handler: async (runtime, { id }, config) => {
+        const keymaster = requireKeymaster(runtime);
+        // Resolve once and hand the DID down: each call resolves internally too, and for an
+        // alias that decrypts the wallet. lookupDID short-circuits on a DID.
         // The asset DID is itself a URI, so the resource block is named by a real
         // identifier rather than an invented scheme.
-        const uri = await requireKeymaster(runtime).lookupDID(id);
-        const file = await requireKeymaster(runtime).getFile(uri);
+        const uri = await keymaster.lookupDID(id);
+
+        // Size first, from the DID document, before fetching anything: a file asset records
+        // `bytes` alongside its CID, so a large asset can be linked without ever pulling
+        // data we would only discard. That costs small assets a second resolve, which is
+        // the cheaper mistake -- the alternative is fetching megabytes to then measure them.
+        const asset = await keymaster.resolveAsset(uri) as { file?: { cid?: string; filename?: string; type?: string; bytes?: number } };
+        const summary = asset?.file;
+
+        if (!summary?.cid) {
+            return null;
+        }
+
+        const mimeType = summary.type ?? 'application/octet-stream';
+        const name = summary.filename ?? 'file';
+
+        // Unknown size counts as too large: guessing "small" risks inlining something that
+        // buries the conversation, and a link costs the client only a resources/read.
+        if (summary.bytes === undefined || summary.bytes > config.inlineLimit) {
+            // MCP's `size` is documented for exactly this -- hosts use it to display file
+            // sizes and estimate context window usage before fetching.
+            return contentResult(
+                [{ type: 'resource_link', uri, name, mimeType, ...(summary.bytes !== undefined && { size: summary.bytes }) }],
+                { name, mimeType, ...(summary.bytes !== undefined && { bytes: summary.bytes }), linked: true }
+            );
+        }
+
+        const file = await keymaster.getFile(uri);
 
         if (!file?.data) {
             return null;
         }
 
-        const mimeType = file.type ?? 'application/octet-stream';
         return contentResult(
             [{
                 type: 'resource',
@@ -594,7 +620,7 @@ function registerToolDefinition(
                 throw new Error('Tool disabled by ARCHON_MCP_READ_ONLY=true');
             }
             const args = definition.schema.parse(rawArgs ?? {});
-            return ok(await definition.handler(runtime, args));
+            return ok(await definition.handler(runtime, args, config));
         } catch (error) {
             return fail(error);
         }

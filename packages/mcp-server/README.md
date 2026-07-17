@@ -39,6 +39,7 @@ Example MCP client config:
 | `ARCHON_PASSPHRASE` | unset | Required for wallet-backed tools; node health tools work without it |
 | `ARCHON_DEFAULT_REGISTRY` | Keymaster default | Default registry for new DIDs |
 | `ARCHON_MCP_READ_ONLY` | `false` | Set to `true` to omit mutating tools from `tools/list` |
+| `ARCHON_MCP_INLINE_LIMIT` | `16384` | Bytes at or below which `archon_get_asset_file` inlines a file rather than linking it |
 
 ## Tools
 
@@ -105,7 +106,7 @@ Tools returning binary assets use the content block types the protocol defines f
 }
 ```
 
-`archon_get_asset_file` returns an embedded `resource` block identified by the asset's DID, which is a URI the server also serves as an MCP resource — see [Resources](#resources):
+`archon_get_asset_file` returns a file asset by its DID, which is a URI the server also serves as an MCP resource — see [Resources](#resources). Small files come back as an embedded `resource` block:
 
 ```json
 {
@@ -118,6 +119,25 @@ Tools returning binary assets use the content block types the protocol defines f
 ```
 
 Both return `null` when the asset carries no data.
+
+### Large files are linked, not inlined
+
+A file's bytes are base64 in a tool result, costing roughly `bytes / 3` tokens of the model's context. A 1 MB asset is ~350k tokens and a 10 MB one — the largest a node accepts — is ~3.5M, more than any context window holds. So above `ARCHON_MCP_INLINE_LIMIT` (16 KiB by default) `archon_get_asset_file` returns a `resource_link` instead:
+
+```json
+{
+  "content": [
+    { "type": "resource_link", "uri": "did:cid:z3v8Auah...", "name": "big.pdf", "mimeType": "application/pdf", "size": 2097152 },
+    { "type": "text", "text": "{\"name\":\"big.pdf\",\"mimeType\":\"application/pdf\",\"bytes\":2097152,\"linked\":true}" }
+  ]
+}
+```
+
+The client fetches the bytes with `resources/read` on that URI, if and when it wants them — the same URI, so both shapes point at the same thing. The size comes from the asset's DID document, so a linked file is never fetched at all; `size` lets a host estimate the cost before asking. An asset with no recorded size is linked rather than gambled on.
+
+The default is low because base64 is not something a model can read — inlining only helps a client render or save the bytes, so it should stay cheap. Raise `ARCHON_MCP_INLINE_LIMIT` to inline more (a very large value restores the old always-inline behaviour, for clients that don't follow resource links); set it to `0` to link everything.
+
+`archon_get_asset_image` always inlines, whatever its size: an `image` block is how a model actually sees an image, and there is no link equivalent it could look at.
 
 `archon_get_vault_item` and `archon_get_dmail_attachment` return an embedded `resource` block the same way, identified by the container's DID plus the item name as a fragment, with the mimeType the vault recorded when the item was written — the same value `archon_list_vault_items` reports:
 

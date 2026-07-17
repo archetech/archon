@@ -11,6 +11,7 @@ const baseConfig: McpServerConfig = {
     passphrase: 'secret',
     defaultRegistry: undefined,
     readOnly: false,
+    inlineLimit: 16 * 1024,
 };
 
 const FILE_DID = 'did:cid:z3v8AuahBQrJDVCNhhVQNzTbdMGmCyUM8b7WrqQKmYYqNZmMbfR';
@@ -202,7 +203,8 @@ describe('mcp server resources', () => {
         const keymaster = {
             lookupDID: jest.fn<any>().mockResolvedValue(FILE_DID),
             getFile: jest.fn<any>().mockResolvedValue({ filename: 'hello.txt', type: 'text/plain', data: Buffer.from('hello') }),
-            resolveAsset: jest.fn<any>().mockResolvedValue({}),
+            // Small enough to embed, so the tool still emits a URI to dereference.
+            resolveAsset: jest.fn<any>().mockResolvedValue({ file: { cid: 'bafy', filename: 'hello.txt', type: 'text/plain', bytes: 5 } }),
         };
 
         const server = new McpServer({ name: 'archon-test', version: '0.0.0' });
