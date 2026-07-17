@@ -539,8 +539,11 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
         // Resolve once so the URI names a real DID rather than an alias, and so the calls
         // below skip their own lookups.
         const vault = await keymaster.lookupDID(id);
-        const buffer = await keymaster.getVaultItem(vault, item, compactOptions(options));
-        return buffer ? vaultItemResult(keymaster, vault, item, Buffer.from(buffer), compactOptions(options)) : null;
+        // One options object for both calls: the item read and the metadata read must see
+        // the same resolve options, or they could look at different versions of the vault.
+        const resolveOptions = compactOptions(options);
+        const buffer = await keymaster.getVaultItem(vault, item, resolveOptions);
+        return buffer ? vaultItemResult(keymaster, vault, item, Buffer.from(buffer), resolveOptions) : null;
     } }),
 
     tool({ name: 'archon_create_dmail', cliCommand: 'create-dmail', description: 'Create a dmail from inline JSON.', schema: z.object({ message: DmailMessageSchema }).merge(VaultOptionsSchema), mutates: true, handler: (runtime, { message, ...options }) => requireKeymaster(runtime).createDmail(message, compactOptions(options)) }),
