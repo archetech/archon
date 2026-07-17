@@ -574,6 +574,57 @@ describe('mcp server tools', () => {
         }))).toMatch(/version/);
     });
 
+    it('returns vault items and dmail attachments as resource blocks', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        runtime.keymaster.lookupDID.mockResolvedValue('did:cid:vault');
+        runtime.keymaster.getVaultItem.mockResolvedValue(Buffer.from('item'));
+        runtime.keymaster.getDmailAttachment.mockResolvedValue(Buffer.from('item'));
+        runtime.keymaster.listVaultItems.mockResolvedValue({ 'hello.txt': { cid: 'bafy', type: 'text/plain' } });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const vault: any = await server.tools.get('archon_get_vault_item')!.handler({ id: 'my-vault', item: 'hello.txt' });
+
+        expect(vault.content).toStrictEqual([
+            {
+                type: 'resource',
+                // The item has no DID of its own, so it is addressed as a fragment on the
+                // container's DID -- and the DID, not the alias it was called with.
+                resource: { uri: 'did:cid:vault#hello.txt', mimeType: 'text/plain', blob: Buffer.from('item').toString('base64') },
+            },
+            { type: 'text', text: JSON.stringify({ name: 'hello.txt', mimeType: 'text/plain' }) },
+        ]);
+        expect(vault.structuredContent).toStrictEqual({ name: 'hello.txt', mimeType: 'text/plain' });
+
+        // A dmail attachment is a vault item, so it produces the same shape.
+        const attachment: any = await server.tools.get('archon_get_dmail_attachment')!.handler({ did: 'did:cid:vault', name: 'hello.txt' });
+        expect(attachment.content[0].resource.uri).toBe('did:cid:vault#hello.txt');
+        expect(attachment.content[0].mimeType ?? attachment.content[0].resource.mimeType).toBe('text/plain');
+    });
+
+    it('falls back to a generic mimeType when the vault recorded none', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        runtime.keymaster.lookupDID.mockResolvedValue('did:cid:vault');
+        runtime.keymaster.listVaultItems.mockResolvedValue({ 'hello.txt': { cid: 'bafy' } });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const vault: any = await server.tools.get('archon_get_vault_item')!.handler({ id: 'my-vault', item: 'hello.txt' });
+
+        expect(vault.content[0].resource.mimeType).toBe('application/octet-stream');
+    });
+
+    it('returns null for a vault item that does not exist', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        runtime.keymaster.getVaultItem.mockResolvedValue(null);
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        expect(expectOk(await server.tools.get('archon_get_vault_item')!.handler({ id: 'my-vault', item: 'nope.txt' }))).toBeNull();
+        // No point paying for the metadata decrypt when there are no bytes.
+        expect(runtime.keymaster.listVaultItems).not.toHaveBeenCalled();
+    });
+
     it('passes inline base64 payloads to file-like tools', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();

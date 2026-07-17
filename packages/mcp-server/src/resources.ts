@@ -7,6 +7,16 @@ import { ArchonRuntime, requireKeymaster } from './runtime.js';
 // what makes that URI dereferenceable instead of decorative.
 export const ARCHON_ASSET_URI_TEMPLATE = 'did:cid:{id}';
 
+// A vault item has no DID of its own -- it is a named entry inside a vault, keyed by
+// (container DID, name) -- so it is addressed as a DID URL fragment. Item names allow
+// anything printable (validateAlias only rejects control characters), including '#' and
+// spaces, so the fragment must be percent-encoded.
+export const ARCHON_VAULT_ITEM_URI_TEMPLATE = 'did:cid:{id}#{item}';
+
+export function vaultItemUri(containerDid: string, name: string): string {
+    return `${containerDid}#${encodeURIComponent(name)}`;
+}
+
 type RegisterableResourceServer = {
     registerResource?: (
         name: string,
@@ -58,10 +68,53 @@ async function readAsset(runtime: ArchonRuntime, uri: URL): Promise<ReadResource
     };
 }
 
+// A dmail attachment is a vault item: addDmailAttachment delegates to addVaultItem and
+// getDmailAttachment to getVaultItem, so a dmail IS a vault as far as items go. One
+// template and one reader therefore cover both surfaces.
+async function readVaultItem(runtime: ArchonRuntime, variables: { id: string; item: string }): Promise<ReadResourceResult> {
+    const keymaster = requireKeymaster(runtime);
+    const did = `did:cid:${variables.id}`;
+    const name = decodeURIComponent(variables.item);
+    const uri = vaultItemUri(did, name);
+
+    const buffer = await keymaster.getVaultItem(did, name);
+
+    if (!buffer) {
+        throw new Error(`Vault item not found: ${uri}`);
+    }
+
+    // The recorded type, not a re-sniff of the bytes: addVaultItem stores what getMimeType
+    // detected at write time and list_vault_items reports that value, so deriving it again
+    // here risks two surfaces disagreeing about one item. Costs a second vault decrypt.
+    const items = await keymaster.listVaultItems(did);
+
+    return {
+        contents: [{
+            uri,
+            mimeType: items?.[name]?.type ?? 'application/octet-stream',
+            blob: Buffer.from(buffer).toString('base64'),
+        }],
+    };
+}
+
 export function registerArchonResources(server: RegisterableResourceServer, runtime: ArchonRuntime): void {
     if (!server.registerResource) {
         throw new Error('MCP server does not support resource registration');
     }
+
+    // Registered BEFORE the asset template, and the order is load-bearing: the SDK returns
+    // the first template whose URI matches, and 'did:cid:{id}' matches greedily -- it would
+    // otherwise swallow 'did:cid:vault#item' as id='vault#item' and fail inside the asset
+    // reader. The reverse cannot happen: this template does not match a bare DID.
+    server.registerResource(
+        'archon-vault-item',
+        new ResourceTemplate(ARCHON_VAULT_ITEM_URI_TEMPLATE, { list: undefined }),
+        {
+            title: 'Archon vault item',
+            description: 'Read an item stored in a vault, or an attachment on a dmail, by the container DID plus the item name as a percent-encoded fragment.',
+        },
+        (_uri: URL, variables: unknown) => readVaultItem(runtime, variables as { id: string; item: string })
+    );
 
     server.registerResource(
         'archon-asset',

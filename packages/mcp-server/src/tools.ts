@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { McpServerConfig } from './config.js';
 import { ArchonRuntime, requireKeymaster } from './runtime.js';
+import { vaultItemUri } from './resources.js';
 import { errorMessage } from './redact.js';
 
 type RegisterableServer = {
@@ -302,13 +303,30 @@ function bufferFromInlineData(input: z.infer<typeof InlineDataSchema>): Buffer {
     return Buffer.from(input.data, input.encoding === 'utf8' ? 'utf8' : 'base64');
 }
 
-function inlineDataFromBuffer(buffer: Buffer, name?: string, mimeType?: string) {
-    return {
-        name,
-        mimeType,
-        encoding: 'base64',
-        data: buffer.toString('base64'),
-    };
+// Shared by the vault-item and dmail-attachment tools: a dmail attachment IS a vault item
+// (addDmailAttachment/getDmailAttachment delegate to the vault ones), so both produce the
+// same resource block. `containerDid` must already be resolved -- callers look it up once
+// and pass the DID down, so the keymaster calls below skip their own alias resolution.
+async function vaultItemResult(
+    keymaster: any,
+    containerDid: string,
+    name: string,
+    buffer: Buffer,
+    options?: Record<string, unknown>
+) {
+    // The recorded type rather than a re-sniff of the bytes: addVaultItem stores what
+    // getMimeType detected at write time, and list_vault_items reports that value. Deriving
+    // it again here would risk two surfaces disagreeing about the same item.
+    const items = await keymaster.listVaultItems(containerDid, options);
+    const mimeType = items?.[name]?.type ?? 'application/octet-stream';
+
+    return contentResult(
+        [{
+            type: 'resource',
+            resource: { uri: vaultItemUri(containerDid, name), mimeType, blob: buffer.toString('base64') },
+        }],
+        { name, mimeType }
+    );
 }
 
 function signableJson(input: unknown): object {
@@ -516,9 +534,16 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_list_vault_members', cliCommand: 'list-vault-members', description: 'List members of a vault.', schema: IdSchema, handler: (runtime, { id }) => requireKeymaster(runtime).listVaultMembers(id) }),
     tool({ name: 'archon_add_vault_item', cliCommand: 'add-vault-item', description: 'Add an inline item to a vault.', schema: IdSchema.extend({ item: InlineDataSchema }), mutates: true, handler: (runtime, { id, item }) => requireKeymaster(runtime).addVaultItem(id, item.name ?? 'item', bufferFromInlineData(item)) }),
     tool({ name: 'archon_remove_vault_item', cliCommand: 'remove-vault-item', description: 'Remove an item from a vault.', schema: IdSchema.extend({ item: z.string() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { id, item }) => requireKeymaster(runtime).removeVaultItem(id, item) }),
-    tool({ name: 'archon_get_vault_item', cliCommand: 'get-vault-item', description: 'Return a vault item as inline base64 data.', schema: IdSchema.extend({ item: z.string() }).merge(ResolveOptionsSchema), handler: async (runtime, { id, item, ...options }) => {
-        const buffer = await requireKeymaster(runtime).getVaultItem(id, item, compactOptions(options));
-        return buffer ? inlineDataFromBuffer(Buffer.from(buffer), item) : null;
+    tool({ name: 'archon_get_vault_item', cliCommand: 'get-vault-item', description: 'Return a vault item as an embedded resource content block.', schema: IdSchema.extend({ item: z.string() }).merge(ResolveOptionsSchema), handler: async (runtime, { id, item, ...options }) => {
+        const keymaster = requireKeymaster(runtime);
+        // Resolve once so the URI names a real DID rather than an alias, and so the calls
+        // below skip their own lookups.
+        const vault = await keymaster.lookupDID(id);
+        // One options object for both calls: the item read and the metadata read must see
+        // the same resolve options, or they could look at different versions of the vault.
+        const resolveOptions = compactOptions(options);
+        const buffer = await keymaster.getVaultItem(vault, item, resolveOptions);
+        return buffer ? vaultItemResult(keymaster, vault, item, Buffer.from(buffer), resolveOptions) : null;
     } }),
 
     tool({ name: 'archon_create_dmail', cliCommand: 'create-dmail', description: 'Create a dmail from inline JSON.', schema: z.object({ message: DmailMessageSchema }).merge(VaultOptionsSchema), mutates: true, handler: (runtime, { message, ...options }) => requireKeymaster(runtime).createDmail(message, compactOptions(options)) }),
@@ -532,9 +557,11 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_remove_dmail', cliCommand: 'remove-dmail', description: 'Delete a dmail from the local list.', schema: DidSchema.merge(ConfirmSchema), mutates: true, handler: (runtime, { did }) => requireKeymaster(runtime).removeDmail(did) }),
     tool({ name: 'archon_add_dmail_attachment', cliCommand: 'add-dmail-attachment', description: 'Add an inline attachment to a dmail.', schema: DidSchema.extend({ attachment: InlineDataSchema }), mutates: true, handler: (runtime, { did, attachment }) => requireKeymaster(runtime).addDmailAttachment(did, attachment.name ?? 'attachment', bufferFromInlineData(attachment)) }),
     tool({ name: 'archon_remove_dmail_attachment', cliCommand: 'remove-dmail-attachment', description: 'Remove an attachment from a dmail.', schema: DidSchema.extend({ name: z.string() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { did, name }) => requireKeymaster(runtime).removeDmailAttachment(did, name) }),
-    tool({ name: 'archon_get_dmail_attachment', cliCommand: 'get-dmail-attachment', description: 'Return a dmail attachment as inline base64 data.', schema: DidSchema.extend({ name: z.string() }), handler: async (runtime, { did, name }) => {
-        const buffer = await requireKeymaster(runtime).getDmailAttachment(did, name);
-        return buffer ? inlineDataFromBuffer(Buffer.from(buffer), name) : null;
+    tool({ name: 'archon_get_dmail_attachment', cliCommand: 'get-dmail-attachment', description: 'Return a dmail attachment as an embedded resource content block.', schema: DidSchema.extend({ name: z.string() }), handler: async (runtime, { did, name }) => {
+        const keymaster = requireKeymaster(runtime);
+        const dmail = await keymaster.lookupDID(did);
+        const buffer = await keymaster.getDmailAttachment(dmail, name);
+        return buffer ? vaultItemResult(keymaster, dmail, name, Buffer.from(buffer)) : null;
     } }),
     tool({ name: 'archon_list_dmail_attachments', cliCommand: 'list-dmail-attachments', description: 'List attachments of a dmail.', schema: DidSchema.merge(ResolveOptionsSchema), handler: (runtime, { did, ...options }) => requireKeymaster(runtime).listDmailAttachments(did, compactOptions(options)) }),
 
