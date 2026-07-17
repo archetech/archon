@@ -22,7 +22,9 @@ export function vaultItemUri(containerDid: string, name: string): string {
 // that makes the failure diagnosable -- unpinned data, or a gateway that is down -- and it
 // is not a secret, being already in the DID document.
 export function assetDataUnavailable(id: string, cid?: string): Error {
-    return new Error(`Asset data is unavailable for ${id}${cid ? ` (CID: ${cid})` : ''}`);
+    const which = cid ? ` (CID: ${cid})` : '';
+
+    return new Error(`Asset data is unavailable for ${id}${which}`);
 }
 
 type RegisterableResourceServer = {
