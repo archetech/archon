@@ -39,17 +39,21 @@ function parseBool(value: string | undefined): boolean {
 }
 
 function parseInlineLimit(value: string | undefined): number {
-    if (value === undefined || value === '') {
+    const trimmed = value?.trim();
+
+    if (trimmed === undefined || trimmed === '') {
         return DEFAULT_INLINE_LIMIT;
     }
 
-    const limit = Number(value);
-
-    if (!Number.isInteger(limit) || limit < 0) {
-        throw new Error(`ARCHON_MCP_INLINE_LIMIT must be a non-negative integer, got "${value}"`);
+    // Match digits before converting, rather than leaning on Number(): it reads ' ' as 0,
+    // '0x10' as 16 and '1e4' as 10000, all of which pass an isInteger check. A stray space
+    // in an env var would otherwise silently mean 0 -- link everything -- while an empty
+    // value means the default, which is an absurd distinction to hang on whitespace.
+    if (!/^\d+$/.test(trimmed) || !Number.isSafeInteger(Number(trimmed))) {
+        throw new Error(`ARCHON_MCP_INLINE_LIMIT must be a non-negative whole number of bytes, got "${value}"`);
     }
 
-    return limit;
+    return Number(trimmed);
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpServerConfig {

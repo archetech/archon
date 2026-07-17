@@ -760,6 +760,34 @@ describe('mcp server tools', () => {
         expect(runtime.keymaster.getFile).not.toHaveBeenCalled();
     });
 
+    it('links every file when the limit is zero, including an empty one', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        // 0 means link everything. A `bytes > limit` test would inline this one, since
+        // 0 > 0 is false -- contradicting the documented escape hatch on the one file where
+        // nobody would notice until they relied on it.
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', filename: 'empty.txt', type: 'text/plain', bytes: 0 } });
+        registerArchonTools(server, runtime as any, { ...baseConfig, inlineLimit: 0 });
+
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+
+        expect(response.content[0].type).toBe('resource_link');
+        expect(runtime.keymaster.getFile).not.toHaveBeenCalled();
+    });
+
+    it('inlines an empty file under a normal limit', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', filename: 'empty.txt', type: 'text/plain', bytes: 0 } });
+        runtime.keymaster.getFile.mockResolvedValue({ filename: 'empty.txt', type: 'text/plain', data: Buffer.alloc(0) });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+
+        expect(response.content[0].type).toBe('resource');
+        expect(response.content[0].resource.blob).toBe('');
+    });
+
     it('inlines everything when the limit is raised', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();

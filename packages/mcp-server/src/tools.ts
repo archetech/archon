@@ -498,9 +498,14 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
         const mimeType = summary.type ?? 'application/octet-stream';
         const name = summary.filename ?? 'file';
 
-        // Unknown size counts as too large: guessing "small" risks inlining something that
-        // buries the conversation, and a link costs the client only a resources/read.
-        if (summary.bytes === undefined || summary.bytes > config.inlineLimit) {
+        // Stated as what may be inlined, so a limit of 0 means "link everything" for every
+        // file including an empty one -- `bytes > limit` would quietly inline the 0-byte
+        // case and contradict the documented escape hatch. Unknown size counts as too
+        // large: guessing "small" risks inlining something that buries the conversation,
+        // while a link costs the client only a resources/read.
+        const inlineable = config.inlineLimit > 0 && summary.bytes !== undefined && summary.bytes <= config.inlineLimit;
+
+        if (!inlineable) {
             // MCP's `size` is documented for exactly this -- hosts use it to display file
             // sizes and estimate context window usage before fetching.
             return contentResult(
