@@ -18,6 +18,7 @@ const baseConfig: McpServerConfig = {
     passphrase: 'secret',
     defaultRegistry: undefined,
     readOnly: false,
+    inlineLimit: 16 * 1024,
 };
 
 const mutatingTools = ARCHON_MCP_TOOL_DEFINITIONS.filter(definition => definition.mutates).map(definition => definition.name);
@@ -665,6 +666,9 @@ describe('mcp server tools', () => {
     it('returns a file asset as an embedded resource content block', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
+        // A file asset's DID document carries the file's summary -- cid, filename, type and
+        // bytes -- with the data itself behind the CID.
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', filename: 'file.txt', type: 'text/plain', bytes: 4 } });
         registerArchonTools(server, runtime as any, baseConfig);
 
         const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'file-alias' });
@@ -692,6 +696,7 @@ describe('mcp server tools', () => {
     it('defaults the mimeType and drops absent metadata from both mirrors', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', bytes: 4 } });
         runtime.keymaster.getFile.mockResolvedValue({ data: Buffer.from('file') });
         registerArchonTools(server, runtime as any, baseConfig);
 
@@ -702,6 +707,96 @@ describe('mcp server tools', () => {
         // is dropped by both, not left as an undefined key on one side.
         expect(response.structuredContent).toStrictEqual({ mimeType: 'application/octet-stream' });
         expect(JSON.parse(response.content[1].text)).toStrictEqual(response.structuredContent);
+    });
+
+    it('links a large file asset instead of inlining it, without fetching the data', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        const bytes = baseConfig.inlineLimit + 1;
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', filename: 'big.pdf', type: 'application/pdf', bytes } });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+
+        expect(response.content).toStrictEqual([
+            { type: 'resource_link', uri: 'did:cid:file', name: 'big.pdf', mimeType: 'application/pdf', size: bytes },
+            { type: 'text', text: JSON.stringify({ name: 'big.pdf', mimeType: 'application/pdf', bytes, linked: true }) },
+        ]);
+        // The whole point: the bytes never left the gatekeeper, let alone entered the
+        // model's context. Size came from the DID document.
+        expect(runtime.keymaster.getFile).not.toHaveBeenCalled();
+    });
+
+    it('inlines a file asset exactly at the limit', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        // The limit is inclusive: at the boundary it still embeds.
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', filename: 'edge.txt', type: 'text/plain', bytes: baseConfig.inlineLimit } });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+
+        expect(response.content[0].type).toBe('resource');
+        expect(runtime.keymaster.getFile).toHaveBeenCalled();
+    });
+
+    it('links a file asset whose size is unknown', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        // An asset with no recorded `bytes` could be any size, so it is linked rather than
+        // gambled on. No `size` is advertised, because none is known.
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', filename: 'mystery.bin' } });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+
+        expect(response.content[0]).toStrictEqual({
+            type: 'resource_link',
+            uri: 'did:cid:file',
+            name: 'mystery.bin',
+            mimeType: 'application/octet-stream',
+        });
+        expect(response.structuredContent).toStrictEqual({ name: 'mystery.bin', mimeType: 'application/octet-stream', linked: true });
+        expect(runtime.keymaster.getFile).not.toHaveBeenCalled();
+    });
+
+    it('links every file when the limit is zero, including an empty one', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        // 0 means link everything. A `bytes > limit` test would inline this one, since
+        // 0 > 0 is false -- contradicting the documented escape hatch on the one file where
+        // nobody would notice until they relied on it.
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', filename: 'empty.txt', type: 'text/plain', bytes: 0 } });
+        registerArchonTools(server, runtime as any, { ...baseConfig, inlineLimit: 0 });
+
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+
+        expect(response.content[0].type).toBe('resource_link');
+        expect(runtime.keymaster.getFile).not.toHaveBeenCalled();
+    });
+
+    it('inlines an empty file under a normal limit', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', filename: 'empty.txt', type: 'text/plain', bytes: 0 } });
+        runtime.keymaster.getFile.mockResolvedValue({ filename: 'empty.txt', type: 'text/plain', data: Buffer.alloc(0) });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+
+        expect(response.content[0].type).toBe('resource');
+        expect(response.content[0].resource.blob).toBe('');
+    });
+
+    it('inlines everything when the limit is raised', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        runtime.keymaster.resolveAsset.mockResolvedValue({ file: { cid: 'bafy', filename: 'big.pdf', type: 'application/pdf', bytes: 10_000_000 } });
+        registerArchonTools(server, runtime as any, { ...baseConfig, inlineLimit: Number.MAX_SAFE_INTEGER });
+
+        // The escape hatch for clients that ignore resource links.
+        const response: any = await server.tools.get('archon_get_asset_file')!.handler({ id: 'did:cid:file' });
+        expect(response.content[0].type).toBe('resource');
     });
 
     it('returns null for file-like assets with no data', async () => {

@@ -15,7 +15,34 @@ describe('mcp server config', () => {
             passphrase: undefined,
             defaultRegistry: undefined,
             readOnly: false,
+            inlineLimit: 16 * 1024,
         });
+    });
+
+    it('parses ARCHON_MCP_INLINE_LIMIT and rejects nonsense', () => {
+        expect(loadConfig({ ARCHON_MCP_INLINE_LIMIT: '65536' }).inlineLimit).toBe(65536);
+        // 0 links everything; a huge value inlines everything, which is the escape hatch
+        // for a client that does not follow resource links.
+        expect(loadConfig({ ARCHON_MCP_INLINE_LIMIT: '0' }).inlineLimit).toBe(0);
+        expect(loadConfig({ ARCHON_MCP_INLINE_LIMIT: '' }).inlineLimit).toBe(16 * 1024);
+
+        expect(() => loadConfig({ ARCHON_MCP_INLINE_LIMIT: 'lots' })).toThrow(/whole number/);
+        expect(() => loadConfig({ ARCHON_MCP_INLINE_LIMIT: '-1' })).toThrow(/whole number/);
+        expect(() => loadConfig({ ARCHON_MCP_INLINE_LIMIT: '1.5' })).toThrow(/whole number/);
+    });
+
+    it('does not let Number() coercion smuggle in a surprising limit', () => {
+        // Number(' ') is 0, which would silently mean "link everything" -- and would make a
+        // stray space behave completely differently from an empty value, which means the
+        // default. Whitespace is trimmed to nothing and treated as unset.
+        expect(loadConfig({ ARCHON_MCP_INLINE_LIMIT: ' ' }).inlineLimit).toBe(16 * 1024);
+        expect(loadConfig({ ARCHON_MCP_INLINE_LIMIT: ' 65536 ' }).inlineLimit).toBe(65536);
+
+        // Number() reads these as 16 and 10000; neither is what an operator typing them
+        // means, so they are rejected rather than guessed at.
+        expect(() => loadConfig({ ARCHON_MCP_INLINE_LIMIT: '0x10' })).toThrow(/whole number/);
+        expect(() => loadConfig({ ARCHON_MCP_INLINE_LIMIT: '1e4' })).toThrow(/whole number/);
+        expect(() => loadConfig({ ARCHON_MCP_INLINE_LIMIT: '  ' })).toBeTruthy();
     });
 
     it('uses ARCHON_NODE_URL before legacy ARCHON_GATEKEEPER_URL', () => {

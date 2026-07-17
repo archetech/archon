@@ -11,6 +11,7 @@ const baseConfig: McpServerConfig = {
     passphrase: 'secret',
     defaultRegistry: undefined,
     readOnly: false,
+    inlineLimit: 16 * 1024,
 };
 
 // A DID document with the fields a real gatekeeper returns, including ones the output
