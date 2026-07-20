@@ -23,12 +23,12 @@
     "sqlite3": "^6.0.1"
   },
   "overrides": {
-    "form-data": "2.5.5",
+    "form-data": "2.5.6",
     "jayson": {
       "uuid": "^11.1.1"
     },
     "qs": "6.15.1",
-    "tar": "^7.5.1",
+    "tar": "^7.5.16",
     "ws": "^8.18.3"
   },
   "devDependencies": {
