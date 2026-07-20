@@ -290,6 +290,36 @@ describe('saveWallet', () => {
         expect(ok).toBe(true);
     });
 
+    // Regression for #733: restoring the unencrypted WalletFile form (as the
+    // MCP surface hands out from create/show) into an instance whose HD-key
+    // cache was already warmed by a *different* wallet used to encrypt the
+    // restored metadata under the wrong key, bricking the stored wallet while
+    // saveWallet still returned true.
+    it('should not corrupt when restoring a different wallet into a warm instance', async () => {
+        // Warm instance A's HD-key cache with wallet A.
+        await keymaster.createId('Alice');
+        await keymaster.loadWallet();
+
+        // Build an independent wallet B and take its decrypted WalletFile form.
+        const walletBStore = new WalletJsonMemory();
+        const keymasterB = new Keymaster({ gatekeeper, wallet: walletBStore, cipher, passphrase: PASSPHRASE });
+        await keymasterB.createId('Bob');
+        const walletB = await keymasterB.loadWallet();
+        expect('enc' in walletB).toBe(false);
+
+        // Restore B into the warmed instance A.
+        const ok = await keymaster.saveWallet(walletB, true);
+        expect(ok).toBe(true);
+
+        // A fresh instance over the same storage must read B back intact,
+        // not throw or surface wallet A's contents.
+        const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+        const restored = await fresh.loadWallet();
+        expect(restored.ids['Bob']).toBeDefined();
+        expect(restored.ids['Alice']).toBeUndefined();
+        expect(restored).toStrictEqual(walletB);
+    });
+
     it('should throw on incorrect passphrase', async () => {
         const wallet = new WalletJsonMemory();
         const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'incorrect' });

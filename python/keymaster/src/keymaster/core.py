@@ -130,6 +130,9 @@ class Keymaster:
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache = None
+        # Identity of the wallet whose seed `_root_cache` was derived from, so a
+        # save of a *different* wallet re-derives instead of reusing a stale key.
+        self._root_cache_key: str | None = None
         self._lock = asyncio.Lock()
         # Node capability manifest (<nodeURL>/api/v1/capabilities), fetched once and
         # memoized. _UNFETCHED until first read; None = node has no manifest (older
@@ -195,6 +198,9 @@ class Keymaster:
             "ids": {},
             "aliases": {},
         }
+        # _root_cache was just set from this mnemonic; record its identity so
+        # the save below reuses it instead of re-deriving.
+        self._root_cache_key = self._root_cache_identity(wallet["seed"])
         ok = await self.save_wallet(wallet, overwrite=overwrite)
         if not ok:
             raise KeymasterError("save wallet failed")
@@ -210,6 +216,7 @@ class Keymaster:
         except InvalidTag as exc:
             raise KeymasterError("Incorrect passphrase.") from exc
         self._root_cache = hd_root_from_mnemonic(mnemonic)
+        self._root_cache_key = self._root_cache_identity(seed)
         root_pair = await self.hd_key_pair()
         try:
             plaintext = decrypt_message(root_pair["privateJwk"], stored["enc"])
@@ -238,6 +245,7 @@ class Keymaster:
 
         self.passphrase = new_passphrase
         self._root_cache = hd_root_from_mnemonic(mnemonic)
+        self._root_cache_key = self._root_cache_identity(wallet["seed"])
         self._wallet_cache = wallet
 
         encrypted = await self.encrypt_wallet_for_storage(wallet)
@@ -249,13 +257,38 @@ class Keymaster:
     async def export_encrypted_wallet(self) -> dict[str, Any]:
         return await self.encrypt_wallet_for_storage(await self.load_wallet())
 
+    @staticmethod
+    def _root_cache_identity(seed: dict[str, Any]) -> str | None:
+        # The passphrase-encrypted mnemonic uniquely identifies the wallet whose
+        # seed a cached root belongs to. Comparing it detects when the cache is
+        # stale for the wallet currently being encrypted (e.g. restoring one
+        # wallet into an instance warmed by another) so we re-derive rather than
+        # encrypt under the wrong key and brick the stored wallet.
+        enc = (seed or {}).get("mnemonicEnc")
+        if not enc:
+            return None
+        return f"{enc['salt']}.{enc['iv']}.{enc['data']}"
+
     async def _root_node(self, wallet: dict[str, Any] | None = None):
+        # When a wallet is supplied, re-derive if the cache belongs to a
+        # different wallet (the #733 fix). When it is not, keep the original
+        # early-return on a warm cache: callers inside decrypt_wallet reach here
+        # while load_wallet is mid-flight, so we must not re-enter load_wallet.
+        if wallet is not None:
+            cache_key = self._root_cache_identity(wallet.get("seed", {}))
+            if self._root_cache is not None and cache_key is not None and self._root_cache_key == cache_key:
+                return self._root_cache
+            mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
+            self._root_cache = hd_root_from_mnemonic(mnemonic)
+            self._root_cache_key = cache_key
+            return self._root_cache
+
         if self._root_cache is not None:
             return self._root_cache
-        if wallet is None:
-            wallet = await self.load_wallet()
+        wallet = await self.load_wallet()
         mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
         self._root_cache = hd_root_from_mnemonic(mnemonic)
+        self._root_cache_key = self._root_cache_identity(wallet.get("seed", {}))
         return self._root_cache
 
     async def hd_key_pair(self, wallet: dict[str, Any] | None = None) -> dict[str, dict[str, str]]:

@@ -206,6 +206,9 @@ export default class Keymaster implements KeymasterInterface {
     private _nodeCapabilities?: Record<string, boolean> | null;
     private _walletCache?: WalletFile;
     private _hdkeyCache?: any;
+    // Identity of the wallet whose seed `_hdkeyCache` was derived from, so a
+    // save of a *different* wallet re-derives instead of reusing a stale key.
+    private _hdkeyCacheKey?: string;
 
     constructor(options: KeymasterOptions) {
         if (!options || !options.gatekeeper || !options.gatekeeper.createDID) {
@@ -315,6 +318,9 @@ export default class Keymaster implements KeymasterInterface {
             counter: 0,
             ids: {}
         };
+        // _hdkeyCache was just set from this mnemonic; record its identity so
+        // the save below reuses it instead of re-deriving.
+        this._hdkeyCacheKey = this.hdkeyCacheKey(wallet.seed);
 
         const ok = await this.saveWallet(wallet, overwrite)
         if (!ok) {
@@ -345,6 +351,10 @@ export default class Keymaster implements KeymasterInterface {
         wallet.seed.mnemonicEnc = mnemonicEnc;
         this.passphrase = newPassphrase;
         this._walletCache = wallet;
+        // Rotation re-encrypts the same mnemonic, so the cached HD key is still
+        // valid; repoint its identity to the new mnemonicEnc so the re-encrypt
+        // below reuses the cache instead of re-deriving.
+        this._hdkeyCacheKey = this.hdkeyCacheKey(wallet.seed);
 
         const encrypted = await this.encryptWalletForStorage(wallet);
         const ok = await this.db.saveWallet(encrypted, true);
@@ -5500,13 +5510,25 @@ export default class Keymaster implements KeymasterInterface {
         } catch { }
     }
 
+    // The passphrase-encrypted mnemonic uniquely identifies the wallet whose
+    // seed a cached HD key belongs to. Used to detect when the cache is stale
+    // for the wallet currently being encrypted (e.g. restoring one wallet into
+    // an instance warmed by another) so we re-derive rather than encrypt under
+    // the wrong key and brick the stored wallet.
+    private hdkeyCacheKey(seed: Seed): string | undefined {
+        const enc = seed.mnemonicEnc;
+        return enc ? `${enc.salt}.${enc.iv}.${enc.data}` : undefined;
+    }
+
     private async getHDKeyFromCacheOrMnemonic(wallet: WalletFile) {
-        if (this._hdkeyCache) {
+        const cacheKey = this.hdkeyCacheKey(wallet.seed);
+        if (this._hdkeyCache && cacheKey !== undefined && this._hdkeyCacheKey === cacheKey) {
             return this._hdkeyCache;
         }
 
         const mnemonic = await this.getMnemonicForDerivation(wallet);
         this._hdkeyCache = this.cipher.generateHDKey(mnemonic);
+        this._hdkeyCacheKey = cacheKey;
         return this._hdkeyCache;
     }
 
@@ -5538,6 +5560,7 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         this._hdkeyCache = this.cipher.generateHDKey(mnemonic);
+        this._hdkeyCacheKey = this.hdkeyCacheKey(stored.seed);
         const { publicJwk, privateJwk } = this.cipher.generateJwk(this._hdkeyCache.privateKey!);
 
         const plaintext = this.cipher.decryptMessage(privateJwk, stored.enc, publicJwk);

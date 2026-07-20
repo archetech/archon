@@ -65,6 +65,37 @@ def test_save_wallet_rejects_unsupported_version(testbed):
         run(testbed.keymaster.save_wallet({"version": 0, "seed": {"mnemonicEnc": {}}, "ids": {}}))
 
 
+def test_save_wallet_restore_into_warm_instance_does_not_corrupt(testbed):
+    # Regression for #733: restoring the unencrypted WalletFile form into an
+    # instance whose root-key cache was warmed by a different wallet used to
+    # encrypt the restored metadata under the wrong key, bricking the stored
+    # wallet while save_wallet still returned True.
+
+    # Warm instance A's root-key cache with wallet A.
+    run(testbed.keymaster.create_id("Alice"))
+    run(testbed.keymaster.load_wallet())
+
+    # Build an independent wallet B and take its decrypted WalletFile form.
+    other = make_testbed()
+    run(other.keymaster.create_id("Bob"))
+    wallet_b = run(other.keymaster.load_wallet())
+    assert "enc" not in wallet_b
+
+    # Restore B into the warmed instance A.
+    assert run(testbed.keymaster.save_wallet(wallet_b, overwrite=True)) is True
+
+    # A fresh instance over the same store must read B back intact.
+    fresh = Keymaster(
+        gatekeeper=testbed.gatekeeper,
+        wallet_store=testbed.wallet_store,
+        passphrase="passphrase",
+    )
+    restored = run(fresh.load_wallet())
+    assert "Bob" in restored["ids"]
+    assert "Alice" not in restored["ids"]
+    assert restored == wallet_b
+
+
 def test_new_wallet_rejects_invalid_mnemonic(testbed):
     with pytest.raises(KeymasterError, match="Invalid parameter: mnemonic"):
         run(testbed.keymaster.new_wallet("not a valid mnemonic", overwrite=True))
