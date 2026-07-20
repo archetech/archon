@@ -1,6 +1,6 @@
 {
   "name": "@didcid/mcp-server",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Archon MCP server",
   "type": "module",
   "main": "./dist/index.js",
@@ -35,9 +35,9 @@
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@didcid/cipher": "^0.4.0",
-    "@didcid/clients": "^0.1.0",
-    "@didcid/keymaster": "^0.6.0",
+    "@didcid/cipher": "^0.4.1",
+    "@didcid/clients": "^0.1.1",
+    "@didcid/keymaster": "^0.6.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^16.4.5",
     "zod": "^3.25.76"

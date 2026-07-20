@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.1](https://github.com/archetech/archon/compare/@didcid/common@0.1.3...@didcid/common@0.3.1) (2026-07-20)
+
+
+### Features
+
+* Add Lightning wallet support via LNbits integration ([#136](https://github.com/archetech/archon/issues/136)) ([#140](https://github.com/archetech/archon/issues/140)) ([4d99d5a](https://github.com/archetech/archon/commit/4d99d5ab8da20897e5aecf8557b271c3b1779d45))
+* expand MCP server toward Keymaster CLI parity ([#606](https://github.com/archetech/archon/issues/606)) ([8021d44](https://github.com/archetech/archon/commit/8021d4486d28003408234c2f33993389965d1dd1))
+
+
+
+
+
 # [0.3.0](https://github.com/archetech/archon/compare/@didcid/common@0.2.0...@didcid/common@0.3.0) (2026-06-26)
 
 **Note:** Version bump only for package @didcid/common
