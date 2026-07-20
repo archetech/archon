@@ -1,6 +1,6 @@
 {
   "name": "@didcid/clients",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Lightweight HTTP clients for Archon services",
   "type": "module",
   "module": "./dist/esm/index.js",
@@ -44,11 +44,21 @@
   },
   "typesVersions": {
     "*": {
-      "gatekeeper": ["./dist/types/gatekeeper-client.d.ts"],
-      "drawbridge": ["./dist/types/drawbridge-client.d.ts"],
-      "keymaster": ["./dist/types/keymaster-client.d.ts"],
-      "gatekeeper-types": ["./dist/types/gatekeeper-types.d.ts"],
-      "keymaster-types": ["./dist/types/keymaster-types.d.ts"]
+      "gatekeeper": [
+        "./dist/types/gatekeeper-client.d.ts"
+      ],
+      "drawbridge": [
+        "./dist/types/drawbridge-client.d.ts"
+      ],
+      "keymaster": [
+        "./dist/types/keymaster-client.d.ts"
+      ],
+      "gatekeeper-types": [
+        "./dist/types/gatekeeper-types.d.ts"
+      ],
+      "keymaster-types": [
+        "./dist/types/keymaster-types.d.ts"
+      ]
     }
   },
   "scripts": {
