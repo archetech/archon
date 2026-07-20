@@ -351,6 +351,10 @@ export default class Keymaster implements KeymasterInterface {
         wallet.seed.mnemonicEnc = mnemonicEnc;
         this.passphrase = newPassphrase;
         this._walletCache = wallet;
+        // Rotation re-encrypts the same mnemonic, so the cached HD key is still
+        // valid; repoint its identity to the new mnemonicEnc so the re-encrypt
+        // below reuses the cache instead of re-deriving.
+        this._hdkeyCacheKey = this.hdkeyCacheKey(wallet.seed);
 
         const encrypted = await this.encryptWalletForStorage(wallet);
         const ok = await this.db.saveWallet(encrypted, true);
