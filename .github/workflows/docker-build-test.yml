@@ -77,3 +77,23 @@ jobs:
         with:
           name: E2E Artifacts (${{ matrix.gatekeeper }}, ${{ matrix.keymaster }})
           path: e2e-results.xml
+
+  # Single stable status that rolls up every build_test_images matrix leg, so
+  # branch protection can require one check instead of the fragile per-leg
+  # matrix names. `if: always()` is required: without it this job is skipped
+  # when a leg fails, and a skipped required check would stall the PR instead
+  # of failing it.
+  build_test_images_result:
+    name: build_test_images result
+    if: always()
+    needs: build_test_images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all matrix legs passed
+        run: |
+          result="${{ needs.build_test_images.result }}"
+          if [ "$result" != "success" ]; then
+            echo "build_test_images did not succeed (result: $result)"
+            exit 1
+          fi
+          echo "All build_test_images legs passed"
