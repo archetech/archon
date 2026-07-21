@@ -441,3 +441,10 @@ Pay a Lightning invoice:
 | `remove-dmail-attachment` | `archon_remove_dmail_attachment` |
 | `get-dmail-attachment` | `archon_get_dmail_attachment` |
 | `list-dmail-attachments` | `archon_list_dmail_attachments` |
+| `pack-didcomm` | `archon_pack_didcomm` |
+| `unpack-didcomm` | `archon_unpack_didcomm` |
+| `send-didcomm` | `archon_send_didcomm` |
+| `receive-didcomm` | `archon_receive_didcomm` |
+| `mediate-didcomm` | `archon_mediate_didcomm` |
+| `publish-didcomm` | `archon_publish_didcomm` |
+| `unpublish-didcomm` | `archon_unpublish_didcomm` |
