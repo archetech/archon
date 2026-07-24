@@ -4,7 +4,7 @@
 
 **Abstract**
 
-Archon is a decentralized identity (DID) protocol implementing the W3C-compliant `did:cid` scheme. It provides a comprehensive peer-to-peer identity infrastructure that enables secure, verifiable decentralized identities anchored to IPFS and multiple blockchain registries. By separating DID creation (via content-addressable storage) from DID updates (via distributed registries), Archon achieves the unprecedented combination of instant, zero-cost identity creation with cryptographically secure, consensus-driven updates. Identities interoperate with the wider ecosystem through a conformant DID resolution interface, DIDComm v2 confidential messaging, and a Model Context Protocol server that exposes the wallet to AI agents.
+Archon is a decentralized identity (DID) protocol implementing the W3C-compliant `did:cid` scheme. It provides a comprehensive peer-to-peer identity infrastructure that enables secure, verifiable decentralized identities anchored to IPFS and multiple blockchain registries. By separating DID creation (via content-addressable storage) from DID updates (via distributed registries), Archon combines instant identity creation carrying no registry transaction fee with cryptographically secure, consensus-driven updates. Identities interoperate with the wider ecosystem through a Universal Resolver-style resolution interface — with documented media-type and content-negotiation deviations (§5.5) — DIDComm v2 confidential messaging, and a Model Context Protocol server that exposes the wallet to AI agents.
 
 ---
 
@@ -1081,7 +1081,7 @@ wallet ──remove (signed)──────────────▶  disca
 
 Envelopes are addressed by parsing the recipient DIDs out of the JWE recipient key identifiers, so the relay routes without opening anything. Retrieval is a deliberate two-step: the wallet fetches its queued envelopes, unpacks them locally, and only then acknowledges the ones that unpacked successfully, which removes them. A message that fails to unpack is therefore not discarded on that attempt — it stays queued for retry until it is acknowledged, reaches the retention deadline, or its store is lost (the default in-memory backend holds mailboxes in process memory and does not survive a restart). Both fetch and remove require a single-use challenge, signed by the identity's key, that expires in five minutes and is consumed on use to prevent replay.
 
-Intended retention for undelivered envelopes is seven days. The mailbox is backed by an in-memory store by default, or Redis. Redis enforces that window with native key expiry; the in-memory store currently prunes a mailbox only when that mailbox is read, so envelopes addressed to a recipient who never polls can outlive the window, and expired unconsumed challenges are not reclaimed at all. That gap is tracked as a known defect rather than intended behavior — deployments that depend on the retention bound should use the Redis backend.
+Retention of undelivered envelopes is bounded at seven days, but that bound is a property of the storage backend rather than of the protocol: it holds only where the backend enforces expiry independently of access. The mailbox is pluggable — an in-memory store by default, or Redis, which enforces the window through native key expiry. A deployment relying on the retention bound, or on envelopes surviving a restart, should choose its backend accordingly. Current per-backend conformance to this bound is recorded with the reference implementation rather than here.
 
 This pull model is what makes self-custody practical. A browser extension, a mobile wallet, or a laptop behind NAT has no stable inbound endpoint and is offline most of the time; requiring one would concede either constant availability or key custody. Instead the wallet reaches out when it is running, and the private keys never leave it.
 
@@ -1135,7 +1135,7 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 **Encryption**
 - Credentials can be encrypted for specific recipients
 - Only the intended holder can decrypt and access
-- Selective disclosure through encrypted presentations
+- Recipient confidentiality: a presentation encrypts the complete signed credential for a chosen verifier, so third parties learn nothing. This is confidentiality of the whole credential, **not** claim-level selective disclosure — the verifier receives every claim in it. Disclosing individual claims requires the salted-hash mechanism described in §14.1, which is not yet implemented.
 
 **Bound Credentials**
 - Credentials can be cryptographically bound to subjects
@@ -1256,7 +1256,7 @@ Individuals create and control their own digital identities without relying on a
 - Generate identity locally using Keymaster
 - Choose appropriate registry based on needs
 - Hold credentials from multiple issuers
-- Present credentials selectively to verifiers
+- Choose which credentials to present to which verifier, each presentation encrypted for its recipient (whole-credential, not claim-level — see §9.3)
 - Recover identity using mnemonic seed phrase
 
 ### 12.2 Enterprise Identity Management
@@ -1439,14 +1439,14 @@ Key innovations include:
 7. **DIDComm v2 messaging** providing confidential, standards-based interoperability with non-Archon agents
 8. **Lightning Network integration** enabling instant DID-to-DID payments and zaps
 9. **L402 API monetization** allowing node operators to offer paid identity services without accounts
-10. **Privacy-preserving voting** with spoil ballots and two-phase revelation
+10. **Encrypted ballot collection** with spoil ballots and two-phase revelation. Ballots are encrypted in storage and results can be published without them, but the poll organizer decrypts each ballot and holds a ballot-key-to-member mapping, so choices are linkable to voters by the organizer. This is confidentiality from third parties, not voter anonymity from the organizer.
 11. **Vaults with secret membership** for anonymous collaboration
-12. **Tor hidden service support** for censorship-resistant, anonymous access
+12. **Tor hidden service support** for censorship-resistant access, hiding network location from the service and from passive network observers. This is privacy-enhancing, not an anonymity guarantee — traffic-correlation attacks and application-level metadata such as DIDs presented in a session remain outside its threat model.
 13. **Interoperable DID resolution** at `/1.0/identifiers`, served by two independent implementations
 14. **An MCP server** letting AI agents operate an identity from a locally held wallet
 15. **Comprehensive credential support** for real-world applications
 
-The protocol is production-ready, with multiple client implementations (CLI, web, mobile, browser extension), a Lightning-enabled API gateway (Drawbridge), a DIDComm v2 messaging service, an MCP server for AI agents, a Python SDK, robust cryptographic foundations, and extensive testing. Organizations seeking to implement decentralized identity infrastructure will find Archon provides the flexibility, security, and performance required for diverse use cases.
+Implementation status: the protocol is implemented across multiple clients (CLI, web, mobile, browser extension), a Lightning-enabled API gateway (Drawbridge), a DIDComm v2 messaging service, an MCP server for AI agents, and a Python SDK, with two independent Gatekeeper implementations in TypeScript and Rust. This paper does not present a formal threat model, a security proof, a conformance matrix, or benchmarks, and the suitability of Archon for a given deployment should be assessed against that gap rather than inferred from this description.
 
 As the digital identity landscape continues to evolve, Archon's modular architecture positions it to adapt to new requirements while maintaining backward compatibility and the core principles of user sovereignty and decentralization.
 
@@ -1455,13 +1455,13 @@ As the digital identity landscape continues to evolve, Archon's modular architec
 ## References
 
 1. W3C Decentralized Identifiers (DIDs) v1.0. https://www.w3.org/TR/did-core/
-2. W3C Verifiable Credentials Data Model v1.1. https://www.w3.org/TR/vc-data-model/
+2. W3C Verifiable Credentials Data Model v1.1. https://www.w3.org/TR/2022/REC-vc-data-model-20220303/
 3. IPFS Content Identifiers (CIDs). https://docs.ipfs.tech/concepts/content-addressing/
 4. BIP-32: Hierarchical Deterministic Wallets. https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
 5. BIP-39: Mnemonic code for generating deterministic keys. https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 6. Hyperswarm Protocol. https://docs.holepunch.to/building-blocks/hyperswarm
 7. JSON Canonicalization Scheme (JCS). RFC 8785
-8. DIDComm Messaging v2.0. Decentralized Identity Foundation. https://identity.foundation/didcomm-messaging/spec/v2.1/
+8. DIDComm Messaging v2.1. Decentralized Identity Foundation. https://identity.foundation/didcomm-messaging/spec/v2.1/
 9. Public Key Authenticated Encryption for JOSE: ECDH-1PU. draft-madden-jose-ecdh-1pu
 10. Model Context Protocol. https://modelcontextprotocol.io/
 11. Selective Disclosure for JSON Web Tokens (SD-JWT). RFC 9901
