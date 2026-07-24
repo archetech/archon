@@ -112,7 +112,7 @@ Archon implements the W3C DID Core 1.0 specification, ensuring interoperability 
 - Service endpoints
 - DID resolution and dereferencing with conformant metadata
 
-Beyond the native API, Archon exposes a dedicated resolution interface at `/1.0/identifiers` (see §5.5) following the Universal Resolver convention: the resolution-result triple, content-type negotiation, and standard `resolutionMetadata.error` codes including `invalidDid` and `notFound`. Both the TypeScript and Rust Gatekeeper implementations serve this interface at full error-classification parity, verified by a shared HTTP contract test suite.
+Beyond the native API, Archon exposes a dedicated resolution interface at `/1.0/identifiers` (see §5.5) following the Universal Resolver convention: the resolution-result triple, content-type negotiation, and standard `resolutionMetadata.error` codes including `invalidDid` and `notFound`. Both the TypeScript and Rust Gatekeeper implementations serve this interface, each covered by its own test suite.
 
 Beyond DID Core, Archon builds on:
 
@@ -169,7 +169,7 @@ A dedicated service owns DIDComm v2 *transport*, keeping message crypto in the w
 - Receives inbound `application/didcomm-encrypted+json` envelopes at a published endpoint
 - Queues envelopes in a per-identity mailbox, released only against a signed challenge proving DID control
 - Delivers all outbound envelopes on the wallet's behalf, so egress can traverse Tor without exposing the wallet host
-- Handles opaque envelopes only — it never holds keys and cannot read message content
+- Holds no private keys and cannot read message content; it parses only envelope headers, which is enough to route and no more
 
 #### MCP Server
 
@@ -189,7 +189,7 @@ Redaction covers errors, not results: successful tool results are serialized as 
 | `archon_new_wallet` | decrypted `WalletFile` | confirmation argument |
 | `archon_create_wallet` | decrypted `WalletFile` | **none** — empty input schema |
 
-`archon_create_wallet` loads the wallet if one already exists, so it returns the same decrypted `WalletFile` as `archon_show_wallet` with nothing gating it. The tool surface is therefore **not a key-custody boundary**: an agent that can call arbitrary tools can obtain the wallet's key material. What the local stdio transport does guarantee is narrower — the wallet file and passphrase are not transmitted over a network to a remote service. Operators needing an actual boundary must restrict the tool set, not rely on the transport.
+`archon_create_wallet` loads the wallet if one already exists, so it returns the same decrypted `WalletFile` as `archon_show_wallet` with nothing gating it. The tool surface is therefore **not a key-custody boundary**: an agent that can call arbitrary tools can obtain the wallet's key material. What the server itself guarantees is narrower — it never uploads the wallet or passphrase of its own accord, and stdio bounds only the hop to its MCP host. Where a result travels after that is the host's business, and a host backed by a remote model will forward a returned `WalletFile` like any other tool output. Operators needing an actual boundary must restrict the tool set, not rely on the transport.
 
 #### Mediators
 
@@ -364,7 +364,7 @@ This surface differs from the native API in three ways that matter for interoper
 2. **Standard error codes.** Failures return DID Core `didResolutionMetadata.error` values — `invalidDid`, `notFound`, `internalError` — rather than bare HTTP status codes. A DID whose own operation chain fails validation is classified as `notFound` (a property of the DID), not as a server error.
 3. **No non-standard members.** Nothing outside the resolution result appears in the response.
 
-Both the TypeScript and Rust Gatekeeper implementations serve this interface, held at parity by a shared HTTP contract test suite. Where a public node fronts Gatekeeper with Drawbridge, the gateway forwards `/1.0/identifiers` as a public, non-paywalled route so that external resolvers can reach it without credentials.
+Both the TypeScript and Rust Gatekeeper implementations serve this interface, each exercised by its own test suite — the Rust integration tests assert the resolution and dereferencing endpoints against committed vectors. Agreement between the two rests on porting discipline and review rather than on an automated differential harness: the implementations are not currently executed against a common suite and compared response-for-response. Consumers requiring byte-level equivalence between a TypeScript and a Rust node should verify it for their own workload. Where a public node fronts Gatekeeper with Drawbridge, the gateway forwards `/1.0/identifiers` as a public, non-paywalled route so that external resolvers can reach it without credentials.
 
 Two deviations from the DID Resolution specification are worth stating plainly rather than glossing. First, the endpoint returns the resolution-result triple while labeling it with `application/did+json` or `application/did+ld+json`, which are DID *document* representation media types; the current DID Resolution binding specifies `application/did-resolution` for the triple. Second, content negotiation falls back to JSON-LD when no requested representation is supported, so `representationNotSupported` is never emitted. This surface is therefore best understood as the widely-deployed Universal Resolver result shape rather than a strictly conformant DID Resolution binding.
 
@@ -1025,7 +1025,7 @@ Archon supports secure key rotation without changing the DID:
 
 ### 8.9 DIDComm v2 Messaging
 
-D-Mail (§8.2) is Archon-native: it works beautifully between Archon identities and not at all with anything else. DIDComm v2 is the interoperability layer — a DIF standard for confidential, authenticated, transport-agnostic messaging between any two DIDs. Archon implements it as an additive capability; DIDComm does not replace D-Mail.
+D-Mail (§8.2) is Archon-native: it works beautifully between Archon identities and not at all with anything else. DIDComm v2 is the interoperability layer — a DIF standard for confidential, optionally sender-authenticated, transport-agnostic messaging between DIDs that publish compatible key-agreement material. Archon implements it as an additive capability; DIDComm does not replace D-Mail.
 
 #### The secp256k1 constraint
 
@@ -1442,7 +1442,7 @@ Key innovations include:
 10. **Privacy-preserving voting** with spoil ballots and two-phase revelation
 11. **Vaults with secret membership** for anonymous collaboration
 12. **Tor hidden service support** for censorship-resistant, anonymous access
-13. **Interoperable DID resolution** at `/1.0/identifiers`, at parity across two independent implementations
+13. **Interoperable DID resolution** at `/1.0/identifiers`, served by two independent implementations
 14. **An MCP server** letting AI agents operate an identity from a locally held wallet
 15. **Comprehensive credential support** for real-world applications
 
