@@ -112,7 +112,7 @@ Archon implements the W3C DID Core 1.0 specification, ensuring interoperability 
 - Service endpoints
 - DID resolution and dereferencing with conformant metadata
 
-Conformance is not merely asserted. Archon exposes a dedicated resolution interface at `/1.0/identifiers` (see §5.5) that follows the DID Core 1.0 resolution contract — content-type negotiation between `application/did+ld+json` and `application/did+json`, and standard `resolutionMetadata.error` codes such as `invalidDid`, `notFound`, and `representationNotSupported`. Both the TypeScript and Rust Gatekeeper implementations serve this interface at full error-classification parity, verified by a shared HTTP contract test suite.
+Beyond the native API, Archon exposes a dedicated resolution interface at `/1.0/identifiers` (see §5.5) following the Universal Resolver convention: the resolution-result triple, content-type negotiation, and standard `resolutionMetadata.error` codes including `invalidDid` and `notFound`. Both the TypeScript and Rust Gatekeeper implementations serve this interface at full error-classification parity, verified by a shared HTTP contract test suite.
 
 Beyond DID Core, Archon builds on:
 
@@ -178,7 +178,9 @@ An stdio Model Context Protocol server (`@didcid/mcp-server`) exposes the wallet
 - Serves the Keymaster operation surface as typed MCP tools with JSON Schema inputs
 - Runs locally against the user's own wallet file and passphrase, connecting outward to Gatekeeper/Drawbridge for registry access
 - Returns native MCP content blocks, linking large assets by resource URI rather than inlining them
-- Redacts sensitive wallet material from tool output
+- Redacts secrets from *error* messages, so credentials embedded in URLs or assignments are not leaked through a failure path
+
+Note that redaction covers errors, not results: successful tool results are serialized as returned. Two tools deliberately return sensitive material — `archon_show_wallet` returns the decrypted wallet and `archon_show_mnemonic` returns the recovery phrase — and both require an explicit `reveal: true` argument to invoke. An operator connecting an agent to a wallet should treat those two as the security boundary.
 
 #### Mediators
 
@@ -337,9 +339,9 @@ All DID state changes occur through signed operations:
 }
 ```
 
-### 5.5 Conformant Resolution and Dereferencing
+### 5.5 Interoperable Resolution and Dereferencing
 
-Archon's native `/did/:did` API is optimized for Archon clients and returns Archon-specific members alongside the DID document. For ecosystem interoperability — Universal Resolver drivers, third-party verifiers, and conformance test suites — Gatekeeper additionally exposes a strictly conformant surface at `/1.0/identifiers`:
+Archon's native `/did/:did` API is optimized for Archon clients and returns Archon-specific members alongside the DID document. For ecosystem interoperability — Universal Resolver drivers, third-party verifiers, and conformance test suites — Gatekeeper additionally exposes a standards-shaped surface at `/1.0/identifiers`, following the Universal Resolver convention:
 
 | Endpoint | Returns |
 |---|---|
@@ -347,13 +349,15 @@ Archon's native `/did/:did` API is optimized for Archon clients and returns Arch
 | `GET /1.0/identifiers/{did}/data` | Dereferences the `didDocumentData` extension (§6) as a secondary resource |
 | `GET /1.0/identifiers/{did}/registration` | Dereferences registration state (registry, type, version) |
 
-This surface differs from the native API in three ways that matter for conformance:
+This surface differs from the native API in three ways that matter for interoperability:
 
 1. **Content negotiation.** The `Accept` header selects between `application/did+ld+json` (the default) and `application/did+json`, with q-value ordering honored.
-2. **Standard error codes.** Failures return DID Core `didResolutionMetadata.error` values — `invalidDid`, `notFound`, `representationNotSupported`, `internalError` — rather than bare HTTP status codes. A DID whose own operation chain fails validation is classified as `notFound` (a property of the DID), not as a server error.
-3. **No non-standard members.** Nothing outside the specified resolution result appears in the response.
+2. **Standard error codes.** Failures return DID Core `didResolutionMetadata.error` values — `invalidDid`, `notFound`, `internalError` — rather than bare HTTP status codes. A DID whose own operation chain fails validation is classified as `notFound` (a property of the DID), not as a server error.
+3. **No non-standard members.** Nothing outside the resolution result appears in the response.
 
 Both the TypeScript and Rust Gatekeeper implementations serve this interface, held at parity by a shared HTTP contract test suite. Where a public node fronts Gatekeeper with Drawbridge, the gateway forwards `/1.0/identifiers` as a public, non-paywalled route so that external resolvers can reach it without credentials.
+
+Two deviations from the DID Resolution specification are worth stating plainly rather than glossing. First, the endpoint returns the resolution-result triple while labeling it with `application/did+json` or `application/did+ld+json`, which are DID *document* representation media types; the current DID Resolution binding specifies `application/did-resolution` for the triple. Second, content negotiation falls back to JSON-LD when no requested representation is supported, so `representationNotSupported` is never emitted. This surface is therefore best understood as the widely-deployed Universal Resolver result shape rather than a strictly conformant DID Resolution binding.
 
 ---
 
@@ -1023,16 +1027,16 @@ Archon's signing keys are secp256k1, which is not a key-agreement curve DIDComm 
 The envelope crypto is implemented in pure JavaScript in `@didcid/cipher`, extending the ECDH-ES and JWE machinery already used for `encryptMessage`. Pure JS (rather than a WASM library) is a deliberate choice: the primary target is in-browser self-custody wallets, which hold keys locally and must therefore pack and unpack client-side, with no bundler-specific WASM wiring or relaxed CSP.
 
 ```
-JWM plaintext  →  optional JWS (ES256K)  →  JWE
-                                            ├─ anoncrypt: ECDH-ES
-                                            └─ authcrypt: ECDH-1PU
-                                            key wrap: A256KW
-                                            content:  A256CBC-HS512
+JWM plaintext  →  optional JWS (ES256K)  →  JWE   (key wrap: A256KW)
+                                            ├─ anoncrypt: ECDH-ES   + XC20P
+                                            └─ authcrypt: ECDH-1PU  + A256CBC-HS512
 ```
+
+The content cipher shown on each branch is the default; callers may select `A256CBC-HS512`, `XC20P`, or `A256GCM` explicitly.
 
 Responsibilities follow the existing `cipher` ↔ `keymaster` split: `cipher` operates on raw JWKs and knows nothing of DIDs or wallets; `keymaster` resolves the recipient DID to its `keyAgreement` key, derives the sender's own keys, and on unpack resolves the *sender's* DID to verify authcrypt or the JWS signature. Private keys never leave the process holding the wallet — in a browser wallet, that is the browser.
 
-Spec compliance is enforced by interoperability testing against the reference `didcomm-node` implementation, kept strictly as a test oracle and never shipped as a runtime dependency, plus committed cross-language envelope vectors that the Python implementation must reproduce byte-for-byte.
+Spec compliance was originally established by interoperability testing against the reference `didcomm-node` implementation, used strictly as a development oracle and never shipped as a runtime dependency. That oracle has since been removed from the repository. Ongoing regression coverage rests on local round trips and on committed TypeScript envelope fixtures that the Python implementation must decrypt, which pins cross-language agreement without carrying a reference implementation as a test dependency.
 
 #### Supported protocols
 
@@ -1070,7 +1074,9 @@ Envelopes are addressed by parsing the recipient DIDs out of the JWE recipient k
 
 This pull model is what makes self-custody practical. A browser extension, a mobile wallet, or a laptop behind NAT has no stable inbound endpoint and is offline most of the time; requiring one would concede either constant availability or key custody. Instead the wallet reaches out when it is running, and the private keys never leave it.
 
-The design is deliberately minimal in what it trusts the relay with, but it is not metadata-free, and it is worth being precise about the residual exposure. The relay cannot read message content, learn who sent a message, or forge one. It *can* observe recipient key identifiers, the timing and volume of both deposits and collections, and it holds ciphertext at rest for up to the retention window. An adversary running the relay therefore learns a communication *pattern* even though every message stays sealed. Identities for whom that pattern is itself sensitive should run their own relay, reach it over Tor, or receive through a mediator rather than a directly published endpoint.
+The design is deliberately minimal in what it trusts the relay with, but it is not metadata-free, and it is worth being precise about the residual exposure. The relay cannot read message content and cannot forge a message or impersonate an authenticated sender. It *can* observe a good deal else. On the normal authcrypt path the sender's DID URL travels in the visible protected `skid` header, readable without decryption, and the outbound relay additionally authenticates the sender DID at hand-off — so the relay learns **who is talking to whom**, not merely who is receiving. It also observes recipient key identifiers, the timing and volume of both deposits and collections, and it holds ciphertext at rest for up to the retention window.
+
+An adversary running the relay therefore reconstructs a social graph and a communication pattern even though every message stays sealed. Anoncrypt omits `skid` and so withholds the sender from the envelope itself, though the delivery hand-off still identifies the sender to its own relay. Identities for whom that pattern is sensitive should run their own relay, reach it over Tor, or receive through a mediator rather than a directly published endpoint.
 
 DIDComm is available across every Archon surface: the Keymaster library, REST API, client, and CLI; the MCP server; the Python SDK; and a full pure-Python implementation of the envelope crypto in the Python keymaster library.
 
@@ -1308,7 +1314,7 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 
 Archon meets agents where they already are, through two standard protocols:
 
-**Model Context Protocol (MCP).** The `@didcid/mcp-server` package exposes the Keymaster surface — identities, credentials, aliases, addresses, groups, vaults, assets, polls, D-Mail, Lightning, and DIDComm — as typed MCP tools with JSON Schema inputs. It runs as a local stdio server against the user's own wallet, so the agent gains the *use* of an identity without the wallet or its passphrase ever leaving the user's machine. Large assets are returned as linked resources rather than inlined, keeping context windows small.
+**Model Context Protocol (MCP).** The `@didcid/mcp-server` package exposes the Keymaster surface — identities, credentials, aliases, addresses, groups, vaults, assets, polls, D-Mail, Lightning, and DIDComm — as typed MCP tools with JSON Schema inputs. It runs as a local stdio server against the user's own wallet, so by default the agent gains the *use* of an identity — signing, issuing, resolving — without the wallet file or its passphrase being transmitted anywhere. That default is not a hard boundary: `archon_show_wallet` and `archon_show_mnemonic` will return the decrypted wallet and the recovery phrase respectively, and while both demand an explicit `reveal: true`, an agent that can call them can read the keys into its own context. Operators who want a strict boundary should withhold those two tools rather than rely on the transport being local. Large assets are returned as linked resources rather than inlined, keeping context windows small.
 
 **DIDComm v2 (§8.9).** Where MCP connects an agent to its *own* identity, DIDComm connects two agents to *each other*: confidential, mutually authenticated messaging between any two DIDs, including credential issuance and proof presentation over standard protocols. An agent can therefore prove a delegated capability to a counterparty that runs no Archon software at all.
 
@@ -1423,8 +1429,8 @@ Key innovations include:
 10. **Privacy-preserving voting** with spoil ballots and two-phase revelation
 11. **Vaults with secret membership** for anonymous collaboration
 12. **Tor hidden service support** for censorship-resistant, anonymous access
-13. **Conformant DID resolution** at `/1.0/identifiers`, at parity across two independent implementations
-14. **An MCP server** giving AI agents the use of an identity without custody of the wallet
+13. **Interoperable DID resolution** at `/1.0/identifiers`, at parity across two independent implementations
+14. **An MCP server** letting AI agents operate an identity from a locally held wallet
 15. **Comprehensive credential support** for real-world applications
 
 The protocol is production-ready, with multiple client implementations (CLI, web, mobile, browser extension), a Lightning-enabled API gateway (Drawbridge), a DIDComm v2 messaging service, an MCP server for AI agents, a Python SDK, robust cryptographic foundations, and extensive testing. Organizations seeking to implement decentralized identity infrastructure will find Archon provides the flexibility, security, and performance required for diverse use cases.
