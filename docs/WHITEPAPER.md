@@ -1050,9 +1050,27 @@ Issue Credential and Present Proof bridge DIDComm to Archon's Verifiable Credent
 
 #### Transport and privacy
 
-Message crypto lives in the wallet; *delivery* is owned by the DIDComm service. Outbound sends are handed to that service over an authenticated challenge-response proving control of the sender DID, and the service delivers the opaque envelope onward. This split exists for privacy: it lets egress traverse Tor without exposing the wallet's host, and it means the transport component handles only ciphertext it cannot read. Inbound messages queue in a per-identity mailbox that is likewise released only against a signed challenge.
+Message crypto lives in the wallet; *delivery* is owned by the DIDComm service. Outbound sends are handed to that service over an authenticated challenge-response proving control of the sender DID, and the service delivers the opaque envelope onward. This split exists for privacy: it lets egress traverse Tor without exposing the wallet's host, and it means the transport component handles only ciphertext it cannot read.
 
 An identity advertises its capability by publishing a `DIDCommMessaging` service entry to its DID document, which auto-discovers the node's public endpoint — preferring a configured public host, falling back to the node's Tor onion address, and otherwise publishing key material only.
+
+#### Mailbox and retrieval
+
+Inbound messages are **not pushed to wallets**. The service acts as a store-and-forward relay: a sender deposits an envelope, the service files it into a per-identity mailbox, and it stays there until the key-holder collects it.
+
+```
+sender ──POST envelope──▶ relay ──▶ mailbox (per recipient DID)
+                                        │
+wallet ──challenge──▶ relay             │  envelope at rest, encrypted
+wallet ──fetch (signed)──────────────▶ ─┘  ──▶ unpack locally
+wallet ──remove (signed)──────────────▶  discard acknowledged ids
+```
+
+Envelopes are addressed by parsing the recipient DIDs out of the JWE recipient key identifiers, so the relay routes without opening anything. Retrieval is a deliberate two-step: the wallet fetches its queued envelopes, unpacks them locally, and only then acknowledges the ones that unpacked successfully, which removes them. A message that fails to unpack is therefore never lost. Both fetch and remove require a single-use challenge, signed by the identity's key, that expires in five minutes and is consumed on use to prevent replay. Undelivered envelopes expire after seven days. The mailbox is backed by an in-memory store by default or Redis using native key expiry.
+
+This pull model is what makes self-custody practical. A browser extension, a mobile wallet, or a laptop behind NAT has no stable inbound endpoint and is offline most of the time; requiring one would concede either constant availability or key custody. Instead the wallet reaches out when it is running, and the private keys never leave it.
+
+The design is deliberately minimal in what it trusts the relay with, but it is not metadata-free, and it is worth being precise about the residual exposure. The relay cannot read message content, learn who sent a message, or forge one. It *can* observe recipient key identifiers, the timing and volume of both deposits and collections, and it holds ciphertext at rest for up to the retention window. An adversary running the relay therefore learns a communication *pattern* even though every message stays sealed. Identities for whom that pattern is itself sensitive should run their own relay, reach it over Tor, or receive through a mediator rather than a directly published endpoint.
 
 DIDComm is available across every Archon surface: the Keymaster library, REST API, client, and CLI; the MCP server; the Python SDK; and a full pure-Python implementation of the envelope crypto in the Python keymaster library.
 
