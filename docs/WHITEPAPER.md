@@ -180,7 +180,16 @@ An stdio Model Context Protocol server (`@didcid/mcp-server`) exposes the wallet
 - Returns native MCP content blocks, linking large assets by resource URI rather than inlining them
 - Redacts secrets from *error* messages, so credentials embedded in URLs or assignments are not leaked through a failure path
 
-Note that redaction covers errors, not results: successful tool results are serialized as returned. Two tools deliberately return sensitive material — `archon_show_wallet` returns the decrypted wallet and `archon_show_mnemonic` returns the recovery phrase — and both require an explicit `reveal: true` argument to invoke. An operator connecting an agent to a wallet should treat those two as the security boundary.
+Redaction covers errors, not results: successful tool results are serialized as returned. Several tools return wallet material directly, and the gating on them is inconsistent:
+
+| Tool | Returns | Gate |
+|---|---|---|
+| `archon_show_mnemonic` | recovery phrase | `reveal: true` |
+| `archon_show_wallet` | decrypted `WalletFile` | `reveal: true` |
+| `archon_new_wallet` | decrypted `WalletFile` | confirmation argument |
+| `archon_create_wallet` | decrypted `WalletFile` | **none** — empty input schema |
+
+`archon_create_wallet` loads the wallet if one already exists, so it returns the same decrypted `WalletFile` as `archon_show_wallet` with nothing gating it. The tool surface is therefore **not a key-custody boundary**: an agent that can call arbitrary tools can obtain the wallet's key material. What the local stdio transport does guarantee is narrower — the wallet file and passphrase are not transmitted over a network to a remote service. Operators needing an actual boundary must restrict the tool set, not rely on the transport.
 
 #### Mediators
 
@@ -1070,11 +1079,15 @@ wallet ──fetch (signed)──────────────▶ ─┘ 
 wallet ──remove (signed)──────────────▶  discard acknowledged ids
 ```
 
-Envelopes are addressed by parsing the recipient DIDs out of the JWE recipient key identifiers, so the relay routes without opening anything. Retrieval is a deliberate two-step: the wallet fetches its queued envelopes, unpacks them locally, and only then acknowledges the ones that unpacked successfully, which removes them. A message that fails to unpack is therefore never lost. Both fetch and remove require a single-use challenge, signed by the identity's key, that expires in five minutes and is consumed on use to prevent replay. Undelivered envelopes expire after seven days. The mailbox is backed by an in-memory store by default or Redis using native key expiry.
+Envelopes are addressed by parsing the recipient DIDs out of the JWE recipient key identifiers, so the relay routes without opening anything. Retrieval is a deliberate two-step: the wallet fetches its queued envelopes, unpacks them locally, and only then acknowledges the ones that unpacked successfully, which removes them. A message that fails to unpack is therefore never lost. Both fetch and remove require a single-use challenge, signed by the identity's key, that expires in five minutes and is consumed on use to prevent replay.
+
+Intended retention for undelivered envelopes is seven days. The mailbox is backed by an in-memory store by default, or Redis. Redis enforces that window with native key expiry; the in-memory store currently prunes a mailbox only when that mailbox is read, so envelopes addressed to a recipient who never polls can outlive the window, and expired unconsumed challenges are not reclaimed at all. That gap is tracked as a known defect rather than intended behavior — deployments that depend on the retention bound should use the Redis backend.
 
 This pull model is what makes self-custody practical. A browser extension, a mobile wallet, or a laptop behind NAT has no stable inbound endpoint and is offline most of the time; requiring one would concede either constant availability or key custody. Instead the wallet reaches out when it is running, and the private keys never leave it.
 
-The design is deliberately minimal in what it trusts the relay with, but it is not metadata-free, and it is worth being precise about the residual exposure. The relay cannot read message content and cannot forge a message or impersonate an authenticated sender. It *can* observe a good deal else. On the normal authcrypt path the sender's DID URL travels in the visible protected `skid` header, readable without decryption, and the outbound relay additionally authenticates the sender DID at hand-off — so the relay learns **who is talking to whom**, not merely who is receiving. It also observes recipient key identifiers, the timing and volume of both deposits and collections, and it holds ciphertext at rest for up to the retention window.
+The design is deliberately minimal in what it trusts the relay with, but it is not metadata-free, and it is worth being precise about the residual exposure. The relay cannot read message content, and cannot forge an *authenticated* message or impersonate an authenticated sender. It can do rather more than that phrasing might suggest.
+
+Deposit is unauthenticated by design — a sender must be able to reach a stranger's mailbox — so anyone who can resolve a recipient's public key, the relay included, can construct a valid anoncrypt envelope and inject it. Anoncrypt carries no sender identity, so there is nothing to authenticate and nothing to forge. Recipients should treat an unauthenticated envelope as exactly that: the guarantee attaches to authcrypt and to the JWS signature layer, not to delivery. On the normal authcrypt path the sender's DID URL travels in the visible protected `skid` header, readable without decryption, and the outbound relay additionally authenticates the sender DID at hand-off — so the relay learns **who is talking to whom**, not merely who is receiving. It also observes recipient key identifiers, the timing and volume of both deposits and collections, and it holds ciphertext at rest for up to the retention window.
 
 An adversary running the relay therefore reconstructs a social graph and a communication pattern even though every message stays sealed. Anoncrypt omits `skid` and so withholds the sender from the envelope itself, though the delivery hand-off still identifies the sender to its own relay. Identities for whom that pattern is sensitive should run their own relay, reach it over Tor, or receive through a mediator rather than a directly published endpoint.
 
@@ -1314,7 +1327,7 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 
 Archon meets agents where they already are, through two standard protocols:
 
-**Model Context Protocol (MCP).** The `@didcid/mcp-server` package exposes the Keymaster surface — identities, credentials, aliases, addresses, groups, vaults, assets, polls, D-Mail, Lightning, and DIDComm — as typed MCP tools with JSON Schema inputs. It runs as a local stdio server against the user's own wallet, so by default the agent gains the *use* of an identity — signing, issuing, resolving — without the wallet file or its passphrase being transmitted anywhere. That default is not a hard boundary: `archon_show_wallet` and `archon_show_mnemonic` will return the decrypted wallet and the recovery phrase respectively, and while both demand an explicit `reveal: true`, an agent that can call them can read the keys into its own context. Operators who want a strict boundary should withhold those two tools rather than rely on the transport being local. Large assets are returned as linked resources rather than inlined, keeping context windows small.
+**Model Context Protocol (MCP).** The `@didcid/mcp-server` package exposes the Keymaster surface — identities, credentials, aliases, addresses, groups, vaults, assets, polls, D-Mail, Lightning, and DIDComm — as typed MCP tools with JSON Schema inputs. It runs as a local stdio server against the user's own wallet, so the agent gains the *use* of an identity — signing, issuing, resolving — without the wallet file or passphrase being transmitted to any remote service. That is a statement about network exposure, not about what the agent can read: as detailed in §4.2, several tools return the decrypted wallet, and `archon_create_wallet` does so with no gating argument at all. An agent with access to the full tool set can therefore read the keys into its own context. Restricting which tools are exposed is the only real boundary. Large assets are returned as linked resources rather than inlined, keeping context windows small.
 
 **DIDComm v2 (§8.9).** Where MCP connects an agent to its *own* identity, DIDComm connects two agents to *each other*: confidential, mutually authenticated messaging between any two DIDs, including credential issuance and proof presentation over standard protocols. An agent can therefore prove a delegated capability to a counterparty that runs no Archon software at all.
 
