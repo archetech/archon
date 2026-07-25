@@ -1154,15 +1154,15 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 ```
 Master Seed (BIP-39 Mnemonic)
         │
-        ├── m/44'/0'/0'  (Bitcoin keys)
-        ├── m/84'/0'/0'  (Native SegWit)
-        ├── m/86'/0'/0'  (Taproot)
-        └── m/390'/0'/0' (DID signing keys)
+        └── m/44'/0'/{account}'          one hardened account per identity
                   │
-                  ├── Identity 1
-                  ├── Identity 2
-                  └── Identity N
+                  ├── .../0/{index}       signing / authentication keys (secp256k1),
+                  │                        indexed so rotation advances the index
+                  └── .../1/0             DIDComm key agreement (change=1 branch,
+                                           kept separate from signing keys)
 ```
+
+Each identity occupies its own hardened account under `m/44'/0'`. Signing keys live on the `change=0` branch and are indexed, so key rotation (§8.8) simply advances to the next index; the DIDComm key-agreement key (§8.9) is derived on the `change=1` branch so it never collides with a signing key.
 
 **Key Types:**
 - **ECDSA secp256k1**: Primary signing algorithm
