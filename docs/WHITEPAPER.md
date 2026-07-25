@@ -4,7 +4,7 @@
 
 **Abstract**
 
-Archon is a decentralized identity (DID) protocol implementing the W3C-compliant `did:cid` scheme. It provides a comprehensive peer-to-peer identity infrastructure that enables secure, verifiable decentralized identities anchored to IPFS and multiple blockchain registries. By separating DID creation (via content-addressable storage) from DID updates (via distributed registries), Archon combines instant identity creation carrying no registry transaction fee with cryptographically secure, consensus-driven updates. Identities interoperate with the wider ecosystem through a Universal Resolver-style resolution interface — with documented media-type and content-negotiation deviations (§5.5) — DIDComm v2 confidential messaging, and a Model Context Protocol server that exposes the wallet to AI agents.
+Archon is a decentralized identity (DID) protocol implementing the W3C-compliant `did:cid` scheme. It provides a comprehensive peer-to-peer identity infrastructure that enables secure, verifiable decentralized identities anchored to IPFS and multiple blockchain registries. By separating DID creation (via content-addressable storage) from DID updates (via distributed registries), Archon combines instant identity creation carrying no registry transaction fee with cryptographically secure, consensus-driven updates. Standards-based messaging, resolution, and agent-integration interfaces let these identities interoperate beyond Archon's own clients.
 
 ---
 
