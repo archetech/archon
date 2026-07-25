@@ -790,34 +790,36 @@ Archon includes a complete decentralized email system built on top of the DID in
 }
 ```
 
-### 8.3 Privacy-Preserving Voting
+### 8.3 Encrypted Ballot Voting
 
-Archon's polling system goes beyond simple vote counting to provide cryptographic privacy guarantees:
+Archon's polling system collects ballots that are encrypted against third parties, with a controlled revelation phase. It is important to be precise about the trust model, because the privacy is directional: each ballot is encrypted **for the poll owner**, who is therefore able to read it. The owner is trusted with individual votes; everyone else is not.
 
 **Two-Phase Voting Protocol:**
 
 ```
-Phase 1: Ballot Collection (Private)
+Phase 1: Ballot Collection
 ──────────────────────────────────────
-• Voters cast encrypted ballots
+• Voters cast ballots encrypted for the poll owner
 • Ballots stored as asset DIDs
-• Vote choices hidden from everyone
-• Eligibility verified via credentials
+• Vote choices hidden from other voters and third parties
+• Eligibility verified via vault membership / credentials
 
 Phase 2: Result Revelation (Optional)
 ──────────────────────────────────────
-• Poll creator can reveal results
-• Individual ballots can remain hidden
-• Or full transparency with ballot publication
+• Poll owner tallies by decrypting every ballot
+• Owner can publish results with individual ballots omitted
+• Or publish in full, with each voter's choice attributed
 ```
 
-**Privacy Features:**
+**Properties and their limits:**
 
-1. **Spoil Ballots**: Voters can cast intentionally invalid ballots that are indistinguishable from valid ones, providing plausible deniability about whether they voted.
+1. **Third-party confidentiality.** A ballot is encrypted, so voters other than the caster and any party other than the owner cannot read it. This is confidentiality against outsiders, **not** anonymity from the owner: `computePollResults()` decrypts each ballot and builds a ballot-key-to-member mapping, so the owner learns exactly how each member voted.
 
-2. **Hidden Results**: Poll creators can choose to keep results hidden until a deadline or indefinitely.
+2. **Spoil ballots.** A voter may cast a spoil ballot (recorded as `vote: 0`). To third parties, who see only ciphertext, a spoil is indistinguishable from a real vote. To the owner it is **not** — on tally it is explicitly classified as `spoil` and attributed to the voter. Spoils provide plausible deniability against outside observers, not against the organizer.
 
-3. **Anonymous Tallying**: Results can be published without revealing individual votes.
+3. **Selective publication.** The owner may publish a tally with individual ballots omitted, so the wider audience need not see individual votes. This is a disclosure choice made by the owner, who has already seen every vote — it is not anonymous tallying, and it depends on the owner being honest about what they publish.
+
+Genuine voter-anonymous voting — where even the tallying party cannot link a choice to a voter — would require a different construction (e.g. blind signatures or a mix/homomorphic tally) and is not what this protocol provides today.
 
 **Poll Structure:**
 ```json
@@ -1025,7 +1027,7 @@ Archon supports secure key rotation without changing the DID:
 
 ### 8.9 DIDComm v2 Messaging
 
-D-Mail (§8.2) is Archon-native: it works beautifully between Archon identities and not at all with anything else. DIDComm v2 is the interoperability layer — a DIF standard for confidential, optionally sender-authenticated, transport-agnostic messaging between DIDs that publish compatible key-agreement material. Archon implements it as an additive capability; DIDComm does not replace D-Mail.
+D-Mail (§8.2) is Archon-native: it works between Archon identities and not with anything else. DIDComm v2 is the interoperability layer — a DIF standard for confidential, optionally sender-authenticated, transport-agnostic messaging between DIDs that publish compatible key-agreement material. Archon implements it as an additive capability; DIDComm does not replace D-Mail.
 
 #### The secp256k1 constraint
 
@@ -1225,8 +1227,8 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 
 **Tor Hidden Service Nodes**
 - Expose Drawbridge API as a `.onion` address
-- Enable fully anonymous identity operations
-- Protect both client and server network identity
+- Hide the server's network location and let clients reach it without a public IP or DNS, improving resistance to blocking and to passive network observation
+- Privacy-enhancing rather than an anonymity guarantee: traffic-correlation attacks and application-level metadata (for instance, DIDs presented within a session) remain outside Tor's threat model
 - Particularly relevant for censorship-resistant use cases
 
 ### 11.2 Peer Discovery
@@ -1288,11 +1290,11 @@ Connected devices receive unique, verifiable identities:
 
 ### 12.5 Voting and Governance
 
-Organizations implement transparent voting systems:
+Organizations implement voting systems where ballots are confidential from other participants (see §8.3 for the trust model — ballots are readable by the poll owner, not anonymous from them):
 
-- Anonymous ballot casting
-- Verifiable vote counting
-- Proof of eligibility without identity disclosure
+- Ballot casting encrypted against other voters and third parties
+- Eligibility gated by vault membership or credentials
+- Owner-run tallying, with the option to publish results without individual ballots
 - Auditable election results
 
 ### 12.6 Micropayments and API Monetization
@@ -1430,7 +1432,7 @@ Archon represents a significant advancement in decentralized identity technology
 
 Key innovations include:
 
-1. **Zero-cost, instant identity creation** through IPFS content addressing
+1. **Instant identity creation with no registry transaction fee** through IPFS content addressing
 2. **Flexible finality options** via multi-registry architecture
 3. **The didDocumentData extension** enabling arbitrary application data bound to identities
 4. **Automatic blockchain timestamping** providing cryptographic proof of when operations occurred
