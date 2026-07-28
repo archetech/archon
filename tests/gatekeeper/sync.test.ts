@@ -227,6 +227,27 @@ describe('exportBatch', () => {
         expect(exports[1].operation).toStrictEqual(updateOp);
     });
 
+    it('should export a DID promoted from local, carrying its create op', async () => {
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'local' });
+        const did = await gatekeeper.createDID(agentOp);
+
+        // a local DID is not exportable
+        expect((await gatekeeper.exportBatch([did])).length).toBe(0);
+
+        // promote local -> hyperswarm via an update op
+        const doc = await gatekeeper.resolveDID(did);
+        doc.didDocumentRegistration!.registry = 'hyperswarm';
+        const updateOp = await helper.createUpdateOp(keypair, did, doc);
+        await gatekeeper.updateDID(updateOp);
+
+        // now exportable, and the local create op comes along so the peer can reconstruct the DID
+        const exports = await gatekeeper.exportBatch([did]);
+        expect(exports.length).toBe(2);
+        expect(exports[0].operation).toStrictEqual(agentOp);
+        expect(exports[1].operation).toStrictEqual(updateOp);
+    });
+
     // eslint-disable-next-line
     it('should return empty array on an invalid DID', async () => {
         const exports = await gatekeeper.exportBatch(['mockDID']);

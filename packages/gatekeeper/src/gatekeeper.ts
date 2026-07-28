@@ -1380,14 +1380,20 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     async exportBatch(dids?: string[]): Promise<GatekeeperEvent[]> {
         const allDIDs = await this.exportDIDs(dids);
-        const nonlocalDIDs = allDIDs.filter(events => {
-            if (events.length > 0) {
-                const create = events[0];
-                const registry = create.operation?.registration?.registry;
-                return registry && registry !== 'local'
-            }
-            return false;
-        });
+        // Export a DID if ANY of its operations is non-local, not only the create op. A DID created
+        // `local` and later promoted (e.g. via change-registry) has a `local` create op but a
+        // non-local update; keying only on the create op left it un-exportable, so the promotion
+        // never reached peers. `.flat()` below still carries the create op along, so a peer receives
+        // the full history and reconstructs the DID.
+        const nonlocalDIDs = allDIDs.filter(events =>
+            events.some(event => {
+                // create ops carry the registry at `operation.registration.registry`; update ops
+                // (including a change-registry promotion) carry it at `doc.didDocumentRegistration.registry`.
+                const registry = event.operation?.registration?.registry
+                    ?? event.operation?.doc?.didDocumentRegistration?.registry;
+                return registry && registry !== 'local';
+            })
+        );
 
         const events = nonlocalDIDs.flat();
         return events.sort((a, b) => new Date(a.operation.proof?.created ?? 0).getTime() - new Date(b.operation.proof?.created ?? 0).getTime());
