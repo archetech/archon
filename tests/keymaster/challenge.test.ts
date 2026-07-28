@@ -49,6 +49,22 @@ describe('createChallenge', () => {
         expect(ttl < 60 * 60 * 1000).toBe(true);
     });
 
+    it('should let a local-default identity create a challenge (ephemeral follows a local default)', async () => {
+        // A fully-local deployment must be able to author ephemeral docs. Previously
+        // ephemeralRegistry was hardcoded 'hyperswarm', so the controller consistency
+        // check rejected a `local` identity authoring a `hyperswarm` ephemeral op.
+        const localKeymaster = new Keymaster({
+            gatekeeper, wallet: new WalletJsonMemory(), cipher,
+            passphrase: 'passphrase', defaultRegistry: 'local',
+        });
+        const alice = await localKeymaster.createId('Alice');
+        const did = await localKeymaster.createChallenge();
+        const doc = await localKeymaster.resolveDID(did);
+
+        expect(doc.didDocument!.controller).toBe(alice);
+        expect(doc.didDocumentData).toStrictEqual({ challenge: {} });
+    });
+
     it('should create an empty challenge with specified expiry', async () => {
         const alice = await keymaster.createId('Alice');
         const validUntil = '2025-01-01';
