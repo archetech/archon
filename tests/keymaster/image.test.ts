@@ -56,7 +56,7 @@ describe('createImage', () => {
             file: {
                 cid,
                 filename: 'image',
-                bytes: 392,
+                bytes: mockImage.length,
                 type: 'image/png',
             },
             image: {
@@ -110,7 +110,7 @@ describe('updateImage', () => {
             file: {
                 cid,
                 filename: 'image',
-                bytes: 522,
+                bytes: mockImage2.length,
                 type: 'image/jpg',
             },
             image: {
@@ -146,7 +146,7 @@ describe('updateImage', () => {
             file: {
                 cid,
                 filename: 'image',
-                bytes: 779,
+                bytes: mockImage.length,
                 type: 'image/png',
             },
             image: {
@@ -198,7 +198,7 @@ describe('getImage', () => {
 
         expect(image).not.toBeNull();
         expect(image!.file.type).toStrictEqual('image/png');
-        expect(image!.file.bytes).toStrictEqual(392);
+        expect(image!.file.bytes).toStrictEqual(mockImage.length);
         expect(image!.file.data).toStrictEqual(mockImage);
         expect(image!.image.width).toStrictEqual(100);
         expect(image!.image.height).toStrictEqual(100);
