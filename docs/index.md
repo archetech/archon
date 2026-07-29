@@ -33,11 +33,6 @@ language-agnostic contracts that every Archon service must satisfy.
 - **Storage** (`pin` queue): [Filecoin](services/mediators/filecoin/README.md), [Pinning](services/mediators/pinning/README.md)
 - **Payments**: [Lightning](services/mediators/lightning/README.md)
 
-## Governance
-
-- [Archonomicon](archonomicon/README.md) — the Archetech Nomicon, a self-amending ruleset
-- [Software Development Game](archonomicon/Nomicon/README.md) — the SDG process the Nomicon is based on, plus the [microNomicon](archonomicon/Nomicon/microNomicon.md) starter ruleset
-
 ## API Reference
 
 - [Gatekeeper API](gatekeeper-api.html) — browsable reference
