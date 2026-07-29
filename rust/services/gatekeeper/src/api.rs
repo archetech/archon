@@ -516,16 +516,32 @@ pub(crate) async fn export_batch(
     let mut events = Vec::new();
     for did in dids {
         let did_events = store.get_events(&did);
-        if let Some(create) = did_events.first() {
-            let registry = create
+        // Export a DID if ANY of its operations is non-local, not only the create op. A DID
+        // created `local` and later promoted (e.g. via change-registry) has a `local` create op
+        // but a non-local update; keying only on the create op left it un-exportable, so the
+        // promotion never reached peers. The whole history is extended below, so a peer receives
+        // the `local` create op too and can reconstruct the DID.
+        let exportable = did_events.iter().any(|event| {
+            // create ops carry the registry at `registration.registry`; update ops (including a
+            // change-registry promotion) carry it at `doc.didDocumentRegistration.registry`.
+            let registry = event
                 .operation
                 .get("registration")
                 .and_then(|value| value.get("registry"))
                 .and_then(Value::as_str)
-                .unwrap_or("");
-            if registry != "local" {
-                events.extend(did_events);
-            }
+                .or_else(|| {
+                    event
+                        .operation
+                        .get("doc")
+                        .and_then(|value| value.get("didDocumentRegistration"))
+                        .and_then(|value| value.get("registry"))
+                        .and_then(Value::as_str)
+                });
+            matches!(registry, Some(registry) if !registry.is_empty() && registry != "local")
+        });
+
+        if exportable {
+            events.extend(did_events);
         }
     }
 

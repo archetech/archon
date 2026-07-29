@@ -92,7 +92,7 @@ unhandled paths.
 | `POST` | `/api/v1/dids/remove` | yes | Body: array of DIDs. Returns boolean. |
 | `POST` | `/api/v1/dids/export` | no | Body: `{ "dids": string[] | undefined }`. Returns `GatekeeperEvent[][]` (one inner array per DID). |
 | `POST` | `/api/v1/dids/import` | yes | Body: `GatekeeperEvent[][]`. Flattens into a batch and queues for processing. Returns `ImportBatchResult`. |
-| `POST` | `/api/v1/batch/export` | yes | Body: `{ "dids": string[] | undefined }`. Returns a single sorted `GatekeeperEvent[]` of all non-`local` events for the chosen DIDs. |
+| `POST` | `/api/v1/batch/export` | yes | Body: `{ "dids": string[] | undefined }`. Returns a single `GatekeeperEvent[]`, sorted by `proof.created`, holding the full history of every chosen DID that is gossip-eligible. Eligibility is per DID, not per event, and an eligible DID exports its `local` operations too — see [§8.7](#87-batch-export-eligibility). |
 | `POST` | `/api/v1/batch/import` | yes | Body: `GatekeeperEvent[]`. Returns `ImportBatchResult`. Empty arrays MUST be rejected with HTTP 500 `Error: Invalid parameter: batch`. |
 | `POST` | `/api/v1/batch/import/cids` | yes | Body: `{ "cids": string[], "metadata": BatchMetadata }`. Hydrates each CID via the operation store or IPFS, then imports. Empty `cids` MUST 500 with `Error: Invalid parameter: cids`; missing `metadata.registry`/`time`/`ordinal` MUST 500 with `Error: Invalid parameter: metadata`. |
 | `GET` | `/api/v1/queue/:registry` | yes | Returns queued outbound `Operation[]` for the registry. |
@@ -823,6 +823,44 @@ operation.type ∈ { create, update, delete }
 `compare_ordinals(a, b)` is element-wise lexicographic over `Vec<u64>`:
 shorter is "less than" prefix-equal longer (matches the TS behavior).
 `None` ordinals compare as equal to anything.
+
+### 8.7 Batch export eligibility
+
+`POST /api/v1/batch/export` is the outbound counterpart of import: it
+selects which DIDs are eligible to be gossiped to peers (the Hyperswarm
+mediator's `shareDb` is the primary caller). `POST /api/v1/dids/export`
+performs no such filtering and returns every requested DID.
+
+Eligibility is decided **per DID, not per event**:
+
+> A DID is exportable if **any** of its operations carries a non-`local`
+> registry.
+
+Read the registry from whichever field the operation shape provides:
+
+| Operation | Registry field |
+| --- | --- |
+| `create` | `operation.registration.registry` |
+| `update` | `operation.doc.didDocumentRegistration.registry` |
+
+A missing or empty registry MUST NOT qualify a DID for export.
+
+Checking only the create operation is **insufficient**. A DID created
+`local` and later promoted (via `change-registry`, an `update` that
+rewrites `didDocumentRegistration.registry`) still has a `local` create
+op, so a create-only test excludes the DID entirely and the promotion
+never reaches peers — the origin reports it as confirmed on the new
+registry while every other node returns `notFound`.
+
+An eligible DID MUST export its **full** operation history, including any
+`local` operations. Peers need the create op to replay the DID from its
+first version; exporting only the non-`local` operations leaves them
+unable to reconstruct it. This does not re-publish the `local` operation,
+because outbound queueing ([§10.4](#104-outbound-queue)) early-returns on
+`local` — only the promoting update drives further distribution.
+
+The response is a single flat `GatekeeperEvent[]`, sorted ascending by
+`operation.proof.created`.
 
 ---
 

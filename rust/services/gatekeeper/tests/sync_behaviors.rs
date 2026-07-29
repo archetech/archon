@@ -683,3 +683,52 @@ async fn sync_processing_handles_large_linear_update_chain_without_pending() -> 
 
     Ok(())
 }
+
+#[tokio::test]
+async fn sync_export_batch_includes_dids_promoted_off_local() -> Result<()> {
+    let service = spawn_json().await?;
+
+    let agent_did = create_did(
+        &service,
+        create_agent_operation(7, "2026-04-11T12:00:00Z", "local"),
+    )
+    .await?;
+
+    // a local DID is not gossip-eligible
+    let batch = admin_post(&service, "batch/export", json!({ "dids": [&agent_did] })).await?;
+    assert_eq!(batch.as_array().unwrap().len(), 0);
+
+    // promote local -> hyperswarm via an update op
+    let mut doc = resolve_did(&service, &agent_did).await?;
+    let previd = doc["didDocumentMetadata"]["versionId"]
+        .as_str()
+        .map(ToString::to_string);
+    doc["didDocumentRegistration"]["registry"] = json!("hyperswarm");
+    let response = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&create_update_operation(
+            7,
+            &agent_did,
+            previd.as_deref(),
+            "2026-04-11T12:01:00Z",
+            doc,
+        ))
+        .send()
+        .await?;
+    assert!(response.status().is_success(), "promotion should succeed");
+
+    // now gossip-eligible, and the local create op comes along so a peer can reconstruct the DID
+    let batch = admin_post(&service, "batch/export", json!({ "dids": [&agent_did] })).await?;
+    let events = batch.as_array().unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0]["operation"]["type"], "create");
+    assert_eq!(events[0]["operation"]["registration"]["registry"], "local");
+    assert_eq!(events[1]["operation"]["type"], "update");
+    assert_eq!(
+        events[1]["operation"]["doc"]["didDocumentRegistration"]["registry"],
+        "hyperswarm"
+    );
+
+    Ok(())
+}
