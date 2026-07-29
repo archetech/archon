@@ -248,6 +248,32 @@ describe('exportBatch', () => {
         expect(exports[1].operation).toStrictEqual(updateOp);
     });
 
+    it('should let a peer reconstruct a DID promoted from local', async () => {
+        // The reported symptom is that peers return notFound, so assert the whole round trip:
+        // exporting the ops is necessary but does not prove a peer can import and replay them.
+        const peerDb = new DbJsonMemory('peer');
+        const peer = new Gatekeeper({ db: peerDb, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet'] });
+        await peer.resetDb();
+
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await helper.createAgentOp(keypair, { version: 1, registry: 'local' });
+        const did = await gatekeeper.createDID(agentOp);
+
+        const doc = await gatekeeper.resolveDID(did);
+        doc.didDocumentRegistration!.registry = 'hyperswarm';
+        await gatekeeper.updateDID(await helper.createUpdateOp(keypair, did, doc));
+
+        const batch = await gatekeeper.exportBatch([did]);
+        expect(await peer.importBatch(batch)).toMatchObject({ queued: 2, rejected: 0 });
+        expect(await peer.processEvents()).toMatchObject({ added: 2, rejected: 0 });
+
+        // the promotion arrived, and the local create op replayed to rebuild the DID
+        const peerDoc = await peer.resolveDID(did);
+        expect(peerDoc.didDocumentRegistration!.registry).toBe('hyperswarm');
+        expect(peerDoc.didDocumentMetadata!.versionSequence).toBe('2');
+        expect(peerDoc.didDocumentMetadata!.confirmed).toBe(true);
+    });
+
     // eslint-disable-next-line
     it('should return empty array on an invalid DID', async () => {
         const exports = await gatekeeper.exportBatch(['mockDID']);
