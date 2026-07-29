@@ -546,11 +546,15 @@ An asset's registry is chosen in this order:
 2. The **ephemeral registry** (`hyperswarm`) for short-lived assets the
    Keymaster creates on the caller's behalf — challenges, challenge
    responses, credential offers, poll and ballot notices, and dmail
-   notices. Ephemeral assets are never anchored to a chain registry, and
-   are excluded from `IDInfo.owned[]` because they are garbage-collected
-   at `validUntil`.
+   notices. Keymaster never *selects* a chain registry for these, but the
+   choice is only a default: a caller who supplies `registry` overrides it
+   per (1).
 3. Otherwise the wallet's default registry (`ARCHON_DEFAULT_REGISTRY`,
    `hyperswarm` when unset).
+
+Any asset carrying `validUntil` — every ephemeral asset, plus any the
+caller marks that way — is omitted from `IDInfo.owned[]`, since it will be
+garbage-collected when it expires.
 
 Implementations MUST then apply this invariant:
 
