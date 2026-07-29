@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from keymaster import KeymasterError, UnknownIDError
+from keymaster import Keymaster, KeymasterError, UnknownIDError
 
-from .helpers import MOCK_SCHEMA, run
+from .helpers import MOCK_SCHEMA, FakeGatekeeper, FakeWalletStore, run
 
 
 def test_schema_lifecycle_and_template(testbed):
@@ -137,6 +137,57 @@ def test_create_and_verify_challenge_response(testbed):
     assert verified["match"] is True
     assert verified["requested"] == 0
     assert verified["responder"] == alice
+
+
+def _keymaster(**kwargs):
+    return Keymaster(
+        gatekeeper=FakeGatekeeper(),
+        wallet_store=FakeWalletStore(),
+        passphrase="passphrase",
+        **kwargs,
+    )
+
+
+def _registry_of(km, did):
+    return run(km.resolve_did(did)).get("didDocumentRegistration", {}).get("registry")
+
+
+def test_local_agent_assets_are_local_whatever_the_default():
+    # Gatekeeper rejects an asset op from a `local` controller on any other registry, so a local
+    # agent's assets must be local — including the ephemeral ones, and regardless of the
+    # instance-wide default.
+    km = _keymaster(default_registry="hyperswarm")
+    run(km.create_id("Alice", {"registry": "local"}))
+
+    assert _registry_of(km, run(km.create_asset({"key": "value"}))) == "local"
+    assert _registry_of(km, run(km.create_challenge())) == "local"
+
+
+def test_non_local_agent_assets_are_not_downgraded_by_a_local_default():
+    # The mirror case: the default is `local` but the agent is not, so nothing is downgraded and
+    # ephemeral assets still land somewhere that propagates.
+    km = _keymaster(default_registry="local")
+    run(km.create_id("Alice", {"registry": "hyperswarm"}))
+
+    assert _registry_of(km, run(km.create_challenge())) == "hyperswarm"
+
+
+def test_local_agent_downgrades_an_explicit_non_local_registry():
+    # Gatekeeper would refuse the operation outright, so the request is unsatisfiable rather than
+    # merely unusual; downgrading keeps a local-only node working.
+    km = _keymaster(default_registry="hyperswarm")
+    run(km.create_id("Alice", {"registry": "local"}))
+    did = run(km.create_asset({"key": "value"}, {"registry": "hyperswarm"}))
+
+    assert _registry_of(km, did) == "local"
+
+
+def test_create_challenge_sets_an_expiry():
+    km = _keymaster()
+    run(km.create_id("Alice"))
+    doc = run(km.resolve_did(run(km.create_challenge())))
+
+    assert doc["didDocumentRegistration"]["validUntil"] is not None
 
 
 def test_verify_response_rejects_non_response_asset(testbed):
