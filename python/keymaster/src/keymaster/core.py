@@ -125,6 +125,8 @@ class Keymaster:
         self.wallet_store = wallet_store
         self.passphrase = passphrase
         self.default_registry = default_registry or "hyperswarm"
+        # Ephemeral assets stay off-chain; `create_asset` downgrades them to `local` when the
+        # controlling agent is local.
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
         self.max_data_length = 8 * 1024
@@ -1854,6 +1856,16 @@ class Keymaster:
         valid_until = options.get("validUntil")
         alias = options.get("alias")
         id_info = await self.fetch_id_info(controller)
+
+        # Gatekeeper rejects an asset operation whose controller is registered `local` unless the
+        # operation is `local` too, so a local agent's assets are downgraded to `local` rather
+        # than submitted and refused. Resolve confirmed, as Gatekeeper does, so a pending
+        # change-registry doesn't let a mismatch through.
+        controller_doc = await self.resolve_did(id_info["did"], {"confirm": True})
+
+        if (controller_doc.get("didDocumentRegistration") or {}).get("registry") == "local":
+            registry = "local"
+
         block = await self.gatekeeper.get_block(registry)
         payload = {
             "type": "create",
@@ -2745,7 +2757,13 @@ class Keymaster:
         return groups
 
     async def create_challenge(self, challenge: dict[str, Any] | None = None, options: dict[str, Any] | None = None) -> str:
-        return await self.create_asset({"challenge": challenge or {}}, options or {})
+        options = dict(options or {})
+        options.setdefault("registry", self.ephemeral_registry)
+        if "validUntil" not in options:
+            expires = __import__("datetime").datetime.utcnow() + __import__("datetime").timedelta(hours=1)
+            options["validUntil"] = expires.isoformat() + "Z"
+
+        return await self.create_asset({"challenge": challenge or {}}, options)
 
     def is_managed_did(self, value: str) -> bool:
         return isinstance(value, str) and value.startswith("did:")

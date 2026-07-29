@@ -230,12 +230,9 @@ export default class Keymaster implements KeymasterInterface {
         this.cipher = options.cipher;
 
         this.defaultRegistry = options.defaultRegistry || 'hyperswarm';
-        // Ephemeral assets (challenges, responses, credential-request notices) follow a `local`
-        // default registry so a fully-local deployment can author them. Otherwise the controller
-        // consistency check bars a `local`-registered identity from a `hyperswarm` ephemeral op,
-        // making challenges/credentials impossible on a local-only node. Non-local defaults are
-        // unchanged (`hyperswarm`).
-        this.ephemeralRegistry = this.defaultRegistry === 'local' ? 'local' : 'hyperswarm';
+        // Ephemeral assets stay off-chain; `createAsset` downgrades them to `local` when the
+        // controlling agent is local.
+        this.ephemeralRegistry = 'hyperswarm';
         this.maxAliasLength = options.maxAliasLength || 32;
         this.maxDataLength = 8 * 1024; // 8 KB max data to store in a JSON object
     }
@@ -855,6 +852,17 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const id = await this.fetchIdInfo(controller);
+
+        // Gatekeeper rejects an asset operation whose controller is registered `local` unless the
+        // operation is `local` too, so a local agent's assets are downgraded to `local` rather
+        // than submitted and refused. Resolve confirmed, as Gatekeeper does, so a pending
+        // change-registry doesn't let a mismatch through.
+        const controllerDoc = await this.resolveDID(id.did, { confirm: true });
+
+        if (controllerDoc.didDocumentRegistration?.registry === 'local') {
+            registry = 'local';
+        }
+
         const block = await this.gatekeeper.getBlock(registry);
         const blockid = block?.hash;
 

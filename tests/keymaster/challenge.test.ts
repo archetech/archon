@@ -49,20 +49,41 @@ describe('createChallenge', () => {
         expect(ttl < 60 * 60 * 1000).toBe(true);
     });
 
-    it('should let a local-default identity create a challenge (ephemeral follows a local default)', async () => {
-        // A fully-local deployment must be able to author ephemeral docs. Previously
-        // ephemeralRegistry was hardcoded 'hyperswarm', so the controller consistency
-        // check rejected a `local` identity authoring a `hyperswarm` ephemeral op.
+    it('should keep a local agent\'s assets local whatever the default registry', async () => {
+        // Gatekeeper rejects an asset op from a `local` controller on any other registry, so a
+        // local agent's assets must be local — including ephemeral ones, and regardless of the
+        // instance-wide default.
+        const alice = await keymaster.createId('Alice', { registry: 'local' });
+        const did = await keymaster.createChallenge();
+        const doc = await keymaster.resolveDID(did);
+
+        expect(doc.didDocument!.controller).toBe(alice);
+        expect(doc.didDocumentRegistration!.registry).toBe('local');
+        expect(doc.didDocumentData).toStrictEqual({ challenge: {} });
+    });
+
+    it('should not downgrade a non-local agent when the default registry is local', async () => {
+        // The mirror case: the default is `local` but the agent is not, so the challenge still
+        // lands somewhere that propagates to a remote verifier.
         const localKeymaster = new Keymaster({
             gatekeeper, wallet: new WalletJsonMemory(), cipher,
             passphrase: 'passphrase', defaultRegistry: 'local',
         });
-        const alice = await localKeymaster.createId('Alice');
+        await localKeymaster.createId('Alice', { registry: 'hyperswarm' });
         const did = await localKeymaster.createChallenge();
         const doc = await localKeymaster.resolveDID(did);
 
-        expect(doc.didDocument!.controller).toBe(alice);
-        expect(doc.didDocumentData).toStrictEqual({ challenge: {} });
+        expect(doc.didDocumentRegistration!.registry).toBe('hyperswarm');
+    });
+
+    it('should downgrade an explicit non-local registry for a local agent', async () => {
+        // Gatekeeper would refuse the operation outright, so the request is unsatisfiable rather
+        // than merely unusual; downgrading keeps a local-only node working.
+        await keymaster.createId('Alice', { registry: 'local' });
+        const did = await keymaster.createAsset({ key: 'value' }, { registry: 'hyperswarm' });
+        const doc = await keymaster.resolveDID(did);
+
+        expect(doc.didDocumentRegistration!.registry).toBe('local');
     });
 
     it('should create an empty challenge with specified expiry', async () => {
