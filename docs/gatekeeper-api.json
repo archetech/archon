@@ -3,7 +3,7 @@
   "info": {
     "title": "Gatekeeper API",
     "version": "0.12.0",
-    "description": "Documentation for Keymaster API"
+    "description": "Documentation for Gatekeeper API"
   },
   "paths": {
     "/metrics": {

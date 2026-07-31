@@ -16,7 +16,8 @@ const gatekeeperOptions = {
         ...baseDefinition,
         info: {
             ...baseDefinition.info,
-            title: 'Gatekeeper API'
+            title: 'Gatekeeper API',
+            description: 'Documentation for Gatekeeper API'
         }
     },
     apis: [
