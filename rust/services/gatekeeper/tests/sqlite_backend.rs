@@ -58,11 +58,14 @@ async fn sqlite_backend_persists_queue_and_blocks_across_restart() -> Result<()>
     assert!(response.status().is_success());
     assert_eq!(response.json::<Value>().await?, Value::Bool(true));
 
+    // `time` is absent from the posted block, so it falls back to 0 — a number,
+    // matching BlockInfo.time and the `txns` fallback below. This previously read
+    // back as the empty string, because the sqlite backend stringified the column.
     let expected_block = json!({
         "registry": "hyperswarm",
         "hash": "sqlite-test-block",
         "height": 17,
-        "time": "",
+        "time": 0,
         "txns": 0,
     });
 
