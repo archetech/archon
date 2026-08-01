@@ -16,11 +16,15 @@ export default class DbJsonCache extends AbstractJson {
     }
 
     async stop(): Promise<void> {
-        this.saveDb(); // Save the current state one last time
-
-        if (this.saveLoopTimeoutId !== null) {
-            clearTimeout(this.saveLoopTimeoutId); // Cancel the next scheduled saveLoop
-            this.saveLoopTimeoutId = null; // Reset the timeout ID
+        // Cancel the scheduled save even if the final save throws — otherwise an
+        // unwritable database leaves the timer armed and the process can never exit.
+        try {
+            this.saveDb(); // Save the current state one last time
+        } finally {
+            if (this.saveLoopTimeoutId !== null) {
+                clearTimeout(this.saveLoopTimeoutId); // Cancel the next scheduled saveLoop
+                this.saveLoopTimeoutId = null; // Reset the timeout ID
+            }
         }
     }
 
