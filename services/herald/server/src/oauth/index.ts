@@ -54,7 +54,11 @@ async function initJWTKeys(): Promise<void> {
             return;
         }
 
-        const { privateKey, publicKey } = await generateKeyPair('ES256');
+        // `extractable: true` is required: jose v6 returns WebCrypto CryptoKeys that
+        // default to non-extractable, and persistJWTKey() below must exportJWK() the
+        // private key. Without it, a node with no persisted key throws on first use
+        // and can never write one, leaving JWKS and all token signing broken.
+        const { privateKey, publicKey } = await generateKeyPair('ES256', { extractable: true });
         jwtSigningKey = privateKey as CryptoKey;
         await persistJWTKey(jwtSigningKey);
 
