@@ -48,6 +48,7 @@
     "lerna": "^9.0.3",
     "macaroons.js": "^0.3.8",
     "mock-fs": "^5.2.0",
+    "multer": "^2.2.0",
     "nock": "^14.0.0",
     "supertest": "^7.2.2",
     "swagger-jsdoc": "^6.2.8",
