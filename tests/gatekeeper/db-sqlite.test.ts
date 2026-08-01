@@ -295,6 +295,38 @@ describe('DbSqlite blocks', () => {
         });
     });
 
+    it('returns height and time as numbers, matching the other backends', async () => {
+        await withDb(async db => {
+            await db.addBlock('local', block(7, 'h7'));
+
+            for (const found of [
+                await db.getBlock('local'),
+                await db.getBlock('local', 7),
+                await db.getBlock('local', 'h7'),
+            ]) {
+                expect(typeof found!.time).toBe('number');
+                expect(typeof found!.height).toBe('number');
+                expect(found!.time).toBe(1_700_000_007);
+            }
+        });
+    });
+
+    it('coerces a legacy row stored under the old TEXT affinity', async () => {
+        await withDb(async db => {
+            // Simulate a database created before the column became INTEGER, where
+            // SQLite stored the value as a string.
+            await (db as any).db.run(
+                'INSERT INTO blocks (registry, hash, height, time, txns) VALUES (?, ?, ?, ?, 0)',
+                'local', 'legacy', '42', '1700000042',
+            );
+
+            const found = await db.getBlock('local', 'legacy');
+            expect(found).toMatchObject({ hash: 'legacy', height: 42, time: 1700000042 });
+            expect(typeof found!.time).toBe('number');
+            expect(typeof found!.height).toBe('number');
+        });
+    });
+
     it('returns null for an unknown registry, height, or hash', async () => {
         await withDb(async db => {
             await expect(db.getBlock('nothing')).resolves.toBeNull();
@@ -310,10 +342,7 @@ describe('DbSqlite blocks', () => {
             await db.addBlock('local', block(1, 'h1'));
             await db.addBlock('local', { height: 1, hash: 'h1', time: 999 });
 
-            // NOTE: `time` comes back as a string. The blocks table declares
-            // `time TEXT NOT NULL` while BlockInfo.time is typed `number`, so the
-            // value is silently stringified on the round trip.
-            await expect(db.getBlock('local', 'h1')).resolves.toMatchObject({ time: '999' });
+            await expect(db.getBlock('local', 'h1')).resolves.toMatchObject({ time: 999 });
         });
     });
 

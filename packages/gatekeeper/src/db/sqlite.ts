@@ -80,7 +80,7 @@ export default class DbSqlite implements GatekeeperDb {
                 registry TEXT NOT NULL,
                 hash TEXT NOT NULL,
                 height INTEGER NOT NULL,
-                time TEXT NOT NULL,
+                time INTEGER NOT NULL,
                 txns INTEGER NOT NULL,
                 PRIMARY KEY (registry, hash)
             );
@@ -377,10 +377,23 @@ export default class DbSqlite implements GatekeeperDb {
                 );
             }
 
-            return blockRow ?? null;
+            return blockRow ? this.normalizeBlock(blockRow) : null;
         } catch (error) {
             return null;
         }
+    }
+
+    // `time` was originally declared TEXT, so SQLite's type affinity stored it as a
+    // string and returned one — while BlockInfo.time is typed `number`, and every
+    // other backend (json, redis, mongo) round-trips it as a number. The column is
+    // now INTEGER, but `CREATE TABLE IF NOT EXISTS` leaves databases created before
+    // that on the old affinity, so coerce on read to fix existing files too.
+    private normalizeBlock(row: BlockInfo): BlockInfo {
+        return {
+            ...row,
+            height: Number(row.height),
+            time: Number(row.time),
+        };
     }
 
     async addOperation(opid: string, op: Operation): Promise<void> {

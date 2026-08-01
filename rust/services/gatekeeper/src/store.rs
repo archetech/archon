@@ -1310,10 +1310,16 @@ impl JsonDb {
 
         if let DbBackend::Sqlite { path } = &self.backend {
             let conn = DbBackend::open_sqlite(path)?;
-            let time_value = match block.get("time") {
-                Some(Value::String(value)) => value.clone(),
-                Some(Value::Number(value)) => value.to_string(),
-                _ => String::new(),
+            // Store the block time as an integer so it reads back as a JSON number,
+            // matching the redis and mongo backends. It was previously stringified,
+            // which left `timeISO` null on this backend (see get_block below).
+            let time_value: i64 = match block.get("time") {
+                Some(Value::Number(value)) => value
+                    .as_i64()
+                    .or_else(|| value.as_f64().map(|seconds| seconds as i64))
+                    .unwrap_or(0),
+                Some(Value::String(value)) => value.parse::<i64>().unwrap_or(0),
+                _ => 0,
             };
             let txns = block
                 .get("txns")
@@ -1413,7 +1419,19 @@ impl JsonDb {
                         "registry": row.get::<_, String>(0)?,
                         "hash": row.get::<_, String>(1)?,
                         "height": row.get::<_, i64>(2)?,
-                        "time": row.get::<_, String>(3)?,
+                        // Emit a JSON number. Databases created before the column
+                        // became INTEGER stored a string, so coerce those on read —
+                        // otherwise `Value::as_u64` fails downstream and the
+                        // anchoring metadata's `timeISO` comes out null.
+                        "time": match row.get::<_, rusqlite::types::Value>(3)? {
+                            rusqlite::types::Value::Integer(value) => json!(value),
+                            rusqlite::types::Value::Real(value) => json!(value as i64),
+                            rusqlite::types::Value::Text(value) => value
+                                .parse::<i64>()
+                                .map(|parsed| json!(parsed))
+                                .unwrap_or(Value::Null),
+                            _ => Value::Null,
+                        },
                         "txns": row.get::<_, i64>(4)?,
                     }))
                 })
@@ -1969,7 +1987,7 @@ impl DbBackend {
                 registry TEXT NOT NULL,
                 hash TEXT NOT NULL,
                 height INTEGER NOT NULL,
-                time TEXT NOT NULL,
+                time INTEGER NOT NULL,
                 txns INTEGER NOT NULL,
                 PRIMARY KEY (registry, hash)
             )",
