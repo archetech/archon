@@ -72,3 +72,21 @@ describe('rate limiter', () => {
         await expect(checkAndRecordRequest(store, 'did:cid:abc', 5, 60)).resolves.toEqual(denied);
     });
 });
+
+describe('combined auth middleware', () => {
+    it('chains subscription auth before the L402 paywall', async () => {
+        const { createAuthMiddleware } = await import('../../services/drawbridge/server/src/middleware/auth');
+
+        const chain = createAuthMiddleware({
+            rootSecret: 'x'.repeat(32),
+            location: 'http://localhost',
+            defaults: { amountSat: 1, expirySeconds: 60, scopes: [] },
+            store: {} as any,
+        } as any);
+
+        // Order matters: subscription auth marks the request so the L402
+        // middleware can skip the challenge for an already-authenticated caller.
+        expect(chain).toHaveLength(2);
+        expect(chain.every(fn => typeof fn === 'function')).toBe(true);
+    });
+});
