@@ -51,6 +51,46 @@ const config = {
         '^@didcid/browser-hdkey$': '<rootDir>/packages/browser-hdkey/lib/hdkey.js',
         '^@noble/curves/secp256k1$': '<rootDir>/node_modules/@noble/curves/secp256k1.js',
     },
+    // Count untested files as 0% instead of leaving them invisible. Without this,
+    // only files a test actually loads enter the denominator, so an entirely
+    // untested surface registers no delta at all and can never show a regression
+    // (see #705, #814, #815). NOTE: this REPLACES the default rather than adding
+    // to it, so every directory to be measured must be listed here.
+    collectCoverageFrom: [
+        'packages/*/src/**/*.ts',
+        'services/gatekeeper/server/src/**/*.{ts,js}',
+        'services/keymaster/server/src/**/*.{ts,js}',
+        'services/drawbridge/server/src/**/*.{ts,js}',
+        'services/herald/server/src/**/*.{ts,js}',
+        'services/didcomm/server/src/**/*.{ts,js}',
+
+        '!**/*.d.ts',
+        // Type-only modules and barrel re-exports: no meaningful runtime code.
+        '!**/types.ts',
+        '!**/*-types.ts',
+        '!**/interfaces.ts',
+        '!packages/*/src/index.ts',
+        // Platform variants not exercised by the node test environment.
+        '!**/cipher-web.ts',
+        '!**/node.ts',
+        '!**/db/web.ts',
+        '!**/db/chrome.ts',
+        '!packages/browser-hdkey/src/**',
+        // Storage backends that need a real server. Listed by path, not by glob:
+        // packages/keymaster/src/db/sqlite.ts IS tested, so `!**/db/sqlite.ts`
+        // would have silently hidden 27 covered lines.
+        '!**/db/mongo.ts',
+        '!**/db/redis.ts',
+        '!services/herald/server/src/db/sqlite.ts',
+        '!services/drawbridge/server/src/store.ts',
+        '!services/herald/server/src/email/sendgrid.ts',
+        // CLI entry points: covered by tests/cli against docker, not the unit run.
+        '!**/cli.ts',
+        // Service bootstrap: builds the app and listens, so it cannot be imported
+        // in-process. Its routes live in the extracted routers, which are measured.
+        '!services/*/server/src/index.ts',
+        '!services/*/server/src/*-api.ts',
+    ],
     testPathIgnorePatterns: [
         "/node_modules/",
         "/kc-app/",
