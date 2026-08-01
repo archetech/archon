@@ -592,3 +592,631 @@ describe('herald stateless name assignment', () => {
         expect(response.status).toBe(500);
     });
 });
+
+describe('herald inbound email webhook', () => {
+    function bridge(overrides: Record<string, any> = {}) {
+        return {
+            isConfigured: jest.fn<any>().mockReturnValue(true),
+            parseInboundEmail: jest.fn<any>((body: any) =>
+                body.from && body.to ? { ...body, subject: body.subject ?? '(no subject)', text: body.text ?? '' } : null),
+            extractReplyToken: jest.fn<any>().mockReturnValue(null),
+            extractEmailAddress: jest.fn<any>((v: string) => v),
+            extractRecipientName: jest.fn<any>().mockReturnValue(null),
+            lookupToken: jest.fn<any>().mockResolvedValue(null),
+            storeEmailMapping: jest.fn<any>().mockResolvedValue(undefined),
+            ...overrides,
+        };
+    }
+
+    function mountBridge(emailBridge: any, over: { db?: any; keymaster?: any } = {}) {
+        const m = mount(over);
+        m.ctx.emailBridge = emailBridge;
+        return m;
+    }
+
+    it('404s when no email bridge is configured', async () => {
+        const { app } = mount();
+
+        const response = await request(app).post('/api/inbound-email').send({ from: 'a@b.com', to: 'c@d.com' });
+
+        expect(response.status).toBe(404);
+        expect(response.body).toEqual({ error: 'Email bridge not configured' });
+    });
+
+    it('400s an email missing from or to', async () => {
+        const { app } = mountBridge(bridge());
+
+        const response = await request(app).post('/api/inbound-email').send({ subject: 'orphan' });
+
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ error: 'Missing from or to fields' });
+    });
+
+    it('drops spam above the score threshold without delivering', async () => {
+        const { app, ctx } = mountBridge(bridge());
+        ctx.keymaster = { setCurrentId: jest.fn<any>(), createDmail: jest.fn<any>(), sendDmail: jest.fn<any>() };
+
+        const response = await request(app)
+            .post('/api/inbound-email')
+            .send({ from: 'spam@bad.test', to: 'alice@archon.test', spam_score: '9.5' });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ ok: true, action: 'spam-rejected' });
+        expect(ctx.keymaster.createDmail).not.toHaveBeenCalled();
+    });
+
+    it('ignores an expired reply token', async () => {
+        const eb = bridge({ extractReplyToken: jest.fn<any>().mockReturnValue('tok') });
+        const { app } = mountBridge(eb);
+
+        const response = await request(app)
+            .post('/api/inbound-email')
+            .send({ from: 'a@b.com', to: 'reply+tok@parse.archon.test' });
+
+        expect(response.body).toEqual({ ok: true, action: 'token-expired' });
+    });
+
+    it('delivers a reply as a dmail referencing the original', async () => {
+        const eb = bridge({
+            extractReplyToken: jest.fn<any>().mockReturnValue('tok'),
+            lookupToken: jest.fn<any>().mockResolvedValue({
+                senderDid: 'did:cid:alice',
+                originalDmailDid: 'did:cid:orig',
+            }),
+        });
+        const keymaster = {
+            setCurrentId: jest.fn<any>().mockResolvedValue(undefined),
+            createDmail: jest.fn<any>().mockResolvedValue('did:cid:dmail'),
+            sendDmail: jest.fn<any>().mockResolvedValue('did:cid:notice'),
+        };
+        const { app } = mountBridge(eb, { keymaster });
+
+        const response = await request(app)
+            .post('/api/inbound-email')
+            .send({ from: 'bob@ext.test', to: 'reply+tok@parse.archon.test', subject: 'Re: hi', text: 'body' });
+
+        expect(response.body).toMatchObject({ ok: true, action: 'delivered', dmailDid: 'did:cid:dmail' });
+        expect(keymaster.createDmail).toHaveBeenCalledWith(
+            expect.objectContaining({
+                to: ['did:cid:alice'],
+                reference: 'did:cid:orig',
+                subject: expect.stringContaining('bob@ext.test'),
+            }),
+            { registry: 'hyperswarm' },
+        );
+        expect(eb.storeEmailMapping).toHaveBeenCalled();
+    });
+
+    it('ignores mail with no recognizable recipient', async () => {
+        const { app } = mountBridge(bridge());
+
+        const response = await request(app)
+            .post('/api/inbound-email')
+            .send({ from: 'a@b.com', to: 'postmaster@archon.test' });
+
+        expect(response.body).toEqual({ ok: true, action: 'no-recipient-ignored' });
+    });
+
+    it('ignores mail addressed to an unknown herald name', async () => {
+        const eb = bridge({ extractRecipientName: jest.fn<any>().mockReturnValue('nobody') });
+        const { app } = mountBridge(eb);
+
+        const response = await request(app)
+            .post('/api/inbound-email')
+            .send({ from: 'a@b.com', to: 'nobody@archon.test' });
+
+        expect(response.body).toEqual({ ok: true, action: 'unknown-name-ignored' });
+    });
+
+    it('delivers unsolicited mail to a known herald name', async () => {
+        const eb = bridge({ extractRecipientName: jest.fn<any>().mockReturnValue('alice') });
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const keymaster = {
+            setCurrentId: jest.fn<any>().mockResolvedValue(undefined),
+            createDmail: jest.fn<any>().mockResolvedValue('did:cid:dmail'),
+            sendDmail: jest.fn<any>().mockResolvedValue('did:cid:notice'),
+        };
+        const { app } = mountBridge(eb, { db, keymaster });
+
+        const response = await request(app)
+            .post('/api/inbound-email')
+            .send({ from: 'bob@ext.test', to: 'alice@archon.test', subject: 'hello' });
+
+        expect(response.body).toMatchObject({ ok: true, action: 'delivered' });
+        expect(keymaster.createDmail).toHaveBeenCalledWith(
+            expect.objectContaining({ to: ['did:cid:alice'] }),
+            { registry: 'hyperswarm' },
+        );
+    });
+
+    it('swallows a processing failure as a 200 so the provider does not retry', async () => {
+        const eb = bridge({
+            extractRecipientName: jest.fn<any>().mockReturnValue('alice'),
+        });
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const keymaster = { setCurrentId: jest.fn<any>().mockRejectedValue(new Error('keymaster down')) };
+        const { app } = mountBridge(eb, { db, keymaster });
+
+        const response = await request(app)
+            .post('/api/inbound-email')
+            .send({ from: 'bob@ext.test', to: 'alice@archon.test' });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ ok: true, action: 'error' });
+    });
+});
+
+describe('herald outbound email', () => {
+    function configuredBridge() {
+        return {
+            isConfigured: jest.fn<any>().mockReturnValue(true),
+            sendEmail: jest.fn<any>().mockResolvedValue({ token: 'tok123' }),
+        };
+    }
+
+    it('404s when the bridge is not configured', async () => {
+        const { app } = mount();
+
+        const response = await request(app).post('/api/send-email').send({});
+
+        expect(response.status).toBe(404);
+    });
+
+    it('requires a bearer token and a herald name', async () => {
+        const noAuth = mount();
+        noAuth.ctx.emailBridge = configuredBridge();
+        await expect(request(noAuth.app).post('/api/send-email').send({}))
+            .resolves.toMatchObject({ status: 401 });
+
+        const nameless = mount({
+            db: createDb({ 'did:cid:alice': { logins: 1 } }),
+            keymaster: { verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, responder: 'did:cid:alice' }) },
+        });
+        nameless.ctx.emailBridge = configuredBridge();
+        const response = await request(nameless.app)
+            .post('/api/send-email')
+            .set('Authorization', 'Bearer valid')
+            .send({});
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ error: 'Herald name required to send email' });
+    });
+
+    it('validates the required body fields', async () => {
+        const m = mount({
+            db: createDb({ 'did:cid:alice': { name: 'alice' } }),
+            keymaster: { verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, responder: 'did:cid:alice' }) },
+        });
+        m.ctx.emailBridge = configuredBridge();
+
+        const response = await request(m.app)
+            .post('/api/send-email')
+            .set('Authorization', 'Bearer valid')
+            .send({ to: 'x@y.com', subject: 'hi' });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/Missing required fields/);
+    });
+
+    it('sends and returns the reply token', async () => {
+        const eb = configuredBridge();
+        const m = mount({
+            db: createDb({ 'did:cid:alice': { name: 'alice' } }),
+            keymaster: { verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, responder: 'did:cid:alice' }) },
+        });
+        m.ctx.emailBridge = eb;
+
+        const response = await request(m.app)
+            .post('/api/send-email')
+            .set('Authorization', 'Bearer valid')
+            .send({ to: 'x@y.com', subject: 'hi', body: 'text', dmailDid: 'did:cid:dmail' });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ ok: true, token: 'tok123' });
+        expect(eb.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            senderName: 'alice',
+            senderDid: 'did:cid:alice',
+            dmailDid: 'did:cid:dmail',
+        }));
+    });
+
+    it('reports a send failure as 500', async () => {
+        const m = mount({
+            db: createDb({ 'did:cid:alice': { name: 'alice' } }),
+            keymaster: { verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, responder: 'did:cid:alice' }) },
+        });
+        m.ctx.emailBridge = {
+            isConfigured: jest.fn<any>().mockReturnValue(true),
+            sendEmail: jest.fn<any>().mockRejectedValue(new Error('sendgrid down')),
+        };
+
+        const response = await request(m.app)
+            .post('/api/send-email')
+            .set('Authorization', 'Bearer valid')
+            .send({ to: 'x@y.com', subject: 'hi', body: 'b', dmailDid: 'did:cid:d' });
+
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ error: 'Failed to send email' });
+    });
+});
+
+describe('herald registry publication', () => {
+    const originalFetch = global.fetch;
+
+    afterEach(() => { global.fetch = originalFetch; });
+
+    function ownerApp() {
+        const db = createDb({ 'did:cid:owner': { name: 'owner' }, 'did:cid:alice': { name: 'alice' } });
+        return mount({ db, session: { user: { did: 'did:cid:owner' } } });
+    }
+
+    it('pins the registry to IPFS and publishes it to IPNS', async () => {
+        const { app } = ownerApp();
+        global.fetch = jest.fn<any>()
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ Hash: 'bafycid' }) })
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ Name: 'k51ipns' }) });
+
+        const response = await request(app).post('/api/admin/publish');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ ok: true, cid: 'bafycid', ipns: 'k51ipns' });
+        expect(response.body.registry.names).toEqual({ owner: 'did:cid:owner', alice: 'did:cid:alice' });
+
+        const [addUrl] = (global.fetch as any).mock.calls[0];
+        expect(String(addUrl)).toContain('/add?pin=true');
+        const [pubUrl] = (global.fetch as any).mock.calls[1];
+        expect(String(pubUrl)).toContain('/name/publish?arg=/ipfs/bafycid');
+    });
+
+    it('reports an IPFS add failure', async () => {
+        const { app } = ownerApp();
+        global.fetch = jest.fn<any>().mockResolvedValue({ ok: false, statusText: 'Service Unavailable' });
+
+        const response = await request(app).post('/api/admin/publish');
+
+        expect(response.status).toBe(500);
+        expect(response.body.error).toMatch(/IPFS add failed/);
+    });
+
+    it('reports an IPNS publish failure', async () => {
+        const { app } = ownerApp();
+        global.fetch = jest.fn<any>()
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ Hash: 'bafycid' }) })
+            .mockResolvedValueOnce({ ok: false, statusText: 'Gateway Timeout' });
+
+        const response = await request(app).post('/api/admin/publish');
+
+        expect(response.status).toBe(500);
+        expect(response.body.error).toMatch(/IPNS publish failed/);
+    });
+
+    it('is owner-only', async () => {
+        const { app } = mount({ session: { user: { did: 'did:cid:alice' } } });
+
+        await expect(request(app).post('/api/admin/publish')).resolves.toMatchObject({ status: 403 });
+    });
+});
+
+describe('herald session-based profile name', () => {
+    function keymasterFull() {
+        return {
+            setCurrentId: jest.fn<any>().mockResolvedValue(undefined),
+            bindCredential: jest.fn<any>().mockResolvedValue({}),
+            issueCredential: jest.fn<any>().mockResolvedValue('did:cid:cred'),
+            getCredential: jest.fn<any>().mockResolvedValue({ credentialSubject: {} }),
+            updateCredential: jest.fn<any>().mockResolvedValue(true),
+            revokeCredential: jest.fn<any>().mockResolvedValue(true),
+        };
+    }
+
+    it('reads back the current name', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const { app } = mount({ db, session: { user: { did: 'did:cid:alice' } } });
+
+        const found = await request(app).get('/api/profile/did:cid:alice/name');
+        expect(found.body).toEqual({ name: 'alice' });
+
+        const missing = await request(app).get('/api/profile/did:cid:ghost/name');
+        expect(missing.status).toBe(404);
+    });
+
+    it('forbids editing another user name', async () => {
+        const { app } = mount({ session: { user: { did: 'did:cid:alice' } } });
+
+        const put = await request(app).put('/api/profile/did:cid:bob/name').send({ name: 'stolen' });
+        expect(put.status).toBe(403);
+
+        const del = await request(app).delete('/api/profile/did:cid:bob/name');
+        expect(del.status).toBe(403);
+    });
+
+    it('rejects an invalid name and a name already taken', async () => {
+        const db = createDb({ 'did:cid:alice': {}, 'did:cid:bob': { name: 'taken' } });
+        const { app } = mount({ db, keymaster: keymasterFull(), session: { user: { did: 'did:cid:alice' } } });
+
+        const invalid = await request(app).put('/api/profile/did:cid:alice/name').send({ name: 'no' });
+        expect(invalid.status).toBe(400);
+
+        const taken = await request(app).put('/api/profile/did:cid:alice/name').send({ name: 'taken' });
+        expect(taken.status).toBe(409);
+        expect(taken.body).toMatchObject({ ok: false, message: 'Name already taken' });
+    });
+
+    it('sets a name and issues a credential', async () => {
+        const db = createDb({ 'did:cid:alice': {} });
+        const keymaster = keymasterFull();
+        const { app } = mount({ db, keymaster, session: { user: { did: 'did:cid:alice' } } });
+
+        const response = await request(app).put('/api/profile/did:cid:alice/name').send({ name: 'Alice' });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ ok: true });
+        expect(db.setUser).toHaveBeenCalledWith('did:cid:alice', expect.objectContaining({ name: 'alice' }));
+        expect(keymaster.issueCredential).toHaveBeenCalled();
+    });
+
+    it('deletes a name and revokes the credential', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice', credentialDid: 'did:cid:cred' } });
+        const keymaster = keymasterFull();
+        const { app } = mount({ db, keymaster, session: { user: { did: 'did:cid:alice' } } });
+
+        const response = await request(app).delete('/api/profile/did:cid:alice/name');
+
+        expect(response.status).toBe(200);
+        expect(keymaster.revokeCredential).toHaveBeenCalledWith('did:cid:cred');
+    });
+
+    it('404s a delete for a user with no record', async () => {
+        const { app } = mount({ session: { user: { did: 'did:cid:ghost' } } });
+
+        const response = await request(app).delete('/api/profile/did:cid:ghost/name');
+
+        expect(response.status).toBe(404);
+    });
+});
+
+describe('herald admin user deletion', () => {
+    it('deletes a user', async () => {
+        const db = createDb({ 'did:cid:owner': {}, 'did:cid:alice': { name: 'alice' } });
+        const { app } = mount({ db, session: { user: { did: 'did:cid:owner' } } });
+
+        const response = await request(app).delete('/api/admin/user/did%3Acid%3Aalice');
+
+        expect(response.status).toBe(200);
+        expect(response.body.ok).toBe(true);
+        expect(db.deleteUser).toHaveBeenCalledWith('did:cid:alice');
+    });
+
+    it('refuses to delete the owner account', async () => {
+        const db = createDb({ 'did:cid:owner': { name: 'owner' } });
+        const { app } = mount({ db, session: { user: { did: 'did:cid:owner' } } });
+
+        const response = await request(app).delete('/api/admin/user/did%3Acid%3Aowner');
+
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ error: 'Cannot delete the owner account' });
+    });
+
+    it('404s an unknown user', async () => {
+        const db = createDb({ 'did:cid:owner': {} });
+        const { app } = mount({ db, session: { user: { did: 'did:cid:owner' } } });
+
+        const response = await request(app).delete('/api/admin/user/did%3Acid%3Aghost');
+
+        expect(response.status).toBe(404);
+    });
+});
+
+describe('herald member lookup', () => {
+    it('resolves a member DID document', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const keymaster = { resolveDID: jest.fn<any>().mockResolvedValue({ didDocument: { id: 'did:cid:alice' } }) };
+        const { app } = mount({ db, keymaster });
+
+        const response = await request(app).get('/api/member/Alice');
+
+        expect(response.status).toBe(200);
+        expect(response.body.didDocument.id).toBe('did:cid:alice');
+        // The name is normalized before lookup.
+        expect(db.findDidByName).toHaveBeenCalledWith('alice');
+    });
+
+    it('404s an unknown member and 500s a resolver failure', async () => {
+        const unknown = mount();
+        await expect(request(unknown.app).get('/api/member/nobody')).resolves.toMatchObject({ status: 404 });
+
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const failing = mount({
+            db,
+            keymaster: { resolveDID: jest.fn<any>().mockRejectedValue(new Error('resolver down')) },
+        });
+        const response = await request(failing.app).get('/api/member/alice');
+        expect(response.status).toBe(500);
+        expect(response.body.error).toBe('resolver down');
+    });
+});
+
+describe('herald LNURLp', () => {
+    function withLightning(endpoint: string) {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const keymaster = {
+            resolveDID: jest.fn<any>().mockResolvedValue({
+                didDocument: { service: [{ type: 'Lightning', serviceEndpoint: endpoint }] },
+            }),
+        };
+        return mount({ db, keymaster });
+    }
+
+    it('reports an error for a name with no Lightning service', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const { app } = mount({
+            db,
+            keymaster: { resolveDID: jest.fn<any>().mockResolvedValue({ didDocument: {} }) },
+        });
+
+        const response = await request(app).get('/.well-known/lnurlp/alice');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ status: 'ERROR' });
+    });
+
+    it('returns a payRequest document for a name with Lightning', async () => {
+        const { app } = withLightning('https://ln.test/invoice');
+
+        const response = await request(app).get('/.well-known/lnurlp/Alice');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ tag: 'payRequest' });
+        expect(response.body.callback).toContain('/api/lnurlp/alice/callback');
+        expect(JSON.parse(response.body.metadata)[1][1]).toBe('alice@archon.test');
+    });
+
+    it('rejects a callback amount outside the sendable range', async () => {
+        const { app } = withLightning('https://ln.test/invoice');
+
+        for (const amount of ['0', '1', '999999999999']) {
+            const response = await request(app).get(`/api/lnurlp/alice/callback?amount=${amount}`);
+            expect([amount, response.body.status]).toEqual([amount, 'ERROR']);
+        }
+    });
+
+    it('errors when the name has no Lightning endpoint', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const { app } = mount({
+            db,
+            keymaster: { resolveDID: jest.fn<any>().mockResolvedValue({ didDocument: {} }) },
+        });
+
+        const response = await request(app).get('/api/lnurlp/alice/callback?amount=100000');
+
+        expect(response.body).toMatchObject({ status: 'ERROR' });
+    });
+});
+
+describe('herald login challenge', () => {
+    it('mints a challenge and returns its wallet URL', async () => {
+        const keymaster = {
+            createChallenge: jest.fn<any>().mockResolvedValue('did:cid:challenge'),
+            resolveDID: jest.fn<any>().mockResolvedValue({ didDocument: {} }),
+        };
+        const { app } = mount({ keymaster });
+
+        const response = await request(app).get('/api/challenge');
+
+        expect(response.status).toBe(200);
+        expect(response.body.challenge).toBe('did:cid:challenge');
+        expect(response.body.challengeURL).toContain('challenge=did:cid:challenge');
+        expect(keymaster.createChallenge).toHaveBeenCalledWith(
+            expect.objectContaining({ callback: expect.stringContaining('/api/login') }),
+        );
+    });
+
+    it('reports a challenge failure as 500', async () => {
+        const keymaster = { createChallenge: jest.fn<any>().mockRejectedValue(new Error('keymaster down')) };
+        const { app } = mount({ keymaster });
+
+        const response = await request(app).get('/api/challenge');
+
+        expect(response.status).toBe(500);
+    });
+});
+
+describe('herald avatar serving', () => {
+    function withAvatar(image: any, avatarDid: string | undefined = 'did:cid:avatar') {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const keymaster = {
+            resolveDID: jest.fn<any>().mockResolvedValue({ didDocumentData: { avatar: avatarDid } }),
+            getImage: jest.fn<any>().mockResolvedValue(image),
+        };
+        return mount({ db, keymaster });
+    }
+
+    it('serves the image bytes with a safe content type', async () => {
+        const { app } = withAvatar({
+            file: { data: Buffer.from('png-bytes'), type: 'image/png', filename: 'me.png' },
+            image: { width: 1, height: 1 },
+        });
+
+        const response = await request(app).get('/api/name/Alice/avatar');
+
+        expect(response.status).toBe(200);
+        expect(response.headers['content-type']).toContain('image/png');
+        expect(response.headers['x-content-type-options']).toBe('nosniff');
+        expect(response.headers['content-disposition']).toContain('me.png');
+    });
+
+    it('falls back to octet-stream for a content type that is not an allowed image', async () => {
+        const { app } = withAvatar({
+            file: { data: Buffer.from('<svg/>'), type: 'image/svg+xml' },
+            image: { width: 1 },
+        });
+
+        const response = await request(app).get('/api/name/alice/avatar');
+
+        expect(response.status).toBe(200);
+        expect(response.headers['content-type']).toContain('application/octet-stream');
+    });
+
+    it('404s when the member has no avatar or the image has no bytes', async () => {
+        const noAvatar = withAvatar(null, '');
+        await expect(request(noAvatar.app).get('/api/name/alice/avatar'))
+            .resolves.toMatchObject({ status: 404 });
+
+        const noBytes = withAvatar({ file: { type: 'image/png' }, image: {} });
+        await expect(request(noBytes.app).get('/api/name/alice/avatar'))
+            .resolves.toMatchObject({ status: 404 });
+    });
+});
+
+describe('herald LNURLp callback invoice fetch', () => {
+    const originalFetch = global.fetch;
+    afterEach(() => { global.fetch = originalFetch; });
+
+    function withLightning() {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const keymaster = {
+            resolveDID: jest.fn<any>().mockResolvedValue({
+                didDocument: { service: [{ type: 'Lightning', serviceEndpoint: 'https://ln.test/invoice' }] },
+            }),
+        };
+        return mount({ db, keymaster });
+    }
+
+    it('converts msats to sats and normalizes the invoice response', async () => {
+        const { app } = withLightning();
+        global.fetch = jest.fn<any>().mockResolvedValue({
+            ok: true,
+            json: async () => ({ pr: 'lnbc1...', routes: [] }),
+        });
+
+        const response = await request(app).get('/api/lnurlp/alice/callback?amount=150000');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ pr: 'lnbc1...', routes: [] });
+        // 150000 msat -> 150 sat
+        expect(String((global.fetch as any).mock.calls[0][0])).toContain('amount=150');
+    });
+
+    it('accepts the paymentRequest spelling from the endpoint', async () => {
+        const { app } = withLightning();
+        global.fetch = jest.fn<any>().mockResolvedValue({
+            ok: true,
+            json: async () => ({ paymentRequest: 'lnbc2...' }),
+        });
+
+        const response = await request(app).get('/api/lnurlp/alice/callback?amount=100000');
+
+        expect(response.body).toMatchObject({ pr: 'lnbc2...', routes: [] });
+    });
+
+    it('reports an error when the lightning endpoint fails or throws', async () => {
+        const notOk = withLightning();
+        global.fetch = jest.fn<any>().mockResolvedValue({ ok: false });
+        const first = await request(notOk.app).get('/api/lnurlp/alice/callback?amount=100000');
+        expect(first.body).toMatchObject({ status: 'ERROR' });
+
+        const threw = withLightning();
+        global.fetch = jest.fn<any>().mockRejectedValue(new Error('network down'));
+        const second = await request(threw.app).get('/api/lnurlp/alice/callback?amount=100000');
+        expect(second.body).toMatchObject({ status: 'ERROR', reason: 'network down' });
+    });
+});
