@@ -74,10 +74,10 @@ function mount(overrides: { db?: any; keymaster?: any; session?: any } = {}) {
         req.session = { ...(overrides.session ?? {}), destroy: (cb: any) => cb?.() };
         next();
     });
-    const { router } = createHeraldRoutes(ctx);
+    const { router, startDmailPollLoop } = createHeraldRoutes(ctx);
     app.use(router);
 
-    return { app, ctx, db };
+    return { app, ctx, db, startDmailPollLoop };
 }
 
 describe('herald public endpoints', () => {
@@ -1218,5 +1218,384 @@ describe('herald LNURLp callback invoice fetch', () => {
         global.fetch = jest.fn<any>().mockRejectedValue(new Error('network down'));
         const second = await request(threw.app).get('/api/lnurlp/alice/callback?amount=100000');
         expect(second.body).toMatchObject({ status: 'ERROR', reason: 'network down' });
+    });
+});
+
+// --- dmail poll loop --------------------------------------------------------
+// Deferred from #820/#821: startDmailPollLoop installs a setTimeout and then a
+// 60s setInterval, and a live timer keeps Jest alive (CI has no --forceExit).
+// Fake timers make it safe — the timers never reach the real event loop, and
+// clearAllTimers in afterEach disposes of them.
+
+describe('dmail poll loop', () => {
+    const dmailItem = (over: Record<string, any> = {}) => ({
+        tags: ['unread'],
+        sender: 'did:cid:sender',
+        message: { subject: 'hello', body: 'body text', to: [], cc: [] },
+        ...over,
+    });
+
+    function pollBridge(over: Record<string, any> = {}) {
+        return {
+            isConfigured: jest.fn<any>().mockReturnValue(true),
+            lookupEmailMapping: jest.fn<any>().mockResolvedValue(null),
+            sendEmail: jest.fn<any>().mockResolvedValue({ token: 'tok' }),
+            ...over,
+        };
+    }
+
+    function pollKeymaster(dmails: Record<string, any>) {
+        return {
+            setCurrentId: jest.fn<any>().mockResolvedValue(undefined),
+            refreshNotices: jest.fn<any>().mockResolvedValue(undefined),
+            listDmail: jest.fn<any>().mockResolvedValue(dmails),
+            fileDmail: jest.fn<any>().mockResolvedValue(true),
+        };
+    }
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+        jest.clearAllTimers();
+        jest.useRealTimers();
+    });
+
+    // Drive the initial 5s delay, then let the poll's promise chain settle.
+    async function runFirstPoll(start: () => void) {
+        start();
+        await jest.advanceTimersByTimeAsync(5000);
+    }
+
+    it('does nothing when the email bridge is not configured', async () => {
+        const m = mount({ keymaster: pollKeymaster({}) });
+        m.ctx.emailBridge = pollBridge({ isConfigured: jest.fn<any>().mockReturnValue(false) });
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(m.ctx.keymaster.listDmail).not.toHaveBeenCalled();
+    });
+
+    it('skips dmails that are not unread', async () => {
+        const keymaster = pollKeymaster({ 'did:cid:d1': dmailItem({ tags: ['inbox'] }) });
+        const m = mount({ keymaster });
+        m.ctx.emailBridge = pollBridge();
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(m.ctx.emailBridge.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('forwards a reply to the bridged email address', async () => {
+        const keymaster = pollKeymaster({
+            'did:cid:d1': dmailItem({ message: { subject: 'Re: hi', body: 'b', to: [], cc: [], reference: 'did:cid:orig' } }),
+        });
+        const db = createDb({ 'did:cid:sender': { name: 'alice' } });
+        const m = mount({ keymaster, db });
+        m.ctx.emailBridge = pollBridge({
+            lookupEmailMapping: jest.fn<any>().mockResolvedValue({
+                emailAddress: 'bob@ext.test',
+                recipientDid: 'did:cid:bob',
+            }),
+        });
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(m.ctx.emailBridge.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            to: 'bob@ext.test',
+            senderName: 'alice',
+            fromEmail: 'alice@archon.test',
+            dmailDid: 'did:cid:d1',
+        }));
+        expect(keymaster.fileDmail).toHaveBeenCalledWith('did:cid:d1', ['inbox']);
+    });
+
+    it('falls back to a generic sender when the DID has no named user', async () => {
+        const keymaster = pollKeymaster({
+            'did:cid:d1': dmailItem({ message: { subject: 'Re: hi', body: 'b', to: [], cc: [], reference: 'did:cid:orig' } }),
+        });
+        const m = mount({ keymaster, db: createDb({}) });
+        m.ctx.emailBridge = pollBridge({
+            lookupEmailMapping: jest.fn<any>().mockResolvedValue({
+                emailAddress: 'bob@ext.test',
+                recipientDid: 'did:cid:bob',
+            }),
+        });
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(m.ctx.emailBridge.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            senderName: 'dmail-user',
+        }));
+    });
+
+    it('uses a non-DID sender verbatim, and Unknown for a non-string one', async () => {
+        const keymaster = pollKeymaster({
+            'did:cid:d1': dmailItem({
+                sender: 'alice',
+                message: { subject: 'Re: hi', body: 'b', to: [], cc: [], reference: 'did:cid:orig' },
+            }),
+            'did:cid:d2': dmailItem({
+                sender: { not: 'a string' },
+                message: { subject: 'Re: hi', body: 'b', to: [], cc: [], reference: 'did:cid:orig' },
+            }),
+        });
+        const m = mount({ keymaster });
+        m.ctx.emailBridge = pollBridge({
+            lookupEmailMapping: jest.fn<any>().mockResolvedValue({
+                emailAddress: 'bob@ext.test',
+                recipientDid: 'did:cid:bob',
+            }),
+        });
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        const senders = (m.ctx.emailBridge.sendEmail as any).mock.calls.map((c: any) => c[0].senderName);
+        expect(senders).toContain('alice');
+        expect(senders).toContain('Unknown');
+    });
+
+    it('leaves a reply alone when no email mapping exists', async () => {
+        const keymaster = pollKeymaster({
+            'did:cid:d1': dmailItem({ message: { subject: 'Re: hi', body: 'b', to: [], cc: [], reference: 'did:cid:orig' } }),
+        });
+        const m = mount({ keymaster });
+        m.ctx.emailBridge = pollBridge({ lookupEmailMapping: jest.fn<any>().mockResolvedValue(null) });
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(m.ctx.emailBridge.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('composes a new email from the "[email to addr]" subject convention', async () => {
+        const keymaster = pollKeymaster({
+            'did:cid:d1': dmailItem({
+                message: {
+                    subject: '[email to bob@ext.test] Real subject',
+                    body: 'b',
+                    to: ['did:cid:service'],
+                    cc: [],
+                },
+            }),
+        });
+        const m = mount({ keymaster });
+        m.ctx.emailBridge = pollBridge();
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(m.ctx.emailBridge.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            to: 'bob@ext.test',
+            subject: 'Real subject',
+        }));
+    });
+
+    it('defaults an empty composed subject', async () => {
+        const keymaster = pollKeymaster({
+            'did:cid:d1': dmailItem({
+                message: { subject: '[email to bob@ext.test]', body: 'b', to: [], cc: ['did:cid:service'] },
+            }),
+        });
+        const m = mount({ keymaster });
+        m.ctx.emailBridge = pollBridge();
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(m.ctx.emailBridge.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+            subject: '(no subject)',
+        }));
+    });
+
+    it('ignores a dmail addressed to the service whose subject does not match', async () => {
+        const keymaster = pollKeymaster({
+            'did:cid:d1': dmailItem({
+                message: { subject: 'just a normal subject', body: 'b', to: ['did:cid:service'], cc: [] },
+            }),
+        });
+        const m = mount({ keymaster });
+        m.ctx.emailBridge = pollBridge();
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(m.ctx.emailBridge.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('ignores a composed email when the service DID is not a recipient', async () => {
+        const keymaster = pollKeymaster({
+            'did:cid:d1': dmailItem({
+                message: { subject: '[email to bob@ext.test] hi', body: 'b', to: ['did:cid:someone'], cc: [] },
+            }),
+        });
+        const m = mount({ keymaster });
+        m.ctx.emailBridge = pollBridge();
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(m.ctx.emailBridge.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('logs a poll failure instead of throwing', async () => {
+        const keymaster = pollKeymaster({});
+        keymaster.listDmail = jest.fn<any>().mockRejectedValue(new Error('keymaster down'));
+        const m = mount({ keymaster });
+        m.ctx.emailBridge = pollBridge();
+
+        await runFirstPoll(m.startDmailPollLoop);
+
+        expect(errorSpy).toHaveBeenCalledWith('Dmail poll error:', expect.anything());
+    });
+
+    it('polls again on the interval and skips a run already in flight', async () => {
+        const keymaster = pollKeymaster({});
+        const m = mount({ keymaster });
+        m.ctx.emailBridge = pollBridge();
+
+        await runFirstPoll(m.startDmailPollLoop);
+        expect(keymaster.listDmail).toHaveBeenCalledTimes(1);
+
+        // The 60s interval fires a second poll.
+        await jest.advanceTimersByTimeAsync(60_000);
+        expect(keymaster.listDmail).toHaveBeenCalledTimes(2);
+    });
+});
+
+// --- remaining guard branches ----------------------------------------------
+
+describe('credential issuance guards', () => {
+    function keymasterWith(over: Record<string, any> = {}) {
+        return {
+            setCurrentId: jest.fn<any>().mockResolvedValue(undefined),
+            bindCredential: jest.fn<any>().mockResolvedValue({}),
+            issueCredential: jest.fn<any>().mockResolvedValue('did:cid:cred'),
+            getCredential: jest.fn<any>().mockResolvedValue({ credentialSubject: {} }),
+            updateCredential: jest.fn<any>().mockResolvedValue(true),
+            revokeCredential: jest.fn<any>().mockResolvedValue(true),
+            verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, responder: 'did:cid:alice' }),
+            ...over,
+        };
+    }
+
+    it('surfaces a failed credential fetch during an update', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'old', credentialDid: 'did:cid:cred' } });
+        const { app } = mount({
+            db,
+            keymaster: keymasterWith({ getCredential: jest.fn<any>().mockResolvedValue(null) }),
+        });
+
+        const response = await request(app)
+            .put('/api/name')
+            .set('Authorization', 'Bearer valid')
+            .send({ name: 'newname' });
+
+        expect(response.status).toBe(500);
+    });
+
+    it('surfaces a failed credential update', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'old', credentialDid: 'did:cid:cred' } });
+        const { app } = mount({
+            db,
+            keymaster: keymasterWith({ updateCredential: jest.fn<any>().mockResolvedValue(false) }),
+        });
+
+        const response = await request(app)
+            .put('/api/name')
+            .set('Authorization', 'Bearer valid')
+            .send({ name: 'newname' });
+
+        expect(response.status).toBe(500);
+    });
+});
+
+describe('credential endpoint fallbacks', () => {
+    it('reports a null name when the user has none', async () => {
+        const db = createDb({ 'did:cid:alice': { logins: 1 } });
+        const { app } = mount({ db, session: { user: { did: 'did:cid:alice' } } });
+
+        const response = await request(app).get('/api/credential');
+
+        expect(response.body).toMatchObject({ hasCredential: false, name: null });
+    });
+
+    it('falls back through message, error, then stringified value', async () => {
+        const db = createDb({ 'did:cid:alice': { credentialDid: 'did:cid:cred' } });
+
+        // An object carrying `error` rather than `message`.
+        const withError = mount({
+            db,
+            keymaster: { getCredential: jest.fn<any>().mockRejectedValue({ error: 'upstream said no' }) },
+            session: { user: { did: 'did:cid:alice' } },
+        });
+        const first = await request(withError.app).get('/api/credential');
+        expect(first.body.error).toBe('upstream said no');
+
+        // A bare string rejection.
+        const withString = mount({
+            db,
+            keymaster: { getCredential: jest.fn<any>().mockRejectedValue('plain failure') },
+            session: { user: { did: 'did:cid:alice' } },
+        });
+        const second = await request(withString.app).get('/api/credential');
+        expect(second.body.error).toBe('plain failure');
+    });
+});
+
+describe('admin user deletion fallbacks', () => {
+    it('names a user by DID when they have no name', async () => {
+        const db = createDb({ 'did:cid:owner': {}, 'did:cid:anon': { logins: 2 } });
+        const { app } = mount({ db, session: { user: { did: 'did:cid:owner' } } });
+
+        const response = await request(app).delete('/api/admin/user/did%3Acid%3Aanon');
+
+        expect(response.status).toBe(200);
+        expect(response.body.message).toContain('did:cid:anon');
+    });
+
+    it('reports a delete failure as 500', async () => {
+        const db = createDb({ 'did:cid:owner': {}, 'did:cid:alice': { name: 'alice' } });
+        (db as any).deleteUser = jest.fn<any>().mockRejectedValue(new Error('db down'));
+        const { app } = mount({ db, session: { user: { did: 'did:cid:owner' } } });
+
+        const response = await request(app).delete('/api/admin/user/did%3Acid%3Aalice');
+
+        expect(response.status).toBe(500);
+        expect(response.body.error).toBe('db down');
+    });
+});
+
+describe('lightning endpoint resolution', () => {
+    function withService(service: any) {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        return mount({
+            db,
+            keymaster: { resolveDID: jest.fn<any>().mockResolvedValue({ didDocument: { service } }) },
+        });
+    }
+
+    it('accepts a service identified by a #lightning fragment rather than by type', async () => {
+        const { app } = withService([{ id: 'did:cid:alice#lightning', serviceEndpoint: 'https://ln.test/i' }]);
+
+        const response = await request(app).get('/.well-known/lnurlp/alice');
+
+        expect(response.body.tag).toBe('payRequest');
+    });
+
+    it('reports an error when the matching service has no endpoint', async () => {
+        const { app } = withService([{ type: 'Lightning' }]);
+
+        const response = await request(app).get('/.well-known/lnurlp/alice');
+
+        expect(response.body).toMatchObject({ status: 'ERROR' });
+    });
+
+    it('reports an error when resolution itself fails', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const { app } = mount({
+            db,
+            keymaster: { resolveDID: jest.fn<any>().mockRejectedValue(new Error('resolver down')) },
+        });
+
+        const response = await request(app).get('/.well-known/lnurlp/alice');
+
+        expect(response.body).toMatchObject({ status: 'ERROR', reason: 'resolver down' });
     });
 });
