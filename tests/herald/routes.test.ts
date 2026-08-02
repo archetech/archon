@@ -1599,3 +1599,85 @@ describe('lightning endpoint resolution', () => {
         expect(response.body).toMatchObject({ status: 'ERROR', reason: 'resolver down' });
     });
 });
+
+describe('inbound email fallbacks', () => {
+    function bridge(over: Record<string, any> = {}) {
+        return {
+            isConfigured: jest.fn<any>().mockReturnValue(true),
+            parseInboundEmail: jest.fn<any>((body: any) =>
+                body.from && body.to
+                    ? { ...body, subject: body.subject ?? '(no subject)', text: body.text ?? '' }
+                    : null),
+            extractReplyToken: jest.fn<any>().mockReturnValue(null),
+            // Returning null forces the `|| email.from` fallback below.
+            extractEmailAddress: jest.fn<any>().mockReturnValue(null),
+            extractRecipientName: jest.fn<any>().mockReturnValue('alice'),
+            lookupToken: jest.fn<any>().mockResolvedValue(null),
+            storeEmailMapping: jest.fn<any>().mockResolvedValue(undefined),
+            ...over,
+        };
+    }
+
+    function keymaster() {
+        return {
+            setCurrentId: jest.fn<any>().mockResolvedValue(undefined),
+            createDmail: jest.fn<any>().mockResolvedValue('did:cid:dmail'),
+            sendDmail: jest.fn<any>().mockResolvedValue('did:cid:notice'),
+        };
+    }
+
+    it('falls back to the raw From header when no address can be extracted', async () => {
+        const km = keymaster();
+        const m = mount({ db: createDb({ 'did:cid:alice': { name: 'alice' } }), keymaster: km });
+        m.ctx.emailBridge = bridge();
+
+        await request(m.app)
+            .post('/api/inbound-email')
+            .send({ from: 'Weird Header <<>>', to: 'alice@archon.test', subject: 'hi', text: 'body' });
+
+        expect(km.createDmail).toHaveBeenCalledWith(
+            expect.objectContaining({ subject: expect.stringContaining('Weird Header') }),
+            { registry: 'hyperswarm' },
+        );
+    });
+
+    it('substitutes placeholder text for an empty body', async () => {
+        const km = keymaster();
+        const m = mount({ db: createDb({ 'did:cid:alice': { name: 'alice' } }), keymaster: km });
+        m.ctx.emailBridge = bridge();
+
+        await request(m.app)
+            .post('/api/inbound-email')
+            .send({ from: 'bob@ext.test', to: 'alice@archon.test', subject: 'hi' });
+
+        expect(km.createDmail).toHaveBeenCalledWith(
+            expect.objectContaining({ body: '(no text content)' }),
+            { registry: 'hyperswarm' },
+        );
+    });
+
+    it('applies the same fallbacks on the reply path', async () => {
+        const km = keymaster();
+        const m = mount({ db: createDb(), keymaster: km });
+        m.ctx.emailBridge = bridge({
+            extractReplyToken: jest.fn<any>().mockReturnValue('tok'),
+            lookupToken: jest.fn<any>().mockResolvedValue({
+                senderDid: 'did:cid:alice',
+                originalDmailDid: 'did:cid:orig',
+            }),
+        });
+
+        await request(m.app)
+            .post('/api/inbound-email')
+            .send({ from: 'Unparseable', to: 'reply+tok@parse.archon.test' });
+
+        expect(km.createDmail).toHaveBeenCalledWith(
+            expect.objectContaining({
+                subject: expect.stringContaining('Unparseable'),
+                body: '(no text content)',
+                reference: 'did:cid:orig',
+            }),
+            { registry: 'hyperswarm' },
+        );
+    });
+});
