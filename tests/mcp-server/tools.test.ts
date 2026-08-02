@@ -892,3 +892,208 @@ describe('mcp server tools', () => {
         expect(error).not.toContain('api-token');
     });
 });
+
+// The suite above drives every tool with fully-populated arguments, which leaves
+// the "argument omitted" and failure sides of the optional branches untaken.
+// These cover the other side.
+
+describe('optional argument branches', () => {
+    it('decodes an inline attachment as base64 by default and as utf8 when asked', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        await server.tools.get('archon_add_vault_item')!.handler({
+            id: 'did:cid:vault',
+            item: { name: 'a.txt', data: Buffer.from('hello').toString('base64') },
+        });
+        expect(runtime.keymaster.addVaultItem).toHaveBeenLastCalledWith(
+            'did:cid:vault', 'a.txt', Buffer.from('hello'),
+        );
+
+        await server.tools.get('archon_add_vault_item')!.handler({
+            id: 'did:cid:vault',
+            item: { name: 'b.txt', data: 'hello', encoding: 'utf8' },
+        });
+        expect(runtime.keymaster.addVaultItem).toHaveBeenLastCalledWith(
+            'did:cid:vault', 'b.txt', Buffer.from('hello'),
+        );
+    });
+
+    it('falls back to a default name when inline data carries none', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        await server.tools.get('archon_add_vault_item')!.handler({
+            id: 'did:cid:vault',
+            item: { data: Buffer.from('x').toString('base64') },
+        });
+        expect(runtime.keymaster.addVaultItem).toHaveBeenLastCalledWith(
+            'did:cid:vault', 'item', expect.anything(),
+        );
+
+        await server.tools.get('archon_add_dmail_attachment')!.handler({
+            did: 'did:cid:dmail',
+            attachment: { data: Buffer.from('x').toString('base64') },
+        });
+        expect(runtime.keymaster.addDmailAttachment).toHaveBeenLastCalledWith(
+            expect.anything(), 'attachment', expect.anything(),
+        );
+    });
+
+    it('resolves the current ID when none is supplied, and errors when there is none', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        await server.tools.get('archon_resolve_id')!.handler({});
+        expect(runtime.keymaster.getCurrentId).toHaveBeenCalled();
+        expect(runtime.keymaster.resolveDID).toHaveBeenLastCalledWith('alice', undefined);
+
+        const noCurrent = new FakeServer();
+        const empty = mockRuntime({ getCurrentId: jest.fn().mockResolvedValue(null) });
+        registerArchonTools(noCurrent, empty as any, baseConfig);
+
+        const response = await noCurrent.tools.get('archon_resolve_id')!.handler({});
+        expect(response.isError).toBe(true);
+        expect(response.content[0].text).toContain('No current ID');
+    });
+
+    it('passes listAliases options only when includeIds is supplied', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        await server.tools.get('archon_list_aliases')!.handler({});
+        expect(runtime.keymaster.listAliases).toHaveBeenLastCalledWith(undefined);
+
+        await server.tools.get('archon_list_aliases')!.handler({ includeIds: true });
+        expect(runtime.keymaster.listAliases).toHaveBeenLastCalledWith({ includeIDs: true });
+
+        // `false` is a real choice and must survive rather than collapsing to undefined.
+        await server.tools.get('archon_list_aliases')!.handler({ includeIds: false });
+        expect(runtime.keymaster.listAliases).toHaveBeenLastCalledWith({ includeIDs: false });
+    });
+
+    it('stores a null property when no value is given', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        await server.tools.get('archon_set_property')!.handler({ id: 'did:cid:asset', key: 'k' });
+
+        expect(runtime.keymaster.mergeData).toHaveBeenLastCalledWith('did:cid:asset', { k: null });
+    });
+
+    it('defaults an image mime type when the asset does not declare one', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime({
+            getImage: jest.fn().mockResolvedValue({
+                file: { data: Buffer.from('png'), filename: 'x.png' },
+                image: { width: 1, height: 1 },
+            }),
+        });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response = await server.tools.get('archon_get_asset_image')!.handler({ id: 'did:cid:image' });
+        const imageBlock = response.content.find((block: any) => block.type === 'image');
+
+        expect(imageBlock.mimeType).toBe('application/octet-stream');
+    });
+});
+
+describe('failure and empty-result branches', () => {
+    it('reports proofValid false when the credential is missing', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime({ getCredential: jest.fn().mockResolvedValue(null) });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response = await server.tools.get('archon_view_credential')!.handler({ did: 'did:cid:vc' });
+
+        expect(expectOk(response)).toStrictEqual({ credential: null, proofValid: false });
+        expect(runtime.keymaster.verifyProof).not.toHaveBeenCalled();
+    });
+
+    it('returns undefined for a property when the DID data is not an object', async () => {
+        for (const didDocumentData of [undefined, null, 'a string', ['an', 'array'], 42]) {
+            const server = new FakeServer();
+            const runtime = mockRuntime({
+                resolveDID: jest.fn().mockResolvedValue({ didDocumentData }),
+            });
+            registerArchonTools(server, runtime as any, baseConfig);
+
+            const response = await server.tools.get('archon_get_property')!.handler({
+                id: 'did:cid:asset',
+                key: 'anything',
+            });
+
+            // Guarding stops an index into a string or array returning a nonsense value.
+            expect(expectOk(response)).toBeUndefined();
+        }
+    });
+
+    it('returns null when a dmail attachment has no bytes', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime({ getDmailAttachment: jest.fn().mockResolvedValue(null) });
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response = await server.tools.get('archon_get_dmail_attachment')!.handler({
+            did: 'did:cid:dmail',
+            name: 'missing.txt',
+        });
+
+        expect(expectOk(response)).toBeNull();
+    });
+
+    it('rejects a non-object payload for signing', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        // The schema itself rejects most non-objects, so drive signableJson's own
+        // guard with an array — which JsonObjectSchema admits but signing must not.
+        for (const object of [['an', 'array'], 'a string', 42, null]) {
+            const response = await server.tools.get('archon_sign_file')!.handler({ object });
+            expect([JSON.stringify(object), response.isError]).toEqual([JSON.stringify(object), true]);
+        }
+    });
+});
+
+describe('tool registration fallbacks', () => {
+    // An older MCP server exposes `tool()` rather than `registerTool()`.
+    class LegacyServer {
+        tools = new Map<string, { shape: any; handler: ToolHandler }>();
+
+        tool(name: string, _description: string, shape: any, handler: ToolHandler) {
+            this.tools.set(name, { shape, handler });
+        }
+    }
+
+    it('registers through the legacy tool() API when registerTool is absent', async () => {
+        const server = new LegacyServer();
+        const runtime = mockRuntime();
+
+        registerArchonTools(server as any, runtime as any, baseConfig);
+
+        expect(server.tools.size).toBe(ARCHON_MCP_TOOL_DEFINITIONS.length);
+        const response = await server.tools.get('archon_list_registries')!.handler({});
+        expect(expectOk(response)).toStrictEqual(['hyperswarm']);
+    });
+
+    it('throws when the server supports neither registration API', () => {
+        expect(() => registerArchonTools({} as any, mockRuntime() as any, baseConfig))
+            .toThrow(/does not support tool registration/);
+    });
+
+    it('defaults missing arguments to an empty object', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        // No argument at all, rather than {} — the schema still has to parse.
+        const response = await server.tools.get('archon_list_registries')!.handler();
+
+        expect(expectOk(response)).toStrictEqual(['hyperswarm']);
+    });
+});
