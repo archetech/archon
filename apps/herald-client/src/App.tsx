@@ -526,6 +526,9 @@ function Home() {
                         <Button component={Link} to='/members' variant="outlined" size="small">
                             Members
                         </Button>
+                        <Button component={Link} to='/directory' variant="outlined" size="small">
+                            Directory
+                        </Button>
                         {auth.isOwner &&
                             <Button component={Link} to='/owner' variant="outlined" size="small">
                                 Owner
@@ -578,6 +581,12 @@ function Home() {
                     >
                         Prove Your DID & Claim Your Name
                     </Button>
+
+                    <Box sx={{ mt: 2 }}>
+                        <Button component={Link} to="/directory" variant="text" size="small">
+                            Browse the directory
+                        </Button>
+                    </Box>
 
                     {/* AI Agent Instructions */}
                     <Box sx={{
