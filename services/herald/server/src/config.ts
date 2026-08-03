@@ -10,6 +10,13 @@ export const DRAWBRIDGE_PORT = Number(process.env.ARCHON_DRAWBRIDGE_PORT) || 422
 export const DRAWBRIDGE_PUBLIC_HOST = process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || `http://localhost:${DRAWBRIDGE_PORT}`;
 export const GATEKEEPER_URL = process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224';
 export const WALLET_URL = process.env.ARCHON_HERALD_WALLET_URL || 'https://wallet.archon.technology';
+// This URL is followed by the visitor's browser, so it must be reachable from
+// the public internet. The node's own explorer cannot be the default: it is
+// profile-gated, bound to port 4000, and proxied by neither Drawbridge nor
+// nginx, so there is no address to advertise — and `localhost:4000` would
+// resolve to each visitor's own machine. Operators running a reachable
+// explorer should set this to it. Set it empty to hide the links entirely.
+export const EXPLORER_URL = process.env.ARCHON_HERALD_EXPLORER_URL ?? 'https://explorer.archon.technology';
 export const HERALD_DATABASE_TYPE = process.env.ARCHON_HERALD_DB || 'json';
 export const DATA_DIR = process.env.ARCHON_HERALD_DATA_DIR || '/app/server/data';
 export const IPFS_API_URL = process.env.ARCHON_HERALD_IPFS_API_URL || 'http://localhost:5001/api/v0';

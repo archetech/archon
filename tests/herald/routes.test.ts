@@ -94,6 +94,17 @@ describe('herald public endpoints', () => {
         });
     });
 
+    it('advertises an explorer the visitor can actually reach', async () => {
+        const { app } = mount();
+
+        const response = await request(app).get('/api/config');
+
+        // The client renders this as a link in the visitor's browser, so a
+        // loopback default would resolve to the visitor's own machine.
+        expect(response.body.explorerUrl).toBeDefined();
+        expect(response.body.explorerUrl).not.toMatch(/localhost|127\.0\.0\.1/);
+    });
+
     it('builds the name registry from users that have a name', async () => {
         const db = createDb({
             'did:cid:alice': { name: 'alice' },
@@ -312,6 +323,21 @@ describe('herald webfinger', () => {
             'http://webfinger.net/rel/avatar',
         ]));
         expect(response.body.links[0].href).toContain('/api/name/alice');
+    });
+
+    it('points profile-page at a route the client serves', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const { app } = mount({ db });
+
+        const response = await request(app).get('/.well-known/webfinger?resource=acct:alice@archon.test');
+
+        const profilePage = response.body.links.find(
+            (link: any) => link.rel === 'http://webfinger.net/rel/profile-page');
+
+        // Regression guard: this used to be `/name/alice`, which the client has no
+        // route for — following it landed on the home page instead of the profile.
+        expect(profilePage.href).toContain('/id/alice');
+        expect(profilePage.href).not.toContain('/name/alice');
     });
 });
 

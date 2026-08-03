@@ -9,6 +9,7 @@ import type { DatabaseInterface, User } from './db/interfaces.js';
 import type { EmailBridge } from './email-bridge.js';
 import { createOAuthRoutes } from './oauth/index.js';
 import {
+    EXPLORER_URL,
     IPFS_API_URL,
     IPNS_KEY_NAME,
     MEMBERSHIP_SCHEMA_DID,
@@ -339,6 +340,7 @@ export function createHeraldRoutes(ctx: HeraldContext): {
             serviceDomain: SERVICE_DOMAIN,
             publicUrl: PUBLIC_URL,
             walletUrl: WALLET_URL,
+            explorerUrl: EXPLORER_URL,
         });
     });
 
@@ -1165,7 +1167,10 @@ export function createHeraldRoutes(ctx: HeraldContext): {
                     {
                         rel: 'http://webfinger.net/rel/profile-page',
                         type: 'text/html',
-                        href: `${PUBLIC_URL}/name/${name}`,
+                        // Must match a route the client actually serves. `/name/:name`
+                        // is not one — it fell through to the SPA's catch-all and
+                        // redirected to the home page.
+                        href: `${PUBLIC_URL}/id/${name}`,
                     },
                     {
                         rel: 'https://w3id.org/did',
