@@ -1430,13 +1430,6 @@ function ViewIdentity() {
                     border: '1px solid #e9ecef',
                     textAlign: 'center'
                 }}>
-                    {registration.type && (
-                        <Chip
-                            label={registration.type === 'agent' ? 'Agent' : 'Asset'}
-                            size="small"
-                            sx={{ mb: 2, textTransform: 'capitalize' }}
-                        />
-                    )}
                     {did && aliasWalletUrl && (
                         <Box>
                             <a href={aliasWalletUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
