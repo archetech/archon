@@ -1113,75 +1113,120 @@ function ViewDirectory() {
 
     return (
         <div className="App">
-            <Header title="Directory" />
-
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
-                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                        {directory.length} registered {directory.length === 1 ? 'identity' : 'identities'} on {serviceName}
-                    </Typography>
-                    {lastUpdated && (
-                        <Typography variant="body2" sx={{ color: '#888' }}>
-                            Last updated: {formatTimestamp(lastUpdated)}
-                        </Typography>
-                    )}
+                <Box sx={{ ...surface, mb: 2.5, overflow: 'hidden' }}>
+                    <Box sx={{
+                        background: 'linear-gradient(135deg, #2c3e50 0%, #46637f 100%)',
+                        px: 3,
+                        py: 3,
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'space-between',
+                        gap: 2,
+                        flexWrap: 'wrap',
+                    }}>
+                        <Box sx={{ minWidth: 0 }}>
+                            <Typography component="h1" sx={{
+                                fontWeight: 700,
+                                fontSize: { xs: '1.5rem', sm: '2rem' },
+                                color: '#fff',
+                                lineHeight: 1.15,
+                            }}>
+                                Directory
+                            </Typography>
+                            <Typography sx={{
+                                mt: 0.5,
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                letterSpacing: '0.08em',
+                                textTransform: 'uppercase',
+                                color: 'rgba(255, 255, 255, 0.6)',
+                            }}>
+                                {serviceName}
+                            </Typography>
+                        </Box>
+                        {lastUpdated && (
+                            <Typography sx={{ fontSize: '0.8125rem', color: 'rgba(255, 255, 255, 0.65)' }}>
+                                Updated {formatTimestamp(lastUpdated)}
+                            </Typography>
+                        )}
+                    </Box>
                 </Box>
 
-                {directory.length === 0 ? (
-                    <Box sx={{
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: 2,
-                        p: 4,
-                        border: '1px solid #e9ecef',
-                        textAlign: 'center',
-                    }}>
-                        <Typography variant="body1" sx={{ color: '#666' }}>
+                <Card
+                    title={directory.length === 1 ? 'Registered identity' : 'Registered identities'}
+                    accent="#3b82f6"
+                    action={<CountChip count={directory.length} />}
+                >
+                    {directory.length === 0 ? (
+                        <Typography sx={{ color: '#64748b', fontSize: '0.9375rem', py: 1 }}>
                             No names have been registered yet.
                         </Typography>
-                    </Box>
-                ) : (
-                    <Table sx={{ backgroundColor: '#fff', borderRadius: 2, overflow: 'hidden' }}>
-                        <TableBody>
-                            {directory.map((entry) => (
-                                <TableRow key={entry.did} sx={{ '&:hover': { backgroundColor: '#f8f9fa' } }}>
-                                    <TableCell sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#2c3e50' }}>
-                                        <Link
-                                            to={`/id/${entry.name}`}
-                                            style={{ textDecoration: 'none', color: 'inherit' }}
-                                        >
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Avatar
-                                                    src={`${api.defaults.baseURL}/name/${entry.name}/avatar`}
-                                                    alt={entry.name}
-                                                    sx={{ width: 36, height: 36 }}
-                                                >
-                                                    {entry.name[0]?.toUpperCase()}
-                                                </Avatar>
-                                                {entry.name}@{serviceDomain}
-                                            </Box>
-                                        </Link>
-                                    </TableCell>
-                                    <TableCell sx={{ color: '#666', fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                                        {entry.did.substring(0, 20)}...{entry.did.substring(entry.did.length - 8)}
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Button
-                                            component={Link}
-                                            to={`/id/${entry.name}`}
-                                            size="small"
-                                            variant="outlined"
-                                        >
-                                            View Identity
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                )}
+                    ) : (
+                        directory.map((entry, index) => (
+                            <Box
+                                key={entry.did}
+                                component={Link}
+                                to={`/id/${entry.name}`}
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 2,
+                                    px: 1.5,
+                                    py: 1.5,
+                                    mx: -1.5,
+                                    borderRadius: 2,
+                                    textDecoration: 'none',
+                                    color: 'inherit',
+                                    borderBottom: index === directory.length - 1
+                                        ? 'none'
+                                        : '1px solid rgba(15, 23, 42, 0.05)',
+                                    transition: 'background-color 120ms ease',
+                                    '&:hover': {
+                                        backgroundColor: '#f8fafc',
+                                        textDecoration: 'none',
+                                    },
+                                    '&:hover .row-chevron': { color: '#2c3e50', transform: 'translateX(2px)' },
+                                }}
+                            >
+                                <Avatar
+                                    src={`${api.defaults.baseURL}/name/${entry.name}/avatar`}
+                                    alt={entry.name}
+                                    sx={{ width: 40, height: 40, flexShrink: 0 }}
+                                >
+                                    {entry.name[0]?.toUpperCase()}
+                                </Avatar>
+                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                    <Typography sx={{ fontWeight: 600, fontSize: '1rem', color: '#0f172a' }}>
+                                        {entry.name}
+                                        <Box component="span" sx={{ color: '#94a3b8', fontWeight: 500 }}>
+                                            @{serviceDomain}
+                                        </Box>
+                                    </Typography>
+                                    <Box component="span" sx={{ ...codePill, mt: 0.5, fontSize: '0.75rem', color: '#64748b' }}>
+                                        {entry.did.substring(0, 20)}…{entry.did.substring(entry.did.length - 8)}
+                                    </Box>
+                                </Box>
+                                <Box
+                                    className="row-chevron"
+                                    component="span"
+                                    sx={{
+                                        color: '#cbd5e1',
+                                        fontSize: '1.25rem',
+                                        lineHeight: 1,
+                                        flexShrink: 0,
+                                        transition: 'color 120ms ease, transform 120ms ease',
+                                    }}
+                                >
+                                    →
+                                </Box>
+                            </Box>
+                        ))
+                    )}
+                </Card>
 
-                <Box sx={{ mt: 3, textAlign: 'center' }}>
-                    <Button component={Link} to="/" variant="text">
+                <Box sx={{ mt: 1, textAlign: 'center' }}>
+                    <Button component={Link} to="/" variant="text" sx={{ textTransform: 'none' }}>
                         ← Back to Home
                     </Button>
                 </Box>
