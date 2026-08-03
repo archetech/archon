@@ -85,27 +85,56 @@ function useMemberData(name: string | undefined) {
     const [explorerUrl, setExplorerUrl] = useState<string>('');
 
     useEffect(() => {
+        if (!name) {
+            return;
+        }
+
+        // A credential's issuer links to another /id/:name, which is the same
+        // route — React keeps this component mounted and only the param
+        // changes. Without resetting, the previous identity's document stays on
+        // screen under the new URL; without the guard, a slower earlier fetch
+        // can resolve last and overwrite the identity actually being viewed.
+        let active = true;
+
+        setLoading(true);
+        setError('');
+        setMemberData(null);
+
         const fetchMember = async () => {
             try {
                 const configResponse = await api.get('/config');
+
+                if (!active) {
+                    return;
+                }
+
                 setServiceDomain(configResponse.data.serviceDomain);
                 setWalletUrl(configResponse.data.walletUrl);
                 setExplorerUrl(configResponse.data.explorerUrl || '');
 
                 const response = await api.get(`/member/${name}`);
-                setMemberData(response.data);
+
+                if (active) {
+                    setMemberData(response.data);
+                }
             }
             catch (err: any) {
-                setError(err.response?.data?.error || 'Member not found');
+                if (active) {
+                    setError(err.response?.data?.error || 'Member not found');
+                }
             }
             finally {
-                setLoading(false);
+                if (active) {
+                    setLoading(false);
+                }
             }
         };
 
-        if (name) {
-            fetchMember();
-        }
+        fetchMember();
+
+        return () => {
+            active = false;
+        };
     }, [name]);
 
     return { memberData, loading, error, serviceDomain, walletUrl, explorerUrl };
@@ -142,8 +171,16 @@ function useNameByDid() {
     return nameByDid;
 }
 
-function useCopyDid() {
+// `resetKey` clears the copied state when the page switches to a different
+// subject. The button latches to "Copied" and disables itself, and this
+// component survives /id/:name -> /id/:other navigation, so without this the
+// next identity opens with its copy button already spent.
+function useCopyDid(resetKey?: string) {
     const [didCopied, setDidCopied] = useState<boolean>(false);
+
+    useEffect(() => {
+        setDidCopied(false);
+    }, [resetKey]);
 
     async function copyDid(text: string) {
         try {
@@ -1688,7 +1725,7 @@ function ViewCredential() {
 function ViewMember() {
     const { name } = useParams<{ name: string }>();
     const { memberData, loading, error, serviceDomain, walletUrl, explorerUrl } = useMemberData(name);
-    const { didCopied, copyDid } = useCopyDid();
+    const { didCopied, copyDid } = useCopyDid(name);
 
     if (loading) {
         return <LoadingShell title={`${name}@${serviceDomain}`} />;
@@ -1702,7 +1739,7 @@ function ViewMember() {
                     <Typography variant="h6" sx={{ color: '#e74c3c', mb: 2 }}>
                         {error}
                     </Typography>
-                    <Button component={Link} to="/members" variant="outlined">
+                    <Button component={Link} to="/directory" variant="outlined">
                         ← Back to Directory
                     </Button>
                 </Box>
@@ -1783,7 +1820,7 @@ function ViewMember() {
                 </Box>
 
                 <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'center' }}>
-                    <Button component={Link} to="/members" variant="outlined">
+                    <Button component={Link} to="/directory" variant="outlined">
                         ← Back to Directory
                     </Button>
                     {/* The DID lives at didDocument.id — the payload has no top-level
@@ -1812,7 +1849,7 @@ function ViewMember() {
 function ViewIdentity() {
     const { name } = useParams<{ name: string }>();
     const { memberData, loading, error, serviceDomain, walletUrl, explorerUrl } = useMemberData(name);
-    const { didCopied, copyDid } = useCopyDid();
+    const { didCopied, copyDid } = useCopyDid(name);
     const nameByDid = useNameByDid();
 
     if (loading) {
