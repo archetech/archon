@@ -32,7 +32,7 @@
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
-    "@types/chrome": "^0.0.309",
+    "@types/chrome": "^0.2.2",
     "@types/hdkey": "^2.1.0",
     "@types/jest": "^29.5.14",
     "@types/mock-fs": "^4.13.4",
