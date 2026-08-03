@@ -44,6 +44,7 @@ function App() {
                 <Route path="/profile/:did" element={<ViewProfile />} />
                 <Route path="/member/:name" element={<ViewMember />} />
                 <Route path="/id/:name" element={<ViewIdentity />} />
+                <Route path="/directory" element={<ViewDirectory />} />
                 <Route path="/credential" element={<ViewCredential />} />
                 <Route path="*" element={<NotFound />} />
             </Routes>
@@ -908,6 +909,143 @@ function ViewMembers() {
     )
 }
 
+// The public directory. `/members` covers the same ground but gates on
+// `/check-auth` and bounces anonymous visitors home, so it cannot be linked to
+// from a public identity page. Every endpoint used here is unauthenticated.
+function ViewDirectory() {
+    const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
+    const [lastUpdated, setLastUpdated] = useState<string>('');
+    const [serviceDomain, setServiceDomain] = useState<string>('');
+    const [serviceName, setServiceName] = useState<string>('Directory');
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string>('');
+
+    useEffect(() => {
+        const fetchDirectory = async () => {
+            try {
+                const configResponse = await api.get('/config');
+                setServiceDomain(configResponse.data.serviceDomain);
+                setServiceName(configResponse.data.serviceName || 'Directory');
+
+                const registryResponse = await api.get('/registry');
+                setLastUpdated(registryResponse.data.updated || '');
+
+                const entries: DirectoryEntry[] = Object.entries(registryResponse.data.names || {})
+                    .map(([name, did]) => ({ name, did: did as string }));
+
+                entries.sort((a, b) => a.name.localeCompare(b.name));
+                setDirectory(entries);
+            }
+            catch (err: any) {
+                setError(err.response?.data?.error || 'Directory unavailable');
+            }
+            finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDirectory();
+    }, []);
+
+    if (loading) {
+        return <LoadingShell title="Directory" />;
+    }
+
+    if (error) {
+        return (
+            <div className="App">
+                <Header title="Directory" />
+                <Box sx={{ maxWidth: 600, mx: 'auto', textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ color: '#e74c3c', mb: 2 }}>
+                        {error}
+                    </Typography>
+                    <Button component={Link} to="/" variant="outlined">
+                        ← Back to Home
+                    </Button>
+                </Box>
+            </div>
+        );
+    }
+
+    return (
+        <div className="App">
+            <Header title="Directory" />
+
+            <Box sx={{ maxWidth: 800, mx: 'auto' }}>
+                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                    <Typography variant="body2" sx={{ color: '#666' }}>
+                        {directory.length} registered {directory.length === 1 ? 'identity' : 'identities'} on {serviceName}
+                    </Typography>
+                    {lastUpdated && (
+                        <Typography variant="body2" sx={{ color: '#888' }}>
+                            Last updated: {formatTimestamp(lastUpdated)}
+                        </Typography>
+                    )}
+                </Box>
+
+                {directory.length === 0 ? (
+                    <Box sx={{
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: 2,
+                        p: 4,
+                        border: '1px solid #e9ecef',
+                        textAlign: 'center',
+                    }}>
+                        <Typography variant="body1" sx={{ color: '#666' }}>
+                            No names have been registered yet.
+                        </Typography>
+                    </Box>
+                ) : (
+                    <Table sx={{ backgroundColor: '#fff', borderRadius: 2, overflow: 'hidden' }}>
+                        <TableBody>
+                            {directory.map((entry) => (
+                                <TableRow key={entry.did} sx={{ '&:hover': { backgroundColor: '#f8f9fa' } }}>
+                                    <TableCell sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#2c3e50' }}>
+                                        <Link
+                                            to={`/id/${entry.name}`}
+                                            style={{ textDecoration: 'none', color: 'inherit' }}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Avatar
+                                                    src={`${api.defaults.baseURL}/name/${entry.name}/avatar`}
+                                                    alt={entry.name}
+                                                    sx={{ width: 36, height: 36 }}
+                                                >
+                                                    {entry.name[0]?.toUpperCase()}
+                                                </Avatar>
+                                                {entry.name}@{serviceDomain}
+                                            </Box>
+                                        </Link>
+                                    </TableCell>
+                                    <TableCell sx={{ color: '#666', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                                        {entry.did.substring(0, 20)}...{entry.did.substring(entry.did.length - 8)}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <Button
+                                            component={Link}
+                                            to={`/id/${entry.name}`}
+                                            size="small"
+                                            variant="outlined"
+                                        >
+                                            View Identity
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+
+                <Box sx={{ mt: 3, textAlign: 'center' }}>
+                    <Button component={Link} to="/" variant="text">
+                        ← Back to Home
+                    </Button>
+                </Box>
+            </Box>
+        </div>
+    );
+}
+
 function ViewOwner() {
     const [adminInfo, setAdminInfo] = useState<any>(null);
     const [publishing, setPublishing] = useState(false);
@@ -1487,7 +1625,7 @@ function ViewIdentity() {
                     <Typography variant="h6" sx={{ color: '#e74c3c', mb: 2 }}>
                         {error}
                     </Typography>
-                    <Button component={Link} to="/members" variant="outlined">
+                    <Button component={Link} to="/directory" variant="outlined">
                         ← Back to Directory
                     </Button>
                 </Box>
@@ -1718,7 +1856,7 @@ function ViewIdentity() {
                 </Card>
 
                 <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <Button component={Link} to="/members" variant="outlined">
+                    <Button component={Link} to="/directory" variant="outlined">
                         ← Back to Directory
                     </Button>
                     <Button component={Link} to={`/member/${name}`} variant="outlined">
