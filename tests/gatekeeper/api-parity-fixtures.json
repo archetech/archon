@@ -70,28 +70,31 @@
     "name": "queue-invalid-registry",
     "method": "GET",
     "path": "/api/v1/queue/mock",
-    "expectedStatus": 500,
+    "expectedStatus": 200,
     "compareMode": "text",
-    "requiresAdminKey": true
+    "requiresAdminKey": true,
+    "note": "an unknown but well-formed registry name is auto-registered, not rejected"
   },
   {
     "name": "queue-clear-invalid-registry",
     "method": "POST",
     "path": "/api/v1/queue/mock/clear",
-    "expectedStatus": 500,
+    "expectedStatus": 200,
     "compareMode": "text",
     "headers": {
       "content-type": "application/json"
     },
     "requiresAdminKey": true,
-    "body": []
+    "body": [],
+    "note": "an unknown but well-formed registry name is auto-registered, not rejected"
   },
   {
     "name": "block-invalid-registry-latest",
     "method": "GET",
     "path": "/api/v1/block/mock/latest",
-    "expectedStatus": 500,
-    "compareMode": "text"
+    "expectedStatus": 200,
+    "compareMode": "text",
+    "note": "an unknown but well-formed registry name is auto-registered, not rejected"
   },
   {
     "name": "batch-import-invalid-payload",

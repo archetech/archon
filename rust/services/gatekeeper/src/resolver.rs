@@ -448,6 +448,19 @@ pub(crate) async fn update_metrics_from_check(state: &AppState, did_check: &Chec
     }
 
     state.metrics.gatekeeper_dids_by_registry.reset();
+    // Seed a zero series for every configured registry before applying counts.
+    // The prometheus crate omits a GaugeVec with no series entirely, so with no
+    // DIDs yet this family vanished from /metrics — while the TypeScript
+    // gatekeeper (prom-client) always emits its HELP/TYPE. A dashboard doing
+    // label_values(gatekeeper_dids_by_registry, registry) therefore got nothing
+    // from this service until the first DID existed.
+    for registry in &state.config.registries {
+        state
+            .metrics
+            .gatekeeper_dids_by_registry
+            .with_label_values(&[registry])
+            .set(0.0);
+    }
     for (registry, count) in &did_check.by_registry {
         state
             .metrics

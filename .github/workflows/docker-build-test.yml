@@ -78,6 +78,62 @@ jobs:
           name: E2E Artifacts (${{ matrix.gatekeeper }}, ${{ matrix.keymaster }})
           path: e2e-results.xml
 
+  # Replays the shared request flows in tests/gatekeeper/api-parity-flows.json
+  # against BOTH gatekeeper implementations and diffs the responses. The runner
+  # (scripts/gatekeeper-parity.mjs) already existed but nothing invoked it, so
+  # TS/Rust parity was maintained by porting discipline with no regression guard
+  # — see #771. #823 is a concrete example of the divergence this catches: block
+  # `time` was stringified in both ports, and the Rust one returned it as a JSON
+  # string, leaving `timeISO` null in anchoring metadata.
+  gatekeeper_parity:
+    name: gatekeeper parity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "22.15.0"
+
+      - name: Pin npm 10.9.2
+        run: npm install --global npm@10.9.2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start both gatekeepers
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          docker compose -f docker/compose/gatekeeper-parity.yml up -d --build --wait
+
+      - name: Run parity checks
+        env:
+          TS_GATEKEEPER_URL: http://localhost:4224
+          RUST_GATEKEEPER_URL: http://localhost:4324
+          ARCHON_ADMIN_API_KEY: parity-admin-key
+        run: node scripts/gatekeeper-parity.mjs
+
+      - name: Grab logs
+        if: always()
+        run: |
+          docker compose -f docker/compose/gatekeeper-parity.yml logs --no-color \
+            > gatekeeper-parity-logs.txt
+          tail -100 gatekeeper-parity-logs.txt
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker/compose/gatekeeper-parity.yml down -v
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: gatekeeper-parity-logs
+          path: gatekeeper-parity-logs.txt
+
   # Single stable status that rolls up every build_test_images matrix leg, so
   # branch protection can require one check instead of the fragile per-leg
   # matrix names. `if: always()` is required: without it this job is skipped

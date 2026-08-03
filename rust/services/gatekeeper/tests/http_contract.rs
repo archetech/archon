@@ -280,7 +280,22 @@ async fn http_contract_matches_resolution_error_and_supported_registry_semantics
     let invalid = response.json::<Value>().await?;
     assert_eq!(invalid["didResolutionMetadata"]["error"], "invalidDid");
 
-    let missing_did = "did:cid:bagaaieramissing";
+    // A malformed CID is invalid DID syntax for this method, not a missing
+    // document. This asserted notFound until the TS/Rust parity harness showed
+    // the legacy /did/ surface classifying differently from both the TypeScript
+    // gatekeeper and this service's own /1.0/identifiers surface.
+    let malformed_did = "did:cid:bagaaieramissing";
+    let response = service
+        .client
+        .get(format!("{}/did/{malformed_did}", service.base_url))
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    let malformed = response.json::<Value>().await?;
+    assert_eq!(malformed["didResolutionMetadata"]["error"], "invalidDid");
+
+    // A well-formed CID that simply is not stored is the notFound case.
+    let missing_did = "did:cid:bafkreiawdmk6fmqc5p237vffyctazpzdgvgqfdj2i3hx2idtodxkwhyj5m";
     let response = service
         .client
         .get(format!("{}/did/{missing_did}", service.base_url))

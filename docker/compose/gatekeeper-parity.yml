@@ -1,0 +1,83 @@
+# Runs BOTH gatekeeper implementations side by side so
+# scripts/gatekeeper-parity.mjs can replay the shared request flows against
+# each and diff the responses. Used by the gatekeeper-parity CI job; also
+# usable locally:
+#
+#   docker compose -f docker/compose/gatekeeper-parity.yml up -d --build
+#   TS_GATEKEEPER_URL=http://localhost:4224 \
+#   RUST_GATEKEEPER_URL=http://localhost:4324 \
+#   ARCHON_ADMIN_API_KEY=<key> node scripts/gatekeeper-parity.mjs
+#
+# Design notes:
+#
+# - The two services need SEPARATE storage. The flows create DIDs, so a shared
+#   store would let whichever implementation ran first turn the other's create
+#   into a duplicate. Each therefore uses the `json` backend against its own
+#   volume, which also keeps mongo and redis out of this job entirely.
+# - IPFS is deliberately SHARED. It is content-addressed, so identical content
+#   must yield identical CIDs — sharing it is safe, and a CID divergence between
+#   the two is exactly the kind of difference worth catching.
+name: archon-gatekeeper-parity
+
+services:
+  ipfs:
+    image: ipfs/kubo:v0.40.1
+    volumes:
+      - parity-ipfs:/data/ipfs
+    healthcheck:
+      test: ["CMD-SHELL", "wget --post-data='' -qO- http://127.0.0.1:5001/api/v0/version >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  gatekeeper-ts:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.gatekeeper-ts
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/gatekeeper-typescript
+    environment: &parity_env
+      ARCHON_GATEKEEPER_PORT: 4224
+      ARCHON_BIND_ADDRESS: 0.0.0.0
+      ARCHON_ADMIN_API_KEY: ${ARCHON_ADMIN_API_KEY:-parity-admin-key}
+      ARCHON_GATEKEEPER_DB: json
+      ARCHON_GATEKEEPER_DID_PREFIX: ${ARCHON_GATEKEEPER_DID_PREFIX:-did:cid}
+      ARCHON_GATEKEEPER_REGISTRIES: ${ARCHON_GATEKEEPER_REGISTRIES:-local,hyperswarm}
+      ARCHON_IPFS_URL: http://ipfs:5001/api/v0
+    ports:
+      - "4224:4224"
+    volumes:
+      - parity-ts-data:/app/gatekeeper/data
+    healthcheck: &parity_health
+      test: ["CMD-SHELL", "test \"$(wget -qO- http://127.0.0.1:4224/api/v1/ready)\" = \"true\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      ipfs:
+        condition: service_healthy
+
+  gatekeeper-rust:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.gatekeeper-rust
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/gatekeeper-rust
+    environment: *parity_env
+    ports:
+      - "4324:4224"
+    volumes:
+      - parity-rust-data:/app/gatekeeper/data
+    healthcheck: *parity_health
+    depends_on:
+      ipfs:
+        condition: service_healthy
+
+volumes:
+  parity-ipfs:
+  parity-ts-data:
+  parity-rust-data:

@@ -1209,7 +1209,7 @@ timestamps and container labels.
 
 ## 16. Test fixtures
 
-Three shared JSON fixtures drive cross-language conformance:
+Five shared JSON fixtures drive cross-language conformance:
 
 | File | Purpose |
 | --- | --- |
@@ -1220,10 +1220,25 @@ Three shared JSON fixtures drive cross-language conformance:
 | [tests/gatekeeper/metrics-parity.json](../../../tests/gatekeeper/metrics-parity.json) | Required metric names + route normalization expectations. |
 
 The script [scripts/gatekeeper-parity.mjs](../../../scripts/gatekeeper-parity.mjs)
-runs side-by-side HTTP and metrics diffs against any two implementations
-listening on `GATEKEEPER_URL_A` and `GATEKEEPER_URL_B`. New implementations
-SHOULD pass this script against the TypeScript reference before being
-considered drop-in.
+replays every fixture and flow against two running implementations and diffs
+the responses per each entry's `compareMode`. It reads `TS_GATEKEEPER_URL` and
+`RUST_GATEKEEPER_URL` (not `GATEKEEPER_URL_A`/`_B`) and exits non-zero on the
+first divergence. New implementations SHOULD pass it against the TypeScript
+reference before being considered drop-in.
+
+It runs on every PR via the `gatekeeper parity` job in
+[.github/workflows/docker-build-test.yml](../../../.github/workflows/docker-build-test.yml),
+which starts both gatekeepers side by side using
+[docker/compose/gatekeeper-parity.yml](../../../docker/compose/gatekeeper-parity.yml).
+To run it locally:
+
+```sh
+docker compose -f docker/compose/gatekeeper-parity.yml up -d --build --wait
+TS_GATEKEEPER_URL=http://localhost:4224 \
+RUST_GATEKEEPER_URL=http://localhost:4324 \
+ARCHON_ADMIN_API_KEY=parity-admin-key node scripts/gatekeeper-parity.mjs
+docker compose -f docker/compose/gatekeeper-parity.yml down -v
+```
 
 The CI workflow
 [.github/workflows/docker-build-test.yml](../../../.github/workflows/docker-build-test.yml)
