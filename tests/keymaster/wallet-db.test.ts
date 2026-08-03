@@ -1,5 +1,5 @@
 import { mkdtemp, rm } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -110,6 +110,74 @@ describe('WalletSQLite', () => {
             await expect(wallet.connect()).resolves.toBeUndefined();
             await expect(wallet.disconnect()).resolves.toBeUndefined();
             await expect(wallet.disconnect()).resolves.toBeUndefined();
+        });
+    });
+});
+
+describe('WalletSQLite defaults and guards', () => {
+    // NOTE: unlike WalletJson.saveWallet, which does mkdirSync(dataFolder,
+    // {recursive:true}), WalletSQLite.connect never creates its folder — it opens
+    // `${dataFolder}/${file}` directly and sqlite fails with SQLITE_CANTOPEN if the
+    // directory is absent. These tests therefore create `data/` first.
+    it('does not create its data folder, unlike WalletJson', async () => {
+        await withTempDir(async dir => {
+            const wallet = new WalletSQLite('wallet.db', join(dir, 'missing'));
+
+            await expect(wallet.saveWallet(walletOne)).rejects.toThrow(/SQLITE_CANTOPEN/);
+        });
+    });
+
+    it('defaults to data/wallet.db when constructed with no arguments', async () => {
+        await withTempDir(async dir => {
+            // The default path is relative to the working directory, so run from a
+            // temp dir rather than writing data/wallet.db into the repo.
+            const cwd = process.cwd();
+            process.chdir(dir);
+            mkdirSync(join(dir, 'data'), { recursive: true });
+            try {
+                const wallet = new WalletSQLite();
+                try {
+                    await expect(wallet.saveWallet(walletOne)).resolves.toBe(true);
+                    await expect(wallet.loadWallet()).resolves.toStrictEqual(walletOne);
+                    expect(existsSync(join(dir, 'data', 'wallet.db'))).toBe(true);
+                } finally {
+                    await wallet.disconnect();
+                }
+            } finally {
+                process.chdir(cwd);
+            }
+        });
+    });
+
+    it('create() applies the same defaults', async () => {
+        await withTempDir(async dir => {
+            const cwd = process.cwd();
+            process.chdir(dir);
+            mkdirSync(join(dir, 'data'), { recursive: true });
+            try {
+                const wallet = await WalletSQLite.create();
+                try {
+                    await expect(wallet.loadWallet()).resolves.toBeNull();
+                    expect(existsSync(join(dir, 'data', 'wallet.db'))).toBe(true);
+                } finally {
+                    await wallet.disconnect();
+                }
+            } finally {
+                process.chdir(cwd);
+            }
+        });
+    });
+
+    it('reports a failed connection rather than dereferencing a null handle', async () => {
+        await withTempDir(async dir => {
+            const wallet = new WalletSQLite('wallet.db', dir);
+            // Both methods call connect() first and then re-check the handle. Stub
+            // connect to a no-op so the handle stays null and the guard is reached —
+            // it is otherwise unreachable, since a successful connect always sets it.
+            (wallet as any).connect = async () => {};
+
+            await expect(wallet.saveWallet(walletOne)).rejects.toThrow('DB failed to connect.');
+            await expect(wallet.loadWallet()).rejects.toThrow('DB failed to connect.');
         });
     });
 });
