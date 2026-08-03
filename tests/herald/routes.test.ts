@@ -313,6 +313,21 @@ describe('herald webfinger', () => {
         ]));
         expect(response.body.links[0].href).toContain('/api/name/alice');
     });
+
+    it('points profile-page at a route the client serves', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const { app } = mount({ db });
+
+        const response = await request(app).get('/.well-known/webfinger?resource=acct:alice@archon.test');
+
+        const profilePage = response.body.links.find(
+            (link: any) => link.rel === 'http://webfinger.net/rel/profile-page');
+
+        // Regression guard: this used to be `/name/alice`, which the client has no
+        // route for — following it landed on the home page instead of the profile.
+        expect(profilePage.href).toContain('/id/alice');
+        expect(profilePage.href).not.toContain('/name/alice');
+    });
 });
 
 describe('herald session login', () => {

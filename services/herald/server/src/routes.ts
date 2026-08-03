@@ -1165,7 +1165,10 @@ export function createHeraldRoutes(ctx: HeraldContext): {
                     {
                         rel: 'http://webfinger.net/rel/profile-page',
                         type: 'text/html',
-                        href: `${PUBLIC_URL}/name/${name}`,
+                        // Must match a route the client actually serves. `/name/:name`
+                        // is not one — it fell through to the SPA's catch-all and
+                        // redirected to the home page.
+                        href: `${PUBLIC_URL}/id/${name}`,
                     },
                     {
                         rel: 'https://w3id.org/did',

@@ -1599,14 +1599,20 @@ function ViewMember() {
                     <Button component={Link} to="/members" variant="outlined">
                         ← Back to Directory
                     </Button>
-                    <Button
-                        component="a"
-                        href={`https://explorer.archon.technology/search?did=${memberData?.id}`}
-                        target="_blank"
-                        variant="outlined"
-                    >
-                        View on Archon Explorer
-                    </Button>
+                    {/* The DID lives at didDocument.id — the payload has no top-level
+                        `id`, so the old `memberData?.id` always linked to ?did=undefined.
+                        Rendered conditionally so a missing DID hides the button rather
+                        than producing another dead link. */}
+                    {memberData?.didDocument?.id && (
+                        <Button
+                            component="a"
+                            href={`https://explorer.archon.technology/search?did=${memberData.didDocument.id}`}
+                            target="_blank"
+                            variant="outlined"
+                        >
+                            View on Archon Explorer
+                        </Button>
+                    )}
                 </Box>
             </Box>
         </div>
