@@ -7,7 +7,7 @@ import {
     Routes,
     Route,
 } from "react-router-dom";
-import { Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
 import { Table, TableBody, TableRow, TableCell } from '@mui/material';
 import axios from 'axios';
 import { format, differenceInDays } from 'date-fns';
@@ -288,36 +288,143 @@ function formatTimestamp(time: string): string {
     return format(date, 'MMM d, yyyy h:mm a');
 }
 
-function Card({ title, children, action }: { title: string, children: React.ReactNode, action?: React.ReactNode }) {
+// Shared surface treatment for the identity page. The rest of the app puts
+// #f8f9fa panels on a #f5f7fa gradient background, which reads as flat because
+// the card and the page are nearly the same value. White panels lifted with a
+// soft shadow give the cards an edge to catch instead.
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+
+const surface = {
+    backgroundColor: '#fff',
+    borderRadius: 3,
+    border: '1px solid rgba(15, 23, 42, 0.07)',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px -18px rgba(15, 23, 42, 0.28)',
+};
+
+const inset = {
+    backgroundColor: '#f8fafc',
+    borderRadius: 2,
+    border: '1px solid rgba(15, 23, 42, 0.06)',
+};
+
+// Monospace values (DIDs, endpoints, keys) sit in a tinted pill so they read as
+// data rather than prose, and wrap instead of stretching the layout.
+const codePill = {
+    fontFamily: MONO,
+    fontSize: '0.8125rem',
+    backgroundColor: '#f1f5f9',
+    border: '1px solid rgba(15, 23, 42, 0.06)',
+    borderRadius: 1,
+    px: 0.75,
+    py: 0.25,
+    wordBreak: 'break-all',
+};
+
+function Card({ title, children, action, accent }: { title: string, children: React.ReactNode, action?: React.ReactNode, accent?: string }) {
     return (
-        <Box sx={{
-            backgroundColor: '#f8f9fa',
-            borderRadius: 2,
-            p: 3,
-            mb: 3,
-            border: '1px solid #e9ecef',
-        }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2 }}>
-                <Typography variant="h6" sx={{ m: 0 }}>{title}</Typography>
+        <Box sx={{ ...surface, mb: 2.5, overflow: 'hidden' }}>
+            <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+                px: 3,
+                py: 1.75,
+                borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
+                ...(accent ? { boxShadow: `inset 3px 0 0 ${accent}` } : {}),
+            }}>
+                <Typography sx={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: '#64748b',
+                }}>
+                    {title}
+                </Typography>
                 {action}
             </Box>
-            {children}
+            <Box sx={{ px: 3, py: 2 }}>
+                {children}
+            </Box>
         </Box>
     );
 }
 
+// Status reads better as a tinted pill than a stock MUI chip, which brings its
+// own palette and sits oddly against the muted card header.
+const STATUS_TONES: Record<string, { fg: string, bg: string, border: string }> = {
+    success: { fg: '#047857', bg: '#ecfdf5', border: 'rgba(4, 120, 87, 0.2)' },
+    error: { fg: '#b91c1c', bg: '#fef2f2', border: 'rgba(185, 28, 28, 0.2)' },
+    neutral: { fg: '#475569', bg: '#f1f5f9', border: 'rgba(71, 85, 105, 0.2)' },
+};
+
+function StatusPill({ label, tone }: { label: string, tone: string }) {
+    const colors = STATUS_TONES[tone] || STATUS_TONES.neutral;
+
+    return (
+        <Box component="span" sx={{
+            display: 'inline-block',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            letterSpacing: '0.02em',
+            color: colors.fg,
+            backgroundColor: colors.bg,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 999,
+            px: 1.25,
+            py: 0.375,
+        }}>
+            {label}
+        </Box>
+    );
+}
+
+function CountChip({ count }: { count: number }) {
+    return (
+        <Box sx={{
+            minWidth: 24,
+            height: 24,
+            px: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 999,
+            backgroundColor: '#f1f5f9',
+            color: '#475569',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+        }}>
+            {count}
+        </Box>
+    );
+}
+
+// Label and value sit in a two-column grid so values line up down the card, and
+// collapse to stacked rows on narrow screens rather than wrapping raggedly.
 function Field({ label, value, mono = false }: { label: string, value: React.ReactNode, mono?: boolean }) {
     return (
-        <Box sx={{ display: 'flex', gap: 2, py: 0.75, alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <Typography variant="body2" sx={{ color: '#666', minWidth: 120, flexShrink: 0 }}>
+        <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: '150px minmax(0, 1fr)' },
+            gap: { xs: 0.25, sm: 2 },
+            py: 1.25,
+            alignItems: 'baseline',
+            borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
+            '&:last-of-type': { borderBottom: 'none', pb: 0 },
+            '&:first-of-type': { pt: 0 },
+        }}>
+            <Typography sx={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 500 }}>
                 {label}
             </Typography>
             <Typography
-                variant="body2"
                 component="div"
                 sx={{
-                    wordBreak: 'break-all',
-                    ...(mono ? { fontFamily: 'Monaco, Consolas, monospace' } : {}),
+                    fontSize: '0.9375rem',
+                    color: '#0f172a',
+                    minWidth: 0,
+                    wordBreak: 'break-word',
+                    ...(mono ? { ...codePill, display: 'inline-block' } : {}),
                 }}
             >
                 {value}
@@ -328,31 +435,51 @@ function Field({ label, value, mono = false }: { label: string, value: React.Rea
 
 function EndpointValue({ uri }: { uri: string }) {
     if (!uri) {
-        return <Typography variant="body2" sx={{ color: '#999' }}>none</Typography>;
+        return <Typography component="span" sx={{ color: '#94a3b8', fontSize: '0.9375rem' }}>none</Typography>;
     }
 
     if (isOnionUri(uri)) {
         return (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                <span style={{ fontFamily: 'Monaco, Consolas, monospace' }}>{uri}</span>
-                <Chip label="Tor" size="small" variant="outlined" />
+                <Box component="span" sx={codePill}>{uri}</Box>
+                <Box component="span" sx={{
+                    fontSize: '0.6875rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: '#9a6b00',
+                    backgroundColor: '#fef3c7',
+                    border: '1px solid rgba(154, 107, 0, 0.2)',
+                    borderRadius: 999,
+                    px: 1,
+                    py: 0.25,
+                }}>
+                    Tor
+                </Box>
             </Box>
         );
     }
 
     if (!isFollowableUri(uri)) {
-        return <span style={{ fontFamily: 'Monaco, Consolas, monospace' }}>{uri}</span>;
+        return <Box component="span" sx={codePill}>{uri}</Box>;
     }
 
     return (
-        <a
+        <Box
+            component="a"
             href={uri}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontFamily: 'Monaco, Consolas, monospace', color: '#1976d2' }}
+            sx={{
+                ...codePill,
+                display: 'inline-block',
+                color: '#1d4ed8',
+                textDecoration: 'none',
+                '&:hover': { backgroundColor: '#e0e7ff', textDecoration: 'none' },
+            }}
         >
             {uri}
-        </a>
+        </Box>
     );
 }
 
@@ -1648,7 +1775,7 @@ function ViewIdentity() {
                     <Typography variant="h6" sx={{ color: '#e74c3c', mb: 2 }}>
                         {error}
                     </Typography>
-                    <Button component={Link} to="/directory" variant="outlined">
+                    <Button component={Link} to="/directory" variant="outlined" sx={{ textTransform: 'none', borderRadius: 2 }}>
                         ← Back to Directory
                     </Button>
                 </Box>
@@ -1676,58 +1803,118 @@ function ViewIdentity() {
 
     return (
         <div className="App">
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 3 }}>
-                <Avatar
-                    src={`${api.defaults.baseURL}/name/${name}/avatar`}
-                    alt={name}
-                    sx={{ width: 64, height: 64, fontSize: '1.75rem' }}
-                >
-                    {name?.[0]?.toUpperCase()}
-                </Avatar>
-                <Link to="/" style={{ textDecoration: 'none' }}>
-                    <Typography variant="h3" component="h1" sx={{ fontWeight: 700, color: '#1a1a1a' }}>
-                        {name}@{serviceDomain}
-                    </Typography>
-                </Link>
-            </Box>
-
             <Box sx={{ maxWidth: 800, mx: 'auto' }}>
-                <Box sx={{
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: 2,
-                    p: 3,
-                    mb: 3,
-                    border: '1px solid #e9ecef',
-                    textAlign: 'center'
-                }}>
-                    {did && aliasWalletUrl && (
-                        <Box>
-                            <a href={aliasWalletUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
-                                <QRCodeSVG value={aliasWalletUrl} />
-                            </a>
-                        </Box>
-                    )}
-                    {did && (
-                        <Box>
-                            <Typography variant="body1" sx={{ fontFamily: 'monospace', color: '#666', wordBreak: 'break-all', mt: 2 }}>
-                                {did}
+                {/* The handle and DID are the page's subject, so they get a
+                    distinct treatment rather than another panel in the stack. */}
+                <Box sx={{ ...surface, mb: 2.5, overflow: 'hidden' }}>
+                    <Box sx={{
+                        background: 'linear-gradient(135deg, #2c3e50 0%, #46637f 100%)',
+                        px: 3,
+                        py: 3.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2.5,
+                        flexWrap: 'wrap',
+                    }}>
+                        <Avatar
+                            src={`${api.defaults.baseURL}/name/${name}/avatar`}
+                            alt={name}
+                            sx={{
+                                width: 72,
+                                height: 72,
+                                fontSize: '2rem',
+                                border: '3px solid rgba(255, 255, 255, 0.25)',
+                                boxShadow: '0 8px 20px -8px rgba(0, 0, 0, 0.5)',
+                            }}
+                        >
+                            {name?.[0]?.toUpperCase()}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0 }}>
+                            <Typography component="h1" sx={{
+                                fontWeight: 700,
+                                fontSize: { xs: '1.5rem', sm: '2rem' },
+                                color: '#fff',
+                                lineHeight: 1.15,
+                                wordBreak: 'break-word',
+                            }}>
+                                {name}
+                                <Box component="span" sx={{ color: 'rgba(255, 255, 255, 0.55)', fontWeight: 500 }}>
+                                    @{serviceDomain}
+                                </Box>
                             </Typography>
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                sx={{ mt: 1.5, textTransform: 'none' }}
-                                onClick={() => copyDid(did)}
-                                disabled={didCopied}
-                            >
-                                {didCopied ? 'Copied' : 'Copy DID'}
-                            </Button>
+                            <Typography sx={{
+                                mt: 0.5,
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                letterSpacing: '0.08em',
+                                textTransform: 'uppercase',
+                                color: 'rgba(255, 255, 255, 0.6)',
+                            }}>
+                                Decentralized identity
+                            </Typography>
+                        </Box>
+                    </Box>
+
+                    {did && (
+                        <Box sx={{
+                            px: 3,
+                            py: 3,
+                            display: 'flex',
+                            gap: 3,
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            justifyContent: { xs: 'center', sm: 'flex-start' },
+                        }}>
+                            {aliasWalletUrl && (
+                                <Box
+                                    component="a"
+                                    href={aliasWalletUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    sx={{
+                                        ...inset,
+                                        p: 1.5,
+                                        lineHeight: 0,
+                                        flexShrink: 0,
+                                        transition: 'box-shadow 120ms ease',
+                                        '&:hover': { boxShadow: '0 8px 24px -12px rgba(15, 23, 42, 0.4)' },
+                                    }}
+                                >
+                                    <QRCodeSVG value={aliasWalletUrl} size={116} />
+                                </Box>
+                            )}
+                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                                <Typography sx={{
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    letterSpacing: '0.08em',
+                                    textTransform: 'uppercase',
+                                    color: '#64748b',
+                                    mb: 1,
+                                }}>
+                                    Identifier
+                                </Typography>
+                                <Box sx={{ ...codePill, display: 'block', fontSize: '0.8125rem', p: 1.25 }}>
+                                    {did}
+                                </Box>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    sx={{ mt: 1.5, textTransform: 'none', borderRadius: 2 }}
+                                    onClick={() => copyDid(did)}
+                                    disabled={didCopied}
+                                >
+                                    {didCopied ? 'Copied' : 'Copy DID'}
+                                </Button>
+                            </Box>
                         </Box>
                     )}
                 </Box>
 
                 <Card
                     title="Service Endpoints"
-                    action={<Chip label={services.length} size="small" variant="outlined" />}
+                    accent="#3b82f6"
+                    action={<CountChip count={services.length} />}
                 >
                     {services.length === 0 ? (
                         <Typography variant="body2" sx={{ color: '#666' }}>
@@ -1744,24 +1931,19 @@ function ViewIdentity() {
                                 <Box
                                     key={service.id || index}
                                     sx={{
-                                        backgroundColor: '#fff',
-                                        borderRadius: 1,
-                                        border: '1px solid #e9ecef',
+                                        ...inset,
                                         p: 2,
-                                        mb: index === services.length - 1 ? 0 : 2,
+                                        mb: index === services.length - 1 ? 0 : 1.5,
                                     }}
                                 >
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                        <Typography sx={{ fontWeight: 700, fontSize: '0.9375rem', color: '#0f172a' }}>
                                             {serviceLabel(service.type)}
                                         </Typography>
                                         {serviceFragment(service.id) && (
-                                            <Chip
-                                                label={serviceFragment(service.id)}
-                                                size="small"
-                                                variant="outlined"
-                                                sx={{ fontFamily: 'Monaco, Consolas, monospace' }}
-                                            />
+                                            <Box component="span" sx={{ ...codePill, fontSize: '0.75rem', color: '#475569' }}>
+                                                {serviceFragment(service.id)}
+                                            </Box>
                                         )}
                                     </Box>
                                     <Field label="Endpoint" value={<EndpointValue uri={uri} />} />
@@ -1784,7 +1966,8 @@ function ViewIdentity() {
 
                 <Card
                     title="Keys"
-                    action={<Chip label={verificationMethods.length} size="small" variant="outlined" />}
+                    accent="#8b5cf6"
+                    action={<CountChip count={verificationMethods.length} />}
                 >
                     {verificationMethods.length === 0 ? (
                         <Typography variant="body2" sx={{ color: '#666' }}>
@@ -1806,20 +1989,19 @@ function ViewIdentity() {
                 {credentials.length > 0 && (
                     <Card
                         title="Credentials"
-                        action={<Chip label={credentials.length} size="small" variant="outlined" />}
+                        accent="#10b981"
+                        action={<CountChip count={credentials.length} />}
                     >
                         {credentials.map(([credentialDid, credential]: [string, any], index: number) => (
                             <Box
                                 key={credentialDid}
                                 sx={{
-                                    backgroundColor: '#fff',
-                                    borderRadius: 1,
-                                    border: '1px solid #e9ecef',
+                                    ...inset,
                                     p: 2,
-                                    mb: index === credentials.length - 1 ? 0 : 2,
+                                    mb: index === credentials.length - 1 ? 0 : 1.5,
                                 }}
                             >
-                                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                                <Typography sx={{ fontWeight: 700, fontSize: '0.9375rem', color: '#0f172a', mb: 1 }}>
                                     {credentialType(credential)}
                                 </Typography>
 
@@ -1827,7 +2009,7 @@ function ViewIdentity() {
                                     <Field key={key} label={humanizeKey(key)} value={formatClaim(value)} />
                                 ))}
 
-                                <Box sx={{ borderTop: '1px solid #e9ecef', mt: 1.5, pt: 1.5 }}>
+                                <Box sx={{ borderTop: '1px solid rgba(15, 23, 42, 0.08)', mt: 2, pt: 1.5 }}>
                                     <Field
                                         label="Issued by"
                                         value={<IssuerValue issuer={credential?.issuer} nameByDid={nameByDid} serviceDomain={serviceDomain} />}
@@ -1845,12 +2027,12 @@ function ViewIdentity() {
                 )}
 
                 {nostr?.npub && (
-                    <Card title="Nostr">
+                    <Card title="Nostr" accent="#a855f7">
                         <Field label="npub" value={nostr.npub} mono />
                     </Card>
                 )}
 
-                <Card title="Document">
+                <Card title="Document" accent="#64748b">
                     {didDocument.controller && (
                         <Field label="Controller" value={didDocument.controller} mono />
                     )}
@@ -1870,19 +2052,19 @@ function ViewIdentity() {
                         label="Status"
                         value={
                             metadata.deactivated
-                                ? <Chip label="Deactivated" size="small" color="error" />
+                                ? <StatusPill label="Deactivated" tone="error" />
                                 : metadata.confirmed
-                                    ? <Chip label="Confirmed" size="small" color="success" />
-                                    : <Chip label="Pending confirmation" size="small" />
+                                    ? <StatusPill label="Confirmed" tone="success" />
+                                    : <StatusPill label="Pending confirmation" tone="neutral" />
                         }
                     />
                 </Card>
 
-                <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Box sx={{ mt: 1, mb: 2, display: 'flex', gap: 1.5, justifyContent: 'center', flexWrap: 'wrap' }}>
                     <Button component={Link} to="/directory" variant="outlined">
                         ← Back to Directory
                     </Button>
-                    <Button component={Link} to={`/member/${name}`} variant="outlined">
+                    <Button component={Link} to={`/member/${name}`} variant="outlined" sx={{ textTransform: 'none', borderRadius: 2 }}>
                         Raw DID Document
                     </Button>
                     {did && explorerUrl && (
@@ -1891,6 +2073,7 @@ function ViewIdentity() {
                             href={buildExplorerUrl(explorerUrl, did)}
                             target="_blank"
                             variant="outlined"
+                            sx={{ textTransform: 'none', borderRadius: 2 }}
                         >
                             View on Archon Explorer
                         </Button>
