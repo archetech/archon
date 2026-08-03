@@ -94,6 +94,17 @@ describe('herald public endpoints', () => {
         });
     });
 
+    it('advertises an explorer the visitor can actually reach', async () => {
+        const { app } = mount();
+
+        const response = await request(app).get('/api/config');
+
+        // The client renders this as a link in the visitor's browser, so a
+        // loopback default would resolve to the visitor's own machine.
+        expect(response.body.explorerUrl).toBeDefined();
+        expect(response.body.explorerUrl).not.toMatch(/localhost|127\.0\.0\.1/);
+    });
+
     it('builds the name registry from users that have a name', async () => {
         const db = createDb({
             'did:cid:alice': { name: 'alice' },

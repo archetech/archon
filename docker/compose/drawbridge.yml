@@ -15,6 +15,9 @@ services:
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       - ARCHON_HERALD_KEYMASTER_URL=${ARCHON_HERALD_KEYMASTER_URL-http://keymaster:4226}
       - ARCHON_HERALD_WALLET_URL=${ARCHON_HERALD_WALLET_URL:-http://localhost:4228}
+      # Single-dash default so an explicitly empty value survives and hides the
+      # explorer links, rather than being replaced by the fallback.
+      - ARCHON_HERALD_EXPLORER_URL=${ARCHON_HERALD_EXPLORER_URL-https://explorer.archon.technology}
       - ARCHON_HERALD_WALLET_PASSPHRASE=${ARCHON_HERALD_WALLET_PASSPHRASE:-}
       - ARCHON_HERALD_DB=${ARCHON_HERALD_DB:-json}
       - ARCHON_REDIS_URL=redis://redis:6379

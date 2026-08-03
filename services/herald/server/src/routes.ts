@@ -9,6 +9,7 @@ import type { DatabaseInterface, User } from './db/interfaces.js';
 import type { EmailBridge } from './email-bridge.js';
 import { createOAuthRoutes } from './oauth/index.js';
 import {
+    EXPLORER_URL,
     IPFS_API_URL,
     IPNS_KEY_NAME,
     MEMBERSHIP_SCHEMA_DID,
@@ -339,6 +340,7 @@ export function createHeraldRoutes(ctx: HeraldContext): {
             serviceDomain: SERVICE_DOMAIN,
             publicUrl: PUBLIC_URL,
             walletUrl: WALLET_URL,
+            explorerUrl: EXPLORER_URL,
         });
     });
 

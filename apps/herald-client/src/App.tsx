@@ -52,6 +52,12 @@ function App() {
     );
 }
 
+// The explorer host comes from the node's own config, so a self-hosted
+// deployment links to its own explorer instead of the public instance.
+function buildExplorerUrl(explorerUrl: string, did: string) {
+    return `${explorerUrl.replace(/\/$/, '')}/search?did=${encodeURIComponent(did)}`;
+}
+
 function buildWalletUrl(walletUrl: string, params: Record<string, string>) {
     try {
         const url = new URL(walletUrl);
@@ -76,6 +82,7 @@ function useMemberData(name: string | undefined) {
     const [error, setError] = useState<string>('');
     const [serviceDomain, setServiceDomain] = useState<string>('');
     const [walletUrl, setWalletUrl] = useState<string>('');
+    const [explorerUrl, setExplorerUrl] = useState<string>('');
 
     useEffect(() => {
         const fetchMember = async () => {
@@ -83,6 +90,7 @@ function useMemberData(name: string | undefined) {
                 const configResponse = await api.get('/config');
                 setServiceDomain(configResponse.data.serviceDomain);
                 setWalletUrl(configResponse.data.walletUrl);
+                setExplorerUrl(configResponse.data.explorerUrl || '');
 
                 const response = await api.get(`/member/${name}`);
                 setMemberData(response.data);
@@ -100,7 +108,7 @@ function useMemberData(name: string | undefined) {
         }
     }, [name]);
 
-    return { memberData, loading, error, serviceDomain, walletUrl };
+    return { memberData, loading, error, serviceDomain, walletUrl, explorerUrl };
 }
 
 // A credential's issuer is a bare DID. When that DID belongs to a member of
@@ -1500,7 +1508,7 @@ function ViewCredential() {
 
 function ViewMember() {
     const { name } = useParams<{ name: string }>();
-    const { memberData, loading, error, serviceDomain, walletUrl } = useMemberData(name);
+    const { memberData, loading, error, serviceDomain, walletUrl, explorerUrl } = useMemberData(name);
     const { didCopied, copyDid } = useCopyDid();
 
     if (loading) {
@@ -1603,10 +1611,10 @@ function ViewMember() {
                         `id`, so the old `memberData?.id` always linked to ?did=undefined.
                         Rendered conditionally so a missing DID hides the button rather
                         than producing another dead link. */}
-                    {memberData?.didDocument?.id && (
+                    {memberData?.didDocument?.id && explorerUrl && (
                         <Button
                             component="a"
-                            href={`https://explorer.archon.technology/search?did=${memberData.didDocument.id}`}
+                            href={buildExplorerUrl(explorerUrl, memberData.didDocument.id)}
                             target="_blank"
                             variant="outlined"
                         >
@@ -1624,7 +1632,7 @@ function ViewMember() {
 // `/member/:name` remains the transparency/audit view, and each links to the other.
 function ViewIdentity() {
     const { name } = useParams<{ name: string }>();
-    const { memberData, loading, error, serviceDomain, walletUrl } = useMemberData(name);
+    const { memberData, loading, error, serviceDomain, walletUrl, explorerUrl } = useMemberData(name);
     const { didCopied, copyDid } = useCopyDid();
     const nameByDid = useNameByDid();
 
@@ -1877,10 +1885,10 @@ function ViewIdentity() {
                     <Button component={Link} to={`/member/${name}`} variant="outlined">
                         Raw DID Document
                     </Button>
-                    {did && (
+                    {did && explorerUrl && (
                         <Button
                             component="a"
-                            href={`https://explorer.archon.technology/search?did=${did}`}
+                            href={buildExplorerUrl(explorerUrl, did)}
                             target="_blank"
                             variant="outlined"
                         >
