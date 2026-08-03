@@ -23,7 +23,7 @@ use crate::{
     build_search_index, chrono_like_now, classify_conformant_error, clear_search_index,
     delete_search_doc, generate_did_from_operation, handle_did_operation, import_batch_impl,
     normalize_path, process_events_impl, query_docs_impl, record_metrics, refresh_metrics_snapshot,
-    resolve_local_doc_async, search_docs_impl, verify_db_impl, AppState, BlockLookup,
+    is_valid_did, resolve_local_doc_async, search_docs_impl, verify_db_impl, AppState, BlockLookup,
     GatekeeperDb, ResolveOptions,
 };
 
@@ -808,10 +808,16 @@ pub(crate) async fn clear_queue(
         .filter(|value| value.is_object())
         .collect::<Vec<_>>();
 
-    let remaining = {
+    // Return the boolean the TypeScript gatekeeper returns, not the remaining
+    // queue. GatekeeperDb.clearQueue and GatekeeperClient.clearQueue are both
+    // typed Promise<boolean>, so a TS client talking to this service previously
+    // received an array where it expected a boolean. (The swagger annotation
+    // documented an array; the annotation was wrong, and is corrected alongside
+    // this change.) Also propagate the store result instead of discarding it —
+    // `let _ =` meant a storage failure was reported as success.
+    let cleared = {
         let mut store = state.store.lock().await;
-        let _ = store.clear_queue(&registry, &operations);
-        store.get_queue(&registry)
+        store.clear_queue(&registry, &operations).unwrap_or(false)
     };
     record_metrics(
         &state,
@@ -820,7 +826,7 @@ pub(crate) async fn clear_queue(
         200,
         start.elapsed().as_secs_f64(),
     );
-    Json(json!(remaining)).into_response()
+    Json(json!(cleared)).into_response()
 }
 
 pub(crate) async fn process_events_route(
@@ -1083,7 +1089,18 @@ pub(crate) async fn resolve_did(
     let local_doc = match resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
         Ok(doc) => doc,
         Err(_) => {
-            let error_kind = if !did.starts_with("did:") {
+            // Use the same syntax check as the conformant surface. This previously
+            // tested only for a `did:` prefix, so a DID that is syntactically
+            // invalid for this method — a foreign method such as did:example:, or a
+            // malformed CID — came back as notFound where the TypeScript gatekeeper
+            // (and this service's own /1.0/identifiers surface) return invalidDid.
+            // #676/#685/#687 brought the conformant surface to parity; this legacy
+            // surface was never brought along.
+            //
+            // Deliberately NOT classify_conformant_error: that maps a non-DID-level
+            // failure to internalError, which this surface has never returned.
+            // notFound stays the default, matching TypeScript.
+            let error_kind = if !is_valid_did(&did) {
                 "invalidDid"
             } else {
                 "notFound"

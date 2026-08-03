@@ -376,14 +376,17 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      *
      *     responses:
      *       200:
-     *         description: The updated queue after clearing the specified events.
+     *         description: Whether the specified events were cleared from the queue.
      *         content:
      *           application/json:
      *             schema:
-     *               type: array
-     *               description: An array of remaining events in the queue. Could be empty if all events were cleared.
-     *               items:
-     *                 type: object
+     *               type: boolean
+     *               description: >
+     *                 true when the batch was cleared. This documented an array of
+     *                 remaining events until the TS/Rust parity harness caught the
+     *                 mismatch: GatekeeperDb.clearQueue and GatekeeperClient.clearQueue
+     *                 are both typed Promise<boolean> and the implementation has always
+     *                 returned a boolean, so the array shape was never correct.
      *       500:
      *         description: Internal Server Error.
      *         content:
