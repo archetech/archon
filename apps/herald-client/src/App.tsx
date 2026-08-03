@@ -1203,8 +1203,15 @@ function ViewDirectory() {
                                             @{serviceDomain}
                                         </Box>
                                     </Typography>
-                                    <Box component="span" sx={{ ...codePill, mt: 0.5, fontSize: '0.75rem', color: '#64748b' }}>
-                                        {entry.did.substring(0, 20)}…{entry.did.substring(entry.did.length - 8)}
+                                    <Box component="span" sx={{
+                                        ...codePill,
+                                        display: 'inline-block',
+                                        maxWidth: '100%',
+                                        mt: 0.5,
+                                        fontSize: '0.75rem',
+                                        color: '#64748b',
+                                    }}>
+                                        {entry.did}
                                     </Box>
                                 </Box>
                                 <Box
