@@ -102,6 +102,37 @@ function useMemberData(name: string | undefined) {
     return { memberData, loading, error, serviceDomain, walletUrl };
 }
 
+// A credential's issuer is a bare DID. When that DID belongs to a member of
+// this service the handle is far more informative, so invert the public name
+// registry to look it up. A failed fetch is not worth surfacing — the DID is
+// still shown, it just stays unresolved.
+function useNameByDid() {
+    const [nameByDid, setNameByDid] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        const fetchRegistry = async () => {
+            try {
+                const response = await api.get('/registry');
+                const names = response.data?.names || {};
+                const inverted: Record<string, string> = {};
+
+                for (const [name, did] of Object.entries(names)) {
+                    inverted[did as string] = name;
+                }
+
+                setNameByDid(inverted);
+            }
+            catch {
+                setNameByDid({});
+            }
+        };
+
+        fetchRegistry();
+    }, []);
+
+    return nameByDid;
+}
+
 function useCopyDid() {
     const [didCopied, setDidCopied] = useState<boolean>(false);
 
@@ -163,18 +194,77 @@ function serviceFragment(id: string): string {
     return hash === -1 ? '' : id.slice(hash);
 }
 
-// `type` is an ordered array whose first entry is the generic
-// "VerifiableCredential"; the specific type, when present, comes after it.
+// Naming a credential is best-effort. In practice `type` is often the bare
+// ["VerifiableCredential"] and `credentialSchema.id` is an opaque DID, so the
+// most specific name usually sits in the subject's own `credentialType` claim.
 function credentialType(credential: any): string {
-    const types = credential?.type;
+    const claimed = credential?.credentialSubject?.credentialType;
 
-    if (!Array.isArray(types) || types.length === 0) {
-        return 'Verifiable Credential';
+    if (typeof claimed === 'string' && claimed) {
+        return claimed;
     }
 
+    const types = Array.isArray(credential?.type) ? credential.type : [];
     const specific = types.filter((type: string) => type !== 'VerifiableCredential');
 
     return specific.length > 0 ? specific.join(', ') : 'Verifiable Credential';
+}
+
+// `credentialSubject` has no fixed shape — it carries whatever the issuer
+// asserted. Claims are rendered generically rather than per-schema so a
+// credential type this page has never seen still displays its contents.
+function humanizeKey(key: string): string {
+    const spaced = key
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .trim();
+
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+}
+
+function formatClaim(value: any): string {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'yes' : 'no';
+    }
+
+    if (Array.isArray(value)) {
+        if (value.length === 0) {
+            return 'none';
+        }
+
+        return value.every(item => typeof item !== 'object' || item === null)
+            ? value.join(', ')
+            : JSON.stringify(value);
+    }
+
+    if (typeof value === 'object') {
+        // One level of nesting reads better inline than as raw JSON.
+        return Object.entries(value)
+            .map(([key, nested]) => `${humanizeKey(key)}: ${formatClaim(nested)}`)
+            .join(' · ');
+    }
+
+    // Claims routinely carry ISO timestamps (`registeredAt`, `issuedAt`). Match
+    // the full date-time form only — a plain `2026-01-31` is already readable,
+    // and parsing it would shift it by the viewer's timezone offset.
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:?\d{2})$/.test(value)) {
+        return formatTimestamp(value);
+    }
+
+    return String(value);
+}
+
+// `id` is the subject DID, which is the member whose page this is, and
+// `credentialType` is already shown as the card's title.
+const HIDDEN_CLAIMS = ['id', 'credentialType'];
+
+function credentialClaims(credential: any): Array<[string, any]> {
+    return Object.entries(credential?.credentialSubject || {})
+        .filter(([key]) => !HIDDEN_CLAIMS.includes(key));
 }
 
 // Document timestamps come straight from the gatekeeper; render the raw value
@@ -254,6 +344,24 @@ function EndpointValue({ uri }: { uri: string }) {
         >
             {uri}
         </a>
+    );
+}
+
+function IssuerValue({ issuer, nameByDid, serviceDomain }: { issuer?: string, nameByDid: Record<string, string>, serviceDomain: string }) {
+    if (!issuer) {
+        return <span>unknown</span>;
+    }
+
+    const issuerName = nameByDid[issuer];
+
+    if (!issuerName) {
+        return <span style={{ fontFamily: 'Monaco, Consolas, monospace' }}>{issuer}</span>;
+    }
+
+    return (
+        <Link to={`/id/${issuerName}`} style={{ color: '#1976d2' }}>
+            {issuerName}@{serviceDomain}
+        </Link>
     );
 }
 
@@ -1365,6 +1473,7 @@ function ViewIdentity() {
     const { name } = useParams<{ name: string }>();
     const { memberData, loading, error, serviceDomain, walletUrl } = useMemberData(name);
     const { didCopied, copyDid } = useCopyDid();
+    const nameByDid = useNameByDid();
 
     if (loading) {
         return <LoadingShell title={`${name}@${serviceDomain}`} />;
@@ -1552,13 +1661,23 @@ function ViewIdentity() {
                                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
                                     {credentialType(credential)}
                                 </Typography>
-                                <Field label="Issuer" value={credential?.issuer || 'unknown'} mono />
-                                {credential?.validFrom && (
-                                    <Field label="Issued" value={formatTimestamp(credential.validFrom)} />
-                                )}
-                                {credential?.validUntil && (
-                                    <Field label="Expires" value={formatTimestamp(credential.validUntil)} />
-                                )}
+
+                                {credentialClaims(credential).map(([key, value]) => (
+                                    <Field key={key} label={humanizeKey(key)} value={formatClaim(value)} />
+                                ))}
+
+                                <Box sx={{ borderTop: '1px solid #e9ecef', mt: 1.5, pt: 1.5 }}>
+                                    <Field
+                                        label="Issued by"
+                                        value={<IssuerValue issuer={credential?.issuer} nameByDid={nameByDid} serviceDomain={serviceDomain} />}
+                                    />
+                                    {credential?.validFrom && (
+                                        <Field label="Issued" value={formatTimestamp(credential.validFrom)} />
+                                    )}
+                                    {credential?.validUntil && (
+                                        <Field label="Expires" value={formatTimestamp(credential.validUntil)} />
+                                    )}
+                                </Box>
                             </Box>
                         ))}
                     </Card>
