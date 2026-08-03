@@ -7,7 +7,7 @@ import {
     Routes,
     Route,
 } from "react-router-dom";
-import { Alert, Avatar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, TextField, Typography } from '@mui/material';
 import { Table, TableBody, TableRow, TableCell } from '@mui/material';
 import axios from 'axios';
 import { format, differenceInDays } from 'date-fns';
@@ -43,6 +43,7 @@ function App() {
                 <Route path="/owner" element={<ViewOwner />} />
                 <Route path="/profile/:did" element={<ViewProfile />} />
                 <Route path="/member/:name" element={<ViewMember />} />
+                <Route path="/id/:name" element={<ViewIdentity />} />
                 <Route path="/credential" element={<ViewCredential />} />
                 <Route path="*" element={<NotFound />} />
             </Routes>
@@ -63,6 +64,197 @@ function buildWalletUrl(walletUrl: string, params: Record<string, string>) {
     catch {
         return null;
     }
+}
+
+// Shared by the two member views: `/member/:name` (raw document) and
+// `/id/:name` (cards). Both need the same payload plus the service config that
+// supplies the handle domain and wallet deep-link base.
+function useMemberData(name: string | undefined) {
+    const [memberData, setMemberData] = useState<any>(null);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string>('');
+    const [serviceDomain, setServiceDomain] = useState<string>('');
+    const [walletUrl, setWalletUrl] = useState<string>('');
+
+    useEffect(() => {
+        const fetchMember = async () => {
+            try {
+                const configResponse = await api.get('/config');
+                setServiceDomain(configResponse.data.serviceDomain);
+                setWalletUrl(configResponse.data.walletUrl);
+
+                const response = await api.get(`/member/${name}`);
+                setMemberData(response.data);
+            }
+            catch (err: any) {
+                setError(err.response?.data?.error || 'Member not found');
+            }
+            finally {
+                setLoading(false);
+            }
+        };
+
+        if (name) {
+            fetchMember();
+        }
+    }, [name]);
+
+    return { memberData, loading, error, serviceDomain, walletUrl };
+}
+
+function useCopyDid() {
+    const [didCopied, setDidCopied] = useState<boolean>(false);
+
+    async function copyDid(text: string) {
+        try {
+            await navigator.clipboard.writeText(text);
+            setDidCopied(true);
+        }
+        catch (copyError: any) {
+            window.alert('Failed to copy text: ' + copyError);
+        }
+    }
+
+    return { didCopied, copyDid };
+}
+
+// A service entry's endpoint is either a plain URI or the DIDComm object form
+// carrying routing keys. Everything downstream wants the URI.
+function serviceEndpointUri(endpoint: any): string {
+    if (typeof endpoint === 'string') {
+        return endpoint;
+    }
+
+    return endpoint?.uri || '';
+}
+
+// Only linkify schemes a browser can actually follow. Anything else (did:, a
+// bare host, an unrecognised scheme) renders as text so the page never emits a
+// link that silently does nothing.
+function isFollowableUri(uri: string): boolean {
+    return /^(https?|mailto):/i.test(uri);
+}
+
+// Onion endpoints are common in practice (Drawbridge publishes its Lightning
+// and DIDComm endpoints over Tor). They are valid but unreachable from an
+// ordinary browser, so label them instead of offering a link that just errors.
+function isOnionUri(uri: string): boolean {
+    try {
+        return new URL(uri).hostname.endsWith('.onion');
+    }
+    catch {
+        return false;
+    }
+}
+
+const SERVICE_LABELS: Record<string, string> = {
+    DIDCommMessaging: 'DIDComm Messaging',
+    Email: 'Email',
+    Lightning: 'Lightning',
+};
+
+function serviceLabel(type: string): string {
+    return SERVICE_LABELS[type] || type || 'Service';
+}
+
+// The fragment identifies the entry within the document (`did:cid:abc#lightning`).
+function serviceFragment(id: string): string {
+    const hash = (id || '').indexOf('#');
+    return hash === -1 ? '' : id.slice(hash);
+}
+
+// `type` is an ordered array whose first entry is the generic
+// "VerifiableCredential"; the specific type, when present, comes after it.
+function credentialType(credential: any): string {
+    const types = credential?.type;
+
+    if (!Array.isArray(types) || types.length === 0) {
+        return 'Verifiable Credential';
+    }
+
+    const specific = types.filter((type: string) => type !== 'VerifiableCredential');
+
+    return specific.length > 0 ? specific.join(', ') : 'Verifiable Credential';
+}
+
+// Document timestamps come straight from the gatekeeper; render the raw value
+// rather than "Invalid Date" if one is ever malformed.
+function formatTimestamp(time: string): string {
+    const date = new Date(time);
+
+    if (isNaN(date.getTime())) {
+        return time;
+    }
+
+    return format(date, 'MMM d, yyyy h:mm a');
+}
+
+function Card({ title, children, action }: { title: string, children: React.ReactNode, action?: React.ReactNode }) {
+    return (
+        <Box sx={{
+            backgroundColor: '#f8f9fa',
+            borderRadius: 2,
+            p: 3,
+            mb: 3,
+            border: '1px solid #e9ecef',
+        }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2 }}>
+                <Typography variant="h6" sx={{ m: 0 }}>{title}</Typography>
+                {action}
+            </Box>
+            {children}
+        </Box>
+    );
+}
+
+function Field({ label, value, mono = false }: { label: string, value: React.ReactNode, mono?: boolean }) {
+    return (
+        <Box sx={{ display: 'flex', gap: 2, py: 0.75, alignItems: 'baseline', flexWrap: 'wrap' }}>
+            <Typography variant="body2" sx={{ color: '#666', minWidth: 120, flexShrink: 0 }}>
+                {label}
+            </Typography>
+            <Typography
+                variant="body2"
+                component="div"
+                sx={{
+                    wordBreak: 'break-all',
+                    ...(mono ? { fontFamily: 'Monaco, Consolas, monospace' } : {}),
+                }}
+            >
+                {value}
+            </Typography>
+        </Box>
+    );
+}
+
+function EndpointValue({ uri }: { uri: string }) {
+    if (!uri) {
+        return <Typography variant="body2" sx={{ color: '#999' }}>none</Typography>;
+    }
+
+    if (isOnionUri(uri)) {
+        return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: 'Monaco, Consolas, monospace' }}>{uri}</span>
+                <Chip label="Tor" size="small" variant="outlined" />
+            </Box>
+        );
+    }
+
+    if (!isFollowableUri(uri)) {
+        return <span style={{ fontFamily: 'Monaco, Consolas, monospace' }}>{uri}</span>;
+    }
+
+    return (
+        <a
+            href={uri}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontFamily: 'Monaco, Consolas, monospace', color: '#1976d2' }}
+        >
+            {uri}
+        </a>
+    );
 }
 
 function Header({ title, showTagline = false }: { title: string, showTagline?: boolean }) {
@@ -1053,45 +1245,8 @@ function ViewCredential() {
 
 function ViewMember() {
     const { name } = useParams<{ name: string }>();
-    const [memberData, setMemberData] = useState<any>(null);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string>('');
-    const [serviceDomain, setServiceDomain] = useState<string>('');
-    const [walletUrl, setWalletUrl] = useState<string>('');
-    const [didCopied, setDidCopied] = useState<boolean>(false);
-
-    useEffect(() => {
-        const fetchMember = async () => {
-            try {
-                const configResponse = await api.get('/config');
-                setServiceDomain(configResponse.data.serviceDomain);
-                setWalletUrl(configResponse.data.walletUrl);
-
-                const response = await api.get(`/member/${name}`);
-                setMemberData(response.data);
-            }
-            catch (err: any) {
-                setError(err.response?.data?.error || 'Member not found');
-            }
-            finally {
-                setLoading(false);
-            }
-        };
-
-        if (name) {
-            fetchMember();
-        }
-    }, [name]);
-
-    async function copyDid(text: string) {
-        try {
-            await navigator.clipboard.writeText(text);
-            setDidCopied(true);
-        }
-        catch (copyError: any) {
-            window.alert('Failed to copy text: ' + copyError);
-        }
-    }
+    const { memberData, loading, error, serviceDomain, walletUrl } = useMemberData(name);
+    const { didCopied, copyDid } = useCopyDid();
 
     if (loading) {
         return <LoadingShell title={`${name}@${serviceDomain}`} />;
@@ -1197,6 +1352,276 @@ function ViewMember() {
                     >
                         View on Archon Explorer
                     </Button>
+                </Box>
+            </Box>
+        </div>
+    );
+}
+
+// Card-based rendering of the same payload `/member/:name` shows as raw JSON.
+// The two pages are deliberately parallel: this one is the readable surface,
+// `/member/:name` remains the transparency/audit view, and each links to the other.
+function ViewIdentity() {
+    const { name } = useParams<{ name: string }>();
+    const { memberData, loading, error, serviceDomain, walletUrl } = useMemberData(name);
+    const { didCopied, copyDid } = useCopyDid();
+
+    if (loading) {
+        return <LoadingShell title={`${name}@${serviceDomain}`} />;
+    }
+
+    if (error) {
+        return (
+            <div className="App">
+                <Header title="Identity Not Found" />
+                <Box sx={{ maxWidth: 600, mx: 'auto', textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ color: '#e74c3c', mb: 2 }}>
+                        {error}
+                    </Typography>
+                    <Button component={Link} to="/members" variant="outlined">
+                        ← Back to Directory
+                    </Button>
+                </Box>
+            </div>
+        );
+    }
+
+    const didDocument = memberData?.didDocument || {};
+    const metadata = memberData?.didDocumentMetadata || {};
+    const registration = memberData?.didDocumentRegistration || {};
+    const did = didDocument.id || '';
+    const services = didDocument.service || [];
+    const verificationMethods = didDocument.verificationMethod || [];
+    const documentData = memberData?.didDocumentData || {};
+    // The manifest is a map of credential DID -> verifiable credential.
+    const credentials = Object.entries(documentData.manifest || {});
+    const nostr = documentData.nostr;
+
+    const aliasWalletUrl = did && walletUrl
+        ? buildWalletUrl(walletUrl, {
+            alias: `${name}@${serviceDomain}`,
+            did,
+        })
+        : null;
+
+    return (
+        <div className="App">
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 3 }}>
+                <Avatar
+                    src={`${api.defaults.baseURL}/name/${name}/avatar`}
+                    alt={name}
+                    sx={{ width: 64, height: 64, fontSize: '1.75rem' }}
+                >
+                    {name?.[0]?.toUpperCase()}
+                </Avatar>
+                <Link to="/" style={{ textDecoration: 'none' }}>
+                    <Typography variant="h3" component="h1" sx={{ fontWeight: 700, color: '#1a1a1a' }}>
+                        {name}@{serviceDomain}
+                    </Typography>
+                </Link>
+            </Box>
+
+            <Box sx={{ maxWidth: 800, mx: 'auto' }}>
+                <Box sx={{
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: 2,
+                    p: 3,
+                    mb: 3,
+                    border: '1px solid #e9ecef',
+                    textAlign: 'center'
+                }}>
+                    {registration.type && (
+                        <Chip
+                            label={registration.type === 'agent' ? 'Agent' : 'Asset'}
+                            size="small"
+                            sx={{ mb: 2, textTransform: 'capitalize' }}
+                        />
+                    )}
+                    {did && aliasWalletUrl && (
+                        <Box>
+                            <a href={aliasWalletUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                                <QRCodeSVG value={aliasWalletUrl} />
+                            </a>
+                        </Box>
+                    )}
+                    {did && (
+                        <Box>
+                            <Typography variant="body1" sx={{ fontFamily: 'monospace', color: '#666', wordBreak: 'break-all', mt: 2 }}>
+                                {did}
+                            </Typography>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                sx={{ mt: 1.5, textTransform: 'none' }}
+                                onClick={() => copyDid(did)}
+                                disabled={didCopied}
+                            >
+                                {didCopied ? 'Copied' : 'Copy DID'}
+                            </Button>
+                        </Box>
+                    )}
+                </Box>
+
+                <Card
+                    title="Service Endpoints"
+                    action={<Chip label={services.length} size="small" variant="outlined" />}
+                >
+                    {services.length === 0 ? (
+                        <Typography variant="body2" sx={{ color: '#666' }}>
+                            This identity publishes no service endpoints.
+                        </Typography>
+                    ) : (
+                        services.map((service: any, index: number) => {
+                            const endpoint = service.serviceEndpoint;
+                            const uri = serviceEndpointUri(endpoint);
+                            const routingKeys = typeof endpoint === 'object' ? endpoint?.routingKeys || [] : [];
+                            const accept = typeof endpoint === 'object' ? endpoint?.accept || [] : [];
+
+                            return (
+                                <Box
+                                    key={service.id || index}
+                                    sx={{
+                                        backgroundColor: '#fff',
+                                        borderRadius: 1,
+                                        border: '1px solid #e9ecef',
+                                        p: 2,
+                                        mb: index === services.length - 1 ? 0 : 2,
+                                    }}
+                                >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                            {serviceLabel(service.type)}
+                                        </Typography>
+                                        {serviceFragment(service.id) && (
+                                            <Chip
+                                                label={serviceFragment(service.id)}
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{ fontFamily: 'Monaco, Consolas, monospace' }}
+                                            />
+                                        )}
+                                    </Box>
+                                    <Field label="Endpoint" value={<EndpointValue uri={uri} />} />
+                                    {accept.length > 0 && (
+                                        <Field label="Accepts" value={accept.join(', ')} mono />
+                                    )}
+                                    {routingKeys.length > 0 && (
+                                        <Field
+                                            label="Routing keys"
+                                            value={routingKeys.map((key: string) => (
+                                                <Box key={key} sx={{ fontFamily: 'Monaco, Consolas, monospace' }}>{key}</Box>
+                                            ))}
+                                        />
+                                    )}
+                                </Box>
+                            );
+                        })
+                    )}
+                </Card>
+
+                <Card
+                    title="Keys"
+                    action={<Chip label={verificationMethods.length} size="small" variant="outlined" />}
+                >
+                    {verificationMethods.length === 0 ? (
+                        <Typography variant="body2" sx={{ color: '#666' }}>
+                            No verification methods published.
+                        </Typography>
+                    ) : (
+                        verificationMethods.map((method: any, index: number) => (
+                            <Box key={method.id || index} sx={{ mb: index === verificationMethods.length - 1 ? 0 : 2 }}>
+                                <Field label="Method" value={serviceFragment(method.id) || method.id} mono />
+                                <Field label="Type" value={method.type || 'unknown'} />
+                                {method.publicKeyJwk?.crv && (
+                                    <Field label="Curve" value={method.publicKeyJwk.crv} mono />
+                                )}
+                            </Box>
+                        ))
+                    )}
+                </Card>
+
+                {credentials.length > 0 && (
+                    <Card
+                        title="Credentials"
+                        action={<Chip label={credentials.length} size="small" variant="outlined" />}
+                    >
+                        {credentials.map(([credentialDid, credential]: [string, any], index: number) => (
+                            <Box
+                                key={credentialDid}
+                                sx={{
+                                    backgroundColor: '#fff',
+                                    borderRadius: 1,
+                                    border: '1px solid #e9ecef',
+                                    p: 2,
+                                    mb: index === credentials.length - 1 ? 0 : 2,
+                                }}
+                            >
+                                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                                    {credentialType(credential)}
+                                </Typography>
+                                <Field label="Issuer" value={credential?.issuer || 'unknown'} mono />
+                                {credential?.validFrom && (
+                                    <Field label="Issued" value={formatTimestamp(credential.validFrom)} />
+                                )}
+                                {credential?.validUntil && (
+                                    <Field label="Expires" value={formatTimestamp(credential.validUntil)} />
+                                )}
+                            </Box>
+                        ))}
+                    </Card>
+                )}
+
+                {nostr?.npub && (
+                    <Card title="Nostr">
+                        <Field label="npub" value={nostr.npub} mono />
+                    </Card>
+                )}
+
+                <Card title="Document">
+                    {didDocument.controller && (
+                        <Field label="Controller" value={didDocument.controller} mono />
+                    )}
+                    {registration.registry && (
+                        <Field label="Registry" value={registration.registry} />
+                    )}
+                    {metadata.created && (
+                        <Field label="Created" value={formatTimestamp(metadata.created)} />
+                    )}
+                    {metadata.updated && (
+                        <Field label="Updated" value={formatTimestamp(metadata.updated)} />
+                    )}
+                    {metadata.version !== undefined && (
+                        <Field label="Version" value={metadata.version} />
+                    )}
+                    <Field
+                        label="Status"
+                        value={
+                            metadata.deactivated
+                                ? <Chip label="Deactivated" size="small" color="error" />
+                                : metadata.confirmed
+                                    ? <Chip label="Confirmed" size="small" color="success" />
+                                    : <Chip label="Pending confirmation" size="small" />
+                        }
+                    />
+                </Card>
+
+                <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Button component={Link} to="/members" variant="outlined">
+                        ← Back to Directory
+                    </Button>
+                    <Button component={Link} to={`/member/${name}`} variant="outlined">
+                        Raw DID Document
+                    </Button>
+                    {did && (
+                        <Button
+                            component="a"
+                            href={`https://explorer.archon.technology/search?did=${did}`}
+                            target="_blank"
+                            variant="outlined"
+                        >
+                            View on Archon Explorer
+                        </Button>
+                    )}
                 </Box>
             </Box>
         </div>
