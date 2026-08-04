@@ -94,17 +94,32 @@ DIDComm X25519 keys **are** seed-derived: `generateX25519Jwk` takes 32 bytes of 
 
 ### Randomness source
 
-All paths draw from the platform CSPRNG through `@noble/hashes` `randomBytes`, which uses `crypto.getRandomValues`, falls back to Node's `crypto.randomBytes`, and **throws if neither is available**:
+Every path reaches `crypto.getRandomValues`, but **through two independent implementations**, not one:
+
+| generator | RNG | reached via |
+| --- | --- | --- |
+| Mnemonic, salts, passphrase IV | `@noble/hashes` `randomBytes` | `bip39.generateMnemonic()`, `generateRandomSalt()` |
+| Vault keypair | `@noble/secp256k1`'s own `randomBytes` | `secp.utils.randomPrivateKey()` |
+
+`@noble/secp256k1` does not use `@noble/hashes` for this — it ships its own. The two are separate packages on separate version lines, so **a dependency bump can change one and leave the other untouched**. (A single install can also contain more than one resolved copy of `@noble/hashes`; `@noble/curves` nests its own.) Anything asserting a property of "the RNG" has to assert it of both.
+
+Both refuse to degrade, by different mechanisms:
 
 ```js
+// @noble/hashes — captures globalThis.crypto at module load
 throw new Error('crypto.getRandomValues must be defined');
+
+// @noble/secp256k1 — reads globalThis.crypto at call time, then dereferences it
+const cr = () => globalThis?.crypto;
 ```
 
-There is no silent degradation to `Math.random()` on any path, in either the Node or browser build. This is the property most worth preserving — a weak-RNG regression is invisible in tests and catastrophic in production.
+There is no silent degradation to `Math.random()` on any path, in either the Node or browser build. This is the property most worth preserving — a weak-RNG regression is invisible in tests and catastrophic in production, so `tests/cipher/rng.test.ts` asserts it of both implementations, in both directions: that each draws from `crypto.getRandomValues`, and that each throws rather than returning anything when no CSPRNG exists.
+
+Note what those tests deliberately do **not** do. A degraded RNG still produces output that looks random, so neither statistical testing nor any assertion about the shape of a generated mnemonic would catch a substitution. Only provenance and the absence of a fallback are worth asserting.
 
 ### Where the entropy ultimately comes from
 
-`crypto.getRandomValues` is where Archon's responsibility ends, but it is not where the randomness originates. The full chain on a Linux node:
+`crypto.getRandomValues` is where Archon's responsibility ends, but it is not where the randomness originates. Below it, both implementations above converge on one chain — on a Linux node:
 
 ```
 bip39.generateMnemonic() · randomPrivateKey() · generateRandomSalt()
@@ -173,7 +188,7 @@ Given the curve-matching argument above, this is defensible. It would only be wo
 | Derivation | `m/44'/0'/{account}'/0/{index}`, deterministic |
 | Chain wallets | same mnemonic, BIP-44/84 coin paths, fetched from Keymaster |
 | Vault keys | ~256 bits, independent, **not** seed-recoverable |
-| RNG | platform CSPRNG; throws rather than degrading |
+| RNG | two implementations (`@noble/hashes`, `@noble/secp256k1`); both throw rather than degrading |
 | Entropy origin | thermal noise (RDSEED, interrupt timing) → kernel CSPRNG → OpenSSL DRBG |
 | Main RNG risk | cloned VM images / shipped seed files |
 | Mnemonic at rest | PBKDF2-SHA512 100k iters + AES-GCM |
