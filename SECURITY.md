@@ -102,6 +102,57 @@ throw new Error('crypto.getRandomValues must be defined');
 
 There is no silent degradation to `Math.random()` on any path, in either the Node or browser build. This is the property most worth preserving — a weak-RNG regression is invisible in tests and catastrophic in production.
 
+### Where the entropy ultimately comes from
+
+`crypto.getRandomValues` is where Archon's responsibility ends, but it is not where the randomness originates. The full chain on a Linux node:
+
+```
+bip39.generateMnemonic() · randomPrivateKey() · generateRandomSalt()
+  ↓ @noble/hashes randomBytes
+crypto.getRandomValues                       Web Crypto
+  ↓ Node routes this to OpenSSL RAND_bytes
+OpenSSL 3.x CTR-DRBG (AES-256-CTR)           periodically reseeded
+  ↓ seeded via the OS entropy syscall
+getrandom(2)                                 BCryptGenRandom / getentropy elsewhere
+  ↓
+Linux kernel CSPRNG (ChaCha20)
+  ↑ seeded and continuously reseeded from
+interrupt timing jitter · RDSEED/RDRAND · bootloader/EFI seed · seed file across reboots
+  ↑ which in turn originate in
+thermal noise in silicon · timing variance between physically independent clocks
+```
+
+Note which branch actually runs: `@noble/hashes` tries `crypto.getRandomValues` first and only falls back to Node's `crypto.randomBytes` if it is absent. Since Node 19 exposes `globalThis.crypto`, **the first branch is the one taken** on every supported Node version and in browsers; the fallback is legacy compatibility that current deployments never reach.
+
+#### The bottom of the chain is physics
+
+Everything above is transport. A DRBG expands entropy, a seed file carries it across a reboot, `getrandom(2)` hands it over — none of them *create* any. Follow the inputs down and they terminate in two physical processes:
+
+**Thermal noise in silicon.** `RDSEED` is backed by an on-die entropy source: a circuit deliberately driven into a metastable state, whose settling direction is decided by Johnson–Nyquist noise — the random thermal motion of charge carriers in the transistors. That raw output is biased, so the hardware conditions it (Intel's design runs it through AES-CBC-MAC) before `RDSEED` returns it. The randomness is manufactured by heat, not by an algorithm.
+
+**Timing variance between independent physical systems.** The kernel timestamps hardware interrupts with the CPU cycle counter and mixes in the low bits. Those bits are unpredictable because the events and the clock measuring them are physically decoupled: a network packet's arrival is determined by events on another machine, a disk completion by mechanical and thermal conditions in the drive, and the sampling clock itself drifts against them through oscillator phase noise — which is, again, thermal. Related jitter-entropy designs measure variance in the CPU's own execution timing, arising from cache state, frequency scaling, and the same underlying noise.
+
+So the honest answer to "where does the entropy ultimately come from" is: **thermal noise in physical hardware**, sampled either directly by a dedicated circuit or indirectly through timing. It bottoms out in statistical mechanics — and at the smallest scale, quantum effects — not in any part of the software stack.
+
+Two caveats worth stating:
+
+- **This host is a WSL2 VM with no `hw_random` device** (`rng_available` is `none`), so the kernel's hardware-RNG framework contributes nothing here. On such systems the arch-random path (`RDSEED` on this i7-14700F) and interrupt timing carry the load. A cloud VM typically also gets `virtio-rng`, which is the *host's* entropy passed through — it does not generate any, which is why a cloned guest is dangerous.
+- **"Random" here means physically unpredictable, not provably indeterminate.** The security claim is that no attacker can model thermal fluctuations in your specific silicon well enough to predict the output — not a metaphysical claim about determinism.
+
+Three consequences worth understanding:
+
+**The CPU's hardware RNG is an input, not the source.** Linux mixes `RDSEED`/`RDRAND` into the pool rather than emitting them directly, so a backdoored CPU RNG cannot by itself determine what Archon gets. (With `random.trust_cpu`, which many distributions enable, that hardware output is additionally *credited* toward initial seeding — it still passes through the ChaCha20 construction.)
+
+**Containers do not have their own entropy.** A dockerised node shares the host kernel's CSPRNG rather than having one of its own. The quality of every key Archon generates is therefore a property of the **host**, so that is where this is hardened, not in the image.
+
+**The real risk is a cloned or freshly-booted image.** This is the one failure mode that could actually make Archon keys predictable, and it happens before any Archon code runs:
+
+- A VM cloned from a snapshot taken *after* the CRNG was seeded starts life with the same CRNG state as every other clone. Two nodes from one golden image can generate the same mnemonic.
+- A golden image that ships a `/var/lib/systemd/random-seed` (or equivalent) hands every instance the same seed file.
+- An embedded or minimal system booting with no seed file and little interrupt activity can sit with an uninitialised CRNG.
+
+`getrandom(2)` blocking until initialisation is the protection against the third case, and it is why nothing here silently falls back to weak randomness. It is **not** protection against the first two — a cloned seeded state looks perfectly initialised. If you build node images, generate identities after first boot, not in the image, and strip any seed file from the template.
+
 ### Mnemonic at rest
 
 The mnemonic is stored encrypted, never in plaintext: PBKDF2-HMAC-SHA512 at **100,000 iterations** (`PBKDF2_ITERATIONS` overrides it) over a 16-byte random salt, then AES-GCM with a 12-byte random IV.
@@ -123,5 +174,7 @@ Given the curve-matching argument above, this is defensible. It would only be wo
 | Chain wallets | same mnemonic, BIP-44/84 coin paths, fetched from Keymaster |
 | Vault keys | ~256 bits, independent, **not** seed-recoverable |
 | RNG | platform CSPRNG; throws rather than degrading |
+| Entropy origin | thermal noise (RDSEED, interrupt timing) → kernel CSPRNG → OpenSSL DRBG |
+| Main RNG risk | cloned VM images / shipped seed files |
 | Mnemonic at rest | PBKDF2-SHA512 100k iters + AES-GCM |
 | TS / Python parity | both fixed at 128 bits |
