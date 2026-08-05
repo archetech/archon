@@ -1,8 +1,8 @@
-[![unit-test](https://github.com/archetech/archon/actions/workflows/unit-test.yml/badge.svg)](https://github.com/archetech/archon/actions/workflows/unit-test.yml) [![Coverage Status](https://coveralls.io/repos/github/archetech/archon/badge.svg?branch=main)](https://coveralls.io/github/archetech/archon?branch=main)
+[![unit-test](https://github.com/archetech/archon/actions/workflows/unit-test.yml/badge.svg)](https://github.com/archetech/archon/actions/workflows/unit-test.yml) [![Coverage Status](https://coveralls.io/repos/github/archetech/archon/badge.svg?branch=main)](https://coveralls.io/github/archetech/archon?branch=main) [![DIF Recommended](https://img.shields.io/badge/DIF-recommended%20DID%20method-5b4b8a)](https://github.com/decentralized-identity/did-methods/blob/main/dif-recommended/findings-did-cid.md)
 
 # Archon
 
-Archon is a peer-to-peer decentralized identity platform built on the W3C **DID (Decentralized Identifier)** standard, and a reference implementation of the `did:cid` method. It lets anyone create, control, and resolve self-sovereign identities without a central authority — and without paying per-operation fees for routine use.
+Archon is a peer-to-peer decentralized identity platform built on the W3C **DID (Decentralized Identifier)** standard, and the reference implementation of [`did:cid`](https://github.com/decentralized-identity/did-methods/blob/main/dif-recommended/findings-did-cid.md), a **DIF-recommended** DID method. It lets anyone create, control, and resolve self-sovereign identities without a central authority — and without paying per-operation fees for routine use.
 
 The protocol separates **DID creation** from **DID updates**: creation is instant and free, since a DID is derived from the content-address (CID) of its initial document in IPFS; updates are anchored to one or more pluggable registries (Hyperswarm for gossip-based propagation, Bitcoin mainnet/signet/testnet4 for blockchain-anchored consensus, with room for more). This split gives Archon the unusual combination of zero-cost identity creation with cryptographically verifiable, consensus-driven history.
 
