@@ -1,6 +1,6 @@
 services:
   herald:
-    profiles: ["drawbridge"]
+    profiles: ["drawbridge-names"]
     build:
       context: ../..
       dockerfile: services/herald/Dockerfile
@@ -53,9 +53,10 @@ services:
         condition: service_healthy
       tor:
         condition: service_started
+        required: false
 
   herald-client:
-    profiles: ["drawbridge"]
+    profiles: ["drawbridge-names"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.herald-client
@@ -130,11 +131,12 @@ services:
         condition: service_healthy
       lightning-mediator:
         condition: service_healthy
+        required: false
       redis:
         condition: service_healthy
 
   lightning-mediator:
-    profiles: ["drawbridge"]
+    profiles: ["drawbridge-lightning"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.lightning-mediator
@@ -201,7 +203,7 @@ services:
         condition: service_healthy
 
   tor:
-    profiles: ["drawbridge"]
+    profiles: ["drawbridge-tor"]
     image: goldy/tor-hidden-service:latest
     ports:
       - "${ARCHON_TOR_SOCKS_PORT:-127.0.0.1:9050}:9050"
