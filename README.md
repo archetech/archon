@@ -2,7 +2,7 @@
 
 # Archon
 
-Archon is a peer-to-peer decentralized identity platform built on the W3C **DID (Decentralized Identifier)** standard, and the reference implementation of [`did:cid`](https://github.com/decentralized-identity/did-methods/tree/main/dif-recommended), a **DIF-recommended** DID method. It lets anyone create, control, and resolve self-sovereign identities without a central authority — and without paying per-operation fees for routine use.
+Archon is a peer-to-peer decentralized identity platform built on the W3C **DID (Decentralized Identifier)** standard, and the reference implementation of `did:cid`, a [**DIF-recommended** DID method](https://github.com/decentralized-identity/did-methods/tree/main/dif-recommended). It lets anyone create, control, and resolve self-sovereign identities without a central authority — and without paying per-operation fees for routine use.
 
 The protocol separates **DID creation** from **DID updates**: creation is instant and free, since a DID is derived from the content-address (CID) of its initial document in IPFS; updates are anchored to one or more pluggable registries (Hyperswarm for gossip-based propagation, Bitcoin mainnet/signet/testnet4 for blockchain-anchored consensus, with room for more). This split gives Archon the unusual combination of zero-cost identity creation with cryptographically verifiable, consensus-driven history.
 
