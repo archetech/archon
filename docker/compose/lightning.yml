@@ -5,7 +5,7 @@ x-cln-image: &cln-image ghcr.io/lightning-goats/cl-hive-node:${ARCHON_CLN_VERSIO
 
 services:
   cln-mainnet-node:
-    profiles: ["lightning", "drawbridge"]
+    profiles: ["lightning", "drawbridge-lightning"]
     image: *cln-image
     environment:
       - NETWORK=bitcoin
@@ -36,7 +36,7 @@ services:
       - "127.0.0.1:3001:3001"
 
   drawbridge-init:
-    profiles: ["lightning", "drawbridge"]
+    profiles: ["lightning", "drawbridge-lightning"]
     image: *cln-image
     entrypoint: ["/bin/bash", "-c"]
     command:
@@ -80,7 +80,7 @@ services:
     restart: "no"
 
   rtl-init:
-    profiles: ["lightning", "drawbridge"]
+    profiles: ["lightning", "drawbridge-lightning"]
     image: *cln-image
     entrypoint: ["/bin/bash", "-c"]
     command:
@@ -123,7 +123,7 @@ services:
     restart: "no"
 
   rtl:
-    profiles: ["lightning", "drawbridge"]
+    profiles: ["lightning", "drawbridge-lightning"]
     image: shahanafarooqui/rtl:0.15.1
     entrypoint: ["/bin/sh", "/scripts/rtl-entrypoint.sh"]
     environment:
@@ -144,7 +144,7 @@ services:
         condition: service_started
 
   lnbits-init:
-    profiles: ["lightning", "drawbridge"]
+    profiles: ["lightning", "drawbridge-lightning"]
     image: *cln-image
     entrypoint: ["/bin/bash", "-c"]
     command:
@@ -206,7 +206,7 @@ services:
     restart: "no"
 
   lnbits:
-    profiles: ["lightning", "drawbridge"]
+    profiles: ["lightning", "drawbridge-lightning"]
     image: ghcr.io/archetech/lnbits:1.5.3-archetech.1
     entrypoint: ["/bin/sh", "/scripts/lnbits-entrypoint.sh"]
     environment:
