@@ -139,6 +139,13 @@ contract.
   (development mode). Implementations MUST log a warning at startup in
   this case.
 
+- Clients MUST send the key in `X-Archon-Admin-Key` and MUST NOT send it as
+  `Authorization: Bearer <key>`. The TS service ignores `Authorization`
+  entirely, and `docs/deployment.md` reserves that header for
+  user/session/OAuth-style flows. The Python service also accepts a bearer
+  token, but relying on that is non-portable and would collide with any future
+  user auth on `Authorization`.
+
 The "admin key" is the only auth boundary. There is no per-user
 authentication — the wallet itself is the identity vault, and possession
 of the admin key implies full access to everything in it.

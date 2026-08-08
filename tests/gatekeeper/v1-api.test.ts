@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 import { createV1Router } from '../../services/gatekeeper/server/src/v1-router';
+import { checkAdminApiKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/gatekeeper/server/src/v1-admin';
 import defaultConfig from '../../services/gatekeeper/server/src/config';
 
 const adminKey = 'test-admin-key';
@@ -515,12 +516,23 @@ describe('/api/v1 block, search, health, and admin behaviour', () => {
         await expect(request(app).get('/api/v1/status')).resolves.toMatchObject({ status: 500 });
     });
 
-    it('leaves admin routes unprotected when no admin key is configured', async () => {
+    it('refuses admin routes when no admin key is configured', async () => {
         const { app, gatekeeper } = mount({ adminApiKey: '' });
 
         const response = await request(app).get('/api/v1/queue/local');
-        expect(response.status).toBe(200);
-        expect(gatekeeper.getQueue).toHaveBeenCalledWith('local');
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ error: 'Admin API key not configured' });
+        expect(gatekeeper.getQueue).not.toHaveBeenCalled();
+    });
+
+    it('rejects an admin key of the wrong length without throwing', async () => {
+        const { app, gatekeeper } = mount();
+
+        const response = await request(app)
+            .get('/api/v1/queue/local')
+            .set('X-Archon-Admin-Key', `${adminKey}-longer`);
+        expect(response.status).toBe(401);
+        expect(gatekeeper.getQueue).not.toHaveBeenCalled();
     });
 });
 
@@ -568,5 +580,39 @@ describe('/api/v1 IPFS routes', () => {
             const response = await call();
             expect([label, response.status]).toEqual([label, 500]);
         }
+    });
+});
+
+describe('startup admin key validation', () => {
+    // main() exits non-zero on a fatal result; these cover the rule itself,
+    // since a route test constructs the app directly and never reaches main().
+    it('is fatal when no admin key is configured', () => {
+        const result = checkAdminApiKey('');
+
+        expect(result.fatal).toBeDefined();
+        expect(result.fatal).toContain('ARCHON_ADMIN_API_KEY must be set');
+        expect(result.fatal).toContain('openssl rand -hex 32');
+        expect(result.warning).toBeUndefined();
+    });
+
+    it('warns but does not block startup for a short key', () => {
+        const result = checkAdminApiKey('short-key');
+
+        expect(result.fatal).toBeUndefined();
+        expect(result.warning).toContain(`shorter than ${MIN_ADMIN_API_KEY_LENGTH}`);
+    });
+
+    it('accepts a key at the minimum length with no warning', () => {
+        const result = checkAdminApiKey('a'.repeat(MIN_ADMIN_API_KEY_LENGTH));
+
+        expect(result.fatal).toBeUndefined();
+        expect(result.warning).toBeUndefined();
+    });
+
+    it('accepts a generated 64-character key', () => {
+        const result = checkAdminApiKey('0'.repeat(64));
+
+        expect(result.fatal).toBeUndefined();
+        expect(result.warning).toBeUndefined();
     });
 });

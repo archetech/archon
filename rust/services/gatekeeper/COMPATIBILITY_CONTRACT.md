@@ -59,7 +59,14 @@ Additional top-level routes:
 - Missing or invalid key response:
   - status: `401`
   - body: `{ "error": "Unauthorized — valid admin API key required" }`
-- When `ARCHON_ADMIN_API_KEY` is unset, admin routes are open for development.
+- The key comparison must be constant-time.
+- When `ARCHON_ADMIN_API_KEY` is unset, admin routes **fail closed**:
+  - status: `403`
+  - body: `{ "error": "Admin API key not configured" }`
+- The service must refuse to start when `ARCHON_ADMIN_API_KEY` is unset,
+  exiting non-zero with a message naming the variable. The 403 above is
+  therefore reachable only when the router is built programmatically (in
+  tests) without a key.
 
 ## Env/runtime contract
 
@@ -78,7 +85,7 @@ must continue to honor them:
 | `ARCHON_GATEKEEPER_UPLOAD_LIMIT` | `10mb` | Binary/text upload body limit. |
 | `ARCHON_GATEKEEPER_GC_INTERVAL` | `15` | DID verification/GC interval in minutes. |
 | `ARCHON_GATEKEEPER_STATUS_INTERVAL` | `5` | Periodic DID status refresh interval in minutes. |
-| `ARCHON_ADMIN_API_KEY` | empty string | Admin API protection. |
+| `ARCHON_ADMIN_API_KEY` | empty string (**required**) | Admin API protection. Both services refuse to start without it. |
 | `ARCHON_GATEKEEPER_FALLBACK_URL` | `https://dev.uniresolver.io` | Universal resolver fallback base URL. |
 | `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` | `5000` | Fallback resolver timeout in milliseconds. |
 | `GIT_COMMIT` | `unknown` | Commit label for `/version` and `service_version_info`. |

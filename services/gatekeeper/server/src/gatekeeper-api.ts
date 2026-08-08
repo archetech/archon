@@ -9,6 +9,7 @@ import type Gatekeeper from '@didcid/gatekeeper';
 import { CheckDIDsResult } from '@didcid/gatekeeper/types';
 import { createIdentifiersRouter } from './identifiers-router.js';
 import { createV1Router } from './v1-router.js';
+import { checkAdminApiKey } from './v1-admin.js';
 import defaultConfig from './config.js';
 import promClient from 'prom-client';
 import pino from 'pino';
@@ -402,6 +403,18 @@ async function createDb(config: GatekeeperApiConfig) {
 
 async function main() {
     const config = defaultConfig;
+
+    const adminKeyCheck = checkAdminApiKey(config.adminApiKey);
+
+    if (adminKeyCheck.fatal) {
+        console.error(adminKeyCheck.fatal);
+        process.exit(1);
+    }
+
+    if (adminKeyCheck.warning) {
+        console.warn(adminKeyCheck.warning);
+    }
+
     const db = await createDb(config);
 
     if (!db) {
@@ -457,11 +470,7 @@ async function main() {
 
     const server = api.app.listen(config.port, config.bindAddress, () => {
         console.log(`Server is running on ${config.bindAddress}:${config.port}`);
-        if (config.adminApiKey) {
-            console.log('Admin API key protection is ENABLED');
-        } else {
-            console.warn('Warning: ARCHON_ADMIN_API_KEY is not set — admin routes are unprotected');
-        }
+        console.log('Admin API key protection is ENABLED');
         api.setReady(true);
     });
 
