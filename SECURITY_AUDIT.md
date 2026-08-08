@@ -85,11 +85,12 @@ The middleware chain (`createAuthMiddleware`) ran subscription-auth first on eve
 - `python/keymaster_service/src/keymaster_service/app.py:125-132`
 - `rust/services/gatekeeper/src/api.rs:2107-2116`
 
-Identical pattern in all four: `if (!config.adminApiKey) { next(); return; }`. Combined with `bindAddress: process.env.ARCHON_BIND_ADDRESS || '0.0.0.0'` (both TS configs) and `sample.env` shipping `ARCHON_BIND_ADDRESS=0.0.0.0` with `ARCHON_ADMIN_API_KEY=` empty, every administrative endpoint — mnemonic export (`/api/v1/wallet/mnemonic`), DB reset, wallet overwrite, key rotation — is unauthenticated. The Feb audit called this "mitigated" — the mitigation is opt-in and unchanged in effect.
+Identical pattern in all four: `if (!config.adminApiKey) { next(); return; }`. With `sample.env` shipping `ARCHON_ADMIN_API_KEY=` empty, every administrative endpoint — mnemonic export (`/api/v1/wallet/mnemonic`), DB reset, wallet overwrite, key rotation — is unauthenticated. The Feb audit called this "mitigated" — the mitigation is opt-in and unchanged in effect.
 
 How far that reaches depends on the service's host binding, which differs:
 
-- **Gatekeeper is reachable from the network in a default compose deployment.** `docker/compose/gatekeeper-ts.yml:33` publishes `${ARCHON_GATEKEEPER_PORT}:4224` with no host-bind prefix, so DB reset and the other Gatekeeper admin routes are exposed on all interfaces with no key set.
+- **Gatekeeper.** `docker/compose/gatekeeper-ts.yml:33` publishes `${ARCHON_GATEKEEPER_PORT}:4224` on all interfaces. That is **by design** — Gatekeeper serves the public DID-resolution surface (`/1.0/identifiers`, `GET /did/:did`), and `docs/deployment.md:648` documents the port as "public for DID resolution, localhost if behind proxy", in deliberate contrast to Keymaster's fixed loopback bind.
+  The defect is not the open port; it is that the *same* public port also carries the admin routes — `db/reset`, `dids/remove`, `batch/import`, queue management — behind fail-open auth. This makes the finding worse rather than better: because the port is legitimately public, an operator **cannot** mitigate by binding it to localhost without giving up DID resolution. Requiring the admin key is the only available fix.
 - **Keymaster is not**, by default: `docker/compose/keymaster-ts.yml:30` publishes `${ARCHON_KEYMASTER_HOST_BIND:-127.0.0.1}:...:4226`, so mnemonic export is loopback-only unless the operator overrides `ARCHON_KEYMASTER_HOST_BIND` (or runs Keymaster outside compose, where `ARCHON_BIND_ADDRESS=0.0.0.0` from `sample.env` applies directly). Note this is *not* a defence against H-03: a malicious web page can still reach loopback Keymaster from the victim's own browser.
 
 **Fail-closed reference implementations already in this repo:** Drawbridge's `services/drawbridge/server/src/v1-admin.ts` returns 403 `{"error":"Admin API key not configured"}` when the key is empty and compares with `crypto.timingSafeEqual` — it is the same Express `RequestHandler` shape and header as the affected TS services, so it is a near-verbatim copy-paste template. Herald (`services/herald/server/src/oauth/index.ts:189`) is fail-closed and timing-safe too. The four services above compare keys with `!==`/`==`/Python `!=` (not timing-safe) — see L-06.
@@ -178,7 +179,7 @@ e.g. `res.status(500).json({ error: error.toString() })` in `v1-search-router.ts
 
 ### M-05: Insecure defaults committed in `sample.env` and `data/btc-*/bitcoin.conf`
 
-- `sample.env`: `ARCHON_BIND_ADDRESS=0.0.0.0`, empty `ARCHON_ADMIN_API_KEY`, empty passphrases — copy-paste deployments inherit the worst configuration (feeds H-01/H-02).
+- `sample.env`: empty `ARCHON_ADMIN_API_KEY` and empty passphrases — copy-paste deployments inherit the weakest configuration (feeds H-01/H-02). Note `ARCHON_BIND_ADDRESS=0.0.0.0` is **not** part of this finding: it is the in-container listen address, which must be `0.0.0.0` for the service to be reachable at all under compose. Host exposure is controlled by the compose port mapping, not by this variable. It matters only when a service is run directly on a host.
 - `data/btc-signet/bitcoin.conf` and `data/btc-testnet4/bitcoin.conf`: committed `rpcuser=signet / rpcpassword=signet` (and `testnet4/testnet4`) with `rpcbind=0.0.0.0` + `rpcallowip=0.0.0.0/0`. Compose now binds host ports to `127.0.0.1` (verified in `docker/compose/btc-signet.yml`), so exposure is limited to the docker network — but any container compromise reaches the RPC with trivial credentials. Test networks only (no mainnet funds at risk), hence Medium.
 
 ### M-06: PBKDF2 iteration count env-overridable without a floor
@@ -283,7 +284,7 @@ other tracking surface.
 
 1. **C-01** — ✅ Done: PR #866, merged 2026-08-08. Any L402 deployment running a build older than that merge is still bypassable and should be updated.
 2. **H-02** — Stop returning the admin key from `/login` without passphrase verification. Python first (live); TS is a startup-window edge case, best closed by validating the passphrase before `app.listen`.
-3. **H-01** — Fail closed on admin auth in production; timing-safe comparisons (copy Drawbridge's `v1-admin.ts` into TS Gatekeeper/Keymaster, `hmac.compare_digest` in Python, a constant-time compare in Rust); secure-by-default `sample.env` (`ARCHON_BIND_ADDRESS=127.0.0.1`, generated admin key); add a host bind to the Gatekeeper compose port mapping to match Keymaster's.
+3. **H-01** — Fail closed on admin auth in production; timing-safe comparisons (copy Drawbridge's `v1-admin.ts` into TS Gatekeeper/Keymaster, `hmac.compare_digest` in Python, a constant-time compare in Rust); secure-by-default `sample.env` (generated admin key). Do **not** "fix" this by host-binding Gatekeeper's compose port — that port is public by design for DID resolution (`docs/deployment.md:648`); the admin key is the control.
 4. **H-03** — CORS allowlist.
 5. **H-04** — `tar` override; `@hono/node-server` pin; assess `helia`/`@libp2p/kad-dht` exposure.
 6. **M-01/M-02** — Stop trusting `X-DID`; atomic check-and-increment for macaroon uses.
