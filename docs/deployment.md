@@ -514,6 +514,7 @@ Enable the `lightning` profile, or enable `drawbridge`, which also starts the bu
 |----------|---------|-------------|
 | `ARCHON_DRAWBRIDGE_PORT` | `4222` | Drawbridge API port |
 | `ARCHON_DRAWBRIDGE_L402_ENABLED` | `false` | Enable L402 payment gates |
+| `ARCHON_DRAWBRIDGE_SUBSCRIPTIONS_ENABLED` | `false` | **Insecure dev stub (#121)** — when `true`, any request with an `X-Subscription-DID` header bypasses L402 payment verification with no credential check. Leave `false` in production |
 | `ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS` | `10` | Default price per API call (sats) |
 | `ARCHON_DRAWBRIDGE_INVOICE_EXPIRY` | `3600` | Invoice expiry in seconds |
 | `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://lightning-mediator:4235` | Drawbridge's upstream Lightning mediator |
