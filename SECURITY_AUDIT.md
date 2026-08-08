@@ -25,7 +25,7 @@ Archon has grown substantially since the Feb 2026 audit: Drawbridge (L402 Lightn
 
 The most serious new finding was a **complete L402 paywall bypass** in Drawbridge: a stub subscription-auth middleware accepted any `X-Subscription-DID` header as authenticated, skipping all payment verification. **Fixed in PR #866 (merged 2026-08-08).**
 
-The fail-open admin-auth pattern flagged in Feb persists across **all four** server implementations (TS Gatekeeper, TS Keymaster, Python Keymaster, Rust Gatekeeper): with `ARCHON_ADMIN_API_KEY` unset, every administrative endpoint — including wallet mnemonic export and DB reset — is unauthenticated. Reach differs by service: default compose publishes Gatekeeper on all interfaces, while Keymaster is loopback-bound (though still reachable from the victim's own browser via H-03). Drawbridge and Herald are already fail-closed. A new variant appears in TS/Python Keymaster: `POST /api/v1/login` returns the admin API key to anyone when the wallet passphrase is unset.
+The fail-open admin-auth pattern flagged in Feb persists across **all four** server implementations (TS Gatekeeper, TS Keymaster, Python Keymaster, Rust Gatekeeper): with `ARCHON_ADMIN_API_KEY` unset, every administrative endpoint — including wallet mnemonic export and DB reset — is unauthenticated. Reach differs by service: default compose publishes Gatekeeper on all interfaces, while Keymaster is loopback-bound (though still reachable from the victim's own browser via H-03). Drawbridge and Herald are already fail-closed. A new variant appears in the Python Keymaster: `POST /api/v1/login` returns the admin API key to anyone when the wallet passphrase is unset. The TS Keymaster shares the source but not the exposure — its Keymaster constructor rejects an empty passphrase and the process dies, leaving only a startup window (H-02).
 
 Positive: secrets hygiene is clean (zero real secrets in 1,992 commits), Drawbridge's macaroon/L402 crypto is well implemented (timing-safe, fail-closed, refuses to boot without a 32+ char secret), Herald enforces session secrets fail-closed with timing-safe admin comparison, the Feb NoSQL-injection finding is fixed (only `$in` supported now), and compose files now bind Mongo/Redis/Keymaster/signet-RPC to localhost with healthchecks.
 
@@ -85,11 +85,12 @@ The middleware chain (`createAuthMiddleware`) ran subscription-auth first on eve
 - `python/keymaster_service/src/keymaster_service/app.py:125-132`
 - `rust/services/gatekeeper/src/api.rs:2107-2116`
 
-Identical pattern in all four: `if (!config.adminApiKey) { next(); return; }`. Combined with `bindAddress: process.env.ARCHON_BIND_ADDRESS || '0.0.0.0'` (both TS configs) and `sample.env` shipping `ARCHON_BIND_ADDRESS=0.0.0.0` with `ARCHON_ADMIN_API_KEY=` empty, every administrative endpoint — mnemonic export (`/api/v1/wallet/mnemonic`), DB reset, wallet overwrite, key rotation — is unauthenticated. The Feb audit called this "mitigated" — the mitigation is opt-in and unchanged in effect.
+Identical pattern in all four: `if (!config.adminApiKey) { next(); return; }`. With `sample.env` shipping `ARCHON_ADMIN_API_KEY=` empty, every administrative endpoint — mnemonic export (`/api/v1/wallet/mnemonic`), DB reset, wallet overwrite, key rotation — is unauthenticated. The Feb audit called this "mitigated" — the mitigation is opt-in and unchanged in effect.
 
 How far that reaches depends on the service's host binding, which differs:
 
-- **Gatekeeper is reachable from the network in a default compose deployment.** `docker/compose/gatekeeper-ts.yml:33` publishes `${ARCHON_GATEKEEPER_PORT}:4224` with no host-bind prefix, so DB reset and the other Gatekeeper admin routes are exposed on all interfaces with no key set.
+- **Gatekeeper.** `docker/compose/gatekeeper-ts.yml:33` publishes `${ARCHON_GATEKEEPER_PORT}:4224` on all interfaces. That is **by design** — Gatekeeper serves the public DID-resolution surface (`/1.0/identifiers`, `GET /did/:did`), and `docs/deployment.md:648` documents the port as "public for DID resolution, localhost if behind proxy", in deliberate contrast to Keymaster's fixed loopback bind.
+  The defect is not the open port; it is that the *same* public port also carries the admin routes — `db/reset`, `dids/remove`, `batch/import`, queue management — behind fail-open auth. This makes the finding worse rather than better: because the port is legitimately public, an operator **cannot** mitigate by binding it to localhost without giving up DID resolution. Requiring the admin key is the only available fix.
 - **Keymaster is not**, by default: `docker/compose/keymaster-ts.yml:30` publishes `${ARCHON_KEYMASTER_HOST_BIND:-127.0.0.1}:...:4226`, so mnemonic export is loopback-only unless the operator overrides `ARCHON_KEYMASTER_HOST_BIND` (or runs Keymaster outside compose, where `ARCHON_BIND_ADDRESS=0.0.0.0` from `sample.env` applies directly). Note this is *not* a defence against H-03: a malicious web page can still reach loopback Keymaster from the victim's own browser.
 
 **Fail-closed reference implementations already in this repo:** Drawbridge's `services/drawbridge/server/src/v1-admin.ts` returns 403 `{"error":"Admin API key not configured"}` when the key is empty and compares with `crypto.timingSafeEqual` — it is the same Express `RequestHandler` shape and header as the affected TS services, so it is a near-verbatim copy-paste template. Herald (`services/herald/server/src/oauth/index.ts:189`) is fail-closed and timing-safe too. The four services above compare keys with `!==`/`==`/Python `!=` (not timing-safe) — see L-06.
@@ -98,8 +99,8 @@ How far that reaches depends on the service's host binding, which differs:
 
 ### H-02: `/api/v1/login` discloses the admin API key when passphrase is unset
 
-**Severity:** 🟠 High
-**Locations:** `services/keymaster/server/src/keymaster-public-router.ts:100-115`; same in `python/keymaster_service/src/keymaster_service/app.py:148-157`
+**Severity:** 🟠 High on the Python service (fresh deployments); 🔵 Low (startup window only) on the TS service — see "Reachability" below
+**Locations:** `python/keymaster_service/src/keymaster_service/app.py:148-157`; same source shape in `services/keymaster/server/src/keymaster-public-router.ts:100-115`
 
 ```ts
 if (!config.keymasterPassphrase) {
@@ -109,18 +110,28 @@ if (!config.keymasterPassphrase) {
 }
 ```
 
-An operator who sets `ARCHON_ADMIN_API_KEY` but leaves `ARCHON_ENCRYPTED_PASSPHRASE` empty (its documented default in `sample.env`) gets **no protection at all**: anyone can POST `/api/v1/login` with an empty body and receive the admin key. The config that looks most secure is silently the bypass.
+An operator who sets `ARCHON_ADMIN_API_KEY` but leaves `ARCHON_ENCRYPTED_PASSPHRASE` empty (its documented default in `sample.env`) gets no protection from the key: POST `/api/v1/login` with an empty body returns it. The config that looks most secure is silently the bypass.
 
-Additionally: passphrase comparison is `!==` (timing oracle), and there is no rate limit or lockout — the passphrase is online-brute-forceable, and it also protects wallet encryption.
+**Reachability differs sharply between the two ports, and the original draft of this
+finding did not distinguish them:**
 
-**Remediation:** Never return the admin key from an unauthenticated endpoint; require the passphrase unconditionally when an admin key is configured; add rate limiting; use timing-safe comparison.
+- **Python — live on a fresh deployment.** The finding is in the FastAPI service (`python/keymaster_service`, image `ghcr.io/archetech/keymaster-python`, selected with `ARCHON_KEYMASTER_FLAVOR=py`), not the `python/keymaster` library. `Keymaster.__init__` (`python/keymaster/src/keymaster/core.py:126`) assigns `self.passphrase = passphrase` with no validation, so nothing rejects an empty one at construction.
+  Whether the service then survives startup depends on wallet state, because `startup()` calls `load_wallet()`:
+  - **No wallet yet → runs indefinitely.** `load_wallet` falls through to `new_wallet()`, which encrypts the mnemonic with `encrypt_with_passphrase(mnemonic, "")` (`core.py:197`). PBKDF2 over an empty string is valid, so the wallet saves and round-trips through `decrypt_wallet` without complaint. The service comes up and serves the dev-mode `/login` branch for as long as it runs. **This is the exposed case.**
+  - **Existing wallet encrypted under a real passphrase → fails safe by accident.** `decrypt_wallet` raises `KeymasterError("Incorrect passphrase.")` (`core.py:219`), so clearing `ARCHON_ENCRYPTED_PASSPHRASE` on an already-initialised node stops the service rather than opening `/login`.
+- **TypeScript — effectively unreachable in steady state.** `config.keymasterPassphrase` feeds both `/login` and the `Keymaster` constructor at `keymaster-api.ts:290`, and that constructor rejects an empty passphrase (`packages/keymaster/src/keymaster.ts:223`, asserted by `tests/keymaster/utils.test.ts:109`). An empty passphrase therefore throws inside the `app.listen` callback; the rejection is unhandled and Node terminates the process. The two reachable states are "passphrase set, login authenticates properly" and "service dead".
+  The residual TS exposure is a **startup window**: the callback runs after `listen`, and `gatekeeper.connect({ waitUntilReady: true })` on line 276 can block for a long time when Gatekeeper is not yet up. During that window the server is listening and `/login` returns the key. A crash-looping container reopens the window on every restart.
+
+Additionally, on both ports: passphrase comparison is non-constant-time (`!==` / `!=`, a timing oracle), and there is no rate limit or lockout — the passphrase is online-brute-forceable, and it also protects wallet encryption.
+
+**Remediation:** Never return the admin key from an unauthenticated endpoint; require the passphrase unconditionally when an admin key is configured; add rate limiting; use timing-safe comparison. Fix Python first. For TS, also consider validating the passphrase *before* `app.listen` so the process fails to start rather than dying mid-callback with a live socket.
 
 ### H-03: CORS allows all origins on Gatekeeper and Keymaster
 
 **Severity:** 🟠 High
 **Locations:** `services/keymaster/server/src/keymaster-api.ts:133-134`, `services/gatekeeper/server/src/gatekeeper-api.ts:116-117`
 
-`app.use(cors())` + `app.options('*', cors())`. Any website can drive a victim's browser against a Keymaster on localhost or a LAN address (`http://localhost:4226/api/v1/...`). With H-01/H-02 in default configs, a malicious page can exfiltrate the wallet mnemonic cross-origin. (Carried over from Feb H-04; still present and now worse given H-02.)
+`app.use(cors())` + `app.options('*', cors())`. Any website can drive a victim's browser against a Keymaster on localhost or a LAN address (`http://localhost:4226/api/v1/...`). With H-01 in a default config, a malicious page can exfiltrate the wallet mnemonic cross-origin — the loopback binding is no defence when the request originates in the victim's own browser. (Carried over from Feb H-04; still present.)
 
 **Remediation:** Default-deny origin list; allow only configured wallet origins.
 
@@ -168,7 +179,7 @@ e.g. `res.status(500).json({ error: error.toString() })` in `v1-search-router.ts
 
 ### M-05: Insecure defaults committed in `sample.env` and `data/btc-*/bitcoin.conf`
 
-- `sample.env`: `ARCHON_BIND_ADDRESS=0.0.0.0`, empty `ARCHON_ADMIN_API_KEY`, empty passphrases — copy-paste deployments inherit the worst configuration (feeds H-01/H-02).
+- `sample.env`: empty `ARCHON_ADMIN_API_KEY` and empty passphrases — copy-paste deployments inherit the weakest configuration (feeds H-01/H-02). Note `ARCHON_BIND_ADDRESS=0.0.0.0` is **not** part of this finding: it is the in-container listen address, which must be `0.0.0.0` for the service to be reachable at all under compose. Host exposure is controlled by the compose port mapping, not by this variable. It matters only when a service is run directly on a host.
 - `data/btc-signet/bitcoin.conf` and `data/btc-testnet4/bitcoin.conf`: committed `rpcuser=signet / rpcpassword=signet` (and `testnet4/testnet4`) with `rpcbind=0.0.0.0` + `rpcallowip=0.0.0.0/0`. Compose now binds host ports to `127.0.0.1` (verified in `docker/compose/btc-signet.yml`), so exposure is limited to the docker network — but any container compromise reaches the RPC with trivial credentials. Test networks only (no mainnet funds at risk), hence Medium.
 
 ### M-06: PBKDF2 iteration count env-overridable without a floor
@@ -245,7 +256,7 @@ other tracking surface.
 | M-01 | No input-validation library/schema | ❌ Still present — no schema-validation dependency in any `services/*/server/package.json` |
 | M-02 | Error message leaks | ❌ Still present — 182 sites (M-03) |
 | M-03 | NoSQL injection | ✅ Fixed — `$in`-only custom matcher |
-| M-04 | Empty passphrase fallback in Keymaster | ❌ Still present, and now materially worse — it is the trigger for H-02 |
+| M-04 | Empty passphrase fallback in Keymaster | ❌ Still present in the config layer, and it is the trigger for H-02 (live on Python; TS refuses to run with it) |
 | M-05 | Default creds in sample.env | ❌ Still present (M-05) |
 | M-06 | No container health checks | ✅ Fixed — healthchecks on core and Drawbridge-stack services |
 | M-07 | No resource limits | ❌ Still present — no `mem_limit` / `cpus` / `deploy.resources` in any compose file |
@@ -272,8 +283,8 @@ other tracking surface.
 ## 8. Remediation Priorities
 
 1. **C-01** — ✅ Done: PR #866, merged 2026-08-08. Any L402 deployment running a build older than that merge is still bypassable and should be updated.
-2. **H-02** — Stop returning the admin key from `/login` without passphrase verification.
-3. **H-01** — Fail closed on admin auth in production; timing-safe comparisons (copy Drawbridge's `v1-admin.ts` into TS Gatekeeper/Keymaster, `hmac.compare_digest` in Python, a constant-time compare in Rust); secure-by-default `sample.env` (`ARCHON_BIND_ADDRESS=127.0.0.1`, generated admin key); add a host bind to the Gatekeeper compose port mapping to match Keymaster's.
+2. **H-02** — Stop returning the admin key from `/login` without passphrase verification. Python first (live); TS is a startup-window edge case, best closed by validating the passphrase before `app.listen`.
+3. **H-01** — Fail closed on admin auth in production; timing-safe comparisons (copy Drawbridge's `v1-admin.ts` into TS Gatekeeper/Keymaster, `hmac.compare_digest` in Python, a constant-time compare in Rust); secure-by-default `sample.env` (generated admin key). Do **not** "fix" this by host-binding Gatekeeper's compose port — that port is public by design for DID resolution (`docs/deployment.md:648`); the admin key is the control.
 4. **H-03** — CORS allowlist.
 5. **H-04** — `tar` override; `@hono/node-server` pin; assess `helia`/`@libp2p/kad-dht` exposure.
 6. **M-01/M-02** — Stop trusting `X-DID`; atomic check-and-increment for macaroon uses.
