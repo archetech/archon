@@ -198,23 +198,31 @@ The label does NOT include the `/api/v1` prefix.
 
 ## 3. Authentication
 
-Two parallel auth schemes; either one passes the request through. Both
-are evaluated in this order on every protected route:
-
-1. **Subscription auth** (cheap, header-only). If the request carries a
-   `X-Subscription-DID` header containing a DID that resolves to an
-   asset the deployment owner has issued as a subscription credential,
-   the request is marked authenticated and proceeds.
-
-2. **L402 auth** (paid). If subscription auth didn't apply, the L402
-   middleware looks for an `Authorization: L402 <macaroon>:<preimage>`
-   header. If valid, proceeds. Otherwise, issues a 402 challenge.
+By default, protected routes are guarded by **L402 auth** alone: the
+L402 middleware looks for an `Authorization: L402 <macaroon>:<preimage>`
+header. If valid, the request proceeds. Otherwise it issues a 402
+challenge.
 
 If `ARCHON_DRAWBRIDGE_L402_ENABLED=false`, the auth middleware chain
 is empty and all proxy routes are open. This is intentional for
 private / single-tenant deployments.
 
-### 3.1 Bypass routes
+### 3.1 Subscription auth (insecure dev stub, off by default)
+
+Setting `ARCHON_DRAWBRIDGE_SUBSCRIPTIONS_ENABLED=true` prepends a
+subscription-auth middleware ahead of L402. **The current middleware is
+a stub and performs no verification whatsoever**: any request carrying
+an `X-Subscription-DID` header — any value, no credential resolution, no
+signature, no expiry or revocation check — is marked
+subscription-authenticated, and the L402 middleware then skips payment
+verification for it. Enabling this flag therefore lets any caller bypass
+the paywall with a single header. It exists only so the dual-auth flow
+can be exercised before the subscription system is built.
+
+Real credential verification is tracked in #121. Until that lands, leave
+this flag `false` in any deployment that is not a throwaway dev instance.
+
+### 3.2 Bypass routes
 
 The L402 middleware (mounted on the `/api/v1` router) has a hard-coded
 bypass list for paths that should never be paywalled. Paths are matched
@@ -475,6 +483,7 @@ shared with the reference TypeScript service.
 | `ARCHON_REDIS_URL` | `redis://localhost:6379` | Macaroon/payment/rate-limit store. |
 | `ARCHON_ADMIN_API_KEY` | empty | Required for L402 admin routes. Empty → admin routes 403. |
 | `ARCHON_DRAWBRIDGE_L402_ENABLED` | `false` | When `false`, all proxy routes open. |
+| `ARCHON_DRAWBRIDGE_SUBSCRIPTIONS_ENABLED` | `false` | **Insecure dev stub (#121).** When `true`, any request carrying an `X-Subscription-DID` header bypasses L402 payment verification with no credential check. See [§3.1](#31-subscription-auth-insecure-dev-stub-off-by-default). |
 | `ARCHON_DRAWBRIDGE_MACAROON_SECRET` | empty (**required**) | HMAC root secret. ≥ 32 chars. |
 | `ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS` | `10` | Per-request price for unmapped operations. |
 | `ARCHON_DRAWBRIDGE_INVOICE_EXPIRY` | `3600` | Macaroon expiry, seconds. |
@@ -543,7 +552,7 @@ No dedicated unit tests. Validation is end-to-end via:
 A conformant third implementation MUST:
 
 - Honor the route table in [§2](#2-http-api-contract) including the
-  bypass list in [§3.1](#31-bypass-routes), the body limits, and the
+  bypass list in [§3.2](#32-bypass-routes), the body limits, and the
   Herald-CORS exception.
 - Serve `GET /api/v1/capabilities` and apply the optional-service
   off-switch + 501 gating ([§1 Optional services](#optional-services)):

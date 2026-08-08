@@ -21,6 +21,10 @@ const config = {
 
     // L402
     l402Enabled: process.env.ARCHON_DRAWBRIDGE_L402_ENABLED === 'true',
+    // Subscription-auth stub (#121) bypasses L402 payment verification for any
+    // request carrying X-Subscription-DID. Keep disabled until #121 implements
+    // real credential verification.
+    subscriptionsEnabled: process.env.ARCHON_DRAWBRIDGE_SUBSCRIPTIONS_ENABLED === 'true',
     macaroonSecret: process.env.ARCHON_DRAWBRIDGE_MACAROON_SECRET || '',
     defaultPriceSats: process.env.ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS ? parseInt(process.env.ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS) : 10,
     invoiceExpiry: process.env.ARCHON_DRAWBRIDGE_INVOICE_EXPIRY ? parseInt(process.env.ARCHON_DRAWBRIDGE_INVOICE_EXPIRY) : 3600,
