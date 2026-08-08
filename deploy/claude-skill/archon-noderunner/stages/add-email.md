@@ -23,9 +23,9 @@ Enable Herald email-challenge flow (email-based DID verification).
    ARCHON_HERALD_SMTP_USER={{user}}
    ARCHON_HERALD_SMTP_PASS={{pass}}
    ARCHON_HERALD_SMTP_FROM={{from}}
-   ARCHON_HERALD_URL=http://herald:4232
+   ARCHON_HERALD_URL=http://herald:4230
    ```
-   Append `herald` (or the specific herald profile) to `COMPOSE_PROFILES`.
+   Append `drawbridge-names` to `COMPOSE_PROFILES` (that is the profile carrying `herald` and `herald-client`; it is additive on top of `drawbridge`, so ensure `drawbridge` is present too). Setting `ARCHON_HERALD_URL` in the same step is required — Drawbridge advertises and proxies `/names/*` based on that URL, not on the profile.
 
 3. **DNS check** — verify SPF/DKIM records are in place. If not, print required records and wait for the operator to add them and confirm.
 

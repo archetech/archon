@@ -86,16 +86,35 @@ Each add-stage has its own instruction file under `stages/` that this skill load
 
 Read the relevant stage file when its subcommand is invoked. Do not embed those procedures here.
 
-## Profile coupling to be aware of
+## Profile layout to be aware of
 
-The `drawbridge` compose profile shares service declarations with the full Lightning stack — enabling `drawbridge` also brings up `cln-mainnet-node`, `lnbits`, `rtl`, and `lightning-mediator` (they declare `profiles: ['lightning', 'drawbridge']`). Because of this coupling:
+Upstream has **split** the drawbridge profiles, so `drawbridge` no longer drags in the Lightning stack. The sub-profiles are additive on top of `drawbridge`:
 
-- **Stage 0 deliberately does NOT enable `drawbridge`** — Caddy proxies directly to the gatekeeper at port 4224.
-- **`add-lightning` is the stage that flips on `drawbridge`** — and with it, Herald, the drawbridge reverse-proxy, drawbridge-client, and the Tor SOCKS daemon. It also switches Caddy's `/api/*` and `/1.0/*` handlers from `localhost:4224` (gatekeeper direct) to `localhost:4222` (drawbridge, which then adds L402 auth).
-- **Tor SOCKS security posture, once `add-lightning` has run:** `ARCHON_TOR_SOCKS_PORT` defaults to `127.0.0.1:9050`; do not override to `0.0.0.0` (open-proxy footgun documented in archon issue #589, fix `be1dc357`). Verify with `docker port archon-tor-1` post-install and refuse to declare the stage healthy if it binds `0.0.0.0`.
-- **Drawbridge onion hostname** — once enabled, published to `data/tor-drawbridge/`; DIDComm and other services can advertise the `.onion` endpoint as a fallback when the operator's public clearnet host is unset. Prefer clearnet: set `ARCHON_DRAWBRIDGE_PUBLIC_HOST=<domain>` at add-lightning time.
+| Profile | Brings up |
+|---------|-----------|
+| `drawbridge` | `drawbridge`, `drawbridge-client` — the front-door proxy alone |
+| `drawbridge-lightning` | `lightning-mediator`, `cln-mainnet-node`, `lnbits`, `rtl` + init containers |
+| `drawbridge-names` | `herald`, `herald-client` |
+| `drawbridge-tor` | `tor` |
 
-If upstream ever splits the compose profiles so `drawbridge` can run without the Lightning containers, revisit this — stage 0 could then re-adopt drawbridge for cleaner routing.
+Capabilities follow the **URLs, not the profiles**: Drawbridge advertises and proxies a subservice whenever its `ARCHON_*_URL` is non-empty. Enabling a profile without its URL, or a URL without its profile, produces a connection error rather than the intended 501. Any stage that enables one must set the other:
+
+| Profile | Must also set |
+|---------|---------------|
+| `drawbridge-lightning` | `ARCHON_LIGHTNING_MEDIATOR_URL=http://lightning-mediator:4235` |
+| `drawbridge-names` | `ARCHON_HERALD_URL=http://herald:4230` |
+| `drawbridge-tor` | `ARCHON_*_TOR_PROXY=tor:9050` (else leave empty) |
+
+Consequences for the stages:
+
+- **Stage 0 still does NOT enable `drawbridge`** — Caddy proxies directly to the gatekeeper at 4224. The split now makes a lean `drawbridge`-only stage 0 *possible* (front-door routing without the Lightning weight); that is a deliberate open question, not something to change silently. Raise it with the operator rather than re-plumbing stage 0 mid-install.
+- **`add-lightning` should append `drawbridge,drawbridge-lightning`**, not bare `drawbridge`. It no longer implicitly brings up Herald or Tor; if the stage wants those, it must add `drawbridge-names` / `drawbridge-tor` explicitly. It still switches Caddy's `/api/*` and `/1.0/*` handlers from `localhost:4224` to `localhost:4222`.
+- **`add-email` should append `drawbridge-names`** and set `ARCHON_HERALD_URL`; Herald no longer arrives as a side effect of the drawbridge profile.
+- **Tor SOCKS security posture, wherever `drawbridge-tor` is enabled:** `ARCHON_TOR_SOCKS_PORT` defaults to `127.0.0.1:9050`; do not override to `0.0.0.0` (open-proxy footgun documented in archon issue #589, fix `be1dc357`). Verify with `docker port archon-tor-1` post-install and refuse to declare the stage healthy if it binds `0.0.0.0`.
+- **`tor` keeps a required `depends_on: drawbridge`**, so `drawbridge-tor` cannot be enabled on its own — always pair it with `drawbridge`.
+- **Drawbridge onion hostname** — with `drawbridge-tor` on, published to `data/tor-drawbridge/`; DIDComm and other services can advertise the `.onion` endpoint as a fallback when the operator's public clearnet host is unset. Prefer clearnet: set `ARCHON_DRAWBRIDGE_PUBLIC_HOST=<domain>`.
+
+Requires Docker Compose **v2.20+** (the compose files use `depends_on: … required: false`). Older Compose fails to parse the merged file entirely.
 
 ## Ongoing operations
 

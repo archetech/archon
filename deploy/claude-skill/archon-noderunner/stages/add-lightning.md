@@ -2,7 +2,9 @@
 
 Enable CLN + LNbits + lightning-mediator + drawbridge L402 authentication.
 
-**Note on profile coupling:** the `drawbridge` compose profile shares service declarations with `lightning` in upstream archon (`profiles: ['lightning', 'drawbridge']`). This stage enables BOTH profiles, which is why it also brings up Herald, drawbridge, drawbridge-client, and the Tor SOCKS daemon in addition to the Lightning-proper services. Stage 0 deliberately does not enable drawbridge, so this stage is the first place any of those come online.
+**Note on profiles:** upstream has split the drawbridge profiles, so `drawbridge` no longer implies the Lightning stack. This stage enables `drawbridge,drawbridge-lightning` (plus `lightning`), which brings up drawbridge, drawbridge-client, `lightning-mediator`, and the Lightning rail. It does **not** bring up Herald or Tor any more — add `drawbridge-names` / `drawbridge-tor` explicitly if the node needs them (`add-email` owns Herald). Stage 0 deliberately does not enable drawbridge, so this stage is still the first place the front-door proxy comes online.
+
+Because Drawbridge derives its capabilities from the `ARCHON_*_URL` values rather than the profiles, `ARCHON_LIGHTNING_MEDIATOR_URL` must be set in the same step as the profile — enabling one without the other yields connection errors instead of a clean 501.
 
 Once this stage completes:
 - Caddy's `/api/*` and `/1.0/*` handlers switch from `localhost:4224` (gatekeeper direct) to `localhost:4222` (drawbridge → gatekeeper). Public API calls now go through drawbridge's L402 auth layer.
@@ -32,7 +34,7 @@ Once this stage completes:
    ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL=http://lnbits:5000
    ARCHON_LIGHTNING_MEDIATOR_LNBITS_ADMIN_KEY={{generated}}
    ```
-   Append `lightning` to `COMPOSE_PROFILES`.
+   Append `lightning,drawbridge,drawbridge-lightning` to `COMPOSE_PROFILES` (idempotently — `drawbridge` may already be present).
 
 5. **Build & bring up** — CLN takes 5-15 minutes on first start (chain sync from bitcoind). Show live progress. Wait for CLN `getinfo` to return warmly.
 

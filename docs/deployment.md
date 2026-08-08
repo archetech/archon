@@ -21,7 +21,10 @@ This guide walks you through deploying an Archon node, from a core DID-only setu
 
 ## 1. Prerequisites
 
-- **Docker** v20.10+ and **Docker Compose** v2
+- **Docker** v20.10+ and **Docker Compose** **v2.20+**
+  (the compose files use `depends_on: … required: false`, added in 2.20; older
+  Compose fails to parse the merged file, which breaks every profile, not just
+  the one you enabled — check with `docker compose version`)
 - **Git** to clone the repository
 - A machine with at least 4 GB RAM (8 GB+ recommended with Lightning)
 
