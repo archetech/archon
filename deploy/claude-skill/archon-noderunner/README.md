@@ -27,13 +27,13 @@ Later stages, added one at a time:
 | `add-registry ZEC:mainnet` | Zcash mainnet anchor writer |
 | `add-registry ETH:mainnet` | Ethereum mainnet anchor writer |
 | `add-registry SOL:mainnet-beta` | Solana mainnet anchor writer |
-| `add-lightning` | CLN + LNbits + Lightning-mediator + drawbridge + Herald + Tor SOCKS (drawbridge profile shares services with lightning) |
+| `add-lightning` | CLN + LNbits + Lightning-mediator + drawbridge (profiles `lightning,drawbridge,drawbridge-lightning`) |
 | `add-didcomm` | DIDComm v2 messaging |
 | `add-email` | Herald email-challenge flow (needs SMTP) |
 | `add-pinning` | IPFS pinning-mediator (needs Pinata JWT or alt backend) |
 | `add-observability` | Prometheus + Grafana (Tailscale-only exposure) |
 
-Drawbridge, Herald, and Tor SOCKS ride along with `add-lightning` — the `drawbridge` compose profile shares service declarations with `lightning`, so enabling one enables the other. If you don't want Lightning, you don't get drawbridge/L402/onion either. Stage 0 without add-lightning is Caddy-direct-to-gatekeeper.
+Upstream has split the drawbridge profiles, so these are now independent. `add-lightning` brings up drawbridge + the Lightning stack (`drawbridge,drawbridge-lightning`); Herald arrives with `add-email` (`drawbridge-names`); Tor SOCKS and the onion hostname require `drawbridge-tor`, which no stage enables by default. Stage 0 without add-lightning is still Caddy-direct-to-gatekeeper.
 
 Each add-stage has its own human checkpoints (funding, credentials, channel opens). The skill will not cross them without explicit confirmation.
 
