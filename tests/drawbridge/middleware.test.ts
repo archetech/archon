@@ -74,15 +74,28 @@ describe('rate limiter', () => {
 });
 
 describe('combined auth middleware', () => {
-    it('chains subscription auth before the L402 paywall', async () => {
+    const l402Options = {
+        rootSecret: 'x'.repeat(32),
+        location: 'http://localhost',
+        defaults: { amountSat: 1, expirySeconds: 60, scopes: [] },
+        store: {} as any,
+    } as any;
+
+    it('defaults to L402 only — the subscription stub is excluded', async () => {
         const { createAuthMiddleware } = await import('../../services/drawbridge/server/src/middleware/auth');
 
-        const chain = createAuthMiddleware({
-            rootSecret: 'x'.repeat(32),
-            location: 'http://localhost',
-            defaults: { amountSat: 1, expirySeconds: 60, scopes: [] },
-            store: {} as any,
-        } as any);
+        // The subscription-auth stub (#121) accepts any X-Subscription-DID
+        // header without verification; it must never be in the default chain.
+        const chain = createAuthMiddleware(l402Options);
+
+        expect(chain).toHaveLength(1);
+        expect(chain.every(fn => typeof fn === 'function')).toBe(true);
+    });
+
+    it('prepends the subscription stub only when explicitly enabled', async () => {
+        const { createAuthMiddleware } = await import('../../services/drawbridge/server/src/middleware/auth');
+
+        const chain = createAuthMiddleware(l402Options, { subscriptionAuthEnabled: true });
 
         // Order matters: subscription auth marks the request so the L402
         // middleware can skip the challenge for an already-authenticated caller.

@@ -372,10 +372,14 @@ async function main() {
         logger,
     };
 
-    // Auth middleware (subscription + L402)
+    // Auth middleware (L402; subscription stub only when explicitly enabled)
     const authMiddleware = config.l402Enabled
-        ? createAuthMiddleware(l402Options)
+        ? createAuthMiddleware(l402Options, { subscriptionAuthEnabled: config.subscriptionsEnabled })
         : [] as express.RequestHandler[];
+
+    if (config.l402Enabled && config.subscriptionsEnabled) {
+        logger.warn('Subscription-auth stub (#121) is ENABLED — requests with X-Subscription-DID bypass L402 payment verification');
+    }
 
     if (!config.l402Enabled) {
         logger.info('L402 paywall disabled (ARCHON_DRAWBRIDGE_L402_ENABLED=false)');
