@@ -515,12 +515,23 @@ describe('/api/v1 block, search, health, and admin behaviour', () => {
         await expect(request(app).get('/api/v1/status')).resolves.toMatchObject({ status: 500 });
     });
 
-    it('leaves admin routes unprotected when no admin key is configured', async () => {
+    it('refuses admin routes when no admin key is configured', async () => {
         const { app, gatekeeper } = mount({ adminApiKey: '' });
 
         const response = await request(app).get('/api/v1/queue/local');
-        expect(response.status).toBe(200);
-        expect(gatekeeper.getQueue).toHaveBeenCalledWith('local');
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ error: 'Admin API key not configured' });
+        expect(gatekeeper.getQueue).not.toHaveBeenCalled();
+    });
+
+    it('rejects an admin key of the wrong length without throwing', async () => {
+        const { app, gatekeeper } = mount();
+
+        const response = await request(app)
+            .get('/api/v1/queue/local')
+            .set('X-Archon-Admin-Key', `${adminKey}-longer`);
+        expect(response.status).toBe(401);
+        expect(gatekeeper.getQueue).not.toHaveBeenCalled();
     });
 });
 
