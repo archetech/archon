@@ -21,8 +21,8 @@ services:
       - ARCHON_DIDCOMM_DB=${ARCHON_DIDCOMM_DB:-memory}
       - ARCHON_REDIS_URL=redis://redis:6379
       # Outbound egress (POST /deliver): dial .onion recipients via Tor (needs
-      # the `drawbridge-tor` profile's tor service). Clearnet delivery needs no
-      # proxy; set ARCHON_DIDCOMM_TOR_PROXY= empty when that profile is off.
+      # the `tor` profile). Clearnet delivery needs no proxy — set
+      # ARCHON_DIDCOMM_TOR_PROXY= empty when that profile is off.
       # Single-dash default, matching the optional-service URLs: an explicitly
       # EMPTY value must survive so onion egress can be disabled. With `:-` an
       # empty value would be replaced by the default and could not be turned off.

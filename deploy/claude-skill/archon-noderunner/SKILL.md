@@ -18,7 +18,7 @@ You are a guided installer for Archon DID nodes. Your job is to bring up a worki
 ### `install --domain <dom> --node-name <name> --node-id <id>`
 Bring up **stage 0**: minimal hyperswarm node delegating chain resolution to an upstream Archon (default `https://4tress.org`). No funding, no external RPC keys required. Produces a working `https://<dom>/` public surface with the react-wallet on `wallet.<dom>`.
 
-Container set (7): `gatekeeper`, `keymaster`, `redis`, `mongodb`, `ipfs` (always-on core), plus `hyperswarm-mediator` and `react-wallet` from the two stage-0 compose profiles. Caddy reverse-proxies public traffic straight to the gatekeeper on port 4224 (no drawbridge, no L402 auth, no Lightning, no Tor SOCKS). Drawbridge and Lightning land with `add-lightning`; Herald with `add-email`; Tor SOCKS only if `drawbridge-tor` is enabled, which no stage does by default.
+Container set (7): `gatekeeper`, `keymaster`, `redis`, `mongodb`, `ipfs` (always-on core), plus `hyperswarm-mediator` and `react-wallet` from the two stage-0 compose profiles. Caddy reverse-proxies public traffic straight to the gatekeeper on port 4224 (no drawbridge, no L402 auth, no Lightning, no Tor SOCKS). Drawbridge and Lightning land with `add-lightning`; Herald with `add-email`; Tor SOCKS only if `tor` is enabled, which no stage does by default.
 
 Deliberately NOT in stage 0: `gatekeeper-client` and `keymaster-client`. These are admin/dev SPAs, not runtime dependencies. Per operator preference (admin UIs should be Tailscale-only), stage 0 leaves them out. An operator wanting them can append `gatekeeper-client,keymaster-client` to `COMPOSE_PROFILES` and expose them via Tailscale rather than the public Caddyfile.
 
@@ -88,31 +88,31 @@ Read the relevant stage file when its subcommand is invoked. Do not embed those 
 
 ## Profile layout to be aware of
 
-Upstream has **split** the drawbridge profiles, so `drawbridge` no longer drags in the Lightning stack. The sub-profiles are additive on top of `drawbridge`:
+Upstream has **split** these into independent profiles, each named after what it starts, so `drawbridge` no longer drags in the Lightning stack:
 
 | Profile | Brings up |
 |---------|-----------|
 | `drawbridge` | `drawbridge`, `drawbridge-client` — the front-door proxy alone |
-| `drawbridge-lightning` | `lightning-mediator`, `cln-mainnet-node`, `lnbits`, `rtl` + init containers |
-| `drawbridge-names` | `herald`, `herald-client` |
-| `drawbridge-tor` | `tor` |
+| `lightning` | `lightning-mediator`, `cln-mainnet-node`, `lnbits`, `rtl` + init containers |
+| `herald` | `herald`, `herald-client` |
+| `tor` | `tor` |
 
-Capabilities follow the **URLs, not the profiles**: Drawbridge advertises and proxies a subservice whenever its `ARCHON_*_URL` is non-empty. Enabling a profile without its URL, or a URL without its profile, produces a connection error rather than the intended 501. Any stage that enables one must set the other:
+Capabilities follow the **URLs, not the profiles**: Drawbridge advertises and proxies an upstream whenever its `ARCHON_*_URL` is non-empty. Enabling a profile without its URL, or a URL without its profile, produces a connection error rather than the intended 501. Any stage that enables one must set the other:
 
 | Profile | Must also set |
 |---------|---------------|
-| `drawbridge-lightning` | `ARCHON_LIGHTNING_MEDIATOR_URL=http://lightning-mediator:4235` |
-| `drawbridge-names` | `ARCHON_HERALD_URL=http://herald:4230` |
-| `drawbridge-tor` | `ARCHON_*_TOR_PROXY=tor:9050` (else leave empty) |
+| `lightning` | `ARCHON_LIGHTNING_MEDIATOR_URL=http://lightning-mediator:4235` |
+| `herald` | `ARCHON_HERALD_URL=http://herald:4230` |
+| `tor` | `ARCHON_*_TOR_PROXY=tor:9050` (else leave empty) |
 
 Consequences for the stages:
 
 - **Stage 0 still does NOT enable `drawbridge`** — Caddy proxies directly to the gatekeeper at 4224. The split now makes a lean `drawbridge`-only stage 0 *possible* (front-door routing without the Lightning weight); that is a deliberate open question, not something to change silently. Raise it with the operator rather than re-plumbing stage 0 mid-install.
-- **`add-lightning` should append `drawbridge,drawbridge-lightning`**, not bare `drawbridge`. It no longer implicitly brings up Herald or Tor; if the stage wants those, it must add `drawbridge-names` / `drawbridge-tor` explicitly. It still switches Caddy's `/api/*` and `/1.0/*` handlers from `localhost:4224` to `localhost:4222`.
-- **`add-email` should append `drawbridge-names`** and set `ARCHON_HERALD_URL`; Herald no longer arrives as a side effect of the drawbridge profile.
-- **Tor SOCKS security posture, wherever `drawbridge-tor` is enabled:** `ARCHON_TOR_SOCKS_PORT` defaults to `127.0.0.1:9050`; do not override to `0.0.0.0` (open-proxy footgun documented in archon issue #589, fix `be1dc357`). Verify with `docker port archon-tor-1` post-install and refuse to declare the stage healthy if it binds `0.0.0.0`.
-- **Always pair the sub-profiles with `drawbridge`.** They will start on their own, but tor's hidden service targets `drawbridge:4222` and `herald-client` is built against Drawbridge's `/names/api`, so alone they front nothing.
-- **Drawbridge onion hostname** — with `drawbridge-tor` on, published to `data/tor-drawbridge/`; DIDComm and other services can advertise the `.onion` endpoint as a fallback when the operator's public clearnet host is unset. Prefer clearnet: set `ARCHON_DRAWBRIDGE_PUBLIC_HOST=<domain>`.
+- **`add-lightning` should append `drawbridge,lightning`**, not bare `drawbridge`. It no longer implicitly brings up Herald or Tor; if the stage wants those, it must add `herald` / `tor` explicitly. It still switches Caddy's `/api/*` and `/1.0/*` handlers from `localhost:4224` to `localhost:4222`.
+- **`add-email` should append `herald`** and set `ARCHON_HERALD_URL`; Herald no longer arrives as a side effect of the drawbridge profile.
+- **Tor SOCKS security posture, wherever `tor` is enabled:** `ARCHON_TOR_SOCKS_PORT` defaults to `127.0.0.1:9050`; do not override to `0.0.0.0` (open-proxy footgun documented in archon issue #589, fix `be1dc357`). Verify with `docker port archon-tor-1` post-install and refuse to declare the stage healthy if it binds `0.0.0.0`.
+- **Pair `lightning` / `herald` / `tor` with `drawbridge`.** They will start on their own, but tor's hidden service targets `drawbridge:4222` and `herald-client` is built against Drawbridge's `/names/api`, so alone they front nothing.
+- **Drawbridge onion hostname** — with `tor` on, published to `data/tor-drawbridge/`; DIDComm and other services can advertise the `.onion` endpoint as a fallback when the operator's public clearnet host is unset. Prefer clearnet: set `ARCHON_DRAWBRIDGE_PUBLIC_HOST=<domain>`.
 
 Requires Docker Compose **v2.20+** (the compose files use `depends_on: … required: false`). Older Compose fails to parse the merged file entirely.
 

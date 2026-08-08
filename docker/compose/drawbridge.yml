@@ -1,6 +1,6 @@
 services:
   herald:
-    profiles: ["drawbridge-names"]
+    profiles: ["herald"]
     build:
       context: ../..
       dockerfile: services/herald/Dockerfile
@@ -26,10 +26,10 @@ services:
       - ARCHON_HERALD_IPNS_KEY_NAME=${ARCHON_HERALD_IPNS_KEY_NAME:-herald}
       - ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID=${ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID:-did:cid:bagaaieravnv5onsflewvrz6urhwfjixfnwq7bgc3ejhlrj2nekx75ddhdupq}
       - ARCHON_HERALD_OWNER_DID=${ARCHON_HERALD_OWNER_DID:-}
-      # Single-dash default: tor lives in the `drawbridge-tor` profile and is an
-      # optional dependency, so an explicitly EMPTY value must survive to disable
-      # onion egress. With `:-` an empty value would be replaced by the default,
-      # leaving Herald dialling a SOCKS proxy that isn't running.
+      # Single-dash default: tor is its own profile and an optional dependency,
+      # so an explicitly EMPTY value must survive to disable onion egress. With
+      # `:-` an empty value would be replaced by the default, leaving Herald
+      # dialling a SOCKS proxy that isn't running.
       - ARCHON_HERALD_TOR_PROXY=${ARCHON_HERALD_TOR_PROXY-tor:9050}
       - ARCHON_HERALD_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
       - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
@@ -60,7 +60,7 @@ services:
         required: false
 
   herald-client:
-    profiles: ["drawbridge-names"]
+    profiles: ["herald"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.herald-client
@@ -140,7 +140,7 @@ services:
         condition: service_healthy
 
   lightning-mediator:
-    profiles: ["drawbridge-lightning"]
+    profiles: ["lightning"]
     build:
       context: ../..
       dockerfile: docker/Dockerfile.lightning-mediator
@@ -208,7 +208,7 @@ services:
         condition: service_healthy
 
   tor:
-    profiles: ["drawbridge-tor"]
+    profiles: ["tor"]
     image: goldy/tor-hidden-service:latest
     ports:
       - "${ARCHON_TOR_SOCKS_PORT:-127.0.0.1:9050}:9050"
@@ -230,7 +230,7 @@ services:
         echo '[tor] Published onion hostname'
         wait
     depends_on:
-      # Optional so `drawbridge-tor` can be selected without `drawbridge`.
+      # Optional so the `tor` profile can be selected without `drawbridge`.
       # A required dependency on a service in another profile makes the whole
       # merged project invalid ("depends on undefined service"), which is a
       # parse error for every profile, not just this one. When `drawbridge` IS

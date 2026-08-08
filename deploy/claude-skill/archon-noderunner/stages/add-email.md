@@ -24,13 +24,13 @@ Enable Herald email-challenge flow (email-based DID verification).
    ARCHON_HERALD_SMTP_PASS={{pass}}
    ARCHON_HERALD_SMTP_FROM={{from}}
    ARCHON_HERALD_URL=http://herald:4230
-   # Explicitly empty: this stage does not enable `drawbridge-tor`. The compose
+   # Explicitly empty: this stage does not enable the `tor` profile. The compose
    # default is `${ARCHON_HERALD_TOR_PROXY-tor:9050}` (single dash), so leaving
    # the key UNSET still resolves to tor:9050 and Herald would dial a container
    # that isn't running. Only an explicit empty value disables onion egress.
    ARCHON_HERALD_TOR_PROXY=
    ```
-   Append `drawbridge-names` to `COMPOSE_PROFILES` (that is the profile carrying `herald` and `herald-client`; it is additive on top of `drawbridge`, so ensure `drawbridge` is present too). Setting `ARCHON_HERALD_URL` in the same step is required — Drawbridge advertises and proxies `/names/*` based on that URL, not on the profile.
+   Append `herald` to `COMPOSE_PROFILES` (it carries `herald` and `herald-client`; ensure `drawbridge` is present too, since Drawbridge is what fronts `/names/*`). Setting `ARCHON_HERALD_URL` in the same step is required — Drawbridge advertises and proxies `/names/*` based on that URL, not on the profile.
 
 3. **DNS check** — verify SPF/DKIM records are in place. If not, print required records and wait for the operator to add them and confirm.
 

@@ -2,7 +2,7 @@
 
 Enable CLN + LNbits + lightning-mediator + drawbridge L402 authentication.
 
-**Note on profiles:** upstream has split the drawbridge profiles, so `drawbridge` no longer implies the Lightning stack. This stage enables `drawbridge,drawbridge-lightning` (plus `lightning`), which brings up drawbridge, drawbridge-client, `lightning-mediator`, and the Lightning rail. It does **not** bring up Herald or Tor any more — add `drawbridge-names` / `drawbridge-tor` explicitly if the node needs them (`add-email` owns Herald). Stage 0 deliberately does not enable drawbridge, so this stage is still the first place the front-door proxy comes online.
+**Note on profiles:** upstream has split these into independent profiles, so `drawbridge` no longer implies the Lightning stack. This stage enables `drawbridge,lightning`, which brings up drawbridge, drawbridge-client, `lightning-mediator`, and the Lightning rail. It does **not** bring up Herald or Tor any more — add the `herald` / `tor` profiles explicitly if the node needs them (`add-email` owns Herald). Stage 0 deliberately does not enable drawbridge, so this stage is still the first place the front-door proxy comes online.
 
 Because Drawbridge derives its capabilities from the `ARCHON_*_URL` values rather than the profiles, `ARCHON_LIGHTNING_MEDIATOR_URL` must be set in the same step as the profile — enabling one without the other yields connection errors instead of a clean 501.
 
@@ -10,7 +10,7 @@ Once this stage completes:
 - Caddy's `/api/*` and `/1.0/*` handlers switch from `localhost:4224` (gatekeeper direct) to `localhost:4222` (drawbridge → gatekeeper). Public API calls now go through drawbridge's L402 auth layer.
 - `/invoice/*` is added at `localhost:4222` for Lightning invoice endpoints.
 
-**Not** part of this stage any more, since it no longer enables `drawbridge-tor`: there is no Tor SOCKS listener on `127.0.0.1:9050` and no onion hostname at `data/tor-drawbridge/drawbridge/hostname`. Do not probe for either when verifying stage health. An operator who wants them adds `drawbridge-tor` to `COMPOSE_PROFILES` and sets the `*_TOR_PROXY` variables to `tor:9050`.
+**Not** part of this stage any more, since it no longer enables the `tor` profile: there is no Tor SOCKS listener on `127.0.0.1:9050` and no onion hostname at `data/tor-drawbridge/drawbridge/hostname`. Do not probe for either when verifying stage health. An operator who wants them adds `tor` to `COMPOSE_PROFILES` and sets the `*_TOR_PROXY` variables to `tor:9050`.
 
 ## Prereqs
 
@@ -33,13 +33,13 @@ Once this stage completes:
    ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL=https://cln:3001
    ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL=http://lnbits:5000
    ARCHON_LIGHTNING_MEDIATOR_LNBITS_ADMIN_KEY={{generated}}
-   # Explicitly empty: this stage does not enable `drawbridge-tor`. The compose
+   # Explicitly empty: this stage does not enable the `tor` profile. The compose
    # default is `${ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY-tor:9050}` (single dash),
    # so leaving the key UNSET still resolves to tor:9050 and the mediator would
    # dial a container that isn't running. Only an explicit empty value disables it.
    ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY=
    ```
-   Append `lightning,drawbridge,drawbridge-lightning` to `COMPOSE_PROFILES` (idempotently — `drawbridge` may already be present).
+   Append `drawbridge,lightning` to `COMPOSE_PROFILES` (idempotently — `drawbridge` may already be present).
 
 5. **Build & bring up** — CLN takes 5-15 minutes on first start (chain sync from bitcoind). Show live progress. Wait for CLN `getinfo` to return warmly.
 
