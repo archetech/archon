@@ -98,7 +98,7 @@ How far that reaches depends on the service's host binding, which differs:
 
 ### H-02: `/api/v1/login` discloses the admin API key when passphrase is unset
 
-**Severity:** 🟠 High on the Python service; 🔵 Low (startup window only) on the TS service — see "Reachability" below
+**Severity:** 🟠 High on the Python service (fresh deployments); 🔵 Low (startup window only) on the TS service — see "Reachability" below
 **Locations:** `python/keymaster_service/src/keymaster_service/app.py:148-157`; same source shape in `services/keymaster/server/src/keymaster-public-router.ts:100-115`
 
 ```ts
@@ -114,7 +114,10 @@ An operator who sets `ARCHON_ADMIN_API_KEY` but leaves `ARCHON_ENCRYPTED_PASSPHR
 **Reachability differs sharply between the two ports, and the original draft of this
 finding did not distinguish them:**
 
-- **Python — live.** `Keymaster.__init__` (`python/keymaster/src/keymaster/core.py:126`) assigns `self.passphrase = passphrase` with no validation, so the service starts normally with an empty passphrase and serves the dev-mode branch indefinitely.
+- **Python — live on a fresh deployment.** The finding is in the FastAPI service (`python/keymaster_service`, image `ghcr.io/archetech/keymaster-python`, selected with `ARCHON_KEYMASTER_FLAVOR=py`), not the `python/keymaster` library. `Keymaster.__init__` (`python/keymaster/src/keymaster/core.py:126`) assigns `self.passphrase = passphrase` with no validation, so nothing rejects an empty one at construction.
+  Whether the service then survives startup depends on wallet state, because `startup()` calls `load_wallet()`:
+  - **No wallet yet → runs indefinitely.** `load_wallet` falls through to `new_wallet()`, which encrypts the mnemonic with `encrypt_with_passphrase(mnemonic, "")` (`core.py:197`). PBKDF2 over an empty string is valid, so the wallet saves and round-trips through `decrypt_wallet` without complaint. The service comes up and serves the dev-mode `/login` branch for as long as it runs. **This is the exposed case.**
+  - **Existing wallet encrypted under a real passphrase → fails safe by accident.** `decrypt_wallet` raises `KeymasterError("Incorrect passphrase.")` (`core.py:219`), so clearing `ARCHON_ENCRYPTED_PASSPHRASE` on an already-initialised node stops the service rather than opening `/login`.
 - **TypeScript — effectively unreachable in steady state.** `config.keymasterPassphrase` feeds both `/login` and the `Keymaster` constructor at `keymaster-api.ts:290`, and that constructor rejects an empty passphrase (`packages/keymaster/src/keymaster.ts:223`, asserted by `tests/keymaster/utils.test.ts:109`). An empty passphrase therefore throws inside the `app.listen` callback; the rejection is unhandled and Node terminates the process. The two reachable states are "passphrase set, login authenticates properly" and "service dead".
   The residual TS exposure is a **startup window**: the callback runs after `listen`, and `gatekeeper.connect({ waitUntilReady: true })` on line 276 can block for a long time when Gatekeeper is not yet up. During that window the server is listening and `/login` returns the key. A crash-looping container reopens the window on every restart.
 
