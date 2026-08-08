@@ -9,17 +9,16 @@ _base_url = os.environ.get("ARCHON_KEYMASTER_URL", "http://localhost:4226")
 _keymaster_api = _base_url + "/api/v1"
 _session = requests.Session()
 
-# Service-to-service admin auth uses X-Archon-Admin-Key; Authorization is
-# reserved for user/session/OAuth-style flows (see docs/deployment.md). The TS
-# Keymaster accepts only the former, the Python service accepts either, so send
-# both: the custom header is what actually authenticates, and the bearer is kept
-# for compatibility with deployments that were relying on it.
+# Service-to-service admin auth uses X-Archon-Admin-Key. Authorization is
+# reserved for user/session/OAuth-style flows (see docs/deployment.md), so the
+# admin secret is deliberately not sent there — the TS Keymaster ignores it
+# anyway, and duplicating the secret into Authorization would collide with any
+# future user auth on that header.
 _ARCHON_ADMIN_HEADER = "X-Archon-Admin-Key"
 
 _admin_api_key = os.environ.get("ARCHON_ADMIN_API_KEY", "")
 if _admin_api_key:
     _session.headers[_ARCHON_ADMIN_HEADER] = _admin_api_key
-    _session.headers["Authorization"] = f"Bearer {_admin_api_key}"
 
 
 class KeymasterError(Exception):
@@ -39,10 +38,11 @@ def set_api_key(api_key: str):
     _admin_api_key = api_key
     if api_key:
         add_custom_header(_ARCHON_ADMIN_HEADER, api_key)
-        add_custom_header("Authorization", f"Bearer {api_key}")
     else:
         remove_custom_header(_ARCHON_ADMIN_HEADER)
-        remove_custom_header("Authorization")
+    # Clear any Authorization left by an older SDK version that sent the admin
+    # key as a bearer token.
+    remove_custom_header("Authorization")
 
 
 def proxy_request(method, url, **kwargs):

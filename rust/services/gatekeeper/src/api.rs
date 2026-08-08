@@ -2104,27 +2104,19 @@ pub(crate) fn is_valid_registry(registry: &str) -> bool {
         && chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, ':' | '_' | '-'))
 }
 
-// Constant-time byte comparison, so a mismatched admin key cannot be
-// recovered byte-by-byte from response timing. Length is not secret (and
-// leaks via the early return), only the contents are.
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-
-    let mut diff = 0u8;
-    for (x, y) in a.iter().zip(b.iter()) {
-        diff |= x ^ y;
-    }
-    diff == 0
+fn require_admin_key(state: &AppState, headers: &HeaderMap) -> Option<Response> {
+    check_admin_key(&state.config.admin_api_key, headers)
 }
 
 // Fails closed: with no key configured the admin routes are refused rather
 // than opened. `run()` additionally refuses to start without
 // ARCHON_ADMIN_API_KEY, so a 403 here means the state was built
 // programmatically without one.
-fn require_admin_key(state: &AppState, headers: &HeaderMap) -> Option<Response> {
-    if state.config.admin_api_key.is_empty() {
+//
+// Split out from `require_admin_key` so it can be unit-tested without
+// standing up an AppState.
+fn check_admin_key(configured: &str, headers: &HeaderMap) -> Option<Response> {
+    if configured.is_empty() {
         return Some(
             (
                 StatusCode::FORBIDDEN,
@@ -2138,8 +2130,15 @@ fn require_admin_key(state: &AppState, headers: &HeaderMap) -> Option<Response> 
         .get("x-archon-admin-key")
         .and_then(|value| value.to_str().ok());
 
+    // constant_time_eq compares contents without early-exit, so a wrong key
+    // cannot be recovered byte-by-byte from response timing. Length is not
+    // secret and is allowed to short-circuit.
     let authorized = match provided {
-        Some(value) => constant_time_eq(value.as_bytes(), state.config.admin_api_key.as_bytes()),
+        Some(value) => {
+            let value = value.as_bytes();
+            let expected = configured.as_bytes();
+            value.len() == expected.len() && constant_time_eq::constant_time_eq(value, expected)
+        }
         None => false,
     };
 
@@ -2207,4 +2206,62 @@ fn confirm_fallback_url(base_url: &str, did: &str, options: &ResolveOptions) -> 
         url_encode_component(did),
         params.join("&")
     )
+}
+
+#[cfg(test)]
+mod admin_key_tests {
+    use super::*;
+    use axum::http::HeaderValue;
+
+    const KEY: &str = "test-admin-key";
+
+    fn headers_with(value: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-archon-admin-key", HeaderValue::from_str(value).unwrap());
+        headers
+    }
+
+    #[test]
+    fn refuses_when_no_key_is_configured() {
+        // Fail closed rather than open — the TS port returns the same 403.
+        let response = check_admin_key("", &headers_with(KEY)).expect("should refuse");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn refuses_when_no_key_is_configured_and_none_provided() {
+        let response = check_admin_key("", &HeaderMap::new()).expect("should refuse");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn rejects_a_missing_header() {
+        let response = check_admin_key(KEY, &HeaderMap::new()).expect("should reject");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn rejects_a_wrong_key_of_equal_length() {
+        let wrong = "test-admin-kez";
+        assert_eq!(wrong.len(), KEY.len());
+        let response = check_admin_key(KEY, &headers_with(wrong)).expect("should reject");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn rejects_a_key_of_the_wrong_length() {
+        // The length guard must run before the constant-time compare, which
+        // requires equal-length slices.
+        let response =
+            check_admin_key(KEY, &headers_with("test-admin-key-longer")).expect("should reject");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        let response = check_admin_key(KEY, &headers_with("test")).expect("should reject");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn accepts_the_configured_key() {
+        assert!(check_admin_key(KEY, &headers_with(KEY)).is_none());
+    }
 }

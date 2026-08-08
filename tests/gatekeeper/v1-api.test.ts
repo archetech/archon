@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 import { createV1Router } from '../../services/gatekeeper/server/src/v1-router';
+import { checkAdminApiKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/gatekeeper/server/src/v1-admin';
 import defaultConfig from '../../services/gatekeeper/server/src/config';
 
 const adminKey = 'test-admin-key';
@@ -579,5 +580,39 @@ describe('/api/v1 IPFS routes', () => {
             const response = await call();
             expect([label, response.status]).toEqual([label, 500]);
         }
+    });
+});
+
+describe('startup admin key validation', () => {
+    // main() exits non-zero on a fatal result; these cover the rule itself,
+    // since a route test constructs the app directly and never reaches main().
+    it('is fatal when no admin key is configured', () => {
+        const result = checkAdminApiKey('');
+
+        expect(result.fatal).toBeDefined();
+        expect(result.fatal).toContain('ARCHON_ADMIN_API_KEY must be set');
+        expect(result.fatal).toContain('openssl rand -hex 32');
+        expect(result.warning).toBeUndefined();
+    });
+
+    it('warns but does not block startup for a short key', () => {
+        const result = checkAdminApiKey('short-key');
+
+        expect(result.fatal).toBeUndefined();
+        expect(result.warning).toContain(`shorter than ${MIN_ADMIN_API_KEY_LENGTH}`);
+    });
+
+    it('accepts a key at the minimum length with no warning', () => {
+        const result = checkAdminApiKey('a'.repeat(MIN_ADMIN_API_KEY_LENGTH));
+
+        expect(result.fatal).toBeUndefined();
+        expect(result.warning).toBeUndefined();
+    });
+
+    it('accepts a generated 64-character key', () => {
+        const result = checkAdminApiKey('0'.repeat(64));
+
+        expect(result.fatal).toBeUndefined();
+        expect(result.warning).toBeUndefined();
     });
 });

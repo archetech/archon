@@ -9,6 +9,7 @@ import type Gatekeeper from '@didcid/gatekeeper';
 import { CheckDIDsResult } from '@didcid/gatekeeper/types';
 import { createIdentifiersRouter } from './identifiers-router.js';
 import { createV1Router } from './v1-router.js';
+import { checkAdminApiKey } from './v1-admin.js';
 import defaultConfig from './config.js';
 import promClient from 'prom-client';
 import pino from 'pino';
@@ -400,27 +401,18 @@ async function createDb(config: GatekeeperApiConfig) {
     }
 }
 
-// Minimum length we accept for ARCHON_ADMIN_API_KEY. Below this we warn but
-// still start — an existing deployment with a short key should not be bricked
-// by an upgrade. `openssl rand -hex 32` (the documented generator) yields 64.
-const MIN_ADMIN_API_KEY_LENGTH = 32;
-
 async function main() {
     const config = defaultConfig;
 
-    // Fail closed: admin routes (db/reset, dids/remove, batch import/export,
-    // queue management) must never be reachable unauthenticated. Refuse to
-    // start rather than serve them open. Mediators read the same
-    // ARCHON_ADMIN_API_KEY, so an unset key would otherwise mean they silently
-    // 403 against the admin routes they depend on.
-    if (!config.adminApiKey) {
-        console.error('ARCHON_ADMIN_API_KEY must be set — admin routes would otherwise be unauthenticated.');
-        console.error('Generate one with: openssl rand -hex 32');
+    const adminKeyCheck = checkAdminApiKey(config.adminApiKey);
+
+    if (adminKeyCheck.fatal) {
+        console.error(adminKeyCheck.fatal);
         process.exit(1);
     }
 
-    if (config.adminApiKey.length < MIN_ADMIN_API_KEY_LENGTH) {
-        console.warn(`Warning: ARCHON_ADMIN_API_KEY is shorter than ${MIN_ADMIN_API_KEY_LENGTH} characters — regenerate it with: openssl rand -hex 32`);
+    if (adminKeyCheck.warning) {
+        console.warn(adminKeyCheck.warning);
     }
 
     const db = await createDb(config);

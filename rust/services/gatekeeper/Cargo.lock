@@ -59,6 +59,7 @@ dependencies = [
  "bytes",
  "chrono",
  "cid",
+ "constant_time_eq",
  "dotenvy",
  "futures-util",
  "k256",

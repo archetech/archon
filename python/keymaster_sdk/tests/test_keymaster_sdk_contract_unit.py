@@ -268,17 +268,15 @@ def test_stream_aliases_and_connection_helpers(monkeypatch):
     assert update_calls == [("did:test:file", b"abc", {"filename": "doc.txt"})]
     assert sdk._base_url == "http://unit.test"
     assert sdk._keymaster_api == "http://unit.test/api/v1"
-    # Service-to-service auth is the custom header — the TS Keymaster reads only
-    # that one. Authorization is sent alongside for the Python service, which
-    # accepts either.
+    # Service-to-service auth is the custom header. Authorization is reserved
+    # for user/session flows and must not carry the admin secret.
     assert sdk._session.headers["X-Archon-Admin-Key"] == "secret"
-    assert sdk._session.headers["Authorization"] == "Bearer secret"
+    assert "Authorization" not in sdk._session.headers
     assert readiness_checks == ["ready", "ready", "ready"]
     assert sleeps == [2, 2]
 
     sdk.set_api_key("")
     assert "X-Archon-Admin-Key" not in sdk._session.headers
-    assert "Authorization" not in sdk._session.headers
 
 
 def test_create_returns_configured_sdk_module(monkeypatch):
