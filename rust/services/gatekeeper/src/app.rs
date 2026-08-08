@@ -54,11 +54,35 @@ pub(crate) struct AppState {
     pub(crate) started_at: Instant,
 }
 
+// Minimum length we accept for ARCHON_ADMIN_API_KEY. Below this we warn but
+// still start — an existing deployment with a short key should not be bricked
+// by an upgrade. `openssl rand -hex 32` (the documented generator) yields 64.
+const MIN_ADMIN_API_KEY_LENGTH: usize = 32;
+
 pub async fn run() -> Result<()> {
     dotenvy::dotenv().ok();
     init_tracing();
 
     let config = Config::from_env()?;
+
+    // Fail closed: admin routes (db/reset, dids/remove, batch import/export,
+    // queue management) must never be reachable unauthenticated. Refuse to
+    // start rather than serve them open. Mediators read the same
+    // ARCHON_ADMIN_API_KEY, so an unset key would otherwise mean they silently
+    // 403 against the admin routes they depend on.
+    if config.admin_api_key.is_empty() {
+        anyhow::bail!(
+            "ARCHON_ADMIN_API_KEY must be set — admin routes would otherwise be unauthenticated. \
+             Generate one with: openssl rand -hex 32"
+        );
+    }
+
+    if config.admin_api_key.len() < MIN_ADMIN_API_KEY_LENGTH {
+        warn!(
+            "Warning: ARCHON_ADMIN_API_KEY is shorter than {MIN_ADMIN_API_KEY_LENGTH} characters - regenerate it with: openssl rand -hex 32"
+        );
+    }
+
     info!(
         "Starting Archon Gatekeeper v{} ({}) with a db ({}) check...",
         config.version, config.git_commit, config.db
@@ -102,11 +126,7 @@ pub async fn run() -> Result<()> {
         .with_context(|| format!("failed to bind {}:{}", config.bind_address, config.port))?;
 
     info!("Server is running on {}:{}", config.bind_address, config.port);
-    if config.admin_api_key.is_empty() {
-        warn!("Warning: ARCHON_ADMIN_API_KEY is not set - admin routes are unprotected");
-    } else {
-        info!("Admin API key protection is ENABLED");
-    }
+    info!("Admin API key protection is ENABLED");
 
     state.ready.store(true, Ordering::Relaxed);
     axum::serve(listener, app)

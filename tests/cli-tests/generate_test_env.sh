@@ -21,6 +21,9 @@ ARCHON_NODE_NAME=archon-quality
 ARCHON_NODE_ID=archon-quality
 ARCHON_PROTOCOL=/ARCHON/test
 
+# Required — Gatekeeper refuses to start without it. Fixed value (not random)
+# so the CLI, Keymaster, and mediator containers share the same key.
+ARCHON_ADMIN_API_KEY=0000000000000000000000000000000000000000000000000000000000000000
 
 # Gatekeeper
 ARCHON_GATEKEEPER_PORT=4224

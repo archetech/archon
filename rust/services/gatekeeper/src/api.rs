@@ -2104,23 +2104,55 @@ pub(crate) fn is_valid_registry(registry: &str) -> bool {
         && chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, ':' | '_' | '-'))
 }
 
-fn require_admin_key(state: &AppState, headers: &HeaderMap) -> Option<Response> {
-    if state.config.admin_api_key.is_empty() {
-        return None;
+// Constant-time byte comparison, so a mismatched admin key cannot be
+// recovered byte-by-byte from response timing. Length is not secret (and
+// leaks via the early return), only the contents are.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
     }
 
-    match headers
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+// Fails closed: with no key configured the admin routes are refused rather
+// than opened. `run()` additionally refuses to start without
+// ARCHON_ADMIN_API_KEY, so a 403 here means the state was built
+// programmatically without one.
+fn require_admin_key(state: &AppState, headers: &HeaderMap) -> Option<Response> {
+    if state.config.admin_api_key.is_empty() {
+        return Some(
+            (
+                StatusCode::FORBIDDEN,
+                Json(json!({ "error": "Admin API key not configured" })),
+            )
+                .into_response(),
+        );
+    }
+
+    let provided = headers
         .get("x-archon-admin-key")
-        .and_then(|value| value.to_str().ok())
-    {
-        Some(value) if value == state.config.admin_api_key => None,
-        _ => Some(
+        .and_then(|value| value.to_str().ok());
+
+    let authorized = match provided {
+        Some(value) => constant_time_eq(value.as_bytes(), state.config.admin_api_key.as_bytes()),
+        None => false,
+    };
+
+    if authorized {
+        None
+    } else {
+        Some(
             (
                 StatusCode::UNAUTHORIZED,
                 Json(json!({ "error": "Unauthorized — valid admin API key required" })),
             )
                 .into_response(),
-        ),
+        )
     }
 }
 

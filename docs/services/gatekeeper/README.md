@@ -119,11 +119,21 @@ unhandled paths.
 ### 2.2 Admin authentication
 
 - Header: `X-Archon-Admin-Key` (case-insensitive)
-- When `ARCHON_ADMIN_API_KEY` is set, admin routes MUST require a matching header.
+- `ARCHON_ADMIN_API_KEY` is **required**. Admin routes MUST require a matching header.
 - On missing or wrong key, return:
   - status `401`
   - body `{"error":"Unauthorized — valid admin API key required"}` (note the em dash)
-- When `ARCHON_ADMIN_API_KEY` is unset/empty, admin routes MUST be open (development mode). Implementations MUST log a warning at startup in this case.
+- The comparison MUST be constant-time (e.g. `crypto.timingSafeEqual`), so a wrong
+  key cannot be recovered byte-by-byte from response timing.
+- When `ARCHON_ADMIN_API_KEY` is unset/empty, admin routes MUST **fail closed**:
+  - status `403`
+  - body `{"error":"Admin API key not configured"}`
+- The server entry point MUST additionally refuse to start when
+  `ARCHON_ADMIN_API_KEY` is unset, exiting non-zero with a message naming the
+  variable. Mediators authenticate against these same admin routes with the same
+  key, so starting without one would leave them silently unable to sync. The 403
+  above therefore applies only when the app is constructed programmatically (e.g.
+  in tests) without a key.
 
 ### 2.3 CORS
 
@@ -1160,7 +1170,7 @@ registry segments are collapsed.
 | `ARCHON_GATEKEEPER_UPLOAD_LIMIT` | `10mb` | Raw/text body cap on `/ipfs/text` and `/ipfs/data`. |
 | `ARCHON_GATEKEEPER_GC_INTERVAL` | `15` | GC loop interval in minutes (`0` disables). |
 | `ARCHON_GATEKEEPER_STATUS_INTERVAL` | `5` | Status loop interval in minutes (`0` disables). |
-| `ARCHON_ADMIN_API_KEY` | empty | Admin API key. Empty disables admin auth. |
+| `ARCHON_ADMIN_API_KEY` | empty (**required**) | Admin API key. The service refuses to start without it; admin routes return 403 when unset. A warning is logged if it is shorter than 32 characters. Generate with `openssl rand -hex 32`. |
 | `ARCHON_GATEKEEPER_FALLBACK_URL` | `https://dev.uniresolver.io` | Universal resolver to consult on local notFound. Empty disables. |
 | `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` | `5000` | Fallback timeout in ms. |
 | `ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL` | empty | Optional Gatekeeper peer to consult when `confirm=true` local resolution is unconfirmed. Empty disables. |
