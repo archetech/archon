@@ -1,783 +1,284 @@
-# 🔒 Archon Security Audit Report
+# 🔒 Archon Security Audit Report — August 2026
 
-**Date:** February 7, 2026 (updated February 9, 2026)
-**Scope:** Full repository — `archetech/archon` (branch: `release-0.2`)
-- **Auditor:** Automated Security Analysis
-- **Classification:** Internal — Confidential
+**Date:** August 8, 2026
+**Scope:** Full repository — `archetech/archon`, branch `main` @ `daf2c2accee5640bd49fe64ca74b28cf6c8b1db2` (2026-08-05)
+**Auditor:** Morningstar (automated + manual review)
+**Supersedes:** February 2026 audit (branch `release-0.2`; retained in git history) — 569 commits since
+**Distribution:** Public — filed in-repo, superseding the previous in-repo report. Unfixed findings below (H-01, H-02, H-03) describe default-configuration weaknesses that are already evident from the shipped `sample.env` and compose files; they are disclosed here so operators can harden their deployments. Report anything new privately per [`SECURITY.md`](SECURITY.md) rather than in a public issue.
 
 ---
 
-## Table of Contents
+## Methodology & Tools (all outputs verified)
 
-1. [Executive Summary](#executive-summary)
-2. [Risk Summary Matrix](#risk-summary-matrix)
-3. [Critical Findings](#1-critical-findings)
-4. [High Severity Findings](#2-high-severity-findings)
-5. [Medium Severity Findings](#3-medium-severity-findings)
-6. [Low Severity Findings](#4-low-severity-findings)
-7. [Informational / Positive Findings](#5-informational--positive-findings)
-8. [Remediation Roadmap](#remediation-roadmap)
-9. [Appendix — Files Reviewed](#appendix--files-reviewed)
+| Tool | Version | Coverage | Result |
+|------|---------|----------|--------|
+| gitleaks | 8.24.3 | Full git history (1,992 commits, 25.35 MB) | 13 findings — **all verified false positives** |
+| npm audit | npm 11.8.0 | Root workspace lockfile | 30 vulns: 1 critical, 17 high, 5 moderate, 7 low |
+| semgrep | latest (uv) | `p/owasp-top-ten` + `p/security-audit`, excl. node_modules/tests | 38 findings — triaged below |
+| Manual review | — | Auth middleware, L402/macaroon, OAuth, extension messaging, cipher, docker | See findings |
 
 ---
 
 ## Executive Summary
 
-Archon is a decentralized identity (DID) protocol implementation comprising microservices (Gatekeeper, Keymaster, mediators), client applications (React wallet, Chrome extension), and supporting infrastructure (Redis, MongoDB, IPFS, Bitcoin nodes).
+Archon has grown substantially since the Feb 2026 audit: Drawbridge (L402 Lightning paywall gateway), Herald (DID-based OAuth/email service), DIDComm relay, vault/dmail/nostr/lightning Keymaster routers, plus Rust and Python service ports. **569 commits** landed since the prior audit baseline.
 
-**Architecture note:** The Gatekeeper and Keymaster services are designed to run behind a reverse proxy (nginx, Caddy, Traefik) that handles TLS termination, authentication, and public endpoint filtering. The services themselves are not intended to be directly exposed to the internet.
+The most serious new finding was a **complete L402 paywall bypass** in Drawbridge: a stub subscription-auth middleware accepted any `X-Subscription-DID` header as authenticated, skipping all payment verification. **Fixed in PR #866 (merged 2026-08-08).**
 
-This audit identified **37 findings** across the codebase, infrastructure, and configuration. The most critical issues center around:
+The fail-open admin-auth pattern flagged in Feb persists across **all four** server implementations (TS Gatekeeper, TS Keymaster, Python Keymaster, Rust Gatekeeper): with `ARCHON_ADMIN_API_KEY` unset, every administrative endpoint — including wallet mnemonic export and DB reset — is unauthenticated. Reach differs by service: default compose publishes Gatekeeper on all interfaces, while Keymaster is loopback-bound (though still reachable from the victim's own browser via H-03). Drawbridge and Herald are already fail-closed. A new variant appears in TS/Python Keymaster: `POST /api/v1/login` returns the admin API key to anyone when the wallet passphrase is unset.
 
-- **No application-level defense-in-depth** for admin endpoints — if the reverse proxy is misconfigured, destructive routes (wallet mnemonic, database reset) are fully exposed *(now mitigated — see [Remediation Applied](#remediation-applied))*
-- **Hardcoded and default credentials** for Bitcoin RPC, Redis, MongoDB, and Grafana — some committed to version control
-- **Sensitive data committed to Git** (encrypted wallet file in `data/wallet.json`)
-- **No network isolation** between containers — flat Docker network topology
-
-**Remediation applied in this release:**
-- Admin API key middleware (`ARCHON_ADMIN_API_KEY`) added to both services for defense-in-depth
-- Configurable bind address (`ARCHON_BIND_ADDRESS`) to restrict to localhost behind a proxy
-- `GET /db/reset` blocked in production (`NODE_ENV=production`)
-- Sample nginx reverse proxy configuration provided in `docs/nginx-proxy.conf.example`
-
-The cryptographic implementation (cipher package) uses sound primitives (secp256k1, XChaCha20-Poly1305, AES-256-GCM with PBKDF2), and no code injection vectors (`eval`, `exec`, `Function()`) were found. SQL queries are properly parameterized.
+Positive: secrets hygiene is clean (zero real secrets in 1,992 commits), Drawbridge's macaroon/L402 crypto is well implemented (timing-safe, fail-closed, refuses to boot without a 32+ char secret), Herald enforces session secrets fail-closed with timing-safe admin comparison, the Feb NoSQL-injection finding is fixed (only `$in` supported now), and compose files now bind Mongo/Redis/Keymaster/signet-RPC to localhost with healthchecks.
 
 | Severity | Count |
 |----------|-------|
-| ✅ Mitigated | 5 |
-| 🔴 Critical | 4 |
-| 🟠 High | 6 |
-| 🟡 Medium | 12 |
-| 🔵 Low | 9 |
-| **Total** | **37** (5 mitigated) |
-
----
-
-## Risk Summary Matrix
-
-| ID | Severity | Category | Finding | Primary Location |
-|----|----------|----------|---------|-----------------|
-| C-01 | ✅ Mitigated | Auth | No authentication on API endpoints → admin key middleware added | `services/gatekeeper/server/`, `services/keymaster/server/` |
-| C-02 | ✅ Mitigated | Auth | Unauthenticated DB reset via GET request → admin key + production guard | `services/gatekeeper/server/` — `GET /db/reset` |
-| C-03 | ✅ Mitigated | Auth | Mnemonic exposed via unauthenticated endpoint → admin key required | `services/keymaster/server/` — `GET /api/v1/wallet/mnemonic` |
-| C-04 | ✅ Mitigated | Secrets | Encrypted wallet committed to Git → `data/.gitignore` excludes `*.json`; file was never committed | `data/wallet.json` |
-| H-01 | ✅ Mitigated | Transport | No TLS → bind address + nginx proxy config provided | All server files |
-| H-02 | 🟠 High | Headers | No security headers (helmet) | `services/gatekeeper/server/`, `services/keymaster/server/` |
-| H-03 | ✅ Mitigated | DoS | No rate limiting → nginx proxy rate limiting provided | All API servers |
-| H-04 | 🟠 High | CORS | CORS allows all origins on Gatekeeper | `services/gatekeeper/server/` |
-| H-05 | 🟠 High | Docker | Containers default to root user | All 7 Dockerfiles |
-| H-06 | 🟠 High | Git | `.gitignore` missing critical data exclusions | `.gitignore` |
-| H-07 | 🟠 High | Extension | `<all_urls>` content script + host permissions | `apps/chrome-extension/` — `manifest.json` |
-| H-08 | 🟠 High | Extension | Plaintext passphrase stored in offscreen memory | `apps/chrome-extension/src/offscreen.ts` |
-| H-09 | 🟠 High | Infra | Bitcoin signet RPC port exposed to all interfaces | `docker/compose/btc-signet.yml` |
-| M-01 | 🟡 Medium | Validation | No input validation library/schema enforcement | All API servers |
-| M-02 | 🟡 Medium | Info Leak | Error messages expose `error.message` to clients | All API servers |
-| M-03 | 🟡 Medium | Injection | Potential NoSQL injection via `queryDocs` endpoint | `services/gatekeeper/server/` — `POST /dids/query` |
-| M-04 | 🟡 Medium | Config | Empty passphrase fallback in Keymaster config | `services/keymaster/server/` — config |
-| M-05 | 🟡 Medium | Secrets | Default credentials in `sample.env` | `sample.env` |
-| M-06 | 🟡 Medium | Docker | No health checks on any container | All `docker-compose` files |
-| M-07 | 🟡 Medium | Docker | No resource limits (CPU/memory) on containers | All `docker-compose` files |
-| M-08 | 🟡 Medium | Docker | No network segmentation — flat topology | All `docker-compose` files |
-| M-09 | 🟡 Medium | Docker | Broad volume mounts — entire `data/` shared | `docker-compose.yml` |
-| M-10 | 🟡 Medium | Extension | Untrusted URL params from web pages forwarded via messaging | `apps/chrome-extension/src/contentScript.ts` |
-| M-11 | 🟡 Medium | Extension | `wasm-unsafe-eval` in CSP | `apps/chrome-extension/` — `manifest.json` |
-| M-12 | 🟡 Medium | Crypto | PBKDF2 iterations overridable via environment variable | `packages/keymaster/src/encryption.ts` |
-| L-01 | 🔵 Low | Docker | `mongo:8.0` not pinned to patch version | `docker-compose.yml` |
-| L-02 | 🔵 Low | Docker | Build tools (`python3`, `make`, `g++`) remain in final images | `docker/Dockerfile.hyperswarm` |
-| L-03 | 🔵 Low | Docker | CLI container runs idle with `tail -f /dev/null` | `docker/Dockerfile.cli` |
-| L-04 | 🔵 Low | Docker | No `security_opt` or capability dropping | All `docker-compose` files |
-| L-05 | 🔵 Low | Docker | No restart policies on critical services | All `docker-compose` files |
-| L-06 | 🔵 Low | Deps | `@noble/ciphers` on pre-stable 0.x line | `packages/cipher/package.json` |
-| L-07 | 🔵 Low | Deps | `@capacitor/core` on alpha pre-release | `apps/react-wallet/package.json` |
-| L-08 | 🔵 Low | Deps | Express 4.x in maintenance mode | `services/*/server/package.json` |
-| L-09 | 🔵 Low | Observability | Prometheus metrics endpoints publicly accessible | Both API servers — `/metrics` |
-| L-10 | 🔵 Low | Infra | Redis has no authentication, but is bound to localhost and isolated in Docker | `data/redis.conf` |
-| L-11 | 🔵 Low | Infra | Bitcoin RPC hardcoded credentials → signet port bound to localhost; testnet4 not exposed; test networks only | `data/btc-signet/bitcoin.conf`, `data/btc-testnet4/bitcoin.conf` |
-| L-12 | 🔵 Low | Infra | MongoDB has no authentication, but is bound to localhost and isolated in Docker | `docker-compose.yml` — `mongodb` service |
+| 🔴 Critical | 1 (fixed — PR #866) |
+| 🟠 High | 4 |
+| 🟡 Medium | 7 |
+| 🔵 Low | 8 |
+| ✅ Positive/Fixed | 9 |
 
 ---
 
 ## 1. Critical Findings
 
-### C-01: No Authentication on Any API Endpoint
+### C-01: L402 paywall bypass via stub subscription-auth middleware — **fixed**
 
-**Severity:** 🔴 Critical → 🟡 **Mitigated**
-**Category:** Authentication & Authorization
-**Affected:** `services/gatekeeper/server/`, `services/keymaster/server/`
+**Severity:** 🔴 Critical (when `ARCHON_DRAWBRIDGE_L402_ENABLED=true`)
+**Status:** ✅ Fixed on `main` — [PR #866](https://github.com/archetech/archon/pull/866), merged 2026-08-08. Vulnerable on the audited commit `daf2c2ac` and on every release up to that point.
+**Location:** `services/drawbridge/server/src/middleware/subscription-auth.ts`, `middleware/auth.ts`, `middleware/l402-auth.ts:71-74`
 
-~~Neither the Gatekeeper nor Keymaster service implements any authentication or authorization middleware.~~
+The subscription-auth middleware marked any request carrying an `X-Subscription-DID` header as authenticated — with **no credential verification**:
 
-**Remediation applied:** Both services now support an `ARCHON_ADMIN_API_KEY` environment variable. When set, all admin/destructive endpoints require the internal `X-Archon-Admin-Key` header. Additionally, `ARCHON_BIND_ADDRESS` allows binding to `127.0.0.1` so only the local reverse proxy can reach the services. A sample nginx configuration (`docs/nginx-proxy.conf.example`) is provided that exposes only public-safe endpoints with rate limiting.
-
-**Protected routes (Gatekeeper):** `/dids/remove`, `/db/reset`, `/db/verify`
-**Protected routes (Keymaster):** `/wallet` (GET/PUT), `/wallet/new`, `/wallet/backup`, `/wallet/recover`, `/wallet/check`, `/wallet/fix`, `/wallet/mnemonic`, `/export/wallet/encrypted`, `/did/:id` (DELETE), `/ids` (POST), `/ids/:id` (DELETE), `/keys/rotate`, `/assets/:id/transfer`
-
-**Remaining risk:** Operators must set `ARCHON_ADMIN_API_KEY` and configure the reverse proxy. Without both, the original risk remains. This should be enforced at deployment level.
-
-**Deployment checklist:**
-```bash
-# In .env:
-ARCHON_BIND_ADDRESS=127.0.0.1        # Only accept connections from localhost/nginx
-ARCHON_ADMIN_API_KEY=$(openssl rand -hex 32)  # Defense-in-depth for admin routes
+```ts
+// For now, if the header is present, mark as subscription-authed and pass through.
+if (subscriptionDid) {
+    (req as any).subscriptionAuth = { credentialDid: subscriptionDid };
+}
 ```
 
----
+The L402 middleware then skipped all payment enforcement:
 
-### C-02: Unauthenticated Database Reset via GET Request
+```ts
+// If subscription auth already passed, skip L402
+if ((req as any).subscriptionAuth) {
+    next();
+    return;
+}
+```
 
-**Severity:** 🔴 Critical → 🟡 **Mitigated**
-**Category:** Authentication & Authorization
-**Affected:** `services/gatekeeper/server/` — `GET /db/reset`
+The middleware chain (`createAuthMiddleware`) ran subscription-auth first on every protected route. The file self-documents as a stub (`TODO (#121)`), introduced in commit `20584529` (2026-02-25).
 
-~~The entire Gatekeeper database can be wiped with a single unauthenticated HTTP GET request.~~
+**Impact:** `curl -H "X-Subscription-DID: did:example:anything" https://<drawbridge>/api/v1/<any-paid-route>` bypassed the entire Lightning paywall. Any node relying on L402 for revenue or abuse-deterrence had neither.
 
-**Remediation applied:**
-1. The route now requires the admin API key when `ARCHON_ADMIN_API_KEY` is set
-2. The route returns `403 Forbidden` when `NODE_ENV=production`, regardless of API key
-3. The sample nginx config blocks this route entirely from external access
-
-**Remaining risk:** In development mode without an API key, the endpoint is still accessible. This is intentional for local development.
-
----
-
-### C-03: Mnemonic Exposed via Unauthenticated Endpoint
-
-**Severity:** 🔴 Critical → 🟡 **Mitigated**
-**Category:** Authentication & Authorization
-**Affected:** `services/keymaster/server/` — `GET /api/v1/wallet/mnemonic`
-
-~~The decrypted BIP39 mnemonic phrase is returned in plaintext to any unauthenticated caller.~~
-
-**Remediation applied:** This endpoint now requires the admin API key when `ARCHON_ADMIN_API_KEY` is set. The sample nginx config does not proxy this route externally.
-
-**Remaining risk:** The endpoint still exists and returns the mnemonic when the correct API key is provided. Consider adding audit logging for mnemonic access.
-
----
-
-### C-04: Encrypted Wallet Committed to Git
-
-**Severity:** ✅ Mitigated
-**Category:** Secrets Management
-**Affected:** `data/wallet.json`
-
-**Status:** This finding was a false positive. The `data/.gitignore` already contains a `*.json` rule that excludes `wallet.json`, and `git log --all -- data/wallet.json` confirms the file was never committed to the repository.
-
-~~The file `data/wallet.json` contains an encrypted wallet with:~~
-~~- AES-GCM encrypted mnemonic seed (salt, IV, ciphertext)~~
-~~- Full encrypted wallet blob~~
-
-~~This file is committed to the repository. Even though the mnemonic is encrypted, the `.gitignore` does not exclude it. If the passphrase is weak, guessable, or leaked, the entire key material is compromised. Additionally, Git history preserves all past versions of the file.~~
-
-~~**Impact:** Encrypted secrets in version control are accessible to anyone with repo access. A weak passphrase enables offline brute-force.~~
-
-**Recommendation:** No action required — existing controls are sufficient.
+**Fix (PR #866):** `createAuthMiddleware` now builds an L402-only chain by default; the stub is included only when `ARCHON_DRAWBRIDGE_SUBSCRIPTIONS_ENABLED=true` is explicitly set (documented in `sample.env` as an insecure dev toggle pending #121), with a startup warning when combined with L402.
 
 ---
 
 ## 2. High Severity Findings
 
-### H-01: No TLS/HTTPS on Any Service
-
-**Severity:** 🟠 High → 🟡 **Mitigated by architecture**
-**Category:** Transport Security
-
-All inter-service and client-facing communication uses plain HTTP. This is acceptable when services are bound to `127.0.0.1` and a TLS-terminating reverse proxy handles external traffic. The sample nginx config (`docs/nginx-proxy.conf.example`) includes HTTPS server block templates.
-
-**Remaining risk:** Inter-container traffic within Docker remains unencrypted. For high-security deployments, consider enabling TLS for Redis, MongoDB, and inter-service HTTP.
-
-**Recommendation:**
-- Set `ARCHON_BIND_ADDRESS=127.0.0.1` in production `.env`
-- Deploy a TLS-terminating reverse proxy (nginx, Caddy, Traefik)
-- Enable TLS for Redis (`tls-port`, `tls-cert-file`, `tls-key-file`) in sensitive environments
-- Document that TLS is **mandatory** for any non-localhost deployment
-
----
-
-### H-02: No Security Headers (Helmet)
+### H-01: Admin auth fails open by default on four of six services
 
 **Severity:** 🟠 High
-**Category:** HTTP Security
+**Locations:**
+- `services/gatekeeper/server/src/v1-admin.ts:11-16`
+- `services/keymaster/server/src/keymaster-admin.ts:11-16`
+- `python/keymaster_service/src/keymaster_service/app.py:125-132`
+- `rust/services/gatekeeper/src/api.rs:2107-2116`
 
-Neither Express server uses `helmet` or sets any security headers. Missing headers include:
-- `Strict-Transport-Security` (HSTS)
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: DENY`
-- `Content-Security-Policy`
-- `X-XSS-Protection`
-- `Referrer-Policy`
+Identical pattern in all four: `if (!config.adminApiKey) { next(); return; }`. Combined with `bindAddress: process.env.ARCHON_BIND_ADDRESS || '0.0.0.0'` (both TS configs) and `sample.env` shipping `ARCHON_BIND_ADDRESS=0.0.0.0` with `ARCHON_ADMIN_API_KEY=` empty, every administrative endpoint — mnemonic export (`/api/v1/wallet/mnemonic`), DB reset, wallet overwrite, key rotation — is unauthenticated. The Feb audit called this "mitigated" — the mitigation is opt-in and unchanged in effect.
 
-**Recommendation:**
-```typescript
-import helmet from 'helmet';
-app.use(helmet());
-```
+How far that reaches depends on the service's host binding, which differs:
 
----
+- **Gatekeeper is reachable from the network in a default compose deployment.** `docker/compose/gatekeeper-ts.yml:33` publishes `${ARCHON_GATEKEEPER_PORT}:4224` with no host-bind prefix, so DB reset and the other Gatekeeper admin routes are exposed on all interfaces with no key set.
+- **Keymaster is not**, by default: `docker/compose/keymaster-ts.yml:30` publishes `${ARCHON_KEYMASTER_HOST_BIND:-127.0.0.1}:...:4226`, so mnemonic export is loopback-only unless the operator overrides `ARCHON_KEYMASTER_HOST_BIND` (or runs Keymaster outside compose, where `ARCHON_BIND_ADDRESS=0.0.0.0` from `sample.env` applies directly). Note this is *not* a defence against H-03: a malicious web page can still reach loopback Keymaster from the victim's own browser.
 
-### H-03: No Rate Limiting
+**Fail-closed reference implementations already in this repo:** Drawbridge's `services/drawbridge/server/src/v1-admin.ts` returns 403 `{"error":"Admin API key not configured"}` when the key is empty and compares with `crypto.timingSafeEqual` — it is the same Express `RequestHandler` shape and header as the affected TS services, so it is a near-verbatim copy-paste template. Herald (`services/herald/server/src/oauth/index.ts:189`) is fail-closed and timing-safe too. The four services above compare keys with `!==`/`==`/Python `!=` (not timing-safe) — see L-06.
 
-**Severity:** 🟠 High → 🟡 **Mitigated at proxy layer**
-**Category:** Availability / DoS Protection
+**Remediation:** Fail closed in production: refuse to start (or refuse admin routes) when `NODE_ENV=production` and no admin key is set. Use `timingSafeEqual` everywhere.
 
-No rate limiting middleware (`express-rate-limit` or equivalent) is present on either API server. The sample nginx config (`docs/nginx-proxy.conf.example`) provides rate limiting zones at the proxy level, which is the recommended approach.
-
-**Remaining risk:** Without the reverse proxy, or for inter-service traffic, there is no rate limiting.
-
-**Recommendation:** Ensure the reverse proxy is deployed with the provided rate limiting configuration. Optionally add `express-rate-limit` as an additional defense layer.
-
----
-
-### H-04: CORS Allows All Origins (Gatekeeper)
+### H-02: `/api/v1/login` discloses the admin API key when passphrase is unset
 
 **Severity:** 🟠 High
-**Category:** Cross-Origin Security
-**Affected:** `services/gatekeeper/server/`
+**Locations:** `services/keymaster/server/src/keymaster-public-router.ts:100-115`; same in `python/keymaster_service/src/keymaster_service/app.py:148-157`
 
-```typescript
-app.use(cors());
-app.options('*', cors());
+```ts
+if (!config.keymasterPassphrase) {
+    // No passphrase configured — return key directly (dev mode)
+    res.json({ adminApiKey: config.adminApiKey || '' });
+    return;
+}
 ```
 
-CORS is configured to allow requests from **any origin**. Any website can make authenticated requests to the Gatekeeper API. For a DID/credential management API, this allows cross-site attacks from any malicious web page.
+An operator who sets `ARCHON_ADMIN_API_KEY` but leaves `ARCHON_ENCRYPTED_PASSPHRASE` empty (its documented default in `sample.env`) gets **no protection at all**: anyone can POST `/api/v1/login` with an empty body and receive the admin key. The config that looks most secure is silently the bypass.
 
-**Recommendation:** Restrict to known origins:
-```typescript
-app.use(cors({ origin: ['https://your-wallet.example.com'], credentials: true }));
-```
+Additionally: passphrase comparison is `!==` (timing oracle), and there is no rate limit or lockout — the passphrase is online-brute-forceable, and it also protects wallet encryption.
 
----
+**Remediation:** Never return the admin key from an unauthenticated endpoint; require the passphrase unconditionally when an admin key is configured; add rate limiting; use timing-safe comparison.
 
-### H-05: Containers Default to Root User
+### H-03: CORS allows all origins on Gatekeeper and Keymaster
 
 **Severity:** 🟠 High
-**Category:** Container Security
-**Affected:** All 7 Dockerfiles (`docker/Dockerfile.cli`, `docker/Dockerfile.explorer`, `docker/Dockerfile.gatekeeper-ts`, `docker/Dockerfile.hyperswarm`, `docker/Dockerfile.keymaster-ts`, `docker/Dockerfile.react-wallet`, `docker/Dockerfile.satoshi`)
+**Locations:** `services/keymaster/server/src/keymaster-api.ts:133-134`, `services/gatekeeper/server/src/gatekeeper-api.ts:116-117`
 
-No Dockerfile includes a `USER` directive or creates a non-root user. While some services override with `user:` in `docker-compose.yml`, the images themselves default to root. `npm ci` and `npm run build` execute as root during build, and any container started outside of compose runs as root.
+`app.use(cors())` + `app.options('*', cors())`. Any website can drive a victim's browser against a Keymaster on localhost or a LAN address (`http://localhost:4226/api/v1/...`). With H-01/H-02 in default configs, a malicious page can exfiltrate the wallet mnemonic cross-origin. (Carried over from Feb H-04; still present and now worse given H-02.)
 
-**Recommendation:** Add to each Dockerfile:
-```dockerfile
-RUN addgroup --system app && adduser --system --ingroup app app
-USER app
-```
+**Remediation:** Default-deny origin list; allow only configured wallet origins.
 
----
-
-### H-06: `.gitignore` Missing Critical Data Exclusions
+### H-04: Vulnerable dependencies in runtime paths
 
 **Severity:** 🟠 High
-**Category:** Secrets Management
-**Affected:** `.gitignore`
+**Source:** `npm audit` (30 total: 1 critical / 17 high / 5 moderate / 7 low)
 
-The following patterns are **not** excluded:
-| Missing Pattern | Risk |
-|----------------|------|
-| `data/wallet.json` | Wallet secrets committed |
-| `data/*.db` / `*.sqlite` | Database files may contain wallet data |
-| `data/redis/` | Redis persistence files |
-| `data/mongodb/` | MongoDB data files |
-| `data/ipfs/` | IPFS data |
-| `*.pem`, `*.key` | Private key files |
+Runtime-relevant (selection):
+- **`tar` (CRITICAL)** — arbitrary file creation/overwrite; reached via `sqlite3` → `node-gyp` → `cacache`/`make-fetch-happen` (WalletSQLite build chain)
+- **`@libp2p/kad-dht` (HIGH)** — unvalidated PUT_VALUE records allow unbounded storage; reached via `helia` (packages/ipfs — Gatekeeper's IPFS layer)
+- **`ip` (HIGH)** — SSRF improper categorization in `isPublic`; no fix available
+- **`@hono/node-server` (MODERATE)** — path traversal in `serve-static`; reached via `@modelcontextprotocol/sdk` (packages/mcp-server)
+- **`nanoid`, `image-size`, `brace-expansion`, `js-yaml` (HIGH)** — DoS classes; mostly dev/build chains (metro/react-native/lerna)
 
-**Recommendation:** Add comprehensive data exclusions:
-```gitignore
-data/wallet.json
-data/*.db
-data/redis/
-data/mongodb/
-data/ipfs/
-data/grafana/
-data/prometheus/
-*.pem
-*.key
-```
-
----
-
-### H-07: Chrome Extension `<all_urls>` Permissions
-
-**Severity:** 🟠 High
-**Category:** Extension Security
-**Affected:** `apps/chrome-extension/` — `manifest.json`
-
-```json
-"content_scripts": [{ "matches": ["<all_urls>"] }],
-"host_permissions": ["<all_urls>"]
-```
-
-The content script runs on every page the user visits and the extension has host permissions for all URLs. This is an unnecessarily broad permission scope that:
-- Increases attack surface if the extension is compromised
-- May cause browser extension store review issues
-- Allows content script to interact with all pages
-
-**Recommendation:** Scope to specific URL patterns (e.g., `*://archon/*`, known wallet domains).
-
----
-
-### H-08: Plaintext Passphrase in Offscreen Document Memory
-
-**Severity:** 🟠 High
-**Category:** Secrets Management
-**Affected:** `apps/chrome-extension/src/offscreen.ts`
-
-The wallet passphrase is stored as a plaintext string in a module-scoped variable within the offscreen document. It persists for the entire session and is retrievable by any extension page via `chrome.runtime.sendMessage`.
-
-**Recommendation:**
-- Clear passphrase from memory after a timeout
-- Consider using the Web Crypto API to wrap the passphrase in a non-exportable key
-- Implement session expiration requiring re-authentication
-
----
-
-### H-09: Bitcoin Signet RPC Port Exposed on All Interfaces
-
-**Severity:** 🟠 High
-**Category:** Network Exposure
-**Affected:** `docker/compose/btc-signet.yml`
-
-```yaml
-ports:
-  - 38332:38332  # Bound to 0.0.0.0
-```
-
-Unlike MongoDB and Redis (which are correctly scoped to `127.0.0.1`), the Bitcoin signet RPC port is published to all host interfaces.
-
-**Recommendation:** Bind to localhost: `127.0.0.1:38332:38332`
+**Remediation:** `npm audit fix` where non-breaking; override `tar` to ≥ patched version; evaluate replacing `sqlite3` with `better-sqlite3` (prebuilt, no node-gyp); pin/override `@hono/node-server` in mcp-server; track the `ip` SSRF for any user-controlled URL validation usage.
 
 ---
 
 ## 3. Medium Severity Findings
 
-### M-01: No Input Validation Library
+### M-01: Macaroon `did` caveat and rate-limiting keyed on self-asserted `X-DID` header
 
-**Severity:** 🟡 Medium
-**Category:** Input Validation
+**Location:** `services/drawbridge/server/src/middleware/l402-auth.ts:133,169`
 
-No schema validation library (Joi, Zod, AJV, etc.) is used at the API layer. Request bodies and parameters are passed directly to service methods without validation. This increases the risk of unexpected behavior, crashes, and potential injection.
+The `did` caveat is verified against `req.headers['x-did']` — client-controlled, never authenticated. The caveat therefore binds the token to nothing (any holder restates any DID). Rate limits are likewise keyed on `did || ip`, so rotating fake `X-DID` values evades per-identity limits. `req.ip` is used without `trust proxy` configuration (`grep -rn "trust proxy" services/ --include=*.ts` returns nothing), so behavior behind the documented nginx proxy will either collapse all clients to one IP or trust spoofed X-Forwarded-For, depending on deployment.
 
-**Recommendation:** Add Zod or Joi schema validation for all API request payloads.
+### M-02: `max_uses` race allows single-use token replay
 
----
+**Location:** `services/drawbridge/server/src/middleware/l402-auth.ts:180-185`
 
-### M-02: Error Messages Leak Internal Details
+Usage increments are deferred to `res.once('finish')`. N concurrent requests with the same priced (single-use) macaroon all read `currentUses = 0` before any increment lands and all pass. Check-and-increment must be atomic in the store (Redis `INCR` + compare in a Lua script, or conditional at verification time).
 
-**Severity:** 🟡 Medium
-**Category:** Information Disclosure
+### M-03: Error messages leak internals to clients — 182 sites
 
-Both API servers return `error.message` directly to clients:
-```typescript
-res.status(500).json({ error: error.message });
-```
+**Locations:** all `services/*/server/src/*.ts` — 182 occurrences of `error.toString()`, via `grep -ro "error\.toString()" services/*/server/src/ | wc -l` on `daf2c2ac`. Raw-error passthrough in other forms (e.g. `error.message`, Python `str(exc)`) is additional.
 
-This can leak stack traces, file paths, database error details, and internal class names.
+e.g. `res.status(500).json({ error: error.toString() })` in `v1-search-router.ts:87`, `v1-did-router.ts` (5 sites), and the Python service's global handler returns `str(exc)`. Stack paths, Redis/Mongo errors, and internal hostnames leak to unauthenticated callers on public routers. (Feb M-02 — still widespread.)
 
-**Recommendation:** Return generic error messages in production; log details server-side only.
+### M-04: Herald inbound-email webhook fails open
 
----
+**Location:** `services/herald/server/src/routes.ts:374-376`
 
-### M-03: Potential NoSQL Injection via `queryDocs`
+`if (WEBHOOK_SECRET && req.query.secret !== WEBHOOK_SECRET)` — when `ARCHON_HERALD_WEBHOOK_SECRET` is unset (default `''` in config), the SendGrid inbound-parse webhook accepts forged email from anyone. The secret is also passed as a **query parameter**, which lands in access logs and proxy histories. Use a header and fail closed.
 
-**Severity:** 🟡 Medium
-**Category:** Injection
-**Affected:** Gatekeeper `POST /dids/query`
+### M-05: Insecure defaults committed in `sample.env` and `data/btc-*/bitcoin.conf`
 
-A user-controlled `where` object is passed directly to the query layer:
-```typescript
-const where = req.body?.where;
-const dids = await gatekeeper.queryDocs(where);
-```
+- `sample.env`: `ARCHON_BIND_ADDRESS=0.0.0.0`, empty `ARCHON_ADMIN_API_KEY`, empty passphrases — copy-paste deployments inherit the worst configuration (feeds H-01/H-02).
+- `data/btc-signet/bitcoin.conf` and `data/btc-testnet4/bitcoin.conf`: committed `rpcuser=signet / rpcpassword=signet` (and `testnet4/testnet4`) with `rpcbind=0.0.0.0` + `rpcallowip=0.0.0.0/0`. Compose now binds host ports to `127.0.0.1` (verified in `docker/compose/btc-signet.yml`), so exposure is limited to the docker network — but any container compromise reaches the RPC with trivial credentials. Test networks only (no mainnet funds at risk), hence Medium.
 
-If the backing store is MongoDB, operators like `$gt`, `$regex`, `$where` could be injected.
+### M-06: PBKDF2 iteration count env-overridable without a floor
 
-**Recommendation:** Validate/sanitize the `where` object; whitelist allowed query operators.
+**Location:** `packages/cipher/src/passphrase.ts:10-18`
 
----
+`PBKDF2_ITERATIONS` accepts any value > 0, silently weakening wallet-at-rest encryption below the 100k default (e.g. `PBKDF2_ITERATIONS=1`). Enforce a minimum (e.g. 100,000) and warn on override. (Feb M-12 — still present.)
 
-### M-04: Empty Passphrase Fallback
+### M-07: Stored-XSS-capable OAuth client name + third-party CDN script without SRI
 
-**Severity:** 🟡 Medium
-**Category:** Configuration Security
-**Affected:** `services/keymaster/server/` config, `sample.env`
+**Location:** `services/herald/server/src/oauth/index.ts:274,323`
 
-```
-ARCHON_ENCRYPTED_PASSPHRASE=     # empty in sample.env
-keymasterPassphrase: process.env.ARCHON_ENCRYPTED_PASSPHRASE || ''
-```
-
-An empty or trivial passphrase renders mnemonic encryption ineffective.
-
-**Recommendation:** Enforce minimum passphrase length/complexity at startup. Refuse to start if passphrase is empty or below a threshold.
-
----
-
-### M-05: Default Credentials in `sample.env`
-
-**Severity:** 🟡 Medium
-**Category:** Secrets Management
-
-`sample.env` contains default credentials likely copied verbatim to production:
-- `ARCHON_BTC_USER=bitcoin` / `ARCHON_BTC_PASS=bitcoin`
-- `ARCHON_BTC_T4_USER=testnet4` / `ARCHON_BTC_T4_PASS=testnet4`
-- `ARCHON_SIGNET_USER=signet` / `ARCHON_SIGNET_PASS=signet`
-- `GRAFANA_ADMIN_USER=admin` / `GRAFANA_ADMIN_PASSWORD=admin`
-
-**Recommendation:** Use placeholder values like `CHANGE_ME_REQUIRED` and validate at startup.
-
----
-
-### M-06: No Health Checks on Containers
-
-**Severity:** 🟡 Medium
-**Category:** Reliability / Security
-
-No `healthcheck:` blocks are defined for any service. `depends_on` only waits for container start, not readiness. Services may connect to unready databases.
-
-**Recommendation:** Add health checks to all critical services.
-
----
-
-### M-07: No Resource Limits on Containers
-
-**Severity:** 🟡 Medium
-**Category:** Availability
-
-No `mem_limit` or `cpus` constraints are set. A runaway container can consume all host resources.
-
-**Recommendation:** Set `deploy.resources.limits` for all services.
-
----
-
-### M-08: No Docker Network Segmentation
-
-**Severity:** 🟡 Medium
-**Category:** Network Security
-
-All containers share the default bridge network. A compromised explorer or react-wallet container can directly access MongoDB, Redis, Bitcoin RPC, and all internal services.
-
-**Recommendation:** Segment into networks: `frontend`, `backend`, `database`, `blockchain`.
-
----
-
-### M-09: Broad Volume Mounts
-
-**Severity:** 🟡 Medium
-**Category:** Container Security
-
-The entire `./data` directory is mounted into multiple containers (gatekeeper, keymaster, satoshi mediators). A compromised container has read/write access to all persistent data.
-
-**Recommendation:** Mount only the specific subdirectory each service needs.
-
----
-
-### M-10: Untrusted URL Parameters from Web Pages
-
-**Severity:** 🟡 Medium
-**Category:** Extension Security
-**Affected:** `apps/chrome-extension/src/contentScript.ts`
-
-The content script extracts `challenge` and `did` parameters from `archon://` URLs on any web page and forwards them to the extension background via `chrome.runtime.sendMessage`. Any website can craft malicious `archon://` links.
-
-**Recommendation:** Validate and sanitize parameters before processing. Consider a whitelist of allowed parameter formats.
-
----
-
-### M-11: `wasm-unsafe-eval` in Extension CSP
-
-**Severity:** 🟡 Medium
-**Category:** Extension Security
-
-```json
-"content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
-}
-```
-
-`wasm-unsafe-eval` allows WebAssembly execution with eval-like semantics. Likely needed for crypto WASM modules but expands the attack surface.
-
-**Recommendation:** Document the justification. Ensure no untrusted WASM can be loaded.
-
----
-
-### M-12: PBKDF2 Iterations Overridable via Environment Variable
-
-**Severity:** 🟡 Medium
-**Category:** Cryptographic Configuration
-**Affected:** `packages/keymaster/src/encryption.ts`
-
-```typescript
-if (typeof process !== 'undefined' && process.env?.PBKDF2_ITERATIONS) {
-    const parsed = parseInt(process.env.PBKDF2_ITERATIONS, 10);
-    if (!isNaN(parsed) && parsed > 0) {
-        return parsed;
-    }
-}
-return ENC_ITER_DEFAULT; // 100,000
-```
-
-The PBKDF2 iteration count can be reduced to `1` via environment variable, making the KDF trivially brutable.
-
-**Recommendation:** Enforce a minimum floor (e.g., 100,000) regardless of environment variable.
+The consent page interpolates `client.name` unescaped into HTML. Client registration (`POST /oauth/clients`) is admin-gated and fail-closed (verified), so exploitation requires a compromised/malicious admin — Medium-Low. The page also loads `qrcode.min.js` from jsdelivr without an integrity hash; a CDN compromise yields JS execution in the auth flow. Positive: `redirect_uri` is strictly validated against the registered list (verified at lines 222-228), and challenges are server-generated.
 
 ---
 
 ## 4. Low Severity Findings
 
-### L-01: `mongo:8.0` Not Pinned to Patch Version
-
-Pin to `mongo:8.0.4` (or specific patch) and consider SHA256 digest pinning for supply-chain hardening.
-
-### L-02: Build Tools Remain in Final Images
-
-`docker/Dockerfile.hyperswarm` installs `python3`, `make`, `g++` for native module compilation but leaves them in the final image. Use multi-stage builds to reduce attack surface.
-
-### L-03: CLI Container Runs Idle
-
-`docker/Dockerfile.cli` uses `CMD ["tail", "-f", "/dev/null"]` keeping the container alive indefinitely. Use one-shot execution (`docker compose run --rm cli ...`).
-
-### L-04: No `security_opt` or Capability Dropping
-
-No service uses `security_opt: [no-new-privileges:true]` or `cap_drop: [ALL]`. Containers retain default Linux capabilities.
-
-### L-05: No Restart Policies
-
-No `restart:` policy is defined on any service. Critical services stay down after crashes.
-
-### L-06: `@noble/ciphers` on Pre-Stable 0.x
-
-`packages/cipher/package.json` uses `@noble/ciphers` ^0.4.1. The current stable line is 1.x.
-
-### L-07: `@capacitor/core` on Alpha
-
-Both `apps/react-wallet` and `apps/chrome-extension` depend on `@capacitor/core` ^2.0.0-alpha.39. Alpha packages may contain unpatched security issues.
-
-### L-08: Express 4.x in Maintenance Mode
-
-Both services use Express ^4.21.0. Express 5 is now available with improved security defaults.
-
-### L-09: Prometheus Metrics Publicly Accessible
-
-Both API servers expose `/metrics` endpoints without authentication, leaking operational data (memory usage, request counts, timing, etc.).
-
-### L-10: Redis Has No Authentication (Downgraded from C-05)
-
-While Redis has no `requirepass` configured, the host port binding in `docker-compose.yml` is `127.0.0.1:6379:6379` (localhost only), and Redis is isolated within the Docker bridge network. It is not reachable from external networks. Access is limited to other containers in the compose stack and local host processes.
-
-**Remaining risk:** A compromised container could perform lateral movement to Redis. Adding `requirepass` would provide defense-in-depth.
-
-**Recommendation:** Consider adding authentication as a hardening measure:
-```properties
-requirepass <strong_random_password>
-```
-
-### L-11: Bitcoin RPC Hardcoded Credentials (Downgraded from C-06)
-
-Simple RPC credentials exist in `bitcoin.conf` files for signet and testnet4. However, the signet RPC port is now bound to `127.0.0.1:38332` (localhost only), and testnet4 has no port mapping at all. Both are test networks with no real funds. Access is limited to the Docker network and local host processes.
-
-**Remaining risk:** Credentials are in Git history. A compromised container could access the Bitcoin RPC within the Docker network.
-
-**Recommendation:** Consider switching to `rpcauth` (hashed credentials) and moving passwords to `.env`.
-
-### L-12: MongoDB Has No Authentication (Downgraded from C-07)
-
-MongoDB is deployed without authentication, but the port is bound to `127.0.0.1:27017:27017` (localhost only) and is isolated within the Docker bridge network. It is not reachable from external networks. Access is limited to other containers in the compose stack and local host processes.
-
-**Remaining risk:** A compromised container could access MongoDB without credentials within the Docker network.
-
-**Recommendation:** Consider enabling authentication as a hardening measure:
-```yaml
-mongodb:
-  image: mongo:8.0.4
-  command: mongod --auth
-  environment:
-    - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
-    - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASS}
-```
+| ID | Finding | Location |
+|----|---------|----------|
+| L-01 | Extension `GET_PASSPHRASE` (and state handlers) have no `sender` validation — any extension context (incl. content scripts on `<all_urls>`) can read the session passphrase. Current content scripts don't relay it, but one careless relay addition exposes it to every web page. | `apps/browser-extension/src/background/background.ts:179-180` |
+| L-02 | `<all_urls>` content script + host permissions persist (Feb H-07). Partially mitigated: handoff messages now validate (`isDidLike`, action allowlist) and NIP-07 has per-origin consent with auto-approve list. | `apps/browser-extension/src/static/manifest.json` |
+| L-03 | `wasm-unsafe-eval` in extension CSP (Feb M-11) — required by crypto deps; document and scope tightly. | manifest.json |
+| L-04 | `/metrics` publicly mounted before auth middleware on TS services. | keymaster-api.ts:150, gatekeeper-api.ts:161 |
+| L-05 | Public `GET /invoice/:did` on Drawbridge creates invoices via the Lightning mediator with no auth — resource-abuse/spam vector (rate limiting not applied on this path). | drawbridge-api.ts:397 |
+| L-06 | Admin-key comparison not timing-safe in TS Gatekeeper/Keymaster (`!==`), Rust Gatekeeper (`==`), or the Python service (plain `!=`; `hmac.compare_digest` is used nowhere under `python/keymaster_service/src/`). Drawbridge and Herald already use `crypto.timingSafeEqual`. | gatekeeper `v1-admin.ts`, `keymaster-admin.ts`, `api.rs:2116`, `keymaster_service/app.py:131` |
+| L-07 | `window.postMessage(..., "*")` for NIP-07 responses (semgrep `wildcard-postmessage-configuration`); low impact since responses target the requesting page, but `messageTargetOrigin` is available and unused there. | contentScript.ts:28-40 |
+| L-08 | Dev-chain dependency hygiene: `dependabot-missing-cooldown`, `.npmrc` missing `minimum-release-age`, Express 4.x maintenance mode, `@noble/ciphers` 0.x, alpha `@capacitor/core` (carried from Feb). | assorted |
 
 ---
 
-## 5. Informational / Positive Findings
+## 5. Semgrep triage notes (38 raw findings)
 
-The audit identified several security-positive patterns:
-
-| Area | Assessment |
-|------|-----------|
-| **Cryptographic primitives** | ✅ Sound choices — secp256k1 via `@noble/secp256k1`, XChaCha20-Poly1305, AES-256-GCM, PBKDF2 with SHA-512 (100K iterations) |
-| **No `eval()` / `exec()` / `Function()`** | ✅ No dynamic code execution found in any source file |
-| **Parameterized SQL queries** | ✅ All SQLite operations use parameterized queries — no SQL injection risk |
-| **No XSS vectors in source** | ✅ No `dangerouslySetInnerHTML` or `innerHTML` usage in application source code |
-| **Chrome Extension uses Manifest V3** | ✅ More secure than V2; no `externally_connectable` or `web_accessible_resources` |
-| **Wallet encryption** | ✅ Mnemonic encrypted at rest with AES-256-GCM + PBKDF2; random 16-byte salt and 12-byte IV per encryption |
-| **BIP39 mnemonic generation** | ✅ Uses standard `bip39.generateMnemonic()` with proper entropy |
-| **HD key derivation** | ✅ Standard BIP32 via `hdkey` package from master seed |
-| **Signature verification** | ✅ ECDSA (secp256k1) with proper hash-then-sign pattern |
-| **Redis Lua scripts** | ✅ Hardcoded script strings; arguments passed as ARGV parameters (not interpolated) |
-| **Base images version-pinned** | ✅ All Dockerfiles use `node:22.15.0-bullseye-slim` |
-| **JSON canonicalization** | ✅ Uses `canonicalize` for deterministic JSON before hashing/signing |
+- `run-shell-injection` in `.github/workflows/npm-package-publish.yml` — **not exploitable**: `workflow_dispatch` only, and all interpolated inputs (`package`, `version`, `preid`) are `type: choice` with fixed option lists. Consider env-var indirection anyway as hardening.
+- `crypto-mode-without-authentication` in `python/keymaster/src/keymaster/didcomm_crypto.py:192` — **false positive**: A256CBC-HS512 implements encrypt-then-MAC with HMAC-SHA-512/32 and `compare_digest` verified before decryption (lines 180-216). Correct JWE construction.
+- `direct-response-write` (9×, drawbridge v1-router) — reviewed, JSON responses of internal data; no injection sink.
+- `missing-user` in `services/herald/Dockerfile` — consistent with Feb H-05 (containers run as root); compose-level `user:` directives exist on some services but not uniformly.
 
 ---
 
-## Remediation Applied
+## 6. Positive / Verified-Fixed Findings
 
-The following changes were implemented in the `release-0.2` branch to address the most critical findings:
-
-### 1. Admin API Key Middleware (C-01, C-02, C-03)
-
-**Files changed:**
-- `services/gatekeeper/server/src/gatekeeper-api.ts`
-- `services/keymaster/server/src/keymaster-api.ts`
-- `services/gatekeeper/server/src/config.js`
-- `services/keymaster/server/src/config.js`
-
-A `requireAdminKey` middleware was added to both services. When `ARCHON_ADMIN_API_KEY` is set, all admin routes require the internal `X-Archon-Admin-Key` header. This protects against reverse proxy misconfiguration.
-
-**Gatekeeper admin routes protected:** `/dids/remove`, `/db/reset`, `/db/verify`
-**Keymaster admin routes protected:** All `/wallet/*` routes, `/did/:id` (DELETE), `/ids` (POST/DELETE), `/keys/rotate`, `/assets/:id/transfer`, `/export/wallet/encrypted`
-
-### 2. Production Guard on Database Reset (C-02)
-
-`GET /api/v1/db/reset` now returns `403 Forbidden` when `NODE_ENV=production`, regardless of API key.
-
-### 3. Configurable Bind Address (H-01)
-
-**Files changed:** `services/*/server/src/config.js`, `docker-compose.yml`, `sample.env`
-
-Both services now support `ARCHON_BIND_ADDRESS` (default `0.0.0.0`). Set to `127.0.0.1` in production so only the local reverse proxy can reach the services.
-
-### 4. Sample Nginx Reverse Proxy Configuration
-
-**File added:** `docs/nginx-proxy.conf.example`
-
-A comprehensive nginx configuration that:
-- Exposes only public-safe Gatekeeper endpoints
-- Blocks all admin, internal, and metrics routes
-- Adds rate limiting zones (30 req/s general, 5 req/s writes)
-- Includes security headers (X-Content-Type-Options, X-Frame-Options, etc.)
-- Provides HTTPS/TLS server block template
-- Documents the recommended deployment pattern
-
-### Deployment Quick Start
-
-```bash
-# 1. Generate a strong admin API key
-echo "ARCHON_ADMIN_API_KEY=$(openssl rand -hex 32)" >> .env
-
-# 2. Bind services to localhost only
-echo "ARCHON_BIND_ADDRESS=127.0.0.1" >> .env
-
-# 3. Set up nginx with the provided config
-sudo cp docs/nginx-proxy.conf.example /etc/nginx/sites-available/archon
-# Edit server_name and TLS settings
-sudo ln -s /etc/nginx/sites-available/archon /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-```
+1. **Secrets hygiene: clean.** gitleaks over full history (1,992 commits): 13 hits, all verified false positives — W3C DIDComm spec vectors, cross-implementation test envelopes with `did:test` keys, the BIP32 documentation example xprv/xpub in `packages/browser-hdkey/README.md`, and a dummy hex macaroon secret in tests.
+2. **Drawbridge macaroon implementation is solid** (`macaroon.ts`): `timingSafeEqual` for payment-hash/preimage, strict hex format validation, fail-closed on unknown caveats, and the service **refuses to start** without a 32+ char `MACAROON_SECRET` (drawbridge-api.ts:336-339). Payment completion checks mediator-side settlement, deletes pending invoices after redemption, and expires them (410). Drawbridge's admin auth (`v1-admin.ts`) is also **fail-closed** (403 when no key is configured) and timing-safe — unlike the services in H-01.
+3. **Herald hardening:** fail-closed session secret with placeholder rejection, timing-safe admin comparison, admin-gated client registration, strict `redirect_uri` validation.
+4. **Feb M-03 (NoSQL injection via `queryDocs`) fixed:** `packages/gatekeeper/src/search-index.ts` implements a custom matcher supporting only `{$in: [...]}` — no operator passthrough to Mongo.
+5. **Compose posture improved:** Mongo/Redis/IPFS-API/Keymaster/signet-RPC all bind `127.0.0.1`; healthchecks present (Feb M-06); node containers take `user:` directives.
+6. **Extension improvements since Feb:** passphrase moved from offscreen-document memory to `chrome.storage.session` (memory-only, cleared with the session); NIP-07 per-origin consent flow; validated handoff message allowlist.
+7. **`SECURITY.md` published** (vulnerability disclosure policy) — added this cycle.
+8. **No code-injection sinks:** no `eval`/`new Function`/`child_process.exec` with user input found in service code (semgrep + manual grep).
+9. **CI publish workflow** constrained to maintainer-dispatched choice inputs.
 
 ---
 
-## Remediation Roadmap
+## 7. Prior Audit Findings — Status on `main`
 
-### Phase 1 — Immediate (Critical / High) — Target: 2 weeks
+Complete mapping: every finding in the February report has a row here. This
+report replaces that document in the tree, so anything left open below has no
+other tracking surface.
 
-| Priority | Action | Effort | Status |
-|----------|--------|--------|--------|
-| 1 | Add authentication middleware to Gatekeeper and Keymaster APIs | Medium | ✅ Done |
-| 2 | Remove or protect `GET /db/reset` and `GET /wallet/mnemonic` endpoints | Low | ✅ Done |
-| 3 | Remove `data/wallet.json` from Git history (`git filter-repo`) and rotate keys | Low | ⬜ Open |
-| 4 | Add `requirepass` to Redis config; enable MongoDB auth | Low | ⬜ Open |
-| 5 | Restrict Bitcoin RPC `rpcallowip` to Docker internal CIDR | Low | ⬜ Open |
-| 6 | Add `helmet` middleware to both Express servers | Low | ⬜ Open |
-| 7 | Add rate limiting at proxy level | Low | ✅ Done (nginx config) |
-| 8 | Restrict CORS to specific allowed origins | Low | ⬜ Open |
-| 9 | Update `.gitignore` with comprehensive data exclusions | Low | ⬜ Open |
-| 10 | Bind Bitcoin RPC ports to `127.0.0.1` in compose files | Low | ⬜ Open |
-
-### Phase 2 — Short-Term (Medium) — Target: 4 weeks
-
-| Priority | Action | Effort |
-|----------|--------|--------|
-| 11 | Add Zod/Joi input validation schemas for all API endpoints | Medium |
-| 12 | Sanitize error responses (generic messages in production) | Low |
-| 13 | Validate/sanitize `queryDocs` `where` parameter | Low |
-| 14 | Enforce minimum passphrase strength at startup | Low |
-| 15 | Replace default credentials in `sample.env` with `CHANGE_ME` placeholders | Low |
-| 16 | Add Docker health checks to all services | Medium |
-| 17 | Implement Docker network segmentation | Medium |
-| 18 | Scope Chrome extension `<all_urls>` to necessary domains | Low |
-| 19 | Add passphrase timeout/expiration in Chrome extension | Medium |
-| 20 | Set minimum floor for PBKDF2 iterations | Low |
-
-### Phase 3 — Ongoing (Low + Hardening) — Target: 8 weeks
-
-| Priority | Action | Effort |
-|----------|--------|--------|
-| 21 | Add `USER` directives to all Dockerfiles | Low |
-| 22 | Implement TLS/HTTPS (reverse proxy or direct) | Medium |
-| 23 | Add Docker resource limits | Low |
-| 24 | Scope volume mounts to per-service subdirectories | Low |
-| 25 | Add `security_opt` and `cap_drop` to compose | Low |
-| 26 | Multi-stage Docker builds to remove build tools | Medium |
-| 27 | Upgrade `@noble/ciphers` to stable 1.x | Low |
-| 28 | Upgrade Express to 5.x | Medium |
-| 29 | Set up automated dependency vulnerability scanning (Dependabot / Snyk) | Low |
-| 30 | Implement audit logging for sensitive operations | Medium |
+| Feb ID | Finding | Status Aug 2026 |
+|--------|---------|-----------------|
+| C-01..C-03 | Unauthenticated admin endpoints | ⚠️ Partially — middleware exists but fails open by default on TS Gatekeeper/Keymaster, Python, Rust (see H-01) |
+| C-04 | Wallet in git | ✅ Resolved — verified no wallet files tracked |
+| H-01 | No TLS | ℹ️ Unchanged by design (reverse proxy terminates TLS; nginx example provided) |
+| H-02 | No security headers | ⚠️ Still absent on TS services |
+| H-03 | No rate limiting | ⚠️ Proxy-level only; Drawbridge has app-level limiting (with M-01 caveats); Keymaster/Gatekeeper none |
+| H-04 | CORS-all | ❌ Still present (H-03 this report) |
+| H-05 | Root containers | ⚠️ Partial (compose `user:` on some services; Dockerfiles unchanged — herald flagged by semgrep) |
+| H-06 | `.gitignore` missing data exclusions | ✅ Resolved — `data/.gitignore` excludes `*.json`, `*.db`, and each service/chain data dir |
+| H-07 | `<all_urls>` extension | ⚠️ Present, partially mitigated (L-02) |
+| H-08 | Plaintext passphrase in offscreen | ✅ Improved — `chrome.storage.session` |
+| H-09 | Signet RPC exposed | ✅ Mitigated — localhost-bound in compose |
+| M-01 | No input-validation library/schema | ❌ Still present — no schema-validation dependency in any `services/*/server/package.json` |
+| M-02 | Error message leaks | ❌ Still present — 182 sites (M-03) |
+| M-03 | NoSQL injection | ✅ Fixed — `$in`-only custom matcher |
+| M-04 | Empty passphrase fallback in Keymaster | ❌ Still present, and now materially worse — it is the trigger for H-02 |
+| M-05 | Default creds in sample.env | ❌ Still present (M-05) |
+| M-06 | No container health checks | ✅ Fixed — healthchecks on core and Drawbridge-stack services |
+| M-07 | No resource limits | ❌ Still present — no `mem_limit` / `cpus` / `deploy.resources` in any compose file |
+| M-08 | No network segmentation | ❌ Still present — flat default network, no `networks:` definitions |
+| M-09 | Broad volume mounts | ✅ Improved — services now bind per-service subdirectories (`data/herald`, `data/drawbridge`, …) rather than all of `data/` |
+| M-10 | Untrusted page→extension messaging | ✅ Improved — validated allowlist |
+| M-11 | `wasm-unsafe-eval` in extension CSP | ⚠️ Present, accepted — required by crypto deps (L-03 this report) |
+| M-12 | PBKDF2 env override | ❌ Still present (M-06) |
+| L-01 | `mongo:8.0` not patch-pinned | ❌ Still present — `docker/compose/core.yml:3` |
+| L-02 | Build tools in final image | ❌ Still present — `docker/Dockerfile.hyperswarm:5` installs `python3 make g++` in a single-stage build |
+| L-03 | CLI container idles on `tail -f` | ❌ Still present — `docker/Dockerfile.cli:21`; accepted (interactive `docker compose exec` container) |
+| L-04 | No `security_opt` / capability dropping | ❌ Still present — neither appears in any compose file |
+| L-05 | No restart policies | ⚠️ Mostly absent — only `docker/compose/lightning.yml` sets `restart:` |
+| L-06 | `@noble/ciphers` on 0.x | ❌ Still present (folded into L-08 this report) |
+| L-07 | `@capacitor/core` alpha | ❌ Still present (folded into L-08 this report) |
+| L-08 | Express 4.x maintenance mode | ❌ Still present (folded into L-08 this report) |
+| L-09 | `/metrics` public | ❌ Still present (L-04 this report) |
+| L-10 | Redis unauthenticated | ⚠️ Unchanged, accepted — no `requirepass`, but bound `127.0.0.1:6379` and docker-network-isolated |
+| L-11 | Bitcoin RPC hardcoded creds | ⚠️ Unchanged, accepted — test networks only; host ports localhost-bound (carried into M-05) |
+| L-12 | MongoDB unauthenticated | ⚠️ Unchanged, accepted — no auth, but bound `127.0.0.1:27017` and docker-network-isolated |
 
 ---
 
-## Appendix — Files Reviewed
+## 8. Remediation Priorities
 
-### Configuration & Infrastructure
-- `package.json` (root)
-- `sample.env` *(updated with `ARCHON_BIND_ADDRESS` and `ARCHON_ADMIN_API_KEY`)*
-- `.gitignore`
-- `docker-compose.yml` *(updated with new env vars)*
-- `docker/compose/btc-mainnet.yml`
-- `docker/compose/btc-signet.yml`
-- `docker/compose/btc-testnet4.yml`
-- `docker/Dockerfile.cli`, `docker/Dockerfile.explorer`, `docker/Dockerfile.gatekeeper-ts`, `docker/Dockerfile.hyperswarm`, `docker/Dockerfile.keymaster-ts`, `docker/Dockerfile.react-wallet`, `docker/Dockerfile.satoshi`
-- `data/redis.conf`
-- `data/wallet.json`
-- `data/btc-signet/bitcoin.conf`
-- `data/btc-testnet4/bitcoin.conf`
-- `observability/prometheus/prometheus.yml`
-
-### Core Packages
-- `packages/cipher/src/cipher-base.ts`
-- `packages/cipher/src/cipher-node.ts`
-- `packages/cipher/src/cipher-web.ts`
-- `packages/cipher/src/types.ts`
-- `packages/cipher/package.json`
-- `packages/gatekeeper/src/gatekeeper.ts`
-- `packages/clients/src/gatekeeper-client.ts`
-- `packages/gatekeeper/src/db/` (all DB implementations)
-- `packages/gatekeeper/package.json`
-- `packages/keymaster/src/keymaster.ts`
-- `packages/clients/src/keymaster-client.ts`
-- `packages/keymaster/src/encryption.ts`
-- `packages/keymaster/src/db/` (all DB implementations)
-- `packages/keymaster/package.json`
-- `packages/common/package.json`
-- `packages/ipfs/package.json`
-
-### Services
-- `services/gatekeeper/server/src/` (server entry, routes, config)
-- `services/gatekeeper/server/package.json`
-- `services/keymaster/server/src/` (server entry, routes, config)
-- `services/keymaster/server/package.json`
-
-### Client Applications
-- `apps/chrome-extension/src/` (manifest, background, content script, offscreen, popup)
-- `apps/chrome-extension/package.json`
-- `apps/react-wallet/src/` (App, auth-related components)
-- `apps/react-wallet/package.json`
+1. **C-01** — ✅ Done: PR #866, merged 2026-08-08. Any L402 deployment running a build older than that merge is still bypassable and should be updated.
+2. **H-02** — Stop returning the admin key from `/login` without passphrase verification.
+3. **H-01** — Fail closed on admin auth in production; timing-safe comparisons (copy Drawbridge's `v1-admin.ts` into TS Gatekeeper/Keymaster, `hmac.compare_digest` in Python, a constant-time compare in Rust); secure-by-default `sample.env` (`ARCHON_BIND_ADDRESS=127.0.0.1`, generated admin key); add a host bind to the Gatekeeper compose port mapping to match Keymaster's.
+4. **H-03** — CORS allowlist.
+5. **H-04** — `tar` override; `@hono/node-server` pin; assess `helia`/`@libp2p/kad-dht` exposure.
+6. **M-01/M-02** — Stop trusting `X-DID`; atomic check-and-increment for macaroon uses.
+7. **M-03** — Generic client-facing error messages; log internals server-side only.
 
 ---
 
-*This report was generated through automated static analysis of the repository source code, configuration files, and infrastructure definitions. It does not include dynamic testing, penetration testing, or runtime analysis. Findings should be validated by the development team before remediation.*
-
-### Files Added/Modified in Remediation
-- `services/gatekeeper/server/src/config.js` — added `bindAddress`, `adminApiKey`
-- `services/gatekeeper/server/src/gatekeeper-api.ts` — added `requireAdminKey` middleware, production guard on `/db/reset`
-- `services/keymaster/server/src/config.js` — added `bindAddress`, `adminApiKey`
-- `services/keymaster/server/src/keymaster-api.ts` — added `requireAdminKey` middleware to all admin routes
-- `docker-compose.yml` — passes `ARCHON_BIND_ADDRESS` and `ARCHON_ADMIN_API_KEY` to services
-- `sample.env` — documents new security env vars
-- `docs/nginx-proxy.conf.example` — new file: sample reverse proxy configuration
+*Evidence basis: every finding above cites a file/line read directly from the working tree @ `daf2c2ac`, or quoted tool output (gitleaks 8.24.3, npm audit, semgrep). No finding rests on assumption.*
