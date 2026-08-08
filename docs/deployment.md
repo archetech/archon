@@ -81,7 +81,7 @@ COMPOSE_PROFILES=hyperswarm,cli,explorer,gatekeeper-client,keymaster-client,reac
 
 Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `lightning`, `drawbridge`, `drawbridge-lightning`, `drawbridge-names`, `drawbridge-tor`, `didcomm`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-mainnet`, `sol-devnet`, `pinning`, and `filecoin`.
 
-The three `drawbridge-*` profiles are **additive on top of `drawbridge`** — they select which subservices the gateway fronts, and are not independently runnable. See [§8](#8-adding-drawbridge-api-gateway--tor).
+The three `drawbridge-*` profiles are **additive on top of `drawbridge`** — they select which subservices the gateway fronts. See [§8](#8-adding-drawbridge-api-gateway--tor).
 
 ### Key Environment Variables
 
@@ -499,7 +499,9 @@ ARCHON_HERALD_URL=
 ARCHON_DIDCOMM_TOR_PROXY=
 ```
 
-**Blanking those URLs is required, not optional.** Drawbridge decides what it offers from the URLs, not from the profiles: a URL left at its default makes `GET /api/v1/capabilities` advertise the service and the proxy routes attempt a connection to a container that is not running. Empty means the capability reports `false` and the route returns HTTP 501. The `drawbridge-*` profiles are additive on top of `drawbridge` and are not independently runnable.
+**Blanking those URLs is required, not optional.** Drawbridge decides what it offers from the URLs, not from the profiles: a URL left at its default makes `GET /api/v1/capabilities` advertise the service and the proxy routes attempt a connection to a container that is not running. Empty means the capability reports `false` and the route returns HTTP 501.
+
+The `drawbridge-*` profiles are designed to be additive on top of `drawbridge`. Selecting one on its own is valid and will start its containers, but they will have nothing to front — tor's hidden service targets `drawbridge:4222`, and `herald-client` is built against Drawbridge's `/names/api`. Pair them with `drawbridge` unless you have a specific reason not to.
 
 ### Lightning Backend
 

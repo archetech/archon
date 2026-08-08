@@ -111,7 +111,7 @@ Consequences for the stages:
 - **`add-lightning` should append `drawbridge,drawbridge-lightning`**, not bare `drawbridge`. It no longer implicitly brings up Herald or Tor; if the stage wants those, it must add `drawbridge-names` / `drawbridge-tor` explicitly. It still switches Caddy's `/api/*` and `/1.0/*` handlers from `localhost:4224` to `localhost:4222`.
 - **`add-email` should append `drawbridge-names`** and set `ARCHON_HERALD_URL`; Herald no longer arrives as a side effect of the drawbridge profile.
 - **Tor SOCKS security posture, wherever `drawbridge-tor` is enabled:** `ARCHON_TOR_SOCKS_PORT` defaults to `127.0.0.1:9050`; do not override to `0.0.0.0` (open-proxy footgun documented in archon issue #589, fix `be1dc357`). Verify with `docker port archon-tor-1` post-install and refuse to declare the stage healthy if it binds `0.0.0.0`.
-- **`tor` keeps a required `depends_on: drawbridge`**, so `drawbridge-tor` cannot be enabled on its own — always pair it with `drawbridge`.
+- **Always pair the sub-profiles with `drawbridge`.** They will start on their own, but tor's hidden service targets `drawbridge:4222` and `herald-client` is built against Drawbridge's `/names/api`, so alone they front nothing.
 - **Drawbridge onion hostname** — with `drawbridge-tor` on, published to `data/tor-drawbridge/`; DIDComm and other services can advertise the `.onion` endpoint as a fallback when the operator's public clearnet host is unset. Prefer clearnet: set `ARCHON_DRAWBRIDGE_PUBLIC_HOST=<domain>`.
 
 Requires Docker Compose **v2.20+** (the compose files use `depends_on: … required: false`). Older Compose fails to parse the merged file entirely.

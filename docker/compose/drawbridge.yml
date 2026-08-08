@@ -230,8 +230,14 @@ services:
         echo '[tor] Published onion hostname'
         wait
     depends_on:
+      # Optional so `drawbridge-tor` can be selected without `drawbridge`.
+      # A required dependency on a service in another profile makes the whole
+      # merged project invalid ("depends on undefined service"), which is a
+      # parse error for every profile, not just this one. When `drawbridge` IS
+      # enabled the condition still applies and tor waits for it to be healthy.
       drawbridge:
         condition: service_healthy
+        required: false
 
 volumes:
   tor-hostname:
