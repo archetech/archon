@@ -1114,7 +1114,20 @@ pub(crate) async fn resolve_did(
         .and_then(|value| value.get("error"))
         .is_some();
 
-    if has_resolver_error && !state.config.fallback_url.trim().is_empty() {
+    // The universal resolver is for FOREIGN DID methods (did:web, did:ethr, ...).
+    // This gatekeeper is itself an authority for its own method, so when a local
+    // resolve of one of our own DIDs fails, an external universal resolver has
+    // nothing to add: it has no driver for our method and the request simply
+    // burns the full fallback_timeout_ms before failing. Skipping it here removes
+    // that stall and lets the confirm fallback -- another Archon gatekeeper,
+    // which *can* resolve our DIDs -- be tried immediately instead.
+    // Mirrors services/gatekeeper/server/src/v1-did-router.ts.
+    let is_own_method = did.starts_with(&format!(
+        "{}:",
+        state.config.did_prefix.trim_end_matches(':')
+    ));
+
+    if has_resolver_error && !is_own_method && !state.config.fallback_url.trim().is_empty() {
         let url = format!(
             "{}/1.0/identifiers/{}",
             state.config.fallback_url.trim_end_matches('/'),
