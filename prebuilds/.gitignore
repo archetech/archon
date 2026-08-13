@@ -1,2 +1,4 @@
 # Populated by scripts/prefetch-prebuilds.mjs; contents are not committed.
 *.tar.gz
+# Interrupted downloads can leave these behind.
+*.tmp

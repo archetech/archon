@@ -48,6 +48,17 @@ function assetFor({ name, repo, napi }, version, arch) {
     return { file, url: `https://github.com/${repo}/releases/download/v${version}/${file}` };
 }
 
+// Versions come from package-lock.json, so a separator in a version string
+// would let the computed filename escape OUT_DIR. That lockfile is already
+// trusted (npm ci runs install scripts from it), but containment is cheap.
+function resolveInside(dir, file) {
+    const full = path.resolve(dir, file);
+    if (full !== path.join(dir, path.basename(full)) || !full.startsWith(dir + path.sep)) {
+        throw new Error(`refusing to write outside ${dir}: ${file}`);
+    }
+    return full;
+}
+
 async function download(url, dest) {
     let lastErr;
     for (let attempt = 1; attempt <= RETRIES; attempt++) {
@@ -55,6 +66,10 @@ async function download(url, dest) {
         try {
             const res = await fetch(url, { redirect: 'follow' });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            // A fetch response can legally carry a null body; without this the
+            // Readable.fromWeb below throws something opaque instead of being
+            // reported and retried like any other failure.
+            if (!res.body) throw new Error('empty response body');
             await pipeline(Readable.fromWeb(res.body), createWriteStream(tmp));
             await rename(tmp, dest);
             return;
@@ -85,7 +100,7 @@ for (const target of TARGETS) {
     for (const arch of ARCHES) {
         const { file, url } = assetFor(target, version, arch);
         try {
-            await download(url, path.join(OUT_DIR, file));
+            await download(url, resolveInside(OUT_DIR, file));
             console.log(`✓ ${file}`);
         } catch (err) {
             failed++;
