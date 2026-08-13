@@ -95,6 +95,11 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: false
+          # The buildx docker-container driver keeps the result in its own
+          # cache, so the image has to be loaded into the docker daemon for the
+          # Anchore scan below to find it. Valid here because this is a
+          # single-platform build.
+          load: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
