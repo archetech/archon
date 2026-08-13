@@ -65,6 +65,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
+      # Required for the GitHub Actions layer cache below: the default docker
+      # driver cannot export cache, only the docker-container driver can.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.15.0"
+
+      - name: Prefetch native prebuilds
+        run: node scripts/prefetch-prebuilds.mjs
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
@@ -87,10 +100,20 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: false
+          # The buildx docker-container driver keeps the result in its own
+          # cache, so the image has to be loaded into the docker daemon for the
+          # Anchore scan below to find it. Valid here because this is a
+          # single-platform build.
+          load: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             GIT_COMMIT=${{ github.sha }}
+          # Scoped per image so the 15 matrix legs don't evict each other. These
+          # are single-stage builds, so mode=min still covers the `npm ci` layer
+          # and keeps us well inside the repo's 10GB Actions cache budget.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=min,scope=${{ matrix.image }}
 
       - name: Run Anchore vulnerability scanner
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2
