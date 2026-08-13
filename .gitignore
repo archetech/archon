@@ -19,3 +19,7 @@ dids.db-journal
 **/.npmrc
 !/.npmrc
 rust/services/gatekeeper/target/
+
+# Prefetched native prebuilds (scripts/prefetch-prebuilds.mjs); binaries are not committed.
+/prebuilds/*.tar.gz
+/prebuilds/*.tmp
