@@ -487,6 +487,88 @@ describe('DIDComm gateway transport helpers', () => {
         expect(removeBody.signature).toBeDefined();
     });
 
+    it('ackDidComm reports the count the relay removed, not the count requested', async () => {
+        const base = useDidCommGateway();
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'mailbox-ack' });
+            }
+            if (url === `${base}/api/v1/messages/remove`) {
+                // Two ids asked for, but the relay only had one left to remove
+                // (the other was already acknowledged or has expired).
+                return jsonResponse({ removed: 1 });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        expect(await keymaster.ackDidComm(['msg-1', 'msg-gone'], { name: 'Alice' })).toBe(1);
+    });
+
+    it('ackDidComm reports zero when the relay removed nothing', async () => {
+        const base = useDidCommGateway();
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'mailbox-ack' });
+            }
+            if (url === `${base}/api/v1/messages/remove`) {
+                return jsonResponse({ removed: 0 });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        // A repeated ack must not report the ids it asked about as removed.
+        expect(await keymaster.ackDidComm(['msg-1'], { name: 'Alice' })).toBe(0);
+    });
+
+    it('acknowledges when ack is left undefined, and only skips on an explicit false', async () => {
+        const base = useDidCommGateway();
+        const aliceDid = await keymaster.createId('Alice');
+        await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+
+        const packed = await keymaster.packDidComm(
+            { type: 'https://x/1/msg', body: { text: 'hi' } },
+            aliceDid,
+            { name: 'Bob' }
+        );
+
+        const removeCalls: string[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'mailbox-1' });
+            }
+            if (url === `${base}/api/v1/messages/fetch`) {
+                return jsonResponse({ messages: [{ id: 'msg-ok', message: packed }] });
+            }
+            if (url === `${base}/api/v1/messages/remove`) {
+                removeCalls.push(url);
+                return jsonResponse({ removed: 1 });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        // undefined and null must both behave as "ack", so a JSON null arriving
+        // through the API boundary cannot silently retain messages.
+        await keymaster.receiveDidComm({ name: 'Alice', ack: undefined });
+        expect(removeCalls).toHaveLength(1);
+
+        await keymaster.receiveDidComm({ name: 'Alice', ack: null as any });
+        expect(removeCalls).toHaveLength(2);
+
+        await keymaster.receiveDidComm({ name: 'Alice', ack: false });
+        expect(removeCalls).toHaveLength(2);
+    });
+
     it('ackDidComm does not call the gateway for an empty id list', async () => {
         useDidCommGateway();
         await keymaster.createId('Alice');

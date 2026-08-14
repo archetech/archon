@@ -10,6 +10,7 @@ import {
     ResolvedAddressInfo,
     CheckWalletResult,
     CreateAssetOptions,
+    DidCommReceivedMessage,
     DidCommUnpackResult,
     DmailItem,
     DmailMessage,
@@ -606,7 +607,7 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async receiveDidComm(options?: { name?: string; endpoint?: string; ack?: boolean }): Promise<DidCommUnpackResult[]> {
+    async receiveDidComm(options?: { name?: string; endpoint?: string; ack?: boolean }): Promise<DidCommReceivedMessage[]> {
         try {
             const response = await this.axios.post(`${this.API}/didcomm/receive`, { options });
             return response.data.results;

@@ -164,6 +164,97 @@ def test_send_didcomm_requires_a_node_gateway():
         asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
 
 
+class _FakeResponse:
+    def __init__(self, payload, status_code=200):
+        self._payload = payload
+        self.status_code = status_code
+
+    def json(self):
+        return self._payload
+
+
+class _FakeClient:
+    """Stands in for httpx.AsyncClient so the mailbox HTTP calls can be observed.
+
+    core.py builds its own client inside `async with`, so there is nothing to
+    inject; patching the class is the seam.
+    """
+
+    def __init__(self, responses, calls):
+        self._responses = responses
+        self._calls = calls
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def get(self, url, **kwargs):
+        self._calls.append(("GET", url, kwargs))
+        return self._responses(url, kwargs)
+
+    async def post(self, url, **kwargs):
+        self._calls.append(("POST", url, kwargs))
+        return self._responses(url, kwargs)
+
+
+def _mailbox_keymaster(monkeypatch, calls, responses):
+    import keymaster.core as core
+
+    monkeypatch.setattr(core.httpx, "AsyncClient", lambda **kw: _FakeClient(responses, calls))
+    km = core.Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass")
+    monkeypatch.setattr(km, "fetch_id_info", _async_return({"did": "did:cid:alice"}))
+    monkeypatch.setattr(km, "fetch_key_pair", _async_return({"privateJwk": {}, "publicJwk": {}}))
+    monkeypatch.setattr(km, "_didcomm_gateway_base", lambda endpoint=None: "https://gateway.example/didcomm")
+    monkeypatch.setattr(km, "_require_node_capability", _async_return(None))
+    monkeypatch.setattr(km, "_didcomm_challenge_auth", _async_return({"challenge": "c", "signature": "s"}))
+    return km
+
+
+def _async_return(value):
+    async def _inner(*args, **kwargs):
+        return value
+    return _inner
+
+
+def test_ack_didcomm_reports_the_relay_count_not_the_requested_count(monkeypatch):
+    # Mirrors the JS keymaster: the relay decides how many were really removed.
+    import asyncio
+
+    calls: list = []
+    km = _mailbox_keymaster(monkeypatch, calls, lambda url, kw: _FakeResponse({"removed": 1}))
+
+    assert asyncio.run(km.ack_didcomm(["msg-1", "msg-gone"])) == 1
+
+
+def test_receive_didcomm_acks_unless_ack_is_explicitly_false(monkeypatch):
+    # A None (e.g. a JSON null crossing an API boundary) must not be read as
+    # "do not acknowledge"; only an explicit False skips the remove call.
+    import asyncio
+
+    def responses(url, kw):
+        if url.endswith("/messages/fetch"):
+            return _FakeResponse({"messages": [{"id": "msg-ok", "message": "envelope"}]})
+        return _FakeResponse({"removed": 1})
+
+    # (ack value, is the message expected to be removed)
+    for ack, expect_removed in ((None, True), (True, True), (False, False), ("unset", True)):
+        calls: list = []
+        km = _mailbox_keymaster(monkeypatch, calls, responses)
+        # Unpacking is not what is under test here; stub it so the message counts
+        # as handled and the ack decision is actually reached.
+        monkeypatch.setattr(km, "unpack_didcomm", _async_return({"message": {}, "metadata": {}}))
+
+        options = {} if ack == "unset" else {"ack": ack}
+        results = asyncio.run(km.receive_didcomm(options))
+
+        assert len(results) == 1
+        assert results[0]["id"] == "msg-ok"
+        removed = any(url.endswith("/messages/remove") for _, url, _ in calls)
+        assert removed is expect_removed, f"ack={ack!r} should removed={expect_removed}"
+
+
 def test_ack_didcomm_rejects_non_list_ids():
     # Mirrors the JS keymaster: ids is validated before any network/wallet work.
     import asyncio

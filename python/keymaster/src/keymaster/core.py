@@ -3838,7 +3838,10 @@ class Keymaster:
                     # Leave messages we can't unpack on the server for inspection/retry.
                     pass
 
-            if handled and options.get("ack", True):
+            # Only an explicit False disables the ack, matching the JS
+            # `options.ack !== false`; a None coming through an API boundary
+            # must not silently retain messages.
+            if handled and options.get("ack", True) is not False:
                 ack = await self._didcomm_challenge_auth(client, base, keypair)
                 await client.post(f"{base}/api/v1/messages/remove", json={"did": id_info["did"], **ack, "ids": handled})
         return results
@@ -3874,7 +3877,11 @@ class Keymaster:
             )
             if response.status_code >= 400:
                 raise KeymasterError(f"DIDComm ack failed: {response.status_code}")
-        return len(ids)
+            # Report what the relay actually removed. Requested ids may be
+            # duplicated, already acknowledged, or expired, so the count we
+            # asked for is not the count that went away.
+            removed = response.json().get("removed")
+        return removed if removed is not None else 0
 
     async def mediate_didcomm(self, options: dict[str, Any] | None = None) -> dict[str, int]:
         options = options or {}

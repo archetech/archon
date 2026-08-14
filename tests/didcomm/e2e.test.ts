@@ -122,7 +122,7 @@ describe('DIDComm relay end-to-end', () => {
         expect(second).toHaveLength(1);
         expect(second[0].id).toBe(first[0].id);
 
-        const acknowledged = await keymaster.ackDidComm([first[0].id!], { name: 'Bob' });
+        const acknowledged = await keymaster.ackDidComm([first[0].id], { name: 'Bob' });
         expect(acknowledged).toBe(1);
 
         const third = await keymaster.receiveDidComm({ name: 'Bob', ack: false });

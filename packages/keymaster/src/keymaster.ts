@@ -41,6 +41,7 @@ import {
     GroupData,
     Vault,
     VaultOptions,
+    DidCommReceivedMessage,
     DidCommUnpackResult,
     IDInfo,
     ImageAsset,
@@ -2797,7 +2798,7 @@ export default class Keymaster implements KeymasterInterface {
     // them later with ackDidComm(), once they have actually been stored.
     async receiveDidComm(
         options: { name?: string; endpoint?: string; ack?: boolean } = {}
-    ): Promise<DidCommUnpackResult[]> {
+    ): Promise<DidCommReceivedMessage[]> {
         const { name } = options;
         const id = await this.fetchIdInfo(name);
         // Read our own mailbox through the local gateway, not our published public
@@ -2828,7 +2829,7 @@ export default class Keymaster implements KeymasterInterface {
         }
         const { messages } = await fetchResponse.json();
 
-        const results: DidCommUnpackResult[] = [];
+        const results: DidCommReceivedMessage[] = [];
         const handled: string[] = [];
         for (const entry of messages || []) {
             try {
@@ -2893,7 +2894,11 @@ export default class Keymaster implements KeymasterInterface {
             throw new KeymasterError(`DIDComm ack failed: ${response.status}`);
         }
 
-        return ids.length;
+        // Report what the relay actually removed. Requested ids may be
+        // duplicated, already acknowledged, or expired, so the count we asked
+        // for is not the count that went away.
+        const { removed } = await response.json();
+        return removed ?? 0;
     }
 
     // Mediator role: fetch Forward messages addressed to this identity, unpack
