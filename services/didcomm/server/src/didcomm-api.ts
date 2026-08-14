@@ -7,7 +7,7 @@ import express, { type Express } from 'express';
 import cors from 'cors';
 import { socksDispatcher } from 'fetch-socks';
 import type { Cipher } from '@didcid/cipher/types';
-import { MailboxStore } from './store.js';
+import { MailboxFullError, MailboxStore } from './store.js';
 import { recipientDidsFromEnvelope, verifyChallengeSignature, type Resolver } from './mailbox.js';
 
 export interface AppDeps {
@@ -64,6 +64,13 @@ export function createApp(deps: AppDeps): Express {
             res.json({ ids });
         }
         catch (error: any) {
+            // A full mailbox is a capacity condition, not a malformed request:
+            // tell the sender delivery failed and is worth retrying later,
+            // rather than reporting it as their mistake.
+            if (error instanceof MailboxFullError) {
+                res.status(429).send({ error: error.message });
+                return;
+            }
             res.status(400).send({ error: error.toString() });
         }
     });

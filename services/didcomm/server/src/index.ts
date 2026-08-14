@@ -5,10 +5,17 @@ import { MailboxStore, MemoryMailboxStore, RedisMailboxStore } from './store.js'
 import config from './config.js';
 
 async function createStore(): Promise<MailboxStore> {
+    const caps = {
+        maxRecipientBytes: config.maxRecipientBytes,
+        maxTotalBytes: config.maxTotalBytes,
+    };
+
     if (config.db === 'redis') {
-        return RedisMailboxStore.create(config.redisURL);
+        // Redis enforces maxRecipientBytes only; see the note on RedisMailboxStore.
+        return RedisMailboxStore.create(config.redisURL, caps);
     }
-    return new MemoryMailboxStore(config.messageTtlMs);
+
+    return new MemoryMailboxStore(config.messageTtlMs, undefined, undefined, caps);
 }
 
 async function main() {

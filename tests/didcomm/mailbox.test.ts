@@ -5,8 +5,11 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import HeliaClient from '@didcid/ipfs/helia';
 import { packEncrypted } from '@didcid/cipher/didcomm';
-import { MemoryMailboxStore, RedisMailboxStore } from '../../services/didcomm/server/src/store.ts';
+import { MailboxFullError, MemoryMailboxStore, RedisMailboxStore } from '../../services/didcomm/server/src/store.ts';
 import { recipientDidsFromEnvelope, verifyChallengeSignature } from '../../services/didcomm/server/src/mailbox.ts';
+import { createApp } from '../../services/didcomm/server/src/didcomm-api.ts';
+import express from 'express';
+import request from 'supertest';
 
 const enc = new TextEncoder();
 
@@ -52,6 +55,120 @@ describe('MemoryMailboxStore', () => {
         await store.issueChallenge('c2');
         now += 1500; // expired
         expect(await store.consumeChallenge('c2')).toBe(false);
+    });
+
+    // The original defect: prune() ran only from list(), so a mailbox nobody
+    // polled kept its envelopes forever, and an unconsumed challenge was never
+    // collected at all. Both are checked here WITHOUT calling list().
+    it('sheds expired messages and challenges without being read', async () => {
+        let now = 1_000_000;
+        const store = new MemoryMailboxStore(1000, 1000, () => now);
+
+        await store.add('did:test:never-polled', 'envelope', 'm1');
+        await store.issueChallenge('c1');
+
+        now += 1500; // past both TTLs
+        store.sweep();
+
+        // Reading would prune on its own, so inspect the internals instead --
+        // otherwise the assertion cannot distinguish a sweep from a lazy prune.
+        expect((store as any).messages.size).toBe(0);
+        expect((store as any).challenges.size).toBe(0);
+    });
+
+    it('sweeps on the unauthenticated write paths, without a timer', async () => {
+        let now = 1_000_000;
+        const store = new MemoryMailboxStore(1000, 1000, () => now);
+
+        await store.add('did:test:never-polled', 'envelope', 'm1');
+        await store.issueChallenge('stale');
+        now += 1500;
+
+        // A single later write is enough: the time-based trigger fires because
+        // more than SWEEP_EVERY_MS of injected time has passed.
+        now += 60 * 1000;
+        await store.issueChallenge('fresh');
+
+        expect((store as any).messages.size).toBe(0);
+        expect((store as any).challenges.has('stale')).toBe(false);
+        expect((store as any).challenges.has('fresh')).toBe(true);
+    });
+
+    it('rejects a deposit that would exceed the per-recipient cap', async () => {
+        const store = new MemoryMailboxStore(1000, 1000, () => 1_000_000, { maxRecipientBytes: 20 });
+
+        await store.add('did:test:bob', 'x'.repeat(15), 'm1');
+        await expect(store.add('did:test:bob', 'x'.repeat(10), 'm2')).rejects.toThrow(MailboxFullError);
+
+        // The rejected message is not stored, and the mailbox still works.
+        expect(await store.list('did:test:bob')).toHaveLength(1);
+        await expect(store.add('did:test:bob', 'x', 'm3')).resolves.toBeDefined();
+    });
+
+    // The depositor picks the recipient DID (routing is by JWE recipient kids),
+    // so a per-recipient cap alone is no bound at all -- an attacker just uses a
+    // fresh DID each time. This is the cap that actually stops that.
+    it('rejects a deposit that would exceed the total cap, across distinct recipients', async () => {
+        const store = new MemoryMailboxStore(1000, 1000, () => 1_000_000, { maxTotalBytes: 30 });
+
+        await store.add('did:test:one', 'x'.repeat(15), 'm1');
+        await store.add('did:test:two', 'x'.repeat(10), 'm2');
+        await expect(store.add('did:test:three', 'x'.repeat(10), 'm3')).rejects.toThrow(MailboxFullError);
+    });
+
+    it('frees capacity when messages are removed or expire', async () => {
+        let now = 1_000_000;
+        const store = new MemoryMailboxStore(1000, 1000, () => now, { maxTotalBytes: 20 });
+
+        await store.add('did:test:bob', 'x'.repeat(20), 'm1');
+        await expect(store.add('did:test:bob', 'x', 'm2')).rejects.toThrow(MailboxFullError);
+
+        await store.remove('did:test:bob', ['m1']);
+        await expect(store.add('did:test:bob', 'x'.repeat(20), 'm3')).resolves.toBeDefined();
+
+        // Expiry frees capacity too, without anyone reading the mailbox.
+        now += 1500;
+        await expect(store.add('did:test:bob', 'x'.repeat(20), 'm4')).resolves.toBeDefined();
+    });
+});
+
+describe('deposit route capacity', () => {
+    // Packing a real envelope needs the whole keymaster stack, but the route
+    // only needs recipientDidsFromEnvelope to succeed -- so a store that
+    // reports full on any add isolates the status-mapping behaviour.
+    function appWithStore(store: any) {
+        const app = express();
+        app.use('/didcomm', createApp({ store, resolver: {} as any, cipher: {} as any }));
+        return app;
+    }
+
+    it('answers 429 when a mailbox is full, not 400', async () => {
+        const store = new MemoryMailboxStore(1000, 1000, () => 1_000_000, { maxTotalBytes: 1 });
+        const packed = JSON.stringify({
+            protected: Buffer.from(JSON.stringify({ enc: 'A256GCM' })).toString('base64url'),
+            recipients: [{ header: { kid: 'did:test:bob#key-agreement' } }],
+            iv: 'x', ciphertext: 'y', tag: 'z',
+        });
+
+        const response = await request(appWithStore(store))
+            .post('/didcomm/api/v1/messages')
+            .set('Content-Type', 'application/json')
+            .send({ message: packed });
+
+        // A full mailbox is a capacity condition; 400 would blame the sender.
+        expect(response.status).toBe(429);
+        expect(response.body.error).toMatch(/full/);
+    });
+
+    it('still answers 400 for a malformed envelope', async () => {
+        const store = new MemoryMailboxStore(1000, 1000, () => 1_000_000, { maxTotalBytes: 1 });
+
+        const response = await request(appWithStore(store))
+            .post('/didcomm/api/v1/messages')
+            .set('Content-Type', 'application/json')
+            .send({ message: 'not an envelope' });
+
+        expect(response.status).toBe(400);
     });
 });
 
@@ -189,12 +306,34 @@ describe('RedisMailboxStore command mapping', () => {
         }
     }
 
-    function redisStore(prefix = 'unit') {
-        const store = new RedisMailboxStore('redis://unused', prefix, 2000, 3000);
+    function redisStore(prefix = 'unit', caps = {}) {
+        const store = new RedisMailboxStore('redis://unused', prefix, 2000, 3000, caps);
         const redis = new FakeRedis();
         (store as any).redis = redis;
         return { store, redis };
     }
+
+    it('enforces the per-recipient cap', async () => {
+        const { store } = redisStore('unit', { maxRecipientBytes: 20 });
+
+        await store.add('did:cid:bob', 'x'.repeat(15), 'id-1');
+        await expect(store.add('did:cid:bob', 'x'.repeat(10), 'id-2')).rejects.toThrow(MailboxFullError);
+    });
+
+    it('drops ids whose bodies have expired while measuring, so the inbox set cannot grow forever', async () => {
+        const { store, redis } = redisStore('unit', { maxRecipientBytes: 100 });
+
+        await store.add('did:cid:bob', 'small', 'id-1');
+        // Body expires via redis TTL; the id stays in the set until something
+        // prunes it. add() refreshes the set's own TTL every time, so without
+        // this pruning a mailbox under sustained delivery accumulates dead ids.
+        redis.values.delete('unit:msg:did:cid:bob:id-1');
+
+        await store.add('did:cid:bob', 'next', 'id-2');
+
+        expect([...(redis.sets.get('unit:inbox:did:cid:bob') || [])]).toEqual(['id-2']);
+        expect(redis.calls).toContainEqual(['srem', 'unit:inbox:did:cid:bob', 'id-1']);
+    });
 
     it('stores messages with TTLs, prunes expired ids while listing, and removes by id', async () => {
         const { store, redis } = redisStore();
