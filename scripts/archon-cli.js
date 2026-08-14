@@ -16,6 +16,12 @@ let keymaster;
 
 const UPDATE_OK = "OK";
 const UPDATE_FAILED = "Update failed";
+const LIGHTNING_ZAP_STATUS_CHECKS = 3;
+const LIGHTNING_ZAP_STATUS_DELAY_MS = 1000;
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 program
     .version(pkg.version)
@@ -1589,6 +1595,647 @@ program
             console.error(error.error || error.message || error);
         }
     });
+
+
+program
+    .command('update-credential <did> <file>')
+    .description('Update an issued credential')
+    .action(async (did, file) => {
+        try {
+            const vc = JSON.parse(fs.readFileSync(file).toString());
+            const ok = await keymaster.updateCredential(did, vc);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('list-addresses')
+    .description('List wallet addresses')
+    .action(async () => {
+        try {
+            const addresses = await keymaster.listAddresses();
+
+            if (Object.keys(addresses).length) {
+                console.log(JSON.stringify(addresses, null, 4));
+            }
+            else {
+                console.log('No addresses defined');
+            }
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('get-address <domain>')
+    .description('Get the current address for a domain')
+    .action(async (domain) => {
+        try {
+            const address = await keymaster.getAddress(domain);
+
+            if (address) {
+                console.log(JSON.stringify(address, null, 4));
+            }
+            else {
+                console.log(`${domain} not found`);
+            }
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('import-address <domain>')
+    .description('Import any existing address for the current ID from a domain')
+    .action(async (domain) => {
+        try {
+            const addresses = await keymaster.importAddress(domain);
+
+            if (Object.keys(addresses).length) {
+                console.log(JSON.stringify(addresses, null, 4));
+            }
+            else {
+                console.log('No addresses imported');
+            }
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('check-address <address>')
+    .description('Check whether an address is available')
+    .action(async (address) => {
+        try {
+            const result = await keymaster.checkAddress(address);
+
+            if (result.status === 'available') {
+                console.log(`${result.address} is available`);
+            }
+            else if (result.status === 'claimed') {
+                console.log(`${result.address} is claimed by ${result.did}`);
+            }
+            else if (result.status === 'unsupported') {
+                console.log(`${result.address} domain does not appear to support names`);
+            }
+            else {
+                console.log(`${result.address} domain is unreachable`);
+            }
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('add-address <address>')
+    .description('Claim an address for the current ID')
+    .action(async (address) => {
+        try {
+            await keymaster.addAddress(address);
+            console.log(UPDATE_OK);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('remove-address <address>')
+    .description('Remove an address for the current ID')
+    .action(async (address) => {
+        try {
+            await keymaster.removeAddress(address);
+            console.log(UPDATE_OK);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('publish-address [address] [id]')
+    .description('Publish a stored address for a DID')
+    .action(async (address, id) => {
+        try {
+            await keymaster.publishAddress(address, id);
+            console.log(UPDATE_OK);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('unpublish-address [id]')
+    .description('Remove the published address from a DID')
+    .action(async (id) => {
+        try {
+            await keymaster.unpublishAddress(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+// Nostr commands
+
+
+program
+    .command('import-nostr <nsec> [id]')
+    .description('Import nostr keys for an agent DID from an nsec private key')
+    .action(async (nsec, id) => {
+        try {
+            const nostr = await keymaster.importNostr(nsec, id);
+            console.log(JSON.stringify(nostr, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('add-lightning [id]')
+    .description('Create a Lightning wallet for a DID')
+    .action(async (id) => {
+        try {
+            const config = await keymaster.addLightning(id);
+            console.log(JSON.stringify(config, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('remove-lightning [id]')
+    .description('Remove Lightning wallet from a DID')
+    .action(async (id) => {
+        try {
+            await keymaster.removeLightning(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('lightning-balance [id]')
+    .description('Check Lightning wallet balance')
+    .action(async (id) => {
+        try {
+            const balance = await keymaster.getLightningBalance(id);
+            console.log(`${balance.balance} sats`);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('lightning-decode <bolt11>')
+    .description('Decode a Lightning BOLT11 invoice')
+    .action(async (bolt11) => {
+        try {
+            const info = await keymaster.decodeLightningInvoice(bolt11);
+            console.log(JSON.stringify(info, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('lightning-invoice <amount> <memo> [id]')
+    .description('Create a Lightning invoice to receive sats')
+    .action(async (amount, memo, id) => {
+        try {
+            const invoice = await keymaster.createLightningInvoice(parseInt(amount), memo, id);
+            console.log(JSON.stringify(invoice, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('lightning-pay <bolt11> [id]')
+    .description('Pay a Lightning invoice')
+    .action(async (bolt11, id) => {
+        try {
+            const payment = await keymaster.payLightningInvoice(bolt11, id);
+            console.log(JSON.stringify(payment, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('lightning-check <paymentHash> [id]')
+    .description('Check status of a Lightning payment')
+    .action(async (paymentHash, id) => {
+        try {
+            const status = await keymaster.checkLightningPayment(paymentHash, id);
+            console.log(JSON.stringify(status, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('publish-lightning [id]')
+    .description('Publish Lightning service endpoint for a DID')
+    .action(async (id) => {
+        try {
+            await keymaster.publishLightning(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('unpublish-lightning [id]')
+    .description('Remove Lightning service endpoint from a DID')
+    .action(async (id) => {
+        try {
+            await keymaster.unpublishLightning(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('lightning-zap <recipient> <amount> [memo]')
+    .description('Send sats via Lightning (DID, alias, or Lightning Address)')
+    .action(async (recipient, amount, memo) => {
+        try {
+            const result = await keymaster.zapLightning(recipient, parseInt(amount), memo);
+            let status = await keymaster.checkLightningPayment(result.paymentHash);
+
+            for (let attempt = 1; attempt < LIGHTNING_ZAP_STATUS_CHECKS && !status.paid; attempt++) {
+                await sleep(LIGHTNING_ZAP_STATUS_DELAY_MS);
+                status = await keymaster.checkLightningPayment(result.paymentHash);
+            }
+
+            console.log(JSON.stringify({
+                ...result,
+                paid: status.paid,
+                status: status.status,
+                preimage: status.preimage,
+            }, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('lightning-payments [id]')
+    .description('Show Lightning payment history')
+    .action(async (id) => {
+        try {
+            const payments = await keymaster.getLightningPayments(id);
+            if (payments.length === 0) {
+                console.log('No payments found.');
+                return;
+            }
+            for (const p of payments) {
+                const d = p.time ? new Date(p.time) : null;
+                const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` : '—';
+                const fee = p.fee > 0 ? ` (fee: ${p.fee})` : '';
+                const memo = p.memo ? ` "${p.memo}"` : '';
+                const status = p.pending ? ' [pending]' : '';
+                console.log(`${date}  ${p.amount} sats${fee}${memo}${status}`);
+            }
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+// Group commands
+
+
+program
+    .command('add-poll-voter <poll> <member>')
+    .description('Add a voter to the poll')
+    .action(async (poll, member) => {
+        try {
+            const ok = await keymaster.addPollVoter(poll, member);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('remove-poll-voter <poll> <member>')
+    .description('Remove a voter from the poll')
+    .action(async (poll, member) => {
+        try {
+            const ok = await keymaster.removePollVoter(poll, member);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('list-poll-voters <poll>')
+    .description('List eligible voters in the poll')
+    .action(async (poll) => {
+        try {
+            const members = await keymaster.listPollVoters(poll);
+            console.log(JSON.stringify(members, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('send-poll <poll>')
+    .description('Send a poll notice to all voters')
+    .action(async (poll) => {
+        try {
+            const did = await keymaster.sendPoll(poll);
+            console.log(did);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('send-ballot <ballot> <poll>')
+    .description('Send a ballot to the poll owner')
+    .action(async (ballot, poll) => {
+        try {
+            const did = await keymaster.sendBallot(ballot, poll);
+            console.log(did);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('view-ballot <ballot>')
+    .description('View ballot details')
+    .action(async (ballot) => {
+        try {
+            const result = await keymaster.viewBallot(ballot);
+            console.log(JSON.stringify(result, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('create-dmail <file>')
+    .description('Create a new dmail from a JSON file')
+    .option('-a, --alias <alias>', 'DID alias')
+    .option('-r, --registry <registry>', 'registry to use')
+    .action(async (file, options) => {
+        try {
+            const { alias, registry } = options;
+            const message = JSON.parse(fs.readFileSync(file).toString());
+            const did = await keymaster.createDmail(message, { alias, registry });
+            console.log(did);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('update-dmail <did> <file>')
+    .description('Update an existing dmail from a JSON file')
+    .action(async (did, file) => {
+        try {
+            const message = JSON.parse(fs.readFileSync(file).toString());
+            const ok = await keymaster.updateDmail(did, message);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('send-dmail <did>')
+    .description('Send a dmail and return the notice DID')
+    .action(async (did) => {
+        try {
+            const notice = await keymaster.sendDmail(did);
+            if (notice) {
+                console.log(notice);
+            } else {
+                console.error('Send failed');
+            }
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('get-dmail <did>')
+    .description('Get a dmail message by DID')
+    .action(async (did) => {
+        try {
+            const message = await keymaster.getDmailMessage(did);
+            if (message) {
+                console.log(JSON.stringify(message, null, 4));
+            } else {
+                console.error('Dmail not found');
+            }
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('list-dmail')
+    .description('List dmails for current ID')
+    .action(async () => {
+        try {
+            const dmails = await keymaster.listDmail();
+            console.log(JSON.stringify(dmails, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('file-dmail <did> <tags>')
+    .description('Assign tags to a dmail (comma-separated, e.g. inbox,unread)')
+    .action(async (did, tags) => {
+        try {
+            const tagList = tags.split(',').map((t) => t.trim());
+            const ok = await keymaster.fileDmail(did, tagList);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('refresh-dmail')
+    .description('Check for new dmails and clean up expired notices')
+    .action(async () => {
+        try {
+            const ok = await keymaster.refreshNotices();
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('import-dmail <did>')
+    .description('Import a dmail into inbox with unread tag')
+    .action(async (did) => {
+        try {
+            const ok = await keymaster.importDmail(did);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('remove-dmail <did>')
+    .description('Delete a dmail')
+    .action(async (did) => {
+        try {
+            const ok = await keymaster.removeDmail(did);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('add-dmail-attachment <did> <file>')
+    .description('Add a file attachment to a dmail')
+    .action(async (did, file) => {
+        try {
+            const data = fs.readFileSync(file);
+            const name = path.basename(file);
+            const ok = await keymaster.addDmailAttachment(did, name, data);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('remove-dmail-attachment <did> <name>')
+    .description('Remove an attachment from a dmail')
+    .action(async (did, name) => {
+        try {
+            const ok = await keymaster.removeDmailAttachment(did, name);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('get-dmail-attachment <did> <name> <file>')
+    .description('Save a dmail attachment to a file')
+    .action(async (did, name, file) => {
+        try {
+            const data = await keymaster.getDmailAttachment(did, name);
+            if (data) {
+                fs.writeFileSync(file, data);
+                console.log(`Data written to ${file}`);
+            } else {
+                console.error(`Attachment ${name} not found`);
+            }
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+
+program
+    .command('list-dmail-attachments <did>')
+    .description('List attachments of a dmail')
+    .action(async (did) => {
+        try {
+            const attachments = await keymaster.listDmailAttachments(did);
+            console.log(JSON.stringify(attachments, null, 4));
+        }
+        catch (error) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+// DIDComm v2 commands
 
 async function run() {
     const keymasterURL = process.env.ARCHON_KEYMASTER_URL || 'http://localhost:4226';
