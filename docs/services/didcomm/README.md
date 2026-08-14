@@ -136,6 +136,11 @@ never acknowledged still expires on its own via the message TTL
   `did`,`challenge`,`signature` / `ids` not an array.
 - `401` — challenge unknown/expired/already used, or signature
   verification failed.
+- `429` — a storage cap would be exceeded (see §5.3). On deposit the
+  envelope was **not** stored: a JWE addressing several recipients is
+  rolled back if a later mailbox is full, so a retry cannot duplicate
+  delivery to the earlier ones. Also returned by `GET /challenge` when the
+  live-challenge ceiling is reached.
 
 The error envelope is `application/json` `{ "error": "<message>" }`.
 There is no `/metrics` endpoint and no admin API.
@@ -206,10 +211,16 @@ TTLs: messages **7 days** (`ARCHON_DIDCOMM_MESSAGE_TTL_MS`), challenges
 
 ### 5.1 Memory backend (default)
 
-In-process maps. `list()` lazily prunes envelopes older than the message
-TTL; `consumeChallenge()` deletes the challenge and returns `true` only
-if it was present and unexpired. Suitable for a single relay instance;
-state is lost on restart.
+In-process maps. `consumeChallenge()` deletes the challenge and returns
+`true` only if it was present and unexpired. Suitable for a single relay
+instance; state is lost on restart.
+
+Expiry is swept on **write** — in `add()` and `issueChallenge()`,
+amortised — rather than on read. Sweeping only on read meant a mailbox
+nobody polled kept its envelopes indefinitely, and an unconsumed
+challenge was never collected at all. Writes are the only thing that
+grows either map, so an idle store needs no sweeping, and no timer is
+used (a stray interval would leak a handle into CI).
 
 ### 5.2 Redis backend (`ARCHON_DIDCOMM_DB=redis`)
 
@@ -222,8 +233,59 @@ Native key expiry. Namespace `didcomm:`:
 | `didcomm:challenge:<challenge>` | STRING | challenge TTL (`PX`) | `"1"`; consumed with `GETDEL` (single-use). |
 
 `list()` reads the inbox set, `MGET`s the bodies, and lazily `SREM`s ids
-whose bodies have already expired. A new implementation MUST use this
-schema if it shares a Redis instance with the reference service.
+whose bodies have already expired. `add()` does the same while measuring
+the mailbox against its cap — necessary because `add()` refreshes the
+inbox set's own TTL on every insert, so under sustained delivery the set
+never expires and would otherwise accumulate ids whose bodies are long
+gone. A new implementation MUST use this schema if it shares a Redis
+instance with the reference service.
+
+### 5.3 Storage caps
+
+Both write paths are unauthenticated by design: a sender must be able to
+reach a stranger's mailbox, and `GET /challenge` is the first step of
+proving DID control. TTLs alone therefore bound *retention*, not *growth*
+— within the retention window an anonymous caller can still deposit
+without limit, and the depositor chooses the recipient DID (routing is by
+the JWE recipient kids). A per-recipient cap alone is no bound at all,
+since a fresh DID sidesteps it.
+
+| Setting | Default | Enforced on |
+| --- | --- | --- |
+| `ARCHON_DIDCOMM_MAX_RECIPIENT_BYTES` | 16 MB | memory + redis |
+| `ARCHON_DIDCOMM_MAX_TOTAL_BYTES` | 256 MB | **memory only** |
+| `ARCHON_DIDCOMM_MAX_CHALLENGES` | 10000 | **memory only** |
+
+All numeric settings are validated at startup: a malformed, zero or
+negative value fails the service rather than being parsed to `NaN`, which
+would compare false against every cap and silently switch the bound off.
+
+`ARCHON_DIDCOMM_MAX_CHALLENGES` is a ceiling on *live* challenges. The
+challenge TTL bounds how long each entry survives, not how many an
+anonymous caller can hold at once, so the ceiling is what actually bounds
+that map. Reaching it answers `429` on `GET /challenge`.
+
+Caps are byte-based, not message counts: with a multi-MB upload limit a
+count says nothing about the resource that actually runs out. Exceeding a
+cap rejects the deposit with `429` rather than evicting older messages,
+so an attacker cannot push a recipient's real mail out of their mailbox.
+
+On redis the per-recipient cap is **approximate**: the measurement and the
+write are separate round trips, so concurrent deliveries — or several
+relay instances sharing one redis — can both measure under the cap and
+both commit. Overshoot is bounded by concurrency x message size. Treat the
+cap as a safety bound rather than an accounting invariant; making it exact
+needs a Lua script that prunes, measures and inserts in one step. The
+memory backend is unaffected, having no await between measuring and
+inserting.
+
+**Redis has no total or challenge cap.** A running total would drift permanently,
+because keys expiring via TTL never decrement it, and recomputing it
+would mean scanning the keyspace on every write. Bounding total storage
+on Redis is a deployment concern: give the relay a **dedicated Redis
+instance or database** with `maxmemory` set. Do **not** set an eviction
+policy on a Redis shared with the Gatekeeper, Drawbridge and the
+mediators — it would evict their keys too.
 
 ---
 

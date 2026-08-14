@@ -7,7 +7,7 @@ import express, { type Express } from 'express';
 import cors from 'cors';
 import { socksDispatcher } from 'fetch-socks';
 import type { Cipher } from '@didcid/cipher/types';
-import { MailboxStore } from './store.js';
+import { MailboxFullError, MailboxStore } from './store.js';
 import { recipientDidsFromEnvelope, verifyChallengeSignature, type Resolver } from './mailbox.js';
 
 export interface AppDeps {
@@ -56,14 +56,43 @@ export function createApp(deps: AppDeps): Express {
             }
             const recipients = recipientDidsFromEnvelope(packed);
             const ids: string[] = [];
-            for (const recipient of recipients) {
-                const id = crypto.randomUUID();
-                await deps.store.add(recipient, packed, id);
-                ids.push(id);
+            // A JWE can address several recipients, each with its own mailbox
+            // and its own cap. If a later one is full, the earlier copies are
+            // already written -- so undo them rather than answer 429 (which
+            // says nothing was stored) with copies left behind, which would
+            // duplicate delivery when the sender retries.
+            const written: Array<{ recipient: string; id: string }> = [];
+            try {
+                for (const recipient of recipients) {
+                    const id = crypto.randomUUID();
+                    await deps.store.add(recipient, packed, id);
+                    written.push({ recipient, id });
+                    ids.push(id);
+                }
+            }
+            catch (error) {
+                for (const { recipient, id } of written) {
+                    try {
+                        await deps.store.remove(recipient, [id]);
+                    }
+                    catch {
+                        // Best effort: a failed rollback leaves a copy that its
+                        // TTL will collect. Still better than keeping it and
+                        // reporting nothing was stored.
+                    }
+                }
+                throw error;
             }
             res.json({ ids });
         }
         catch (error: any) {
+            // A full mailbox is a capacity condition, not a malformed request:
+            // tell the sender delivery failed and is worth retrying later,
+            // rather than reporting it as their mistake.
+            if (error instanceof MailboxFullError) {
+                res.status(429).send({ error: error.message });
+                return;
+            }
             res.status(400).send({ error: error.toString() });
         }
     });
@@ -71,7 +100,17 @@ export function createApp(deps: AppDeps): Express {
     // Single-use challenge for proving DID control on fetch/remove.
     v1.get('/challenge', async (_req, res) => {
         const challenge = crypto.randomBytes(32).toString('base64url');
-        await deps.store.issueChallenge(challenge);
+        try {
+            await deps.store.issueChallenge(challenge);
+        }
+        catch (error: any) {
+            if (error instanceof MailboxFullError) {
+                res.status(429).send({ error: error.message });
+                return;
+            }
+            res.status(500).send({ error: error.toString() });
+            return;
+        }
         res.json({ challenge });
     });
 
