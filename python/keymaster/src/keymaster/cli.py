@@ -988,7 +988,12 @@ async def cmd_send_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
 
 
 async def cmd_receive_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
-    _print_json(await km.receive_didcomm({"name": args.name, "endpoint": args.endpoint}))
+    _print_json(await km.receive_didcomm({"name": args.name, "endpoint": args.endpoint, "ack": args.ack}))
+
+
+async def cmd_ack_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    acknowledged = await km.ack_didcomm(args.ids, {"name": args.name, "endpoint": args.endpoint})
+    _print_json({"acknowledged": acknowledged})
 
 
 async def cmd_mediate_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1385,6 +1390,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("-e", "--encryption", help="content encryption: A256CBC-HS512 | XC20P | A256GCM")
     sp.add_argument("-n", "--name", help="sender identity name (defaults to current)")
     sp = add("receive-didcomm", "Fetch and unpack queued DIDComm messages from the current ID's mailbox", cmd_receive_didcomm)
+    sp.add_argument("-n", "--name", help="identity name (defaults to current)")
+    sp.add_argument("--endpoint", help="override the mailbox endpoint")
+    sp.add_argument("--no-ack", dest="ack", action="store_false", default=True,
+                    help="leave messages in the mailbox (acknowledge later with ack-didcomm)")
+    sp = add("ack-didcomm", "Acknowledge (remove) DIDComm messages from the current ID's mailbox by id", cmd_ack_didcomm)
+    sp.add_argument("ids", nargs="+", help="mailbox message ids to acknowledge")
     sp.add_argument("-n", "--name", help="identity name (defaults to current)")
     sp.add_argument("--endpoint", help="override the mailbox endpoint")
     sp = add("mediate-didcomm", "Relay queued Forward envelopes from this ID's mailbox to their recipients (mediator role)", cmd_mediate_didcomm)

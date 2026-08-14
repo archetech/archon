@@ -2744,7 +2744,7 @@
     "/didcomm/receive": {
       "post": {
         "summary": "Fetch and unpack queued DIDComm messages from the current identity's mailbox.",
-        "description": "Proves DID control with a signed challenge, fetches queued envelopes from the identity's `DIDCommMessaging` endpoint, unpacks them, and acknowledges (removes) the ones that unpacked.",
+        "description": "Proves DID control with a signed challenge, fetches queued envelopes from the identity's `DIDCommMessaging` endpoint, and unpacks them. By default the messages that unpacked are acknowledged (removed); set `options.ack` to false to leave them in the mailbox and remove them later via `/didcomm/ack`.",
         "requestBody": {
           "required": false,
           "content": {
@@ -2760,6 +2760,10 @@
                       },
                       "endpoint": {
                         "type": "string"
+                      },
+                      "ack": {
+                        "type": "boolean",
+                        "default": true
                       }
                     }
                   }
@@ -2781,6 +2785,64 @@
                       "items": {
                         "type": "object"
                       }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request."
+          }
+        }
+      }
+    },
+    "/didcomm/ack": {
+      "post": {
+        "summary": "Acknowledge (remove) mailbox messages by id.",
+        "description": "Proves DID control with a signed challenge and removes the given messages from the identity's mailbox. Used with `/didcomm/receive` called with `options.ack` false, so that messages are only deleted once they have been stored.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "options": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "endpoint": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The number of messages acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "acknowledged": {
+                      "type": "integer"
                     }
                   }
                 }

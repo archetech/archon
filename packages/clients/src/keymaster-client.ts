@@ -606,10 +606,20 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async receiveDidComm(options?: { name?: string; endpoint?: string }): Promise<DidCommUnpackResult[]> {
+    async receiveDidComm(options?: { name?: string; endpoint?: string; ack?: boolean }): Promise<DidCommUnpackResult[]> {
         try {
             const response = await this.axios.post(`${this.API}/didcomm/receive`, { options });
             return response.data.results;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async ackDidComm(ids: string[], options?: { name?: string; endpoint?: string }): Promise<number> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/ack`, { ids, options });
+            return response.data.acknowledged;
         }
         catch (error) {
             throwError(error);

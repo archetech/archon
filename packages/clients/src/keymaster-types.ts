@@ -364,6 +364,9 @@ export interface NoticeMessage {
 }
 
 export interface DidCommUnpackResult {
+    // Mailbox id, present when the result came from receiveDidComm; pass it to
+    // ackDidComm to delete the message once it has been stored.
+    id?: string;
     message: any;
     metadata: {
         encrypted: boolean;
@@ -428,7 +431,8 @@ export interface KeymasterInterface {
         to: string | string[],
         options?: { sign?: boolean; anoncrypt?: boolean; encryption?: 'A256CBC-HS512' | 'XC20P' | 'A256GCM'; name?: string }
     ): Promise<string[]>;
-    receiveDidComm(options?: { name?: string; endpoint?: string }): Promise<DidCommUnpackResult[]>;
+    receiveDidComm(options?: { name?: string; endpoint?: string; ack?: boolean }): Promise<DidCommUnpackResult[]>;
+    ackDidComm(ids: string[], options?: { name?: string; endpoint?: string }): Promise<number>;
     mediateDidComm(options?: { name?: string; endpoint?: string }): Promise<{ relayed: number; skipped: number }>;
 
     // Nostr

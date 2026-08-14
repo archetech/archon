@@ -3802,6 +3802,9 @@ class Keymaster:
         return ids
 
     async def receive_didcomm(self, options: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        # options["ack"] defaults to True so existing callers keep the
+        # retrieve-and-delete behaviour. Pass ack=False to leave messages in the
+        # mailbox and remove them later with ack_didcomm().
         options = options or {}
         name = options.get("name")
         id_info = await self.fetch_id_info(name)
@@ -3825,16 +3828,53 @@ class Keymaster:
             handled: list[str] = []
             for entry in messages:
                 try:
-                    results.append(await self.unpack_didcomm(entry["message"], {"name": name}))
+                    # The id travels with the result so a caller that defers the
+                    # ack can name the messages it has stored.
+                    unpacked = await self.unpack_didcomm(entry["message"], {"name": name})
+                    unpacked["id"] = entry["id"]
+                    results.append(unpacked)
                     handled.append(entry["id"])
                 except Exception:
                     # Leave messages we can't unpack on the server for inspection/retry.
                     pass
 
-            if handled:
+            if handled and options.get("ack", True):
                 ack = await self._didcomm_challenge_auth(client, base, keypair)
                 await client.post(f"{base}/api/v1/messages/remove", json={"did": id_info["did"], **ack, "ids": handled})
         return results
+
+    async def ack_didcomm(self, ids: list[str], options: dict[str, Any] | None = None) -> int:
+        """Acknowledge (delete) mailbox messages by id.
+
+        Split out from receive_didcomm so that "I decrypted it" and "I stored it"
+        can be separate decisions; the server-side TTL remains the backstop for
+        anything never acknowledged.
+        """
+        if not isinstance(ids, list):
+            raise KeymasterError("Invalid parameter: ids")
+
+        if not ids:
+            return 0
+
+        options = options or {}
+        name = options.get("name")
+        id_info = await self.fetch_id_info(name)
+        base = self._didcomm_gateway_base(options.get("endpoint"))
+        if not options.get("endpoint"):
+            await self._require_node_capability("didcomm", "DIDComm messaging")
+        keypair = await self.fetch_key_pair(name)
+        if not keypair:
+            raise KeymasterError("unable to resolve signing key")
+
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            auth = await self._didcomm_challenge_auth(client, base, keypair)
+            response = await client.post(
+                f"{base}/api/v1/messages/remove",
+                json={"did": id_info["did"], **auth, "ids": ids},
+            )
+            if response.status_code >= 400:
+                raise KeymasterError(f"DIDComm ack failed: {response.status_code}")
+        return len(ids)
 
     async def mediate_didcomm(self, options: dict[str, Any] | None = None) -> dict[str, int]:
         options = options or {}

@@ -96,6 +96,7 @@ const defaultToolArgs = {
 };
 
 const toolArgOverrides: Record<string, Record<string, unknown>> = {
+    archon_ack_didcomm: { ids: ['mailbox-id-1'] },
     archon_bind_credential: { schema: 'did:cid:schema' },
     archon_create_response: { challenge: 'did:cid:challenge' },
     archon_create_schema_template: { schema: 'did:cid:schema' },
@@ -278,6 +279,7 @@ function mockRuntime(overrides: Record<string, unknown> = {}) {
         unpackDidComm: jest.fn().mockResolvedValue({ body: 'hello' }),
         sendDidComm: jest.fn().mockResolvedValue(['msg-1']),
         receiveDidComm: jest.fn().mockResolvedValue([{ body: 'hello' }]),
+        ackDidComm: jest.fn().mockResolvedValue(1),
         mediateDidComm: jest.fn().mockResolvedValue({ forwarded: 1 }),
         ...overrides,
     };

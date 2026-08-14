@@ -1518,6 +1518,35 @@ describe('sendDidComm', () => {
     });
 });
 
+describe('ackDidComm', () => {
+    it('should acknowledge messages and return the count', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/ack`)
+            .reply(200, { acknowledged: 2 });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const out = await keymaster.ackDidComm(['id-1', 'id-2']);
+
+        expect(out).toBe(2);
+    });
+
+    it('should throw exception on ackDidComm server error', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.didcomm}/ack`)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.ackDidComm(['id-1']);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('receiveDidComm', () => {
     it('should receive and return unpacked messages', async () => {
         const results = [{ message: { body: { hi: 1 } }, metadata: { encrypted: true, authenticated: true, nonRepudiation: false } }];
