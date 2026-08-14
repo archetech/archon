@@ -105,6 +105,37 @@ describe('DIDComm relay end-to-end', () => {
         expect(again).toHaveLength(0);
     });
 
+    it('leaves messages in the mailbox when ack is false', async () => {
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm(endpoint, 'Alice');
+        await keymaster.publishDidComm(endpoint, 'Bob');
+
+        await keymaster.sendDidComm({ type: 'https://x/1/msg', body: { hi: 1 } }, bobDid, { name: 'Alice' });
+
+        const first = await keymaster.receiveDidComm({ name: 'Bob', ack: false });
+        expect(first).toHaveLength(1);
+        expect(first[0].id).toBeDefined();
+
+        // still there, because nothing was acknowledged
+        const second = await keymaster.receiveDidComm({ name: 'Bob', ack: false });
+        expect(second).toHaveLength(1);
+        expect(second[0].id).toBe(first[0].id);
+
+        const acknowledged = await keymaster.ackDidComm([first[0].id], { name: 'Bob' });
+        expect(acknowledged).toBe(1);
+
+        const third = await keymaster.receiveDidComm({ name: 'Bob', ack: false });
+        expect(third).toHaveLength(0);
+    });
+
+    it('ackDidComm is a no-op for an empty id list', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.publishDidComm(endpoint, 'Bob');
+
+        expect(await keymaster.ackDidComm([], { name: 'Bob' })).toBe(0);
+    });
+
     it('delivers a signed (non-repudiable) message', async () => {
         const aliceDid = await keymaster.createId('Alice');
         const bobDid = await keymaster.createId('Bob');

@@ -15,7 +15,7 @@ The canonical implementation is
 > [DIDComm design doc](../../didcomm-design.md). This document covers only
 > the relay's HTTP surface, mailbox routing, auth, and storage. The
 > matching client methods are `publishDidComm` / `sendDidComm` /
-> `receiveDidComm` / `mediateDidComm` on Keymaster (and the Python
+> `receiveDidComm` / `ackDidComm` / `mediateDidComm` on Keymaster (and the Python
 > port + SDK).
 
 ---
@@ -121,6 +121,13 @@ Typical recipient loop (`receiveDidComm`): `GET /challenge` → sign →
 `POST /messages/fetch` → unpack each locally → `GET /challenge` again →
 `POST /messages/remove` with the ids that unpacked. (A second challenge
 is fetched for the remove call because each challenge is single-use.)
+
+Removal is a separate step from retrieval, so a client that wants to
+store messages before deleting them can call `receiveDidComm` with
+`ack: false` and issue the `remove` call later via `ackDidComm(ids)`.
+Each unpacked result carries its mailbox `id` for that purpose. Anything
+never acknowledged still expires on its own via the message TTL
+(`ARCHON_DIDCOMM_MESSAGE_TTL_MS`, 7 days by default).
 
 ### 2.5 Status codes
 

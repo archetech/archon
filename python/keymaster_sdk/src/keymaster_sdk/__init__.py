@@ -155,6 +155,7 @@ from .keymaster_sdk import (
     pack_didcomm,
     unpack_didcomm,
     send_didcomm,
+    ack_didcomm,
     receive_didcomm,
     mediate_didcomm,
 )

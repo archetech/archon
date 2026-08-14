@@ -374,6 +374,14 @@ export interface DidCommUnpackResult {
     };
 }
 
+// A message read from a mailbox always has an id. Kept distinct from
+// DidCommUnpackResult, which unpackDidComm returns and where no mailbox -- and
+// so no id -- is involved. The id is how a deferred ack names what it stored,
+// so it is required rather than optional here.
+export interface DidCommReceivedMessage extends DidCommUnpackResult {
+    id: string;
+}
+
 export interface KeymasterInterface {
     // Wallet
     loadWallet(): Promise<WalletFile>;
@@ -428,7 +436,8 @@ export interface KeymasterInterface {
         to: string | string[],
         options?: { sign?: boolean; anoncrypt?: boolean; encryption?: 'A256CBC-HS512' | 'XC20P' | 'A256GCM'; name?: string }
     ): Promise<string[]>;
-    receiveDidComm(options?: { name?: string; endpoint?: string }): Promise<DidCommUnpackResult[]>;
+    receiveDidComm(options?: { name?: string; endpoint?: string; ack?: boolean }): Promise<DidCommReceivedMessage[]>;
+    ackDidComm(ids: string[], options?: { name?: string; endpoint?: string }): Promise<number>;
     mediateDidComm(options?: { name?: string; endpoint?: string }): Promise<{ relayed: number; skipped: number }>;
 
     // Nostr

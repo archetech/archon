@@ -1445,6 +1445,17 @@ def receive_didcomm(options=None):
     return response["results"]
 
 
+def ack_didcomm(ids, options=None):
+    if options is None:
+        options = {}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/didcomm/ack",
+        json={"ids": ids, "options": options},
+    )
+    return response["acknowledged"]
+
+
 def mediate_didcomm(options=None):
     if options is None:
         options = {}

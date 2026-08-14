@@ -221,7 +221,8 @@ already spec-standard, so only resolution and transport are method-specific.
   prove DID control with a single-use **signed challenge** (ES256K over the nonce, verified
   via gatekeeper resolution) and retrieve its queue; `messages/remove` acks. keymaster
   `sendDidComm` (pack → resolve the recipient's `DIDCommMessaging` endpoint → POST) and
-  `receiveDidComm` (challenge → sign → fetch → unpack → ack), wired through
+  `receiveDidComm` (challenge → sign → fetch → unpack → ack; pass `ack: false` to defer
+  the delete and call `ackDidComm(ids)` once the messages are stored), wired through
   interface/client/API. In-memory store with TTL by default, or a **redis** backend (native
   key expiry) via `ARCHON_DIDCOMM_DB`, both behind the async `MailboxStore` interface (mongo
   can be added the same way). *Validated:* core logic unit tests (incl. the redis store

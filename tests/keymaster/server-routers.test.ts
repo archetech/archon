@@ -155,6 +155,7 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/didcomm/unpack', 400],
     ['POST', '/didcomm/send', 400],
     ['POST', '/didcomm/receive', 400],
+    ['POST', '/didcomm/ack', 400],
     ['POST', '/didcomm/mediate', 400],
     // dmail
     ['GET', '/dmail', 500],
@@ -291,6 +292,44 @@ describe('keymaster server routers', () => {
         }
 
         expect(notFound).toEqual([]);
+    });
+
+    // The ROUTES table is hand-maintained, so a new endpoint is silently
+    // untested if nobody remembers to add it. Walk what is actually mounted and
+    // insist every route is represented.
+    it('has a ROUTES entry for every mounted route', async () => {
+        const { app } = mount();
+        const root = (app as any).router ?? (app as any)._router;
+        const mounted: string[] = [];
+
+        for (const layer of root.stack) {
+            for (const sub of layer.handle?.stack || []) {
+                if (!sub.route) {
+                    continue;
+                }
+                for (const method of Object.keys(sub.route.methods)) {
+                    mounted.push(`${method.toUpperCase()} ${sub.route.path}`);
+                }
+            }
+        }
+
+        // The public router is not Keymaster-backed, so the "failing Keymaster
+        // maps to this status" table does not apply to it. Those routes have
+        // their own tests in the 'keymaster public router' block below.
+        const publicRoutes = ['GET /ready', 'GET /version', 'POST /login'];
+
+        const covered = (entry: string) => {
+            if (publicRoutes.includes(entry)) {
+                return true;
+            }
+
+            const [method, pattern] = entry.split(' ');
+            const regex = new RegExp(`^${pattern.replace(/:[^/]+/g, '[^/]+')}$`);
+            return ROUTES.some(([m, p]) => m === method && regex.test(p));
+        };
+
+        expect(mounted.length).toBeGreaterThan(0);
+        expect(mounted.filter(entry => !covered(entry))).toEqual([]);
     });
 
     it('maps a failing Keymaster to each route documented error status', async () => {

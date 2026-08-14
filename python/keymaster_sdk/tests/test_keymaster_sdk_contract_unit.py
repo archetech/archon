@@ -305,6 +305,8 @@ def test_didcomm_wrappers_forward_expected_requests(monkeypatch):
             return {"ids": ["id-1", "id-2"]}
         if url.endswith("/didcomm/receive"):
             return {"results": [{"message": {"body": {"content": "hi"}}}]}
+        if url.endswith("/didcomm/ack"):
+            return {"acknowledged": 2}
         if url.endswith("/didcomm/mediate"):
             return {"result": {"relayed": 2, "skipped": 1}}
         raise AssertionError(url)
@@ -318,6 +320,7 @@ def test_didcomm_wrappers_forward_expected_requests(monkeypatch):
     assert sdk.unpack_didcomm("PACKED", {"name": "Bob"})["message"]["body"]["content"] == "hi"
     assert sdk.send_didcomm({"type": "t", "body": {}}, ["did:test:bob"], {"anoncrypt": True}) == ["id-1", "id-2"]
     assert sdk.receive_didcomm({"name": "Bob"})[0]["message"]["body"]["content"] == "hi"
+    assert sdk.ack_didcomm(["id-1", "id-2"], {"name": "Bob"}) == 2
     assert sdk.mediate_didcomm({"name": "Mediator"}) == {"relayed": 2, "skipped": 1}
 
     assert calls == [
@@ -331,5 +334,7 @@ def test_didcomm_wrappers_forward_expected_requests(monkeypatch):
         ("POST", "http://unit.test/api/v1/didcomm/send",
          {"json": {"message": {"type": "t", "body": {}}, "to": ["did:test:bob"], "options": {"anoncrypt": True}}}),
         ("POST", "http://unit.test/api/v1/didcomm/receive", {"json": {"options": {"name": "Bob"}}}),
+        ("POST", "http://unit.test/api/v1/didcomm/ack",
+         {"json": {"ids": ["id-1", "id-2"], "options": {"name": "Bob"}}}),
         ("POST", "http://unit.test/api/v1/didcomm/mediate", {"json": {"options": {"name": "Mediator"}}}),
     ]

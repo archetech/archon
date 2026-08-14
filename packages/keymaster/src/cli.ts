@@ -2144,10 +2144,26 @@ program
     .description('Fetch and unpack queued DIDComm messages from the current identity mailbox')
     .option('-n, --name <name>', 'identity name (defaults to current)')
     .option('--endpoint <url>', 'override the mailbox endpoint')
+    .option('--no-ack', 'leave messages in the mailbox (acknowledge later with ack-didcomm)')
     .action(async (options) => {
         try {
-            const results = await keymaster.receiveDidComm({ name: options.name, endpoint: options.endpoint });
+            const results = await keymaster.receiveDidComm({ name: options.name, endpoint: options.endpoint, ack: options.ack });
             console.log(JSON.stringify(results, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('ack-didcomm <ids...>')
+    .description('Acknowledge (remove) DIDComm messages from the current identity mailbox by id')
+    .option('-n, --name <name>', 'identity name (defaults to current)')
+    .option('--endpoint <url>', 'override the mailbox endpoint')
+    .action(async (ids, options) => {
+        try {
+            const acknowledged = await keymaster.ackDidComm(ids, { name: options.name, endpoint: options.endpoint });
+            console.log(JSON.stringify({ acknowledged }, null, 4));
         }
         catch (error: any) {
             console.error(error.error || error.message || error);

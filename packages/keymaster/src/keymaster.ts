@@ -41,6 +41,7 @@ import {
     GroupData,
     Vault,
     VaultOptions,
+    DidCommReceivedMessage,
     DidCommUnpackResult,
     IDInfo,
     ImageAsset,
@@ -2792,9 +2793,12 @@ export default class Keymaster implements KeymasterInterface {
 
     // Fetch queued messages from this identity's own mailbox (proving DID control
     // with a signed challenge), unpack them, and acknowledge (remove) what unpacked.
+    // `ack` defaults to true so existing callers keep the retrieve-and-delete
+    // behaviour. Pass ack: false to leave messages in the mailbox and remove
+    // them later with ackDidComm(), once they have actually been stored.
     async receiveDidComm(
-        options: { name?: string; endpoint?: string } = {}
-    ): Promise<DidCommUnpackResult[]> {
+        options: { name?: string; endpoint?: string; ack?: boolean } = {}
+    ): Promise<DidCommReceivedMessage[]> {
         const { name } = options;
         const id = await this.fetchIdInfo(name);
         // Read our own mailbox through the local gateway, not our published public
@@ -2825,11 +2829,13 @@ export default class Keymaster implements KeymasterInterface {
         }
         const { messages } = await fetchResponse.json();
 
-        const results: DidCommUnpackResult[] = [];
+        const results: DidCommReceivedMessage[] = [];
         const handled: string[] = [];
         for (const entry of messages || []) {
             try {
-                results.push(await this.unpackDidComm(entry.message, { name }));
+                // The id travels with the result so a caller that defers the ack
+                // can name the messages it has stored.
+                results.push({ ...await this.unpackDidComm(entry.message, { name }), id: entry.id });
                 handled.push(entry.id);
             }
             catch {
@@ -2837,7 +2843,7 @@ export default class Keymaster implements KeymasterInterface {
             }
         }
 
-        if (handled.length > 0) {
+        if (handled.length > 0 && options.ack !== false) {
             const ackAuth = await sign();
             await fetch(`${base}/api/v1/messages/remove`, {
                 method: 'POST',
@@ -2847,6 +2853,52 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         return results;
+    }
+
+    // Acknowledge (delete) mailbox messages by id. Split out from receiveDidComm
+    // so that "I decrypted it" and "I stored it" can be separate decisions; the
+    // server-side TTL remains the backstop for anything never acknowledged.
+    async ackDidComm(
+        ids: string[],
+        options: { name?: string; endpoint?: string } = {}
+    ): Promise<number> {
+        if (!Array.isArray(ids)) {
+            throw new InvalidParameterError('ids');
+        }
+
+        if (ids.length === 0) {
+            return 0;
+        }
+
+        const { name } = options;
+        const id = await this.fetchIdInfo(name);
+        const base = this.didcommGatewayBase(options.endpoint);
+        if (!options.endpoint) {
+            await this.requireNodeCapability('didcomm', 'DIDComm messaging');
+        }
+        const keypair = await this.fetchKeyPair(name);
+        if (!keypair) {
+            throw new KeymasterError('unable to resolve signing key');
+        }
+
+        const challenge = await this.fetchDidCommChallenge(base, 'DIDComm ack failed');
+        const signature = this.cipher.signHash(this.cipher.hashMessage(challenge), keypair.privateJwk);
+
+        const response = await fetch(`${base}/api/v1/messages/remove`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ did: id.did, challenge, signature, ids }),
+        });
+
+        if (!response.ok) {
+            throw new KeymasterError(`DIDComm ack failed: ${response.status}`);
+        }
+
+        // Report what the relay actually removed. Requested ids may be
+        // duplicated, already acknowledged, or expired, so the count we asked
+        // for is not the count that went away.
+        const { removed } = await response.json();
+        return removed ?? 0;
     }
 
     // Mediator role: fetch Forward messages addressed to this identity, unpack
