@@ -31,6 +31,17 @@ const config = {
 
     // Rate limiting
     rateLimitMax: process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX ? parseInt(process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX) : 100,
+    // Public DIDComm passthrough. Separate knobs from the paid path because the
+    // traffic is unauthenticated and much chattier: one poll is four requests
+    // (challenge, fetch, challenge, remove), so a per-source ceiling has to
+    // clear an active wallet comfortably. The global bucket is the backstop
+    // that holds even when every request shares a source, as over Tor.
+    didcommRateLimitPerSource: process.env.ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_PER_SOURCE
+        ? parseInt(process.env.ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_PER_SOURCE) : 300,
+    didcommRateLimitGlobal: process.env.ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_GLOBAL
+        ? parseInt(process.env.ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_GLOBAL) : 3000,
+    didcommRateLimitWindow: process.env.ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW
+        ? parseInt(process.env.ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW) : 60,
     rateLimitWindow: process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW ? parseInt(process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW) : 60,
 
     // Redis

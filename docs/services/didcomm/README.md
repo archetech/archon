@@ -240,6 +240,41 @@ never expires and would otherwise accumulate ids whose bodies are long
 gone. A new implementation MUST use this schema if it shares a Redis
 instance with the reference service.
 
+### 5.2.1 Rate limiting at the edge
+
+Storage caps bound where a flood stops; they do not bound how fast it gets
+there, and with a 10 MB body limit on the Drawbridge side a 256 MB cap is
+reachable in a couple of dozen requests. Once storage is full the relay
+answers `429` to legitimate senders too, for as long as an attacker keeps
+it that way.
+
+Drawbridge therefore rate-limits its public `/didcomm` passthrough, with
+two buckets, because neither works alone:
+
+| Setting | Default | Bucket |
+| --- | --- | --- |
+| `ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_PER_SOURCE` | 300 | per request source |
+| `ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_GLOBAL` | 3000 | whole surface |
+| `ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW` | 60s | window for both |
+
+The per-source bucket is meaningful on clearnet only: over Tor every
+request arrives from the local daemon and shares one source, and
+`trust proxy` is not configured, so behind a reverse proxy the source is
+the proxy. The global bucket is the backstop that holds in both cases. It
+is blunt by nature — during a flood it turns away legitimate senders too,
+which is still better than the storage-full alternative, where they are
+refused anyway and for longer.
+
+Defaults assume one poll costs four requests (challenge, fetch, challenge,
+remove), so 300/minute clears an active wallet comfortably.
+
+If the limiter's own store is unreachable it **fails open**: it exists to
+protect availability, and refusing every request would cause the outage it
+is meant to prevent. The storage caps still bound growth underneath.
+
+This covers the public edge only. The relay remains directly reachable on
+the internal network (port 4236).
+
 ### 5.3 Storage caps
 
 Both write paths are unauthenticated by design: a sender must be able to

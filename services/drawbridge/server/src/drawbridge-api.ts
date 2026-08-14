@@ -9,6 +9,7 @@ import GatekeeperClient from '@didcid/clients/gatekeeper';
 
 import config from './config.js';
 import { RedisStore } from './store.js';
+import { publicRateLimit } from './middleware/public-rate-limit.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import { createV1Router } from './v1-router.js';
@@ -437,7 +438,19 @@ async function main() {
     // DIDCommMessaging endpoint is `<drawbridge public host>/didcomm`.
     // Optional service: when the relay URL is unconfigured the node does not
     // offer DIDComm — say so clearly (501) rather than proxying to nothing (502).
-    app.use('/didcomm', async (req, res) => {
+    // Unauthenticated by design and therefore the one public surface that can
+    // be flooded for free; the relay's storage caps bound where that stops, this
+    // bounds how fast it gets there.
+    const didcommRateLimit = publicRateLimit({
+        store,
+        name: 'didcomm',
+        perSourceMax: config.didcommRateLimitPerSource,
+        globalMax: config.didcommRateLimitGlobal,
+        windowSeconds: config.didcommRateLimitWindow,
+        logger,
+    });
+
+    app.use('/didcomm', didcommRateLimit, async (req, res) => {
         if (config.didcommURL === '') {
             res.status(501).json({ error: 'DIDComm is not enabled on this node' });
             return;
