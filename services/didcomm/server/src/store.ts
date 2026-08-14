@@ -26,6 +26,10 @@ export interface MailboxCaps {
     // resource that actually runs out.
     maxRecipientBytes?: number;
     maxTotalBytes?: number;
+    // Hard ceiling on live challenges. Sweeping expired ones bounds retention
+    // only: GET /challenge is unauthenticated, so within the TTL an anonymous
+    // caller can hold arbitrarily many entries that are all still valid.
+    maxChallenges?: number;
 }
 
 export interface MailboxStore {
@@ -172,6 +176,18 @@ export class MemoryMailboxStore implements MailboxStore {
         // GET /challenge is unauthenticated by design, so this is the map an
         // anonymous caller can grow; sweep on the same path that grows it.
         this.maybeSweep();
+
+        const { maxChallenges } = this.caps;
+
+        if (maxChallenges !== undefined && this.challenges.size >= maxChallenges) {
+            // As in add(): never refuse on stale accounting.
+            this.sweep();
+
+            if (this.challenges.size >= maxChallenges) {
+                throw new MailboxFullError(`too many outstanding challenges (limit ${maxChallenges})`);
+            }
+        }
+
         this.challenges.set(challenge, this.now() + this.challengeTtlMs);
     }
 
@@ -190,7 +206,17 @@ export class MemoryMailboxStore implements MailboxStore {
 // retention is enforced by redis itself rather than by sweeping; a recipient's
 // inbox is a SET of ids whose message bodies expire on their own.
 //
-// maxRecipientBytes is enforced here. maxTotalBytes is NOT: a running total
+// maxRecipientBytes is enforced here, but approximately: the measurement and the
+// write are separate round trips, so concurrent deliveries (or several relay
+// instances sharing one redis) can both measure under the cap and both commit.
+// Overshoot is bounded by concurrency x message size. The cap is a safety bound
+// rather than an accounting invariant; making it exact needs a Lua script that
+// prunes, measures and inserts in one step.
+//
+// maxChallenges is NOT enforced here, for the same reason as maxTotalBytes:
+// counting live challenges means scanning the keyspace on every issue.
+//
+// maxTotalBytes is NOT enforced either: a running total
 // would drift permanently, because keys that expire via TTL never decrement it,
 // and recomputing it would mean scanning the keyspace on every write. Bounding
 // total storage on redis is therefore a deployment concern -- a dedicated redis

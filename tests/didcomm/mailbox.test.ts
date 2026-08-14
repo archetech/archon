@@ -116,6 +116,34 @@ describe('MemoryMailboxStore', () => {
         await expect(store.add('did:test:three', 'x'.repeat(10), 'm3')).rejects.toThrow(MailboxFullError);
     });
 
+    // TTL sweeping bounds how long a challenge lives, not how many can be live
+    // at once -- and GET /challenge is unauthenticated, so without a ceiling an
+    // anonymous caller can hold arbitrarily many valid entries.
+    it('refuses to issue past the challenge ceiling', async () => {
+        const store = new MemoryMailboxStore(1000, 1000, () => 1_000_000, { maxChallenges: 2 });
+
+        await store.issueChallenge('c1');
+        await store.issueChallenge('c2');
+        await expect(store.issueChallenge('c3')).rejects.toThrow(MailboxFullError);
+    });
+
+    it('frees challenge capacity as entries expire or are consumed', async () => {
+        let now = 1_000_000;
+        const store = new MemoryMailboxStore(1000, 1000, () => now, { maxChallenges: 2 });
+
+        await store.issueChallenge('c1');
+        await store.issueChallenge('c2');
+        await expect(store.issueChallenge('c3')).rejects.toThrow(MailboxFullError);
+
+        // Consuming one frees a slot...
+        await store.consumeChallenge('c1');
+        await expect(store.issueChallenge('c3')).resolves.toBeUndefined();
+
+        // ...and so does expiry, with nothing reading the map.
+        now += 1500;
+        await expect(store.issueChallenge('c4')).resolves.toBeUndefined();
+    });
+
     it('frees capacity when messages are removed or expire', async () => {
         let now = 1_000_000;
         const store = new MemoryMailboxStore(1000, 1000, () => now, { maxTotalBytes: 20 });
@@ -158,6 +186,43 @@ describe('deposit route capacity', () => {
         // A full mailbox is a capacity condition; 400 would blame the sender.
         expect(response.status).toBe(429);
         expect(response.body.error).toMatch(/full/);
+    });
+
+    it('answers 429 when the challenge ceiling is reached', async () => {
+        const store = new MemoryMailboxStore(1000, 1000, () => 1_000_000, { maxChallenges: 1 });
+        const app = appWithStore(store);
+
+        expect((await request(app).get('/didcomm/api/v1/challenge')).status).toBe(200);
+
+        const second = await request(app).get('/didcomm/api/v1/challenge');
+        expect(second.status).toBe(429);
+        expect(second.body.error).toMatch(/challenges/);
+    });
+
+    // A 429 says the envelope was not stored. If an earlier recipient's copy
+    // were left behind, a retry would deliver to them twice.
+    it('rolls back earlier recipients when a later one is full', async () => {
+        const store = new MemoryMailboxStore(1000, 1000, () => 1_000_000, { maxRecipientBytes: 400 });
+        const packed = JSON.stringify({
+            protected: Buffer.from(JSON.stringify({ enc: 'A256GCM' })).toString('base64url'),
+            recipients: [
+                { header: { kid: 'did:test:first#key-agreement' } },
+                { header: { kid: 'did:test:second#key-agreement' } },
+            ],
+            iv: 'x', ciphertext: 'y', tag: 'z',
+        });
+
+        // Fill the second recipient's mailbox so the deposit fails part-way.
+        await store.add('did:test:second', 'x'.repeat(399), 'filler');
+
+        const response = await request(appWithStore(store))
+            .post('/didcomm/api/v1/messages')
+            .set('Content-Type', 'application/json')
+            .send({ message: packed });
+
+        expect(response.status).toBe(429);
+        expect(await store.list('did:test:first')).toHaveLength(0);
+        expect(await store.list('did:test:second')).toHaveLength(1); // only the filler
     });
 
     it('still answers 400 for a malformed envelope', async () => {

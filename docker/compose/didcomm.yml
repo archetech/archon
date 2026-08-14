@@ -23,6 +23,7 @@ services:
       # bound total storage with maxmemory on a dedicated instance.
       - ARCHON_DIDCOMM_MAX_RECIPIENT_BYTES=${ARCHON_DIDCOMM_MAX_RECIPIENT_BYTES:-16777216}
       - ARCHON_DIDCOMM_MAX_TOTAL_BYTES=${ARCHON_DIDCOMM_MAX_TOTAL_BYTES:-268435456}
+      - ARCHON_DIDCOMM_MAX_CHALLENGES=${ARCHON_DIDCOMM_MAX_CHALLENGES:-10000}
       # Mailbox store: 'memory' (default) or 'redis'.
       - ARCHON_DIDCOMM_DB=${ARCHON_DIDCOMM_DB:-memory}
       - ARCHON_REDIS_URL=redis://redis:6379

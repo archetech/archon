@@ -8,6 +8,7 @@ async function createStore(): Promise<MailboxStore> {
     const caps = {
         maxRecipientBytes: config.maxRecipientBytes,
         maxTotalBytes: config.maxTotalBytes,
+        maxChallenges: config.maxChallenges,
     };
 
     if (config.db === 'redis') {
