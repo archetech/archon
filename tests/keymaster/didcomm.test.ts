@@ -425,6 +425,107 @@ describe('DIDComm gateway transport helpers', () => {
         expect(removeBody.ids).toEqual(['msg-ok']);
     });
 
+    it('leaves messages on the server and returns their ids when ack is false', async () => {
+        const base = useDidCommGateway();
+        const aliceDid = await keymaster.createId('Alice');
+        await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+
+        const packed = await keymaster.packDidComm(
+            { type: 'https://x/1/msg', body: { text: 'keep me' } },
+            aliceDid,
+            { name: 'Bob' }
+        );
+
+        const requests: string[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            requests.push(url);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'mailbox-1' });
+            }
+            if (url === `${base}/api/v1/messages/fetch`) {
+                return jsonResponse({ messages: [{ id: 'msg-ok', message: packed }] });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        const received = await keymaster.receiveDidComm({ name: 'Alice', ack: false });
+
+        expect(received).toHaveLength(1);
+        expect(received[0].id).toBe('msg-ok');
+        expect(received[0].message.body).toEqual({ text: 'keep me' });
+        expect(requests.some(url => url.endsWith('/messages/remove'))).toBe(false);
+    });
+
+    it('ackDidComm removes the given ids with a freshly signed challenge', async () => {
+        const base = useDidCommGateway();
+        const aliceDid = await keymaster.createId('Alice');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+
+        const requests: any[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+            const url = String(input);
+            requests.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'mailbox-ack' });
+            }
+            if (url === `${base}/api/v1/messages/remove`) {
+                return jsonResponse({ removed: 2 });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        const acknowledged = await keymaster.ackDidComm(['msg-1', 'msg-2'], { name: 'Alice' });
+
+        expect(acknowledged).toBe(2);
+        const removeBody = requests.find(r => r.url.endsWith('/messages/remove'))?.body;
+        expect(removeBody.did).toBe(aliceDid);
+        expect(removeBody.ids).toEqual(['msg-1', 'msg-2']);
+        expect(removeBody.challenge).toBe('mailbox-ack');
+        expect(removeBody.signature).toBeDefined();
+    });
+
+    it('ackDidComm does not call the gateway for an empty id list', async () => {
+        useDidCommGateway();
+        await keymaster.createId('Alice');
+
+        const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            throw new Error(`unexpected fetch ${String(input)}`);
+        });
+
+        expect(await keymaster.ackDidComm([], { name: 'Alice' })).toBe(0);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('ackDidComm rejects a non-array id list', async () => {
+        useDidCommGateway();
+        await keymaster.createId('Alice');
+
+        await expect(keymaster.ackDidComm('msg-1' as any, { name: 'Alice' }))
+            .rejects.toThrow('Invalid parameter: ids');
+    });
+
+    it('ackDidComm surfaces a failed remove call', async () => {
+        const base = useDidCommGateway();
+        await keymaster.createId('Alice');
+
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'mailbox-ack' });
+            }
+            if (url === `${base}/api/v1/messages/remove`) {
+                return jsonResponse({ error: 'nope' }, 500);
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        await expect(keymaster.ackDidComm(['msg-1'], { name: 'Alice' }))
+            .rejects.toThrow('DIDComm ack failed: 500');
+    });
+
     it('surfaces DIDComm gateway challenge failures clearly', async () => {
         const base = useDidCommGateway();
         await keymaster.createId('Alice');

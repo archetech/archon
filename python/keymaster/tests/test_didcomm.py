@@ -164,6 +164,27 @@ def test_send_didcomm_requires_a_node_gateway():
         asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
 
 
+def test_ack_didcomm_rejects_non_list_ids():
+    # Mirrors the JS keymaster: ids is validated before any network/wallet work.
+    import asyncio
+    import pytest
+    from keymaster.core import Keymaster, KeymasterError
+
+    km = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass")
+    with pytest.raises(KeymasterError):
+        asyncio.run(km.ack_didcomm("msg-1"))
+
+
+def test_ack_didcomm_empty_list_is_a_noop():
+    # An empty ack short-circuits before the gateway is resolved, so this works
+    # even with a gatekeeper that could not reach a node.
+    import asyncio
+    from keymaster.core import Keymaster
+
+    km = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass")
+    assert asyncio.run(km.ack_didcomm([])) == 0
+
+
 def test_capability_gating_blocks_unavailable_services():
     # When the node's manifest says a service is off, the relevant verb fails with
     # a clear "does not offer …" error (before any network/crypto/wallet work).
