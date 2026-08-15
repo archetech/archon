@@ -11,11 +11,10 @@ export const DRAWBRIDGE_PUBLIC_HOST = process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST 
 export const GATEKEEPER_URL = process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224';
 export const WALLET_URL = process.env.ARCHON_HERALD_WALLET_URL || 'https://wallet.archon.technology';
 // This URL is followed by the visitor's browser, so it must be reachable from
-// the public internet. The node's own explorer cannot be the default: it is
-// Drawbridge now proxies the node's own explorer at /explorer, so the default is
-// the node itself rather than the shared public instance. A node without the
-// explorer profile answers 501 there; operators in that position should point
-// this at a reachable explorer, or set it empty to hide the links entirely.
+// the public internet. Drawbridge proxies the node's own explorer at /explorer,
+// so the default is this node rather than the shared public instance. A node
+// without the explorer profile answers 501 there; operators in that position
+// should point this at a reachable explorer, or set it empty to hide the links.
 export const EXPLORER_URL = process.env.ARCHON_HERALD_EXPLORER_URL
     ?? `${DRAWBRIDGE_PUBLIC_HOST.replace(/\/$/, '')}/explorer`;
 export const HERALD_DATABASE_TYPE = process.env.ARCHON_HERALD_DB || 'json';

@@ -24,9 +24,11 @@ export function getRuntimeConfig(): RuntimeConfig {
 }
 
 export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
-    // Relative to the app's base, so this works under any prefix the explorer
-    // is mounted at without knowing what that prefix is.
-    const url = new URL("config.json", document.baseURI).toString();
+    // Resolved against Vite's base, not document.baseURI. The advertised link
+    // is `<host>/explorer` with no trailing slash, and relative resolution from
+    // there drops the last segment -- giving `/config.json`, a 404, and a silent
+    // fall back to the loopback defaults on the exact path most visitors take.
+    const url = new URL("config.json", new URL(import.meta.env.BASE_URL, window.location.origin)).toString();
 
     try {
         const response = await fetch(url, { cache: "no-store" });

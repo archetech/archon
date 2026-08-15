@@ -6,11 +6,15 @@ services:
       dockerfile: docker/Dockerfile.explorer
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        # Must match the runtime value below: this one is baked into the bundle's
+        # asset URLs, the other decides where express mounts it.
+        VITE_EXPLORER_BASE: ${VITE_EXPLORER_BASE:-/explorer/}
     image: ghcr.io/archetech/explorer
     environment:
       - VITE_EXPLORER_PORT=4000
-      # Path prefix the bundle is built with and the server mounts at. Must match
-      # the Drawbridge route, which preserves the prefix rather than stripping it.
+      # Where express mounts the app. Kept in step with the build arg above; the
+      # Drawbridge route preserves this prefix rather than stripping it, so
+      # changing it means changing that route too.
       - VITE_EXPLORER_BASE=${VITE_EXPLORER_BASE:-/explorer/}
       # Resolved at runtime and handed to the browser, so a publicly served
       # explorer points visitors at this node rather than their own loopback.

@@ -130,9 +130,7 @@ services:
       - ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES=${ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES:-67108864}
       - ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW:-60}
       - ARCHON_HERALD_URL=${ARCHON_HERALD_URL-http://herald:4230}
-      # Empty unless the explorer profile is enabled, in which case /explorer
-      # proxies to it; otherwise Drawbridge answers 501 there.
-      - ARCHON_EXPLORER_URL=${ARCHON_EXPLORER_URL-}
+      - ARCHON_EXPLORER_URL=${ARCHON_EXPLORER_URL-http://explorer:4000}
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - ${ARCHON_DRAWBRIDGE_PORT:-4222}:4222

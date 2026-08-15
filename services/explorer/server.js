@@ -48,6 +48,12 @@ app.get(`${base}/config.json`, (_req, res) => {
     });
 });
 
+// Normalise the no-trailing-slash form. Anything resolving relative URLs from
+// the page would otherwise resolve them one level too high.
+app.get(base, (_req, res) => {
+    res.redirect(`${base}/`);
+});
+
 app.use(base, express.static(path.join(__dirname, 'dist')));
 
 // Anything under the prefix is a client-side route.
