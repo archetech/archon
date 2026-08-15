@@ -444,8 +444,10 @@ async function main() {
     const didcommRateLimit = publicRateLimit({
         store,
         name: 'didcomm',
-        perSourceMax: config.didcommRateLimitPerSource,
-        globalMax: config.didcommRateLimitGlobal,
+        readPerSourceMax: config.didcommReadPerSource,
+        readGlobalMax: config.didcommReadGlobal,
+        depositPerSourceBytes: config.didcommDepositPerSourceBytes,
+        depositGlobalBytes: config.didcommDepositGlobalBytes,
         windowSeconds: config.didcommRateLimitWindow,
         logger,
     });

@@ -65,6 +65,9 @@ export interface DrawbridgeStore {
     checkRateLimit(did: string, maxRequests: number, windowSeconds: number): Promise<RateLimitResult>;
     recordRequest(did: string, windowSeconds: number): Promise<void>;
     checkAndRecordRequest(did: string, maxRequests: number, windowSeconds: number): Promise<RateLimitResult>;
+    // Cost-weighted variant, for budgeting a resource rather than a request
+    // count -- a single 10MB deposit and a 2KB one are not the same load.
+    checkAndRecordCost(key: string, cost: number, maxCost: number, windowSeconds: number): Promise<RateLimitResult>;
 
 }
 
