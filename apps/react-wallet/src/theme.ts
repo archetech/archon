@@ -89,7 +89,15 @@ export function createAppTheme(isDark: boolean) {
     return createTheme({
         palette: {
             mode: isDark ? "dark" : "light",
-            primary: { main: c.accent, dark: c.accentHover, contrastText: "#FFFFFF" },
+            // White on the dark-mode accent is only ~3.9:1 (and ~3.1:1 on hover),
+            // under the 4.5:1 needed at this text size. The bright accent is
+            // right against near-black surfaces, so the label goes dark instead
+            // of the accent going muddy: 5.1:1 and 6.4:1.
+            primary: {
+                main: c.accent,
+                dark: c.accentHover,
+                contrastText: isDark ? "#08090A" : "#FFFFFF",
+            },
             background: { default: c.bg, paper: c.surface },
             text: { primary: c.text, secondary: c.textMuted },
             divider: c.border,
@@ -176,7 +184,11 @@ export function createAppTheme(isDark: boolean) {
                         minHeight: 34,
                         transition: "background-color 120ms ease, border-color 120ms ease",
                     },
-                    contained: {
+                    // Scoped to primary: applied to every contained button this
+                    // repainted error and warning buttons with the accent on
+                    // hover, dropping the destructive signal exactly when the
+                    // pointer is on the control.
+                    containedPrimary: {
                         "&:hover": { backgroundColor: c.accentHover },
                     },
                     outlined: {

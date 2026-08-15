@@ -31,7 +31,10 @@ export default function PageHeader(
             }}
         >
             <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h3" sx={{ mb: description ? 0.5 : 0 }}>
+                {/* h3 is the visual size; h1 is the document level. MUI maps
+                    variant to element by default, which would open every page
+                    at level 3 with no h1 for screen-reader navigation. */}
+                <Typography variant="h3" component="h1" sx={{ mb: description ? 0.5 : 0 }}>
                     {title}
                 </Typography>
                 {description && (

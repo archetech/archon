@@ -41,7 +41,9 @@ export default function Section(
                     }}
                 >
                     <Box sx={{ minWidth: 0 }}>
-                        {title && <Typography variant="h6">{title}</Typography>}
+                        {/* Visual size h6, document level h2: sections sit
+                            directly beneath the page title. */}
+                        {title && <Typography variant="h6" component="h2">{title}</Typography>}
                         {description && (
                             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
                                 {description}

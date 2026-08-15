@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useId, useState } from "react";
 import { Button, Divider, ListItemIcon, ListItemText, Menu, MenuItem } from "@mui/material";
 import { MoreHoriz } from "@mui/icons-material";
 
@@ -25,6 +25,10 @@ export default function ActionMenu(
         label?: string;
     }) {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const open = Boolean(anchorEl);
+    const id = useId();
+    const buttonId = `action-menu-button-${id}`;
+    const menuId = `action-menu-${id}`;
 
     if (!items.length) {
         return null;
@@ -62,13 +66,19 @@ export default function ActionMenu(
                 variant="outlined"
                 onClick={(event) => setAnchorEl(event.currentTarget)}
                 endIcon={<MoreHoriz />}
+                id={buttonId}
+                aria-haspopup="menu"
+                aria-expanded={open ? true : undefined}
+                aria-controls={open ? menuId : undefined}
             >
                 {label}
             </Button>
 
             <Menu
+                id={menuId}
                 anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
+                open={open}
+                MenuListProps={{ "aria-labelledby": buttonId }}
                 onClose={() => setAnchorEl(null)}
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "top", horizontal: "right" }}

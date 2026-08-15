@@ -37,6 +37,7 @@ import SettingsTab from "./components/SettingsTab";
 import IdentitiesTab from "./components/IdentitiesTab";
 import BrowserHeader from "./components/BrowserHeader";
 import JsonViewer from "./components/JsonViewer";
+import PageHeader from "./components/layout/PageHeader";
 import { useVariablesContext } from "./contexts/VariablesProvider";
 import { useUIContext } from "./contexts/UIContext";
 import { useThemeContext } from "./contexts/ContextProviders";
@@ -217,6 +218,10 @@ function BrowserContent() {
             </TabPanel>
 
             <TabPanel value="viewer" sx={{ p: 0 }}>
+                <PageHeader
+                    title="Resolver"
+                    description="Resolve any DID and inspect the document it returns."
+                />
                 <JsonViewer browserTab="viewer" showResolveField={true} />
             </TabPanel>
 
