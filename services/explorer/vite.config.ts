@@ -7,7 +7,11 @@ export default defineConfig(({ mode }) => {
     return {
         plugins: [react()],
         root: './',
-	    base: '/',
+        // Served under a path prefix so Drawbridge can expose it publicly on the
+        // node's own host. Vite bakes this in, so the image is prefix-specific;
+        // server.js mounts the app at the same prefix, which keeps direct access
+        // on port 4000 and proxied access byte-identical.
+        base: env.VITE_EXPLORER_BASE || '/explorer/',
         server: {
             port: parseInt(env.VITE_EXPLORER_PORT) || 4000,
         },

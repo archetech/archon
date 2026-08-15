@@ -29,6 +29,9 @@ const config = {
     // (the capability off-switch), while an unset var falls back to the default.
     heraldURL: process.env.ARCHON_HERALD_URL ?? 'http://localhost:4230',
     lightningMediatorURL: process.env.ARCHON_LIGHTNING_MEDIATOR_URL ?? 'http://localhost:4235',
+    // Explorer is profile-gated, so this is empty on most nodes and /explorer
+    // answers 501, matching how /names and /didcomm behave when disabled.
+    explorerURL: process.env.ARCHON_EXPLORER_URL ?? '',
     didcommURL: process.env.ARCHON_DIDCOMM_URL ?? 'http://localhost:4236',
     // Public base URL this node is reachable at (clearnet host or Tor onion).
     // Used to advertise the DIDComm relay endpoint (`<publicHost>/didcomm`).

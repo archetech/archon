@@ -9,6 +9,14 @@ services:
     image: ghcr.io/archetech/explorer
     environment:
       - VITE_EXPLORER_PORT=4000
+      # Path prefix the bundle is built with and the server mounts at. Must match
+      # the Drawbridge route, which preserves the prefix rather than stripping it.
+      - VITE_EXPLORER_BASE=${VITE_EXPLORER_BASE:-/explorer/}
+      # Resolved at runtime and handed to the browser, so a publicly served
+      # explorer points visitors at this node rather than their own loopback.
+      # Default to the node's public gatekeeper surface when one is configured.
+      - ARCHON_EXPLORER_GATEKEEPER_URL=${ARCHON_EXPLORER_GATEKEEPER_URL:-${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-http://localhost:4224}}
+      - ARCHON_EXPLORER_SEARCH_URL=${ARCHON_EXPLORER_SEARCH_URL:-${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-http://localhost:4224}}
       - VITE_GATEKEEPER_URL=http://localhost:4224
       - VITE_SEARCH_SERVER=http://localhost:4224
       - VITE_OPERATION_NETWORKS=hyperswarm,local,BTC:signet,BTC:testnet4,ZEC:mainnet

@@ -24,7 +24,7 @@ import { handleCopyDID } from '../shared/utilities.js';
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
 
-const searchServerURL = import.meta.env.VITE_SEARCH_SERVER || "http://localhost:4224";
+import { getRuntimeConfig } from "../runtimeConfig.js";
 const VERSION = '/api/v1';
 
 function JsonViewer(
@@ -93,7 +93,7 @@ function JsonViewer(
             setFormDid(query);
             setSearchPage(0);
 
-            const response = await axios.get(`${searchServerURL}${VERSION}/search`, {
+            const response = await axios.get(`${getRuntimeConfig().searchServerUrl}${VERSION}/search`, {
                 params: { q: query }
             });
             setSearchResults(response.data);
