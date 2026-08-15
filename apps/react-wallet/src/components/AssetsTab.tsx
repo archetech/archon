@@ -8,6 +8,7 @@ import FileTab from "./FileTab";
 import GroupsTab from "./GroupsTab";
 import VaultTab from "./VaultTab";
 import CloneAssetTab from "./CloneAssetTab";
+import PageHeader from "./layout/PageHeader";
 
 function AssetsTab({ subTab }: {subTab: string}) {
     const [assetSubTab, setAssetSubTab] = useState<string>("schemas");
@@ -22,6 +23,10 @@ function AssetsTab({ subTab }: {subTab: string}) {
 
     return (
         <TabContext value={assetSubTab}>
+            <PageHeader
+                title="Assets"
+                description="Vaults, schemas, images, files and groups owned by this identity."
+            />
             <Box
                 sx={{
                     position: "sticky",

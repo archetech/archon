@@ -1,9 +1,15 @@
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
+import { jsonViewTheme } from "./layout/jsonViewTheme";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
-import { Badge, Create, Image, Login, PermIdentity } from "@mui/icons-material";
+import { Badge, Create, DriveFileRenameOutline, Image, Login, LoopOutlined, PermIdentity, RestoreOutlined, SaveAltOutlined, SwapHorizOutlined, DeleteOutline } from "@mui/icons-material";
+import PageHeader from "./layout/PageHeader";
+import Section from "./layout/Section";
+import EmptyState from "./layout/EmptyState";
+import ActionMenu from "./layout/ActionMenu";
 import { useUIContext } from "../contexts/UIContext";
+import { useThemeContext } from "../contexts/ContextProviders";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
@@ -81,6 +87,7 @@ function IdentitiesTab() {
     const [avatarCandidateLoading, setAvatarCandidateLoading] = useState<boolean>(false);
     const [avatarCandidateError, setAvatarCandidateError] = useState<string>("");
     const { keymaster } = useWalletContext();
+    const { darkMode } = useThemeContext();
     const { setError, setSuccess } = useSnackbar();
     const {
         refreshAll,
@@ -1009,63 +1016,47 @@ function IdentitiesTab() {
                 </DialogActions>
             </Dialog>
 
-            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0, width: '100%' }}>
-                <Box sx={{ mt: currentId ? 2 : 0, display: 'flex', alignItems: 'center', width: '100%', flexWrap: 'wrap', flexDirection: 'row', gap: 1 }}>
-                    <Button variant="contained" onClick={openCreateModal}>
-                        Create ID
-                    </Button>
-                    {currentId && (
+            <Box sx={{ width: '100%' }}>
+                <PageHeader
+                    title="Identities"
+                    description={currentId
+                        ? `Managing ${currentId}. Keys, addresses and profile for this identity.`
+                        : "Create an identity to start issuing and holding credentials."}
+                    actions={
                         <>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={handleRenameId}
-                            >
-                                Rename
-                            </Button>
-
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={handleRemoveId}
-                            >
-                                Remove
-                            </Button>
-
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={backupId}
-                            >
-                                Backup
-                            </Button>
-
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={handleRecoverId}
-                            >
-                                Recover
-                            </Button>
-
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={rotateKeys}
-                            >
-                                Rotate
-                            </Button>
-
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={() => setMigrateOpen(true)}
-                            >
-                                Migrate...
+                            {currentId && (
+                                <ActionMenu
+                                    items={[
+                                        { label: "Rename", onClick: handleRenameId, icon: <DriveFileRenameOutline fontSize="small" /> },
+                                        { label: "Backup", onClick: backupId, icon: <SaveAltOutlined fontSize="small" /> },
+                                        { label: "Recover", onClick: handleRecoverId, icon: <RestoreOutlined fontSize="small" /> },
+                                        { label: "Rotate keys", onClick: rotateKeys, icon: <LoopOutlined fontSize="small" /> },
+                                        { label: "Migrate registry", onClick: () => setMigrateOpen(true), icon: <SwapHorizOutlined fontSize="small" /> },
+                                        { label: "Remove identity", onClick: handleRemoveId, icon: <DeleteOutline fontSize="small" />, destructive: true },
+                                    ]}
+                                />
+                            )}
+                            <Button variant="contained" onClick={openCreateModal}>
+                                Create ID
                             </Button>
                         </>
-                    )}
-                </Box>
+                    }
+                />
+
+                {!currentId && (
+                    <Section>
+                        <EmptyState
+                            icon={<PermIdentity />}
+                            title="No identity selected"
+                            description="An identity holds your keys and is the subject of the credentials you issue and receive."
+                            action={
+                                <Button variant="contained" onClick={openCreateModal}>
+                                    Create ID
+                                </Button>
+                            }
+                        />
+                    </Section>
+                )}
                 {currentId && (
                     <Box sx={{ mt: 2, width: '100%' }}>
                         <Tabs
@@ -1073,325 +1064,371 @@ function IdentitiesTab() {
                             onChange={(_event, newValue) => setIdentityTab(newValue)}
                             variant="scrollable"
                             scrollButtons="auto"
+                            sx={{ mb: 2, minHeight: 40, borderBottom: 1, borderColor: "divider" }}
                         >
-                            <Tab value="details" label="Details" icon={<PermIdentity />} iconPosition="top" />
-                            <Tab value="addresses" label="Addresses" icon={<Badge />} iconPosition="top" />
-                            <Tab value="name" label="Name" icon={<Create />} iconPosition="top" />
-                            <Tab value="avatar" label="Avatar" icon={<Image />} iconPosition="top" />
-                            <Tab value="nostr" label="Nostr" icon={<Login />} iconPosition="top" />
+                            <Tab value="details" label="Details" icon={<PermIdentity fontSize="small" />} iconPosition="start" />
+                            <Tab value="addresses" label="Addresses" icon={<Badge fontSize="small" />} iconPosition="start" />
+                            <Tab value="name" label="Name" icon={<Create fontSize="small" />} iconPosition="start" />
+                            <Tab value="avatar" label="Avatar" icon={<Image fontSize="small" />} iconPosition="start" />
+                            <Tab value="nostr" label="Nostr" icon={<Login fontSize="small" />} iconPosition="start" />
                         </Tabs>
                         {identityTab === "details" && (
-                            <Box sx={{ mt: 2, width: '100%' }}>
-                                <Paper variant="outlined" sx={{ p: 2, overflowX: "auto", width: '100%' }}>
-                                    {currentIdDocs ? (
-                                        <Box sx={{ width: '100%' }}>
-                                            <JsonView value={currentIdDocs} displayDataTypes={false} />
-                                        </Box>
-                                    ) : (
-                                        <Typography variant="body2" color="text.secondary">
-                                        No DID document available for the current identity.
-                                        </Typography>
-                                    )}
-                                </Paper>
-                            </Box>
+                            <Section
+                                title="DID document"
+                                description="The resolved document for this identity, as published to its registry."
+                                dense
+                            >
+                                {currentIdDocs ? (
+                                    <Box sx={{ p: 2, overflowX: "auto", width: '100%' }}>
+                                        <JsonView value={currentIdDocs} displayDataTypes={false} style={jsonViewTheme(darkMode)} />
+                                    </Box>
+                                ) : (
+                                    <EmptyState
+                                        icon={<PermIdentity />}
+                                        title="No DID document"
+                                        description="Nothing has resolved for this identity yet. It may still be propagating to its registry."
+                                    />
+                                )}
+                            </Section>
                         )}
                         {identityTab === "addresses" && (
-                            <Box sx={{ mt: 2, width: '100%' }}>
-                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
-                                    <TextField label="Name" size="small" value={addressName} onChange={(e) => setAddressName(e.target.value)} />
-                                    <TextField label="Domain" size="small" value={addressDomain} onChange={(e) => setAddressDomain(e.target.value)} />
-                                </Box>
-                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
-                                    <Button variant="contained" size="small" onClick={checkAddressValue} disabled={addressBusy || !addressName.trim() || !addressDomain.trim()}>Check</Button>
-                                    <Button variant="contained" size="small" onClick={addAddressValue} disabled={addressBusy || !addressName.trim() || !addressDomain.trim()}>Add</Button>
-                                    <Button variant="contained" size="small" onClick={() => resolveStoredAddress(addressDomain)} disabled={addressBusy || !addressDomain.trim()}>Get</Button>
-                                    <Button variant="contained" size="small" onClick={importAddressDomain} disabled={addressBusy || !addressDomain.trim()}>Import</Button>
-                                    <Button variant="contained" size="small" onClick={() => removeAddressValue()} disabled={addressBusy || (!selectedAddress && (!addressName.trim() || !addressDomain.trim()))}>Remove</Button>
-                                    <Button variant="contained" size="small" onClick={clearAddressFields} disabled={addressBusy || (!addressName && !addressDomain && !selectedAddress && !addressDetails)}>Clear</Button>
-                                </Box>
-                                <TableContainer component={Paper} sx={{ mb: 1 }}>
-                                    <Table size="small" sx={{ tableLayout: "fixed" }}>
-                                        <colgroup>
-                                            <col />
-                                            <col style={{ width: "140px" }} />
-                                            <col style={{ width: "210px" }} />
-                                        </colgroup>
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>Address</TableCell>
-                                                <TableCell>Added</TableCell>
-                                                <TableCell>Actions</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
-                                                <TableRow key={address} selected={address === selectedAddress}>
-                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400 }}>{address}</TableCell>
-                                                    <TableCell sx={{ fontFamily: 'monospace' }}>{formatAddedDate(info.added)}</TableCell>
-                                                    <TableCell>
-                                                        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-                                                            <Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button>
-                                                            <Button
-                                                                variant="contained"
-                                                                size="small"
-                                                                color={address === publishedAddress ? "error" : "primary"}
-                                                                onClick={() => address === publishedAddress ? clearPublishedAddressValue() : setPublishedAddressValue(address)}
-                                                                disabled={addressBusy || !currentId}
-                                                            >
-                                                                {address === publishedAddress ? "Unpublish" : "Publish"}
-                                                            </Button>
-                                                        </Box>
-                                                    </TableCell>
+                            <Box sx={{ width: '100%' }}>
+                                <Section
+                                    title="Add an address"
+                                    description="Claim a name at a domain and attach it to this identity."
+                                >
+                                    <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                                        <TextField label="Name" size="small" value={addressName} onChange={(e) => setAddressName(e.target.value)} />
+                                        <TextField label="Domain" size="small" value={addressDomain} onChange={(e) => setAddressDomain(e.target.value)} />
+                                        <Button variant="contained" onClick={addAddressValue} disabled={addressBusy || !addressName.trim() || !addressDomain.trim()}>Add</Button>
+                                        <Button variant="outlined" onClick={checkAddressValue} disabled={addressBusy || !addressName.trim() || !addressDomain.trim()}>Check</Button>
+                                        <ActionMenu
+                                            label="More"
+                                            items={[
+                                                { label: "Get stored address", onClick: () => resolveStoredAddress(addressDomain), disabled: addressBusy || !addressDomain.trim() },
+                                                { label: "Import from domain", onClick: importAddressDomain, disabled: addressBusy || !addressDomain.trim() },
+                                                { label: "Clear fields", onClick: clearAddressFields, disabled: addressBusy || (!addressName && !addressDomain && !selectedAddress && !addressDetails) },
+                                                { label: "Remove address", onClick: () => removeAddressValue(), disabled: addressBusy || (!selectedAddress && (!addressName.trim() || !addressDomain.trim())), destructive: true },
+                                            ]}
+                                        />
+                                    </Box>
+                                </Section>
+                                <Section title="Addresses" dense>
+                                    <TableContainer sx={{ border: 0 }}>
+                                        <Table size="small" sx={{ tableLayout: "fixed" }}>
+                                            <colgroup>
+                                                <col />
+                                                <col style={{ width: "140px" }} />
+                                                <col style={{ width: "210px" }} />
+                                            </colgroup>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Address</TableCell>
+                                                    <TableCell>Added</TableCell>
+                                                    <TableCell>Actions</TableCell>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
-                                <TextField multiline minRows={8} fullWidth value={addressDetails} InputProps={{ readOnly: true }} />
+                                            </TableHead>
+                                            <TableBody>
+                                                {Object.entries(addressList).sort(([a], [b]) => a.localeCompare(b)).map(([address, info]) => (
+                                                    <TableRow key={address} selected={address === selectedAddress}>
+                                                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: address === publishedAddress ? 700 : 400 }}>{address}</TableCell>
+                                                        <TableCell sx={{ fontFamily: 'monospace' }}>{formatAddedDate(info.added)}</TableCell>
+                                                        <TableCell>
+                                                            <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                                                                <Button variant="contained" size="small" onClick={() => selectAddress(address)} disabled={addressBusy}>Select</Button>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    size="small"
+                                                                    color={address === publishedAddress ? "error" : "primary"}
+                                                                    onClick={() => address === publishedAddress ? clearPublishedAddressValue() : setPublishedAddressValue(address)}
+                                                                    disabled={addressBusy || !currentId}
+                                                                >
+                                                                    {address === publishedAddress ? "Unpublish" : "Publish"}
+                                                                </Button>
+                                                            </Box>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                    {Object.keys(addressList).length === 0 && (
+                                        <EmptyState
+                                            icon={<Badge />}
+                                            title="No addresses yet"
+                                            description="Addresses let others reach this identity by a human-readable name instead of its DID."
+                                        />
+                                    )}
+                                </Section>
+
+                                <Section title="Details" description="Raw response for the selected address." dense>
+                                    <TextField
+                                        multiline
+                                        minRows={8}
+                                        fullWidth
+                                        value={addressDetails}
+                                        InputProps={{ readOnly: true, sx: { fontFamily: 'monospace', fontSize: '0.8125rem' } }}
+                                        sx={{ '& fieldset': { border: 0 } }}
+                                    />
+                                </Section>
                             </Box>
                         )}
                         {identityTab === "name" && (
-                            <Box sx={{ mt: 2, width: '100%', maxWidth: 520 }}>
-                                <Typography variant="body2" sx={{ mb: 1 }}>
-                                    The selected identity stores its display name as the `name` property.
-                                </Typography>
-                                <TextField
-                                    label="Current Name"
-                                    value={identityNameValue}
-                                    fullWidth
-                                    size="small"
-                                    margin="normal"
-                                    slotProps={{ input: { readOnly: true } }}
-                                    placeholder={identityNameLoading ? "Loading..." : "No name set"}
-                                />
-                                <TextField
-                                    label="Name"
-                                    value={identityNameInput}
-                                    onChange={(e) => setIdentityNameInput(e.target.value)}
-                                    fullWidth
-                                    size="small"
-                                    margin="normal"
-                                    placeholder="Enter name"
-                                />
-                                {identityNameError && (
-                                    <Alert severity="warning" sx={{ mt: 1 }}>
-                                        {identityNameError}
-                                    </Alert>
-                                )}
-                                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
-                                    <Button
-                                        variant="contained"
-                                        onClick={setIdentityNameProperty}
-                                        disabled={!identityNameInput.trim()}
-                                    >
+                            <Box sx={{ width: '100%', maxWidth: 560 }}>
+                                <Section
+                                    title="Display name"
+                                    description="Stored on the identity as its `name` property."
+                                >
+                                    <TextField
+                                        label="Current Name"
+                                        value={identityNameValue}
+                                        fullWidth
+                                        size="small"
+                                        margin="normal"
+                                        slotProps={{ input: { readOnly: true } }}
+                                        placeholder={identityNameLoading ? "Loading..." : "No name set"}
+                                    />
+                                    <TextField
+                                        label="Name"
+                                        value={identityNameInput}
+                                        onChange={(e) => setIdentityNameInput(e.target.value)}
+                                        fullWidth
+                                        size="small"
+                                        margin="normal"
+                                        placeholder="Enter name"
+                                    />
+                                    {identityNameError && (
+                                        <Alert severity="warning" sx={{ mt: 1 }}>
+                                            {identityNameError}
+                                        </Alert>
+                                    )}
+                                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
+                                        <Button
+                                            variant="contained"
+                                            onClick={setIdentityNameProperty}
+                                            disabled={!identityNameInput.trim()}
+                                        >
                                         Set Name
-                                    </Button>
-                                    <Button
-                                        variant="contained"
-                                        color="error"
-                                        onClick={removeIdentityNameProperty}
-                                        disabled={!identityNameValue}
-                                    >
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            onClick={removeIdentityNameProperty}
+                                            disabled={!identityNameValue}
+                                        >
                                         Remove Name
-                                    </Button>
-                                </Box>
+                                        </Button>
+                                    </Box>
+                                </Section>
                             </Box>
                         )}
                         {identityTab === "avatar" && (
-                            <Box sx={{ mt: 2, width: "100%" }}>
-                                <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "flex-start", mb: 3 }}>
-                                    <Box sx={{ width: 220 }}>
-                                        <Typography variant="subtitle1" sx={{ mb: 1 }}>{displayedAvatarTitle}</Typography>
-                                        <Paper variant="outlined" sx={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", bgcolor: "grey.50" }}>
-                                            {displayedAvatarPreviewUrl ? (
-                                                <img src={displayedAvatarPreviewUrl} alt={`${currentId} avatar`} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                                            ) : (
-                                                <Typography color="text.secondary" sx={{ textAlign: "center", px: 2 }}>
-                                                    {displayedAvatarEmptyText}
-                                                </Typography>
+                            <Box sx={{ width: "100%" }}>
+                                <Section
+                                    title="Avatar"
+                                    description="Stored on the identity as its `avatar` property."
+                                >
+                                    <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "flex-start" }}>
+                                        <Box sx={{ width: 220 }}>
+                                            <Typography variant="subtitle1" sx={{ mb: 1 }}>{displayedAvatarTitle}</Typography>
+                                            <Paper variant="outlined" sx={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", bgcolor: "action.hover", borderRadius: 2 }}>
+                                                {displayedAvatarPreviewUrl ? (
+                                                    <img src={displayedAvatarPreviewUrl} alt={`${currentId} avatar`} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                                                ) : (
+                                                    <Typography color="text.secondary" sx={{ textAlign: "center", px: 2 }}>
+                                                        {displayedAvatarEmptyText}
+                                                    </Typography>
+                                                )}
+                                            </Paper>
+                                        </Box>
+                                        <Box sx={{ flex: 1, minWidth: 280 }}>
+                                            <Typography variant="body2" sx={{ mb: 1 }}>
+                                                {isAvatarPreviewMode
+                                                    ? "Review the preview below, then apply it to the selected identity."
+                                                    : "The selected identity stores its avatar as the `avatar` property."}
+                                            </Typography>
+                                            <TextField
+                                                label={displayedAvatarDidLabel}
+                                                value={displayedAvatarDid}
+                                                fullWidth
+                                                size="small"
+                                                margin="normal"
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                            {displayedAvatarError && (
+                                                <Alert severity="warning" sx={{ mt: 1 }}>
+                                                    {displayedAvatarError}
+                                                </Alert>
                                             )}
-                                        </Paper>
-                                    </Box>
-                                    <Box sx={{ flex: 1, minWidth: 280 }}>
-                                        <Typography variant="body2" sx={{ mb: 1 }}>
-                                            {isAvatarPreviewMode
-                                                ? "Review the preview below, then apply it to the selected identity."
-                                                : "The selected identity stores its avatar as the `avatar` property."}
-                                        </Typography>
-                                        <TextField
-                                            label={displayedAvatarDidLabel}
-                                            value={displayedAvatarDid}
-                                            fullWidth
-                                            size="small"
-                                            margin="normal"
-                                            InputProps={{ readOnly: true }}
-                                        />
-                                        {displayedAvatarError && (
-                                            <Alert severity="warning" sx={{ mt: 1 }}>
-                                                {displayedAvatarError}
-                                            </Alert>
-                                        )}
-                                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
-                                            {isAvatarPreviewMode ? (
-                                                <>
-                                                    <Button
-                                                        variant="contained"
-                                                        onClick={applyAvatarCandidate}
-                                                        disabled={!avatarCandidateDid || !avatarCandidatePreviewUrl}
-                                                    >
+                                            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
+                                                {isAvatarPreviewMode ? (
+                                                    <>
+                                                        <Button
+                                                            variant="contained"
+                                                            onClick={applyAvatarCandidate}
+                                                            disabled={!avatarCandidateDid || !avatarCandidatePreviewUrl}
+                                                        >
                                                         Set Avatar
-                                                    </Button>
-                                                    <Button
-                                                        variant="outlined"
-                                                        onClick={clearAvatarCandidate}
-                                                        disabled={!avatarCandidateDid && !avatarCandidatePreviewUrl && !avatarCandidateError}
-                                                    >
+                                                        </Button>
+                                                        <Button
+                                                            variant="outlined"
+                                                            onClick={clearAvatarCandidate}
+                                                            disabled={!avatarCandidateDid && !avatarCandidatePreviewUrl && !avatarCandidateError}
+                                                        >
                                                         Clear Preview
-                                                    </Button>
-                                                </>
-                                            ) : (
-                                                <Button variant="contained" color="error" onClick={removeAvatarProperty} disabled={!avatarDid}>
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <Button variant="outlined" color="error" onClick={removeAvatarProperty} disabled={!avatarDid}>
                                                     Remove Avatar
-                                                </Button>
-                                            )}
+                                                    </Button>
+                                                )}
+                                            </Box>
                                         </Box>
                                     </Box>
-                                </Box>
 
-                                <FormControl sx={{ mb: 2 }}>
-                                    <FormLabel>Set Avatar From</FormLabel>
-                                    <RadioGroup row value={avatarMode} onChange={handleAvatarModeChange}>
-                                        <FormControlLabel value="alias" control={<Radio />} label="Image Alias" />
-                                        <FormControlLabel value="did" control={<Radio />} label="DID" />
-                                        <FormControlLabel value="upload" control={<Radio />} label="Upload Image" />
-                                    </RadioGroup>
-                                </FormControl>
+                                    <FormControl sx={{ mb: 2 }}>
+                                        <FormLabel>Set Avatar From</FormLabel>
+                                        <RadioGroup row value={avatarMode} onChange={handleAvatarModeChange}>
+                                            <FormControlLabel value="alias" control={<Radio />} label="Image Alias" />
+                                            <FormControlLabel value="did" control={<Radio />} label="DID" />
+                                            <FormControlLabel value="upload" control={<Radio />} label="Upload Image" />
+                                        </RadioGroup>
+                                    </FormControl>
 
-                                {avatarMode === "alias" && (
-                                    <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                                        <Select
-                                            value={avatarAlias}
-                                            displayEmpty
-                                            size="small"
-                                            sx={{ minWidth: 280 }}
-                                            onChange={(event) => setAvatarAlias(event.target.value)}
-                                        >
-                                            <MenuItem value="" disabled>Select image alias</MenuItem>
-                                            {imageList.map((name) => (
-                                                <MenuItem key={name} value={name}>{name}</MenuItem>
-                                            ))}
-                                        </Select>
-                                        <Button
-                                            variant="contained"
-                                            onClick={() => previewAvatarCandidate(avatarAlias, { alias: avatarAlias })}
-                                            disabled={!avatarAlias}
-                                        >
+                                    {avatarMode === "alias" && (
+                                        <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                                            <Select
+                                                value={avatarAlias}
+                                                displayEmpty
+                                                size="small"
+                                                sx={{ minWidth: 280 }}
+                                                onChange={(event) => setAvatarAlias(event.target.value)}
+                                            >
+                                                <MenuItem value="" disabled>Select image alias</MenuItem>
+                                                {imageList.map((name) => (
+                                                    <MenuItem key={name} value={name}>{name}</MenuItem>
+                                                ))}
+                                            </Select>
+                                            <Button
+                                                variant="contained"
+                                                onClick={() => previewAvatarCandidate(avatarAlias, { alias: avatarAlias })}
+                                                disabled={!avatarAlias}
+                                            >
                                             Preview
-                                        </Button>
-                                    </Box>
-                                )}
+                                            </Button>
+                                        </Box>
+                                    )}
 
-                                {avatarMode === "did" && (
-                                    <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                                        <TextField
-                                            label="Avatar DID"
-                                            value={avatarInputDid}
-                                            onChange={(e) => setAvatarInputDid(e.target.value)}
-                                            size="small"
-                                            sx={{ minWidth: 420, flex: 1 }}
-                                        />
-                                        <Button
-                                            variant="contained"
-                                            onClick={() => previewAvatarCandidate(avatarInputDid)}
-                                            disabled={!avatarInputDid.trim()}
-                                        >
+                                    {avatarMode === "did" && (
+                                        <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                                            <TextField
+                                                label="Avatar DID"
+                                                value={avatarInputDid}
+                                                onChange={(e) => setAvatarInputDid(e.target.value)}
+                                                size="small"
+                                                sx={{ minWidth: 420, flex: 1 }}
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                onClick={() => previewAvatarCandidate(avatarInputDid)}
+                                                disabled={!avatarInputDid.trim()}
+                                            >
                                             Preview
-                                        </Button>
-                                    </Box>
-                                )}
+                                            </Button>
+                                        </Box>
+                                    )}
 
-                                {avatarMode === "upload" && (
-                                    <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                                        <Select
-                                            value={registries.includes(registry) ? registry : ""}
-                                            onChange={(e) => setRegistry(e.target.value)}
-                                            size="small"
-                                            sx={{ minWidth: 220 }}
-                                        >
-                                            {registries.map((r) => (
-                                                <MenuItem key={r} value={r}>{r}</MenuItem>
-                                            ))}
-                                        </Select>
-                                        <Button
-                                            variant="contained"
-                                            onClick={() => document.getElementById("avatarUpload")?.click()}
-                                            disabled={!registry}
-                                        >
+                                    {avatarMode === "upload" && (
+                                        <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                                            <Select
+                                                value={registries.includes(registry) ? registry : ""}
+                                                onChange={(e) => setRegistry(e.target.value)}
+                                                size="small"
+                                                sx={{ minWidth: 220 }}
+                                            >
+                                                {registries.map((r) => (
+                                                    <MenuItem key={r} value={r}>{r}</MenuItem>
+                                                ))}
+                                            </Select>
+                                            <Button
+                                                variant="contained"
+                                                onClick={() => document.getElementById("avatarUpload")?.click()}
+                                                disabled={!registry}
+                                            >
                                             Upload Image...
-                                        </Button>
-                                        <input
-                                            type="file"
-                                            id="avatarUpload"
-                                            accept="image/*"
-                                            style={{ display: "none" }}
-                                            onChange={uploadAvatarImage}
-                                        />
-                                    </Box>
-                                )}
+                                            </Button>
+                                            <input
+                                                type="file"
+                                                id="avatarUpload"
+                                                accept="image/*"
+                                                style={{ display: "none" }}
+                                                onChange={uploadAvatarImage}
+                                            />
+                                        </Box>
+                                    )}
+                                </Section>
                             </Box>
                         )}
                         {identityTab === "nostr" && (
-                            <Box sx={{ mt: 2, width: '100%' }}>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
-                                    {nostrKeys ? (
-                                        <Button variant="contained" color="error" onClick={() => setRemoveNostrModal(true)} sx={{ whiteSpace: 'nowrap' }}>
+                            <Box sx={{ width: '100%' }}>
+                                <Section
+                                    title="Nostr"
+                                    description="Attach a Nostr keypair to this identity, or import an existing nsec."
+                                >
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                                        {nostrKeys ? (
+                                            <Button variant="contained" color="error" onClick={() => setRemoveNostrModal(true)} sx={{ whiteSpace: 'nowrap' }}>
                                             Remove Nostr
-                                        </Button>
-                                    ) : (
-                                        <>
-                                            <Button variant="contained" color="primary" onClick={addNostr} sx={{ whiteSpace: 'nowrap' }}>
-                                                Add Nostr
-                                            </Button>
-                                            <Button variant="contained" color="primary" onClick={() => setImportNostrModal(true)} sx={{ whiteSpace: 'nowrap' }}>
-                                                Import nsec
-                                            </Button>
-                                        </>
-                                    )}
-                                    {nostrKeys && (
-                                        nsecValue ? (
-                                            <Button variant="contained" color="warning" onClick={hideNsec} sx={{ whiteSpace: 'nowrap' }}>
-                                                Hide nsec
                                             </Button>
                                         ) : (
-                                            <Button variant="contained" color="warning" onClick={showNsec} sx={{ whiteSpace: 'nowrap' }}>
-                                                Show nsec
-                                            </Button>
-                                        )
-                                    )}
-                                </Box>
-                                {nostrKeys ? (
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                            npub: {nostrKeys.npub}
-                                        </Typography>
-                                        <br />
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                            pubkey: {nostrKeys.pubkey}
-                                        </Typography>
-                                        {nsecValue && (
                                             <>
-                                                <br />
-                                                <Typography variant="caption" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                                                    nsec: {nsecValue}
-                                                </Typography>
+                                                <Button variant="contained" color="primary" onClick={addNostr} sx={{ whiteSpace: 'nowrap' }}>
+                                                Add Nostr
+                                                </Button>
+                                                <Button variant="contained" color="primary" onClick={() => setImportNostrModal(true)} sx={{ whiteSpace: 'nowrap' }}>
+                                                Import nsec
+                                                </Button>
                                             </>
                                         )}
+                                        {nostrKeys && (
+                                            nsecValue ? (
+                                                <Button variant="contained" color="warning" onClick={hideNsec} sx={{ whiteSpace: 'nowrap' }}>
+                                                Hide nsec
+                                                </Button>
+                                            ) : (
+                                                <Button variant="contained" color="warning" onClick={showNsec} sx={{ whiteSpace: 'nowrap' }}>
+                                                Show nsec
+                                                </Button>
+                                            )
+                                        )}
                                     </Box>
-                                ) : (
-                                    <Typography variant="body2" color="text.secondary">
-                                        No Nostr keys are configured for this identity yet.
-                                    </Typography>
-                                )}
+                                    {nostrKeys ? (
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                            npub: {nostrKeys.npub}
+                                            </Typography>
+                                            <br />
+                                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                            pubkey: {nostrKeys.pubkey}
+                                            </Typography>
+                                            {nsecValue && (
+                                                <>
+                                                    <br />
+                                                    <Typography variant="caption" color="error" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                                    nsec: {nsecValue}
+                                                    </Typography>
+                                                </>
+                                            )}
+                                        </Box>
+                                    ) : (
+                                        <EmptyState
+                                            icon={<Login />}
+                                            title="No Nostr keys"
+                                            description="Add a keypair to use this identity on Nostr, or import an existing nsec."
+                                        />
+                                    )}
+                                </Section>
                             </Box>
                         )}
                     </Box>

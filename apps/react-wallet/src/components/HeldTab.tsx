@@ -9,6 +9,10 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 import JsonViewer from "./JsonViewer";
 import DisplayDID from "./DisplayDID";
 import {scanQrCode} from "../utils/utils";
+import { Badge } from "@mui/icons-material";
+import Section from "./layout/Section";
+import EmptyState from "./layout/EmptyState";
+import ActionMenu from "./layout/ActionMenu";
 
 function HeldTab() {
     const [open, setOpen] = useState<boolean>(false);
@@ -275,70 +279,42 @@ function HeldTab() {
             </Box>
 
             <Box className="overflow-box">
-                {heldList.map((did) => (
-                    <Box key={did} className="margin-bottom">
-                        <DisplayDID did={did} />
+                {heldList.length === 0 ? (
+                    <Section>
+                        <EmptyState
+                            icon={<Badge />}
+                            title="No credentials held"
+                            description="Credentials issued to your identities will appear here once accepted."
+                        />
+                    </Section>
+                ) : heldList.map((did) => (
+                    <Section key={did}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
+                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                                <DisplayDID did={did} />
+                            </Box>
 
-                        <Box className="flex-box">
-                            <Button
-                                variant="outlined"
-                                className="button large top"
-                                onClick={() => displayJson(did)}
-                            >
-                                Resolve
-                            </Button>
-
-                            <Button
-                                variant="outlined"
-                                className="button large top"
-                                onClick={() =>
-                                    decryptCredential(did)
-                                }
-                            >
-                                Decrypt
-                            </Button>
-
-                            <Button
-                                variant="outlined"
-                                className="button large top"
-                                onClick={() => {
-                                    handleRemoveOpen();
-                                    setRemoveDID(did);
-                                }}
-                                disabled={!credentialUnpublished(did)}
-                            >
-                                Remove
-                            </Button>
+                            <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
+                                <Button variant="outlined" onClick={() => displayJson(did)}>
+                                    Resolve
+                                </Button>
+                                <ActionMenu
+                                    items={[
+                                        { label: "Decrypt", onClick: () => decryptCredential(did) },
+                                        { label: "Publish", onClick: () => publishCredential(did), disabled: credentialPublished(did) },
+                                        { label: "Reveal", onClick: () => revealCredential(did), disabled: credentialRevealed(did) },
+                                        { label: "Unpublish", onClick: () => unpublishCredential(did), disabled: credentialUnpublished(did) },
+                                        {
+                                            label: "Remove",
+                                            onClick: () => { handleRemoveOpen(); setRemoveDID(did); },
+                                            disabled: !credentialUnpublished(did),
+                                            destructive: true,
+                                        },
+                                    ]}
+                                />
+                            </Box>
                         </Box>
-                        <Box className="flex-box">
-                            <Button
-                                variant="outlined"
-                                className="button large bottom"
-                                onClick={() => publishCredential(did)}
-                                disabled={credentialPublished(did)}
-                            >
-                                Publish
-                            </Button>
-
-                            <Button
-                                variant="outlined"
-                                className="button large bottom"
-                                onClick={() => revealCredential(did)}
-                                disabled={credentialRevealed(did)}
-                            >
-                                Reveal
-                            </Button>
-
-                            <Button
-                                variant="outlined"
-                                className="button large bottom"
-                                onClick={() => unpublishCredential(did)}
-                                disabled={credentialUnpublished(did)}
-                            >
-                                Unpublish
-                            </Button>
-                        </Box>
-                    </Box>
+                    </Section>
                 ))}
             </Box>
             <JsonViewer browserTab="credentials" browserSubTab="held" />

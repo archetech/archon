@@ -1,9 +1,11 @@
 import React, { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
+import { jsonViewTheme } from "./jsonViewTheme";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography, useMediaQuery } from "@mui/material";
 import { Badge, Create, Image, Login, PermIdentity } from "@mui/icons-material";
 import { useUIContext } from "../contexts/UIContext";
+import { useThemeContext } from "../contexts/ContextProviders";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
@@ -84,6 +86,7 @@ function IdentitiesTab() {
     } = useWalletContext();
     const hideAddressAddedColumn = !isBrowser && isNarrowViewport;
     const { setError, setSuccess } = useSnackbar();
+    const { darkMode } = useThemeContext();
     const {
         refreshAll,
         resetCurrentID,
@@ -1088,7 +1091,7 @@ function IdentitiesTab() {
                                 <Paper variant="outlined" sx={{ p: 2, overflowX: "auto", width: '100%' }}>
                                     {currentIdDocs ? (
                                         <Box sx={{ width: '100%' }}>
-                                            <JsonView value={currentIdDocs} displayDataTypes={false} />
+                                            <JsonView value={currentIdDocs} displayDataTypes={false} style={jsonViewTheme(darkMode)} />
                                         </Box>
                                     ) : (
                                         <Typography variant="body2" color="text.secondary">

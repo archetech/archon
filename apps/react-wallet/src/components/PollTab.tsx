@@ -38,6 +38,7 @@ import WarningModal from "../modals/WarningModal";
 import CopyResolveDID from "./CopyResolveDID";
 import DisplayDID from "./DisplayDID";
 import { useThemeContext } from "../contexts/ContextProviders";
+import PageHeader from "./layout/PageHeader";
 
 const PollsTab: React.FC = () => {
     const { keymaster } = useWalletContext();
@@ -435,6 +436,10 @@ const PollsTab: React.FC = () => {
 
     return (
         <Box>
+            <PageHeader
+                title="Polls"
+                description="Create polls, cast ballots and publish results."
+            />
             <WarningModal
                 title="Remove Poll"
                 warningText={`Are you sure you want to remove '${removeName}'?`}

@@ -40,6 +40,7 @@ import TextInputModal from "../modals/TextInputModal";
 import SelectInputModal from "../modals/SelectInputModal";
 import CopyResolveDID from "./CopyResolveDID";
 import { scanAliasQrCode } from "../utils/utils";
+import PageHeader from "./layout/PageHeader";
 
 function AliasedDIDs() {
     const [removeOpen, setRemoveOpen] = useState<boolean>(false);
@@ -385,6 +386,10 @@ function AliasedDIDs() {
 
     return (
         <Box>
+            <PageHeader
+                title="Aliases"
+                description="Short names you have given to DIDs, so you do not have to remember them."
+            />
             <WarningModal
                 title="Remove DID"
                 warningText={`Are you sure you want to remove '${removeName}'?`}

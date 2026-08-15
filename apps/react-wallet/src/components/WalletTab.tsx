@@ -14,6 +14,9 @@ import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
 import { Capacitor } from "@capacitor/core";
+import PageHeader from "./layout/PageHeader";
+import Section from "./layout/Section";
+import ActionMenu from "./layout/ActionMenu";
 
 const WalletTab = () => {
     const [open, setOpen] = useState<boolean>(false);
@@ -315,113 +318,53 @@ const WalletTab = () => {
                     right: 0,
                 }}
             >
-                <Box display="flex" flexDirection="column" alignItems="center">
+                <PageHeader
+                    title="Wallet"
+                    description="Back up, restore and secure the wallet holding your identities."
+                    actions={
+                        <ActionMenu
+                            items={[
+                                { label: "Import wallet", onClick: importWallet },
+                                { label: "New wallet", onClick: handleClickOpen, destructive: true },
+                            ]}
+                        />
+                    }
+                />
 
-                    <Box display="flex" flexDirection="column" sx={{ mb: 2, width: 'max-content' }}>
-                        <Button
-                            className="mini-margin"
-                            variant="contained"
-                            color="primary"
-                            onClick={handleClickOpen}
-                            sx={{ width: '100%', mb: 1 }}
-                        >
-                            New
-                        </Button>
+                <Section
+                    title="Backup and restore"
+                    description="Keep a copy of this wallet somewhere safe, or restore one you already have."
+                >
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        <Button variant="contained" onClick={backupWallet}>Backup</Button>
+                        <Button variant="outlined" onClick={handleRecoverWallet}>Recover</Button>
+                        <Button variant="outlined" onClick={downloadWallet}>Download</Button>
+                        <Button variant="outlined" onClick={handleUploadClick}>Upload</Button>
+                    </Box>
+                </Section>
 
-                        <Button
-                            className="mini-margin"
-                            variant="contained"
-                            color="primary"
-                            onClick={importWallet}
-                            sx={{ width: '100%', mb: 1 }}
-                        >
-                            Import
-                        </Button>
-
-                        <Button
-                            className="mini-margin"
-                            variant="contained"
-                            color="primary"
-                            onClick={backupWallet}
-                            sx={{ width: '100%', mb: 1 }}
-                        >
-                            Backup
-                        </Button>
-
-                        <Button
-                            className="mini-margin"
-                            variant="contained"
-                            color="primary"
-                            onClick={handleRecoverWallet}
-                            sx={{ width: '100%', mb: 1 }}
-                        >
-                            Recover
-                        </Button>
-
-                        <Button
-                            className="mini-margin"
-                            variant="contained"
-                            color="primary"
-                            onClick={checkWallet}
-                            sx={{ width: '100%', mb: 1 }}
-                            disabled={checkingWallet}
-                        >
-                            Check
-                        </Button>
-
-                        {mnemonicString ? (
-                            <Button
-                                className="mini-margin"
-                                variant="contained"
-                                color="primary"
-                                onClick={hideMnemonic}
-                                sx={{ width: '100%', mb: 1 }}
-                            >
-                                Hide Mnemonic
-                            </Button>
-                        ) : (
-                            <Button
-                                className="mini-margin"
-                                variant="contained"
-                                color="primary"
-                                onClick={showMnemonic}
-                                sx={{ width: '100%', mb: 1 }}
-                            >
-                                Show Mnemonic
-                            </Button>
-                        )}
-
-                        <Button
-                            className="mini-margin"
-                            variant="contained"
-                            color="primary"
-                            onClick={() => setShowChangePassphrase(true)}
-                            sx={{ width: '100%', mb: 1 }}
-                        >
+                <Section
+                    title="Security"
+                    description="Your recovery phrase reconstructs this wallet. Only reveal it somewhere private."
+                >
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        <Button variant="contained" onClick={() => setShowChangePassphrase(true)}>
                             Change Passphrase
                         </Button>
-
-                        <Button
-                            className="mini-margin"
-                            variant="contained"
-                            color="primary"
-                            onClick={downloadWallet}
-                            sx={{ width: '100%', mb: 1 }}
-                        >
-                            Download
-                        </Button>
-
-                        <Button
-                            className="mini-margin"
-                            variant="contained"
-                            color="primary"
-                            onClick={handleUploadClick}
-                            sx={{ width: '100%', mb: 1 }}
-                        >
-                            Upload
-                        </Button>
+                        {mnemonicString ? (
+                            <Button variant="outlined" onClick={hideMnemonic}>Hide Mnemonic</Button>
+                        ) : (
+                            <Button variant="outlined" onClick={showMnemonic}>Show Mnemonic</Button>
+                        )}
                     </Box>
-                </Box>
+                </Section>
+
+                <Section
+                    title="Maintenance"
+                    description="Check the wallet for inconsistencies and repair them."
+                >
+                    <Button variant="outlined" onClick={checkWallet} disabled={checkingWallet}>Check</Button>
+                </Section>
 
                 {mnemonicString && (
                     <Box

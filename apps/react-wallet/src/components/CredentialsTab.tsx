@@ -4,6 +4,7 @@ import { TabContext, TabPanel } from "@mui/lab";
 import IssueTab from "./IssueTab";
 import IssuedTab from "./IssuedTab";
 import HeldTab from "./HeldTab";
+import PageHeader from "./layout/PageHeader";
 
 function CredentialsTab({ subTab, refresh }: {subTab: string, refresh: number}) {
     const [credentialTab, setCredentialTab] = useState<string>("held");
@@ -18,6 +19,10 @@ function CredentialsTab({ subTab, refresh }: {subTab: string, refresh: number}) 
 
     return (
         <TabContext value={credentialTab}>
+            <PageHeader
+                title="Credentials"
+                description="Credentials you hold, and credentials you have issued to others."
+            />
             <Box
                 sx={{
                     position: "sticky",

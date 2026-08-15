@@ -37,12 +37,12 @@ import SettingsTab from "./components/SettingsTab";
 import IdentitiesTab from "./components/IdentitiesTab";
 import BrowserHeader from "./components/BrowserHeader";
 import JsonViewer from "./components/JsonViewer";
+import PageHeader from "./components/layout/PageHeader";
 import { useVariablesContext } from "./contexts/VariablesProvider";
 import { useUIContext } from "./contexts/UIContext";
 import { useThemeContext } from "./contexts/ContextProviders";
 import { useWalletContext } from "./contexts/WalletProvider";
 import { useSafeArea } from "./contexts/SafeAreaContext";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
 import AliasedDIDs from "./components/AliasedDIDs";
 import AssetsTab from "./components/AssetsTab";
 import DmailTab from "./components/DmailTab";
@@ -68,16 +68,7 @@ function BrowserContent() {
         pendingSubTab,
         setPendingSubTab
     } = useUIContext();
-    const { darkMode } = useThemeContext();
     const { top: safeTop, bottom: safeBottom } = useSafeArea();
-
-    const theme = useMemo(
-        () =>
-            createTheme({
-                palette: { mode: darkMode ? "dark" : "light" },
-            }),
-        [darkMode]
-    );
 
     const assetTabs = ["groups", "schemas", "images", "files", "vaults"];
     const displayComponent = validId && currentId !== "";
@@ -227,6 +218,10 @@ function BrowserContent() {
             </TabPanel>
 
             <TabPanel value="viewer" sx={{ p: 0 }}>
+                <PageHeader
+                    title="Resolver"
+                    description="Resolve any DID and inspect the document it returns."
+                />
                 <JsonViewer browserTab="viewer" showResolveField={true} />
             </TabPanel>
 
@@ -241,411 +236,409 @@ function BrowserContent() {
     const sidebarWidthExpanded = 220;
 
     return (
-        <ThemeProvider theme={theme}>
+        <Box
+            sx={{
+                position: "fixed",
+                maxWidth: menuOpen
+                    ? BASE_CONTENT_WIDTH + sidebarWidthExpanded
+                    : BASE_CONTENT_WIDTH + sidebarWidthCollapsed,
+                transition: 'max-width 0.2s ease',
+                inset: 0,
+                pt: `${safeTop}px`,
+                display: "flex",
+                flexDirection: "column",
+                bgcolor: "background.default",
+            }}
+        >
             <Box
                 sx={{
-                    position: "fixed",
-                    maxWidth: menuOpen
-                        ? BASE_CONTENT_WIDTH + sidebarWidthExpanded
-                        : BASE_CONTENT_WIDTH + sidebarWidthCollapsed,
-                    transition: 'max-width 0.2s ease',
-                    inset: 0,
-                    pt: `${safeTop}px`,
+                    flex: 1,
+                    width: "100%",
+                    mx: "auto",
                     display: "flex",
                     flexDirection: "column",
-                    bgcolor: "background.default",
+                    minHeight: 0,
                 }}
             >
-                <Box
-                    sx={{
-                        flex: 1,
-                        width: "100%",
-                        mx: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        minHeight: 0,
-                    }}
-                >
-                    <BrowserHeader
-                        menuOpen={isTabletUp ? menuOpen : false}
-                        toggleMenuOpen={isTabletUp ? toggleMenuOpen : undefined}
-                    />
+                <BrowserHeader
+                    menuOpen={isTabletUp ? menuOpen : false}
+                    toggleMenuOpen={isTabletUp ? toggleMenuOpen : undefined}
+                />
 
-                    <TabContext value={selectedTab}>
-                        {isTabletUp ? (
+                <TabContext value={selectedTab}>
+                    {isTabletUp ? (
+                        <Box
+                            sx={{
+                                display: "flex",
+                                flex: 1,
+                                minHeight: 0,
+                                overflow: "hidden",
+                            }}
+                        >
                             <Box
                                 sx={{
+                                    flexShrink: 0,
+                                    width: menuOpen
+                                        ? sidebarWidthExpanded
+                                        : sidebarWidthCollapsed,
+                                    transition: "width 0.2s ease",
+                                    borderRight: (t) =>
+                                        `1px solid ${t.palette.divider}`,
+                                    bgcolor: "background.paper",
+                                    py: 1,
                                     display: "flex",
-                                    flex: 1,
-                                    minHeight: 0,
-                                    overflow: "hidden",
                                 }}
                             >
-                                <Box
+                                <TabList
+                                    orientation="vertical"
+                                    onChange={handleSidebarTabChange}
                                     sx={{
-                                        flexShrink: 0,
-                                        width: menuOpen
-                                            ? sidebarWidthExpanded
-                                            : sidebarWidthCollapsed,
-                                        transition: "width 0.2s ease",
-                                        borderRight: (t) =>
-                                            `1px solid ${t.palette.divider}`,
-                                        bgcolor: "background.paper",
-                                        py: 1,
-                                        display: "flex",
-                                    }}
-                                >
-                                    <TabList
-                                        orientation="vertical"
-                                        onChange={handleSidebarTabChange}
-                                        sx={{
-                                            width: "100%",
-                                            "& .MuiTab-root": {
-                                                minHeight: 44,
-                                                maxHeight: 44,
-                                                justifyContent: "flex-start",
-                                                px: 2,
-                                            },
-                                            "& .MuiTab-root .MuiTab-iconWrapper":{
-                                                mr: 1.5 ,
-                                            },
-                                        }}
-                                    >
-                                        <Tab
-                                            icon={<Person />}
-                                            label={
-                                                menuOpen ? "Identities" : ""
-                                            }
-                                            value="identities"
-                                            iconPosition="start"
-                                        />
-
-                                        {displayComponent && (
-                                            <Tab
-                                                icon={<Key />}
-                                                label={menuOpen ? "Auth" : ""}
-                                                value="auth"
-                                                iconPosition="start"
-                                            />
-                                        )}
-
-                                        {displayComponent && (
-                                            <Tab
-                                                icon={<Email />}
-                                                label={menuOpen ? "DMail" : ""}
-                                                value="dmail"
-                                                iconPosition="start"
-                                            />
-                                        )}
-
-                                        {displayComponent && (
-                                            <Tab
-                                                icon={<Badge />}
-                                                label={
-                                                    menuOpen
-                                                        ? "Credentials"
-                                                        : ""
-                                                }
-                                                value="credentials"
-                                                iconPosition="start"
-                                            />
-                                        )}
-
-                                        {displayComponent && (
-                                            <Tab
-                                                icon={<ListIcon />}
-                                                label={
-                                                    menuOpen
-                                                        ? "Aliases"
-                                                        : ""
-                                                }
-                                                value="aliases"
-                                                iconPosition="start"
-                                            />
-                                        )}
-
-                                        {displayComponent && (
-                                            <Tab
-                                                icon={<Tune />}
-                                                label={
-                                                    menuOpen
-                                                        ? "Properties"
-                                                        : ""
-                                                }
-                                                value="properties"
-                                                iconPosition="start"
-                                            />
-                                        )}
-
-                                        {displayComponent && (
-                                            <Tab
-                                                icon={<Poll />}
-                                                label={
-                                                    menuOpen ? "Polls" : ""
-                                                }
-                                                value="polls"
-                                                iconPosition="start"
-                                            />
-                                        )}
-
-                                        {displayComponent && hasLightning && (
-                                            <Tab
-                                                icon={<Bolt />}
-                                                label={
-                                                    menuOpen ? "Lightning" : ""
-                                                }
-                                                value="lightning"
-                                                iconPosition="start"
-                                            />
-                                        )}
-
-                                        {displayComponent && (
-                                            <Tab
-                                                icon={<Token />}
-                                                label={
-                                                    menuOpen ? "Assets" : ""
-                                                }
-                                                value="assets"
-                                                iconPosition="start"
-                                            />
-                                        )}
-
-                                        <Tab
-                                            icon={<AccountBalanceWallet />}
-                                            label={
-                                                menuOpen ? "Wallet" : ""
-                                            }
-                                            value="wallet"
-                                            iconPosition="start"
-                                        />
-
-                                        <Tab
-                                            icon={<ManageSearch />}
-                                            label={
-                                                menuOpen
-                                                    ? "JSON Viewer"
-                                                    : ""
-                                            }
-                                            value="viewer"
-                                            iconPosition="start"
-                                            sx={{
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        />
-
-                                        <Tab
-                                            icon={<Settings />}
-                                            label={
-                                                menuOpen ? "Settings" : ""
-                                            }
-                                            value="settings"
-                                            iconPosition="start"
-                                        />
-                                    </TabList>
-                                </Box>
-
-                                <Box
-                                    id="contentScroll"
-                                    sx={{
-                                        flex: 1,
-                                        minWidth: 0,
-                                        overflow: "auto",
-                                        px: 2,
-                                        py: 1,
-                                    }}
-                                >
-                                    {tabPanels}
-                                </Box>
-                            </Box>
-                        ) : (
-                            <>
-                                <Box
-                                    id="contentScroll"
-                                    sx={{
-                                        flex: 1,
-                                        overflow: "auto",
-                                        WebkitOverflowScrolling: "touch",
-                                        px: 1,
-                                        pb: `calc(${safeBottom}px + 56px)`,
-                                    }}
-                                >
-                                    {tabPanels}
-                                </Box>
-
-                                <BottomNavigation
-                                    value={bottomNavValue}
-                                    onChange={handleBottomNavChange}
-                                    showLabels
-                                    sx={{
-                                        position: "fixed",
-                                        left: 0,
-                                        right: 0,
-                                        bottom: 0,
-                                        pb: `${safeBottom}px`,
-                                        alignItems: "flex-start",
-                                        minHeight: 56,
-                                        bgcolor: "background.paper",
-                                        borderTop: (t) =>
-                                            `1px solid ${t.palette.divider}`,
-                                        zIndex: (t) => t.zIndex.appBar,
-                                        "& .MuiBottomNavigationAction-root": {
-                                            minWidth: "auto",
-                                            px: 0,
+                                        width: "100%",
+                                        "& .MuiTab-root": {
+                                            minHeight: 44,
+                                            maxHeight: 44,
+                                            justifyContent: "flex-start",
+                                            px: 2,
+                                        },
+                                        "& .MuiTab-root .MuiTab-iconWrapper":{
+                                            mr: 1.5 ,
                                         },
                                     }}
                                 >
-                                    <BottomNavigationAction
-                                        value="identities"
-                                        label="Identities"
+                                    <Tab
                                         icon={<Person />}
+                                        label={
+                                            menuOpen ? "Identities" : ""
+                                        }
+                                        value="identities"
+                                        iconPosition="start"
                                     />
-                                    <BottomNavigationAction
-                                        value="wallet"
-                                        label="Wallet"
+
+                                    {displayComponent && (
+                                        <Tab
+                                            icon={<Key />}
+                                            label={menuOpen ? "Auth" : ""}
+                                            value="auth"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    {displayComponent && (
+                                        <Tab
+                                            icon={<Email />}
+                                            label={menuOpen ? "DMail" : ""}
+                                            value="dmail"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    {displayComponent && (
+                                        <Tab
+                                            icon={<Badge />}
+                                            label={
+                                                menuOpen
+                                                    ? "Credentials"
+                                                    : ""
+                                            }
+                                            value="credentials"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    {displayComponent && (
+                                        <Tab
+                                            icon={<ListIcon />}
+                                            label={
+                                                menuOpen
+                                                    ? "Aliases"
+                                                    : ""
+                                            }
+                                            value="aliases"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    {displayComponent && (
+                                        <Tab
+                                            icon={<Tune />}
+                                            label={
+                                                menuOpen
+                                                    ? "Properties"
+                                                    : ""
+                                            }
+                                            value="properties"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    {displayComponent && (
+                                        <Tab
+                                            icon={<Poll />}
+                                            label={
+                                                menuOpen ? "Polls" : ""
+                                            }
+                                            value="polls"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    {displayComponent && hasLightning && (
+                                        <Tab
+                                            icon={<Bolt />}
+                                            label={
+                                                menuOpen ? "Lightning" : ""
+                                            }
+                                            value="lightning"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    {displayComponent && (
+                                        <Tab
+                                            icon={<Token />}
+                                            label={
+                                                menuOpen ? "Assets" : ""
+                                            }
+                                            value="assets"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    <Tab
                                         icon={<AccountBalanceWallet />}
+                                        label={
+                                            menuOpen ? "Wallet" : ""
+                                        }
+                                        value="wallet"
+                                        iconPosition="start"
                                     />
-                                    <BottomNavigationAction
-                                        value="viewer"
-                                        label="Viewer"
+
+                                    <Tab
                                         icon={<ManageSearch />}
+                                        label={
+                                            menuOpen
+                                                ? "JSON Viewer"
+                                                : ""
+                                        }
+                                        value="viewer"
+                                        iconPosition="start"
+                                        sx={{
+                                            whiteSpace: "nowrap",
+                                        }}
                                     />
-                                    <BottomNavigationAction
-                                        value="settings"
-                                        label="Settings"
+
+                                    <Tab
                                         icon={<Settings />}
+                                        label={
+                                            menuOpen ? "Settings" : ""
+                                        }
+                                        value="settings"
+                                        iconPosition="start"
                                     />
-                                    <BottomNavigationAction
-                                        value="more"
-                                        label="More"
-                                        icon={<MoreHoriz />}
-                                        disabled={!displayComponent}
-                                    />
-                                </BottomNavigation>
-                            </>
-                        )}
-                    </TabContext>
+                                </TabList>
+                            </Box>
 
-                    {!isTabletUp && (
-                        <Dialog
-                            fullScreen
-                            open={moreOpen}
-                            onClose={() => setMoreOpen(false)}
-                        >
-                            <AppBar sx={{ position: "relative" }}>
-                                <Toolbar
-                                    sx={{
-                                        height: 80,
-                                        alignItems: "flex-end",
-                                        minHeight: "80px !important",
-                                    }}
-                                >
-                                    <IconButton
-                                        edge="start"
-                                        color="inherit"
-                                        onClick={() => setMoreOpen(false)}
-                                    >
-                                        <Close />
-                                    </IconButton>
+                            <Box
+                                id="contentScroll"
+                                sx={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    overflow: "auto",
+                                    px: 2,
+                                    py: 1,
+                                }}
+                            >
+                                {tabPanels}
+                            </Box>
+                        </Box>
+                    ) : (
+                        <>
+                            <Box
+                                id="contentScroll"
+                                sx={{
+                                    flex: 1,
+                                    overflow: "auto",
+                                    WebkitOverflowScrolling: "touch",
+                                    px: 1,
+                                    pb: `calc(${safeBottom}px + 56px)`,
+                                }}
+                            >
+                                {tabPanels}
+                            </Box>
 
-                                    <Typography
-                                        variant="h6"
-                                        component="h6"
-                                        sx={{ ml: 2 }}
-                                    >
-                                        Archon
-                                    </Typography>
-
-                                    <Box
-                                        component="img"
-                                        src="/icon_transparent.png"
-                                        alt="Archon"
-                                        sx={{ width: 32, height: 32 }}
-                                    />
-                                </Toolbar>
-                            </AppBar>
-
-                            <List sx={{ py: 0 }}>
-                                <ListItemButton
-                                    onClick={() => selectFromMore("auth")}
-                                >
-                                    <ListItemIcon>
-                                        <Key />
-                                    </ListItemIcon>
-                                    <ListItemText primary="Auth" />
-                                </ListItemButton>
-
-                                <ListItemButton
-                                    onClick={() => selectFromMore("dmail")}
-                                >
-                                    <ListItemIcon>
-                                        <Email />
-                                    </ListItemIcon>
-                                    <ListItemText primary="DMail" />
-                                </ListItemButton>
-
-                                <ListItemButton
-                                    onClick={() =>
-                                        selectFromMore("credentials")
-                                    }
-                                >
-                                    <ListItemIcon>
-                                        <Badge />
-                                    </ListItemIcon>
-                                    <ListItemText primary="Credentials" />
-                                </ListItemButton>
-
-                                <ListItemButton
-                                    onClick={() => selectFromMore("aliases")}
-                                >
-                                    <ListItemIcon>
-                                        <ListIcon />
-                                    </ListItemIcon>
-                                    <ListItemText primary="Aliases" />
-                                </ListItemButton>
-
-                                <ListItemButton
-                                    onClick={() => selectFromMore("properties")}
-                                >
-                                    <ListItemIcon>
-                                        <Tune />
-                                    </ListItemIcon>
-                                    <ListItemText primary="Properties" />
-                                </ListItemButton>
-
-                                <ListItemButton
-                                    onClick={() => selectFromMore("polls")}
-                                >
-                                    <ListItemIcon>
-                                        <Poll />
-                                    </ListItemIcon>
-                                    <ListItemText primary="Polls" />
-                                </ListItemButton>
-
-                                {hasLightning && (
-                                    <ListItemButton
-                                        onClick={() => selectFromMore("lightning")}
-                                    >
-                                        <ListItemIcon>
-                                            <Bolt />
-                                        </ListItemIcon>
-                                        <ListItemText primary="Lightning" />
-                                    </ListItemButton>
-                                )}
-
-                                <ListItemButton
-                                    onClick={() => selectFromMore("assets")}
-                                >
-                                    <ListItemIcon>
-                                        <Token />
-                                    </ListItemIcon>
-                                    <ListItemText primary="Assets" />
-                                </ListItemButton>
-                            </List>
-                        </Dialog>
+                            <BottomNavigation
+                                value={bottomNavValue}
+                                onChange={handleBottomNavChange}
+                                showLabels
+                                sx={{
+                                    position: "fixed",
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    pb: `${safeBottom}px`,
+                                    alignItems: "flex-start",
+                                    minHeight: 56,
+                                    bgcolor: "background.paper",
+                                    borderTop: (t) =>
+                                        `1px solid ${t.palette.divider}`,
+                                    zIndex: (t) => t.zIndex.appBar,
+                                    "& .MuiBottomNavigationAction-root": {
+                                        minWidth: "auto",
+                                        px: 0,
+                                    },
+                                }}
+                            >
+                                <BottomNavigationAction
+                                    value="identities"
+                                    label="Identities"
+                                    icon={<Person />}
+                                />
+                                <BottomNavigationAction
+                                    value="wallet"
+                                    label="Wallet"
+                                    icon={<AccountBalanceWallet />}
+                                />
+                                <BottomNavigationAction
+                                    value="viewer"
+                                    label="Viewer"
+                                    icon={<ManageSearch />}
+                                />
+                                <BottomNavigationAction
+                                    value="settings"
+                                    label="Settings"
+                                    icon={<Settings />}
+                                />
+                                <BottomNavigationAction
+                                    value="more"
+                                    label="More"
+                                    icon={<MoreHoriz />}
+                                    disabled={!displayComponent}
+                                />
+                            </BottomNavigation>
+                        </>
                     )}
-                </Box>
+                </TabContext>
+
+                {!isTabletUp && (
+                    <Dialog
+                        fullScreen
+                        open={moreOpen}
+                        onClose={() => setMoreOpen(false)}
+                    >
+                        <AppBar sx={{ position: "relative" }}>
+                            <Toolbar
+                                sx={{
+                                    height: 80,
+                                    alignItems: "flex-end",
+                                    minHeight: "80px !important",
+                                }}
+                            >
+                                <IconButton
+                                    edge="start"
+                                    color="inherit"
+                                    onClick={() => setMoreOpen(false)}
+                                >
+                                    <Close />
+                                </IconButton>
+
+                                <Typography
+                                    variant="h6"
+                                    component="h6"
+                                    sx={{ ml: 2 }}
+                                >
+                                        Archon
+                                </Typography>
+
+                                <Box
+                                    component="img"
+                                    src="/icon_transparent.png"
+                                    alt="Archon"
+                                    sx={{ width: 32, height: 32 }}
+                                />
+                            </Toolbar>
+                        </AppBar>
+
+                        <List sx={{ py: 0 }}>
+                            <ListItemButton
+                                onClick={() => selectFromMore("auth")}
+                            >
+                                <ListItemIcon>
+                                    <Key />
+                                </ListItemIcon>
+                                <ListItemText primary="Auth" />
+                            </ListItemButton>
+
+                            <ListItemButton
+                                onClick={() => selectFromMore("dmail")}
+                            >
+                                <ListItemIcon>
+                                    <Email />
+                                </ListItemIcon>
+                                <ListItemText primary="DMail" />
+                            </ListItemButton>
+
+                            <ListItemButton
+                                onClick={() =>
+                                    selectFromMore("credentials")
+                                }
+                            >
+                                <ListItemIcon>
+                                    <Badge />
+                                </ListItemIcon>
+                                <ListItemText primary="Credentials" />
+                            </ListItemButton>
+
+                            <ListItemButton
+                                onClick={() => selectFromMore("aliases")}
+                            >
+                                <ListItemIcon>
+                                    <ListIcon />
+                                </ListItemIcon>
+                                <ListItemText primary="Aliases" />
+                            </ListItemButton>
+
+                            <ListItemButton
+                                onClick={() => selectFromMore("properties")}
+                            >
+                                <ListItemIcon>
+                                    <Tune />
+                                </ListItemIcon>
+                                <ListItemText primary="Properties" />
+                            </ListItemButton>
+
+                            <ListItemButton
+                                onClick={() => selectFromMore("polls")}
+                            >
+                                <ListItemIcon>
+                                    <Poll />
+                                </ListItemIcon>
+                                <ListItemText primary="Polls" />
+                            </ListItemButton>
+
+                            {hasLightning && (
+                                <ListItemButton
+                                    onClick={() => selectFromMore("lightning")}
+                                >
+                                    <ListItemIcon>
+                                        <Bolt />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Lightning" />
+                                </ListItemButton>
+                            )}
+
+                            <ListItemButton
+                                onClick={() => selectFromMore("assets")}
+                            >
+                                <ListItemIcon>
+                                    <Token />
+                                </ListItemIcon>
+                                <ListItemText primary="Assets" />
+                            </ListItemButton>
+                        </List>
+                    </Dialog>
+                )}
             </Box>
-        </ThemeProvider>
+        </Box>
     );
 }
 

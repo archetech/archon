@@ -9,6 +9,8 @@ import {
     GATEKEEPER_KEY,
 } from "../constants";
 import packageJson from "../../package.json";
+import PageHeader from "./layout/PageHeader";
+import Section from "./layout/Section";
 
 const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
 const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
@@ -85,56 +87,65 @@ const SettingsTab = () => {
     };
 
     return (
-        <Box
-            sx={{ display: "flex", flexDirection: "column", maxWidth: "400px", mt: 1 }}
-        >
-            <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
-                <Typography>Theme</Typography>
-                <LightMode sx={{ ml: 2, mr: 1 }} />
+        <Box sx={{ maxWidth: 560 }}>
+            <PageHeader
+                title="Settings"
+                description="Appearance, the node this wallet talks to, and how often it refreshes."
+            />
 
-                <Switch
-                    checked={darkMode}
-                    onChange={handleDarkModeToggle}
-                    color="default"
+            <Section title="Appearance">
+                <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
+                    <Typography sx={{ flex: 1 }}>Theme</Typography>
+                    <LightMode fontSize="small" sx={{ mr: 1, color: "text.secondary" }} />
+
+                    <Switch
+                        checked={darkMode}
+                        onChange={handleDarkModeToggle}
+                        color="default"
+                    />
+
+                    <DarkMode fontSize="small" sx={{ ml: 1, color: "text.secondary" }} />
+                </Box>
+            </Section>
+
+            <Section title="Connection" description="The Archon node this wallet reads from and writes to.">
+                <TextField
+                    fullWidth
+                    label="Node URL"
+                    variant="outlined"
+                    value={gatekeeperUrl}
+                    onChange={(e) => setGatekeeperUrl(e.target.value)}
+                    sx={{ mb: 2 }}
+                    className="text-field"
                 />
 
-                <DarkMode sx={{ ml: 1 }} />
-            </Box>
+                <TextField
+                    fullWidth
+                    label="Auto-refresh interval (seconds)"
+                    variant="outlined"
+                    type="number"
+                    value={refreshIntervalSeconds}
+                    onChange={(e) => setRefreshIntervalSeconds(e.target.value)}
+                    sx={{ mb: 2 }}
+                    className="text-field"
+                    inputProps={{ min: 0, step: 1 }}
+                    helperText="Set to 0 to disable automatic DMail and poll refresh."
+                />
 
-            <TextField
-                label="Node URL"
-                variant="outlined"
-                value={gatekeeperUrl}
-                onChange={(e) => setGatekeeperUrl(e.target.value)}
-                sx={{ mb: 2 }}
-                className="text-field"
-            />
-
-            <TextField
-                label="Auto-refresh interval (seconds)"
-                variant="outlined"
-                type="number"
-                value={refreshIntervalSeconds}
-                onChange={(e) => setRefreshIntervalSeconds(e.target.value)}
-                sx={{ mb: 2 }}
-                className="text-field"
-                inputProps={{ min: 0, step: 1 }}
-                helperText="Set to 0 to disable automatic DMail and poll refresh."
-            />
-
-            <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSave}
-                startIcon={<Save />}
-                sx={{ alignSelf: "start" }}
-            >
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleSave}
+                    startIcon={<Save />}
+                    sx={{ alignSelf: "start" }}
+                >
                 Save
-            </Button>
+                </Button>
+            </Section>
 
-            <Box sx={{ mt: 3, opacity: 0.6 }}>
-                <Typography variant="caption" display="block">
-                    Client v{packageJson.version} | Server v{serverVersion || "..."}
+            <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                    Client v{packageJson.version} &nbsp;·&nbsp; Server v{serverVersion || "..."}
                 </Typography>
             </Box>
         </Box>

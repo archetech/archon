@@ -5,6 +5,7 @@ import React, {
     useState
 } from "react";
 import JsonView from '@uiw/react-json-view';
+import { jsonViewTheme } from "./layout/jsonViewTheme";
 import {
     Box,
     TextField,
@@ -18,11 +19,13 @@ import {
 } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
+import { useThemeContext } from "../contexts/ContextProviders";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import VersionNavigator from "./VersionNavigator";
 
 function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { browserTab: string, browserSubTab?: string, showResolveField?: boolean }) {
+    const { darkMode } = useThemeContext();
     const [aliasDocs, setAliasDocs] = useState<Record<string, unknown> | undefined>(undefined);
     const [aliasDocsVersion, setAliasDocsVersion] = useState<number>(1);
     const [aliasDocsVersionMax, setAliasDocsVersionMax] = useState<number>(1);
@@ -253,6 +256,7 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
                     <JsonView
                         value={aliasDocs}
                         shortenTextAfterLength={0}
+                        style={jsonViewTheme(darkMode)}
                     >
                         <JsonView.String
                             render={(
