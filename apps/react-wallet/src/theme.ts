@@ -8,12 +8,12 @@ import { createTheme, ThemeOptions } from "@mui/material/styles";
 // whole app restyles at once and the change is reverted by dropping this file
 // and restoring the two-line createTheme call in ContextProviders.
 
-// Inter is the typeface this look is built around. It is not a dependency yet,
-// so the stack falls through to the platform UI font, which is close in
-// proportion. Adding `@fontsource/inter` and importing it in main.tsx is the
-// single highest-fidelity follow-up.
+// Inter is the typeface this look is built around, loaded as a variable font in
+// main.tsx. The rest of the stack is the fallback path if it fails to load.
 const FONT_STACK = [
-    "InterVariable",
+    // Exactly as @fontsource-variable/inter registers it: the space matters,
+    // and a mismatch here fails silently by falling through to the next font.
+    "Inter Variable",
     "Inter",
     "system-ui",
     "-apple-system",
