@@ -98,15 +98,22 @@ describe('drawbridge v1 unprotected routes', () => {
 
     it('derives capabilities from which downstream URLs are configured', async () => {
         const all = mount({
-            config: { didcommURL: 'http://didcomm', lightningMediatorURL: 'http://ln', heraldURL: 'http://herald' },
+            config: {
+                didcommURL: 'http://didcomm',
+                lightningMediatorURL: 'http://ln',
+                heraldURL: 'http://herald',
+                explorerURL: 'http://explorer',
+            },
         });
         await expect(request(all.app).get('/api/v1/capabilities')).resolves.toMatchObject({
-            body: { didcomm: true, lightning: true, names: true },
+            body: { didcomm: true, lightning: true, names: true, explorer: true },
         });
 
-        const none = mount({ config: { didcommURL: '', lightningMediatorURL: '', heraldURL: '' } });
+        const none = mount({
+            config: { didcommURL: '', lightningMediatorURL: '', heraldURL: '', explorerURL: '' },
+        });
         await expect(request(none.app).get('/api/v1/capabilities')).resolves.toMatchObject({
-            body: { didcomm: false, lightning: false, names: false },
+            body: { didcomm: false, lightning: false, names: false, explorer: false },
         });
     });
 

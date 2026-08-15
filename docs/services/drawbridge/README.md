@@ -88,6 +88,7 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 | `*` | `/didcomm/**` | Forwarded to the local DIDComm relay (path prefix `/didcomm` stripped). Carries the relay's own routes (mailbox `messages/*`, signed-`challenge`, egress `deliver`). Not paywalled — DIDComm authenticates with its own signed challenge. **501** if DIDComm is disabled. `application/didcomm-encrypted+json` bodies are captured as text and forwarded verbatim. |
 | `GET` | `/.well-known/*` | Forwarded to Herald (e.g. `lnurlp/<name>`, `webfinger`, `names`). |
 | `GET\|POST\|PUT\|DELETE` | `/names/*` | Forwarded to Herald (`/api/*`). **501** if name resolution is disabled. |
+| `GET` | `/explorer/**` | Forwarded to the node's own DID explorer. **501** if the explorer is disabled. Unlike the routes above, the `/explorer` prefix is **not** stripped: the explorer's bundle is built with `base=/explorer/` and the app is mounted there, so the prefix has to survive the hop or its asset URLs point somewhere the upstream no longer answers. |
 | `*` | `/1.0/identifiers/**` | Forwarded verbatim to the Gatekeeper's standards-conformant DID resolution / dereferencing surface (`/1.0/identifiers/:did`, `/:did/data`, `/:did/registration`; see [Gatekeeper spec §2.6](../gatekeeper/README.md)). **Not paywalled** — public DID resolution for interop with universal resolvers, which do not speak L402. Proxied unchanged (no prefix stripped), so the Gatekeeper's resolution triple, raw dereferenced resources, and status/error shapes pass through intact. |
 | `GET` | `/metrics` | Prometheus exposition. |
 
@@ -477,6 +478,7 @@ shared with the reference TypeScript service.
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Upstream Gatekeeper. |
 | `ARCHON_HERALD_URL` | `http://localhost:4230` | Upstream Herald (for `/.well-known/*` and `/names/*`). Set **empty** to disable name resolution (capability `names:false`, `/names` → 501). |
 | `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://localhost:4235` | Upstream for Lightning routes + L402 invoice/pending storage. Set **empty** to disable Lightning (capability `lightning:false`, `/lightning` + `/invoice/:did` → 501). |
+| `ARCHON_EXPLORER_URL` | `http://localhost:4000` | Upstream DID explorer proxied at `/explorer`. Set **empty** to disable it (capability `explorer:false`, `/explorer` → 501). Belongs to the `explorer` profile — blank it when that profile is off, or Herald links visitors at a container that is not running. |
 | `ARCHON_DIDCOMM_URL` | `http://localhost:4236` | Upstream DIDComm relay proxied at `/didcomm`. Set **empty** to disable DIDComm (capability `didcomm:false`, `/didcomm` → 501). *The bundled compose defaults this **empty** (DIDComm is opt-in, off by default); enabling requires the `didcomm` profile **and** setting this URL.* |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Public base URL this node is reachable at (clearnet host or Tor onion). Used by `/didcomm-endpoint` to advertise `<host>/didcomm`. |
 | `ARCHON_DRAWBRIDGE_TOR_HOSTNAME_FILE` | `/data/tor/hostname` | When `PUBLIC_HOST` is empty, `/didcomm-endpoint` falls back to the Tor onion read from this shared hidden-service hostname file. |
