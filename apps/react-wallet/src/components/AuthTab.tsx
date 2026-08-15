@@ -12,6 +12,7 @@ import { useVariablesContext } from "../contexts/VariablesProvider";
 import { scanQrCodeRaw } from "../utils/utils";
 import { dispatchDeepLink } from "../utils/deepLinkQueue";
 import PageHeader from "./layout/PageHeader";
+import ActionMenu from "./layout/ActionMenu";
 
 interface AutoLoginState {
     responseDID: string;
@@ -428,45 +429,26 @@ function AuthTab() {
                         />
                     </Box>
 
-                    <Box className="flex-box">
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
                         <Button
                             variant="contained"
-                            color="primary"
-                            onClick={openChallengeDialog}
-                            className="button large bottom"
-                        >
-                            New...
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => resolveChallenge(challenge)}
-                            className="button large bottom"
-                            disabled={!challenge || challenge === authDID}
-                        >
-                            Resolve
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            color="primary"
                             onClick={createResponse}
-                            className="button large bottom"
                             disabled={!challenge}
                         >
                             Respond
                         </Button>
 
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={clearChallenge}
-                            className="button large bottom"
-                            disabled={!challenge}
-                        >
-                            Clear
+                        <Button variant="outlined" onClick={openChallengeDialog}>
+                            New challenge
                         </Button>
+
+                        <ActionMenu
+                            label="More"
+                            items={[
+                                { label: "Resolve challenge", onClick: () => resolveChallenge(challenge), disabled: !challenge || challenge === authDID },
+                                { label: "Clear", onClick: clearChallenge, disabled: !challenge },
+                            ]}
+                        />
                     </Box>
 
                     <Box className="flex-box mt-2">
@@ -480,46 +462,30 @@ function AuthTab() {
                         />
                     </Box>
 
-                    <Box className="flex-box">
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
                         <Button
                             variant="contained"
-                            color="primary"
-                            onClick={() => decryptResponse(response)}
-                            className="button large bottom"
-                            disabled={!response || response === authDID}
-                        >
-                            Decrypt
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={verifyResponse}
-                            className="button large bottom"
-                            disabled={!response}
-                        >
-                            Verify
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            color="primary"
                             onClick={sendResponse}
-                            className="button large bottom"
                             disabled={disableSendResponse}
                         >
                             Send
                         </Button>
 
                         <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={clearResponse}
-                            className="button large bottom"
+                            variant="outlined"
+                            onClick={verifyResponse}
                             disabled={!response}
                         >
-                            Clear
+                            Verify
                         </Button>
+
+                        <ActionMenu
+                            label="More"
+                            items={[
+                                { label: "Decrypt response", onClick: () => decryptResponse(response), disabled: !response || response === authDID },
+                                { label: "Clear", onClick: clearResponse, disabled: !response },
+                            ]}
+                        />
                     </Box>
 
                     <Dialog open={showChallengeDialog} onClose={closeChallengeDialog}>

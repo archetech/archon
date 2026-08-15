@@ -51,6 +51,7 @@ import DisplayDID from "./DisplayDID";
 import VersionNavigator from "./VersionNavigator";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import PageHeader from "./layout/PageHeader";
+import ActionMenu from "./layout/ActionMenu";
 
 const DmailTab: React.FC = () => {
     const [registry, setRegistry] = useState<string>("hyperswarm");
@@ -1194,28 +1195,32 @@ const DmailTab: React.FC = () => {
                     </Button>
                 </Box>
 
-                <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-
-                    <Button variant="contained" onClick={handleUpdate} disabled={!dmailDid}>
-                        Update
-                    </Button>
+                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
 
                     <Button variant="contained" onClick={handleSend} disabled={!dmailDid}>
                         Send
                     </Button>
 
-                    <Button variant="contained" color="primary" onClick={() => setRevokeOpen(true)} disabled={!dmailDid}>
-                        Revoke
+                    <Button variant="outlined" onClick={handleUpdate} disabled={!dmailDid}>
+                        Save draft
                     </Button>
 
-                    <Button
-                        variant="outlined"
-                        color="secondary"
-                        onClick={clearAll}
-                        disabled={!(sendToList.length || sendCcList.length || sendCc || sendTo || sendSubject || sendBody)}
-                    >
-                        Clear
-                    </Button>
+                    <ActionMenu
+                        label="More"
+                        items={[
+                            {
+                                label: "Clear",
+                                onClick: clearAll,
+                                disabled: !(sendToList.length || sendCcList.length || sendCc || sendTo || sendSubject || sendBody),
+                            },
+                            {
+                                label: "Revoke",
+                                onClick: () => setRevokeOpen(true),
+                                disabled: !dmailDid,
+                                destructive: true,
+                            },
+                        ]}
+                    />
                 </Box>
 
                 <Box display="flex" flexDirection="column" gap={1}>

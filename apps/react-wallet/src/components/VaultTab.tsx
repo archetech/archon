@@ -422,9 +422,8 @@ function VaultTab() {
             </Typography>
             {isVaultItemFile(item) ? (
                 <Button
-                    variant="contained"
+                    variant="outlined"
                     size="small"
-                    color="primary"
                     onClick={() => downloadVaultItem(name)}
                     sx={{ mr: 1 }}
                 >
@@ -432,9 +431,8 @@ function VaultTab() {
                 </Button>
             ) : (
                 <Button
-                    variant="contained"
+                    variant="outlined"
                     size="small"
-                    color="primary"
                     onClick={() => revealVaultItem(name)}
                     sx={{ mr: 1 }}
                 >
@@ -443,9 +441,9 @@ function VaultTab() {
             )}
             {selectedVaultOwned &&
                 <Button
-                    variant="contained"
+                    variant="outlined"
                     size="small"
-                    color="primary"
+                    color="error"
                     onClick={() => removeVaultItem(name)}
                 >
                     Remove
