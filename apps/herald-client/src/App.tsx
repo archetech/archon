@@ -610,6 +610,19 @@ function Home() {
         }
     })();
 
+    // The CLI in the quickstart has to talk to *this* node. publicUrl is this
+    // service's own address (DRAWBRIDGE_PUBLIC_HOST + /names), so its origin is
+    // the node URL. Falls back to a placeholder rather than a real host, so a
+    // misconfigured instance cannot quietly send someone to the wrong node.
+    const nodeUrl = (() => {
+        try {
+            return publicUrl ? new URL(publicUrl).origin : 'https://your-node.com';
+        }
+        catch {
+            return 'https://your-node.com';
+        }
+    })();
+
     useEffect(() => {
         const init = async () => {
             try {
@@ -779,7 +792,7 @@ function Home() {
 npm install -g @didcid/keymaster
 
 # Set up environment
-export ARCHON_NODE_URL=https://archon.technology
+export ARCHON_NODE_URL=${nodeUrl}
 export ARCHON_PASSPHRASE="your-secret-passphrase"
 
 # Create wallet and identity
