@@ -11,6 +11,7 @@ import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { scanQrCodeRaw } from "../utils/utils";
 import { dispatchDeepLink } from "../utils/deepLinkQueue";
+import PageHeader from "./layout/PageHeader";
 
 interface AutoLoginState {
     responseDID: string;
@@ -286,6 +287,10 @@ function AuthTab() {
 
     return (
         <Box>
+            <PageHeader
+                title="Authentication"
+                description="Respond to login challenges and verify responses from others."
+            />
             {autoLoginLoading && (
                 <Paper elevation={2} sx={{ p: 3, m: 2, textAlign: 'center' }}>
                     <CircularProgress size={40} />

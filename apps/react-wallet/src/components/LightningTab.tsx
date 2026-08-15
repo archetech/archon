@@ -17,6 +17,9 @@ import { DecodedLightningInvoice, LightningPaymentRecord, LightningPaymentStatus
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
+import { Bolt } from "@mui/icons-material";
+import PageHeader from "./layout/PageHeader";
+import EmptyState from "./layout/EmptyState";
 
 const LIGHTNING_PAYMENT_STATUS_CHECKS = 3;
 const LIGHTNING_PAYMENT_STATUS_DELAY_MS = 1000;
@@ -267,10 +270,14 @@ const LightningTab: React.FC = () => {
 
     return (
         <Box>
+            <PageHeader
+                title="Lightning"
+                description="Receive, send and zap sats from this identity's Lightning wallet."
+            />
             <Tabs
                 value={activeTab}
                 onChange={(_, v) => setActiveTab(v)}
-                sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
+                sx={{ borderBottom: 1, borderColor: "divider", mb: 2, minHeight: 40 }}
             >
                 <Tab label="Wallet" value="wallet" />
                 <Tab label="Payments" value="payments" />
@@ -284,14 +291,16 @@ const LightningTab: React.FC = () => {
                     {loadingBalance && <CircularProgress size={24} />}
 
                     {!loadingBalance && isConfigured === false && (
-                        <Box>
-                            <Typography sx={{ mb: 2 }}>
-                                No Lightning wallet configured for this identity.
-                            </Typography>
-                            <Button variant="contained" onClick={handleSetupLightning}>
+                        <EmptyState
+                            icon={<Bolt />}
+                            title="No Lightning wallet"
+                            description="Set one up to receive and send sats from this identity."
+                            action={
+                                <Button variant="contained" onClick={handleSetupLightning}>
                                 Set Up Lightning
-                            </Button>
-                        </Box>
+                                </Button>
+                            }
+                        />
                     )}
 
                     {!loadingBalance && isConfigured === true && (

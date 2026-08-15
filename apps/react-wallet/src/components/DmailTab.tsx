@@ -50,6 +50,7 @@ import DmailSearchModal, { AdvancedSearchParams } from "../modals/DmailSearchMod
 import DisplayDID from "./DisplayDID";
 import VersionNavigator from "./VersionNavigator";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
+import PageHeader from "./layout/PageHeader";
 
 const DmailTab: React.FC = () => {
     const [registry, setRegistry] = useState<string>("hyperswarm");
@@ -1277,6 +1278,10 @@ const DmailTab: React.FC = () => {
 
     return (
         <Box>
+            <PageHeader
+                title="DMail"
+                description="Encrypted messages addressed to your identities."
+            />
             <WarningModal
                 isOpen={revokeOpen}
                 title="Revoke DMail"

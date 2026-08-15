@@ -2,8 +2,9 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 import { WalletProvider } from "./WalletProvider";
 import { VariablesProvider } from "./VariablesProvider";
 import { UIProvider } from "./UIContext";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
-import { Box, useMediaQuery } from "@mui/material";
+import { ThemeProvider } from "@mui/material/styles";
+import { Box, CssBaseline, useMediaQuery } from "@mui/material";
+import { createAppTheme } from "../theme";
 import { SafeAreaProvider } from "./SafeAreaContext";
 import { SnackbarProvider } from "./SnackbarProvider";
 
@@ -28,11 +29,7 @@ export function ContextProviders(
     const [darkMode, setDarkMode] = useState<boolean>(false);
     const THEME_KEY = 'themeMode';
 
-    const theme = createTheme({
-        palette: {
-            mode: darkMode ? 'dark' : 'light',
-        },
-    });
+    const theme = createAppTheme(darkMode);
 
     function handleDarkModeToggle(event: React.ChangeEvent<HTMLInputElement>) {
         const isDark = event.target.checked;
@@ -68,6 +65,7 @@ export function ContextProviders(
     return (
         <ThemeContext.Provider value={value}>
             <ThemeProvider theme={theme}>
+                <CssBaseline />
                 <Box
                     sx={{
                         width: "100%",

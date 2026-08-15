@@ -14,6 +14,7 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
+import PageHeader from "./layout/PageHeader";
 
 function PropertiesTab() {
     const { keymaster } = useWalletContext();
@@ -170,6 +171,10 @@ function PropertiesTab() {
 
     return (
         <Box>
+            <PageHeader
+                title="Properties"
+                description="Arbitrary key/value data stored on the selected identity."
+            />
             <WarningModal
                 title="Remove Property"
                 warningText={`Are you sure you want to remove '${deleteKey}'?`}
