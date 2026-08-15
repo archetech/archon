@@ -481,6 +481,7 @@ Drawbridge and the services it fronts are separate profiles, each named after wh
 | `drawbridge` | `drawbridge`, `drawbridge-client` | The front-door proxy itself |
 | `lightning` | `lightning-mediator` + the Lightning rail (CLN, LNbits, RTL, init containers) | L402 paywall, zaps, `/invoice/:did` |
 | `herald` | `herald`, `herald-client` | `/names/*`, `/.well-known/*` |
+| `explorer` | `explorer` | `/explorer` — the node's own DID explorer, which Herald links to |
 | `tor` | `tor` | Onion hidden service |
 
 The full stack — the same service set the single `drawbridge` profile used to give:
@@ -496,10 +497,13 @@ COMPOSE_PROFILES=hyperswarm,didcomm,drawbridge
 ARCHON_DIDCOMM_URL=http://didcomm:4236
 ARCHON_LIGHTNING_MEDIATOR_URL=
 ARCHON_HERALD_URL=
+ARCHON_EXPLORER_URL=
 ARCHON_DIDCOMM_TOR_PROXY=
 ```
 
-**Blanking the two upstream URLs is required, not optional.** Drawbridge decides what it offers from the URLs, not from the profiles: `ARCHON_LIGHTNING_MEDIATOR_URL` or `ARCHON_HERALD_URL` left at its default makes `GET /api/v1/capabilities` advertise the service and the proxy routes attempt a connection to a container that is not running. Empty means the capability reports `false` and the route returns HTTP 501.
+**Blanking the unused upstream URLs is required, not optional.** Drawbridge decides what it offers from the URLs, not from the profiles: `ARCHON_LIGHTNING_MEDIATOR_URL`, `ARCHON_HERALD_URL` or `ARCHON_EXPLORER_URL` left at its default makes `GET /api/v1/capabilities` advertise the service and the proxy routes attempt a connection to a container that is not running. Empty means the capability reports `false` and the route returns HTTP 501.
+
+`ARCHON_EXPLORER_URL` has a further consequence: Herald links to `<public host>/explorer` by default, so leaving it set without the `explorer` profile gives every visitor a broken link from the identity pages. Either run the profile or set `ARCHON_HERALD_EXPLORER_URL` to a reachable explorer — or empty, to hide the links.
 
 `ARCHON_DIDCOMM_TOR_PROXY` is **not** a Drawbridge capability variable and behaves differently. It is read by the DIDComm relay, and the `didcomm` capability stays enabled either way via `ARCHON_DIDCOMM_URL`. Blanking it affects only `.onion` delivery, which then returns HTTP 502 naming the unset variable instead of failing to dial a Tor container that is not running.
 

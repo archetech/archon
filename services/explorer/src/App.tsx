@@ -15,6 +15,8 @@ import Header from "./components/Header.js";
 import { GatekeeperEvent } from "@didcid/gatekeeper/types";
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 
+import { getRuntimeConfig } from './runtimeConfig.js';
+
 const gatekeeper = new GatekeeperClient();
 
 interface SnackbarState {
@@ -22,8 +24,6 @@ interface SnackbarState {
     message: string;
     severity: AlertColor;
 }
-
-const gatekeeperUrl = import.meta.env.VITE_GATEKEEPER_URL || 'http://localhost:4224';
 
 function App() {
     const [isReady, setIsReady] = useState<boolean>(false);
@@ -92,7 +92,7 @@ function App() {
 
         async function init() {
             await gatekeeper.connect({
-                url: gatekeeperUrl,
+                url: getRuntimeConfig().gatekeeperUrl,
                 waitUntilReady: true,
                 intervalSeconds: 5,
                 chatty: true,

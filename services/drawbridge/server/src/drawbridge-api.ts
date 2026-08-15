@@ -434,6 +434,27 @@ async function main() {
         }
     });
 
+    // Public face for the node's own explorer, so Herald can link to it instead
+    // of the shared public instance.
+    //
+    // Note the empty prefixToStrip: the explorer's bundle is built with
+    // base=/explorer/ and the app is mounted there, so the prefix has to survive
+    // the hop. Stripping it -- as /names and /didcomm do -- would serve an
+    // index.html whose asset URLs point at /explorer/... on a server that no
+    // longer answers there.
+    app.use('/explorer', async (req, res) => {
+        if (config.explorerURL === '') {
+            res.status(501).json({ error: 'Explorer is not enabled on this node' });
+            return;
+        }
+        try {
+            await proxyRequest(req, res, config.explorerURL, '');
+        } catch (error: any) {
+            logger.error({ err: error, path: req.originalUrl }, 'Explorer proxy error');
+            res.status(502).json({ error: 'Upstream explorer error' });
+        }
+    });
+
     // Public face for the DIDComm relay (mailbox). The published
     // DIDCommMessaging endpoint is `<drawbridge public host>/didcomm`.
     // Optional service: when the relay URL is unconfigured the node does not

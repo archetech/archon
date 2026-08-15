@@ -51,6 +51,7 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
             didcomm: config.didcommURL !== '',
             lightning: config.lightningMediatorURL !== '',
             names: config.heraldURL !== '',
+            explorer: config.explorerURL !== '',
         });
     });
 
