@@ -118,6 +118,17 @@ services:
       - ARCHON_DRAWBRIDGE_INVOICE_EXPIRY=${ARCHON_DRAWBRIDGE_INVOICE_EXPIRY:-3600}
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX=${ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX:-100}
       - ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW:-60}
+      # Public /didcomm passthrough. Unauthenticated by design, so it gets its
+      # own budgets. Per-source applies only when the source identifies a
+      # client -- behind Tor or a reverse proxy it does not, and those are
+      # limited globally only.
+      - ARCHON_DRAWBRIDGE_DIDCOMM_READ_PER_SOURCE=${ARCHON_DRAWBRIDGE_DIDCOMM_READ_PER_SOURCE:-300}
+      - ARCHON_DRAWBRIDGE_DIDCOMM_READ_GLOBAL=${ARCHON_DRAWBRIDGE_DIDCOMM_READ_GLOBAL:-3000}
+      # Deposits are budgeted in bytes: a request ceiling loose enough for
+      # normal traffic still allows enough max-size envelopes to fill the relay.
+      - ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_PER_SOURCE_BYTES=${ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_PER_SOURCE_BYTES:-16777216}
+      - ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES=${ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES:-67108864}
+      - ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW:-60}
       - ARCHON_HERALD_URL=${ARCHON_HERALD_URL-http://herald:4230}
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:

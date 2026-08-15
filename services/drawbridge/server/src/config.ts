@@ -2,6 +2,25 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// parseInt yields NaN for a malformed value. NaN reaches the limiter's Lua as a
+// nil, the comparison there throws, and the middleware's fail-open path then
+// lets everything through -- a security setting switched off by a typo while
+// still looking configured. A zero or negative window is just as bad: the
+// window key expires immediately, so nothing is ever counted.
+function positiveInt(name: string, value: string | undefined, fallback: number): number {
+    if (value === undefined || value === '') {
+        return fallback;
+    }
+
+    const parsed = Number(value);
+
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+        throw new Error(`${name} must be a positive integer, got "${value}"`);
+    }
+
+    return parsed;
+}
+
 const config = {
     port: process.env.ARCHON_DRAWBRIDGE_PORT ? parseInt(process.env.ARCHON_DRAWBRIDGE_PORT) : 4222,
     bindAddress: process.env.ARCHON_BIND_ADDRESS || '0.0.0.0',
@@ -30,8 +49,25 @@ const config = {
     invoiceExpiry: process.env.ARCHON_DRAWBRIDGE_INVOICE_EXPIRY ? parseInt(process.env.ARCHON_DRAWBRIDGE_INVOICE_EXPIRY) : 3600,
 
     // Rate limiting
-    rateLimitMax: process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX ? parseInt(process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX) : 100,
-    rateLimitWindow: process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW ? parseInt(process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW) : 60,
+    rateLimitMax: positiveInt('ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX', process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX, 100),
+    // Public DIDComm passthrough, limited separately from the paid path because
+    // the traffic is unauthenticated. Reads (challenge/fetch/remove) are chatty
+    // and cheap -- one poll is four requests -- so their ceiling is a request
+    // count generous enough for an active wallet. Deposits are budgeted in
+    // BYTES instead: a request ceiling loose enough for normal traffic still
+    // allows a couple of dozen max-size envelopes, which is all it takes to
+    // fill the relay's storage cap.
+    didcommReadPerSource: positiveInt('ARCHON_DRAWBRIDGE_DIDCOMM_READ_PER_SOURCE',
+        process.env.ARCHON_DRAWBRIDGE_DIDCOMM_READ_PER_SOURCE, 300),
+    didcommReadGlobal: positiveInt('ARCHON_DRAWBRIDGE_DIDCOMM_READ_GLOBAL',
+        process.env.ARCHON_DRAWBRIDGE_DIDCOMM_READ_GLOBAL, 3000),
+    didcommDepositPerSourceBytes: positiveInt('ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_PER_SOURCE_BYTES',
+        process.env.ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_PER_SOURCE_BYTES, 16 * 1024 * 1024),
+    didcommDepositGlobalBytes: positiveInt('ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES',
+        process.env.ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES, 64 * 1024 * 1024),
+    didcommRateLimitWindow: positiveInt('ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW',
+        process.env.ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW, 60),
+    rateLimitWindow: positiveInt('ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW', process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW, 60),
 
     // Redis
     redisUrl: process.env.ARCHON_REDIS_URL || 'redis://localhost:6379',

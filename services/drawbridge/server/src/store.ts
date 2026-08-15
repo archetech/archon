@@ -195,6 +195,48 @@ export class RedisStore implements DrawbridgeStore {
         return { allowed, remaining, resetAt };
     }
 
+    // Fixed-window cost budget. A sorted set is the right shape for counting
+    // requests, but not for spending a budget: this is a counter that a caller
+    // charges by an arbitrary amount, so a deposit can cost its size in bytes.
+    async checkAndRecordCost(key: string, cost: number, maxCost: number, windowSeconds: number): Promise<RateLimitResult> {
+        const redisKey = `${PREFIX}:ratecost:${key}`;
+        const now = Math.floor(Date.now() / 1000);
+
+        const luaScript = `
+            local key = KEYS[1]
+            local cost = tonumber(ARGV[1])
+            local maxCost = tonumber(ARGV[2])
+            local windowSecs = tonumber(ARGV[3])
+
+            local spent = redis.call('INCRBY', key, cost)
+            if spent == cost then
+                redis.call('EXPIRE', key, windowSecs)
+            end
+
+            local ttl = redis.call('TTL', key)
+            if ttl < 0 then
+                ttl = windowSecs
+            end
+
+            if spent > maxCost then
+                return {0, spent, ttl}
+            end
+
+            return {1, spent, ttl}
+        `;
+
+        const result = await this.redis.eval(
+            luaScript, 1, redisKey,
+            String(cost), String(maxCost), String(windowSeconds)
+        ) as number[];
+
+        return {
+            allowed: result[0] === 1,
+            remaining: Math.max(0, maxCost - result[1]),
+            resetAt: now + result[2],
+        };
+    }
+
     async disconnect(): Promise<void> {
         await this.redis.quit();
     }

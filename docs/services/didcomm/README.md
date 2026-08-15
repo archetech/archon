@@ -240,6 +240,65 @@ never expires and would otherwise accumulate ids whose bodies are long
 gone. A new implementation MUST use this schema if it shares a Redis
 instance with the reference service.
 
+### 5.2.1 Rate limiting at the edge
+
+Storage caps bound where a flood stops; they do not bound how fast it gets
+there, and with a 10 MB body limit on the Drawbridge side a 256 MB cap is
+reachable in a couple of dozen requests. Once storage is full the relay
+answers `429` to legitimate senders too, for as long as an attacker keeps
+it that way.
+
+Drawbridge therefore rate-limits its public `/didcomm` passthrough, with
+two buckets, because neither works alone:
+
+Reads and deposits are budgeted separately, because they are not the same
+load:
+
+| Setting | Default | Budget |
+| --- | --- | --- |
+| `ARCHON_DRAWBRIDGE_DIDCOMM_READ_PER_SOURCE` | 300 | requests, per source |
+| `ARCHON_DRAWBRIDGE_DIDCOMM_READ_GLOBAL` | 3000 | requests, whole surface |
+| `ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_PER_SOURCE_BYTES` | 16 MB | bytes, per source |
+| `ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES` | 64 MB | bytes, whole surface |
+| `ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW` | 60s | window for all four |
+
+**Deposits are budgeted in bytes, not requests.** A request ceiling loose
+enough for normal traffic still permits a couple of dozen max-size
+envelopes, and a couple of dozen is all it takes to fill the storage cap —
+a request count is simply not the resource being consumed. Reads
+(challenge/fetch/remove) stay on a request count: they are cheap and
+chatty, one poll being four requests, so 300/minute clears an active
+wallet comfortably.
+
+**The per-source bucket applies only when the source identifies a client.**
+`trust proxy` is not configured, so a request via the bundled Tor container
+or any reverse proxy arrives from a private address that every such client
+shares. Keying on it would throttle all of them together — and, worse,
+would refuse them at the per-source ceiling long before the global one was
+reached, so the global backstop could never do its job. Private, loopback,
+link-local and CGNAT sources are therefore limited globally only. Configure
+`trust proxy` if you terminate TLS at a proxy and want per-source limiting
+to work.
+
+The global budget is blunt by nature: during a flood it turns away
+legitimate senders too. That is still better than the storage-full
+alternative, where they are refused anyway and for longer.
+
+Rate limiting raises the cost of a flood and slows it; it does not make
+filling the store impossible. With a 10 MB body limit no request-count
+ceiling could, which is why the storage caps in §5.3 exist as well.
+
+If the limiter's own store is unreachable it **fails open**: it exists to
+protect availability, and refusing every request would cause the outage it
+is meant to prevent. Note what that leaves: the storage caps still bound
+growth, but globally so **only on the memory backend**, or on redis given
+a deployment-level `maxmemory` (§5.3). On a redis relay without one, an
+attacker rotating recipient DIDs is bounded by the per-recipient cap
+alone, which is to say not bounded at all.
+
+This covers the public edge only. The relay remains directly reachable on
+the internal network (port 4236).
+
 ### 5.3 Storage caps
 
 Both write paths are unauthenticated by design: a sender must be able to
