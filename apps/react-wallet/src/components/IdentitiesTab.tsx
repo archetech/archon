@@ -1,5 +1,6 @@
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
+import { jsonViewTheme } from "./layout/jsonViewTheme";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
 import { Badge, Create, DriveFileRenameOutline, Image, Login, LoopOutlined, PermIdentity, RestoreOutlined, SaveAltOutlined, SwapHorizOutlined, DeleteOutline } from "@mui/icons-material";
@@ -8,6 +9,7 @@ import Section from "./layout/Section";
 import EmptyState from "./layout/EmptyState";
 import ActionMenu from "./layout/ActionMenu";
 import { useUIContext } from "../contexts/UIContext";
+import { useThemeContext } from "../contexts/ContextProviders";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
@@ -85,6 +87,7 @@ function IdentitiesTab() {
     const [avatarCandidateLoading, setAvatarCandidateLoading] = useState<boolean>(false);
     const [avatarCandidateError, setAvatarCandidateError] = useState<string>("");
     const { keymaster } = useWalletContext();
+    const { darkMode } = useThemeContext();
     const { setError, setSuccess } = useSnackbar();
     const {
         refreshAll,
@@ -1077,7 +1080,7 @@ function IdentitiesTab() {
                             >
                                 {currentIdDocs ? (
                                     <Box sx={{ p: 2, overflowX: "auto", width: '100%' }}>
-                                        <JsonView value={currentIdDocs} displayDataTypes={false} />
+                                        <JsonView value={currentIdDocs} displayDataTypes={false} style={jsonViewTheme(darkMode)} />
                                     </Box>
                                 ) : (
                                     <EmptyState
