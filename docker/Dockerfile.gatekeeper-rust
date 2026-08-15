@@ -1,4 +1,4 @@
-FROM rust:1.90-bookworm AS builder
+FROM rust:1.90-trixie AS builder
 
 WORKDIR /build
 COPY rust/services/gatekeeper/Cargo.toml ./Cargo.toml
@@ -6,7 +6,7 @@ COPY rust/services/gatekeeper/Cargo.lock ./Cargo.lock
 COPY rust/services/gatekeeper/src ./src
 RUN cargo build --release
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates wget \
