@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Tab } from "@mui/material";
 import { TabContext, TabList, TabPanel } from "@mui/lab";
 import {
@@ -23,9 +23,7 @@ import BrowserHeader from "./BrowserHeader";
 import JsonViewer from "./JsonViewer";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
-import { useThemeContext } from "../contexts/ContextProviders";
 import { useVariablesContext } from "../contexts/VariablesProvider";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
 import AliasedDIDs from "./AliasedDIDs";
 import AssetsTab from "./AssetsTab";
 import DmailTab from "./DmailTab";
@@ -41,15 +39,6 @@ function BrowserContent() {
     const { isBrowser, hasLightning } = useWalletContext();
     const { currentId, validId } = useVariablesContext();
     const { openBrowser, setOpenBrowser } = useUIContext();
-    const { darkMode } = useThemeContext();
-
-    const theme = useMemo(
-        () =>
-            createTheme({
-                palette: { mode: darkMode ? "dark" : "light" },
-            }),
-        [darkMode]
-    );
 
     const [activeTab, setActiveTab] = useState<string>("identities");
     const [activeSubTab, setActiveSubTab] = useState<string>("");
@@ -188,215 +177,213 @@ function BrowserContent() {
     };
 
     return (
-        <ThemeProvider theme={theme}>
-            <Box className="rootContainer">
-                <BrowserHeader menuOpen={menuOpen} toggleMenuOpen={toggleMenuOpen} />
-                <TabContext value={activeTab}>
-                    <Box
-                        className="layoutContainer"
-                        sx={{
-                            width: browserPageWidth,
-                            maxWidth: browserPageWidth,
-                            transition: "width 0.2s ease-in-out",
-                        }}
-                    >
-                        <Box className={`sidebar ${menuOpen ? "open" : ""}`}>
-                            <TabList orientation="vertical" onChange={handleTabChange} className="tabList">
+        <Box className="rootContainer">
+            <BrowserHeader menuOpen={menuOpen} toggleMenuOpen={toggleMenuOpen} />
+            <TabContext value={activeTab}>
+                <Box
+                    className="layoutContainer"
+                    sx={{
+                        width: browserPageWidth,
+                        maxWidth: browserPageWidth,
+                        transition: "width 0.2s ease-in-out",
+                    }}
+                >
+                    <Box className={`sidebar ${menuOpen ? "open" : ""}`}>
+                        <TabList orientation="vertical" onChange={handleTabChange} className="tabList">
+                            <Tab
+                                icon={<PermIdentity />}
+                                label={menuOpen ? "Identities" : ""}
+                                value="identities"
+                                iconPosition="start"
+                                className="sidebarTab"
+                                sx={{ gap: 0.25 }}
+                            />
+
+                            {displayComponent && (
                                 <Tab
-                                    icon={<PermIdentity />}
-                                    label={menuOpen ? "Identities" : ""}
-                                    value="identities"
+                                    icon={<Key />}
+                                    label={menuOpen ? "Auth" : ""}
+                                    value="auth"
                                     iconPosition="start"
                                     className="sidebarTab"
                                     sx={{ gap: 0.25 }}
                                 />
+                            )}
 
-                                {displayComponent && (
-                                    <Tab
-                                        icon={<Key />}
-                                        label={menuOpen ? "Auth" : ""}
-                                        value="auth"
-                                        iconPosition="start"
-                                        className="sidebarTab"
-                                        sx={{ gap: 0.25 }}
-                                    />
-                                )}
-
-                                {displayComponent && (
-                                    <Tab
-                                        icon={<Email />}
-                                        label={menuOpen ? "DMail" : ""}
-                                        value="dmail"
-                                        iconPosition="start"
-                                        className="sidebarTab"
-                                        sx={{ gap: 0.25 }}
-                                    />
-                                )}
-
-                                {displayComponent && (
-                                    <Tab
-                                        icon={<Badge />}
-                                        label={menuOpen ? "Credentials" : ""}
-                                        value="credentials"
-                                        iconPosition="start"
-                                        className="sidebarTab"
-                                        sx={{ gap: 0.25 }}
-                                    />
-                                )}
-
-                                {displayComponent && (
-                                    <Tab
-                                        icon={<List />}
-                                        label={menuOpen ? "Aliases" : ""}
-                                        value="aliases"
-                                        iconPosition="start"
-                                        className="sidebarTab"
-                                        sx={{ gap: 0.25 }}
-                                    />
-                                )}
-
-                                {displayComponent && (
-                                    <Tab
-                                        icon={<Poll />}
-                                        label={menuOpen ? "Polls" : ""}
-                                        value="polls"
-                                        iconPosition="start"
-                                        className="sidebarTab"
-                                        sx={{ gap: 0.25 }}
-                                    />
-                                )}
-
-                                {displayComponent && (
-                                    <Tab
-                                        icon={<Tune />}
-                                        label={menuOpen ? "Properties" : ""}
-                                        value="properties"
-                                        iconPosition="start"
-                                        className="sidebarTab"
-                                        sx={{ gap: 0.25 }}
-                                    />
-                                )}
-
-                                {displayComponent && hasLightning && (
-                                    <Tab
-                                        icon={<Bolt />}
-                                        label={menuOpen ? "Lightning" : ""}
-                                        value="lightning"
-                                        iconPosition="start"
-                                        className="sidebarTab"
-                                        sx={{ gap: 0.25 }}
-                                    />
-                                )}
-
-                                {displayComponent && (
-                                    <Tab
-                                        icon={<Token />}
-                                        label={menuOpen ? "Assets" : ""}
-                                        value="assets"
-                                        iconPosition="start"
-                                        className="sidebarTab"
-                                        sx={{ gap: 0.25 }}
-                                    />
-                                )}
-
+                            {displayComponent && (
                                 <Tab
-                                    icon={<AccountBalanceWallet />}
-                                    label={menuOpen ? "Wallet" : ""}
-                                    value="wallet"
+                                    icon={<Email />}
+                                    label={menuOpen ? "DMail" : ""}
+                                    value="dmail"
                                     iconPosition="start"
                                     className="sidebarTab"
                                     sx={{ gap: 0.25 }}
                                 />
+                            )}
 
+                            {displayComponent && (
                                 <Tab
-                                    icon={<ManageSearch />}
-                                    label={menuOpen ? "JSON Viewer" : ""}
-                                    value="viewer"
-                                    iconPosition="start"
-                                    className="sidebarTab"
-                                    sx={{ gap: 0.25, whiteSpace: "nowrap" }}
-                                />
-
-                                <Tab
-                                    icon={<Settings />}
-                                    label={menuOpen ? "Settings" : ""}
-                                    value="settings"
+                                    icon={<Badge />}
+                                    label={menuOpen ? "Credentials" : ""}
+                                    value="credentials"
                                     iconPosition="start"
                                     className="sidebarTab"
                                     sx={{ gap: 0.25 }}
                                 />
-                            </TabList>
-                        </Box>
-
-                        <Box className="browser-context">
-                            <TabPanel value="identities" sx={{ p: 0 }}>
-                                <IdentitiesTab />
-                            </TabPanel>
-
-                            {displayComponent && (
-                                <TabPanel value="auth" sx={{ p: 0 }}>
-                                    <AuthTab />
-                                </TabPanel>
                             )}
 
                             {displayComponent && (
-                                <TabPanel value="dmail" sx={{ p: 0 }}>
-                                    <DmailTab />
-                                </TabPanel>
+                                <Tab
+                                    icon={<List />}
+                                    label={menuOpen ? "Aliases" : ""}
+                                    value="aliases"
+                                    iconPosition="start"
+                                    className="sidebarTab"
+                                    sx={{ gap: 0.25 }}
+                                />
                             )}
 
                             {displayComponent && (
-                                <TabPanel value="credentials" sx={{ p: 0 }}>
-                                    <CredentialsTab subTab={activeSubTab} refresh={refresh} />
-                                </TabPanel>
+                                <Tab
+                                    icon={<Poll />}
+                                    label={menuOpen ? "Polls" : ""}
+                                    value="polls"
+                                    iconPosition="start"
+                                    className="sidebarTab"
+                                    sx={{ gap: 0.25 }}
+                                />
                             )}
 
                             {displayComponent && (
-                                <TabPanel value="aliases" sx={{ p: 0 }}>
-                                    <AliasedDIDs />
-                                </TabPanel>
-                            )}
-
-                            {displayComponent && (
-                                <TabPanel value="polls" sx={{ p: 0 }}>
-                                    <PollTab />
-                                </TabPanel>
-                            )}
-
-                            {displayComponent && (
-                                <TabPanel value="properties" sx={{ p: 0 }}>
-                                    <PropertiesTab />
-                                </TabPanel>
+                                <Tab
+                                    icon={<Tune />}
+                                    label={menuOpen ? "Properties" : ""}
+                                    value="properties"
+                                    iconPosition="start"
+                                    className="sidebarTab"
+                                    sx={{ gap: 0.25 }}
+                                />
                             )}
 
                             {displayComponent && hasLightning && (
-                                <TabPanel value="lightning" sx={{ p: 0 }}>
-                                    <LightningTab />
-                                </TabPanel>
+                                <Tab
+                                    icon={<Bolt />}
+                                    label={menuOpen ? "Lightning" : ""}
+                                    value="lightning"
+                                    iconPosition="start"
+                                    className="sidebarTab"
+                                    sx={{ gap: 0.25 }}
+                                />
                             )}
 
                             {displayComponent && (
-                                <TabPanel value="assets" sx={{ p: 0 }}>
-                                    <AssetsTab subTab={assetSubTab} />
-                                </TabPanel>
+                                <Tab
+                                    icon={<Token />}
+                                    label={menuOpen ? "Assets" : ""}
+                                    value="assets"
+                                    iconPosition="start"
+                                    className="sidebarTab"
+                                    sx={{ gap: 0.25 }}
+                                />
                             )}
 
-                            <TabPanel value="wallet" sx={{ p: 0 }}>
-                                <WalletTab />
-                            </TabPanel>
+                            <Tab
+                                icon={<AccountBalanceWallet />}
+                                label={menuOpen ? "Wallet" : ""}
+                                value="wallet"
+                                iconPosition="start"
+                                className="sidebarTab"
+                                sx={{ gap: 0.25 }}
+                            />
 
-                            <TabPanel value="viewer" sx={{ p: 0 }}>
-                                <JsonViewer browserTab="viewer" showResolveField={true} />
-                            </TabPanel>
+                            <Tab
+                                icon={<ManageSearch />}
+                                label={menuOpen ? "JSON Viewer" : ""}
+                                value="viewer"
+                                iconPosition="start"
+                                className="sidebarTab"
+                                sx={{ gap: 0.25, whiteSpace: "nowrap" }}
+                            />
 
-                            <TabPanel value="settings" sx={{ p: 0 }}>
-                                <SettingsTab />
-                            </TabPanel>
-                        </Box>
+                            <Tab
+                                icon={<Settings />}
+                                label={menuOpen ? "Settings" : ""}
+                                value="settings"
+                                iconPosition="start"
+                                className="sidebarTab"
+                                sx={{ gap: 0.25 }}
+                            />
+                        </TabList>
                     </Box>
-                </TabContext>
-            </Box>
-        </ThemeProvider>
+
+                    <Box className="browser-context">
+                        <TabPanel value="identities" sx={{ p: 0 }}>
+                            <IdentitiesTab />
+                        </TabPanel>
+
+                        {displayComponent && (
+                            <TabPanel value="auth" sx={{ p: 0 }}>
+                                <AuthTab />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && (
+                            <TabPanel value="dmail" sx={{ p: 0 }}>
+                                <DmailTab />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && (
+                            <TabPanel value="credentials" sx={{ p: 0 }}>
+                                <CredentialsTab subTab={activeSubTab} refresh={refresh} />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && (
+                            <TabPanel value="aliases" sx={{ p: 0 }}>
+                                <AliasedDIDs />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && (
+                            <TabPanel value="polls" sx={{ p: 0 }}>
+                                <PollTab />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && (
+                            <TabPanel value="properties" sx={{ p: 0 }}>
+                                <PropertiesTab />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && hasLightning && (
+                            <TabPanel value="lightning" sx={{ p: 0 }}>
+                                <LightningTab />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && (
+                            <TabPanel value="assets" sx={{ p: 0 }}>
+                                <AssetsTab subTab={assetSubTab} />
+                            </TabPanel>
+                        )}
+
+                        <TabPanel value="wallet" sx={{ p: 0 }}>
+                            <WalletTab />
+                        </TabPanel>
+
+                        <TabPanel value="viewer" sx={{ p: 0 }}>
+                            <JsonViewer browserTab="viewer" showResolveField={true} />
+                        </TabPanel>
+
+                        <TabPanel value="settings" sx={{ p: 0 }}>
+                            <SettingsTab />
+                        </TabPanel>
+                    </Box>
+                </Box>
+            </TabContext>
+        </Box>
     );
 }
 
