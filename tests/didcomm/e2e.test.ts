@@ -59,10 +59,16 @@ beforeEach(async () => {
     cipher = new CipherNode();
 
     // The relay both stores mail and (Phase 8) performs outbound delivery; these
-    // tests deliver to the same localhost relay, which needed an explicit
-    // allowPrivateEgress opt-in until the egress guard was removed (#645).
+    // tests deliver to their own localhost relay over plain http, which clearnet
+    // egress otherwise refuses. allowInsecureEgress has no environment binding,
+    // so it is reachable from an in-process test and from nowhere else (#645).
     const app = express();
-    app.use('/didcomm', createApp({ store: new MemoryMailboxStore(), resolver: gatekeeper, cipher }));
+    app.use('/didcomm', createApp({
+        store: new MemoryMailboxStore(),
+        resolver: gatekeeper,
+        cipher,
+        allowInsecureEgress: true,
+    }));
     await new Promise<void>(resolve => { server = app.listen(0, resolve); });
     const port = (server.address() as any).port;
     const nodeURL = `http://localhost:${port}`;

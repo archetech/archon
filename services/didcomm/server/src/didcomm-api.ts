@@ -17,6 +17,11 @@ export interface AppDeps {
     uploadLimit?: string;
     // Outbound egress (POST /deliver): SOCKS5 Tor proxy for .onion destinations.
     torProxy?: string;
+    // Allow clearnet delivery over plain http. In-process tests only, which
+    // deliver to their own localhost relay. Deliberately has NO environment
+    // binding and is not read from config: a running node cannot turn this on,
+    // so it cannot become the deployment footgun the old opt-in flag was.
+    allowInsecureEgress?: boolean;
 }
 
 export function createApp(deps: AppDeps): Express {
@@ -180,19 +185,22 @@ export function createApp(deps: AppDeps): Express {
             }
             const onion = url.hostname.endsWith('.onion');
 
-            // Egress is deliberately unrestricted: destinations are filtered by
-            // neither scheme nor address. The previous guard rejected non-https and
-            // private/loopback hosts unless ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS was
-            // set, but it matched hostnames with a literal regex, so an attacker's
-            // `127.0.0.1.nip.io` (or a mapped IPv6 form) walked through it while
-            // honest same-host and LAN delivery was blocked. It stopped the wrong
-            // party, so it is gone rather than half-enforced -- see #645.
+            // Clearnet egress is https-only. Destinations are NOT filtered by
+            // address: the old private/loopback check matched hostnames with a
+            // literal regex, so `127.0.0.1.nip.io` and mapped IPv6 forms walked
+            // through it while honest same-host and LAN delivery did not. It
+            // stopped the wrong party and was removed (#645).
             //
-            // What this means for operators: POST /deliver authenticates any
-            // resolvable DID, so anyone able to create a DID can make this relay
-            // issue a POST, with a body they control, to any host it can reach. Do
-            // not run it on a network segment carrying services you would not want
-            // reachable that way.
+            // The scheme check stays because it is the half that holds. A DNS name
+            // cannot forge it, and it is what keeps plaintext internal services out
+            // of reach: the usual SSRF target is `http://redis:6379` with inline
+            // commands in the body, and an https fetch to redis dies in the TLS
+            // handshake. POST /deliver authenticates any *resolvable* DID rather
+            // than a local identity, so without this anyone able to create a DID
+            // could aim the relay at anything on its network segment.
+            if (!onion && url.protocol !== 'https:' && !deps.allowInsecureEgress) {
+                return res.status(400).send({ error: 'clearnet endpoint must use https' });
+            }
 
             const fetchOptions: any = {
                 method: 'POST',

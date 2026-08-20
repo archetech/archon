@@ -161,17 +161,24 @@ recipient. Destinations ending in `.onion` are dialled through the SOCKS proxy
 in `ARCHON_DIDCOMM_TOR_PROXY`; without one configured, an onion destination is
 refused with `502`.
 
-> **Egress is unrestricted.** Destinations are filtered by neither scheme nor
-> address — https and http, public and private, all forwarded. An earlier guard
-> rejected non-https and private/loopback hosts, but matched hostnames with a
-> literal regex, so `127.0.0.1.nip.io` and mapped IPv6 forms passed it while
-> honest same-host and LAN delivery did not; it was removed rather than left
-> half-enforced (#645).
+> **Clearnet destinations must be https; they are not filtered by address.**
+> The two halves of the old guard were not equally useful, and only one survived
+> (#645).
 >
-> The challenge auth here proves control of *some* resolvable DID, not of a
-> local identity, so anyone able to create a DID can make the relay issue a POST,
-> with a body of their choosing, to any host it can reach. Deploy it where that
-> is acceptable, and keep it off segments carrying services that would answer.
+> The **address** filter is gone. It matched hostnames with a literal regex, so
+> `127.0.0.1.nip.io` — or any attacker-controlled name pointing inward, or a
+> mapped IPv6 form — passed it, while honest same-host and LAN delivery did not.
+> It restricted only callers who were not trying to evade it.
+>
+> The **scheme** check stays, because a DNS name cannot forge it. It is what
+> keeps plaintext internal services out of reach: the usual SSRF target is
+> `http://redis:6379` with inline commands in the body, and an https fetch to
+> redis dies in the TLS handshake.
+>
+> Residual exposure, unchanged by that removal: challenge auth here proves
+> control of *some* resolvable DID, not of a local identity, so anyone able to
+> create a DID can make the relay POST a body of their choosing to any **https**
+> host it can reach, private ones included.
 
 ---
 

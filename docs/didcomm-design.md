@@ -321,14 +321,14 @@ recipients (they delegate transport) and keeps the keymaster free of network egr
 the relay e2e routes every send through `/deliver`; a unit test asserts the no-gateway hard error.
 Privacy: the service sees recipient DIDs + timing, not content.
 
-**Egress is unrestricted, deliberately.** The relay filters destinations by neither scheme nor
-address. An earlier guard rejected non-https and private/loopback hosts unless
-`ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS` was set, but it matched hostnames with a literal regex, so
-`127.0.0.1.nip.io` and mapped IPv6 forms passed while honest same-host and LAN delivery did not.
-It stopped the wrong party, and was removed rather than left half-enforced (#645). Note what
-follows: `POST /deliver` authenticates any *resolvable* DID, not only local identities, so anyone
-able to create a DID can make the relay POST a body of their choosing to any host it can reach.
-Run it where that is acceptable.
+**Clearnet egress is https-only, and not filtered by address** (#645). The old guard did both, behind
+`ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS`; only the scheme half was worth keeping. The address half
+matched hostnames with a literal regex, so `127.0.0.1.nip.io` and mapped IPv6 forms passed it while
+honest same-host and LAN delivery did not — it restricted only callers not trying to evade it. The
+scheme check no DNS name can forge, and it is what keeps plaintext internal services out of reach
+(`http://redis:6379` with inline commands in the body being the usual shape). Residual exposure:
+`POST /deliver` authenticates any *resolvable* DID, not only a local identity, so anyone able to
+create a DID can make the relay POST a body of their choosing to any https host it can reach.
 
 **Reading your own mailbox uses the same local gateway.** `receiveDidComm`/`mediateDidComm`
 (challenge → fetch → unpack → ack) connect to **`<nodeURL>/didcomm`** as well — *not* the identity's
