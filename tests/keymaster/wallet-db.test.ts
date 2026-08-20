@@ -115,6 +115,21 @@ describe('WalletSQLite', () => {
 });
 
 describe('WalletSQLite defaults and guards', () => {
+    // Two tests below chdir, because WalletSQLite's default path is relative to
+    // the working directory and that is the thing under test. cwd is
+    // process-global and the unit suite runs --runInBand, so a test that fails to
+    // restore it corrupts every later suite in the process. The paired finally
+    // covers a thrown assertion but NOT a jest timeout, which abandons the
+    // pending body and moves on -- hence this backstop, which jest runs either
+    // way.
+    const originalCwd = process.cwd();
+
+    afterEach(() => {
+        if (process.cwd() !== originalCwd) {
+            process.chdir(originalCwd);
+        }
+    });
+
     // NOTE: unlike WalletJson.saveWallet, which does mkdirSync(dataFolder,
     // {recursive:true}), WalletSQLite.connect never creates its folder — it opens
     // `${dataFolder}/${file}` directly and sqlite fails with SQLITE_CANTOPEN if the
@@ -147,6 +162,13 @@ describe('WalletSQLite defaults and guards', () => {
                 process.chdir(cwd);
             }
         });
+    });
+
+    it('leaves the working directory as it found it', () => {
+        // Regression guard for the cascade this backstop prevents: when this
+        // suite leaked cwd, the failure surfaced in cli-parity.test.ts as an
+        // ENOENT naming a temp directory, which points at the wrong file.
+        expect(process.cwd()).toBe(originalCwd);
     });
 
     it('create() applies the same defaults', async () => {
