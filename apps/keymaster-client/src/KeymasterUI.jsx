@@ -411,6 +411,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const TRUST_PING_RESPONSE_TYPE = 'https://didcomm.org/trust-ping/2.0/ping-response';
 
     const [didcommTab, setDidcommTab] = useState('inbox');
+    const [didcommComposeTo, setDidcommComposeTo] = useState('');
+    const [didcommComposeKind, setDidcommComposeKind] = useState('message');
+    const [didcommComposeContent, setDidcommComposeContent] = useState('');
+    const [didcommComposeAnoncrypt, setDidcommComposeAnoncrypt] = useState(false);
     const [didcommMessages, setDidcommMessages] = useState([]);
     const [didcommInboxLoading, setDidcommInboxLoading] = useState(false);
     // A ref, not the loading flag: the poll's interval callback closes over the
@@ -539,6 +543,56 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             didcommPollingRef.current = false;
             setDidcommInboxLoading(false);
         }
+    }
+
+    async function sendDidCommMessage() {
+        const recipient = didcommComposeTo.trim();
+
+        if (!recipient) {
+            showError('Enter a recipient DID or alias');
+            return;
+        }
+
+        if (didcommComposeKind === 'message' && !didcommComposeContent.trim()) {
+            showError('Enter a message to send');
+            return;
+        }
+
+        setDidcommBusy(true);
+        try {
+            // Resolve first: an alias must not travel in the envelope, which
+            // addresses recipients by DID. This also turns an unknown name into a
+            // clear error before any crypto happens.
+            const docs = await keymaster.resolveDID(recipient);
+            const recipientDid = docs.didDocument?.id;
+
+            if (!recipientDid) {
+                showError(`Could not resolve ${recipient}`);
+                return;
+            }
+
+            const message = didcommComposeKind === 'ping'
+                ? { type: TRUST_PING_TYPE, body: { response_requested: true } }
+                : { type: BASIC_MESSAGE_TYPE, body: { content: didcommComposeContent } };
+
+            await keymaster.sendDidComm(message, recipientDid, {
+                name: currentId,
+                anoncrypt: didcommComposeAnoncrypt,
+            });
+
+            showSuccess(didcommComposeKind === 'ping' ? 'Ping sent' : 'Message sent');
+            setDidcommComposeContent('');
+        } catch (error) {
+            showError(error);
+        } finally {
+            setDidcommBusy(false);
+        }
+    }
+
+    function replyToDidComm(sender) {
+        setDidcommComposeTo(sender);
+        setDidcommComposeKind('message');
+        setDidcommTab('compose');
     }
 
     async function dismissDidComm(ids) {
@@ -7790,6 +7844,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 textColor="primary"
                             >
                                 <Tab label="Inbox" value="inbox" />
+                                <Tab label="Compose" value="compose" />
                                 <Tab label="Endpoint" value="endpoint" />
                             </Tabs>
 
@@ -7852,6 +7907,15 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                                     Respond
                                                                 </Button>
                                                             }
+                                                            {message.type === BASIC_MESSAGE_TYPE && sender &&
+                                                                <Button
+                                                                    size="small"
+                                                                    onClick={() => replyToDidComm(sender)}
+                                                                    disabled={didcommBusy}
+                                                                >
+                                                                    Reply
+                                                                </Button>
+                                                            }
                                                             <Button
                                                                 size="small"
                                                                 color="error"
@@ -7880,6 +7944,75 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             );
                                         })
                                     }
+                                </Box>
+                            }
+
+                            {didcommTab === 'compose' &&
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                        Send a DIDComm message to any agent that publishes a messaging endpoint.
+                                    </Typography>
+
+                                    <TextField
+                                        label="To (DID or alias)"
+                                        value={didcommComposeTo}
+                                        onChange={(e) => setDidcommComposeTo(e.target.value)}
+                                        disabled={didcommBusy}
+                                        placeholder="did:cid:... or a wallet alias"
+                                        fullWidth
+                                    />
+
+                                    <TextField
+                                        select
+                                        label="Type"
+                                        value={didcommComposeKind}
+                                        onChange={(e) => setDidcommComposeKind(e.target.value)}
+                                        disabled={didcommBusy}
+                                        fullWidth
+                                    >
+                                        <MenuItem value="message">Message</MenuItem>
+                                        <MenuItem value="ping">Trust ping</MenuItem>
+                                    </TextField>
+
+                                    {didcommComposeKind === 'message' &&
+                                        <TextField
+                                            label="Message"
+                                            value={didcommComposeContent}
+                                            onChange={(e) => setDidcommComposeContent(e.target.value)}
+                                            disabled={didcommBusy}
+                                            multiline
+                                            minRows={4}
+                                            fullWidth
+                                        />
+                                    }
+
+                                    <Box>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={didcommComposeAnoncrypt}
+                                                    onChange={(e) => setDidcommComposeAnoncrypt(e.target.checked)}
+                                                    disabled={didcommBusy}
+                                                />
+                                            }
+                                            label="Send anonymously"
+                                        />
+                                        <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                            {didcommComposeAnoncrypt
+                                                ? 'The recipient cannot tell who sent this, and cannot reply to it.'
+                                                : 'The recipient can verify this came from the current identity.'}
+                                        </Typography>
+                                    </Box>
+
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={sendDidCommMessage}
+                                        disabled={didcommBusy}
+                                        sx={{ alignSelf: 'start' }}
+                                    >
+                                        Send
+                                    </Button>
                                 </Box>
                             }
 

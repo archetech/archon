@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Box, Button, Chip, CircularProgress, Divider, Tab, Tabs, TextField, Typography
+    Box, Button, Checkbox, Chip, CircularProgress, Divider, FormControlLabel, MenuItem,
+    Tab, Tabs, TextField, Typography
 } from "@mui/material";
 import { Forum, Inbox } from "@mui/icons-material";
-import { BASIC_MESSAGE_TYPE, TRUST_PING_TYPE, trustPingResponse } from "@didcid/keymaster/didcomm-protocols";
+import {
+    BASIC_MESSAGE_TYPE, TRUST_PING_TYPE, basicMessage, trustPing, trustPingResponse
+} from "@didcid/keymaster/didcomm-protocols";
 import type { DidCommReceivedMessage } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
@@ -79,6 +82,10 @@ function DidCommTab() {
     const [messages, setMessages] = useState<DidCommReceivedMessage[]>([]);
     const [inboxLoading, setInboxLoading] = useState<boolean>(true);
     const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(() => loadRefreshIntervalSeconds());
+    const [composeTo, setComposeTo] = useState<string>("");
+    const [composeKind, setComposeKind] = useState<string>("message");
+    const [composeContent, setComposeContent] = useState<string>("");
+    const [composeAnoncrypt, setComposeAnoncrypt] = useState<boolean>(false);
     const pollingRef = useRef<boolean>(false);
     const { keymaster } = useWalletContext();
     const { currentId, currentDID } = useVariablesContext();
@@ -209,6 +216,58 @@ function DidCommTab() {
         }
     }
 
+    async function send() {
+        if (!keymaster) return;
+
+        const recipient = composeTo.trim();
+
+        if (!recipient) {
+            setError("Enter a recipient DID or alias");
+            return;
+        }
+
+        if (composeKind === "message" && !composeContent.trim()) {
+            setError("Enter a message to send");
+            return;
+        }
+
+        setBusy(true);
+        try {
+            // Resolve first: an alias must not travel in the envelope, which
+            // addresses recipients by DID. This also turns an unknown name into a
+            // clear error before any crypto happens.
+            const docs = await keymaster.resolveDID(recipient);
+            const recipientDid = docs.didDocument?.id;
+
+            if (!recipientDid) {
+                setError(`Could not resolve ${recipient}`);
+                return;
+            }
+
+            const message = composeKind === "ping"
+                ? trustPing()
+                : basicMessage(composeContent);
+
+            await keymaster.sendDidComm(message as unknown as Record<string, unknown>, recipientDid, {
+                name: currentId,
+                anoncrypt: composeAnoncrypt,
+            });
+
+            setSuccess(composeKind === "ping" ? "Ping sent" : "Message sent");
+            setComposeContent("");
+        } catch (error: any) {
+            setError(error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function replyTo(sender: string) {
+        setComposeTo(sender);
+        setComposeKind("message");
+        setActiveTab("compose");
+    }
+
     async function dismiss(ids: string[]) {
         if (!keymaster || !ids.length) return;
 
@@ -274,6 +333,11 @@ function DidCommTab() {
                                 Respond
                             </Button>
                         )}
+                        {message.type === BASIC_MESSAGE_TYPE && sender && (
+                            <Button size="small" onClick={() => replyTo(sender)} disabled={busy}>
+                                Reply
+                            </Button>
+                        )}
                         <Button size="small" color="error" onClick={() => dismiss([received.id])} disabled={busy}>
                             Dismiss
                         </Button>
@@ -331,6 +395,7 @@ function DidCommTab() {
                 sx={{ borderBottom: 1, borderColor: "divider", mb: 2, minHeight: 40 }}
             >
                 <Tab label="Inbox" value="inbox" />
+                <Tab label="Compose" value="compose" />
                 <Tab label="Endpoint" value="endpoint" />
             </Tabs>
 
@@ -371,6 +436,70 @@ function DidCommTab() {
                     ) : (
                         messages.map(renderMessage)
                     )}
+                </Section>
+            )}
+
+            {activeTab === "compose" && (
+                <Section
+                    title="New message"
+                    description="Send a DIDComm message to any agent that publishes a messaging endpoint."
+                    actions={
+                        <Button variant="contained" onClick={send} disabled={busy}>
+                            Send
+                        </Button>
+                    }
+                >
+                    <TextField
+                        fullWidth
+                        label="To (DID or alias)"
+                        value={composeTo}
+                        onChange={event => setComposeTo(event.target.value)}
+                        disabled={busy}
+                        placeholder="did:cid:... or a wallet alias"
+                        sx={{ mb: 2 }}
+                    />
+
+                    <TextField
+                        select
+                        fullWidth
+                        label="Type"
+                        value={composeKind}
+                        onChange={event => setComposeKind(event.target.value)}
+                        disabled={busy}
+                        sx={{ mb: 2 }}
+                    >
+                        <MenuItem value="message">Message</MenuItem>
+                        <MenuItem value="ping">Trust ping</MenuItem>
+                    </TextField>
+
+                    {composeKind === "message" && (
+                        <TextField
+                            fullWidth
+                            multiline
+                            minRows={4}
+                            label="Message"
+                            value={composeContent}
+                            onChange={event => setComposeContent(event.target.value)}
+                            disabled={busy}
+                            sx={{ mb: 1 }}
+                        />
+                    )}
+
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                checked={composeAnoncrypt}
+                                onChange={event => setComposeAnoncrypt(event.target.checked)}
+                                disabled={busy}
+                            />
+                        }
+                        label="Send anonymously"
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                        {composeAnoncrypt
+                            ? "The recipient cannot tell who sent this, and cannot reply to it."
+                            : "The recipient can verify this came from the current identity."}
+                    </Typography>
                 </Section>
             )}
 
