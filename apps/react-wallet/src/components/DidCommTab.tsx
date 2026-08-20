@@ -3,14 +3,17 @@ import {
     Box, Button, Checkbox, Chip, CircularProgress, Divider, FormControlLabel, MenuItem,
     Tab, Tabs, TextField, Typography
 } from "@mui/material";
-import { Forum, Inbox } from "@mui/icons-material";
+import { ContentCopy, Forum, Inbox, QrCodeScanner } from "@mui/icons-material";
+import { QRCodeSVG } from "qrcode.react";
 import {
-    BASIC_MESSAGE_TYPE, TRUST_PING_TYPE, basicMessage, trustPing, trustPingResponse
+    BASIC_MESSAGE_TYPE, TRUST_PING_TYPE, basicMessage, decodeOutOfBandInvitation,
+    encodeOutOfBandInvitation, outOfBandInvitation, trustPing, trustPingResponse
 } from "@didcid/keymaster/didcomm-protocols";
 import type { DidCommReceivedMessage } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
+import { scanQrText } from "../utils/utils";
 import { loadRefreshIntervalSeconds } from "../contexts/UIContext";
 import PageHeader from "./layout/PageHeader";
 import Section from "./layout/Section";
@@ -97,6 +100,9 @@ function DidCommTab() {
     const [composeKind, setComposeKind] = useState<string>("message");
     const [composeContent, setComposeContent] = useState<string>("");
     const [composeAnoncrypt, setComposeAnoncrypt] = useState<boolean>(false);
+    const [inviteUrl, setInviteUrl] = useState<string>("");
+    const [inviteInput, setInviteInput] = useState<string>("");
+    const [decodedInvite, setDecodedInvite] = useState<{ from?: string; goal?: string } | null>(null);
     // Keyed by identity, not a bare boolean: an in-flight read must not block a
     // read for a *different* identity, and must not commit its result after the
     // identity has changed.
@@ -177,6 +183,15 @@ function DidCommTab() {
         setLoading(true);
         refreshStatus();
     }, [refreshStatus]);
+
+    useEffect(() => {
+        // An invitation names the identity that made it, so it must not survive a
+        // switch: leaving it on screen would offer a QR and a copyable link for
+        // the previous identity under the new one's name.
+        setInviteUrl("");
+        setInviteInput("");
+        setDecodedInvite(null);
+    }, [currentDID]);
 
     useEffect(() => {
         activeIdRef.current = currentId;
@@ -291,6 +306,78 @@ function DidCommTab() {
             setError(error);
         } finally {
             setBusy(false);
+        }
+    }
+
+    function createInvitation() {
+        if (!currentDID) {
+            setError("Select an identity first");
+            return;
+        }
+
+        // The invitation names the inviter; everything a recipient needs to reach
+        // them is resolvable from that DID, so the URL carries no endpoint.
+        const invitation = outOfBandInvitation(currentDID);
+        setInviteUrl(encodeOutOfBandInvitation(invitation));
+    }
+
+    function acceptInvitation(value: string) {
+        const trimmed = value.trim();
+
+        // Drop the previous result first: a failed decode must not leave the last
+        // inviter on screen with a live "Message them" button.
+        setDecodedInvite(null);
+
+        if (!trimmed) {
+            setError("Paste an invitation URL first");
+            return;
+        }
+
+        try {
+            const invitation = decodeOutOfBandInvitation(trimmed);
+
+            // The payload is whatever the sender chose to encode, so nothing here
+            // is known to be a string. An object `from` would throw when React
+            // renders it, and would reach Compose's trim() as a non-string.
+            const from = invitation?.from;
+            if (typeof from !== "string" || !from.trim()) {
+                setError("That invitation names no inviter");
+                return;
+            }
+
+            const goal = invitation?.body?.goal;
+            setDecodedInvite({
+                from: from.trim(),
+                goal: typeof goal === "string" ? goal : undefined,
+            });
+        } catch {
+            // decode throws on anything that is not a well-formed _oob payload.
+            setError("Could not read that invitation");
+        }
+    }
+
+    async function scanInvitation() {
+        // scanQrText, not scanQrCodeRaw: the latter only returns codes that carry
+        // a DID in the clear, and an invitation hides its DID inside the payload.
+        const scanned = await scanQrText();
+
+        if (!scanned) {
+            setError("Failed to scan QR code");
+            return;
+        }
+
+        setInviteInput(scanned);
+        acceptInvitation(scanned);
+    }
+
+    async function copyInvitation() {
+        try {
+            await navigator.clipboard.writeText(inviteUrl);
+            setSuccess("Invitation copied");
+        } catch {
+            // Clipboard access is unavailable outside a secure context and can be
+            // refused; the link is on screen to copy by hand either way.
+            setError("Could not copy — select the link and copy it manually");
         }
     }
 
@@ -432,6 +519,7 @@ function DidCommTab() {
             >
                 <Tab label="Inbox" value="inbox" />
                 <Tab label="Compose" value="compose" />
+                <Tab label="Invite" value="invite" />
                 <Tab label="Endpoint" value="endpoint" />
             </Tabs>
 
@@ -537,6 +625,97 @@ function DidCommTab() {
                             : "The recipient can verify this came from the current identity."}
                     </Typography>
                 </Section>
+            )}
+
+            {activeTab === "invite" && (
+                <>
+                    <Section
+                        title="Invite someone"
+                        description="Share an out-of-band invitation so another agent can reach this identity without being handed a DID."
+                        actions={
+                            <Button variant="contained" onClick={createInvitation} disabled={busy}>
+                                {inviteUrl ? "Regenerate" : "Create"}
+                            </Button>
+                        }
+                    >
+                        {inviteUrl ? (
+                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                {/* White plate behind the code: a dark page background
+                                    breaks scanning, since readers expect light quiet zones. */}
+                                <Box sx={{ p: 2, bgcolor: "#fff", borderRadius: 1 }}>
+                                    <QRCodeSVG value={inviteUrl} size={200} />
+                                </Box>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ wordBreak: "break-all", fontFamily: "monospace", fontSize: "0.7rem" }}
+                                >
+                                    {inviteUrl}
+                                </Typography>
+                                <Button size="small" startIcon={<ContentCopy />} onClick={copyInvitation}>
+                                    Copy link
+                                </Button>
+                            </Box>
+                        ) : (
+                            <Typography variant="body2" color="text.secondary">
+                                Create an invitation to show a QR code and a link.
+                            </Typography>
+                        )}
+                    </Section>
+
+                    <Section
+                        title="Accept an invitation"
+                        description="Scan or paste an invitation to start a conversation with whoever issued it."
+                        actions={
+                            <>
+                                <Button variant="outlined" startIcon={<QrCodeScanner />} onClick={scanInvitation} disabled={busy}>
+                                    Scan
+                                </Button>
+                                <Button variant="contained" onClick={() => acceptInvitation(inviteInput)} disabled={busy}>
+                                    Accept
+                                </Button>
+                            </>
+                        }
+                    >
+                        <TextField
+                            fullWidth
+                            label="Invitation URL"
+                            value={inviteInput}
+                            onChange={event => setInviteInput(event.target.value)}
+                            disabled={busy}
+                            placeholder="https://didcomm.org?_oob=..."
+                            sx={{ mb: 2 }}
+                        />
+
+                        {decodedInvite && (
+                            <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                    Invitation from
+                                </Typography>
+                                <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                                    {decodedInvite.from}
+                                </Typography>
+                                {decodedInvite.goal && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        Purpose: {decodedInvite.goal}
+                                    </Typography>
+                                )}
+                                {/* The inviter is only a claim -- an invitation is
+                                    unsigned and anyone can mint one naming any DID.
+                                    So this starts a message, it does not assert a
+                                    relationship. */}
+                                <Button
+                                    variant="contained"
+                                    sx={{ mt: 2 }}
+                                    onClick={() => decodedInvite.from && replyTo(decodedInvite.from)}
+                                    disabled={busy || !decodedInvite.from}
+                                >
+                                    Message them
+                                </Button>
+                            </Box>
+                        )}
+                    </Section>
+                </>
             )}
 
             {activeTab === "endpoint" && (

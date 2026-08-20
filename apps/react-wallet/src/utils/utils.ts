@@ -125,6 +125,10 @@ export async function scanQrCode() {
     return null;
 }
 
+// "Raw" here means the whole payload rather than the extracted DID -- but only
+// for codes that carry a DID somewhere. Callers scanning something with no DID
+// in it (an out-of-band invitation hides its DID inside a base64url payload)
+// want scanQrText instead.
 export async function scanQrCodeRaw(): Promise<string | null> {
     try {
         const perm = await BarcodeScanner.requestPermissions();
@@ -144,6 +148,28 @@ export async function scanQrCodeRaw(): Promise<string | null> {
                 return b.rawValue;
             }
         }
+    } catch {}
+    return null;
+}
+
+// The scanned text, with no interpretation at all. Out-of-band invitations are
+// `https://didcomm.org?_oob=<base64url>`: the DID is inside the payload and the
+// base64url alphabet has no `:`, so every DID-shaped filter rejects them.
+// Validation belongs to the caller, which knows what it asked the user to scan.
+export async function scanQrText(): Promise<string | null> {
+    try {
+        const perm = await BarcodeScanner.requestPermissions();
+        if (perm.camera !== 'granted') {
+            return null;
+        }
+
+        const ready = await ensureGoogleModuleReady();
+        if (!ready) {
+            return null;
+        }
+
+        const { barcodes } = await BarcodeScanner.scan();
+        return barcodes[0]?.rawValue ?? null;
     } catch {}
     return null;
 }
