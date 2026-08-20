@@ -325,8 +325,10 @@ Privacy: the service sees recipient DIDs + timing, not content.
 `ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS`; only the scheme half was worth keeping. The address half
 matched hostnames with a literal regex, so `127.0.0.1.nip.io` and mapped IPv6 forms passed it while
 honest same-host and LAN delivery did not — it restricted only callers not trying to evade it. The
-scheme check no DNS name can forge, and it is what keeps plaintext internal services out of reach
-(`http://redis:6379` with inline commands in the body being the usual shape). Residual exposure:
+scheme check is what keeps plaintext internal services out of reach (`http://redis:6379` with
+inline commands in the body being the usual shape), and the relay does **not follow redirects**,
+without which the check would be worthless: 307/308 preserve method and body, so an https endpoint
+answering `307 -> http://redis:6379` would reach it regardless. Residual exposure:
 `POST /deliver` authenticates any *resolvable* DID, not only a local identity, so anyone able to
 create a DID can make the relay POST a body of their choosing to any https host it can reach.
 

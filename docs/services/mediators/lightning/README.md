@@ -156,17 +156,19 @@ Detected by `did.includes('@') && !did.startsWith('did:')`. Flow:
 
 1. Parse `<name>@<domain>`, construct
    `https://<domain>/.well-known/lnurlp/<urlencode(name)>`.
-2. Reject if `domain` resolves to a private address
-   (`localhost|127.*|10.*|172.(16-31).*|192.168.*`).
-3. Fetch the LNURL-pay endpoint JSON. Reject if `status === "ERROR"` or
-   missing `callback`.
-4. Validate the callback URL is `https:` and not a private address.
-5. Enforce `amountMsats = amount * 1000` against `minSendable` /
+2. Fetch the LNURL-pay endpoint JSON. Destinations are **not** filtered by
+   address; the scheme is what is enforced, and it is enforced across
+   redirects — each hop must be `https:`, at most 5 hops. Reject if
+   `status === "ERROR"` or missing `callback`.
+3. Validate the callback URL is `https:`. It comes from the remote response,
+   so it is attacker-influenced; the same per-hop rule applies when fetching
+   it.
+4. Enforce `amountMsats = amount * 1000` against `minSendable` /
    `maxSendable` from the LNURL response.
-6. Append `?amount=<msats>&comment=<memo>` to the callback if it has no
+5. Append `?amount=<msats>&comment=<memo>` to the callback if it has no
    existing query string, otherwise append `&amount=<msats>&comment=<memo>`
    (comment only if memo is non-empty) and fetch it.
-7. The response's `pr` field is the BOLT11 invoice.
+6. The response's `pr` field is the BOLT11 invoice.
 
 ### 4.2 DID (`did:cid:...`)
 
@@ -176,7 +178,8 @@ Detected by `did.includes('@') && !did.startsWith('did:')`. Flow:
    endpoint" }`.
 3. Validate the endpoint URL:
    - `.onion` hosts MUST use `http:`.
-   - Non-`.onion` MUST use `https:` and MUST NOT be a private host.
+   - Non-`.onion` MUST use `https:`. The address is **not** checked; a
+     private https endpoint is allowed.
 4. Build `<serviceEndpoint>?amount=<sats>&memo=<memo>`.
 5. If the mediator has a `publicHost` (see [§6.3](#63-public-host-resolution))
    and the endpoint's hostname matches, shortcut through the internal
@@ -184,7 +187,10 @@ Detected by `did.includes('@') && !did.startsWith('did:')`. Flow:
    looping back through our own onion.
 6. Fetch the invoice URL (through the Tor SOCKS proxy at
    `ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY` when the destination is
-   `.onion`).
+   `.onion`). Redirects are **not followed**: this hop may legitimately be
+   onion-`http:` or the internal loopback shortcut, so there is no single
+   scheme rule to re-apply, and an invoice endpoint has no reason to
+   redirect. A 3xx answers `502`.
 7. Extract `paymentRequest` from the response.
 
 ### 4.3 Payment
@@ -347,7 +353,7 @@ A conformant third implementation MUST:
 - Use the Redis key schema in [§5](#5-redis-key-schema) if sharing a
   Redis namespace with the reference service.
 - Enforce the LUD-16 / DID validation rules in [§4](#4-zap-flow)
-  (private-host rejection, .onion-only http, etc.).
+  (https-only clearnet including across redirects, .onion-only http, etc.).
 - Use constant-time admin-key comparison.
 - Preserve the `/invoice/:did` public endpoint's shape so external
   zappers can pay published DIDs unchanged.

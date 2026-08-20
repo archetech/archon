@@ -191,13 +191,12 @@ export function createApp(deps: AppDeps): Express {
             // through it while honest same-host and LAN delivery did not. It
             // stopped the wrong party and was removed (#645).
             //
-            // The scheme check stays because it is the half that holds. A DNS name
-            // cannot forge it, and it is what keeps plaintext internal services out
-            // of reach: the usual SSRF target is `http://redis:6379` with inline
-            // commands in the body, and an https fetch to redis dies in the TLS
-            // handshake. POST /deliver authenticates any *resolvable* DID rather
-            // than a local identity, so without this anyone able to create a DID
-            // could aim the relay at anything on its network segment.
+            // The scheme check keeps plaintext internal services out of reach --
+            // the usual SSRF target is `http://redis:6379` with inline commands in
+            // the body, and an https fetch to redis dies in the TLS handshake.
+            // POST /deliver authenticates any *resolvable* DID rather than a local
+            // identity, so without this anyone able to create a DID could aim the
+            // relay at anything on its network segment.
             if (!onion && url.protocol !== 'https:' && !deps.allowInsecureEgress) {
                 return res.status(400).send({ error: 'clearnet endpoint must use https' });
             }
@@ -206,6 +205,13 @@ export function createApp(deps: AppDeps): Express {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/didcomm-encrypted+json' },
                 body: message,
+                // Checking the scheme is worthless if a redirect can undo it: fetch
+                // follows by default, and 307/308 preserve method and body, so an
+                // https endpoint answering 307 -> http://redis:6379 delivers the
+                // caller's bytes to the plaintext service the check exists to keep
+                // out. A DIDComm mailbox has no reason to redirect, so refuse
+                // rather than revalidate each hop.
+                redirect: 'manual',
             };
             if (onion) {
                 if (!deps.torProxy) {
@@ -217,6 +223,13 @@ export function createApp(deps: AppDeps): Express {
 
             const target = `${endpoint.replace(/\/+$/, '')}/api/v1/messages`;
             const response = await fetch(target, fetchOptions);
+            if (response.status >= 300 && response.status < 400) {
+                // Say what happened: a bare "failed: 307" reads like the recipient
+                // is broken rather than like a rule we enforce.
+                return res.status(502).send({
+                    error: `delivery to ${url.host} failed: endpoint redirected (${response.status}); redirects are not followed`,
+                });
+            }
             if (!response.ok) {
                 return res.status(502).send({ error: `delivery to ${url.host} failed: ${response.status}` });
             }

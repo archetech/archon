@@ -235,21 +235,73 @@ describe('deposit route capacity', () => {
     });
 
     it('does not filter clearnet delivery by address', async () => {
-        // A private https destination gets past the guard and fails at the fetch
-        // instead -- 502, not the 400 an address filter would return.
-        const { app } = appWithEgress();
-        const response = await deliver(app, 'https://192.168.0.255:9');
+        // A private https destination gets past the guard and is actually
+        // attempted -- what an address filter would have refused outright.
+        // fetch is mocked: a real connection to a LAN address would hang or, on
+        // the wrong subnet, reach someone.
+        const attempted: string[] = [];
+        const realFetch = globalThis.fetch;
+        globalThis.fetch = (async (input: any) => {
+            attempted.push(String(input));
+            return new Response(JSON.stringify({ ids: ['x'] }), { status: 200 });
+        }) as any;
 
-        expect(response.status).toBe(502);
+        try {
+            const { app } = appWithEgress();
+            const response = await deliver(app, 'https://192.168.0.255');
+
+            expect(response.status).toBe(200);
+            expect(attempted).toEqual(['https://192.168.0.255/api/v1/messages']);
+        }
+        finally {
+            globalThis.fetch = realFetch;
+        }
+    });
+
+    it('does not follow a redirect off the https endpoint', async () => {
+        // The scheme check is worthless if a redirect can undo it: 307/308
+        // preserve method and body, so an https endpoint answering
+        // `307 -> http://redis:6379` would deliver the caller's bytes there.
+        const realFetch = globalThis.fetch;
+        let passedRedirect: string | undefined;
+        globalThis.fetch = (async (_input: any, init: any) => {
+            passedRedirect = init?.redirect;
+            return new Response(null, { status: 307, headers: { location: 'http://redis:6379/' } });
+        }) as any;
+
+        try {
+            const { app } = appWithEgress();
+            const response = await deliver(app, 'https://relay.example');
+
+            expect(passedRedirect).toBe('manual');
+            expect(response.status).toBe(502);
+            expect(response.body.error).toMatch(/redirect/);
+        }
+        finally {
+            globalThis.fetch = realFetch;
+        }
     });
 
     it('allows plain http only when the host app opts in', async () => {
         // allowInsecureEgress exists for in-process tests and has no environment
         // binding, so a deployed relay cannot reach this branch.
-        const { app } = appWithEgress({ allowInsecureEgress: true });
-        const response = await deliver(app, 'http://127.0.0.1:9');
+        const attempted: string[] = [];
+        const realFetch = globalThis.fetch;
+        globalThis.fetch = (async (input: any) => {
+            attempted.push(String(input));
+            return new Response(JSON.stringify({ ids: ['x'] }), { status: 200 });
+        }) as any;
 
-        expect(response.status).toBe(502);
+        try {
+            const { app } = appWithEgress({ allowInsecureEgress: true });
+            const response = await deliver(app, 'http://127.0.0.1:4236');
+
+            expect(response.status).toBe(200);
+            expect(attempted).toEqual(['http://127.0.0.1:4236/api/v1/messages']);
+        }
+        finally {
+            globalThis.fetch = realFetch;
+        }
     });
 
     // A 429 says the envelope was not stored. If an earlier recipient's copy

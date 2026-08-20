@@ -93,9 +93,40 @@ function normalizePath(path: string): string {
 // No address filter on outbound fetches. The one that used to live here matched
 // hostnames with a literal regex, so `127.0.0.1.nip.io` -- or any name an
 // attacker controls that points inward -- passed it while honest LAN use did
-// not. What remains, at each call site, is the scheme requirement: no DNS name
-// can forge that, and it is what keeps plaintext internal services out of reach.
-// Matches the DIDComm relay; see #645.
+// not. What remains, at each call site, is the scheme requirement, which keeps
+// plaintext internal services out of reach. Matches the DIDComm relay; see #645.
+
+// Checking the scheme is worthless if a redirect can undo it: fetch follows
+// redirects by default, and 307/308 preserve method and body, so an https
+// endpoint answering `307 -> http://redis:6379` reaches the plaintext service
+// the check exists to keep out. LNURL services do redirect in the wild, so
+// rather than refuse outright (as the DIDComm relay does, where nothing
+// legitimately redirects) follow each hop by hand and re-apply the rule.
+const MAX_LNURL_REDIRECTS = 5;
+
+async function fetchHttpsOnly(target: string, init?: RequestInit): Promise<Response> {
+    let current = target;
+
+    for (let hop = 0; hop <= MAX_LNURL_REDIRECTS; hop++) {
+        if (new URL(current).protocol !== 'https:') {
+            throw new Error(`refusing non-https hop to ${new URL(current).host}`);
+        }
+
+        const response = await fetch(current, { ...init, redirect: 'manual' });
+        if (response.status < 300 || response.status >= 400) {
+            return response;
+        }
+
+        const location = response.headers.get('location');
+        if (!location) {
+            throw new Error(`redirect with no location from ${new URL(current).host}`);
+        }
+        // Relative locations resolve against the hop we are on.
+        current = new URL(location, current).toString();
+    }
+
+    throw new Error(`too many redirects (${MAX_LNURL_REDIRECTS})`);
+}
 
 function parsePositiveInteger(value: unknown): number | null {
     const parsed = typeof value === 'number' ? value : parseInt(String(value), 10);
@@ -410,11 +441,18 @@ async function main(): Promise<void> {
                 }
 
                 const [name, domain] = parts;
-                // https by construction, so an internal plaintext service cannot be
-                // reached through this even though the address is not filtered.
+                // https by construction -- and fetchHttpsOnly keeps it that way
+                // across redirects, which plain fetch would follow down to http.
                 const lnurlUrl = new URL(`https://${domain}/.well-known/lnurlp/${encodeURIComponent(name)}`);
 
-                const lnurlResponse = await fetch(lnurlUrl.toString());
+                let lnurlResponse: Response;
+                try {
+                    lnurlResponse = await fetchHttpsOnly(lnurlUrl.toString());
+                }
+                catch (error: any) {
+                    res.status(502).json({ error: `Lightning Address lookup failed: ${error.message}` });
+                    return;
+                }
                 if (!lnurlResponse.ok) {
                     res.status(502).json({ error: `Lightning Address lookup failed: ${lnurlResponse.statusText}` });
                     return;
@@ -456,7 +494,14 @@ async function main(): Promise<void> {
                     invoiceUrl += `&comment=${encodeURIComponent(memo)}`;
                 }
 
-                const invoiceResponse = await fetch(invoiceUrl);
+                let invoiceResponse: Response;
+                try {
+                    invoiceResponse = await fetchHttpsOnly(invoiceUrl);
+                }
+                catch (error: any) {
+                    res.status(502).json({ error: `Invoice request failed: ${error.message}` });
+                    return;
+                }
                 if (!invoiceResponse.ok) {
                     const error = await invoiceResponse.json().catch(() => ({ error: invoiceResponse.statusText }));
                     res.status(502).json({ error: `Invoice request failed: ${error.error || invoiceResponse.statusText}` });
@@ -518,7 +563,13 @@ async function main(): Promise<void> {
                     }
                 }
 
-                const fetchOptions: any = {};
+                // Refuse redirects rather than re-check each hop: this endpoint may
+                // legitimately be onion-http or the internal loopback shortcut, so
+                // there is no single scheme rule to re-apply -- and an invoice
+                // endpoint is a machine API returning JSON, with no reason to
+                // redirect. Left as-is, a published https endpoint answering
+                // `307 -> http://redis:6379` would reach it with our request.
+                const fetchOptions: any = { redirect: 'manual' };
                 if (useTorProxy && config.torProxy) {
                     const [host, port] = config.torProxy.split(':');
                     fetchOptions.dispatcher = socksDispatcher({
@@ -529,6 +580,12 @@ async function main(): Promise<void> {
                 }
 
                 const invoiceResponse = await fetch(invoiceUrl.toString(), fetchOptions);
+                if (invoiceResponse.status >= 300 && invoiceResponse.status < 400) {
+                    res.status(502).json({
+                        error: `Invoice request failed: endpoint redirected (${invoiceResponse.status}); redirects are not followed`,
+                    });
+                    return;
+                }
                 if (!invoiceResponse.ok) {
                     const error = await invoiceResponse.json().catch(() => ({ error: invoiceResponse.statusText }));
                     res.status(502).json({ error: `Invoice request failed: ${error.error || invoiceResponse.statusText}` });

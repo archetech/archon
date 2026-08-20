@@ -170,10 +170,15 @@ refused with `502`.
 > mapped IPv6 form — passed it, while honest same-host and LAN delivery did not.
 > It restricted only callers who were not trying to evade it.
 >
-> The **scheme** check stays, because a DNS name cannot forge it. It is what
-> keeps plaintext internal services out of reach: the usual SSRF target is
-> `http://redis:6379` with inline commands in the body, and an https fetch to
-> redis dies in the TLS handshake.
+> The **scheme** check stays. It is what keeps plaintext internal services out
+> of reach: the usual SSRF target is `http://redis:6379` with inline commands in
+> the body, and an https fetch to redis dies in the TLS handshake.
+>
+> **Redirects are not followed** (`redirect: 'manual'`), because the scheme check
+> is worthless without that. `fetch` follows by default and 307/308 preserve
+> method and body, so an https endpoint answering `307 -> http://redis:6379`
+> would hand the caller's bytes to the plaintext service. A mailbox has no reason
+> to redirect; a 3xx from the endpoint answers `502`.
 >
 > Residual exposure, unchanged by that removal: challenge auth here proves
 > control of *some* resolvable DID, not of a local identity, so anyone able to
