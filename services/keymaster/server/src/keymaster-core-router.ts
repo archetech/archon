@@ -43,6 +43,54 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
 
     /**
      * @swagger
+     * /capabilities:
+     *   get:
+     *     summary: Report which optional services the node offers.
+     *     description: >
+     *       Reads the node's capability manifest. `capabilities` is null when the
+     *       node serves no manifest (an older node, or a bare gatekeeper), which
+     *       callers should treat as unknown rather than unsupported.
+     *     responses:
+     *       200:
+     *         description: The node's capability manifest, or null if it serves none.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 capabilities:
+     *                   type: object
+     *                   nullable: true
+     *                   additionalProperties:
+     *                     type: boolean
+     *                   properties:
+     *                     didcomm:
+     *                       type: boolean
+     *                     lightning:
+     *                       type: boolean
+     *                     names:
+     *                       type: boolean
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 error:
+     *                   type: string
+     */
+    router.get('/capabilities', async (req, res) => {
+        try {
+            const capabilities = await getKeymaster().getNodeCapabilities();
+            res.json({ capabilities });
+        } catch (error: any) {
+            res.status(500).send({ error: error.toString() });
+        }
+    });
+
+    /**
+     * @swagger
      * /wallet:
      *   get:
      *     summary: Retrieve the current wallet.

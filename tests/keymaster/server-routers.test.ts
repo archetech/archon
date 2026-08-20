@@ -124,6 +124,7 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/challenge', 400],
     // core
     ['GET', '/registries', 500],
+    ['GET', '/capabilities', 500],
     ['GET', '/wallet', 500],
     ['PUT', '/wallet', 500],
     ['POST', '/wallet/new', 500],

@@ -8,6 +8,7 @@ import logging
 import os
 import struct
 from typing import Any, Protocol, cast
+from urllib.parse import urlparse
 
 import httpx
 from bolt11 import decode as decode_bolt11
@@ -140,6 +141,9 @@ class Keymaster:
         # memoized. _UNFETCHED until first read; None = node has no manifest (older
         # node / not a gateway) → callers proceed lazily rather than regress.
         self._node_capabilities: Any = _UNFETCHED
+        # This node's own public DIDComm endpoint, fetched once and memoized.
+        # _UNFETCHED until first read; None = the node advertises none.
+        self._node_didcomm_endpoint: Any = _UNFETCHED
 
     def _upgrade_wallet(self, wallet: dict[str, Any]) -> dict[str, Any]:
         version = wallet.get("version")
@@ -3499,6 +3503,34 @@ class Keymaster:
             }
         return await self.resolve_did(did)
 
+    async def _node_didcomm_endpoint_uri(self) -> str | None:
+        # The public DIDComm endpoint this node advertises (the same value
+        # publish_didcomm auto-discovers), used to recognise mail bound for a
+        # mailbox that lives here. Memoized; None when the node advertises none.
+        if self._node_didcomm_endpoint is not _UNFETCHED:
+            return self._node_didcomm_endpoint
+        getter = getattr(self.gatekeeper, "get_didcomm_endpoint", None)
+        if not getter:
+            self._node_didcomm_endpoint = None
+            return None
+        try:
+            self._node_didcomm_endpoint = await getter() or None
+        except Exception:
+            self._node_didcomm_endpoint = None
+        return self._node_didcomm_endpoint
+
+    @staticmethod
+    def _same_didcomm_endpoint(a: str, b: str) -> bool:
+        # Compare endpoints the way two publishers of the same node would write
+        # them: case-insensitive scheme and host, trailing slashes ignored.
+        def normalize(value: str) -> str:
+            parsed = urlparse(value)
+            if not parsed.scheme or not parsed.netloc:
+                return value.rstrip("/")
+            return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}"
+
+        return normalize(a) == normalize(b)
+
     async def _resolve_didcomm_endpoint(self, did: str) -> dict[str, Any] | None:
         doc = await self._resolve_did_for_didcomm(did)
         service = next((s for s in doc.get("didDocument", {}).get("service") or [] if s.get("type") == "DIDCommMessaging"), None)
@@ -3544,7 +3576,7 @@ class Keymaster:
         # If the node doesn't offer DIDComm, don't advertise a dead endpoint:
         # publish key-only (an explicit endpoint still overrides this).
         if endpoint is None:
-            caps = await self._get_node_capabilities()
+            caps = await self.get_node_capabilities()
             if caps is None or caps.get("didcomm") is not False:
                 getter = getattr(self.gatekeeper, "get_didcomm_endpoint", None)
                 if getter:
@@ -3649,6 +3681,24 @@ class Keymaster:
 
         return dc.pack_didcomm_message(envelope, recipients, sender=sender, signer=signer, enc=options.get("encryption"))
 
+    @staticmethod
+    def _assert_sender_matches_envelope(message: Any, metadata: dict[str, Any]) -> None:
+        # Authcrypt binds the sender to the envelope's `skid`; the plaintext `from`
+        # header is just a claim inside it, and nothing else checks the two agree.
+        # Without this, an authenticated sender can name any DID as `from` and every
+        # consumer that trusts that header -- a wallet showing "authenticated", a
+        # reply, an auto-response -- is addressing the wrong party.
+        if not metadata.get("authenticated") or not metadata.get("sender"):
+            return
+        sender_from = message.get("from") if isinstance(message, dict) else None
+        if not isinstance(sender_from, str) or not sender_from:
+            return
+        authenticated_did = metadata["sender"].split("#")[0]
+        if sender_from != authenticated_did:
+            raise KeymasterError(
+                f"DIDComm sender mismatch: message claims {sender_from} but is authenticated as {authenticated_did}"
+            )
+
     async def unpack_didcomm(self, packed: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
         options = options or {}
         name = options.get("name")
@@ -3698,8 +3748,11 @@ class Keymaster:
             result = dc.verify_jws(text, public_jwk)
             metadata["nonRepudiation"] = True
             metadata["signer"] = jws_kid
-            return {"message": json.loads(result["payload"].decode("utf-8")), "metadata": metadata}
+            signed_message = json.loads(result["payload"].decode("utf-8"))
+            self._assert_sender_matches_envelope(signed_message, metadata)
+            return {"message": signed_message, "metadata": metadata}
 
+        self._assert_sender_matches_envelope(inner, metadata)
         return {"message": inner, "metadata": metadata}
 
     def _didcomm_gateway_base(self, override: str | None = None) -> str:
@@ -3715,10 +3768,12 @@ class Keymaster:
             raise KeymasterError("cannot reach the DIDComm gateway: no node URL configured")
         return base.rstrip("/")
 
-    async def _get_node_capabilities(self) -> dict[str, bool] | None:
+    async def get_node_capabilities(self) -> dict[str, bool] | None:
         # Fetch (once, memoized) the node's capability manifest. None when the node
         # exposes no manifest (older node, or node URL is a bare gatekeeper) — callers
-        # then proceed lazily so we never regress against existing nodes.
+        # then proceed lazily so we never regress against existing nodes. Public so
+        # clients (wallet UIs) can gate optional-feature surfaces on the same signal
+        # the gated operations use; None means "unknown", which callers treat as allowed.
         if self._node_capabilities is not _UNFETCHED:
             return self._node_capabilities
         node_url = getattr(self.gatekeeper, "url", None)
@@ -3737,7 +3792,7 @@ class Keymaster:
     async def _require_node_capability(self, capability: str, human_name: str) -> None:
         # Throw clearly when the node explicitly does not offer a capability. Unknown
         # (no manifest) is permissive — the op proceeds and fails later if truly absent.
-        caps = await self._get_node_capabilities()
+        caps = await self.get_node_capabilities()
         if caps is not None and caps.get(capability) is False:
             raise KeymasterError(f"this node does not offer {human_name}")
 
@@ -3782,6 +3837,34 @@ class Keymaster:
                     routing = await self._resolve_routing_key(endpoint["routingKeys"][0])
                     envelope = dc.wrap_forward(packed, recipient_ka["kid"], {"kid": routing["kid"], "publicJwk": routing["publicJwk"]})
 
+                # A recipient whose mailbox is on this node needs no egress: deposit
+                # straight into the local relay. Without this, sending to your own
+                # identity leaves the node and comes back -- and with an
+                # auto-discovered .onion endpoint that means a full Tor round trip,
+                # which fails outright on a node that runs no Tor. Mirror of
+                # receive/mediate, which read the local gateway rather than the
+                # published endpoint. Skipped when a mediator is in the path, whose
+                # Forward envelope is addressed elsewhere by design.
+                node_endpoint = await self._node_didcomm_endpoint_uri()
+                if not endpoint["routingKeys"] and node_endpoint and self._same_didcomm_endpoint(endpoint["uri"], node_endpoint):
+                    local_response = await client.post(
+                        f"{service_base}/api/v1/messages",
+                        content=envelope,
+                        headers={"Content-Type": "application/didcomm-encrypted+json"},
+                    )
+                    if local_response.status_code >= 400:
+                        local_detail = None
+                        try:
+                            local_detail = local_response.json().get("error")
+                        except Exception:
+                            local_detail = None
+                        local_suffix = f" ({local_detail})" if local_detail else ""
+                        raise KeymasterError(
+                            f"DIDComm delivery to {recipient_did} failed: {local_response.status_code}{local_suffix}"
+                        )
+                    ids.extend(local_response.json().get("ids") or [])
+                    continue
+
                 # Authenticated hand-off to the service (signed challenge proving
                 # control of sender_did); it delivers the opaque envelope.
                 try:
@@ -3797,7 +3880,16 @@ class Keymaster:
                     json={"did": sender_did, "challenge": challenge, "signature": signature, "endpoint": endpoint["uri"], "message": envelope},
                 )
                 if response.status_code >= 400:
-                    raise KeymasterError(f"DIDComm delivery to {recipient_did} failed: {response.status_code}")
+                    # The status alone cannot tell a missing Tor proxy from a recipient
+                    # that rejected the envelope -- the service says which in the body,
+                    # so carry it through instead of discarding it.
+                    detail = None
+                    try:
+                        detail = response.json().get("error")
+                    except Exception:
+                        detail = None
+                    suffix = f" ({detail})" if detail else ""
+                    raise KeymasterError(f"DIDComm delivery to {recipient_did} failed: {response.status_code}{suffix}")
                 ids.extend(response.json().get("ids") or [])
         return ids
 

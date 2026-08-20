@@ -58,6 +58,7 @@ from .keymaster_sdk import (
     get_ipfs_data,
     get_lightning_balance,
     get_lightning_payments,
+    get_node_capabilities,
     get_vault,
     get_vault_item,
     get_image,

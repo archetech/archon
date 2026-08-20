@@ -290,6 +290,29 @@ def test_create_returns_configured_sdk_module(monkeypatch):
     assert connect_calls == [{"url": "http://unit.test", "apiKey": "secret"}]
 
 
+def test_get_node_capabilities_forwards_expected_request(monkeypatch):
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_proxy_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return {"capabilities": {"didcomm": True, "lightning": False, "names": True}}
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    assert sdk.get_node_capabilities() == {"didcomm": True, "lightning": False, "names": True}
+    assert calls == [("GET", "http://unit.test/api/v1/capabilities", {})]
+
+
+def test_get_node_capabilities_returns_none_without_a_manifest(monkeypatch):
+    # A node that serves no manifest reports null, which callers treat as unknown
+    # (permissive) rather than unsupported.
+    monkeypatch.setattr(sdk, "proxy_request", lambda method, url, **kwargs: {"capabilities": None})
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    assert sdk.get_node_capabilities() is None
+
+
 def test_didcomm_wrappers_forward_expected_requests(monkeypatch):
     calls: list[tuple[str, str, dict]] = []
 

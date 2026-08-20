@@ -382,6 +382,17 @@ export interface DidCommReceivedMessage extends DidCommUnpackResult {
     id: string;
 }
 
+// The node's optional-service manifest, served by Drawbridge at
+// `GET /api/v1/capabilities`. Each flag is true iff the node has that service
+// wired up; a node that serves no manifest at all is reported as null (unknown)
+// rather than all-false, so callers stay permissive against older nodes.
+export interface NodeCapabilities {
+    didcomm: boolean;
+    lightning: boolean;
+    names: boolean;
+    [capability: string]: boolean;
+}
+
 export interface KeymasterInterface {
     // Wallet
     loadWallet(): Promise<WalletFile>;
@@ -421,6 +432,9 @@ export interface KeymasterInterface {
     removeAddress(address: string): Promise<boolean>;
     publishAddress(address?: string, name?: string): Promise<boolean>;
     unpublishAddress(name?: string): Promise<boolean>;
+
+    // Node
+    getNodeCapabilities(): Promise<NodeCapabilities | null>;
 
     // DIDComm
     publishDidComm(endpoint?: string, name?: string, routingKeys?: string[]): Promise<boolean>;

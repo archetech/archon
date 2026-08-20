@@ -169,6 +169,10 @@ class _FakeResponse:
         self._payload = payload
         self.status_code = status_code
 
+    @property
+    def is_success(self):
+        return self.status_code < 400
+
     def json(self):
         return self._payload
 
@@ -226,6 +230,144 @@ def test_ack_didcomm_reports_the_relay_count_not_the_requested_count(monkeypatch
     km = _mailbox_keymaster(monkeypatch, calls, lambda url, kw: _FakeResponse({"removed": 1}))
 
     assert asyncio.run(km.ack_didcomm(["msg-1", "msg-gone"])) == 1
+
+
+def test_unpack_rejects_a_from_that_contradicts_the_authenticated_sender():
+    # Authcrypt binds the sender to skid; the plaintext `from` is an unchecked
+    # claim inside the envelope. Mirrors the JS keymaster.
+    import pytest
+    from keymaster.core import Keymaster, KeymasterError
+
+    metadata = {"authenticated": True, "sender": "did:cid:mallory#key-agreement-1"}
+
+    with pytest.raises(KeymasterError, match="sender mismatch"):
+        Keymaster._assert_sender_matches_envelope({"from": "did:cid:bob"}, metadata)
+
+    # Matching from, and a message with no from at all, both pass.
+    Keymaster._assert_sender_matches_envelope({"from": "did:cid:mallory"}, metadata)
+    Keymaster._assert_sender_matches_envelope({"body": {}}, metadata)
+
+
+def test_unpack_leaves_an_anoncrypt_from_alone():
+    # No skid means no authenticated sender to contradict; the claim is simply
+    # unverified, and callers must present it that way rather than reject it.
+    from keymaster.core import Keymaster
+
+    Keymaster._assert_sender_matches_envelope(
+        {"from": "did:cid:bob"}, {"authenticated": False, "sender": None}
+    )
+
+
+def test_send_didcomm_deposits_locally_for_a_mailbox_on_this_node(monkeypatch):
+    # Sending to your own identity must not leave the node. With an auto-discovered
+    # .onion endpoint that would be a full Tor round trip out and back -- and no
+    # delivery at all on a node running no Tor. Mirrors the JS keymaster.
+    import asyncio
+
+    onion = "http://abcdefghijklmnop.onion:4222/didcomm"
+    calls: list = []
+
+    def responses(url, kw):
+        return _FakeResponse({"ids": ["local-1"]})
+
+    km = _mailbox_keymaster(monkeypatch, calls, responses)
+    monkeypatch.setattr(km, "pack_didcomm", _async_return("envelope"))
+    monkeypatch.setattr(km, "_resolve_didcomm_endpoint", _async_return({"uri": onion, "routingKeys": []}))
+    monkeypatch.setattr(km, "_node_didcomm_endpoint_uri", _async_return(onion))
+
+    assert asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:alice")) == ["local-1"]
+
+    urls = [url for _method, url, _kw in calls]
+    assert urls == ["https://gateway.example/didcomm/api/v1/messages"]
+    assert not any("/deliver" in url for url in urls)
+    assert not any("/challenge" in url for url in urls)
+
+
+def test_send_didcomm_uses_the_service_for_a_mailbox_elsewhere(monkeypatch):
+    import asyncio
+
+    calls: list = []
+
+    def responses(url, kw):
+        if url.endswith("/challenge"):
+            return _FakeResponse({"challenge": "c"})
+        return _FakeResponse({"ids": ["remote-1"]})
+
+    km = _mailbox_keymaster(monkeypatch, calls, responses)
+    monkeypatch.setattr(km, "pack_didcomm", _async_return("envelope"))
+    monkeypatch.setattr(km, "_resolve_didcomm_endpoint", _async_return({"uri": "https://othernode.example/didcomm", "routingKeys": []}))
+    monkeypatch.setattr(km, "_node_didcomm_endpoint_uri", _async_return("https://mynode.example/didcomm"))
+    monkeypatch.setattr("keymaster.core.sign_hash", lambda *args, **kwargs: "sig")
+
+    assert asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob")) == ["remote-1"]
+
+    urls = [url for _method, url, _kw in calls]
+    assert any("/deliver" in url for url in urls)
+    assert not any(url.endswith("/api/v1/messages") for url in urls)
+
+
+def test_same_didcomm_endpoint_ignores_case_and_trailing_slash():
+    from keymaster.core import Keymaster
+
+    assert Keymaster._same_didcomm_endpoint("https://Node.Example/didcomm/", "https://node.example/didcomm")
+    assert not Keymaster._same_didcomm_endpoint("https://node.example/didcomm", "https://other.example/didcomm")
+
+
+def test_delivery_failure_carries_the_service_error_body(monkeypatch):
+    # 502 alone cannot tell a missing Tor proxy from a recipient that rejected the
+    # envelope; the reason lives in the body. Mirrors the JS keymaster.
+    import asyncio
+    import pytest
+    from keymaster.core import KeymasterError
+
+    def responses(url, kw):
+        if url.endswith("/challenge"):
+            return _FakeResponse({"challenge": "c"})
+        return _FakeResponse(
+            {"error": "onion endpoint requires a Tor proxy (set ARCHON_DIDCOMM_TOR_PROXY)"},
+            status_code=502,
+        )
+
+    calls: list = []
+    km = _mailbox_keymaster(monkeypatch, calls, responses)
+    monkeypatch.setattr(km, "pack_didcomm", _async_return("envelope"))
+    monkeypatch.setattr(km, "_resolve_didcomm_endpoint", _async_return({"uri": "https://bob.example/didcomm", "routingKeys": []}))
+    monkeypatch.setattr("keymaster.core.sign_hash", lambda *args, **kwargs: "sig")
+
+    with pytest.raises(KeymasterError) as exc:
+        asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
+
+    assert "502 (onion endpoint requires a Tor proxy" in str(exc.value)
+
+
+def test_delivery_failure_without_a_body_still_reports_the_status(monkeypatch):
+    import asyncio
+    import pytest
+    from keymaster.core import KeymasterError
+
+    class _NoBody:
+        status_code = 504
+        is_success = False
+
+        @staticmethod
+        def json():
+            raise ValueError("not json")
+
+    def responses(url, kw):
+        if url.endswith("/challenge"):
+            return _FakeResponse({"challenge": "c"})
+        return _NoBody()
+
+    calls: list = []
+    km = _mailbox_keymaster(monkeypatch, calls, responses)
+    monkeypatch.setattr(km, "pack_didcomm", _async_return("envelope"))
+    monkeypatch.setattr(km, "_resolve_didcomm_endpoint", _async_return({"uri": "https://bob.example/didcomm", "routingKeys": []}))
+    monkeypatch.setattr("keymaster.core.sign_hash", lambda *args, **kwargs: "sig")
+
+    with pytest.raises(KeymasterError) as exc:
+        asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
+
+    assert str(exc.value).endswith("failed: 504")
 
 
 def test_receive_didcomm_acks_unless_ack_is_explicitly_false(monkeypatch):
@@ -316,6 +458,64 @@ def test_capability_gating_permissive_when_manifest_absent():
     with pytest.raises(Exception) as exc:
         asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
     assert "does not offer" not in str(exc.value)
+
+
+def test_get_node_capabilities_is_public_and_memoized(monkeypatch):
+    # The same signal the gates use, exposed so a wallet can hide a surface instead
+    # of offering it and failing. Mirrors the JS Keymaster.getNodeCapabilities.
+    import asyncio
+    import httpx
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    calls: list[str] = []
+
+    class _Response:
+        is_success = True
+
+        @staticmethod
+        def json():
+            return {"didcomm": True, "lightning": False, "names": True}
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url):
+            calls.append(url)
+            return _Response()
+
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+
+    async def run():
+        first = await km.get_node_capabilities()
+        second = await km.get_node_capabilities()
+        return first, second
+
+    first, second = asyncio.run(run())
+    assert first == {"didcomm": True, "lightning": False, "names": True}
+    assert second == first
+    assert calls == ["http://node.test/api/v1/capabilities"]  # memoized, fetched once
+
+
+def test_get_node_capabilities_none_without_node_url():
+    import asyncio
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = None
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    assert asyncio.run(km.get_node_capabilities()) is None
 
 
 def test_coordinate_mediation_builders():

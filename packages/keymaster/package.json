@@ -37,6 +37,11 @@
       "require": "./dist/cjs/keymaster-client.cjs",
       "types": "./dist/types/keymaster-client.d.ts"
     },
+    "./didcomm-protocols": {
+      "import": "./dist/esm/didcomm-protocols.js",
+      "require": "./dist/cjs/didcomm-protocols.cjs",
+      "types": "./dist/types/didcomm-protocols.d.ts"
+    },
     "./wallet/json": {
       "import": "./dist/esm/db/json.js",
       "require": "./dist/cjs/db/json.cjs",

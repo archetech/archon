@@ -1380,6 +1380,11 @@ def get_lightning_payments(id=None):
     return response["payments"]
 
 
+def get_node_capabilities():
+    response = proxy_request("GET", f"{_keymaster_api}/capabilities")
+    return response["capabilities"]
+
+
 # DIDComm v2
 
 

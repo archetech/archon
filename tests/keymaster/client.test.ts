@@ -17,6 +17,7 @@ const Endpoints = {
     wallet_mnemonic: '/api/v1/wallet/mnemonic',
     wallet_passphrase: '/api/v1/wallet/passphrase',
     registries: '/api/v1/registries',
+    capabilities: '/api/v1/capabilities',
     ids: '/api/v1/ids',
     ids_current: '/api/v1/ids/current',
     keys_rotate: '/api/v1/keys/rotate',
@@ -1362,6 +1363,46 @@ describe('unpublishAddress', () => {
 
         try {
             await keymaster.unpublishAddress();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('getNodeCapabilities', () => {
+    it('should return the node capability manifest', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.capabilities)
+            .reply(200, { capabilities: { didcomm: true, lightning: false, names: true } });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const capabilities = await keymaster.getNodeCapabilities();
+
+        expect(capabilities).toStrictEqual({ didcomm: true, lightning: false, names: true });
+    });
+
+    it('should return null when the node serves no manifest', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.capabilities)
+            .reply(200, { capabilities: null });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const capabilities = await keymaster.getNodeCapabilities();
+
+        expect(capabilities).toBeNull();
+    });
+
+    it('should throw exception on getNodeCapabilities server error', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.capabilities)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.getNodeCapabilities();
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
