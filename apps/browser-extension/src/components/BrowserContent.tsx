@@ -23,7 +23,7 @@ import BrowserHeader from "./BrowserHeader";
 import JsonViewer from "./JsonViewer";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import AliasedDIDs from "./AliasedDIDs";
 import AssetsTab from "./AssetsTab";
 import DmailTab from "./DmailTab";

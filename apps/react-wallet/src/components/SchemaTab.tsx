@@ -3,7 +3,7 @@ import {Box, Button, FormControl, IconButton, MenuItem, Select, TextField, Toolt
 import { useWalletContext } from "../contexts/WalletProvider";
 import {useSnackbar} from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { Edit } from "@mui/icons-material";
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";

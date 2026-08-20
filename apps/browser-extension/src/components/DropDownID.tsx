@@ -9,7 +9,7 @@ import { ArrowDropDown } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { requestBrowserRefresh } from "../utils/utils";
 import CopyDID from "./CopyDID";
 import GatekeeperClient from "@didcid/clients/gatekeeper";

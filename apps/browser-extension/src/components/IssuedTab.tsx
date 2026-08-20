@@ -5,7 +5,7 @@ import {
     TextField,
 } from "@mui/material";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";

@@ -10,7 +10,7 @@ import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
 import { SelectInputModal } from "@didcid/wallet-ui";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { requestBrowserRefresh } from "../utils/utils";
 import type { AddressCheckResult, AddressInfo, FileAsset, ImageAsset, NostrKeys } from "@didcid/keymaster/types";
 import GatekeeperClient from "@didcid/clients/gatekeeper";

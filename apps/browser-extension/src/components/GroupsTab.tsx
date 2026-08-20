@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {Box, Button, Divider, IconButton, MenuItem, Select, TextField, Tooltip, Typography} from "@mui/material";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import {Delete, Edit} from "@mui/icons-material";

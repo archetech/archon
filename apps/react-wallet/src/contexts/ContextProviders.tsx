@@ -1,6 +1,6 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { WalletProvider } from "./WalletProvider";
-import { VariablesProvider } from "./VariablesProvider";
+import { VariablesProvider } from "@didcid/wallet-ui";
 import { UIProvider } from "./UIContext";
 import { ThemeProvider } from "@mui/material/styles";
 import { Box, CssBaseline, useMediaQuery } from "@mui/material";

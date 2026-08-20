@@ -1,12 +1,21 @@
 import React, { createContext, Dispatch, ReactNode, SetStateAction, useContext, useEffect, useState } from "react";
 import { WalletProvider } from "./WalletProvider";
-import { VariablesProvider } from "./VariablesProvider";
+import { VariablesProvider } from "@didcid/wallet-ui";
 import { AuthProvider } from "./AuthContext";
 import { RefreshMode, UIProvider, openBrowserValues } from "./UIContext";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { Box } from "@mui/material";
 import { requestBrowserRefresh } from "../utils/utils";
 import { SnackbarProvider } from "@didcid/wallet-ui";
+
+// The popup is destroyed whenever it closes, so the state the user was looking
+// at has to be written through to the background script and read back on open.
+// Passed to the shared VariablesProvider rather than reached for inside it: the
+// full-page browser view keeps a live page and persists nothing, which is why
+// the store is omitted there.
+async function storeExtensionState(key: string, value: string | boolean) {
+    await chrome.runtime.sendMessage({ action: "STORE_STATE", key, value });
+}
 
 interface ThemeContextValue {
     darkMode: boolean;
@@ -86,7 +95,7 @@ export function ContextProviders(
                 >
                     <SnackbarProvider>
                         <WalletProvider isBrowser={isBrowser}>
-                            <VariablesProvider>
+                            <VariablesProvider store={isBrowser ? undefined : storeExtensionState}>
                                 <AuthProvider>
                                     <UIProvider
                                         pendingAuth={pendingAuth}

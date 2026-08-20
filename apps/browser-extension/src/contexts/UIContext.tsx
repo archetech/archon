@@ -19,7 +19,7 @@ import {
 import { useWalletContext } from "./WalletProvider";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { useAuthContext } from "./AuthContext";
-import { useVariablesContext } from "./VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useThemeContext } from "./ContextProviders";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
 

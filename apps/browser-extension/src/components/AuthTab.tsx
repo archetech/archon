@@ -9,7 +9,7 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useAuthContext } from "../contexts/AuthContext";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 
 interface AutoLoginState {
     responseDID: string;

@@ -3,19 +3,23 @@ import { DmailItem } from "@didcid/keymaster/types";
 
 interface VariablesContextValue {
     currentId: string;
-    setCurrentId: Dispatch<SetStateAction<string>>;
+    setCurrentId: (value: string) => Promise<void>;
     validId: boolean;
     setValidId: Dispatch<SetStateAction<boolean>>;
     currentDID: string;
     setCurrentDID: Dispatch<SetStateAction<string>>;
     registry: string;
-    setRegistry: Dispatch<SetStateAction<string>>;
+    setRegistry: (value: string) => Promise<void>;
     registries: string[];
     setRegistries: Dispatch<SetStateAction<string[]>>;
     idList: string[];
     setIdList: Dispatch<SetStateAction<string[]>>;
     unresolvedIdList: string[];
     setUnresolvedIdList: Dispatch<SetStateAction<string[]>>;
+    manifest: Record<string, unknown> | undefined;
+    setManifest: Dispatch<SetStateAction<Record<string, unknown> | undefined>>;
+    heldDID: string;
+    setHeldDID: (value: string) => Promise<void>;
     heldList: string[];
     setHeldList: Dispatch<SetStateAction<string[]>>;
     credentialDID: string;
@@ -49,9 +53,9 @@ interface VariablesContextValue {
     dmailList: Record<string, DmailItem>;
     setDmailList: Dispatch<SetStateAction<Record<string, DmailItem>>>;
     alias: string;
-    setAlias: Dispatch<SetStateAction<string>>;
+    setAlias: (value: string) => Promise<void>;
     aliasDID: string;
-    setAliasDID: Dispatch<SetStateAction<string>>;
+    setAliasDID: (value: string) => Promise<void>;
     aliasList: Record<string, string>;
     setAliasList: Dispatch<SetStateAction<Record<string, string>>>;
     aliasRegistry: Record<string, string>;
@@ -62,21 +66,34 @@ interface VariablesContextValue {
     setAgentList: Dispatch<SetStateAction<string[]>>;
     pollList: string[];
     setPollList: Dispatch<SetStateAction<string[]>>;
-    manifest: Record<string, unknown> | undefined;
-    setManifest: Dispatch<SetStateAction<Record<string, unknown> | undefined>>;
+    resetCredentialState: () => void;
+    refreshCredentialsStored: (state: Record<string, any>) => Promise<void>;
+    refreshRegistryStored: (state: Record<string, any>) => Promise<void>;
+    storeState: (key: string, value: string | boolean) => Promise<void>;
 }
 
 const VariablesContext = createContext<VariablesContextValue | null>(null);
 
-export function VariablesProvider({ children }: { children: ReactNode }) {
-    const [currentId, setCurrentId] = useState<string>("");
+// Persisting this state is a platform capability, not a feature of the state
+// itself. The extension's popup is destroyed every time it closes, so it writes
+// through to chrome storage and reads back on open; react-wallet keeps a live
+// page and persists nothing. Supplying `store` opts in -- omit it and every
+// setter below is a plain state update.
+export type VariablesStore = (key: string, value: string | boolean) => Promise<void>;
+
+export function VariablesProvider(
+    { children, store }: { children: ReactNode; store?: VariablesStore }
+) {
+    const [currentId, setCurrentIdState] = useState<string>("");
     const [validId, setValidId] = useState<boolean>(false);
     const [currentDID, setCurrentDID] = useState<string>("");
     const [idList, setIdList] = useState<string[]>([]);
     const [unresolvedIdList, setUnresolvedIdList] = useState<string[]>([]);
-    const [registry, setRegistry] = useState<string>("hyperswarm");
+    const [manifest, setManifest] = useState<Record<string, unknown> | undefined>(undefined);
+    const [registry, setRegistryState] = useState<string>("hyperswarm");
     const [registries, setRegistries] = useState<string[]>([]);
     const [heldList, setHeldList] = useState<string[]>([]);
+    const [heldDID, setHeldDIDState] = useState<string>("");
     const [aliasList, setAliasList] = useState<Record<string, string>>({});
     const [aliasRegistry, setAliasRegistry] = useState<Record<string, string>>({});
     const [unresolvedList, setUnresolvedList] = useState<Record<string, string>>({});
@@ -96,10 +113,65 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     const [credentialSubject, setCredentialSubject] = useState<string>("");
     const [credentialSchema, setCredentialSchema] = useState<string>("");
     const [credentialString, setCredentialString] = useState<string>("");
-    const [alias, setAlias] = useState<string>("");
-    const [aliasDID, setAliasDID] = useState<string>("");
+    const [alias, setAliasState] = useState<string>("");
+    const [aliasDID, setAliasDIDState] = useState<string>("");
     const [dmailList, setDmailList] = useState<Record<string, DmailItem>>({});
-    const [manifest, setManifest] = useState<Record<string, unknown> | undefined>(undefined);
+    async function setHeldDID(value: string) {
+        setHeldDIDState(value);
+        await storeState("heldDID", value);
+    }
+
+    async function setAlias(value: string) {
+        setAliasState(value);
+        await storeState("aliasName", value);
+    }
+
+    async function setAliasDID(value: string) {
+        setAliasDIDState(value);
+        await storeState("aliasDID", value);
+    }
+
+    async function setCurrentId(value: string) {
+        setCurrentIdState(value);
+        await storeState("currentId", value);
+    }
+
+    async function setRegistry(value: string) {
+        setRegistryState(value);
+        await storeState("registry", value);
+    }
+
+    function resetCredentialState() {
+        setAliasState("");
+        setAliasDIDState("");
+        setHeldDIDState("");
+        setCurrentIdState("");
+        setRegistryState("hyperswarm");
+    }
+
+    async function refreshCredentialsStored(state: Record<string, any>) {
+        if (state.heldDID) {
+            setHeldDIDState(state.heldDID);
+        }
+
+        if (state.aliasName) {
+            setAliasState(state.aliasName);
+        }
+
+        if (state.aliasDID) {
+            setAliasDIDState(state.aliasDID);
+        }
+    }
+
+    async function refreshRegistryStored(state: Record<string, any>) {
+        if (state.registry) {
+            setRegistryState(state.registry);
+        }
+    }
+
+    async function storeState(key: string, value: string | boolean) {
+        await store?.(key, value);
+    }
 
     const value: VariablesContextValue = {
         currentId,
@@ -116,6 +188,10 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
         setIdList,
         unresolvedIdList,
         setUnresolvedIdList,
+        manifest,
+        setManifest,
+        heldDID,
+        setHeldDID,
         heldList,
         setHeldList,
         groupList,
@@ -162,8 +238,10 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
         setPollList,
         dmailList,
         setDmailList,
-        manifest,
-        setManifest,
+        storeState,
+        resetCredentialState,
+        refreshCredentialsStored,
+        refreshRegistryStored,
     }
 
     return (

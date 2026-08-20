@@ -4,7 +4,7 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { useThemeContext } from "../contexts/ContextProviders";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 
 function CloneAssetTab() {
     const [alias, setAlias] = useState("");

@@ -39,7 +39,7 @@ import IdentitiesTab from "./components/IdentitiesTab";
 import BrowserHeader from "./components/BrowserHeader";
 import JsonViewer from "./components/JsonViewer";
 import PageHeader from "./components/layout/PageHeader";
-import { useVariablesContext } from "./contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "./contexts/UIContext";
 import { useThemeContext } from "./contexts/ContextProviders";
 import { useWalletContext } from "./contexts/WalletProvider";

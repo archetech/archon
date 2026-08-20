@@ -3,7 +3,7 @@ import { Box, Button, IconButton, InputAdornment, TextField, Tooltip } from "@mu
 import { CameraAlt } from "@mui/icons-material";
 import WarningModal from "../modals/WarningModal";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import JsonViewer from "./JsonViewer";

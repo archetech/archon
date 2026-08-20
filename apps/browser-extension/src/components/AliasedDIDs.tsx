@@ -31,7 +31,7 @@ import {
     MoveUp,
 } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { requestBrowserRefresh } from "../utils/utils";

@@ -29,7 +29,7 @@ import {
 } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "@didcid/wallet-ui";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import PollResultsModal from "../modals/PollResultsModal";
 import {PollConfig, PollResults} from "@didcid/keymaster/types";

@@ -15,7 +15,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { LightningNotConfiguredError } from "@didcid/common/errors";
 import { DecodedLightningInvoice, LightningPaymentRecord, LightningPaymentStatus } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 
 const LIGHTNING_PAYMENT_STATUS_CHECKS = 3;

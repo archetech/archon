@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import { Add, Delete, Edit, Save, Close } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
 

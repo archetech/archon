@@ -44,7 +44,7 @@ import {
 } from "@mui/icons-material";
 import { DmailItem, DmailMessage } from '@didcid/keymaster/types';
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import TextInputModal from "../modals/TextInputModal";

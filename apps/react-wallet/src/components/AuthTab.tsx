@@ -8,7 +8,7 @@ import axios from "axios";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { scanQrCodeRaw } from "../utils/utils";
 import { dispatchDeepLink } from "../utils/deepLinkQueue";
 import PageHeader from "./layout/PageHeader";

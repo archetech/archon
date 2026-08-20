@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useContext, useState } from "react";
-import { useVariablesContext } from "./VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 
 interface AuthContextValue {
     authDID: string;
