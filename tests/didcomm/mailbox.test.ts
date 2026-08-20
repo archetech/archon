@@ -199,6 +199,111 @@ describe('deposit route capacity', () => {
         expect(second.body.error).toMatch(/challenges/);
     });
 
+    // Egress checks sit behind challenge auth, so these need a relay that accepts
+    // the signature -- otherwise every request 401s before reaching them.
+    function appWithEgress(options: { allowInsecureEgress?: boolean } = {}) {
+        const store = new MemoryMailboxStore(1000, 1000, () => 1_000_000);
+        const resolver = {
+            resolveDID: async () => ({
+                didDocument: { verificationMethod: [{ publicKeyJwk: { kty: 'EC' } }] },
+            }),
+        };
+        const cipher = { hashMessage: () => 'hash', verifySig: () => true };
+        const app = express();
+        app.use('/didcomm', createApp({ store, resolver: resolver as any, cipher: cipher as any, ...options }));
+        return { app, store };
+    }
+
+    async function deliver(app: any, endpoint: string) {
+        const { body } = await request(app).get('/didcomm/api/v1/challenge');
+        return request(app)
+            .post('/didcomm/api/v1/deliver')
+            .send({ did: 'did:test:alice', challenge: body.challenge, signature: 's', endpoint, message: 'x' });
+    }
+
+    // The scheme check is the half of the old egress guard that held: a DNS name
+    // cannot forge it, and it keeps plaintext internal services (the usual SSRF
+    // target being http://redis:6379 with inline commands in the body) out of
+    // reach. The address half was removed in #645 -- it matched hostnames with a
+    // literal regex, so 127.0.0.1.nip.io passed while honest LAN delivery did not.
+    it('refuses clearnet delivery over plain http', async () => {
+        const { app } = appWithEgress();
+        const response = await deliver(app, 'http://redis:6379');
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/https/);
+    });
+
+    it('does not filter clearnet delivery by address', async () => {
+        // A private https destination gets past the guard and is actually
+        // attempted -- what an address filter would have refused outright.
+        // fetch is mocked: a real connection to a LAN address would hang or, on
+        // the wrong subnet, reach someone.
+        const attempted: string[] = [];
+        const realFetch = globalThis.fetch;
+        globalThis.fetch = (async (input: any) => {
+            attempted.push(String(input));
+            return new Response(JSON.stringify({ ids: ['x'] }), { status: 200 });
+        }) as any;
+
+        try {
+            const { app } = appWithEgress();
+            const response = await deliver(app, 'https://192.168.0.255');
+
+            expect(response.status).toBe(200);
+            expect(attempted).toEqual(['https://192.168.0.255/api/v1/messages']);
+        }
+        finally {
+            globalThis.fetch = realFetch;
+        }
+    });
+
+    it('does not follow a redirect off the https endpoint', async () => {
+        // The scheme check is worthless if a redirect can undo it: 307/308
+        // preserve method and body, so an https endpoint answering
+        // `307 -> http://redis:6379` would deliver the caller's bytes there.
+        const realFetch = globalThis.fetch;
+        let passedRedirect: string | undefined;
+        globalThis.fetch = (async (_input: any, init: any) => {
+            passedRedirect = init?.redirect;
+            return new Response(null, { status: 307, headers: { location: 'http://redis:6379/' } });
+        }) as any;
+
+        try {
+            const { app } = appWithEgress();
+            const response = await deliver(app, 'https://relay.example');
+
+            expect(passedRedirect).toBe('manual');
+            expect(response.status).toBe(502);
+            expect(response.body.error).toMatch(/redirect/);
+        }
+        finally {
+            globalThis.fetch = realFetch;
+        }
+    });
+
+    it('allows plain http only when the host app opts in', async () => {
+        // allowInsecureEgress exists for in-process tests and has no environment
+        // binding, so a deployed relay cannot reach this branch.
+        const attempted: string[] = [];
+        const realFetch = globalThis.fetch;
+        globalThis.fetch = (async (input: any) => {
+            attempted.push(String(input));
+            return new Response(JSON.stringify({ ids: ['x'] }), { status: 200 });
+        }) as any;
+
+        try {
+            const { app } = appWithEgress({ allowInsecureEgress: true });
+            const response = await deliver(app, 'http://127.0.0.1:4236');
+
+            expect(response.status).toBe(200);
+            expect(attempted).toEqual(['http://127.0.0.1:4236/api/v1/messages']);
+        }
+        finally {
+            globalThis.fetch = realFetch;
+        }
+    });
+
     // A 429 says the envelope was not stored. If an earlier recipient's copy
     // were left behind, a retry would deliver to them twice.
     it('rolls back earlier recipients when a later one is full', async () => {
