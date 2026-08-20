@@ -28,7 +28,10 @@ function buildHeaders(adminKey) {
     };
 
     if (adminKey) {
-        headers.Authorization = `Bearer ${adminKey}`;
+        // Gatekeeper reads the admin key from this header only (v1-admin.ts).
+        // Inert on the routes this script calls, which are unguarded -- but a
+        // bearer token here would silently stop working the day one is guarded.
+        headers['X-Archon-Admin-Key'] = adminKey;
     }
 
     return headers;
