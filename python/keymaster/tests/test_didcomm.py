@@ -232,6 +232,32 @@ def test_ack_didcomm_reports_the_relay_count_not_the_requested_count(monkeypatch
     assert asyncio.run(km.ack_didcomm(["msg-1", "msg-gone"])) == 1
 
 
+def test_unpack_rejects_a_from_that_contradicts_the_authenticated_sender():
+    # Authcrypt binds the sender to skid; the plaintext `from` is an unchecked
+    # claim inside the envelope. Mirrors the JS keymaster.
+    import pytest
+    from keymaster.core import Keymaster, KeymasterError
+
+    metadata = {"authenticated": True, "sender": "did:cid:mallory#key-agreement-1"}
+
+    with pytest.raises(KeymasterError, match="sender mismatch"):
+        Keymaster._assert_sender_matches_envelope({"from": "did:cid:bob"}, metadata)
+
+    # Matching from, and a message with no from at all, both pass.
+    Keymaster._assert_sender_matches_envelope({"from": "did:cid:mallory"}, metadata)
+    Keymaster._assert_sender_matches_envelope({"body": {}}, metadata)
+
+
+def test_unpack_leaves_an_anoncrypt_from_alone():
+    # No skid means no authenticated sender to contradict; the claim is simply
+    # unverified, and callers must present it that way rather than reject it.
+    from keymaster.core import Keymaster
+
+    Keymaster._assert_sender_matches_envelope(
+        {"from": "did:cid:bob"}, {"authenticated": False, "sender": None}
+    )
+
+
 def test_send_didcomm_deposits_locally_for_a_mailbox_on_this_node(monkeypatch):
     # Sending to your own identity must not leave the node. With an auto-discovered
     # .onion endpoint that would be a full Tor round trip out and back -- and no

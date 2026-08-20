@@ -418,8 +418,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [didcommMessages, setDidcommMessages] = useState([]);
     const [didcommInboxLoading, setDidcommInboxLoading] = useState(false);
     // A ref, not the loading flag: the poll's interval callback closes over the
-    // render that created it, so a state read there would always be stale.
-    const didcommPollingRef = useRef(false);
+    // render that created it, so a state read there would always be stale. Keyed
+    // by identity, so an in-flight read neither blocks nor overwrites a read for a
+    // different identity.
+    const didcommInFlightRef = useRef(null);
+    const didcommActiveIdRef = useRef('');
     const [didcommStatus, setDidcommStatus] = useState(null);
     const [didcommEndpoint, setDidcommEndpoint] = useState('');
     const [didcommRoutingKeys, setDidcommRoutingKeys] = useState('');
@@ -460,6 +463,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }, [tab]);
 
     useEffect(() => {
+        didcommActiveIdRef.current = currentId;
+        // Drop the previous identity's mail immediately rather than leaving it on
+        // screen under the new name until the fetch returns.
+        setDidcommMessages([]);
         if (tab === 'didcomm') {
             refreshDidComm();
             refreshDidCommInbox({ quiet: true });
@@ -519,19 +526,27 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     // the whole mailbox. The list is replaced rather than accumulated: what is on
     // screen is exactly what is still in the mailbox.
     async function refreshDidCommInbox(options = {}) {
-        if (!currentId) {
+        const requested = currentId;
+
+        if (!requested) {
             setDidcommMessages([]);
             return;
         }
 
-        if (didcommPollingRef.current) {
+        if (didcommInFlightRef.current === requested) {
             return;
         }
-        didcommPollingRef.current = true;
+        didcommInFlightRef.current = requested;
         setDidcommInboxLoading(true);
 
         try {
-            const received = await keymaster.receiveDidComm({ name: currentId, ack: false });
+            const received = await keymaster.receiveDidComm({ name: requested, ack: false });
+            // A read that finishes after the identity changed belongs to nobody on
+            // screen; committing it would show one identity's mail under another's
+            // name, and with polling off it would stay there.
+            if (didcommActiveIdRef.current !== requested) {
+                return;
+            }
             setDidcommMessages(received);
         } catch (error) {
             // A polled failure is usually a node that is briefly unreachable; only
@@ -540,7 +555,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 showError(error);
             }
         } finally {
-            didcommPollingRef.current = false;
+            if (didcommInFlightRef.current === requested) {
+                didcommInFlightRef.current = null;
+            }
             setDidcommInboxLoading(false);
         }
     }
@@ -614,9 +631,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function respondToDidCommPing(received) {
         const message = received.message || {};
+        // Only the envelope's authenticated sender is safe to address. The
+        // plaintext `from` is the sender's own claim, so responding to it could
+        // send the answer to a party who never pinged.
+        const sender = didcommAuthenticatedSender(received);
 
-        if (!message.from || !message.id) {
-            showError('This ping carries no sender to respond to');
+        if (!sender || !message.id) {
+            showError('This ping has no authenticated sender to respond to');
             return;
         }
 
@@ -624,7 +645,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         try {
             await keymaster.sendDidComm(
                 { type: TRUST_PING_RESPONSE_TYPE, body: {}, thid: message.id },
-                message.from,
+                sender,
                 { name: currentId },
             );
             showSuccess('Ping response sent');
@@ -633,6 +654,17 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         } finally {
             setDidcommBusy(false);
         }
+    }
+
+    // Authcrypt binds the sender to the envelope; `message.from` is an unverified
+    // claim inside it. unpack now rejects a mismatch outright, so this is the
+    // second line of the same rule: never address or display a claim as if the
+    // envelope vouched for it.
+    function didcommAuthenticatedSender(received) {
+        if (!received.metadata?.authenticated || !received.metadata?.sender) {
+            return undefined;
+        }
+        return received.metadata.sender.split('#')[0];
     }
 
     function didcommMessageLabel(type) {
@@ -7875,7 +7907,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         </Typography>
                                         : didcommMessages.map((received) => {
                                             const message = received.message || {};
-                                            const sender = message.from || received.metadata?.sender;
+                                            const sender = didcommAuthenticatedSender(received);
+                                            const claimed = typeof message.from === 'string' ? message.from : undefined;
                                             // DIDComm created_time is seconds since the epoch, not milliseconds.
                                             const time = message.created_time
                                                 ? new Date(message.created_time * 1000).toLocaleString()
@@ -7898,7 +7931,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                             </Typography>
                                                         }
                                                         <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
-                                                            {message.type === TRUST_PING_TYPE &&
+                                                            {message.type === TRUST_PING_TYPE && sender &&
                                                                 <Button
                                                                     size="small"
                                                                     onClick={() => respondToDidCommPing(received)}
@@ -7927,7 +7960,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                         </Box>
                                                     </Box>
                                                     <Typography variant="body2" sx={{ opacity: 0.7, wordBreak: 'break-all' }}>
-                                                        From: {sender || 'unknown'}
+                                                        From: {sender || (claimed ? `${claimed} (unverified)` : 'unknown')}
                                                     </Typography>
                                                     {message.type === BASIC_MESSAGE_TYPE
                                                         ? <Typography variant="body1" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>

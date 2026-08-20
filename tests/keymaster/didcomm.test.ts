@@ -6,6 +6,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import HeliaClient from '@didcid/ipfs/helia';
 import {
+    packDidCommMessage,
     packEncrypted,
     unpackEncrypted,
     didKeyToX25519,
@@ -302,6 +303,85 @@ describe('packDidComm / unpackDidComm (cross-method: Archon did:cid <-> did:key)
         expect(out.body).toEqual(body);
         expect(metadata.authenticated).toBe(true);
         expect(metadata.sender).toBe(bob.kid);
+    });
+});
+
+describe('authenticated sender binding', () => {
+    // packDidComm already strips a caller-supplied `from` and sets it itself, so
+    // the threat is a foreign agent: anyone may send us DIDComm, and an envelope
+    // authenticated as Mallory can carry `from: alice` in its plaintext.
+    async function forgeEnvelope(senderName: string, recipientDid: string, claimedFrom: string) {
+        const senderKa = await keymaster.fetchDidCommKeyPair(senderName);
+        const senderDid = (await keymaster.fetchIdInfo(senderName)).did;
+        const recipientDoc = await keymaster.resolveDID(recipientDid);
+        const recipientKa = (keymaster as any).resolveKeyAgreement(recipientDoc);
+
+        return packDidCommMessage(
+            {
+                id: 'forged-1',
+                typ: 'application/didcomm-plain+json',
+                type: 'https://didcomm.org/basicmessage/2.0/message',
+                to: [recipientDid],
+                from: claimedFrom,
+                body: { content: 'trust me' },
+            },
+            [recipientKa],
+            { sender: { kid: `${senderDid}#key-agreement-1`, privateJwk: senderKa.privateJwk } },
+        );
+    }
+
+    it('rejects a message whose from does not match the authenticated sender', async () => {
+        const aliceDid = await keymaster.createId('Alice');
+        await keymaster.createId('Mallory');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://mallory.example/didcomm', 'Mallory');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+
+        const packed = await forgeEnvelope('Mallory', aliceDid, bobDid);
+
+        await expect(keymaster.unpackDidComm(packed, { name: 'Alice' }))
+            .rejects.toThrow(/sender mismatch/);
+    });
+
+    it('accepts a message whose from matches the authenticated sender', async () => {
+        const aliceDid = await keymaster.createId('Alice');
+        const malloryDid = await keymaster.createId('Mallory');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://mallory.example/didcomm', 'Mallory');
+
+        const packed = await forgeEnvelope('Mallory', aliceDid, malloryDid);
+        const { message, metadata } = await keymaster.unpackDidComm(packed, { name: 'Alice' });
+
+        expect(metadata.authenticated).toBe(true);
+        expect(message.from).toBe(malloryDid);
+    });
+
+    it('leaves an anoncrypt from alone, since nothing authenticates it', async () => {
+        // No skid means no authenticated sender to contradict; the claim is simply
+        // unverified, and callers must present it that way rather than reject it.
+        const aliceDid = await keymaster.createId('Alice');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+
+        const recipientDoc = await keymaster.resolveDID(aliceDid);
+        const recipientKa = (keymaster as any).resolveKeyAgreement(recipientDoc);
+        const packed = packDidCommMessage(
+            {
+                id: 'anon-1',
+                typ: 'application/didcomm-plain+json',
+                type: 'https://didcomm.org/basicmessage/2.0/message',
+                to: [aliceDid],
+                from: bobDid,
+                body: { content: 'anonymous' },
+            },
+            [recipientKa],
+            {},
+        );
+
+        const { metadata } = await keymaster.unpackDidComm(packed, { name: 'Alice' });
+        expect(metadata.authenticated).toBe(false);
     });
 });
 

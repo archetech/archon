@@ -2556,6 +2556,30 @@ export default class Keymaster implements KeymasterInterface {
         return packDidCommMessage(envelope, recipients, packOptions);
     }
 
+    // Authcrypt binds the sender to the envelope's `skid`; the plaintext `from`
+    // header is just a claim inside it, and nothing else checks the two agree.
+    // Without this, an authenticated sender can name any DID as `from` and every
+    // consumer that trusts that header -- a wallet showing "authenticated", a
+    // reply, an auto-response -- is addressing the wrong party.
+    private static assertSenderMatchesEnvelope(
+        message: any,
+        metadata: { authenticated: boolean; sender?: string }
+    ): void {
+        if (!metadata.authenticated || !metadata.sender) {
+            return;
+        }
+        const from = message?.from;
+        if (typeof from !== 'string' || from.length === 0) {
+            return;
+        }
+        const authenticatedDid = metadata.sender.split('#')[0];
+        if (from !== authenticatedDid) {
+            throw new KeymasterError(
+                `DIDComm sender mismatch: message claims ${from} but is authenticated as ${authenticatedDid}`
+            );
+        }
+    }
+
     async unpackDidComm(
         packed: string,
         options: { name?: string } = {}
@@ -2615,9 +2639,12 @@ export default class Keymaster implements KeymasterInterface {
             const { payload } = verifyJws(text, signerVm.publicKeyJwk);
             metadata.nonRepudiation = true;
             metadata.signer = jwsKid;
-            return { message: JSON.parse(new TextDecoder().decode(payload)), metadata };
+            const signedMessage = JSON.parse(new TextDecoder().decode(payload));
+            Keymaster.assertSenderMatchesEnvelope(signedMessage, metadata);
+            return { message: signedMessage, metadata };
         }
 
+        Keymaster.assertSenderMatchesEnvelope(inner, metadata);
         return { message: inner, metadata };
     }
 

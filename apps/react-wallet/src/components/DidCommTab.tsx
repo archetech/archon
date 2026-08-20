@@ -67,6 +67,17 @@ function messageLabel(type?: string): string {
     return type || "Unknown";
 }
 
+// Authcrypt binds the sender to the envelope; `message.from` is an unverified
+// claim inside it. unpackDidComm now rejects a mismatch outright, so this is the
+// second line of the same rule: never address or display a claim as if the
+// envelope vouched for it.
+function authenticatedSender(received: DidCommReceivedMessage): string | undefined {
+    if (!received.metadata.authenticated || !received.metadata.sender) {
+        return undefined;
+    }
+    return received.metadata.sender.split('#')[0];
+}
+
 function formatTime(created?: number): string {
     // DIDComm created_time is seconds since the epoch, not milliseconds.
     return created ? new Date(created * 1000).toLocaleString() : "";
@@ -86,7 +97,11 @@ function DidCommTab() {
     const [composeKind, setComposeKind] = useState<string>("message");
     const [composeContent, setComposeContent] = useState<string>("");
     const [composeAnoncrypt, setComposeAnoncrypt] = useState<boolean>(false);
-    const pollingRef = useRef<boolean>(false);
+    // Keyed by identity, not a bare boolean: an in-flight read must not block a
+    // read for a *different* identity, and must not commit its result after the
+    // identity has changed.
+    const inFlightRef = useRef<string | null>(null);
+    const activeIdRef = useRef<string>("");
     const { keymaster } = useWalletContext();
     const { currentId, currentDID } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
@@ -118,20 +133,30 @@ function DidCommTab() {
     // on screen is exactly what is still in the mailbox. Messages that fail to
     // unpack stay on the server and never appear here.
     const refreshInbox = useCallback(async (options: { quiet?: boolean } = {}) => {
-        if (!keymaster || !currentId) {
+        const requested = currentId;
+
+        if (!keymaster || !requested) {
             setMessages([]);
             setInboxLoading(false);
             return;
         }
 
-        // A slow fetch must not overlap with the next tick of the poll.
-        if (pollingRef.current) {
+        // A slow fetch must not overlap with the next tick of the poll -- but only
+        // for the same identity, or switching identity while a read is in flight
+        // would silently skip the new read.
+        if (inFlightRef.current === requested) {
             return;
         }
-        pollingRef.current = true;
+        inFlightRef.current = requested;
 
         try {
-            const received = await keymaster.receiveDidComm({ name: currentId, ack: false });
+            const received = await keymaster.receiveDidComm({ name: requested, ack: false });
+            // A read that finishes after the identity changed belongs to nobody on
+            // screen; committing it would show one identity's mail under another's
+            // name, and with polling off it would stay there.
+            if (activeIdRef.current !== requested) {
+                return;
+            }
             setMessages(received);
         } catch (error: any) {
             // A quiet (polled) failure is usually a node that is briefly
@@ -140,7 +165,9 @@ function DidCommTab() {
                 setError(error);
             }
         } finally {
-            pollingRef.current = false;
+            if (inFlightRef.current === requested) {
+                inFlightRef.current = null;
+            }
             setInboxLoading(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,9 +179,14 @@ function DidCommTab() {
     }, [refreshStatus]);
 
     useEffect(() => {
+        activeIdRef.current = currentId;
+        // Drop the previous identity's mail immediately rather than leaving it on
+        // screen under the new name until the fetch returns.
+        setMessages([]);
         setInboxLoading(true);
         refreshInbox({ quiet: true });
-    }, [refreshInbox]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refreshInbox, currentId]);
 
     useEffect(() => {
         // Poll only while this screen is mounted, at the interval the user set in
@@ -287,10 +319,13 @@ function DidCommTab() {
         if (!keymaster) return;
 
         const message = received.message as DidCommPlaintext;
-        const sender = message.from;
+        // Only the envelope's authenticated sender is safe to address. The
+        // plaintext `from` is the sender's own claim, so responding to it could
+        // send the answer to a party who never pinged.
+        const sender = authenticatedSender(received);
 
         if (!sender || !message.id) {
-            setError("This ping carries no sender to respond to");
+            setError("This ping has no authenticated sender to respond to");
             return;
         }
 
@@ -307,7 +342,8 @@ function DidCommTab() {
 
     function renderMessage(received: DidCommReceivedMessage) {
         const message = received.message as DidCommPlaintext;
-        const sender = message.from || received.metadata.sender;
+        const sender = authenticatedSender(received);
+        const claimed = typeof message.from === 'string' ? message.from : undefined;
         const time = formatTime(message.created_time);
 
         return (
@@ -328,7 +364,7 @@ function DidCommTab() {
                         </Typography>
                     )}
                     <Box sx={{ ml: "auto", display: "flex", gap: 1 }}>
-                        {message.type === TRUST_PING_TYPE && (
+                        {message.type === TRUST_PING_TYPE && sender && (
                             <Button size="small" onClick={() => respondToPing(received)} disabled={busy}>
                                 Respond
                             </Button>
@@ -345,7 +381,7 @@ function DidCommTab() {
                 </Box>
 
                 <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-all" }}>
-                    From: {sender || "unknown"}
+                    From: {sender || (claimed ? `${claimed} (unverified)` : "unknown")}
                 </Typography>
 
                 {message.type === BASIC_MESSAGE_TYPE ? (

@@ -3681,6 +3681,24 @@ class Keymaster:
 
         return dc.pack_didcomm_message(envelope, recipients, sender=sender, signer=signer, enc=options.get("encryption"))
 
+    @staticmethod
+    def _assert_sender_matches_envelope(message: Any, metadata: dict[str, Any]) -> None:
+        # Authcrypt binds the sender to the envelope's `skid`; the plaintext `from`
+        # header is just a claim inside it, and nothing else checks the two agree.
+        # Without this, an authenticated sender can name any DID as `from` and every
+        # consumer that trusts that header -- a wallet showing "authenticated", a
+        # reply, an auto-response -- is addressing the wrong party.
+        if not metadata.get("authenticated") or not metadata.get("sender"):
+            return
+        sender_from = message.get("from") if isinstance(message, dict) else None
+        if not isinstance(sender_from, str) or not sender_from:
+            return
+        authenticated_did = metadata["sender"].split("#")[0]
+        if sender_from != authenticated_did:
+            raise KeymasterError(
+                f"DIDComm sender mismatch: message claims {sender_from} but is authenticated as {authenticated_did}"
+            )
+
     async def unpack_didcomm(self, packed: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
         options = options or {}
         name = options.get("name")
@@ -3730,8 +3748,11 @@ class Keymaster:
             result = dc.verify_jws(text, public_jwk)
             metadata["nonRepudiation"] = True
             metadata["signer"] = jws_kid
-            return {"message": json.loads(result["payload"].decode("utf-8")), "metadata": metadata}
+            signed_message = json.loads(result["payload"].decode("utf-8"))
+            self._assert_sender_matches_envelope(signed_message, metadata)
+            return {"message": signed_message, "metadata": metadata}
 
+        self._assert_sender_matches_envelope(inner, metadata)
         return {"message": inner, "metadata": metadata}
 
     def _didcomm_gateway_base(self, override: str | None = None) -> str:
