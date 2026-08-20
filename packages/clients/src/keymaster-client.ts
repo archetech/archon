@@ -26,6 +26,7 @@ import {
     IssueCredentialsOptions,
     KeymasterClientOptions,
     KeymasterInterface,
+    NodeCapabilities,
     LightningConfig,
     LightningBalance,
     LightningInvoice,
@@ -543,6 +544,16 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.delete(`${this.API}/addresses/publish`, { data: { name } });
             return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getNodeCapabilities(): Promise<NodeCapabilities | null> {
+        try {
+            const response = await this.axios.get(`${this.API}/capabilities`);
+            return response.data.capabilities;
         }
         catch (error) {
             throwError(error);

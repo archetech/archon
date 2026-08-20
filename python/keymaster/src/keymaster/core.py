@@ -3544,7 +3544,7 @@ class Keymaster:
         # If the node doesn't offer DIDComm, don't advertise a dead endpoint:
         # publish key-only (an explicit endpoint still overrides this).
         if endpoint is None:
-            caps = await self._get_node_capabilities()
+            caps = await self.get_node_capabilities()
             if caps is None or caps.get("didcomm") is not False:
                 getter = getattr(self.gatekeeper, "get_didcomm_endpoint", None)
                 if getter:
@@ -3715,10 +3715,12 @@ class Keymaster:
             raise KeymasterError("cannot reach the DIDComm gateway: no node URL configured")
         return base.rstrip("/")
 
-    async def _get_node_capabilities(self) -> dict[str, bool] | None:
+    async def get_node_capabilities(self) -> dict[str, bool] | None:
         # Fetch (once, memoized) the node's capability manifest. None when the node
         # exposes no manifest (older node, or node URL is a bare gatekeeper) — callers
-        # then proceed lazily so we never regress against existing nodes.
+        # then proceed lazily so we never regress against existing nodes. Public so
+        # clients (wallet UIs) can gate optional-feature surfaces on the same signal
+        # the gated operations use; None means "unknown", which callers treat as allowed.
         if self._node_capabilities is not _UNFETCHED:
             return self._node_capabilities
         node_url = getattr(self.gatekeeper, "url", None)
@@ -3737,7 +3739,7 @@ class Keymaster:
     async def _require_node_capability(self, capability: str, human_name: str) -> None:
         # Throw clearly when the node explicitly does not offer a capability. Unknown
         # (no manifest) is permissive — the op proceeds and fails later if truly absent.
-        caps = await self._get_node_capabilities()
+        caps = await self.get_node_capabilities()
         if caps is not None and caps.get(capability) is False:
             raise KeymasterError(f"this node does not offer {human_name}")
 

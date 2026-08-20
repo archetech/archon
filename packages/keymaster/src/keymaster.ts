@@ -49,6 +49,7 @@ import {
     IssueCredentialsOptions,
     KeymasterInterface,
     KeymasterOptions,
+    NodeCapabilities,
     LightningConfig,
     LightningBalance,
     LightningInvoice,
@@ -204,7 +205,7 @@ export default class Keymaster implements KeymasterInterface {
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
     // memoized. `undefined` = not yet fetched; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
-    private _nodeCapabilities?: Record<string, boolean> | null;
+    private _nodeCapabilities?: NodeCapabilities | null;
     private _walletCache?: WalletFile;
     private _hdkeyCache?: any;
     // Identity of the wallet whose seed `_hdkeyCache` was derived from, so a
@@ -2661,8 +2662,10 @@ export default class Keymaster implements KeymasterInterface {
 
     // Fetch (once, memoized) the node's capability manifest. Returns null when the
     // node exposes no manifest (older node, or the node URL is a bare gatekeeper) —
-    // callers then proceed lazily so we never regress against existing nodes.
-    private async getNodeCapabilities(): Promise<Record<string, boolean> | null> {
+    // callers then proceed lazily so we never regress against existing nodes. Public
+    // so clients (wallet UIs) can gate optional-feature surfaces on the same signal
+    // the gated operations use; null means "unknown", which callers treat as allowed.
+    async getNodeCapabilities(): Promise<NodeCapabilities | null> {
         if (this._nodeCapabilities !== undefined) {
             return this._nodeCapabilities;
         }

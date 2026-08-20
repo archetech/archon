@@ -691,4 +691,38 @@ describe('node capability gating', () => {
         const err = await keymaster.sendDidComm({ type: 'x', body: {} } as any, alice).catch(e => e);
         expect(String(err)).not.toMatch(/does not offer/);
     });
+
+    // The same signal the gates use, exposed so a wallet can hide a surface instead
+    // of offering it and failing.
+    it('reports the manifest and fetches it only once', async () => {
+        const nodeURL = 'https://node.example';
+        (gatekeeper as any).url = nodeURL;
+
+        const requests: string[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            requests.push(String(input));
+            return jsonResponse({ didcomm: true, lightning: false, names: true });
+        });
+
+        await expect(keymaster.getNodeCapabilities()).resolves.toEqual({
+            didcomm: true,
+            lightning: false,
+            names: true,
+        });
+        await keymaster.getNodeCapabilities();
+
+        expect(requests).toEqual([`${nodeURL}/api/v1/capabilities`]);
+    });
+
+    it('reports null when the node serves no manifest', async () => {
+        (gatekeeper as any).url = 'https://node.example';
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ error: 'not found' }, 404));
+
+        await expect(keymaster.getNodeCapabilities()).resolves.toBeNull();
+    });
+
+    it('reports null when no node URL is configured', async () => {
+        (gatekeeper as any).url = undefined;
+        await expect(keymaster.getNodeCapabilities()).resolves.toBeNull();
+    });
 });

@@ -318,6 +318,64 @@ def test_capability_gating_permissive_when_manifest_absent():
     assert "does not offer" not in str(exc.value)
 
 
+def test_get_node_capabilities_is_public_and_memoized(monkeypatch):
+    # The same signal the gates use, exposed so a wallet can hide a surface instead
+    # of offering it and failing. Mirrors the JS Keymaster.getNodeCapabilities.
+    import asyncio
+    import httpx
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    calls: list[str] = []
+
+    class _Response:
+        is_success = True
+
+        @staticmethod
+        def json():
+            return {"didcomm": True, "lightning": False, "names": True}
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url):
+            calls.append(url)
+            return _Response()
+
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+
+    async def run():
+        first = await km.get_node_capabilities()
+        second = await km.get_node_capabilities()
+        return first, second
+
+    first, second = asyncio.run(run())
+    assert first == {"didcomm": True, "lightning": False, "names": True}
+    assert second == first
+    assert calls == ["http://node.test/api/v1/capabilities"]  # memoized, fetched once
+
+
+def test_get_node_capabilities_none_without_node_url():
+    import asyncio
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = None
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    assert asyncio.run(km.get_node_capabilities()) is None
+
+
 def test_coordinate_mediation_builders():
     assert p.mediate_request()["type"] == p.MEDIATE_REQUEST_TYPE
     grant = p.mediate_grant("did:cid:mediator", "req-1")

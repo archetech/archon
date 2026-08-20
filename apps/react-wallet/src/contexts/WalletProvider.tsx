@@ -45,6 +45,7 @@ interface WalletContextValue {
     refreshFlag: number;
     keymaster: Keymaster | null;
     hasLightning: boolean;
+    hasDidComm: boolean;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -66,6 +67,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const [showRecoverSetup, setShowRecoverSetup] = useState(false);
     const [refreshFlag, setRefreshFlag] = useState<number>(0);
     const [hasLightning, setHasLightning] = useState<boolean>(false);
+    // Unknown (a node that serves no capability manifest) is permissive, matching
+    // the gate inside Keymaster: show the surface and let the operation fail late
+    // rather than hiding it against every older node.
+    const [hasDidComm, setHasDidComm] = useState<boolean>(true);
 
     const keymasterRef = useRef<Keymaster | null>(null);
 
@@ -139,6 +144,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setUploadAction(null);
         setPassphraseErrorText("");
         keymasterRef.current = instance;
+        try {
+            const capabilities = await instance.getNodeCapabilities();
+            setHasDidComm(capabilities?.didcomm !== false);
+        } catch (error) {
+            console.error('Failed to read node capabilities:', error);
+        }
         setRefreshFlag(r => r + 1);
         setIsReady(true);
         setSessionPassphrase(passphrase);
@@ -360,6 +371,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         refreshFlag,
         keymaster: keymasterRef.current,
         hasLightning,
+        hasDidComm,
     };
 
     return (
