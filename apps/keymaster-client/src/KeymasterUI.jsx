@@ -409,12 +409,16 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const BASIC_MESSAGE_TYPE = 'https://didcomm.org/basicmessage/2.0/message';
     const TRUST_PING_TYPE = 'https://didcomm.org/trust-ping/2.0/ping';
     const TRUST_PING_RESPONSE_TYPE = 'https://didcomm.org/trust-ping/2.0/ping-response';
+    const OUT_OF_BAND_INVITATION_TYPE = 'https://didcomm.org/out-of-band/2.0/invitation';
 
     const [didcommTab, setDidcommTab] = useState('inbox');
     const [didcommComposeTo, setDidcommComposeTo] = useState('');
     const [didcommComposeKind, setDidcommComposeKind] = useState('message');
     const [didcommComposeContent, setDidcommComposeContent] = useState('');
     const [didcommComposeAnoncrypt, setDidcommComposeAnoncrypt] = useState(false);
+    const [didcommInviteUrl, setDidcommInviteUrl] = useState('');
+    const [didcommInviteInput, setDidcommInviteInput] = useState('');
+    const [didcommDecodedInvite, setDidcommDecodedInvite] = useState(null);
     const [didcommMessages, setDidcommMessages] = useState([]);
     const [didcommInboxLoading, setDidcommInboxLoading] = useState(false);
     // A ref, not the loading flag: the poll's interval callback closes over the
@@ -603,6 +607,62 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             showError(error);
         } finally {
             setDidcommBusy(false);
+        }
+    }
+
+    // Out-of-band invitation encoding, inlined for the same reason as the protocol
+    // URIs above: the server-wallet demo depends only on the thin client package.
+    // Mirrors encodeOutOfBandInvitation/decodeOutOfBandInvitation.
+    function encodeInvitation(invitation) {
+        const json = JSON.stringify(invitation);
+        const b64 = btoa(unescape(encodeURIComponent(json)))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+        return `https://didcomm.org?_oob=${b64}`;
+    }
+
+    function decodeInvitation(urlOrOob) {
+        const match = urlOrOob.match(/[?&]_oob=([^&]+)/);
+        const oob = match ? decodeURIComponent(match[1]) : urlOrOob;
+        const json = decodeURIComponent(escape(atob(oob.replace(/-/g, '+').replace(/_/g, '/'))));
+        return JSON.parse(json);
+    }
+
+    function createDidCommInvitation() {
+        if (!currentDID) {
+            showError('Select an identity first');
+            return;
+        }
+
+        // The invitation names the inviter; everything a recipient needs to reach
+        // them is resolvable from that DID, so the URL carries no endpoint.
+        setDidcommInviteUrl(encodeInvitation({
+            type: OUT_OF_BAND_INVITATION_TYPE,
+            from: currentDID,
+            body: { accept: ['didcomm/v2'] },
+        }));
+    }
+
+    function acceptDidCommInvitation() {
+        const trimmed = didcommInviteInput.trim();
+
+        if (!trimmed) {
+            showError('Paste an invitation URL first');
+            return;
+        }
+
+        try {
+            const invitation = decodeInvitation(trimmed);
+
+            if (!invitation?.from) {
+                showError('That invitation names no inviter');
+                return;
+            }
+
+            setDidcommDecodedInvite({ from: invitation.from, goal: invitation.body?.goal });
+        } catch {
+            showError('Could not read that invitation');
         }
     }
 
@@ -7877,6 +7937,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             >
                                 <Tab label="Inbox" value="inbox" />
                                 <Tab label="Compose" value="compose" />
+                                <Tab label="Invite" value="invite" />
                                 <Tab label="Endpoint" value="endpoint" />
                             </Tabs>
 
@@ -8046,6 +8107,93 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                     >
                                         Send
                                     </Button>
+                                </Box>
+                            }
+
+                            {didcommTab === 'invite' &&
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                        Share an out-of-band invitation so another agent can reach this identity without being handed a DID.
+                                    </Typography>
+
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Button
+                                            variant="contained"
+                                            color="primary"
+                                            onClick={createDidCommInvitation}
+                                            disabled={didcommBusy}
+                                        >
+                                            {didcommInviteUrl ? 'Regenerate' : 'Create Invitation'}
+                                        </Button>
+                                    </Box>
+
+                                    {didcommInviteUrl &&
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                            {/* White plate behind the code: a dark page
+                                                background breaks scanning, since readers
+                                                expect light quiet zones. */}
+                                            <Box sx={{ p: 2, backgroundColor: '#fff' }}>
+                                                <QRCodeSVG value={didcommInviteUrl} size={200} />
+                                            </Box>
+                                            <Typography variant="body2" sx={{ opacity: 0.7, wordBreak: 'break-all', fontFamily: 'monospace', fontSize: '0.7rem' }}>
+                                                {didcommInviteUrl}
+                                            </Typography>
+                                            <Button
+                                                size="small"
+                                                onClick={async () => {
+                                                    await navigator.clipboard.writeText(didcommInviteUrl);
+                                                    showSuccess('Invitation copied');
+                                                }}
+                                            >
+                                                Copy Link
+                                            </Button>
+                                        </Box>
+                                    }
+
+                                    <Typography variant="subtitle2">Accept an invitation</Typography>
+                                    <TextField
+                                        label="Invitation URL"
+                                        value={didcommInviteInput}
+                                        onChange={(e) => setDidcommInviteInput(e.target.value)}
+                                        disabled={didcommBusy}
+                                        placeholder="https://didcomm.org?_oob=..."
+                                        fullWidth
+                                    />
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={acceptDidCommInvitation}
+                                        disabled={didcommBusy}
+                                        sx={{ alignSelf: 'start' }}
+                                    >
+                                        Accept
+                                    </Button>
+
+                                    {didcommDecodedInvite &&
+                                        <Box>
+                                            <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                                <strong>Invitation from:</strong> {didcommDecodedInvite.from}
+                                            </Typography>
+                                            {didcommDecodedInvite.goal &&
+                                                <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                                    Purpose: {didcommDecodedInvite.goal}
+                                                </Typography>
+                                            }
+                                            {/* The inviter is only a claim -- an invitation
+                                                is unsigned and anyone can mint one naming any
+                                                DID. This starts a message, it does not assert
+                                                a relationship. */}
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                onClick={() => replyToDidComm(didcommDecodedInvite.from)}
+                                                disabled={didcommBusy}
+                                                sx={{ mt: 1 }}
+                                            >
+                                                Message Them
+                                            </Button>
+                                        </Box>
+                                    }
                                 </Box>
                             }
 
