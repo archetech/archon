@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 // AGENTS.md requires the three CLIs to stay in parity:
 //
@@ -19,8 +20,14 @@ const SCRIPT_ONLY = new Set([
     'perf-test',
 ]);
 
+// Resolve from this file, not process.cwd(). cwd is process-global and the unit
+// suite runs --runInBand, so any test that chdirs -- and fails or times out
+// before restoring -- would otherwise make this suite fail with an ENOENT that
+// names an unrelated temp directory.
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
 function readSource(relativePath: string): string {
-    return readFileSync(path.join(process.cwd(), relativePath), 'utf-8');
+    return readFileSync(path.join(REPO_ROOT, relativePath), 'utf-8');
 }
 
 const packageCli = readSource('packages/keymaster/src/cli.ts');
