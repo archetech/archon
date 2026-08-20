@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
-import { Box, Button, Chip, CircularProgress, TextField, Typography } from "@mui/material";
-import { Forum } from "@mui/icons-material";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+    Box, Button, Chip, CircularProgress, Divider, Tab, Tabs, TextField, Typography
+} from "@mui/material";
+import { Forum, Inbox } from "@mui/icons-material";
+import { BASIC_MESSAGE_TYPE, TRUST_PING_TYPE, trustPingResponse } from "@didcid/keymaster/didcomm-protocols";
+import type { DidCommReceivedMessage } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
+import { loadRefreshIntervalSeconds } from "../contexts/UIContext";
 import PageHeader from "./layout/PageHeader";
 import Section from "./layout/Section";
 import EmptyState from "./layout/EmptyState";
@@ -17,6 +22,15 @@ interface DidCommStatus {
     keyAgreement: boolean;
     endpoint?: string;
     routingKeys: string[];
+}
+
+interface DidCommPlaintext {
+    id?: string;
+    type?: string;
+    from?: string;
+    thid?: string;
+    created_time?: number;
+    body?: Record<string, unknown>;
 }
 
 function readStatus(
@@ -40,17 +54,37 @@ function readStatus(
     };
 }
 
+function messageLabel(type?: string): string {
+    if (type === BASIC_MESSAGE_TYPE) {
+        return "Message";
+    }
+    if (type === TRUST_PING_TYPE) {
+        return "Trust ping";
+    }
+    return type || "Unknown";
+}
+
+function formatTime(created?: number): string {
+    // DIDComm created_time is seconds since the epoch, not milliseconds.
+    return created ? new Date(created * 1000).toLocaleString() : "";
+}
+
 function DidCommTab() {
+    const [activeTab, setActiveTab] = useState<string>("inbox");
     const [status, setStatus] = useState<DidCommStatus | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [busy, setBusy] = useState<boolean>(false);
     const [endpoint, setEndpoint] = useState<string>("");
     const [routingKeys, setRoutingKeys] = useState<string>("");
+    const [messages, setMessages] = useState<DidCommReceivedMessage[]>([]);
+    const [inboxLoading, setInboxLoading] = useState<boolean>(true);
+    const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(() => loadRefreshIntervalSeconds());
+    const pollingRef = useRef<boolean>(false);
     const { keymaster } = useWalletContext();
     const { currentId, currentDID } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
 
-    const refresh = useCallback(async () => {
+    const refreshStatus = useCallback(async () => {
         if (!keymaster || !currentDID) {
             setStatus(null);
             setLoading(false);
@@ -72,10 +106,69 @@ function DidCommTab() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [keymaster, currentDID]);
 
+    // Reading with ack: false leaves everything on the server, so each poll returns
+    // the whole mailbox. The list is therefore replaced, not accumulated -- what is
+    // on screen is exactly what is still in the mailbox. Messages that fail to
+    // unpack stay on the server and never appear here.
+    const refreshInbox = useCallback(async (options: { quiet?: boolean } = {}) => {
+        if (!keymaster || !currentId) {
+            setMessages([]);
+            setInboxLoading(false);
+            return;
+        }
+
+        // A slow fetch must not overlap with the next tick of the poll.
+        if (pollingRef.current) {
+            return;
+        }
+        pollingRef.current = true;
+
+        try {
+            const received = await keymaster.receiveDidComm({ name: currentId, ack: false });
+            setMessages(received);
+        } catch (error: any) {
+            // A quiet (polled) failure is usually a node that is briefly
+            // unreachable; only an explicit refresh should raise a snackbar.
+            if (!options.quiet) {
+                setError(error);
+            }
+        } finally {
+            pollingRef.current = false;
+            setInboxLoading(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [keymaster, currentId]);
+
     useEffect(() => {
         setLoading(true);
-        refresh();
-    }, [refresh]);
+        refreshStatus();
+    }, [refreshStatus]);
+
+    useEffect(() => {
+        setInboxLoading(true);
+        refreshInbox({ quiet: true });
+    }, [refreshInbox]);
+
+    useEffect(() => {
+        // Poll only while this screen is mounted, at the interval the user set in
+        // Settings. Zero means "manual refresh only", matching the wallet's own
+        // background refresh.
+        if (refreshIntervalSeconds === 0) {
+            return;
+        }
+
+        const interval = setInterval(() => {
+            refreshInbox({ quiet: true });
+        }, refreshIntervalSeconds * 1000);
+
+        return () => clearInterval(interval);
+    }, [refreshInbox, refreshIntervalSeconds]);
+
+    useEffect(() => {
+        const handleIntervalChange = () => setRefreshIntervalSeconds(loadRefreshIntervalSeconds());
+        window.addEventListener('archon:refresh-interval-change', handleIntervalChange);
+        return () => window.removeEventListener('archon:refresh-interval-change', handleIntervalChange);
+    }, []);
 
     async function publish() {
         if (!keymaster) return;
@@ -93,7 +186,7 @@ function DidCommTab() {
             setSuccess("DIDComm endpoint published");
             setEndpoint("");
             setRoutingKeys("");
-            await refresh();
+            await refreshStatus();
         } catch (error: any) {
             setError(error);
         } finally {
@@ -108,12 +201,113 @@ function DidCommTab() {
         try {
             await keymaster.unpublishDidComm(currentId);
             setSuccess("DIDComm endpoint unpublished");
-            await refresh();
+            await refreshStatus();
         } catch (error: any) {
             setError(error);
         } finally {
             setBusy(false);
         }
+    }
+
+    async function dismiss(ids: string[]) {
+        if (!keymaster || !ids.length) return;
+
+        setBusy(true);
+        try {
+            const removed = await keymaster.ackDidComm(ids, { name: currentId });
+            setSuccess(removed === 1 ? "Message dismissed" : `${removed} messages dismissed`);
+            await refreshInbox();
+        } catch (error: any) {
+            setError(error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function respondToPing(received: DidCommReceivedMessage) {
+        if (!keymaster) return;
+
+        const message = received.message as DidCommPlaintext;
+        const sender = message.from;
+
+        if (!sender || !message.id) {
+            setError("This ping carries no sender to respond to");
+            return;
+        }
+
+        setBusy(true);
+        try {
+            await keymaster.sendDidComm(trustPingResponse(message.id) as unknown as Record<string, unknown>, sender, { name: currentId });
+            setSuccess("Ping response sent");
+        } catch (error: any) {
+            setError(error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function renderMessage(received: DidCommReceivedMessage) {
+        const message = received.message as DidCommPlaintext;
+        const sender = message.from || received.metadata.sender;
+        const time = formatTime(message.created_time);
+
+        return (
+            <Box key={received.id} sx={{ mb: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", mb: 0.5 }}>
+                    <Chip label={messageLabel(message.type)} size="small" />
+                    {/* Anoncrypt hides the sender entirely, so "who sent this" and
+                        "is that claim verified" are two different questions. */}
+                    <Chip
+                        label={received.metadata.authenticated ? "Authenticated" : "Anonymous"}
+                        size="small"
+                        color={received.metadata.authenticated ? "success" : "default"}
+                        variant="outlined"
+                    />
+                    {time && (
+                        <Typography variant="caption" color="text.secondary">
+                            {time}
+                        </Typography>
+                    )}
+                    <Box sx={{ ml: "auto", display: "flex", gap: 1 }}>
+                        {message.type === TRUST_PING_TYPE && (
+                            <Button size="small" onClick={() => respondToPing(received)} disabled={busy}>
+                                Respond
+                            </Button>
+                        )}
+                        <Button size="small" color="error" onClick={() => dismiss([received.id])} disabled={busy}>
+                            Dismiss
+                        </Button>
+                    </Box>
+                </Box>
+
+                <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-all" }}>
+                    From: {sender || "unknown"}
+                </Typography>
+
+                {message.type === BASIC_MESSAGE_TYPE ? (
+                    <Typography variant="body1" sx={{ mt: 1, whiteSpace: "pre-wrap" }}>
+                        {String(message.body?.content ?? "")}
+                    </Typography>
+                ) : (
+                    <Box
+                        component="pre"
+                        sx={{
+                            mt: 1,
+                            p: 1,
+                            borderRadius: 1,
+                            bgcolor: "action.hover",
+                            fontSize: "0.75rem",
+                            overflowX: "auto",
+                            m: 0,
+                        }}
+                    >
+                        {JSON.stringify(message.body ?? {}, null, 2)}
+                    </Box>
+                )}
+
+                <Divider sx={{ mt: 2 }} />
+            </Box>
+        );
     }
 
     if (loading) {
@@ -125,114 +319,165 @@ function DidCommTab() {
     }
 
     return (
-        <Box sx={{ p: 2 }}>
+        <Box>
             <PageHeader
                 title="DIDComm"
-                description="Publish a messaging endpoint so other agents can send encrypted DIDComm messages to this identity."
-                actions={
-                    <>
-                        <Button variant="contained" onClick={publish} disabled={busy}>
-                            {status ? "Update" : "Publish"}
-                        </Button>
-                        {status && (
-                            <ActionMenu
-                                items={[{
-                                    label: "Unpublish",
-                                    onClick: unpublish,
-                                    disabled: busy,
-                                    destructive: true,
-                                }]}
-                            />
-                        )}
-                    </>
-                }
+                description="Read encrypted DIDComm messages sent to this identity, and publish the endpoint others deliver them to."
             />
 
-            {status ? (
+            <Tabs
+                value={activeTab}
+                onChange={(_, value) => setActiveTab(value)}
+                sx={{ borderBottom: 1, borderColor: "divider", mb: 2, minHeight: 40 }}
+            >
+                <Tab label="Inbox" value="inbox" />
+                <Tab label="Endpoint" value="endpoint" />
+            </Tabs>
+
+            {activeTab === "inbox" && (
                 <Section
-                    title="Published"
-                    description="What this identity's DID document currently advertises."
+                    title="Mailbox"
+                    description="Messages stay on the node until dismissed."
+                    actions={
+                        <>
+                            <Button variant="outlined" onClick={() => refreshInbox()} disabled={busy}>
+                                Refresh
+                            </Button>
+                            {messages.length > 0 && (
+                                <ActionMenu
+                                    items={[{
+                                        label: "Dismiss all",
+                                        onClick: () => dismiss(messages.map(message => message.id)),
+                                        disabled: busy,
+                                        destructive: true,
+                                    }]}
+                                />
+                            )}
+                        </>
+                    }
                 >
-                    <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" color="text.secondary">
-                            Endpoint
-                        </Typography>
-                        {status.endpoint ? (
-                            <Typography variant="body1" sx={{ wordBreak: "break-all" }}>
-                                {status.endpoint}
-                            </Typography>
-                        ) : (
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
-                                <Chip label="Key only" size="small" color="warning" />
-                                <Typography variant="body2" color="text.secondary">
-                                    Others can encrypt to this identity but have nowhere to deliver.
-                                </Typography>
-                            </Box>
-                        )}
-                    </Box>
-
-                    {status.routingKeys.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                            <Typography variant="body2" color="text.secondary">
-                                Routing keys
-                            </Typography>
-                            {status.routingKeys.map(key => (
-                                <Typography
-                                    key={key}
-                                    variant="body2"
-                                    sx={{ wordBreak: "break-all", fontFamily: "monospace", fontSize: "0.75rem" }}
-                                >
-                                    {key}
-                                </Typography>
-                            ))}
+                    {inboxLoading && messages.length === 0 ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                            <CircularProgress size={24} />
                         </Box>
-                    )}
-
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">
-                            Key agreement
-                        </Typography>
-                        <Chip
-                            label={status.keyAgreement ? "Published" : "Missing"}
-                            size="small"
-                            color={status.keyAgreement ? "success" : "warning"}
-                            sx={{ mt: 0.5 }}
+                    ) : messages.length === 0 ? (
+                        <EmptyState
+                            icon={<Inbox />}
+                            title="No messages"
+                            description={status?.endpoint
+                                ? "Nothing in the mailbox for this identity."
+                                : "Publish an endpoint so others have somewhere to deliver messages."}
                         />
-                    </Box>
-                </Section>
-            ) : (
-                <Section dense>
-                    <EmptyState
-                        icon={<Forum />}
-                        title="No DIDComm endpoint published"
-                        description="Publish to add a key agreement key and a messaging endpoint to this identity's DID document."
-                    />
+                    ) : (
+                        messages.map(renderMessage)
+                    )}
                 </Section>
             )}
 
-            <Section
-                title="Endpoint"
-                description="Leave blank to use this node's own relay. Set one explicitly to publish a mediator or an endpoint the node cannot discover."
-            >
-                <TextField
-                    fullWidth
-                    label="Endpoint URL (optional)"
-                    value={endpoint}
-                    onChange={event => setEndpoint(event.target.value)}
-                    disabled={busy}
-                    placeholder="https://relay.example/didcomm"
-                    sx={{ mb: 2 }}
-                />
-                <TextField
-                    fullWidth
-                    label="Routing keys (optional, comma separated)"
-                    value={routingKeys}
-                    onChange={event => setRoutingKeys(event.target.value)}
-                    disabled={busy}
-                    placeholder="did:cid:mediator#key-agreement-1"
-                    helperText="Set these when delivery goes through a mediator; senders then wrap messages in a Forward."
-                />
-            </Section>
+            {activeTab === "endpoint" && (
+                <>
+                    {status ? (
+                        <Section
+                            title="Published"
+                            description="What this identity's DID document currently advertises."
+                            actions={
+                                <ActionMenu
+                                    items={[{
+                                        label: "Unpublish",
+                                        onClick: unpublish,
+                                        disabled: busy,
+                                        destructive: true,
+                                    }]}
+                                />
+                            }
+                        >
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                    Endpoint
+                                </Typography>
+                                {status.endpoint ? (
+                                    <Typography variant="body1" sx={{ wordBreak: "break-all" }}>
+                                        {status.endpoint}
+                                    </Typography>
+                                ) : (
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+                                        <Chip label="Key only" size="small" color="warning" />
+                                        <Typography variant="body2" color="text.secondary">
+                                            Others can encrypt to this identity but have nowhere to deliver.
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+
+                            {status.routingKeys.length > 0 && (
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Routing keys
+                                    </Typography>
+                                    {status.routingKeys.map(key => (
+                                        <Typography
+                                            key={key}
+                                            variant="body2"
+                                            sx={{ wordBreak: "break-all", fontFamily: "monospace", fontSize: "0.75rem" }}
+                                        >
+                                            {key}
+                                        </Typography>
+                                    ))}
+                                </Box>
+                            )}
+
+                            <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                    Key agreement
+                                </Typography>
+                                <Chip
+                                    label={status.keyAgreement ? "Published" : "Missing"}
+                                    size="small"
+                                    color={status.keyAgreement ? "success" : "warning"}
+                                    sx={{ mt: 0.5 }}
+                                />
+                            </Box>
+                        </Section>
+                    ) : (
+                        <Section dense>
+                            <EmptyState
+                                icon={<Forum />}
+                                title="No DIDComm endpoint published"
+                                description="Publish to add a key agreement key and a messaging endpoint to this identity's DID document."
+                            />
+                        </Section>
+                    )}
+
+                    <Section
+                        title="Endpoint"
+                        description="Leave blank to use this node's own relay. Set one explicitly to publish a mediator or an endpoint the node cannot discover."
+                        actions={
+                            <Button variant="contained" onClick={publish} disabled={busy}>
+                                {status ? "Update" : "Publish"}
+                            </Button>
+                        }
+                    >
+                        <TextField
+                            fullWidth
+                            label="Endpoint URL (optional)"
+                            value={endpoint}
+                            onChange={event => setEndpoint(event.target.value)}
+                            disabled={busy}
+                            placeholder="https://relay.example/didcomm"
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Routing keys (optional, comma separated)"
+                            value={routingKeys}
+                            onChange={event => setRoutingKeys(event.target.value)}
+                            disabled={busy}
+                            placeholder="did:cid:mediator#key-agreement-1"
+                            helperText="Set these when delivery goes through a mediator; senders then wrap messages in a Forward."
+                        />
+                    </Section>
+                </>
+            )}
         </Box>
     );
 }

@@ -25,6 +25,7 @@ export default defineConfig({
             "@didcid/keymaster/wallet/typeGuards": path.resolve(__dirname, "../../packages/keymaster/dist/esm/db/typeGuards.js"),
             "@didcid/keymaster/types": path.resolve(__dirname, "../../packages/keymaster/dist/types/types.d.js"),
             "@didcid/keymaster/search": path.resolve(__dirname, "../../packages/keymaster/dist/esm/search-client.js"),
+            "@didcid/keymaster/didcomm-protocols": path.resolve(__dirname, "../../packages/keymaster/dist/esm/didcomm-protocols.js"),
 
             "@didcid/keymaster": path.resolve(__dirname, "../../packages/keymaster/dist/esm/keymaster.js"),
             buffer: 'buffer',

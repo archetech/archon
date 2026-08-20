@@ -24,7 +24,9 @@ import WalletWeb from "@didcid/keymaster/wallet/web";
 const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
 const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
 
-function loadRefreshIntervalSeconds() {
+// Exported so a screen that polls only while it is open (the DIDComm inbox) can
+// honour the same interval the background refresh uses.
+export function loadRefreshIntervalSeconds() {
     const saved = localStorage.getItem(REFRESH_INTERVAL_STORAGE_KEY);
     const parsed = Number(saved);
 

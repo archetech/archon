@@ -403,6 +403,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [lightningStatusFilter, setLightningStatusFilter] = useState({ settled: true, pending: true, failed: true, expired: true });
     const [isPublished, setIsPublished] = useState(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState(false);
+    // Inlined rather than imported from @didcid/keymaster: this file is shared with
+    // the server-wallet demo, which deliberately depends only on the thin client
+    // package. These are stable DIDComm protocol URIs.
+    const BASIC_MESSAGE_TYPE = 'https://didcomm.org/basicmessage/2.0/message';
+    const TRUST_PING_TYPE = 'https://didcomm.org/trust-ping/2.0/ping';
+    const TRUST_PING_RESPONSE_TYPE = 'https://didcomm.org/trust-ping/2.0/ping-response';
+
+    const [didcommTab, setDidcommTab] = useState('inbox');
+    const [didcommMessages, setDidcommMessages] = useState([]);
+    const [didcommInboxLoading, setDidcommInboxLoading] = useState(false);
+    // A ref, not the loading flag: the poll's interval callback closes over the
+    // render that created it, so a state read there would always be stale.
+    const didcommPollingRef = useRef(false);
     const [didcommStatus, setDidcommStatus] = useState(null);
     const [didcommEndpoint, setDidcommEndpoint] = useState('');
     const [didcommRoutingKeys, setDidcommRoutingKeys] = useState('');
@@ -445,9 +458,25 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     useEffect(() => {
         if (tab === 'didcomm') {
             refreshDidComm();
+            refreshDidCommInbox({ quiet: true });
         }
         // eslint-disable-next-line
     }, [tab, currentId]);
+
+    useEffect(() => {
+        // Poll only while the DIDComm screen is open, at the interval configured in
+        // Settings. Zero means manual refresh only.
+        if (tab !== 'didcomm' || refreshIntervalSeconds === 0) {
+            return;
+        }
+
+        const interval = setInterval(() => {
+            refreshDidCommInbox({ quiet: true });
+        }, refreshIntervalSeconds * 1000);
+
+        return () => clearInterval(interval);
+        // eslint-disable-next-line
+    }, [tab, currentId, refreshIntervalSeconds]);
 
     async function refreshDidComm() {
         if (!currentId) {
@@ -480,6 +509,86 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             showError(error);
             setDidcommStatus(null);
         }
+    }
+
+    // Reading with ack: false leaves everything on the server, so each poll returns
+    // the whole mailbox. The list is replaced rather than accumulated: what is on
+    // screen is exactly what is still in the mailbox.
+    async function refreshDidCommInbox(options = {}) {
+        if (!currentId) {
+            setDidcommMessages([]);
+            return;
+        }
+
+        if (didcommPollingRef.current) {
+            return;
+        }
+        didcommPollingRef.current = true;
+        setDidcommInboxLoading(true);
+
+        try {
+            const received = await keymaster.receiveDidComm({ name: currentId, ack: false });
+            setDidcommMessages(received);
+        } catch (error) {
+            // A polled failure is usually a node that is briefly unreachable; only
+            // an explicit refresh should raise a snackbar.
+            if (!options.quiet) {
+                showError(error);
+            }
+        } finally {
+            didcommPollingRef.current = false;
+            setDidcommInboxLoading(false);
+        }
+    }
+
+    async function dismissDidComm(ids) {
+        if (!ids.length) {
+            return;
+        }
+
+        setDidcommBusy(true);
+        try {
+            const removed = await keymaster.ackDidComm(ids, { name: currentId });
+            showSuccess(removed === 1 ? 'Message dismissed' : `${removed} messages dismissed`);
+            await refreshDidCommInbox();
+        } catch (error) {
+            showError(error);
+        } finally {
+            setDidcommBusy(false);
+        }
+    }
+
+    async function respondToDidCommPing(received) {
+        const message = received.message || {};
+
+        if (!message.from || !message.id) {
+            showError('This ping carries no sender to respond to');
+            return;
+        }
+
+        setDidcommBusy(true);
+        try {
+            await keymaster.sendDidComm(
+                { type: TRUST_PING_RESPONSE_TYPE, body: {}, thid: message.id },
+                message.from,
+                { name: currentId },
+            );
+            showSuccess('Ping response sent');
+        } catch (error) {
+            showError(error);
+        } finally {
+            setDidcommBusy(false);
+        }
+    }
+
+    function didcommMessageLabel(type) {
+        if (type === BASIC_MESSAGE_TYPE) {
+            return 'Message';
+        }
+        if (type === TRUST_PING_TYPE) {
+            return 'Trust ping';
+        }
+        return type || 'Unknown';
     }
 
     async function publishDidComm() {
@@ -7674,6 +7783,108 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     }
                     {tab === 'didcomm' &&
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 700, mt: 2 }}>
+                            <Tabs
+                                value={didcommTab}
+                                onChange={(_, v) => setDidcommTab(v)}
+                                indicatorColor="primary"
+                                textColor="primary"
+                            >
+                                <Tab label="Inbox" value="inbox" />
+                                <Tab label="Endpoint" value="endpoint" />
+                            </Tabs>
+
+                            {didcommTab === 'inbox' &&
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Button
+                                            variant="contained"
+                                            color="primary"
+                                            onClick={() => refreshDidCommInbox()}
+                                            disabled={didcommBusy || didcommInboxLoading}
+                                        >
+                                            Refresh
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            color="primary"
+                                            onClick={() => dismissDidComm(didcommMessages.map(m => m.id))}
+                                            disabled={didcommBusy || !didcommMessages.length}
+                                        >
+                                            Dismiss All
+                                        </Button>
+                                    </Box>
+
+                                    {didcommMessages.length === 0
+                                        ? <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                            {didcommInboxLoading ? 'Loading...' : 'No messages in the mailbox for this identity.'}
+                                        </Typography>
+                                        : didcommMessages.map((received) => {
+                                            const message = received.message || {};
+                                            const sender = message.from || received.metadata?.sender;
+                                            // DIDComm created_time is seconds since the epoch, not milliseconds.
+                                            const time = message.created_time
+                                                ? new Date(message.created_time * 1000).toLocaleString()
+                                                : '';
+
+                                            return (
+                                                <Box key={received.id} sx={{ borderBottom: 1, borderColor: 'divider', pb: 1.5 }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                        <Typography variant="subtitle2">
+                                                            {didcommMessageLabel(message.type)}
+                                                        </Typography>
+                                                        {/* Anoncrypt hides the sender entirely, so "who sent this" and
+                                                            "is that claim verified" are two different questions. */}
+                                                        <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                                                            {received.metadata?.authenticated ? 'authenticated' : 'anonymous'}
+                                                        </Typography>
+                                                        {time &&
+                                                            <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                                                                {time}
+                                                            </Typography>
+                                                        }
+                                                        <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+                                                            {message.type === TRUST_PING_TYPE &&
+                                                                <Button
+                                                                    size="small"
+                                                                    onClick={() => respondToDidCommPing(received)}
+                                                                    disabled={didcommBusy}
+                                                                >
+                                                                    Respond
+                                                                </Button>
+                                                            }
+                                                            <Button
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => dismissDidComm([received.id])}
+                                                                disabled={didcommBusy}
+                                                            >
+                                                                Dismiss
+                                                            </Button>
+                                                        </Box>
+                                                    </Box>
+                                                    <Typography variant="body2" sx={{ opacity: 0.7, wordBreak: 'break-all' }}>
+                                                        From: {sender || 'unknown'}
+                                                    </Typography>
+                                                    {message.type === BASIC_MESSAGE_TYPE
+                                                        ? <Typography variant="body1" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
+                                                            {String(message.body?.content ?? '')}
+                                                        </Typography>
+                                                        : <Box
+                                                            component="pre"
+                                                            sx={{ mt: 1, fontSize: '0.75rem', overflowX: 'auto', m: 0 }}
+                                                        >
+                                                            {JSON.stringify(message.body ?? {}, null, 2)}
+                                                        </Box>
+                                                    }
+                                                </Box>
+                                            );
+                                        })
+                                    }
+                                </Box>
+                            }
+
+                            {didcommTab === 'endpoint' &&
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <Typography variant="body2" sx={{ opacity: 0.7 }}>
                                 Publish a messaging endpoint so other agents can send encrypted DIDComm messages to this identity.
                             </Typography>
@@ -7743,6 +7954,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                     Unpublish
                                 </Button>
                             </Box>
+                            </Box>
+                            }
                         </Box>
                     }
                     {tab === 'wallet' &&
