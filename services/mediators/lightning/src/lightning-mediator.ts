@@ -90,9 +90,12 @@ function normalizePath(path: string): string {
         .replace(/\/invoice\/(?:did:[^/]+|did%3[aA][^/]+)/g, '/invoice/:did');
 }
 
-function isPrivateHost(hostname: string): boolean {
-    return /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
-}
+// No address filter on outbound fetches. The one that used to live here matched
+// hostnames with a literal regex, so `127.0.0.1.nip.io` -- or any name an
+// attacker controls that points inward -- passed it while honest LAN use did
+// not. What remains, at each call site, is the scheme requirement: no DNS name
+// can forge that, and it is what keeps plaintext internal services out of reach.
+// Matches the DIDComm relay; see #645.
 
 function parsePositiveInteger(value: unknown): number | null {
     const parsed = typeof value === 'number' ? value : parseInt(String(value), 10);
@@ -407,11 +410,9 @@ async function main(): Promise<void> {
                 }
 
                 const [name, domain] = parts;
+                // https by construction, so an internal plaintext service cannot be
+                // reached through this even though the address is not filtered.
                 const lnurlUrl = new URL(`https://${domain}/.well-known/lnurlp/${encodeURIComponent(name)}`);
-                if (isPrivateHost(lnurlUrl.hostname)) {
-                    res.status(400).json({ error: 'Invalid Lightning Address: private addresses not allowed' });
-                    return;
-                }
 
                 const lnurlResponse = await fetch(lnurlUrl.toString());
                 if (!lnurlResponse.ok) {
@@ -431,9 +432,12 @@ async function main(): Promise<void> {
                     return;
                 }
 
+                // The callback comes from the remote LNURL response, so it is
+                // attacker-influenced: hold the scheme line even though the
+                // address is not filtered.
                 const callbackUrl = new URL(callback);
-                if (callbackUrl.protocol !== 'https:' || isPrivateHost(callbackUrl.hostname)) {
-                    res.status(400).json({ error: 'Invalid callback URL' });
+                if (callbackUrl.protocol !== 'https:') {
+                    res.status(400).json({ error: 'Invalid callback URL: must use https' });
                     return;
                 }
 
@@ -492,10 +496,6 @@ async function main(): Promise<void> {
                 }
                 if (!isOnion && url.protocol !== 'https:') {
                     res.status(400).json({ error: 'Invalid service endpoint: must use https' });
-                    return;
-                }
-                if (!isOnion && isPrivateHost(url.hostname)) {
-                    res.status(400).json({ error: 'Invalid service endpoint: private addresses not allowed' });
                     return;
                 }
 
