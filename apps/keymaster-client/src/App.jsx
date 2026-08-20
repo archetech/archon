@@ -36,10 +36,11 @@ function App() {
 
             const { adminApiKey } = await res.json();
             const km = new KeymasterClient();
-            await km.connect({ url: keymasterUrl });
-            if (adminApiKey) {
-                km.addCustomHeader('Authorization', `Bearer ${adminApiKey}`);
-            }
+            // The admin key goes in X-Archon-Admin-Key, which is the only header
+            // the keymaster service reads; connect installs it. It was previously
+            // sent as an Authorization bearer token, which the service ignores, so
+            // every protected call 401'd whenever ARCHON_ADMIN_API_KEY was set.
+            await km.connect({ url: keymasterUrl, apiKey: adminApiKey });
             try {
                 const capabilities = await km.getNodeCapabilities();
                 setHasDidComm(capabilities?.didcomm !== false);
