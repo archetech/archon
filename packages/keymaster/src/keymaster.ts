@@ -206,6 +206,9 @@ export default class Keymaster implements KeymasterInterface {
     // memoized. `undefined` = not yet fetched; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
     private _nodeCapabilities?: NodeCapabilities | null;
+    // This node's own public DIDComm endpoint, fetched once and memoized.
+    // `undefined` = not yet fetched; `null` = the node advertises none.
+    private _nodeDidCommEndpoint?: string | null;
     private _walletCache?: WalletFile;
     private _hdkeyCache?: any;
     // Identity of the wallet whose seed `_hdkeyCache` was derived from, so a
@@ -2618,6 +2621,42 @@ export default class Keymaster implements KeymasterInterface {
         return { message: inner, metadata };
     }
 
+    // The public DIDComm endpoint this node advertises (the same value
+    // publishDidComm auto-discovers), used to recognise mail bound for a mailbox
+    // that lives here. Memoized; null when the node advertises none.
+    private async nodeDidCommEndpoint(): Promise<string | null> {
+        if (this._nodeDidCommEndpoint !== undefined) {
+            return this._nodeDidCommEndpoint;
+        }
+        const gateway = this.gatekeeper as Partial<DrawbridgeInterface>;
+        if (typeof gateway.getDidCommEndpoint !== 'function') {
+            this._nodeDidCommEndpoint = null;
+            return null;
+        }
+        try {
+            this._nodeDidCommEndpoint = (await gateway.getDidCommEndpoint()) || null;
+        }
+        catch {
+            this._nodeDidCommEndpoint = null;
+        }
+        return this._nodeDidCommEndpoint;
+    }
+
+    // Compare endpoints the way two publishers of the same node would write them:
+    // case-insensitive scheme and host, trailing slashes ignored.
+    private static sameDidCommEndpoint(a: string, b: string): boolean {
+        const normalize = (value: string): string => {
+            try {
+                const url = new URL(value);
+                return `${url.protocol.toLowerCase()}//${url.host.toLowerCase()}${url.pathname.replace(/\/+$/, '')}`;
+            }
+            catch {
+                return value.replace(/\/+$/, '');
+            }
+        };
+        return normalize(a) === normalize(b);
+    }
+
     private async resolveDidCommEndpoint(did: string): Promise<{ uri: string; routingKeys: string[] } | undefined> {
         const doc = await this.resolveDidForDidComm(did);
         const service = (doc.didDocument?.service || []).find(s => s.type === 'DIDCommMessaging');
@@ -2776,6 +2815,34 @@ export default class Keymaster implements KeymasterInterface {
                 envelope = wrapForward(packed, recipientKa.kid, { kid: routing.kid, publicJwk: routing.publicJwk });
             }
 
+            // A recipient whose mailbox is on this node needs no egress: deposit
+            // straight into the local relay. Without this, sending to your own
+            // identity leaves the node and comes back -- and with an
+            // auto-discovered `.onion` endpoint that means a full Tor round trip,
+            // which fails outright on a node that runs no Tor. Mirror of
+            // receive/mediate, which read the local gateway rather than the
+            // published endpoint. Skipped when a mediator is in the path, whose
+            // Forward envelope is addressed elsewhere by design.
+            const nodeEndpoint = await this.nodeDidCommEndpoint();
+            if (endpoint.routingKeys.length === 0 && nodeEndpoint
+                && Keymaster.sameDidCommEndpoint(endpoint.uri, nodeEndpoint)) {
+                const localResponse = await fetch(`${serviceBase}/api/v1/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/didcomm-encrypted+json' },
+                    body: envelope,
+                });
+                if (!localResponse.ok) {
+                    const localDetail = await localResponse.json().then(body => body?.error).catch(() => undefined);
+                    const localSuffix = localDetail ? ` (${localDetail})` : '';
+                    throw new KeymasterError(
+                        `DIDComm delivery to ${recipientDid} failed: ${localResponse.status}${localSuffix}`
+                    );
+                }
+                const localData = await localResponse.json();
+                ids.push(...(localData.ids || []));
+                continue;
+            }
+
             // Authenticated hand-off to the service (signed challenge proving we
             // control senderDid), which delivers the opaque envelope to the recipient.
             const challenge = await this.fetchDidCommChallenge(serviceBase, `DIDComm delivery to ${recipientDid} failed`);
@@ -2786,7 +2853,12 @@ export default class Keymaster implements KeymasterInterface {
                 body: JSON.stringify({ did: senderDid, challenge, signature, endpoint: endpoint.uri, message: envelope }),
             });
             if (!response.ok) {
-                throw new KeymasterError(`DIDComm delivery to ${recipientDid} failed: ${response.status}`);
+                // The status alone cannot tell a missing Tor proxy from a recipient
+                // that rejected the envelope -- the service says which in the body,
+                // so carry it through instead of discarding it.
+                const detail = await response.json().then(body => body?.error).catch(() => undefined);
+                const suffix = detail ? ` (${detail})` : '';
+                throw new KeymasterError(`DIDComm delivery to ${recipientDid} failed: ${response.status}${suffix}`);
             }
             const data = await response.json();
             ids.push(...(data.ids || []));

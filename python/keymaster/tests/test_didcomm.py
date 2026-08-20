@@ -169,6 +169,10 @@ class _FakeResponse:
         self._payload = payload
         self.status_code = status_code
 
+    @property
+    def is_success(self):
+        return self.status_code < 400
+
     def json(self):
         return self._payload
 
@@ -226,6 +230,118 @@ def test_ack_didcomm_reports_the_relay_count_not_the_requested_count(monkeypatch
     km = _mailbox_keymaster(monkeypatch, calls, lambda url, kw: _FakeResponse({"removed": 1}))
 
     assert asyncio.run(km.ack_didcomm(["msg-1", "msg-gone"])) == 1
+
+
+def test_send_didcomm_deposits_locally_for_a_mailbox_on_this_node(monkeypatch):
+    # Sending to your own identity must not leave the node. With an auto-discovered
+    # .onion endpoint that would be a full Tor round trip out and back -- and no
+    # delivery at all on a node running no Tor. Mirrors the JS keymaster.
+    import asyncio
+
+    onion = "http://abcdefghijklmnop.onion:4222/didcomm"
+    calls: list = []
+
+    def responses(url, kw):
+        return _FakeResponse({"ids": ["local-1"]})
+
+    km = _mailbox_keymaster(monkeypatch, calls, responses)
+    monkeypatch.setattr(km, "pack_didcomm", _async_return("envelope"))
+    monkeypatch.setattr(km, "_resolve_didcomm_endpoint", _async_return({"uri": onion, "routingKeys": []}))
+    monkeypatch.setattr(km, "_node_didcomm_endpoint_uri", _async_return(onion))
+
+    assert asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:alice")) == ["local-1"]
+
+    urls = [url for _method, url, _kw in calls]
+    assert urls == ["https://gateway.example/didcomm/api/v1/messages"]
+    assert not any("/deliver" in url for url in urls)
+    assert not any("/challenge" in url for url in urls)
+
+
+def test_send_didcomm_uses_the_service_for_a_mailbox_elsewhere(monkeypatch):
+    import asyncio
+
+    calls: list = []
+
+    def responses(url, kw):
+        if url.endswith("/challenge"):
+            return _FakeResponse({"challenge": "c"})
+        return _FakeResponse({"ids": ["remote-1"]})
+
+    km = _mailbox_keymaster(monkeypatch, calls, responses)
+    monkeypatch.setattr(km, "pack_didcomm", _async_return("envelope"))
+    monkeypatch.setattr(km, "_resolve_didcomm_endpoint", _async_return({"uri": "https://othernode.example/didcomm", "routingKeys": []}))
+    monkeypatch.setattr(km, "_node_didcomm_endpoint_uri", _async_return("https://mynode.example/didcomm"))
+    monkeypatch.setattr("keymaster.core.sign_hash", lambda *args, **kwargs: "sig")
+
+    assert asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob")) == ["remote-1"]
+
+    urls = [url for _method, url, _kw in calls]
+    assert any("/deliver" in url for url in urls)
+    assert not any(url.endswith("/api/v1/messages") for url in urls)
+
+
+def test_same_didcomm_endpoint_ignores_case_and_trailing_slash():
+    from keymaster.core import Keymaster
+
+    assert Keymaster._same_didcomm_endpoint("https://Node.Example/didcomm/", "https://node.example/didcomm")
+    assert not Keymaster._same_didcomm_endpoint("https://node.example/didcomm", "https://other.example/didcomm")
+
+
+def test_delivery_failure_carries_the_service_error_body(monkeypatch):
+    # 502 alone cannot tell a missing Tor proxy from a recipient that rejected the
+    # envelope; the reason lives in the body. Mirrors the JS keymaster.
+    import asyncio
+    import pytest
+    from keymaster.core import KeymasterError
+
+    def responses(url, kw):
+        if url.endswith("/challenge"):
+            return _FakeResponse({"challenge": "c"})
+        return _FakeResponse(
+            {"error": "onion endpoint requires a Tor proxy (set ARCHON_DIDCOMM_TOR_PROXY)"},
+            status_code=502,
+        )
+
+    calls: list = []
+    km = _mailbox_keymaster(monkeypatch, calls, responses)
+    monkeypatch.setattr(km, "pack_didcomm", _async_return("envelope"))
+    monkeypatch.setattr(km, "_resolve_didcomm_endpoint", _async_return({"uri": "https://bob.example/didcomm", "routingKeys": []}))
+    monkeypatch.setattr("keymaster.core.sign_hash", lambda *args, **kwargs: "sig")
+
+    with pytest.raises(KeymasterError) as exc:
+        asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
+
+    assert "502 (onion endpoint requires a Tor proxy" in str(exc.value)
+
+
+def test_delivery_failure_without_a_body_still_reports_the_status(monkeypatch):
+    import asyncio
+    import pytest
+    from keymaster.core import KeymasterError
+
+    class _NoBody:
+        status_code = 504
+        is_success = False
+
+        @staticmethod
+        def json():
+            raise ValueError("not json")
+
+    def responses(url, kw):
+        if url.endswith("/challenge"):
+            return _FakeResponse({"challenge": "c"})
+        return _NoBody()
+
+    calls: list = []
+    km = _mailbox_keymaster(monkeypatch, calls, responses)
+    monkeypatch.setattr(km, "pack_didcomm", _async_return("envelope"))
+    monkeypatch.setattr(km, "_resolve_didcomm_endpoint", _async_return({"uri": "https://bob.example/didcomm", "routingKeys": []}))
+    monkeypatch.setattr("keymaster.core.sign_hash", lambda *args, **kwargs: "sig")
+
+    with pytest.raises(KeymasterError) as exc:
+        asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
+
+    assert str(exc.value).endswith("failed: 504")
 
 
 def test_receive_didcomm_acks_unless_ack_is_explicitly_false(monkeypatch):

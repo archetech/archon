@@ -608,6 +608,150 @@ describe('DIDComm gateway transport helpers', () => {
             .rejects.toThrow('DIDComm ack failed: 500');
     });
 
+    it('deposits locally when the recipient mailbox lives on this node', async () => {
+        // Sending to your own identity must not leave the node. With an
+        // auto-discovered .onion endpoint, egress would mean a full Tor round trip
+        // out and back -- and no delivery at all on a node running no Tor.
+        const base = useDidCommGateway();
+        const onion = 'http://abcdefghijklmnop.onion:4222/didcomm';
+        (gatekeeper as any).getDidCommEndpoint = async () => onion;
+
+        const aliceDid = await keymaster.createId('Alice');
+        await keymaster.publishDidComm(onion, 'Alice');
+
+        const posted: string[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+            const url = String(input);
+            posted.push(url);
+            if (url === `${base}/api/v1/messages`) {
+                expect(String(init?.body)).toContain('protected');
+                return jsonResponse({ ids: ['local-1'] });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        await expect(
+            keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, aliceDid, { name: 'Alice' })
+        ).resolves.toEqual(['local-1']);
+
+        expect(posted).toEqual([`${base}/api/v1/messages`]);
+        expect(posted).not.toContain(`${base}/api/v1/deliver`);
+        expect(posted).not.toContain(`${base}/api/v1/challenge`);
+    });
+
+    it('still goes through the service when the recipient is on another node', async () => {
+        const base = useDidCommGateway();
+        (gatekeeper as any).getDidCommEndpoint = async () => 'https://mynode.example/didcomm';
+
+        await keymaster.createId('Alice');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://mynode.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://othernode.example/didcomm', 'Bob');
+
+        const posted: string[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            posted.push(url);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'remote-challenge' });
+            }
+            if (url === `${base}/api/v1/deliver`) {
+                return jsonResponse({ ids: ['remote-1'] });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        await expect(
+            keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, bobDid, { name: 'Alice' })
+        ).resolves.toEqual(['remote-1']);
+
+        expect(posted).toContain(`${base}/api/v1/deliver`);
+        expect(posted).not.toContain(`${base}/api/v1/messages`);
+    });
+
+    it('sends through the service when a mediator is in the path, even on this node', async () => {
+        // The Forward envelope is addressed to the mediator, not to us; depositing
+        // it here would put an envelope this node cannot unpack in a local mailbox.
+        const base = useDidCommGateway();
+        const nodeEndpoint = 'https://mynode.example/didcomm';
+        (gatekeeper as any).getDidCommEndpoint = async () => nodeEndpoint;
+
+        await keymaster.createId('Alice');
+        const mediatorDid = await keymaster.createId('Mediator');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm(nodeEndpoint, 'Alice');
+        await keymaster.publishDidComm(nodeEndpoint, 'Mediator');
+        await keymaster.publishDidComm(nodeEndpoint, 'Bob', [mediatorDid]);
+
+        const posted: string[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            posted.push(url);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'mediated-challenge' });
+            }
+            if (url === `${base}/api/v1/deliver`) {
+                return jsonResponse({ ids: ['mediated-1'] });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        await expect(
+            keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, bobDid, { name: 'Alice' })
+        ).resolves.toEqual(['mediated-1']);
+
+        expect(posted).toContain(`${base}/api/v1/deliver`);
+        expect(posted).not.toContain(`${base}/api/v1/messages`);
+    });
+
+    it('carries the service error body into a failed delivery', async () => {
+        // 502 alone cannot tell a missing Tor proxy from a recipient that rejected
+        // the envelope; the reason lives in the body.
+        const base = useDidCommGateway();
+        await keymaster.createId('Alice');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'delivery-challenge' });
+            }
+            if (url === `${base}/api/v1/deliver`) {
+                return jsonResponse({ error: 'onion endpoint requires a Tor proxy (set ARCHON_DIDCOMM_TOR_PROXY)' }, 502);
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        await expect(
+            keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, bobDid, { name: 'Alice' })
+        ).rejects.toThrow(/502 \(onion endpoint requires a Tor proxy/);
+    });
+
+    it('still reports a failed delivery when the service sends no error body', async () => {
+        const base = useDidCommGateway();
+        await keymaster.createId('Alice');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'delivery-challenge' });
+            }
+            if (url === `${base}/api/v1/deliver`) {
+                return new Response('gateway timeout', { status: 504 });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        await expect(
+            keymaster.sendDidComm({ type: 'https://x/1/msg', body: {} }, bobDid, { name: 'Alice' })
+        ).rejects.toThrow(/failed: 504$/);
+    });
+
     it('surfaces DIDComm gateway challenge failures clearly', async () => {
         const base = useDidCommGateway();
         await keymaster.createId('Alice');
