@@ -7,10 +7,5 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts"
-  },
-  "peerDependencies": {
-    "@mui/icons-material": "*",
-    "@mui/material": "*",
-    "react": "*"
   }
 }

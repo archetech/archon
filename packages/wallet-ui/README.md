@@ -10,6 +10,14 @@ The apps alias this package to `src/` and let their own Vite build compile the
 TSX. There is no `dist/`, no build step, and nothing to rebuild between editing
 a component and seeing it in either wallet.
 
+## It declares no dependencies
+
+React and MUI come from whichever app is building, resolved through that app's
+bundler alias and `dedupe` list. Declaring them here — even as peers — makes
+`npm ci` demand MUI's whole transitive tree in the root lockfile, and installing
+them puts a *second* copy of React and MUI at the repo root. Two MUI instances
+in one bundle means two emotion caches and broken theming.
+
 ## What belongs here
 
 Components that are **presentational**: they render, they call handlers, and
