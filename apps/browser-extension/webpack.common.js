@@ -15,7 +15,14 @@ module.exports = {
     module: {
         rules: [
             {
-                use: "ts-loader",
+                // transpileOnly: type checking happens in `npm run typecheck`,
+                // not here. Since the shared wallet-ui components brought MUI's
+                // real generics into scope, checking inside the bundle recursed
+                // deep enough to blow the stack -- and did it for the Firefox
+                // build while Chrome squeaked through, which is the signature of
+                // a threshold rather than a type error. Transpiling is also
+                // several times faster, and tsc remains the authority.
+                use: { loader: "ts-loader", options: { transpileOnly: true } },
                 test: /\.tsx?$/,
                 exclude: /node_modules/,
             },
