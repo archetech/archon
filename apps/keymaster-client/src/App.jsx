@@ -11,6 +11,10 @@ const keymasterUrl = localStorage.getItem(STORAGE_KEY) || defaultUrl;
 
 function App() {
     const [keymaster, setKeymaster] = useState(null);
+    // Unknown (a node serving no capability manifest) is permissive, matching the
+    // gate inside Keymaster: show the surface rather than hide it against an
+    // older node, and let the operation fail late if the service really is absent.
+    const [hasDidComm, setHasDidComm] = useState(true);
     const [showLogin, setShowLogin] = useState(true);
     const [loginError, setLoginError] = useState('');
 
@@ -36,6 +40,13 @@ function App() {
             if (adminApiKey) {
                 km.addCustomHeader('Authorization', `Bearer ${adminApiKey}`);
             }
+            try {
+                const capabilities = await km.getNodeCapabilities();
+                setHasDidComm(capabilities?.didcomm !== false);
+            } catch {
+                // Capability manifest unreadable — leave DIDComm visible.
+            }
+
             setShowLogin(false);
             setKeymaster(km);
         } catch {
@@ -61,6 +72,7 @@ function App() {
                 <KeymasterUI
                     keymaster={keymaster}
                     title={'Keymaster Server Wallet Demo'}
+                    hasDidComm={hasDidComm}
                     serverUrl={keymasterUrl}
                     onServerUrlChange={handleServerUrlChange}
                 />

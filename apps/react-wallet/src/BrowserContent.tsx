@@ -20,6 +20,7 @@ import {
     Badge,
     Bolt,
     Email,
+    Forum,
     Key,
     List as ListIcon,
     ManageSearch,
@@ -47,6 +48,7 @@ import AliasedDIDs from "./components/AliasedDIDs";
 import AssetsTab from "./components/AssetsTab";
 import DmailTab from "./components/DmailTab";
 import LightningTab from "./components/LightningTab";
+import DidCommTab from "./components/DidCommTab";
 import PollTab from "./components/PollTab";
 import AuthTab from "./components/AuthTab";
 import PropertiesTab from "./components/PropertiesTab";
@@ -59,7 +61,7 @@ function BrowserContent() {
     const [menuOpen, setMenuOpen] = useState<boolean>(false);
     const { isTabletUp } = useThemeContext();
 
-    const { hasLightning } = useWalletContext();
+    const { hasLightning, hasDidComm } = useWalletContext();
     const { currentId, validId } = useVariablesContext();
     const {
         selectedTab,
@@ -204,6 +206,12 @@ function BrowserContent() {
             {displayComponent && hasLightning && (
                 <TabPanel value="lightning" sx={{ p: 0 }}>
                     <LightningTab />
+                </TabPanel>
+            )}
+
+            {displayComponent && hasDidComm && (
+                <TabPanel value="didcomm" sx={{ p: 0 }}>
+                    <DidCommTab />
                 </TabPanel>
             )}
 
@@ -389,6 +397,17 @@ function BrowserContent() {
                                                 menuOpen ? "Lightning" : ""
                                             }
                                             value="lightning"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    {displayComponent && hasDidComm && (
+                                        <Tab
+                                            icon={<Forum />}
+                                            label={
+                                                menuOpen ? "DIDComm" : ""
+                                            }
+                                            value="didcomm"
                                             iconPosition="start"
                                         />
                                     )}
@@ -623,6 +642,17 @@ function BrowserContent() {
                                         <Bolt />
                                     </ListItemIcon>
                                     <ListItemText primary="Lightning" />
+                                </ListItemButton>
+                            )}
+
+                            {hasDidComm && (
+                                <ListItemButton
+                                    onClick={() => selectFromMore("didcomm")}
+                                >
+                                    <ListItemIcon>
+                                        <Forum />
+                                    </ListItemIcon>
+                                    <ListItemText primary="DIDComm" />
                                 </ListItemButton>
                             )}
 

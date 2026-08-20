@@ -37,6 +37,10 @@ function App() {
     const [modalAction, setModalAction] = useState(null);
     const [passphraseErrorText, setPassphraseErrorText] = useState("");
     const [keymaster, setKeymaster] = useState(null);
+    // Unknown (a node serving no capability manifest) is permissive, matching the
+    // gate inside Keymaster: show the surface rather than hide it against an
+    // older node, and let the operation fail late if the service really is absent.
+    const [hasDidComm, setHasDidComm] = useState(true);
     const [kmEpoch, setKmEpoch] = useState(0);
     const [uploadAction, setUploadAction] = useState(null);
     const [pendingWallet, setPendingWallet] = useState(null);
@@ -80,6 +84,14 @@ function App() {
         setPassphraseErrorText("");
         setKeymaster(instance);
         setKmEpoch((e) => e + 1);
+
+        try {
+            const capabilities = await instance.getNodeCapabilities();
+            setHasDidComm(capabilities?.didcomm !== false);
+        } catch {
+            // Capability manifest unreadable — leave DIDComm visible.
+        }
+
         setIsReady(true);
     };
 
@@ -294,6 +306,7 @@ function App() {
                     challengeDID={challengeDID}
                     onWalletUpload={handleWalletUploadFile}
                     hasLightning={hasLightning}
+                    hasDidComm={hasDidComm}
                     serverUrl={gatekeeperUrl}
                     onServerUrlChange={handleServerUrlChange}
                 />

@@ -52,6 +52,7 @@ import {
     Clear,
     ContentCopy,
     Create,
+    Forum,
     Groups,
     Delete,
     Download,
@@ -179,7 +180,7 @@ function formatAddedDate(value) {
     return value.slice(0, 10);
 }
 
-function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, serverUrl, onServerUrlChange }) {
+function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, hasDidComm, serverUrl, onServerUrlChange }) {
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
     const [saveId, setSaveId] = useState('');
@@ -402,6 +403,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [lightningStatusFilter, setLightningStatusFilter] = useState({ settled: true, pending: true, failed: true, expired: true });
     const [isPublished, setIsPublished] = useState(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState(false);
+    const [didcommStatus, setDidcommStatus] = useState(null);
+    const [didcommEndpoint, setDidcommEndpoint] = useState('');
+    const [didcommRoutingKeys, setDidcommRoutingKeys] = useState('');
+    const [didcommBusy, setDidcommBusy] = useState(false);
+
     const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(() => loadRefreshIntervalSeconds());
     const [settingsRefreshIntervalSeconds, setSettingsRefreshIntervalSeconds] = useState(() => loadRefreshIntervalSeconds());
 
@@ -435,6 +441,81 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
         // eslint-disable-next-line
     }, [tab]);
+
+    useEffect(() => {
+        if (tab === 'didcomm') {
+            refreshDidComm();
+        }
+        // eslint-disable-next-line
+    }, [tab, currentId]);
+
+    async function refreshDidComm() {
+        if (!currentId) {
+            setDidcommStatus(null);
+            return;
+        }
+
+        try {
+            const docs = await keymaster.resolveDID(currentId);
+            const didDocument = docs.didDocument;
+            const service = (didDocument?.service || []).find(entry => entry.type === 'DIDCommMessaging');
+            const keyAgreement = Boolean(didDocument?.keyAgreement?.length);
+
+            if (!service && !keyAgreement) {
+                setDidcommStatus(null);
+                return;
+            }
+
+            // The plain string form carries no routing keys; the object form is
+            // what publishDidComm writes for an identity behind a mediator.
+            const endpoint = typeof service?.serviceEndpoint === 'string'
+                ? service.serviceEndpoint
+                : service?.serviceEndpoint?.uri;
+            const routingKeys = typeof service?.serviceEndpoint === 'object'
+                ? service.serviceEndpoint.routingKeys || []
+                : [];
+
+            setDidcommStatus({ keyAgreement, endpoint, routingKeys });
+        } catch (error) {
+            showError(error);
+            setDidcommStatus(null);
+        }
+    }
+
+    async function publishDidComm() {
+        setDidcommBusy(true);
+        try {
+            const keys = didcommRoutingKeys
+                .split(',')
+                .map(key => key.trim())
+                .filter(Boolean);
+
+            // An empty endpoint is not "no endpoint" -- it asks the node to supply
+            // its own relay, which is what most identities want.
+            await keymaster.publishDidComm(didcommEndpoint.trim() || undefined, currentId, keys.length ? keys : undefined);
+            showSuccess('DIDComm endpoint published');
+            setDidcommEndpoint('');
+            setDidcommRoutingKeys('');
+            await refreshDidComm();
+        } catch (error) {
+            showError(error);
+        } finally {
+            setDidcommBusy(false);
+        }
+    }
+
+    async function unpublishDidComm() {
+        setDidcommBusy(true);
+        try {
+            await keymaster.unpublishDidComm(currentId);
+            showSuccess('DIDComm endpoint unpublished');
+            await refreshDidComm();
+        } catch (error) {
+            showError(error);
+        } finally {
+            setDidcommBusy(false);
+        }
+    }
 
     function showAlert(warning) {
         setSnackbar({
@@ -4572,6 +4653,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                         {currentId && !widget && hasLightning &&
                             <Tab key="lightning" value="lightning" label={'Lightning'} icon={<Bolt />} />
                         }
+                        {currentId && !widget && hasDidComm &&
+                            <Tab key="didcomm" value="didcomm" label={'DIDComm'} icon={<Forum />} />
+                        }
                         {currentId &&
                             <Tab key="auth" value="auth" label={'Auth'} icon={<Key />} />
                         }
@@ -7586,6 +7670,79 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                     }
                                 </Box>
                             }
+                        </Box>
+                    }
+                    {tab === 'didcomm' &&
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 700, mt: 2 }}>
+                            <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                Publish a messaging endpoint so other agents can send encrypted DIDComm messages to this identity.
+                            </Typography>
+
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                <Typography variant="subtitle2">Published</Typography>
+                                {didcommStatus
+                                    ? <>
+                                        {didcommStatus.endpoint
+                                            ? <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                                <strong>Endpoint:</strong> {didcommStatus.endpoint}
+                                            </Typography>
+                                            : <Typography variant="body2">
+                                                <strong>Endpoint:</strong> key only (others can encrypt to this identity but have nowhere to deliver)
+                                            </Typography>
+                                        }
+                                        {didcommStatus.routingKeys.length > 0 &&
+                                            <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                                <strong>Routing keys:</strong> {didcommStatus.routingKeys.join(', ')}
+                                            </Typography>
+                                        }
+                                        <Typography variant="body2">
+                                            <strong>Key agreement:</strong> {didcommStatus.keyAgreement ? 'published' : 'missing'}
+                                        </Typography>
+                                    </>
+                                    : <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                        Nothing published for this identity yet.
+                                    </Typography>
+                                }
+                            </Box>
+
+                            <TextField
+                                label="Endpoint URL (optional)"
+                                value={didcommEndpoint}
+                                onChange={(e) => setDidcommEndpoint(e.target.value)}
+                                disabled={didcommBusy}
+                                placeholder="https://relay.example/didcomm"
+                                helperText="Leave blank to use this node's own relay."
+                                fullWidth
+                            />
+
+                            <TextField
+                                label="Routing keys (optional, comma separated)"
+                                value={didcommRoutingKeys}
+                                onChange={(e) => setDidcommRoutingKeys(e.target.value)}
+                                disabled={didcommBusy}
+                                placeholder="did:cid:mediator#key-agreement-1"
+                                helperText="Set these when delivery goes through a mediator; senders then wrap messages in a Forward."
+                                fullWidth
+                            />
+
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={publishDidComm}
+                                    disabled={didcommBusy}
+                                >
+                                    {didcommStatus ? 'Update' : 'Publish'}
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    onClick={unpublishDidComm}
+                                    disabled={didcommBusy || !didcommStatus}
+                                >
+                                    Unpublish
+                                </Button>
+                            </Box>
                         </Box>
                     }
                     {tab === 'wallet' &&
