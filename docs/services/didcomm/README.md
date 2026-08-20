@@ -151,6 +151,28 @@ There is no `/metrics` endpoint and no admin API.
 and `express.json` are both capped at `ARCHON_DIDCOMM_UPLOAD_LIMIT`
 (default `5mb`).
 
+### 2.7 Outbound delivery (DID-control auth)
+
+`POST /api/v1/deliver` takes `{ did, challenge, signature, endpoint, message }`
+and forwards the opaque envelope to `<endpoint>/api/v1/messages`. This is the
+single egress path: the keymaster performs crypto only and never dials
+recipients itself, which is what lets a browser wallet reach a `.onion`
+recipient. Destinations ending in `.onion` are dialled through the SOCKS proxy
+in `ARCHON_DIDCOMM_TOR_PROXY`; without one configured, an onion destination is
+refused with `502`.
+
+> **Egress is unrestricted.** Destinations are filtered by neither scheme nor
+> address — https and http, public and private, all forwarded. An earlier guard
+> rejected non-https and private/loopback hosts, but matched hostnames with a
+> literal regex, so `127.0.0.1.nip.io` and mapped IPv6 forms passed it while
+> honest same-host and LAN delivery did not; it was removed rather than left
+> half-enforced (#645).
+>
+> The challenge auth here proves control of *some* resolvable DID, not of a
+> local identity, so anyone able to create a DID can make the relay issue a POST,
+> with a body of their choosing, to any host it can reach. Deploy it where that
+> is acceptable, and keep it off segments carrying services that would answer.
+
 ---
 
 ## 3. Authentication

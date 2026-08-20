@@ -42,10 +42,8 @@ const config = {
     maxChallenges: positiveInt('ARCHON_DIDCOMM_MAX_CHALLENGES',
         process.env.ARCHON_DIDCOMM_MAX_CHALLENGES, 10000),
     redisURL: process.env.ARCHON_REDIS_URL || 'redis://localhost:6379',
-    // Outbound egress (POST /deliver): SOCKS5 Tor proxy for .onion destinations,
-    // and an opt-in to allow private/loopback destinations (dev/test only).
+    // Outbound egress (POST /deliver): SOCKS5 Tor proxy for .onion destinations.
     torProxy: process.env.ARCHON_DIDCOMM_TOR_PROXY || '',
-    allowPrivateEgress: process.env.ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS === 'true',
 };
 
 export default config;

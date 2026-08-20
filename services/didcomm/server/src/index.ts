@@ -29,7 +29,6 @@ async function main() {
         cipher,
         uploadLimit: config.uploadLimit,
         torProxy: config.torProxy,
-        allowPrivateEgress: config.allowPrivateEgress,
     });
 
     app.listen(config.didcommPort, config.bindAddress, () => {

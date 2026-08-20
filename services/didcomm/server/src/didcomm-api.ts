@@ -15,15 +15,8 @@ export interface AppDeps {
     resolver: Resolver;
     cipher: Cipher;
     uploadLimit?: string;
-    // Outbound egress (POST /deliver): SOCKS5 Tor proxy for .onion destinations,
-    // and whether to permit private/loopback destinations (dev/test only).
+    // Outbound egress (POST /deliver): SOCKS5 Tor proxy for .onion destinations.
     torProxy?: string;
-    allowPrivateEgress?: boolean;
-}
-
-// SSRF guard: block loopback/private/link-local hosts for clearnet egress.
-function isPrivateHost(hostname: string): boolean {
-    return /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|0\.0\.0\.0|\[?::1\]?$)/.test(hostname);
 }
 
 export function createApp(deps: AppDeps): Express {
@@ -187,14 +180,19 @@ export function createApp(deps: AppDeps): Express {
             }
             const onion = url.hostname.endsWith('.onion');
 
-            if (!onion && !deps.allowPrivateEgress) {
-                if (url.protocol !== 'https:') {
-                    return res.status(400).send({ error: 'clearnet endpoint must use https' });
-                }
-                if (isPrivateHost(url.hostname)) {
-                    return res.status(400).send({ error: 'private/loopback endpoint not allowed' });
-                }
-            }
+            // Egress is deliberately unrestricted: destinations are filtered by
+            // neither scheme nor address. The previous guard rejected non-https and
+            // private/loopback hosts unless ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS was
+            // set, but it matched hostnames with a literal regex, so an attacker's
+            // `127.0.0.1.nip.io` (or a mapped IPv6 form) walked through it while
+            // honest same-host and LAN delivery was blocked. It stopped the wrong
+            // party, so it is gone rather than half-enforced -- see #645.
+            //
+            // What this means for operators: POST /deliver authenticates any
+            // resolvable DID, so anyone able to create a DID can make this relay
+            // issue a POST, with a body they control, to any host it can reach. Do
+            // not run it on a network segment carrying services you would not want
+            // reachable that way.
 
             const fetchOptions: any = {
                 method: 'POST',

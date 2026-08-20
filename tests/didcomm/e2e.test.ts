@@ -58,10 +58,11 @@ beforeEach(async () => {
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm'] });
     cipher = new CipherNode();
 
-    // allowPrivateEgress: the relay both stores mail and (Phase 8) performs
-    // outbound delivery; tests deliver to the same localhost relay.
+    // The relay both stores mail and (Phase 8) performs outbound delivery; these
+    // tests deliver to the same localhost relay, which needed an explicit
+    // allowPrivateEgress opt-in until the egress guard was removed (#645).
     const app = express();
-    app.use('/didcomm', createApp({ store: new MemoryMailboxStore(), resolver: gatekeeper, cipher, allowPrivateEgress: true }));
+    app.use('/didcomm', createApp({ store: new MemoryMailboxStore(), resolver: gatekeeper, cipher }));
     await new Promise<void>(resolve => { server = app.listen(0, resolve); });
     const port = (server.address() as any).port;
     const nodeURL = `http://localhost:${port}`;

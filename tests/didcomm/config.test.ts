@@ -14,18 +14,19 @@ describe('didcomm service config', () => {
             maxChallenges: expect.any(Number),
             redisURL: expect.any(String),
             torProxy: expect.any(String),
-            allowPrivateEgress: expect.any(Boolean),
         });
     });
 
-    it('defaults egress to Tor-less and private destinations disallowed', () => {
-        // These two gate outbound delivery, so their defaults are the safe ones:
-        // no proxy configured, and private/loopback destinations refused unless
-        // explicitly opted into for dev.
+    it('defaults egress to Tor-less', () => {
+        // Onion delivery needs a proxy and there is no sensible default host, so
+        // an unset value means "no onion egress" rather than a guessed one.
         expect(config.torProxy).toBe(process.env.ARCHON_DIDCOMM_TOR_PROXY || '');
-        expect(config.allowPrivateEgress).toBe(
-            process.env.ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS === 'true',
-        );
+    });
+
+    it('carries no private-egress switch', () => {
+        // Removed with the guard it gated (#645): destinations are no longer
+        // filtered, so there is nothing left to opt into.
+        expect(config).not.toHaveProperty('allowPrivateEgress');
     });
 
     it('defaults the message TTL to seven days', () => {

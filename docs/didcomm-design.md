@@ -319,8 +319,16 @@ direct-dial fallback**. (As with Lightning, sends work only when the keymaster's
 gateway/Drawbridge, not a bare gatekeeper.) This lets the CLI and in-browser wallet reach `.onion`
 recipients (they delegate transport) and keeps the keymaster free of network egress. *Validated:*
 the relay e2e routes every send through `/deliver`; a unit test asserts the no-gateway hard error.
-Privacy: the service sees recipient DIDs + timing, not content. (`ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS=true`
-permits loopback destinations for dev/test.)
+Privacy: the service sees recipient DIDs + timing, not content.
+
+**Egress is unrestricted, deliberately.** The relay filters destinations by neither scheme nor
+address. An earlier guard rejected non-https and private/loopback hosts unless
+`ARCHON_DIDCOMM_ALLOW_PRIVATE_EGRESS` was set, but it matched hostnames with a literal regex, so
+`127.0.0.1.nip.io` and mapped IPv6 forms passed while honest same-host and LAN delivery did not.
+It stopped the wrong party, and was removed rather than left half-enforced (#645). Note what
+follows: `POST /deliver` authenticates any *resolvable* DID, not only local identities, so anyone
+able to create a DID can make the relay POST a body of their choosing to any host it can reach.
+Run it where that is acceptable.
 
 **Reading your own mailbox uses the same local gateway.** `receiveDidComm`/`mediateDidComm`
 (challenge → fetch → unpack → ack) connect to **`<nodeURL>/didcomm`** as well — *not* the identity's
