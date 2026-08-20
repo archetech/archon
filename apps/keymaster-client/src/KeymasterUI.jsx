@@ -95,6 +95,11 @@ import { Buffer } from 'buffer';
 import { QRCodeSVG } from 'qrcode.react';
 import './App.css';
 import PollResultsModal from "./PollResultsModal";
+import {
+    decodeOutOfBandInvitation,
+    encodeOutOfBandInvitation,
+    outOfBandInvitation,
+} from './oobCodec.mjs';
 import TextInputModal from "./TextInputModal";
 import WarningModal from "./WarningModal";
 import packageJson from "../package.json";
@@ -409,7 +414,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const BASIC_MESSAGE_TYPE = 'https://didcomm.org/basicmessage/2.0/message';
     const TRUST_PING_TYPE = 'https://didcomm.org/trust-ping/2.0/ping';
     const TRUST_PING_RESPONSE_TYPE = 'https://didcomm.org/trust-ping/2.0/ping-response';
-    const OUT_OF_BAND_INVITATION_TYPE = 'https://didcomm.org/out-of-band/2.0/invitation';
 
     const [didcommTab, setDidcommTab] = useState('inbox');
     const [didcommComposeTo, setDidcommComposeTo] = useState('');
@@ -465,6 +469,16 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
         // eslint-disable-next-line
     }, [tab]);
+
+    useEffect(() => {
+        // An invitation names the identity that made it, so it must not survive a
+        // switch: leaving it on screen would offer a QR and a copyable link for
+        // the previous identity under the new one's name.
+        setDidcommInviteUrl('');
+        setDidcommInviteInput('');
+        setDidcommDecodedInvite(null);
+        // eslint-disable-next-line
+    }, [currentDID]);
 
     useEffect(() => {
         didcommActiveIdRef.current = currentId;
@@ -610,25 +624,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
-    // Out-of-band invitation encoding, inlined for the same reason as the protocol
-    // URIs above: the server-wallet demo depends only on the thin client package.
-    // Mirrors encodeOutOfBandInvitation/decodeOutOfBandInvitation.
-    function encodeInvitation(invitation) {
-        const json = JSON.stringify(invitation);
-        const b64 = btoa(unescape(encodeURIComponent(json)))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=+$/, '');
-        return `https://didcomm.org?_oob=${b64}`;
-    }
-
-    function decodeInvitation(urlOrOob) {
-        const match = urlOrOob.match(/[?&]_oob=([^&]+)/);
-        const oob = match ? decodeURIComponent(match[1]) : urlOrOob;
-        const json = decodeURIComponent(escape(atob(oob.replace(/-/g, '+').replace(/_/g, '/'))));
-        return JSON.parse(json);
-    }
-
     function createDidCommInvitation() {
         if (!currentDID) {
             showError('Select an identity first');
@@ -637,15 +632,15 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
         // The invitation names the inviter; everything a recipient needs to reach
         // them is resolvable from that DID, so the URL carries no endpoint.
-        setDidcommInviteUrl(encodeInvitation({
-            type: OUT_OF_BAND_INVITATION_TYPE,
-            from: currentDID,
-            body: { accept: ['didcomm/v2'] },
-        }));
+        setDidcommInviteUrl(encodeOutOfBandInvitation(outOfBandInvitation(currentDID)));
     }
 
     function acceptDidCommInvitation() {
         const trimmed = didcommInviteInput.trim();
+
+        // Drop the previous result first: a failed decode must not leave the last
+        // inviter on screen with a live "Message Them" button.
+        setDidcommDecodedInvite(null);
 
         if (!trimmed) {
             showError('Paste an invitation URL first');
@@ -653,14 +648,22 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
 
         try {
-            const invitation = decodeInvitation(trimmed);
+            const invitation = decodeOutOfBandInvitation(trimmed);
 
-            if (!invitation?.from) {
+            // The payload is whatever the sender chose to encode, so nothing here
+            // is known to be a string. An object `from` would throw when React
+            // renders it, and would reach the compose field as a non-string.
+            const from = invitation?.from;
+            if (typeof from !== 'string' || !from.trim()) {
                 showError('That invitation names no inviter');
                 return;
             }
 
-            setDidcommDecodedInvite({ from: invitation.from, goal: invitation.body?.goal });
+            const goal = invitation?.body?.goal;
+            setDidcommDecodedInvite({
+                from: from.trim(),
+                goal: typeof goal === 'string' ? goal : undefined,
+            });
         } catch {
             showError('Could not read that invitation');
         }
@@ -8141,8 +8144,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             <Button
                                                 size="small"
                                                 onClick={async () => {
-                                                    await navigator.clipboard.writeText(didcommInviteUrl);
-                                                    showSuccess('Invitation copied');
+                                                    try {
+                                                        await navigator.clipboard.writeText(didcommInviteUrl);
+                                                        showSuccess('Invitation copied');
+                                                    } catch {
+                                                        // Unavailable outside a secure context, and refusable;
+                                                        // the link is on screen to copy by hand either way.
+                                                        showError('Could not copy — select the link and copy it manually');
+                                                    }
                                                 }}
                                             >
                                                 Copy Link

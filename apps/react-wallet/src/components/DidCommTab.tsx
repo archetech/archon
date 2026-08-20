@@ -13,7 +13,7 @@ import type { DidCommReceivedMessage } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
-import { scanQrCodeRaw } from "../utils/utils";
+import { scanQrText } from "../utils/utils";
 import { loadRefreshIntervalSeconds } from "../contexts/UIContext";
 import PageHeader from "./layout/PageHeader";
 import Section from "./layout/Section";
@@ -185,6 +185,15 @@ function DidCommTab() {
     }, [refreshStatus]);
 
     useEffect(() => {
+        // An invitation names the identity that made it, so it must not survive a
+        // switch: leaving it on screen would offer a QR and a copyable link for
+        // the previous identity under the new one's name.
+        setInviteUrl("");
+        setInviteInput("");
+        setDecodedInvite(null);
+    }, [currentDID]);
+
+    useEffect(() => {
         activeIdRef.current = currentId;
         // Drop the previous identity's mail immediately rather than leaving it on
         // screen under the new name until the fetch returns.
@@ -315,6 +324,10 @@ function DidCommTab() {
     function acceptInvitation(value: string) {
         const trimmed = value.trim();
 
+        // Drop the previous result first: a failed decode must not leave the last
+        // inviter on screen with a live "Message them" button.
+        setDecodedInvite(null);
+
         if (!trimmed) {
             setError("Paste an invitation URL first");
             return;
@@ -323,12 +336,20 @@ function DidCommTab() {
         try {
             const invitation = decodeOutOfBandInvitation(trimmed);
 
-            if (!invitation?.from) {
+            // The payload is whatever the sender chose to encode, so nothing here
+            // is known to be a string. An object `from` would throw when React
+            // renders it, and would reach Compose's trim() as a non-string.
+            const from = invitation?.from;
+            if (typeof from !== "string" || !from.trim()) {
                 setError("That invitation names no inviter");
                 return;
             }
 
-            setDecodedInvite({ from: invitation.from, goal: invitation.body?.goal });
+            const goal = invitation?.body?.goal;
+            setDecodedInvite({
+                from: from.trim(),
+                goal: typeof goal === "string" ? goal : undefined,
+            });
         } catch {
             // decode throws on anything that is not a well-formed _oob payload.
             setError("Could not read that invitation");
@@ -336,7 +357,9 @@ function DidCommTab() {
     }
 
     async function scanInvitation() {
-        const scanned = await scanQrCodeRaw();
+        // scanQrText, not scanQrCodeRaw: the latter only returns codes that carry
+        // a DID in the clear, and an invitation hides its DID inside the payload.
+        const scanned = await scanQrText();
 
         if (!scanned) {
             setError("Failed to scan QR code");
@@ -348,8 +371,14 @@ function DidCommTab() {
     }
 
     async function copyInvitation() {
-        await navigator.clipboard.writeText(inviteUrl);
-        setSuccess("Invitation copied");
+        try {
+            await navigator.clipboard.writeText(inviteUrl);
+            setSuccess("Invitation copied");
+        } catch {
+            // Clipboard access is unavailable outside a secure context and can be
+            // refused; the link is on screen to copy by hand either way.
+            setError("Could not copy — select the link and copy it manually");
+        }
     }
 
     function replyTo(sender: string) {

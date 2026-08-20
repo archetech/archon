@@ -84,22 +84,6 @@ describe('DIDComm protocol builders', () => {
         const bare = url.split('_oob=')[1];
         expect(decodeOutOfBandInvitation(bare).type).toBe(OUT_OF_BAND_INVITATION_TYPE);
     });
-
-    // The wallets that cannot import this module (the demo KeymasterUI depends on
-    // the thin client package only) inline the same encoding with btoa. Pin the
-    // wire format against that construction so the two cannot drift apart
-    // silently: a changed encoding here would strand invitations between wallets.
-    it('encodes exactly as a btoa-based browser implementation would', () => {
-        const invitation = outOfBandInvitation('did:cid:alice', { goal: 'naïve — 主题 🎉' });
-        const json = JSON.stringify(invitation);
-        const browserStyle = btoa(unescape(encodeURIComponent(json)))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=+$/, '');
-
-        expect(encodeOutOfBandInvitation(invitation)).toBe(`https://didcomm.org?_oob=${browserStyle}`);
-        expect(decodeOutOfBandInvitation(`https://didcomm.org?_oob=${browserStyle}`)).toStrictEqual(invitation);
-    });
 });
 
 describe('credential-exchange builders (issue-credential / present-proof 3.0)', () => {
