@@ -1,6 +1,5 @@
 import { createContext, ReactNode, useContext, useState } from "react";
 import { Alert, AlertColor, Snackbar } from "@mui/material";
-import { useSafeArea } from "./SafeAreaContext";
 
 interface SnackbarContextValue {
     setError: (error: any) => void;
@@ -16,8 +15,13 @@ interface SnackbarState {
 
 const SnackbarContext = createContext<SnackbarContextValue | null>(null);
 
-export function SnackbarProvider({ children }: { children: ReactNode }) {
-    const { top: safeTop } = useSafeArea();
+// `topOffset` is a platform capability rather than a style choice: react-wallet
+// runs as a Capacitor app and must clear the notch, which it reads from its own
+// safe-area context, while the extension has no inset and passes nothing. The
+// host supplies the number so this file needs neither context.
+export function SnackbarProvider(
+    { children, topOffset = 0 }: { children: ReactNode; topOffset?: number }
+) {
     const [snackbar, setSnackbar] = useState<SnackbarState>({
         open: false,
         message: "",
@@ -54,7 +58,7 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
                 autoHideDuration={5000}
                 onClose={handleSnackbarClose}
                 anchorOrigin={{ vertical: "top", horizontal: "center" }}
-                sx={{ mt: `${safeTop}px` }}
+                sx={{ mt: `${topOffset}px` }}
             >
                 <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: "100%" }}>
                     {snackbar.message}

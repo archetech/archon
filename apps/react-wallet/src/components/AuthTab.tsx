@@ -6,7 +6,7 @@ import {
 import { CameraAlt, CheckCircle, Login, Warning } from "@mui/icons-material";
 import axios from "axios";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { scanQrCodeRaw } from "../utils/utils";

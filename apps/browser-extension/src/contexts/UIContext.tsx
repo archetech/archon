@@ -17,7 +17,7 @@ import {
     Token,
 } from '@mui/icons-material';
 import { useWalletContext } from "./WalletProvider";
-import { useSnackbar } from "./SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { useAuthContext } from "./AuthContext";
 import { useVariablesContext } from "./VariablesProvider";
 import { useThemeContext } from "./ContextProviders";

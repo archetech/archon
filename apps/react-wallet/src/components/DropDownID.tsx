@@ -8,7 +8,7 @@ import {
 import { ArrowDropDown } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import CopyDID from "./CopyDID";
 import GatekeeperClient from "@didcid/clients/gatekeeper";

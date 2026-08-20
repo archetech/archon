@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
     Divider, MenuItem, Paper, Select, TextField, Typography
@@ -8,7 +8,7 @@ import axios from "axios";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useAuthContext } from "../contexts/AuthContext";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 
 interface AutoLoginState {

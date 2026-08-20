@@ -28,7 +28,7 @@ import {
     PersonAdd,
 } from "@mui/icons-material";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
 import PollResultsModal from "../modals/PollResultsModal";

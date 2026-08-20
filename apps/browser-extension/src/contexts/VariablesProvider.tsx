@@ -1,4 +1,4 @@
-import React, { createContext, Dispatch, ReactNode, SetStateAction, useContext, useState } from "react";
+import { createContext, Dispatch, ReactNode, SetStateAction, useContext, useState } from "react";
 import { useWalletContext } from "./WalletProvider";
 import {DmailItem} from "@didcid/keymaster/types";
 

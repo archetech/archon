@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
-import CredentialForm from "./CredentialForm";
+import { useSnackbar } from "@didcid/wallet-ui";
+import { CredentialForm } from "@didcid/wallet-ui";
 import {
     Autocomplete,
     Box,

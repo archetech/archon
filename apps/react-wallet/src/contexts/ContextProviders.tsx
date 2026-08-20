@@ -5,8 +5,17 @@ import { UIProvider } from "./UIContext";
 import { ThemeProvider } from "@mui/material/styles";
 import { Box, CssBaseline, useMediaQuery } from "@mui/material";
 import { createAppTheme } from "../theme";
-import { SafeAreaProvider } from "./SafeAreaContext";
-import { SnackbarProvider } from "./SnackbarProvider";
+import { SafeAreaProvider, useSafeArea } from "./SafeAreaContext";
+import { SnackbarProvider } from "@didcid/wallet-ui";
+
+// The shared SnackbarProvider takes the inset as a number rather than reaching
+// for a context that only exists here: this wallet runs as a Capacitor app and
+// must clear the notch, the extension has no inset at all. Reading it is the
+// host's job, so it happens here.
+function SafeAreaSnackbarProvider({ children }: { children: ReactNode }) {
+    const { top } = useSafeArea();
+    return <SnackbarProvider topOffset={top}>{children}</SnackbarProvider>;
+}
 
 interface ThemeContextValue {
     darkMode: boolean;
@@ -76,7 +85,7 @@ export function ContextProviders(
                     }}
                 >
                     <SafeAreaProvider>
-                        <SnackbarProvider>
+                        <SafeAreaSnackbarProvider>
                             <WalletProvider>
                                 <VariablesProvider>
                                     <UIProvider>
@@ -84,7 +93,7 @@ export function ContextProviders(
                                     </UIProvider>
                                 </VariablesProvider>
                             </WalletProvider>
-                        </SnackbarProvider>
+                        </SafeAreaSnackbarProvider>
                     </SafeAreaProvider>
                 </Box>
             </ThemeProvider>

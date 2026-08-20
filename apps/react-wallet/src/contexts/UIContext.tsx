@@ -18,7 +18,7 @@ import {
 } from '@mui/icons-material';
 import { useWalletContext } from "./WalletProvider";
 import { useVariablesContext } from "./VariablesProvider";
-import { useSnackbar } from "./SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 
 const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';

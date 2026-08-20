@@ -35,9 +35,9 @@ import {
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import TextInputModal from "../modals/TextInputModal";
-import SelectInputModal from "../modals/SelectInputModal";
+import { SelectInputModal } from "@didcid/wallet-ui";
 import CopyResolveDID from "./CopyResolveDID";
 import { scanAliasQrCode } from "../utils/utils";
 import PageHeader from "./layout/PageHeader";

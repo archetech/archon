@@ -12,7 +12,7 @@ import {
 import type { DidCommReceivedMessage } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { scanQrText } from "../utils/utils";
 import { loadRefreshIntervalSeconds } from "../contexts/UIContext";
 import PageHeader from "./layout/PageHeader";

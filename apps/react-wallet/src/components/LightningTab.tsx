@@ -16,7 +16,7 @@ import { LightningNotConfiguredError } from "@didcid/common/errors";
 import { DecodedLightningInvoice, LightningPaymentRecord, LightningPaymentStatus } from "@didcid/keymaster/types";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { Bolt } from "@mui/icons-material";
 import PageHeader from "./layout/PageHeader";
 import EmptyState from "./layout/EmptyState";

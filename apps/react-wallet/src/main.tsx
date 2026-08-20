@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import BrowserContent from "./BrowserContent";
 import { ContextProviders } from "./contexts/ContextProviders";

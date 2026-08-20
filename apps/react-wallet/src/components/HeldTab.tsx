@@ -5,7 +5,7 @@ import WarningModal from "../modals/WarningModal";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import JsonViewer from "./JsonViewer";
 import DisplayDID from "./DisplayDID";
 import {scanQrCode} from "../utils/utils";

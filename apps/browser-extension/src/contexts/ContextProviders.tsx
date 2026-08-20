@@ -6,7 +6,7 @@ import { RefreshMode, UIProvider, openBrowserValues } from "./UIContext";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { Box } from "@mui/material";
 import { requestBrowserRefresh } from "../utils/utils";
-import { SnackbarProvider } from "./SnackbarProvider";
+import { SnackbarProvider } from "@didcid/wallet-ui";
 
 interface ThemeContextValue {
     darkMode: boolean;

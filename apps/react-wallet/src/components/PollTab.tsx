@@ -30,7 +30,7 @@ import {
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import PollResultsModal from "../modals/PollResultsModal";
 import {PollConfig, PollResults} from "@didcid/keymaster/types";
 import TextInputModal from "../modals/TextInputModal";

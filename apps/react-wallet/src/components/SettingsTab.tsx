@@ -3,7 +3,7 @@ import {Box, Button, Switch, TextField, Typography} from "@mui/material";
 import { DarkMode, LightMode, Save } from "@mui/icons-material";
 import { useThemeContext } from "../contexts/ContextProviders";
 import { useWalletContext } from "../contexts/WalletProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import {
     DEFAULT_GATEKEEPER_URL,
     GATEKEEPER_KEY,

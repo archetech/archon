@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useCallback, useEffect, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import { jsonViewTheme } from "./jsonViewTheme";
 import { useWalletContext } from "../contexts/WalletProvider";
@@ -6,10 +6,10 @@ import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, 
 import { Badge, Create, Image, Login, PermIdentity } from "@mui/icons-material";
 import { useUIContext } from "../contexts/UIContext";
 import { useThemeContext } from "../contexts/ContextProviders";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
-import SelectInputModal from "../modals/SelectInputModal";
+import { SelectInputModal } from "@didcid/wallet-ui";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { requestBrowserRefresh } from "../utils/utils";
 import type { AddressCheckResult, AddressInfo, FileAsset, ImageAsset, NostrKeys } from "@didcid/keymaster/types";
