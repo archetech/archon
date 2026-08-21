@@ -7,7 +7,7 @@ import {
     Button,
     DialogContentText,
 } from "@mui/material";
-import { useThemeContext } from "../contexts/ContextProviders";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 interface WarningModalProps {
     isOpen: boolean;
@@ -18,7 +18,7 @@ interface WarningModalProps {
 }
 
 const WarningModal: React.FC<WarningModalProps> = ({ isOpen, title, warningText, onSubmit, onClose }) => {
-    const { isTabletUp } = useThemeContext();
+    const isTabletUp = useIsTabletUp();
 
     if (!isOpen) {
         return null;

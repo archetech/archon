@@ -5,18 +5,18 @@ import {
 } from "@mui/material";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
-import WarningModal from "../modals/WarningModal";
+import { WarningModal } from "@didcid/wallet-ui";
 import { MnemonicModal } from "@didcid/wallet-ui";
-import PassphraseModal from "../modals/PassphraseModal";
+import { PassphraseModal } from "@didcid/wallet-ui";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import { clearSessionPassphrase, setSessionPassphrase } from "../utils/sessionPassphrase";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
 import { Capacitor } from "@capacitor/core";
-import PageHeader from "./layout/PageHeader";
-import Section from "./layout/Section";
-import ActionMenu from "./layout/ActionMenu";
+import { PageHeader } from "@didcid/wallet-ui";
+import { Section } from "@didcid/wallet-ui";
+import { ActionMenu } from "@didcid/wallet-ui";
 
 const WalletTab = () => {
     const [open, setOpen] = useState<boolean>(false);

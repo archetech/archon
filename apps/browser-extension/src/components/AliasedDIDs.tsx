@@ -12,7 +12,7 @@ import {
     Tooltip,
     Typography,
 } from "@mui/material";
-import WarningModal from "../modals/WarningModal";
+import { WarningModal } from "@didcid/wallet-ui";
 import {
     ArrowDropDown,
     Article,
@@ -35,7 +35,7 @@ import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { requestBrowserRefresh } from "../utils/utils";
-import TextInputModal from "../modals/TextInputModal";
+import { TextInputModal } from "@didcid/wallet-ui";
 import { SelectInputModal } from "@didcid/wallet-ui";
 import { CopyResolveDID } from "@didcid/wallet-ui";
 

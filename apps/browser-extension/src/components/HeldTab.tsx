@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Box, Button, TextField } from "@mui/material";
-import WarningModal from "../modals/WarningModal";
+import { WarningModal } from "@didcid/wallet-ui";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";

@@ -31,14 +31,14 @@ import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
-import PollResultsModal from "../modals/PollResultsModal";
+import { PollResultsModal } from "@didcid/wallet-ui";
 import {PollConfig, PollResults} from "@didcid/keymaster/types";
-import TextInputModal from "../modals/TextInputModal";
-import WarningModal from "../modals/WarningModal";
+import { TextInputModal } from "@didcid/wallet-ui";
+import { WarningModal } from "@didcid/wallet-ui";
 import { CopyResolveDID } from "@didcid/wallet-ui";
 import { DisplayDID } from "@didcid/wallet-ui";
 import { useThemeContext } from "../contexts/ContextProviders";
-import PageHeader from "./layout/PageHeader";
+import { PageHeader } from "@didcid/wallet-ui";
 
 const PollsTab: React.FC = () => {
     const { keymaster } = useWalletContext();

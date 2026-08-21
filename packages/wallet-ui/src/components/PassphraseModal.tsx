@@ -10,7 +10,7 @@ import {
     Box,
     CircularProgress,
 } from "@mui/material";
-import { useThemeContext } from "../contexts/ContextProviders";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 interface PassphraseModalProps {
     isOpen: boolean,
@@ -43,7 +43,7 @@ const PassphraseModal: React.FC<PassphraseModalProps> = (
     const [localError, setLocalError] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const combinedError = localError || errorText || "";
-    const { isTabletUp } = useThemeContext();
+    const isTabletUp = useIsTabletUp();
 
     if (!isOpen) {
         return null;

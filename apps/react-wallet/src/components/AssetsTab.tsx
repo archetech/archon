@@ -8,7 +8,7 @@ import FileTab from "./FileTab";
 import GroupsTab from "./GroupsTab";
 import VaultTab from "./VaultTab";
 import CloneAssetTab from "./CloneAssetTab";
-import PageHeader from "./layout/PageHeader";
+import { PageHeader } from "@didcid/wallet-ui";
 
 function AssetsTab({ subTab }: {subTab: string}) {
     const [assetSubTab, setAssetSubTab] = useState<string>("schemas");

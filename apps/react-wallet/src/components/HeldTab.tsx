@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Box, Button, IconButton, InputAdornment, TextField, Tooltip } from "@mui/material";
 import { CameraAlt } from "@mui/icons-material";
-import WarningModal from "../modals/WarningModal";
+import { WarningModal } from "@didcid/wallet-ui";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
@@ -10,9 +10,9 @@ import JsonViewer from "./JsonViewer";
 import { DisplayDID } from "@didcid/wallet-ui";
 import {scanQrCode} from "../utils/utils";
 import { Badge } from "@mui/icons-material";
-import Section from "./layout/Section";
-import EmptyState from "./layout/EmptyState";
-import ActionMenu from "./layout/ActionMenu";
+import { Section } from "@didcid/wallet-ui";
+import { EmptyState } from "@didcid/wallet-ui";
+import { ActionMenu } from "@didcid/wallet-ui";
 
 function HeldTab() {
     const [open, setOpen] = useState<boolean>(false);

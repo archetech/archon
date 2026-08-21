@@ -8,9 +8,6 @@ import { createAppTheme } from "../theme";
 import { SafeAreaProvider, useSafeArea } from "./SafeAreaContext";
 import { useDeepLinks } from "../hooks/useDeepLinks";
 import WalletWeb from "@didcid/keymaster/wallet/web";
-import PassphraseModal from "../modals/PassphraseModal";
-import WarningModal from "../modals/WarningModal";
-import { MnemonicModal } from "@didcid/wallet-ui";
 import { DEFAULT_GATEKEEPER_URL, GATEKEEPER_KEY } from "../constants";
 import {
     getSessionPassphrase,
@@ -56,12 +53,6 @@ function resolveGatekeeperUrl() {
     localStorage.setItem(GATEKEEPER_KEY, url);
     return url;
 }
-
-const walletModals = {
-    Passphrase: PassphraseModal,
-    Warning: WarningModal,
-    Mnemonic: MnemonicModal,
-};
 
 // The shared SnackbarProvider takes the inset as a number rather than reaching
 // for a context that only exists here: this wallet runs as a Capacitor app and
@@ -145,7 +136,6 @@ export function ContextProviders(
                                 walletStore={walletStore}
                                 session={walletSession}
                                 resolveGatekeeperUrl={resolveGatekeeperUrl}
-                                modals={walletModals}
                             >
                                 <VariablesProvider>
                                     <UIProvider>

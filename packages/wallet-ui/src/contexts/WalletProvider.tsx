@@ -15,6 +15,12 @@ import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
 import CipherWeb from "@didcid/cipher";
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 import { encryptWithPassphrase } from '@didcid/cipher/passphrase';
+// Imported directly now that all three are shared. They were injected while the
+// wallets still styled their dialogs differently, to avoid restyling one of them
+// as a side effect of a refactor.
+import PassphraseModal from "../components/PassphraseModal";
+import WarningModal from "../components/WarningModal";
+import MnemonicModal from "../components/MnemonicModal";
 
 const gatekeeper = new DrawbridgeClient();
 const cipher = new CipherWeb();
@@ -45,16 +51,6 @@ export interface WalletSession {
     clear: () => void | Promise<void>;
 }
 
-// The modals are injected as components rather than shared, because the two
-// wallets style their dialogs differently (#893 restyled react-wallet's and not
-// the extension's) and a refactor should not quietly restyle either. Only the
-// props this provider passes are specified here.
-export interface WalletModalComponents {
-    Passphrase: React.ComponentType<any>;
-    Warning: React.ComponentType<any>;
-    Mnemonic: React.ComponentType<any>;
-}
-
 export interface WalletProviderProps {
     children: ReactNode;
     // The wallet backend: WalletWeb in a page, WalletChrome in an extension.
@@ -62,7 +58,6 @@ export interface WalletProviderProps {
     session: WalletSession;
     // Resolved per app: localStorage here, chrome.storage.sync there.
     resolveGatekeeperUrl: () => string | Promise<string>;
-    modals: WalletModalComponents;
     // Extension-only: its full-page view behaves differently from its popup.
     // Undefined in a wallet that has no such mode.
     isBrowser?: boolean;
@@ -73,9 +68,8 @@ const WalletContext = createContext<WalletContextValue | null>(null);
 const INCORRECT_PASSPHRASE = "Incorrect passphrase";
 
 export function WalletProvider(
-    { children, walletStore, session, resolveGatekeeperUrl, modals, isBrowser = false }: WalletProviderProps
+    { children, walletStore, session, resolveGatekeeperUrl, isBrowser = false }: WalletProviderProps
 ) {
-    const { Passphrase: PassphraseModal, Warning: WarningModal, Mnemonic: MnemonicModal } = modals;
     const [passphraseErrorText, setPassphraseErrorText] = useState<string>("");
     const [pendingMnemonic, setPendingMnemonic] = useState<string>("");
     const [pendingWallet, setPendingWallet] = useState<unknown>(null);

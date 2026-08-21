@@ -8,7 +8,8 @@ import {
     DialogTitle,
     Typography,
 } from "@mui/material";
-import { PollResults } from "@didcid/keymaster/types";
+import { PollResults } from "@didcid/keymaster";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 interface PollResultsModalProps {
     open: boolean;
@@ -17,6 +18,8 @@ interface PollResultsModalProps {
 }
 
 const PollResultsModal: React.FC<PollResultsModalProps> = ({ open, onClose, results }) => {
+    const isTabletUp = useIsTabletUp();
+
     if (!results) {
         return null;
     }
@@ -24,7 +27,19 @@ const PollResultsModal: React.FC<PollResultsModalProps> = ({ open, onClose, resu
     const { tally, votes } = results;
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            maxWidth="lg"
+            fullWidth
+            slotProps={{
+                paper: {
+                    sx: {
+                        width: isTabletUp ? '65%' : '100%'
+                    }
+                }
+            }}
+        >
             <DialogTitle>Poll Results</DialogTitle>
 
             <DialogContent dividers>

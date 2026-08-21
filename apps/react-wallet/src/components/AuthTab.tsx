@@ -11,8 +11,8 @@ import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { scanQrCodeRaw } from "../utils/utils";
 import { dispatchDeepLink } from "../utils/deepLinkQueue";
-import PageHeader from "./layout/PageHeader";
-import ActionMenu from "./layout/ActionMenu";
+import { PageHeader } from "@didcid/wallet-ui";
+import { ActionMenu } from "@didcid/wallet-ui";
 
 interface AutoLoginState {
     responseDID: string;

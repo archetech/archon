@@ -8,9 +8,6 @@ import { Box } from "@mui/material";
 import { requestBrowserRefresh } from "../utils/utils";
 import { SnackbarProvider, ViewerNavigationProvider } from "@didcid/wallet-ui";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
-import PassphraseModal from "../modals/PassphraseModal";
-import WarningModal from "../modals/WarningModal";
-import { MnemonicModal } from "@didcid/wallet-ui";
 
 // Supplies "open this DID in the viewer" to the shared components, which cannot
 // reach a UIContext -- the two wallets keep their own. Here it opens the
@@ -47,12 +44,6 @@ async function resolveGatekeeperUrl() {
     const { gatekeeperUrl } = await chrome.storage.sync.get(["gatekeeperUrl"]);
     return gatekeeperUrl as string;
 }
-
-const walletModals = {
-    Passphrase: PassphraseModal,
-    Warning: WarningModal,
-    Mnemonic: MnemonicModal,
-};
 
 // The popup is destroyed whenever it closes, so the state the user was looking
 // at has to be written through to the background script and read back on open.
@@ -145,7 +136,6 @@ export function ContextProviders(
                             walletStore={walletStore}
                             session={walletSession}
                             resolveGatekeeperUrl={resolveGatekeeperUrl}
-                            modals={walletModals}
                         >
                             <VariablesProvider store={isBrowser ? undefined : storeExtensionState}>
                                 <AuthProvider>

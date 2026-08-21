@@ -4,7 +4,7 @@ import { TabContext, TabPanel } from "@mui/lab";
 import IssueTab from "./IssueTab";
 import IssuedTab from "./IssuedTab";
 import HeldTab from "./HeldTab";
-import PageHeader from "./layout/PageHeader";
+import { PageHeader } from "@didcid/wallet-ui";
 
 function CredentialsTab({ subTab, refresh }: {subTab: string, refresh: number}) {
     const [credentialTab, setCredentialTab] = useState<string>("held");

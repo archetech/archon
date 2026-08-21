@@ -9,7 +9,7 @@ import { ImageFileAsset, FileAsset, ImageAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import GatekeeperClient from "@didcid/clients/gatekeeper";
 import { VersionNavigator } from "@didcid/wallet-ui";
-import TextInputModal from "../modals/TextInputModal";
+import { TextInputModal } from "@didcid/wallet-ui";
 import { CopyResolveDID } from "@didcid/wallet-ui";
 
 const gatekeeper = new GatekeeperClient();

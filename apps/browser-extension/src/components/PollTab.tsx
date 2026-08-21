@@ -31,10 +31,10 @@ import { useWalletContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import PollResultsModal from "../modals/PollResultsModal";
+import { PollResultsModal } from "@didcid/wallet-ui";
 import {PollConfig, PollResults} from "@didcid/keymaster/types";
-import TextInputModal from "../modals/TextInputModal";
-import WarningModal from "../modals/WarningModal";
+import { TextInputModal } from "@didcid/wallet-ui";
+import { WarningModal } from "@didcid/wallet-ui";
 import { CopyResolveDID } from "@didcid/wallet-ui";
 import { DisplayDID } from "@didcid/wallet-ui";
 

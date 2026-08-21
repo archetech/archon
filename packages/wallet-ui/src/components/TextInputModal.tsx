@@ -11,7 +11,7 @@ import {
     InputAdornment,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import { useThemeContext } from "../contexts/ContextProviders";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 interface TextInputModalProps {
     isOpen: boolean;
@@ -41,7 +41,7 @@ const TextInputModal: React.FC<TextInputModalProps> = (
     }) => {
     const [value, setValue] = useState(defaultValue);
     const [revealed, setRevealed] = useState(false);
-    const { isTabletUp } = useThemeContext();
+    const isTabletUp = useIsTabletUp();
 
     useEffect(() => {
         if (isOpen) {

@@ -4,7 +4,7 @@ import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { Edit } from "@mui/icons-material";
-import TextInputModal from "../modals/TextInputModal";
+import { TextInputModal } from "@didcid/wallet-ui";
 import { CopyResolveDID } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 

@@ -38,7 +38,7 @@ import SettingsTab from "./components/SettingsTab";
 import IdentitiesTab from "./components/IdentitiesTab";
 import BrowserHeader from "./components/BrowserHeader";
 import JsonViewer from "./components/JsonViewer";
-import PageHeader from "./components/layout/PageHeader";
+import { PageHeader } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "./contexts/UIContext";
 import { useThemeContext } from "./contexts/ContextProviders";
@@ -51,7 +51,7 @@ import LightningTab from "./components/LightningTab";
 import DidCommTab from "./components/DidCommTab";
 import PollTab from "./components/PollTab";
 import AuthTab from "./components/AuthTab";
-import PropertiesTab from "./components/PropertiesTab";
+import { PropertiesTab } from "@didcid/wallet-ui";
 
 function BrowserContent() {
     const [moreOpen, setMoreOpen] = useState<boolean>(false);

@@ -42,8 +42,8 @@ import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
-import TextInputModal from "../modals/TextInputModal";
-import WarningModal from "../modals/WarningModal";
+import { TextInputModal } from "@didcid/wallet-ui";
+import { WarningModal } from "@didcid/wallet-ui";
 import { CopyResolveDID } from "@didcid/wallet-ui";
 import { CopyDID } from "@didcid/wallet-ui";
 import { DmailSearchModal } from "@didcid/wallet-ui";
@@ -51,8 +51,8 @@ import type { AdvancedSearchParams } from "@didcid/wallet-ui";
 import { DisplayDID } from "@didcid/wallet-ui";
 import { VersionNavigator } from "@didcid/wallet-ui";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
-import PageHeader from "./layout/PageHeader";
-import ActionMenu from "./layout/ActionMenu";
+import { PageHeader } from "@didcid/wallet-ui";
+import { ActionMenu } from "@didcid/wallet-ui";
 
 const DmailTab: React.FC = () => {
     const [registry, setRegistry] = useState<string>("hyperswarm");

@@ -30,7 +30,7 @@ import DmailTab from "./DmailTab";
 import LightningTab from "./LightningTab";
 import PollTab from "./PollTab";
 import AuthTab from "./AuthTab";
-import PropertiesTab from "./PropertiesTab";
+import { PropertiesTab } from "@didcid/wallet-ui";
 
 function BrowserContent() {
     const [menuOpen, setMenuOpen] = useState<boolean>(false);

@@ -5,9 +5,9 @@ import {
 } from "@mui/material";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
-import WarningModal from "../modals/WarningModal";
+import { WarningModal } from "@didcid/wallet-ui";
 import { MnemonicModal } from "@didcid/wallet-ui";
-import PassphraseModal from "../modals/PassphraseModal";
+import { PassphraseModal } from "@didcid/wallet-ui";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
 
 const WalletTab = () => {

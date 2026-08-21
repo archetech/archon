@@ -15,10 +15,10 @@ import { useVariablesContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { scanQrText } from "../utils/utils";
 import { loadRefreshIntervalSeconds } from "../contexts/UIContext";
-import PageHeader from "./layout/PageHeader";
-import Section from "./layout/Section";
-import EmptyState from "./layout/EmptyState";
-import ActionMenu from "./layout/ActionMenu";
+import { PageHeader } from "@didcid/wallet-ui";
+import { Section } from "@didcid/wallet-ui";
+import { EmptyState } from "@didcid/wallet-ui";
+import { ActionMenu } from "@didcid/wallet-ui";
 
 // What publishDidComm writes into the DID document, read back so the screen can
 // say what the identity currently advertises. Two states are both "published":

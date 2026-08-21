@@ -18,8 +18,8 @@ import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { Bolt } from "@mui/icons-material";
-import PageHeader from "./layout/PageHeader";
-import EmptyState from "./layout/EmptyState";
+import { PageHeader } from "@didcid/wallet-ui";
+import { EmptyState } from "@didcid/wallet-ui";
 
 const LIGHTNING_PAYMENT_STATUS_CHECKS = 3;
 const LIGHTNING_PAYMENT_STATUS_DELAY_MS = 1000;

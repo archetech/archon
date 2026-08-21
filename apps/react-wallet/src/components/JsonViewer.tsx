@@ -5,7 +5,7 @@ import React, {
     useState
 } from "react";
 import JsonView from '@uiw/react-json-view';
-import { jsonViewTheme } from "./layout/jsonViewTheme";
+import { jsonViewTheme } from "@didcid/wallet-ui";
 import {
     Box,
     TextField,

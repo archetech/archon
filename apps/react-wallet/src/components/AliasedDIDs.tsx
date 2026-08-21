@@ -13,7 +13,7 @@ import {
     Tooltip,
     Typography,
 } from "@mui/material";
-import WarningModal from "../modals/WarningModal";
+import { WarningModal } from "@didcid/wallet-ui";
 import {
     ArrowDropDown,
     Article,
@@ -36,11 +36,11 @@ import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
-import TextInputModal from "../modals/TextInputModal";
+import { TextInputModal } from "@didcid/wallet-ui";
 import { SelectInputModal } from "@didcid/wallet-ui";
 import { CopyResolveDID } from "@didcid/wallet-ui";
 import { scanAliasQrCode } from "../utils/utils";
-import PageHeader from "./layout/PageHeader";
+import { PageHeader } from "@didcid/wallet-ui";
 
 function AliasedDIDs() {
     const [removeOpen, setRemoveOpen] = useState<boolean>(false);

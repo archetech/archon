@@ -16,9 +16,9 @@ import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import {Delete, Edit} from "@mui/icons-material";
-import WarningModal from "../modals/WarningModal";
+import { WarningModal } from "@didcid/wallet-ui";
 import { Group } from '@didcid/keymaster/types'
-import TextInputModal from "../modals/TextInputModal";
+import { TextInputModal } from "@didcid/wallet-ui";
 import { CopyResolveDID } from "@didcid/wallet-ui";
 import { useThemeContext } from "../contexts/ContextProviders";
 
