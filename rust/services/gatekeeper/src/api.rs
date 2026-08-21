@@ -1122,10 +1122,11 @@ pub(crate) async fn resolve_did(
     // that stall and lets the confirm fallback -- another Archon gatekeeper,
     // which *can* resolve our DIDs -- be tried immediately instead.
     // Mirrors services/gatekeeper/server/src/v1-did-router.ts.
-    let is_own_method = did.starts_with(&format!(
-        "{}:",
-        state.config.did_prefix.trim_end_matches(':')
-    ));
+    // Explicitly empty-checked rather than relying on `format!("{}:", "")`
+    // yielding ":" (which no DID starts with). Both fall open; only this one says
+    // so. Mirrors the TypeScript `prefix.length > 0 &&`.
+    let prefix = state.config.did_prefix.trim_end_matches(':');
+    let is_own_method = !prefix.is_empty() && did.starts_with(&format!("{prefix}:"));
 
     if has_resolver_error && !is_own_method && !state.config.fallback_url.trim().is_empty() {
         let url = format!(
