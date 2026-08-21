@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Box, Button, Checkbox, Chip, CircularProgress, Divider, FormControlLabel, MenuItem,
-    Tab, Tabs, TextField, Typography
+    Autocomplete, Box, Button, Checkbox, Chip, CircularProgress, Divider,
+    FormControlLabel, MenuItem, Tab, Tabs, TextField, Typography
 } from "@mui/material";
 import { ContentCopy, Forum, Inbox, QrCodeScanner } from "@mui/icons-material";
 import { QRCodeSVG } from "qrcode.react";
@@ -108,7 +108,7 @@ function DidCommTab() {
     const inFlightRef = useRef<string | null>(null);
     const activeIdRef = useRef<string>("");
     const { keymaster } = useWalletContext();
-    const { currentId, currentDID } = useVariablesContext();
+    const { currentId, currentDID, agentList } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
     const { scanQr, loadRefreshInterval } = usePlatformCapabilities();
 
@@ -579,14 +579,29 @@ function DidCommTab() {
                         </Button>
                     }
                 >
-                    <TextField
-                        fullWidth
-                        label="To (DID or alias)"
-                        value={composeTo}
-                        onChange={event => setComposeTo(event.target.value)}
+                    {/* freeSolo, matching the Dmail recipient field: the known
+                        agents are offered, but a DID that is not in the wallet can
+                        still be typed. send() resolves either form before packing. */}
+                    <Autocomplete
+                        freeSolo
+                        options={agentList || []}
+                        // inputValue, not value: Reply sets the recipient
+                        // programmatically, and only a controlled input text
+                        // follows that.
+                        inputValue={composeTo}
                         disabled={busy}
-                        placeholder="did:cid:... or a wallet alias"
+                        // Not trimmed per keystroke -- that would eat the space in
+                        // a two-word alias as you typed it. send() trims.
+                        onInputChange={(_, value) => setComposeTo(value)}
                         sx={{ mb: 2 }}
+                        renderInput={params => (
+                            <TextField
+                                {...params}
+                                fullWidth
+                                label="To (DID or alias)"
+                                placeholder="did:cid:... or a wallet alias"
+                            />
+                        )}
                     />
 
                     <TextField
