@@ -49,6 +49,24 @@ Four files stay as two copies, and will:
 Sharing any of them would produce a file made mostly of questions about which
 host is running, which is worse than two files that each say one thing.
 
+## Capabilities are a two-sided contract
+
+A capability is only half done when the host supplies it. Review of the first
+pass found three failures of the other half, all of them silent:
+
+- `requestRefresh` was supplied and never called, so mutations from the
+  extension's popup stopped refreshing its open full-page view.
+- `scanQr` was consumed with `scanQr?.()` while the button rendered
+  unconditionally, so the extension offered a control that could only report a
+  failed scan. If a capability can be absent, hide the affordance.
+- the refresh interval was read from `localStorage` by shared code on the
+  assumption both wallets stored it there. They use the same *key* in different
+  *storage* -- the extension's is `chrome.storage.sync`, and asynchronous -- so
+  the extension silently got the default forever. It is a capability now.
+
+None of these broke a build or a type. Assume anything a host does differently
+is invisible to tooling and check both sides by hand.
+
 ## What does not belong here
 
 Anything importing `@capacitor/*`, `chrome.*`, or an app's own context. Those

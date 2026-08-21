@@ -21,6 +21,13 @@ export interface PlatformCapabilities {
     // sessions. Returns whether anything was restored. The extension's popup is
     // destroyed on close and does; react-wallet keeps a live page and does not.
     restoreSession?: () => Promise<boolean | void>;
+    // How often a polling screen should poll, in seconds; 0 means manual only.
+    // A capability rather than a shared helper reading localStorage: both
+    // wallets use the same storage KEY but not the same storage -- the
+    // extension's lives in chrome.storage.sync and is asynchronous. Reading
+    // localStorage here would silently give the extension the default forever,
+    // ignoring a saved value including a deliberate 0.
+    loadRefreshInterval?: () => Promise<number>;
 }
 
 const PlatformCapabilitiesContext = createContext<PlatformCapabilities>({});

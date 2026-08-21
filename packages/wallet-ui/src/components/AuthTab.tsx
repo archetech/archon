@@ -407,7 +407,10 @@ function AuthTab() {
                                     maxLength: 80,
                                 },
                                 input: {
-                                    endAdornment: (
+                                    // Only offered where there is a camera. In a host
+                                    // without one this control could do nothing but
+                                    // report a failed scan.
+                                    endAdornment: scanQr ? (
                                         <InputAdornment position="end">
                                             <Tooltip title="Scan QR" placement="top">
                                                 <span>
@@ -420,7 +423,7 @@ function AuthTab() {
                                                 </span>
                                             </Tooltip>
                                         </InputAdornment>
-                                    ),
+                                    ) : undefined,
                                 }
                             }}
                         />

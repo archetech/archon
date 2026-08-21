@@ -14,7 +14,6 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
-import { loadRefreshIntervalSeconds } from "../hooks/useRefreshInterval";
 import PageHeader from "./layout/PageHeader";
 import Section from "./layout/Section";
 import EmptyState from "./layout/EmptyState";
@@ -95,7 +94,7 @@ function DidCommTab() {
     const [routingKeys, setRoutingKeys] = useState<string>("");
     const [messages, setMessages] = useState<DidCommReceivedMessage[]>([]);
     const [inboxLoading, setInboxLoading] = useState<boolean>(true);
-    const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(() => loadRefreshIntervalSeconds());
+    const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(0);
     const [composeTo, setComposeTo] = useState<string>("");
     const [composeKind, setComposeKind] = useState<string>("message");
     const [composeContent, setComposeContent] = useState<string>("");
@@ -111,7 +110,7 @@ function DidCommTab() {
     const { keymaster } = useWalletContext();
     const { currentId, currentDID } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
-    const { scanQr } = usePlatformCapabilities();
+    const { scanQr, loadRefreshInterval } = usePlatformCapabilities();
 
     const refreshStatus = useCallback(async () => {
         if (!keymaster || !currentDID) {
@@ -220,9 +219,15 @@ function DidCommTab() {
     }, [refreshInbox, refreshIntervalSeconds]);
 
     useEffect(() => {
-        const handleIntervalChange = () => setRefreshIntervalSeconds(loadRefreshIntervalSeconds());
-        window.addEventListener('archon:refresh-interval-change', handleIntervalChange);
-        return () => window.removeEventListener('archon:refresh-interval-change', handleIntervalChange);
+        // Starts at 0 (no polling) until the host answers, because the extension
+        // reads this from chrome.storage.sync and cannot answer synchronously.
+        const load = () => {
+            loadRefreshInterval?.().then(setRefreshIntervalSeconds).catch(() => {});
+        };
+        load();
+        window.addEventListener('archon:refresh-interval-change', load);
+        return () => window.removeEventListener('archon:refresh-interval-change', load);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function publish() {
@@ -669,9 +674,13 @@ function DidCommTab() {
                         description="Scan or paste an invitation to start a conversation with whoever issued it."
                         actions={
                             <>
-                                <Button variant="outlined" startIcon={<QrCodeScanner />} onClick={scanInvitation} disabled={busy}>
-                                    Scan
-                                </Button>
+                                {/* Paste stays available either way; Scan appears
+                                    only where there is a camera to use. */}
+                                {scanQr && (
+                                    <Button variant="outlined" startIcon={<QrCodeScanner />} onClick={scanInvitation} disabled={busy}>
+                                        Scan
+                                    </Button>
+                                )}
                                 <Button variant="contained" onClick={() => acceptInvitation(inviteInput)} disabled={busy}>
                                     Accept
                                 </Button>

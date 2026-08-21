@@ -32,7 +32,7 @@ export function useWalletData() {
     const { keymaster } = useWalletContext();
     const { setError } = useSnackbar();
     const { resetView } = useWalletNavigation();
-    const { restoreSession } = usePlatformCapabilities();
+    const { restoreSession, requestRefresh } = usePlatformCapabilities();
     const {
         currentId,
         setCurrentId,
@@ -404,6 +404,10 @@ export function useWalletData() {
         await storeState("currentId", "");
         resetView?.();
         await refreshCurrentID();
+        // The identity changed, so any other view this host has is now stale.
+        // The extension used to do this at each call site; doing it here covers
+        // the switch and create paths together.
+        requestRefresh?.();
     }
 
     return {

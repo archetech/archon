@@ -44,6 +44,7 @@ function HostSeams({ children }: { children: ReactNode }) {
             <PlatformCapabilitiesProvider
                 requestRefresh={() => requestBrowserRefresh(isBrowser)}
                 restoreSession={refreshStored}
+                loadRefreshInterval={loadRefreshInterval}
             >
                 {children}
             </PlatformCapabilitiesProvider>
@@ -80,6 +81,23 @@ async function resolveGatekeeperUrl() {
 // Passed to the shared VariablesProvider rather than reached for inside it: the
 // full-page browser view keeps a live page and persists nothing, which is why
 // the store is omitted there.
+// The same key react-wallet keeps in localStorage, but this host keeps it in
+// chrome.storage.sync -- which is why the shared code asks rather than reads.
+const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
+
+async function loadRefreshInterval(): Promise<number> {
+    const result = await chrome.storage.sync.get([REFRESH_INTERVAL_STORAGE_KEY]);
+    const saved = result[REFRESH_INTERVAL_STORAGE_KEY];
+    const parsed = Number(saved);
+
+    if (saved === undefined || !Number.isFinite(parsed) || parsed < 0) {
+        return DEFAULT_REFRESH_INTERVAL_SECONDS;
+    }
+
+    return Math.floor(parsed);
+}
+
 async function storeExtensionState(key: string, value: string | boolean) {
     await chrome.runtime.sendMessage({ action: "STORE_STATE", key, value });
 }

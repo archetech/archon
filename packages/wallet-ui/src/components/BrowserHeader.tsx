@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { Box, IconButton, Typography } from "@mui/material";
 import { Menu } from "@mui/icons-material";
 import DropDownID from "./DropDownID";
@@ -5,10 +6,15 @@ import DropDownID from "./DropDownID";
 const BrowserHeader = (
     {
         menuOpen,
-        toggleMenuOpen
+        toggleMenuOpen,
+        actions,
     }: {
         menuOpen: boolean,
         toggleMenuOpen?: () => void,
+        // Whatever this host puts in its header besides the identity picker.
+        // The extension's full-page view keeps its light/dark switch here, since
+        // that is the only place it has one -- its Settings has no theme control.
+        actions?: ReactNode,
     }) => {
     return (
         <Box
@@ -45,8 +51,9 @@ const BrowserHeader = (
 
             <Box sx={{ flexGrow: 1 }} />
 
-            <Box sx={{ mr: 2 }}>
+            <Box sx={{ mr: 2, display: "flex", alignItems: "center" }}>
                 <DropDownID />
+                {actions}
             </Box>
         </Box>
     );

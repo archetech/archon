@@ -79,7 +79,11 @@ module.exports = {
             "@didcid/keymaster/types": path.resolve(__dirname, "../../packages/keymaster/dist/types/types.d.js"),
             "@didcid/keymaster/search": path.resolve(__dirname, "../../packages/keymaster/dist/esm/search-client.js"),
             "@didcid/cipher/passphrase": path.resolve(__dirname, "../../packages/cipher/dist/esm/passphrase.js"),
-            "@didcid/keymaster": path.resolve(__dirname, "../../packages/keymaster/dist/esm/keymaster.js"),
+            // Exact ($): without it this alias also captures subpath imports like
+            // "@didcid/keymaster/didcomm-protocols" and rewrites them to
+            // keymaster.js/didcomm-protocols. Exact leaves subpaths to the
+            // package's own exports.
+            "@didcid/keymaster$": path.resolve(__dirname, "../../packages/keymaster/dist/esm/keymaster.js"),
         },
         fallback: {
             buffer: require.resolve("buffer")

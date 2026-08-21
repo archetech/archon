@@ -10,11 +10,28 @@ import React, {
 } from "react";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
-import { useWalletData, loadRefreshIntervalSeconds } from "@didcid/wallet-ui";
+import { useWalletData } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 
 
+
+const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
+
+// This wallet keeps the interval in localStorage. The extension uses the same
+// key in chrome.storage.sync, which is why the shared code takes it as a
+// capability instead of reading storage itself.
+export function loadRefreshIntervalSeconds() {
+    const saved = localStorage.getItem(REFRESH_INTERVAL_STORAGE_KEY);
+    const parsed = Number(saved);
+
+    if (!saved || !Number.isFinite(parsed) || parsed < 0) {
+        return DEFAULT_REFRESH_INTERVAL_SECONDS;
+    }
+
+    return Math.floor(parsed);
+}
 
 interface UIContextValue {
     selectedTab: string;

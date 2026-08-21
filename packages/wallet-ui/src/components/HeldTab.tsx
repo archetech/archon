@@ -28,7 +28,7 @@ function HeldTab() {
     } = useVariablesContext();
     const { updateManifest, refreshHeld } = useWalletData();
     const { pendingHeldDID, setPendingHeldDID } = useWalletNavigation();
-    const { scanQr } = usePlatformCapabilities();
+    const { scanQr, requestRefresh } = usePlatformCapabilities();
     const { openView } = useWalletNavigation();
 
     useEffect(() => {
@@ -124,6 +124,7 @@ function HeldTab() {
         try {
             await keymaster.removeCredential(removeDID);
             await refreshHeld();
+            requestRefresh?.();
         } catch (error: any) {
             setError(error);
         } finally {
@@ -215,7 +216,9 @@ function HeldTab() {
                             maxLength: 80,
                         },
                         input: {
-                            endAdornment: (
+                            // Only offered where there is a camera; without one this
+                            // could do nothing but report a failed scan.
+                            endAdornment: scanQr ? (
                                 <InputAdornment position="end">
                                     <Tooltip title="Scan QR" placement="top">
                                         <span>
@@ -228,7 +231,7 @@ function HeldTab() {
                                         </span>
                                     </Tooltip>
                                 </InputAdornment>
-                            ),
+                            ) : undefined,
                         }
                     }}
                 />

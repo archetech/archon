@@ -93,7 +93,7 @@ function AliasedDIDs() {
     } = useVariablesContext();
     const { refreshAliases } = useWalletData();
     const { openView, pendingView } = useWalletNavigation();
-    const { scanAliasQr } = usePlatformCapabilities();
+    const { scanAliasQr, requestRefresh } = usePlatformCapabilities();
 
     async function scanAliasQR() {
         const result = await scanAliasQr?.();
@@ -175,6 +175,7 @@ function AliasedDIDs() {
             await keymaster.addAlias(alias, aliasDID);
             await clearFields();
             await refreshAliases();
+            requestRefresh?.();
         } catch (error: any) {
             setError(error);
         }

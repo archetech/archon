@@ -1,7 +1,7 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { WalletProvider } from "@didcid/wallet-ui";
 import { VariablesProvider } from "@didcid/wallet-ui";
-import { UIProvider, useUIContext } from "./UIContext";
+import { UIProvider, useUIContext, loadRefreshIntervalSeconds } from "./UIContext";
 import { ThemeProvider } from "@mui/material/styles";
 import { Box, CssBaseline, useMediaQuery } from "@mui/material";
 import { createAppTheme } from "../theme";
@@ -168,7 +168,11 @@ export function ContextProviders(
                                         <Navigation>
                                             {/* This wallet is the Capacitor app, so it
                                                 is the one with a camera. */}
-                                            <PlatformCapabilitiesProvider scanQr={scanQrText} scanAliasQr={scanAliasQrCode}>
+                                            <PlatformCapabilitiesProvider
+                                                scanQr={scanQrText}
+                                                scanAliasQr={scanAliasQrCode}
+                                                loadRefreshInterval={async () => loadRefreshIntervalSeconds()}
+                                            >
                                                 {children}
                                             </PlatformCapabilitiesProvider>
                                         </Navigation>
