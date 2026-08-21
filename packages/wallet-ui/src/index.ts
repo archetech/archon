@@ -6,3 +6,4 @@ export { VariablesProvider, useVariablesContext } from './contexts/VariablesProv
 export type { VariablesStore } from './contexts/VariablesProvider';
 export { WalletProvider, useWalletContext } from './contexts/WalletProvider';
 export type { WalletSession, WalletModalComponents, WalletProviderProps } from './contexts/WalletProvider';
+export { useWalletData } from './hooks/useWalletData';
