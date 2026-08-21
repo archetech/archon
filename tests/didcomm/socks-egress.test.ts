@@ -17,13 +17,20 @@ const SOCKS_USERS = [
 ];
 
 describe('SOCKS egress (#916)', () => {
-    it.each(SOCKS_USERS)('%s imports fetch from undici', path => {
+    it.each(SOCKS_USERS)('%s routes the dispatcher-bearing request through undici', path => {
         const source = readFileSync(path, 'utf-8');
 
         // Guard the guard: if a file stops dispatching over SOCKS this test
         // should be removed rather than passing vacuously.
         expect(source).toContain('socksDispatcher');
-        expect(source).toMatch(/import \{ fetch(?: as \w+)? \} from 'undici';/);
+        expect(source).toMatch(/import \{ fetch as \w+ \} from 'undici';/);
+
+        // The import alone proves nothing -- reverting the call site to the global
+        // fetch while leaving an unused import would keep it green. Assert the
+        // selection itself: when a dispatcher is attached, undici's fetch is used.
+        expect(source).toMatch(
+            /dispatcher\s*\?\s*(socksFetch|socksEgress\.fetch)\s*:\s*fetch/,
+        );
     });
 
     it.each(SOCKS_USERS)('%s declares undici so it shares one copy with fetch-socks', path => {

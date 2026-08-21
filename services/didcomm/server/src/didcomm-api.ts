@@ -17,6 +17,13 @@ import type { Cipher } from '@didcid/cipher/types';
 import { MailboxFullError, MailboxStore } from './store.js';
 import { recipientDidsFromEnvelope, verifyChallengeSignature, type Resolver } from './mailbox.js';
 
+// An object, so tests can substitute it. SOCKS-dispatched requests deliberately
+// bypass globalThis.fetch, so a test cannot observe them by stubbing that -- and
+// mocking the 'undici' module does not work either, since this file resolves it
+// from the service's own node_modules while a test resolves it from the repo
+// root. Two different modules, one mock.
+export const socksEgress = { fetch: socksFetch };
+
 export interface AppDeps {
     store: MailboxStore;
     resolver: Resolver;
@@ -231,7 +238,7 @@ export function createApp(deps: AppDeps): Express {
             const target = `${endpoint.replace(/\/+$/, '')}/api/v1/messages`;
             // Only the SOCKS-dispatched path needs undici's fetch; clearnet stays
             // on the built-in one, which the rest of the service uses.
-            const doFetch = fetchOptions.dispatcher ? socksFetch : fetch;
+            const doFetch = fetchOptions.dispatcher ? socksEgress.fetch : fetch;
             const response = await doFetch(target, fetchOptions);
             if (response.status >= 300 && response.status < 400) {
                 // Say what happened: a bare "failed: 307" reads like the recipient

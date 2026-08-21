@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -7,7 +8,7 @@ import HeliaClient from '@didcid/ipfs/helia';
 import { packEncrypted } from '@didcid/cipher/didcomm';
 import { MailboxFullError, MemoryMailboxStore, RedisMailboxStore } from '../../services/didcomm/server/src/store.ts';
 import { recipientDidsFromEnvelope, verifyChallengeSignature } from '../../services/didcomm/server/src/mailbox.ts';
-import { createApp } from '../../services/didcomm/server/src/didcomm-api.ts';
+import { createApp, socksEgress } from '../../services/didcomm/server/src/didcomm-api.ts';
 import express from 'express';
 import request from 'supertest';
 
@@ -201,7 +202,7 @@ describe('deposit route capacity', () => {
 
     // Egress checks sit behind challenge auth, so these need a relay that accepts
     // the signature -- otherwise every request 401s before reaching them.
-    function appWithEgress(options: { allowInsecureEgress?: boolean } = {}) {
+    function appWithEgress(options: { allowInsecureEgress?: boolean; torProxy?: string } = {}) {
         const store = new MemoryMailboxStore(1000, 1000, () => 1_000_000);
         const resolver = {
             resolveDID: async () => ({
@@ -278,6 +279,38 @@ describe('deposit route capacity', () => {
             expect(response.body.error).toMatch(/redirect/);
         }
         finally {
+            globalThis.fetch = realFetch;
+        }
+    });
+
+    // #916: a SOCKS dispatcher built on fetch-socks's undici is rejected by
+    // Node's built-in fetch ("invalid onRequestStart method"), which surfaced as
+    // an unreachable-looking `TypeError: fetch failed` and broke every onion
+    // delivery. The onion path must therefore go through undici's fetch.
+    it('sends onion deliveries through undici, never the global fetch', async () => {
+        const socksFetchMock = jest.fn<any>().mockResolvedValue(
+            new Response(JSON.stringify({ ids: ['onion-1'] }), { status: 200 }),
+        );
+        const realSocksFetch = socksEgress.fetch;
+        socksEgress.fetch = socksFetchMock;
+
+        // A trap, not a stub: the global fetch reaching this request is exactly
+        // what the regression looks like.
+        const realFetch = globalThis.fetch;
+        const globalTrap = jest.fn<any>();
+        globalThis.fetch = globalTrap as any;
+
+        try {
+            const { app } = appWithEgress({ torProxy: '127.0.0.1:1' });
+            const response = await deliver(app, 'http://abcdefghijklmnop.onion:4222/didcomm');
+
+            expect(response.status).toBe(200);
+            expect(globalTrap).not.toHaveBeenCalled();
+            expect(socksFetchMock).toHaveBeenCalledTimes(1);
+            expect(socksFetchMock.mock.calls[0][1].dispatcher).toBeDefined();
+        }
+        finally {
+            socksEgress.fetch = realSocksFetch;
             globalThis.fetch = realFetch;
         }
     });
