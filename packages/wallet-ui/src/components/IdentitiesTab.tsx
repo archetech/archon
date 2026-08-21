@@ -1,26 +1,22 @@
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import { jsonViewTheme } from "@didcid/wallet-ui";
-import { useWalletContext } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
 import { Badge, Create, DriveFileRenameOutline, Image, Login, LoopOutlined, PermIdentity, RestoreOutlined, SaveAltOutlined, SwapHorizOutlined, DeleteOutline } from "@mui/icons-material";
-import { PageHeader } from "@didcid/wallet-ui";
-import { Section } from "@didcid/wallet-ui";
-import { EmptyState } from "@didcid/wallet-ui";
-import { ActionMenu } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
-import { useThemeContext } from "../contexts/ContextProviders";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { WarningModal } from "@didcid/wallet-ui";
-import { TextInputModal } from "@didcid/wallet-ui";
-import { SelectInputModal } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
+import PageHeader from "./layout/PageHeader";
+import Section from "./layout/Section";
+import EmptyState from "./layout/EmptyState";
+import ActionMenu from "./layout/ActionMenu";
+import { useWalletData } from "../hooks/useWalletData";
+import { useIsDarkMode } from "../hooks/useIsTabletUp";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import WarningModal from "./WarningModal";
+import TextInputModal from "./TextInputModal";
+import SelectInputModal from "./SelectInputModal";
+import { useVariablesContext } from "../contexts/VariablesProvider";
 import type { AddressCheckResult, AddressInfo, FileAsset, ImageAsset, NostrKeys } from "@didcid/keymaster/types";
 import GatekeeperClient from "@didcid/clients/gatekeeper";
-import {
-    DEFAULT_GATEKEEPER_URL,
-    GATEKEEPER_KEY
-} from "../constants";
 
 const gatekeeper = new GatekeeperClient();
 
@@ -86,13 +82,10 @@ function IdentitiesTab() {
     const [avatarCandidatePreviewUrl, setAvatarCandidatePreviewUrl] = useState<string>("");
     const [avatarCandidateLoading, setAvatarCandidateLoading] = useState<boolean>(false);
     const [avatarCandidateError, setAvatarCandidateError] = useState<string>("");
-    const { keymaster } = useWalletContext();
-    const { darkMode } = useThemeContext();
+    const { keymaster, gatekeeperUrl } = useWalletContext();
+    const darkMode = useIsDarkMode();
     const { setError, setSuccess } = useSnackbar();
-    const {
-        refreshAll,
-        resetCurrentID,
-    } = useUIContext();
+    const { refreshAll, resetCurrentID } = useWalletData();
     const {
         currentId,
         currentDID,
@@ -103,12 +96,19 @@ function IdentitiesTab() {
         registries,
     } = useVariablesContext();
     useEffect(() => {
+        // Depends on gatekeeperUrl, and must: the host resolves it
+        // asynchronously, so it is empty on the first render. With an empty
+        // dependency array this would connect to "" and never retry -- which is
+        // new, since this used to read localStorage synchronously inside the
+        // effect.
+        if (!gatekeeperUrl) {
+            return;
+        }
         const init = async () => {
-            const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY);
-            await gatekeeper.connect({ url: gatekeeperUrl || DEFAULT_GATEKEEPER_URL });
+            await gatekeeper.connect({ url: gatekeeperUrl });
         };
         init();
-    }, []);
+    }, [gatekeeperUrl]);
 
     const findAliasByDid = useCallback((did: string, allowedAliases?: string[]): string => {
         if (!did) {

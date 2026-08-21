@@ -35,9 +35,9 @@ import {
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useThemeContext } from "../contexts/ContextProviders";
-import IdentitiesTab from "./IdentitiesTab";
-import HeldTab from "./HeldTab";
-import AuthTab from "./AuthTab";
+import { IdentitiesTab } from "@didcid/wallet-ui";
+import { HeldTab } from "@didcid/wallet-ui";
+import { AuthTab } from "@didcid/wallet-ui";
 import PanelHeader from "./PanelHeader";
 
 const denseItemSx = { minHeight: 32, pl: 1.5, pr: 2 };

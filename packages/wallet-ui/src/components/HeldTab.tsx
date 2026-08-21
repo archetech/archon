@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
 import { Box, Button, IconButton, InputAdornment, TextField, Tooltip } from "@mui/material";
 import { CameraAlt } from "@mui/icons-material";
-import { WarningModal } from "@didcid/wallet-ui";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { JsonViewer } from "@didcid/wallet-ui";
-import { DisplayDID } from "@didcid/wallet-ui";
-import {scanQrCode} from "../utils/utils";
+import WarningModal from "./WarningModal";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletData } from "../hooks/useWalletData";
+import { useWalletNavigation } from "../contexts/WalletNavigation";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import JsonViewer from "./JsonViewer";
+import DisplayDID from "./DisplayDID";
+import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
 import { Badge } from "@mui/icons-material";
-import { Section } from "@didcid/wallet-ui";
-import { EmptyState } from "@didcid/wallet-ui";
-import { ActionMenu } from "@didcid/wallet-ui";
+import Section from "./layout/Section";
+import EmptyState from "./layout/EmptyState";
+import ActionMenu from "./layout/ActionMenu";
 
 function HeldTab() {
     const [open, setOpen] = useState<boolean>(false);
@@ -25,18 +26,15 @@ function HeldTab() {
         heldList,
         manifest,
     } = useVariablesContext();
-    const {
-        updateManifest,
-        pendingHeldDID,
-        setPendingHeldDID,
-        setOpenBrowser,
-        refreshHeld,
-    } = useUIContext();
+    const { updateManifest, refreshHeld } = useWalletData();
+    const { pendingHeldDID, setPendingHeldDID } = useWalletNavigation();
+    const { scanQr } = usePlatformCapabilities();
+    const { openView } = useWalletNavigation();
 
     useEffect(() => {
         if (pendingHeldDID) {
             setHeldDID(pendingHeldDID);
-            setPendingHeldDID(null);
+            setPendingHeldDID?.(null);
         }
     }, [pendingHeldDID, setHeldDID, setPendingHeldDID]);
 
@@ -176,7 +174,7 @@ function HeldTab() {
     }
 
     function displayJson(did: string, contents?: any) {
-        setOpenBrowser({
+        openView({
             did,
             contents,
             tab: "credentials",
@@ -185,7 +183,7 @@ function HeldTab() {
     }
 
     async function scanCredentialQR() {
-        const qr = await scanQrCode();
+        const qr = await scanQr?.();
         if (!qr) {
             setError("Failed to scan QR code");
             return;

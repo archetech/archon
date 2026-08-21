@@ -18,6 +18,8 @@
       "@uiw/react-json-view": ["./node_modules/@uiw/react-json-view"],
       "@uiw/react-json-view/*": ["./node_modules/@uiw/react-json-view/*"],
       "qrcode.react": ["./node_modules/qrcode.react"],
+      "@mui/lab": ["./node_modules/@mui/lab"],
+      "@mui/lab/*": ["./node_modules/@mui/lab/*"],
       "@mui/material": ["./node_modules/@mui/material"],
       "@mui/material/*": ["./node_modules/@mui/material/*"],
       "@mui/icons-material": ["./node_modules/@mui/icons-material"],

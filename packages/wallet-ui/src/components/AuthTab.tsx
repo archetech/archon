@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-    Divider, MenuItem, Paper, Select, TextField, Typography
+    Divider, MenuItem, Paper, Select, TextField, IconButton, InputAdornment, Tooltip, Typography
 } from "@mui/material";
-import { CheckCircle, Login, Warning } from "@mui/icons-material";
+import { CameraAlt, CheckCircle, Login, Warning } from "@mui/icons-material";
 import axios from "axios";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useAuthContext } from "../contexts/AuthContext";
-import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useWalletNavigation } from "../contexts/WalletNavigation";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
+import PageHeader from "./layout/PageHeader";
+import ActionMenu from "./layout/ActionMenu";
 
 interface AutoLoginState {
     responseDID: string;
@@ -21,24 +23,11 @@ interface AutoLoginState {
 }
 
 function AuthTab() {
-    const { keymaster } = useWalletContext();
-    const { setError, setSuccess } = useSnackbar();
-    const {
-        authDID,
-        challenge,
-        setChallenge,
-        setAuthDID,
-        response,
-        setResponse,
-        callback,
-        setCallback,
-        disableSendResponse,
-        setDisableSendResponse,
-        pendingAutoResponse,
-        setPendingAutoResponse,
-    } = useAuthContext();
-    const { openBrowserWindow } = useUIContext();
-    const { schemaList, agentList } = useVariablesContext();
+    const [authDID, setAuthDID] = useState<string>("");
+    const [callback, setCallback] = useState<string>("");
+    const [challenge, setChallenge] = useState<string>("");
+    const [response, setResponse] = useState<string>("");
+    const [disableSendResponse, setDisableSendResponse] = useState<boolean>(true);
     const [showChallengeDialog, setShowChallengeDialog] = useState<boolean>(false);
     const [challengeCredentials, setChallengeCredentials] = useState<{ schema: string; issuer: string }[]>([]);
     const [challengeSchemaSelection, setChallengeSchemaSelection] = useState<string>("");
@@ -46,14 +35,38 @@ function AuthTab() {
     const [autoLogin, setAutoLogin] = useState<AutoLoginState | null>(null);
     const [autoLoginLoading, setAutoLoginLoading] = useState(false);
     const [autoLoginSent, setAutoLoginSent] = useState(false);
+    const pendingAutoRef = useRef<string | null>(null);
+    const { keymaster } = useWalletContext();
+    const { pendingChallenge, setPendingChallenge, dispatchDeepLink } = useWalletNavigation();
+    const { openView } = useWalletNavigation();
+    const {
+        setError,
+        setSuccess,
+    } = useSnackbar();
+    const { scanQr } = usePlatformCapabilities();
+    const { schemaList, agentList } = useVariablesContext();
 
     useEffect(() => {
-        if (pendingAutoResponse && challenge && keymaster) {
-            setPendingAutoResponse(false);
-            handleAutoResponse(challenge);
+        if (pendingChallenge && pendingChallenge !== challenge) {
+            setChallenge(pendingChallenge);
+            setPendingChallenge?.(null);
+            if (keymaster) {
+                handleAutoResponse(pendingChallenge);
+            } else {
+                pendingAutoRef.current = pendingChallenge;
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pendingAutoResponse, challenge, keymaster]);
+    }, [pendingChallenge]);
+
+    useEffect(() => {
+        if (keymaster && pendingAutoRef.current) {
+            const did = pendingAutoRef.current;
+            pendingAutoRef.current = null;
+            handleAutoResponse(did);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [keymaster]);
 
     async function handleAutoResponse(challengeDID: string) {
         if (!keymaster) return;
@@ -68,7 +81,7 @@ function AuthTab() {
             const callbackUrl = challengeData?.callback || "";
 
             const responseDID = await keymaster.createResponse(challengeDID, { retries: 10 });
-            await setResponse(responseDID);
+            setResponse(responseDID);
 
             const decrypted = await keymaster.decryptJSON(responseDID) as {
                 response: { challenge: string; credentials: { vc: string; vp: string }[]; requested: number; fulfilled: number; match: boolean }
@@ -84,8 +97,8 @@ function AuthTab() {
                 credentials: responseData.credentials,
             });
 
-            await setCallback(callbackUrl);
-            await setDisableSendResponse(!callbackUrl);
+            setCallback(callbackUrl);
+            setDisableSendResponse(!callbackUrl);
         } catch (error: any) {
             setError(error);
         } finally {
@@ -96,13 +109,13 @@ function AuthTab() {
     async function autoLoginSend() {
         if (!autoLogin?.callbackUrl || !autoLogin.responseDID) return;
         try {
-            await setDisableSendResponse(true);
+            setDisableSendResponse(true);
             await axios.post(autoLogin.callbackUrl, { response: autoLogin.responseDID });
             setAutoLoginSent(true);
             setSuccess("Response sent successfully");
-            await setCallback("");
+            setCallback("");
         } catch (error: any) {
-            await setDisableSendResponse(false);
+            setDisableSendResponse(false);
             setError(error);
         }
     }
@@ -174,7 +187,11 @@ function AuthTab() {
         try {
             const contents = await keymaster.resolveAsset(did);
             await setAuthDID(did);
-            openBrowserWindow({ title: "Resolve Challenge", did, contents });
+            openView({
+                did,
+                tab: "viewer",
+                contents
+            });
         } catch (error: any) {
             setError(error);
         }
@@ -215,7 +232,11 @@ function AuthTab() {
         try {
             const contents = await keymaster.decryptJSON(did);
             await setAuthDID(did);
-            openBrowserWindow({ title: "Decrypt Response", did, contents });
+            openView({
+                did,
+                tab: "viewer",
+                contents
+            });
         } catch (error: any) {
             setError(error);
         }
@@ -252,8 +273,22 @@ function AuthTab() {
         }
     }
 
+    async function scanChallengeQR() {
+        const qr = await scanQr?.();
+        if (!qr) {
+            setError("Failed to scan QR code");
+            return;
+        }
+
+        dispatchDeepLink?.(qr);
+    }
+
     return (
         <Box>
+            <PageHeader
+                title="Authentication"
+                description="Respond to login challenges and verify responses from others."
+            />
             {autoLoginLoading && (
                 <Paper elevation={2} sx={{ p: 3, m: 2, textAlign: 'center' }}>
                     <CircularProgress size={40} />
@@ -369,51 +404,48 @@ function AuthTab() {
                             className="text-field top"
                             slotProps={{
                                 htmlInput: {
-                                    maxLength: 85,
+                                    maxLength: 80,
                                 },
+                                input: {
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <Tooltip title="Scan QR" placement="top">
+                                                <span>
+                                                    <IconButton
+                                                        edge="end"
+                                                        onClick={scanChallengeQR}
+                                                    >
+                                                        <CameraAlt />
+                                                    </IconButton>
+                                                </span>
+                                            </Tooltip>
+                                        </InputAdornment>
+                                    ),
+                                }
                             }}
                         />
                     </Box>
 
-                    <Box className="flex-box">
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
                         <Button
                             variant="contained"
-                            color="primary"
-                            onClick={openChallengeDialog}
-                            className="button large bottom"
-                        >
-                            New...
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => resolveChallenge(challenge)}
-                            className="button large bottom"
-                            disabled={!challenge || challenge === authDID}
-                        >
-                            Resolve
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            color="primary"
                             onClick={createResponse}
-                            className="button large bottom"
                             disabled={!challenge}
                         >
                             Respond
                         </Button>
 
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={clearChallenge}
-                            className="button large bottom"
-                            disabled={!challenge}
-                        >
-                            Clear
+                        <Button variant="outlined" onClick={openChallengeDialog}>
+                            New challenge
                         </Button>
+
+                        <ActionMenu
+                            label="More"
+                            items={[
+                                { label: "Resolve challenge", onClick: () => resolveChallenge(challenge), disabled: !challenge || challenge === authDID },
+                                { label: "Clear", onClick: clearChallenge, disabled: !challenge },
+                            ]}
+                        />
                     </Box>
 
                     <Box className="flex-box mt-2">
@@ -427,46 +459,30 @@ function AuthTab() {
                         />
                     </Box>
 
-                    <Box className="flex-box">
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
                         <Button
                             variant="contained"
-                            color="primary"
-                            onClick={() => decryptResponse(response)}
-                            className="button large bottom"
-                            disabled={!response || response === authDID}
-                        >
-                            Decrypt
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={verifyResponse}
-                            className="button large bottom"
-                            disabled={!response}
-                        >
-                            Verify
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            color="primary"
                             onClick={sendResponse}
-                            className="button large bottom"
                             disabled={disableSendResponse}
                         >
                             Send
                         </Button>
 
                         <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={clearResponse}
-                            className="button large bottom"
+                            variant="outlined"
+                            onClick={verifyResponse}
                             disabled={!response}
                         >
-                            Clear
+                            Verify
                         </Button>
+
+                        <ActionMenu
+                            label="More"
+                            items={[
+                                { label: "Decrypt response", onClick: () => decryptResponse(response), disabled: !response || response === authDID },
+                                { label: "Clear", onClick: clearResponse, disabled: !response },
+                            ]}
+                        />
                     </Box>
 
                     <Dialog open={showChallengeDialog} onClose={closeChallengeDialog}>

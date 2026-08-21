@@ -5,6 +5,7 @@ import {
     AccountBalanceWallet,
     Badge,
     Bolt,
+    Forum,
     Email,
     Key,
     List,
@@ -15,28 +16,29 @@ import {
     Token,
     Tune,
 } from "@mui/icons-material";
-import CredentialsTab from "./CredentialsTab";
+import { CredentialsTab } from "@didcid/wallet-ui";
 import WalletTab from "./WalletTab";
 import SettingsTab from "./SettingsTab";
-import IdentitiesTab from "./IdentitiesTab";
-import BrowserHeader from "./BrowserHeader";
+import { IdentitiesTab } from "@didcid/wallet-ui";
+import { BrowserHeader } from "@didcid/wallet-ui";
 import { JsonViewer } from "@didcid/wallet-ui";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { AliasedDIDs } from "@didcid/wallet-ui";
-import AssetsTab from "./AssetsTab";
-import DmailTab from "./DmailTab";
+import { AssetsTab } from "@didcid/wallet-ui";
+import { DmailTab } from "@didcid/wallet-ui";
 import { LightningTab } from "@didcid/wallet-ui";
+import { DidCommTab } from "@didcid/wallet-ui";
 import { PollTab } from "@didcid/wallet-ui";
-import AuthTab from "./AuthTab";
+import { AuthTab } from "@didcid/wallet-ui";
 import { PropertiesTab } from "@didcid/wallet-ui";
 
 function BrowserContent() {
     const [menuOpen, setMenuOpen] = useState<boolean>(false);
     const [didRun, setDidRun] = useState<boolean>(false);
     const [refresh, setRefresh] = useState<number>(0);
-    const { isBrowser, hasLightning } = useWalletContext();
+    const { isBrowser, hasLightning, hasDidComm } = useWalletContext();
     const { currentId, validId } = useVariablesContext();
     const { openBrowser, setOpenBrowser } = useUIContext();
 
@@ -265,6 +267,17 @@ function BrowserContent() {
                                 />
                             )}
 
+                            {displayComponent && hasDidComm && (
+                                <Tab
+                                    icon={<Forum />}
+                                    label={menuOpen ? "DIDComm" : ""}
+                                    value="didcomm"
+                                    iconPosition="start"
+                                    className="sidebarTab"
+                                    sx={{ gap: 0.25 }}
+                                />
+                            )}
+
                             {displayComponent && hasLightning && (
                                 <Tab
                                     icon={<Bolt />}
@@ -354,6 +367,12 @@ function BrowserContent() {
                         {displayComponent && (
                             <TabPanel value="properties" sx={{ p: 0 }}>
                                 <PropertiesTab />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && hasDidComm && (
+                            <TabPanel value="didcomm" sx={{ p: 0 }}>
+                                <DidCommTab />
                             </TabPanel>
                         )}
 

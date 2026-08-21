@@ -31,6 +31,24 @@ for one of those directly cannot be shared, so the capability is injected
 instead: `SnackbarProvider` takes a `topOffset` because only react-wallet has a
 safe-area inset to honour.
 
+## What is deliberately not here
+
+Four files stay as two copies, and will:
+
+- **UIContext** — the two wallets model different UIs. The extension coordinates
+  a popup with a full-page view (RefreshMode, chrome.tabs, an auth context);
+  react-wallet has one window and its own deep-link pendings. Everything
+  underneath that -- the wallet-data layer -- is in `useWalletData` here.
+- **ContextProviders** — each app's composition root, where its own hosts,
+  capabilities and seams are wired.
+- **SettingsTab** — configures the host: its version, its theme toggle, where it
+  keeps the gatekeeper URL.
+- **WalletTab** — the host's storage and files: Capacitor filesystem and share
+  on one side, chrome.storage and a blob download on the other.
+
+Sharing any of them would produce a file made mostly of questions about which
+host is running, which is worse than two files that each say one thing.
+
 ## What does not belong here
 
 Anything importing `@capacitor/*`, `chrome.*`, or an app's own context. Those

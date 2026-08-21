@@ -17,6 +17,10 @@ export interface PlatformCapabilities {
     // Tell the host's other views that wallet state changed. Undefined where
     // there are no other views.
     requestRefresh?: () => void;
+    // Restore the view the user last had, if this host keeps one across
+    // sessions. Returns whether anything was restored. The extension's popup is
+    // destroyed on close and does; react-wallet keeps a live page and does not.
+    restoreSession?: () => Promise<boolean | void>;
 }
 
 const PlatformCapabilitiesContext = createContext<PlatformCapabilities>({});

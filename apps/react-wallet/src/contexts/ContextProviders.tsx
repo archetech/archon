@@ -8,6 +8,7 @@ import { createAppTheme } from "../theme";
 import { SafeAreaProvider, useSafeArea } from "./SafeAreaContext";
 import { useDeepLinks } from "../hooks/useDeepLinks";
 import { scanAliasQrCode, scanQrText } from "../utils/utils";
+import { dispatchDeepLink } from "../utils/deepLinkQueue";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import { DEFAULT_GATEKEEPER_URL, GATEKEEPER_KEY } from "../constants";
 import {
@@ -33,12 +34,28 @@ function DeepLinks() {
 // -- the two wallets keep their own. This wallet has a single window, so
 // everything switches its own tab.
 function Navigation({ children }: { children: ReactNode }) {
-    const { openBrowser, setOpenBrowser } = useUIContext();
+    const {
+        openBrowser,
+        setOpenBrowser,
+        pendingChallenge,
+        setPendingChallenge,
+        pendingHeldDID,
+        setPendingHeldDID,
+    } = useUIContext();
     return (
         <WalletNavigationProvider
             openView={view => setOpenBrowser(view)}
             pendingView={openBrowser}
             clearPendingView={() => setOpenBrowser(undefined)}
+            resetView={() => setOpenBrowser({ clearState: true })}
+            // Deep links are this wallet's alone, so it is the only host that
+            // supplies these; the extension leaves them undefined and the screens
+            // that read them simply never fire.
+            pendingChallenge={pendingChallenge}
+            setPendingChallenge={setPendingChallenge}
+            pendingHeldDID={pendingHeldDID}
+            setPendingHeldDID={setPendingHeldDID}
+            dispatchDeepLink={dispatchDeepLink}
         >
             {children}
         </WalletNavigationProvider>

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Box, Stack, Tab, Tabs } from "@mui/material";
 import { TabContext, TabPanel } from "@mui/lab";
-import { IssueTab } from "@didcid/wallet-ui";
-import { IssuedTab } from "@didcid/wallet-ui";
+import IssueTab from "./IssueTab";
+import IssuedTab from "./IssuedTab";
 import HeldTab from "./HeldTab";
-import { PageHeader } from "@didcid/wallet-ui";
+import PageHeader from "./layout/PageHeader";
 
 function CredentialsTab({ subTab, refresh }: {subTab: string, refresh: number}) {
     const [credentialTab, setCredentialTab] = useState<string>("held");

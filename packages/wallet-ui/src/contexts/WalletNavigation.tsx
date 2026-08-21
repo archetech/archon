@@ -27,6 +27,19 @@ export interface WalletNavigation {
     // What the host currently wants shown, for the components that render it.
     pendingView?: WalletView;
     clearPendingView?: () => void;
+    // Tell whatever other view exists to reset itself. Distinct from openView:
+    // this must not *open* anything, and in a host with no other view -- the
+    // extension's popup -- it does nothing at all.
+    resetView?: () => void;
+    // Something outside the UI asked for a screen to open on a particular thing
+    // -- react-wallet's deep links do this. Undefined in a host with no such
+    // mechanism, and the screens that read them simply never fire.
+    pendingChallenge?: string | null;
+    setPendingChallenge?: (value: string | null) => void;
+    pendingHeldDID?: string | null;
+    setPendingHeldDID?: (value: string | null) => void;
+    // Hand a URL back to the host's own deep-link handling.
+    dispatchDeepLink?: (url: string) => void;
 }
 
 const WalletNavigationContext = createContext<WalletNavigation | null>(null);

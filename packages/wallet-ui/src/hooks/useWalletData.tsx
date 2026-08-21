@@ -9,6 +9,8 @@ import {
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useWalletNavigation } from "../contexts/WalletNavigation";
+import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
 
 // The half of each wallet's UIContext that is about wallet *data* rather than
 // about the UI it drives: reading identities, aliases, credentials and vaults
@@ -29,6 +31,8 @@ import { useSnackbar } from "../contexts/SnackbarProvider";
 export function useWalletData() {
     const { keymaster } = useWalletContext();
     const { setError } = useSnackbar();
+    const { resetView } = useWalletNavigation();
+    const { restoreSession } = usePlatformCapabilities();
     const {
         currentId,
         setCurrentId,
@@ -60,6 +64,9 @@ export function useWalletData() {
         setCredentialSchema,
         setCredentialString,
         resetCredentialState,
+        storeState,
+        setRegistries,
+        setDmailList,
     } = useVariablesContext();
 
     async function getValidIds() {
@@ -351,8 +358,59 @@ export function useWalletData() {
         setVaultList([]);
         setPollList([]);
     }
+    async function refreshAll() {
+        if (!keymaster) {
+            return;
+        }
+
+        try {
+            const regs = await keymaster.listRegistries();
+            setRegistries(regs);
+        } catch (error: any) {
+            setError(error);
+        }
+
+        try {
+            // A host that kept the user's last view restores it instead; only fall
+            // back to reading the current id when it had nothing, or has no such
+            // notion at all.
+            const restored = restoreSession ? await restoreSession() : false;
+            if (!restored) {
+                await refreshCurrentID();
+            }
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
+    async function refreshInbox() {
+        if (!keymaster) {
+            return;
+        }
+        try {
+            const msgs = await keymaster.listDmail();
+            setDmailList(prev =>
+                JSON.stringify(prev) === JSON.stringify(msgs) ? prev : msgs
+            );
+        } catch (err: any) {
+            setError(err);
+        }
+    }
+
+    // Was app-local while the hosts differed on how to clear the view and the
+    // stored id. Both are capabilities now: storeState is inert without a store,
+    // and resetView does nothing in a host with no second view.
+    async function resetCurrentID() {
+        await storeState("currentId", "");
+        resetView?.();
+        await refreshCurrentID();
+    }
+
     return {
         getValidIds,
+        resetCurrentID,
+        refreshAll,
+        refreshInbox,
         refreshAliases,
         refreshCurrentDID,
         refreshCurrentID,

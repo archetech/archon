@@ -38,21 +38,22 @@ import {
     ArrowBack,
 } from "@mui/icons-material";
 import { DmailItem, DmailMessage } from '@didcid/keymaster/types';
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { TextInputModal } from "@didcid/wallet-ui";
-import { WarningModal } from "@didcid/wallet-ui";
-import { CopyResolveDID } from "@didcid/wallet-ui";
-import { CopyDID } from "@didcid/wallet-ui";
-import { DmailSearchModal } from "@didcid/wallet-ui";
-import type { AdvancedSearchParams } from "@didcid/wallet-ui";
-import { DisplayDID } from "@didcid/wallet-ui";
-import { VersionNavigator } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletData } from "../hooks/useWalletData";
+import { useWalletNavigation } from "../contexts/WalletNavigation";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import TextInputModal from "./TextInputModal";
+import WarningModal from "./WarningModal";
+import CopyResolveDID from "./CopyResolveDID";
+import CopyDID from "./CopyDID";
+import DmailSearchModal from "./DmailSearchModal";
+import type { AdvancedSearchParams } from "./DmailSearchModal";
+import DisplayDID from "./DisplayDID";
+import VersionNavigator from "./VersionNavigator";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
-import { PageHeader } from "@didcid/wallet-ui";
-import { ActionMenu } from "@didcid/wallet-ui";
+import PageHeader from "./layout/PageHeader";
+import ActionMenu from "./layout/ActionMenu";
 
 const DmailTab: React.FC = () => {
     const [registry, setRegistry] = useState<string>("hyperswarm");
@@ -87,11 +88,8 @@ const DmailTab: React.FC = () => {
         dmailList,
         registries,
     } = useVariablesContext();
-    const {
-        getVaultItemIcon,
-        refreshInbox,
-        setOpenBrowser
-    } = useUIContext();
+    const { getVaultItemIcon, refreshInbox } = useWalletData();
+    const { openView } = useWalletNavigation();
 
     const TAG = {
         inbox: "inbox",
@@ -648,7 +646,7 @@ const DmailTab: React.FC = () => {
         if (!senderDid.startsWith('did:')) {
             return;
         }
-        setOpenBrowser({
+        openView({
             did: senderDid,
             tab: "aliases",
         });

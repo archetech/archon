@@ -6,23 +6,20 @@ import {
     MenuItem,
 } from "@mui/material";
 import { ArrowDropDown } from "@mui/icons-material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { CopyDID } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletData } from "../hooks/useWalletData";
+
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import CopyDID from "./CopyDID";
 import GatekeeperClient from "@didcid/clients/gatekeeper";
 import type { FileAsset, ImageAsset } from "@didcid/keymaster/types";
-import {
-    DEFAULT_GATEKEEPER_URL,
-    GATEKEEPER_KEY
-} from "../constants";
 
 const gatekeeper = new GatekeeperClient();
 let avatarRequestCounter = 0;
 
 const DropDownID = () => {
-    const { keymaster } = useWalletContext();
+    const { keymaster, gatekeeperUrl } = useWalletContext();
     const {
         currentDID,
         currentId,
@@ -30,7 +27,7 @@ const DropDownID = () => {
         unresolvedIdList,
     } = useVariablesContext();
     const { setError } = useSnackbar();
-    const { resetCurrentID } = useUIContext();
+    const { resetCurrentID } = useWalletData();
 
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string>("");
@@ -39,12 +36,19 @@ const DropDownID = () => {
         currentId?.length > 10 ? currentId.slice(0, 10) + "..." : currentId;
 
     useEffect(() => {
+        // Depends on gatekeeperUrl, and must: the host resolves it
+        // asynchronously, so it is empty on the first render. With an empty
+        // dependency array this would connect to "" and never retry -- which is
+        // new, since this used to read localStorage synchronously inside the
+        // effect.
+        if (!gatekeeperUrl) {
+            return;
+        }
         const init = async () => {
-            const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY);
-            await gatekeeper.connect({ url: gatekeeperUrl || DEFAULT_GATEKEEPER_URL });
+            await gatekeeper.connect({ url: gatekeeperUrl });
         };
         init();
-    }, []);
+    }, [gatekeeperUrl]);
 
     useEffect(() => {
         const loadAvatar = async () => {

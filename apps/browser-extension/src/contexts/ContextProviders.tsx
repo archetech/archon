@@ -20,8 +20,10 @@ import WalletChrome from "@didcid/keymaster/wallet/chrome";
 // opens a chrome tab instead. Deciding that here is what lets the components
 // stop asking `isBrowser && setOpenBrowser ? ... : openBrowserWindow(...)`
 // individually.
-function Navigation({ children }: { children: ReactNode }) {
-    const { openBrowser, setOpenBrowser, openBrowserWindow } = useUIContext();
+// Both seams in one place, because both are answered from this UIContext and a
+// component can only read it from inside the provider.
+function HostSeams({ children }: { children: ReactNode }) {
+    const { openBrowser, setOpenBrowser, openBrowserWindow, refreshStored } = useUIContext();
     const { isBrowser } = useWalletContext();
     return (
         <WalletNavigationProvider
@@ -34,8 +36,17 @@ function Navigation({ children }: { children: ReactNode }) {
             }}
             pendingView={openBrowser}
             clearPendingView={setOpenBrowser ? () => setOpenBrowser(undefined) : undefined}
+            // Only the full-page view has state to reset; the popup has none.
+            resetView={setOpenBrowser ? () => setOpenBrowser({ clearState: true }) : undefined}
         >
-            {children}
+            {/* No camera here; the wallet's other views need telling when state
+                changes, and the popup restores the view it had when it closed. */}
+            <PlatformCapabilitiesProvider
+                requestRefresh={() => requestBrowserRefresh(isBrowser)}
+                restoreSession={refreshStored}
+            >
+                {children}
+            </PlatformCapabilitiesProvider>
         </WalletNavigationProvider>
     );
 }
@@ -167,15 +178,9 @@ export function ContextProviders(
                                         setBrowserRefresh={setBrowserRefresh}
                                         setOpenBrowser={setOpenBrowser}
                                     >
-                                        <Navigation>
-                                            {/* No camera here; the wallet's other
-                                                views need telling when state changes. */}
-                                            <PlatformCapabilitiesProvider
-                                                requestRefresh={() => requestBrowserRefresh(isBrowser)}
-                                            >
-                                                {children}
-                                            </PlatformCapabilitiesProvider>
-                                        </Navigation>
+                                        <HostSeams>
+                                            {children}
+                                        </HostSeams>
                                     </UIProvider>
                                 </AuthProvider>
                             </VariablesProvider>

@@ -33,6 +33,9 @@ interface UIContextValue {
     openBrowser: openBrowserValues | undefined;
     setOpenBrowser: Dispatch<SetStateAction<openBrowserValues | undefined>> | undefined;
     openBrowserWindow: (options: openBrowserValues) => void;
+    // Restores the view this popup had before it was closed. Handed to the
+    // shared code as the restoreSession capability.
+    refreshStored: () => Promise<boolean | undefined>;
     handleCopyDID: (did: string) => void;
     getVaultItemIcon: (name: string, item: any) => React.ReactNode;
     updateManifest: () => Promise<void>;
@@ -487,6 +490,7 @@ export function UIProvider(
         getVaultItemIcon,
         updateManifest,
         refreshAll,
+        refreshStored,
         resetCurrentID,
         refreshHeld,
         refreshAliases,

@@ -10,15 +10,15 @@ import {
     encodeOutOfBandInvitation, outOfBandInvitation, trustPing, trustPingResponse
 } from "@didcid/keymaster/didcomm-protocols";
 import type { DidCommReceivedMessage } from "@didcid/keymaster/types";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { scanQrText } from "../utils/utils";
-import { loadRefreshIntervalSeconds } from "../contexts/UIContext";
-import { PageHeader } from "@didcid/wallet-ui";
-import { Section } from "@didcid/wallet-ui";
-import { EmptyState } from "@didcid/wallet-ui";
-import { ActionMenu } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
+import { loadRefreshIntervalSeconds } from "../hooks/useRefreshInterval";
+import PageHeader from "./layout/PageHeader";
+import Section from "./layout/Section";
+import EmptyState from "./layout/EmptyState";
+import ActionMenu from "./layout/ActionMenu";
 
 // What publishDidComm writes into the DID document, read back so the screen can
 // say what the identity currently advertises. Two states are both "published":
@@ -111,6 +111,7 @@ function DidCommTab() {
     const { keymaster } = useWalletContext();
     const { currentId, currentDID } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
+    const { scanQr } = usePlatformCapabilities();
 
     const refreshStatus = useCallback(async () => {
         if (!keymaster || !currentDID) {
@@ -359,7 +360,7 @@ function DidCommTab() {
     async function scanInvitation() {
         // scanQrText, not scanQrCodeRaw: the latter only returns codes that carry
         // a DID in the clear, and an invitation hides its DID inside the payload.
-        const scanned = await scanQrText();
+        const scanned = await scanQr?.();
 
         if (!scanned) {
             setError("Failed to scan QR code");

@@ -32,11 +32,11 @@ import {
     Close,
     Tune,
 } from "@mui/icons-material";
-import CredentialsTab from "./components/CredentialsTab";
+import { CredentialsTab } from "@didcid/wallet-ui";
 import WalletTab from "./components/WalletTab";
 import SettingsTab from "./components/SettingsTab";
-import IdentitiesTab from "./components/IdentitiesTab";
-import BrowserHeader from "./components/BrowserHeader";
+import { IdentitiesTab } from "@didcid/wallet-ui";
+import { BrowserHeader } from "@didcid/wallet-ui";
 import { JsonViewer } from "@didcid/wallet-ui";
 import { PageHeader } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
@@ -45,12 +45,12 @@ import { useThemeContext } from "./contexts/ContextProviders";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useSafeArea } from "./contexts/SafeAreaContext";
 import { AliasedDIDs } from "@didcid/wallet-ui";
-import AssetsTab from "./components/AssetsTab";
-import DmailTab from "./components/DmailTab";
+import { AssetsTab } from "@didcid/wallet-ui";
+import { DmailTab } from "@didcid/wallet-ui";
 import { LightningTab } from "@didcid/wallet-ui";
-import DidCommTab from "./components/DidCommTab";
+import { DidCommTab } from "@didcid/wallet-ui";
 import { PollTab } from "@didcid/wallet-ui";
-import AuthTab from "./components/AuthTab";
+import { AuthTab } from "@didcid/wallet-ui";
 import { PropertiesTab } from "@didcid/wallet-ui";
 
 function BrowserContent() {
