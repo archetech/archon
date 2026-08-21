@@ -30,7 +30,7 @@ import {
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
+import { useWalletData } from "@didcid/wallet-ui";
 import { PollResultsModal } from "@didcid/wallet-ui";
 import {PollConfig, PollResults} from "@didcid/keymaster/types";
 import { TextInputModal } from "@didcid/wallet-ui";
@@ -52,9 +52,7 @@ const PollsTab: React.FC = () => {
         pollList,
         registries,
     } = useVariablesContext();
-    const {
-        refreshAliases
-    } = useUIContext();
+    const { refreshAliases } = useWalletData();
     const [registry, setRegistry] = useState<string>("hyperswarm");
     const [pollName, setPollName] = useState<string>("");
     const [description, setDescription] = useState<string>("");

@@ -15,7 +15,7 @@ import {
 } from "@mui/icons-material";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
+import { useWalletData } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { AuthDetailsModal } from "@didcid/wallet-ui";
 import { WarningModal } from "@didcid/wallet-ui";
@@ -60,10 +60,7 @@ function VaultTab() {
         vaultList,
         registries,
     } = useVariablesContext();
-    const {
-        getVaultItemIcon,
-        refreshAliases,
-    } = useUIContext();
+    const { getVaultItemIcon, refreshAliases } = useWalletData();
 
     function removeVaultMember(did: string): void {
         showWarning(

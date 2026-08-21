@@ -29,7 +29,7 @@ import {
 } from "@mui/icons-material";
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
+import { useWalletData } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { PollResultsModal } from "@didcid/wallet-ui";
 import {PollConfig, PollResults} from "@didcid/keymaster/types";
@@ -54,7 +54,7 @@ const PollsTab: React.FC = () => {
         agentList,
         pollList,
     } = useVariablesContext();
-    const { refreshAliases } = useUIContext();
+    const { refreshAliases } = useWalletData();
     const { isTabletUp } = useThemeContext();
     const [registry, setRegistry] = useState<string>("hyperswarm");
     const [pollName, setPollName] = useState<string>("");

@@ -2,7 +2,7 @@ import { useState } from "react";
 import {Box, Button, FormControl, IconButton, MenuItem, Select, TextField, Tooltip} from "@mui/material";
 import { useWalletContext } from "@didcid/wallet-ui";
 import {useSnackbar} from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
+import { useWalletData } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { Edit } from "@mui/icons-material";
 import { TextInputModal } from "@didcid/wallet-ui";
@@ -15,9 +15,7 @@ const SchemaTab = ()=> {
         setError,
         setSuccess,
     } = useSnackbar();
-    const {
-        refreshAliases,
-    } = useUIContext();
+    const { refreshAliases } = useWalletData();
     const {
         registries,
         aliasList,

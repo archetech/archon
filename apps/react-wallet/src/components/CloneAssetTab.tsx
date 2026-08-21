@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {Box, TextField, Select, MenuItem, Button, FormControl} from "@mui/material";
 import { useWalletContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
+import { useWalletData } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { useThemeContext } from "../contexts/ContextProviders";
 import { useVariablesContext } from "@didcid/wallet-ui";
@@ -13,7 +13,7 @@ function CloneAssetTab() {
 
     const { keymaster } = useWalletContext();
     const { setError } = useSnackbar();
-    const { refreshAliases } = useUIContext();
+    const { refreshAliases } = useWalletData();
     const { isTabletUp } = useThemeContext();
     const { registries } = useVariablesContext();
 

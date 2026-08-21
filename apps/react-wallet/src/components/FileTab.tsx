@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 import { Box, Button, FormControl, IconButton, LinearProgress, MenuItem, Select, Tooltip, Typography } from "@mui/material";
 import { Download, Edit } from "@mui/icons-material";
 import { useWalletContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
+import { useWalletData } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { FileAsset } from "@didcid/keymaster/types";
@@ -26,7 +26,7 @@ function formatBytes(bytes: number): string {
 const FileTab = () => {
     const { keymaster } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
-    const { refreshAliases } = useUIContext();
+    const { refreshAliases } = useWalletData();
     const {
         fileList,
         aliasList,
