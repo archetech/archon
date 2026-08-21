@@ -587,8 +587,10 @@ async function main(): Promise<void> {
                     });
                 }
 
-                // socksFetch: this request may carry a SOCKS dispatcher (#916).
-                const invoiceResponse = await socksFetch(invoiceUrl.toString(), fetchOptions);
+                // Only the SOCKS-dispatched path needs undici's fetch; clearnet and
+                // the internal loopback shortcut stay on the built-in one (#916).
+                const doFetch = fetchOptions.dispatcher ? socksFetch : fetch;
+                const invoiceResponse = await doFetch(invoiceUrl.toString(), fetchOptions);
                 if (invoiceResponse.status >= 300 && invoiceResponse.status < 400) {
                     res.status(502).json({
                         error: `Invoice request failed: endpoint redirected (${invoiceResponse.status}); redirects are not followed`,

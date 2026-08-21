@@ -30,6 +30,13 @@ import {
     WEBHOOK_SECRET,
 } from './config.js';
 
+// An object, so tests can substitute it. SOCKS-dispatched requests deliberately
+// bypass globalThis.fetch, so a test cannot observe them by stubbing that --
+// and mocking the 'undici' module does not work either, because this file
+// resolves it from the service's own node_modules while a test resolves it from
+// the repo root. Two different modules, one mock.
+export const socksEgress = { fetch: socksFetch };
+
 // Mutable state owned by the bootstrap in index.ts. Routes read it through this
 // object because it is populated after the routes are registered.
 export interface HeraldContext {
@@ -1078,8 +1085,10 @@ export function createHeraldRoutes(ctx: HeraldContext): {
                 });
             }
 
-            // socksFetch: this request may carry a SOCKS dispatcher (#916).
-            const response = await socksFetch(invoiceUrl, fetchOptions);
+            // Only the SOCKS-dispatched path needs undici's fetch; clearnet stays
+            // on the built-in one, which the rest of this service uses (#916).
+            const doFetch = fetchOptions.dispatcher ? socksEgress.fetch : fetch;
+            const response = await doFetch(invoiceUrl, fetchOptions);
             if (!response.ok) {
                 res.json({ status: 'ERROR', reason: 'Lightning service returned an error' });
                 return;
