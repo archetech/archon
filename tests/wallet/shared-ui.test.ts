@@ -10,12 +10,28 @@ import { join } from 'path';
 const SHARED_DIR = 'packages/wallet-ui/src';
 const APPS = ['apps/react-wallet/src', 'apps/browser-extension/src'];
 
-function sharedNames(): string[] {
-    return ['components', 'contexts']
-        .flatMap(dir => {
-            const path = join(SHARED_DIR, dir);
-            return existsSync(path) ? readdirSync(path) : [];
-        })
+// Walk the whole package rather than a list of directories. An earlier version
+// named components/ and contexts/, and the very next change added hooks/ --
+// which meant the file carrying the most logic sat outside the guard.
+function sharedFiles(dir = SHARED_DIR): string[] {
+    if (!existsSync(dir)) {
+        return [];
+    }
+
+    return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) {
+            return sharedFiles(path);
+        }
+        return /\.tsx?$/.test(entry.name) ? [path] : [];
+    });
+}
+
+// Only components can be shadowed by an app-local copy, so index.ts and other
+// bare .ts modules are excluded from that particular check.
+function sharedComponentNames(): string[] {
+    return sharedFiles()
+        .map(path => path.split('/').pop() as string)
         .filter(name => name.endsWith('.tsx'));
 }
 
@@ -23,13 +39,13 @@ describe('shared wallet UI', () => {
     it('has something in it', () => {
         // Guard the guard: an empty shared package would make every check below
         // vacuously true.
-        expect(sharedNames().length).toBeGreaterThan(0);
+        expect(sharedFiles().length).toBeGreaterThan(0);
     });
 
     it('is not shadowed by a same-named component in either app', () => {
         const shadowed: string[] = [];
 
-        for (const name of sharedNames()) {
+        for (const name of sharedComponentNames()) {
             for (const app of APPS) {
                 for (const dir of ['components', 'contexts', 'modals']) {
                     const candidate = join(app, dir, name);
@@ -50,21 +66,16 @@ describe('shared wallet UI', () => {
         // SnackbarProvider takes topOffset rather than reading a safe-area context.
         const offenders: string[] = [];
 
-        for (const dir of ['components', 'contexts']) {
-            const path = join(SHARED_DIR, dir);
-            if (!existsSync(path)) continue;
+        for (const path of sharedFiles()) {
+            // Comments stripped first: these files explain what each host does
+            // differently, so naming chrome.storage in prose is expected and
+            // only a real reference should fail.
+            const source = readFileSync(path, 'utf-8')
+                .replace(/\/\*[\s\S]*?\*\//g, '')
+                .replace(/\/\/.*$/gm, '');
 
-            for (const name of readdirSync(path).filter(f => f.endsWith('.tsx'))) {
-                // Comments stripped first: these files explain what each host does
-                // differently, so naming chrome.storage in prose is expected and
-                // only a real reference should fail.
-                const source = readFileSync(join(path, name), 'utf-8')
-                    .replace(/\/\*[\s\S]*?\*\//g, '')
-                    .replace(/\/\/.*$/gm, '');
-
-                if (/@capacitor|@capawesome|\bchrome\./.test(source)) {
-                    offenders.push(name);
-                }
+            if (/@capacitor|@capawesome|\bchrome\./.test(source)) {
+                offenders.push(path);
             }
         }
 

@@ -42,8 +42,6 @@ export function useWalletData() {
         setAgentList,
         setAliasList,
         setAliasRegistry,
-        setAlias,
-        setAliasDID,
         setGroupList,
         setImageList,
         setFileList,
@@ -61,6 +59,7 @@ export function useWalletData() {
         credentialSchema,
         setCredentialSchema,
         setCredentialString,
+        resetCredentialState,
     } = useVariablesContext();
 
     async function getValidIds() {
@@ -333,7 +332,14 @@ export function useWalletData() {
     }
 
     function wipeUserState() {
-        setCurrentId("");
+        // resetCredentialState, not the individual setters: it also clears
+        // heldDID and puts registry back to its default, which is what the
+        // extension's copy of this function did and what a wipe should mean --
+        // carrying the previous identity's registry into a wiped state is a bug
+        // either way. It also uses the raw state setters, so wiping does not
+        // fire a burst of concurrent writes at a store whose handler is
+        // read-modify-write.
+        resetCredentialState();
         setCurrentDID("");
         setManifest({});
         setAliasList({});
@@ -344,8 +350,6 @@ export function useWalletData() {
         setIssuedString("");
         setVaultList([]);
         setPollList([]);
-        setAlias("");
-        setAliasDID("");
     }
     return {
         getValidIds,

@@ -135,12 +135,20 @@ export function ContextProviders(
                                 resolveGatekeeperUrl={resolveGatekeeperUrl}
                                 modals={walletModals}
                             >
-                                <DeepLinks />
                                 <VariablesProvider>
                                     <UIProvider>
                                         {children}
                                     </UIProvider>
                                 </VariablesProvider>
+                                {/* After the subtree, not before it. This drains
+                                    the deep-link queue as soon as the wallet is
+                                    ready, and React runs sibling effects in order
+                                    -- so mounted first it could dispatch
+                                    archon:open* before UIContext had installed the
+                                    listeners for them. Inside WalletProvider, where
+                                    this code used to live, it ran after its
+                                    children for the same reason. */}
+                                <DeepLinks />
                             </WalletProvider>
                         </SafeAreaSnackbarProvider>
                     </SafeAreaProvider>
