@@ -14,7 +14,7 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { LightningNotConfiguredError } from "@didcid/common/errors";
 import { DecodedLightningInvoice, LightningPaymentRecord, LightningPaymentStatus } from "@didcid/keymaster/types";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { Bolt } from "@mui/icons-material";

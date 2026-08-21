@@ -4,7 +4,7 @@ import {
     Button,
     TextField,
 } from "@mui/material";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import WarningModal from "../modals/WarningModal";

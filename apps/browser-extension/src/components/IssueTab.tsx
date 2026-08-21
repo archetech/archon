@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { CredentialForm } from "@didcid/wallet-ui";

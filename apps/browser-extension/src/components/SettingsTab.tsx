@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Box, Button, TextField, Typography } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import packageJson from "../../package.json";
 

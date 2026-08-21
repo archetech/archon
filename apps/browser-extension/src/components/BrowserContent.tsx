@@ -21,7 +21,7 @@ import SettingsTab from "./SettingsTab";
 import IdentitiesTab from "./IdentitiesTab";
 import BrowserHeader from "./BrowserHeader";
 import JsonViewer from "./JsonViewer";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import AliasedDIDs from "./AliasedDIDs";

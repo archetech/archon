@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {Box, Button, Switch, TextField, Typography} from "@mui/material";
 import { DarkMode, LightMode, Save } from "@mui/icons-material";
 import { useThemeContext } from "../contexts/ContextProviders";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import {
     DEFAULT_GATEKEEPER_URL,

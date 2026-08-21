@@ -1,7 +1,7 @@
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import { jsonViewTheme } from "./layout/jsonViewTheme";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
 import { Badge, Create, DriveFileRenameOutline, Image, Login, LoopOutlined, PermIdentity, RestoreOutlined, SaveAltOutlined, SwapHorizOutlined, DeleteOutline } from "@mui/icons-material";
 import PageHeader from "./layout/PageHeader";

@@ -42,7 +42,7 @@ import PageHeader from "./components/layout/PageHeader";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "./contexts/UIContext";
 import { useThemeContext } from "./contexts/ContextProviders";
-import { useWalletContext } from "./contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useSafeArea } from "./contexts/SafeAreaContext";
 import AliasedDIDs from "./components/AliasedDIDs";
 import AssetsTab from "./components/AssetsTab";

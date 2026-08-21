@@ -16,7 +16,7 @@ import {
     PictureAsPdf,
     Token,
 } from '@mui/icons-material';
-import { useWalletContext } from "./WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { useAuthContext } from "./AuthContext";
 import { useVariablesContext } from "@didcid/wallet-ui";

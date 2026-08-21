@@ -18,7 +18,7 @@ import {
     LockOpen,
     ManageSearch,
 } from "@mui/icons-material";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useThemeContext } from "../contexts/ContextProviders";
 import { useSnackbar } from "@didcid/wallet-ui";

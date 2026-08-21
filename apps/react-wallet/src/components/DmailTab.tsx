@@ -38,7 +38,7 @@ import {
     ArrowBack,
 } from "@mui/icons-material";
 import { DmailItem, DmailMessage } from '@didcid/keymaster/types';
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";

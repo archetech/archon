@@ -55,7 +55,13 @@ describe('shared wallet UI', () => {
             if (!existsSync(path)) continue;
 
             for (const name of readdirSync(path).filter(f => f.endsWith('.tsx'))) {
-                const source = readFileSync(join(path, name), 'utf-8');
+                // Comments stripped first: these files explain what each host does
+                // differently, so naming chrome.storage in prose is expected and
+                // only a real reference should fail.
+                const source = readFileSync(join(path, name), 'utf-8')
+                    .replace(/\/\*[\s\S]*?\*\//g, '')
+                    .replace(/\/\/.*$/gm, '');
+
                 if (/@capacitor|@capawesome|\bchrome\./.test(source)) {
                     offenders.push(name);
                 }

@@ -1,12 +1,55 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
-import { WalletProvider } from "./WalletProvider";
+import { WalletProvider } from "@didcid/wallet-ui";
 import { VariablesProvider } from "@didcid/wallet-ui";
 import { UIProvider } from "./UIContext";
 import { ThemeProvider } from "@mui/material/styles";
 import { Box, CssBaseline, useMediaQuery } from "@mui/material";
 import { createAppTheme } from "../theme";
 import { SafeAreaProvider, useSafeArea } from "./SafeAreaContext";
+import { useDeepLinks } from "../hooks/useDeepLinks";
+import WalletWeb from "@didcid/keymaster/wallet/web";
+import PassphraseModal from "../modals/PassphraseModal";
+import WarningModal from "../modals/WarningModal";
+import MnemonicModal from "../modals/MnemonicModal";
+import { DEFAULT_GATEKEEPER_URL, GATEKEEPER_KEY } from "../constants";
+import {
+    getSessionPassphrase,
+    setSessionPassphrase,
+    clearSessionPassphrase,
+} from "../utils/sessionPassphrase";
 import { SnackbarProvider } from "@didcid/wallet-ui";
+
+// Renders nothing: it exists to run the deep-link handler inside the wallet
+// provider, since the handler needs the wallet to be ready before it opens a
+// screen. This is the app-local half of what used to live in WalletProvider.
+function DeepLinks() {
+    useDeepLinks();
+    return null;
+}
+
+const walletStore = new WalletWeb();
+
+// The capabilities the shared WalletProvider needs from this host: where the
+// wallet lives, where the passphrase survives a reload, and how the gatekeeper
+// URL is chosen. The extension answers all three differently.
+const walletSession = {
+    get: getSessionPassphrase,
+    set: setSessionPassphrase,
+    clear: clearSessionPassphrase,
+};
+
+function resolveGatekeeperUrl() {
+    const url = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
+    // Persist the fallback so Settings shows what is actually in use.
+    localStorage.setItem(GATEKEEPER_KEY, url);
+    return url;
+}
+
+const walletModals = {
+    Passphrase: PassphraseModal,
+    Warning: WarningModal,
+    Mnemonic: MnemonicModal,
+};
 
 // The shared SnackbarProvider takes the inset as a number rather than reaching
 // for a context that only exists here: this wallet runs as a Capacitor app and
@@ -86,7 +129,13 @@ export function ContextProviders(
                 >
                     <SafeAreaProvider>
                         <SafeAreaSnackbarProvider>
-                            <WalletProvider>
+                            <WalletProvider
+                                walletStore={walletStore}
+                                session={walletSession}
+                                resolveGatekeeperUrl={resolveGatekeeperUrl}
+                                modals={walletModals}
+                            >
+                                <DeepLinks />
                                 <VariablesProvider>
                                     <UIProvider>
                                         {children}

@@ -10,7 +10,7 @@ import {
     encodeOutOfBandInvitation, outOfBandInvitation, trustPing, trustPingResponse
 } from "@didcid/keymaster/didcomm-protocols";
 import type { DidCommReceivedMessage } from "@didcid/keymaster/types";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { scanQrText } from "../utils/utils";

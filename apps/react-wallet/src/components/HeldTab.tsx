@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Box, Button, IconButton, InputAdornment, TextField, Tooltip } from "@mui/material";
 import { CameraAlt } from "@mui/icons-material";
 import WarningModal from "../modals/WarningModal";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
