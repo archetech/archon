@@ -158,6 +158,8 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/didcomm/receive', 400],
     ['POST', '/didcomm/ack', 400],
     ['POST', '/didcomm/mediate', 400],
+    ['POST', '/didcomm/credential/send', 400],
+    ['POST', '/didcomm/credential/accept', 400],
     // dmail
     ['GET', '/dmail', 500],
     ['POST', '/dmail', 500],

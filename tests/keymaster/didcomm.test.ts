@@ -950,3 +950,101 @@ describe('node capability gating', () => {
         await expect(keymaster.getNodeCapabilities()).resolves.toBeNull();
     });
 });
+
+describe('credential exchange over DIDComm', () => {
+    // #905: sendCredential posts a Notice carrying the credential's DID, which
+    // only works for a did:cid subject -- issueCredential encrypts to the ISSUER
+    // when the subject is foreign, so such a holder can neither resolve that DID
+    // nor decrypt what it points at. DIDComm carries the credential itself, which
+    // is the only way to reach them.
+    const mockSchema = {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        type: 'object',
+        properties: { email: { type: 'string' } },
+        required: ['email'],
+    };
+
+    async function issueTo(subject: string) {
+        const schemaDid = await keymaster.createSchema(mockSchema);
+        const bound = await keymaster.bindCredential(subject, { schema: schemaDid });
+        return keymaster.issueCredential(bound);
+    }
+
+    it('sends the credential itself, not a reference to it', async () => {
+        const base = useDidCommGateway();
+        await keymaster.createId('Alice');
+        const bob = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob');
+        await keymaster.setCurrentId('Alice');
+
+        const credentialDid = await issueTo(bob);
+
+        let packed = '';
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'credential-challenge' });
+            }
+            if (url === `${base}/api/v1/deliver`) {
+                packed = JSON.parse(String(init?.body)).message;
+                return jsonResponse({ ids: ['credential-1'] });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+
+        await expect(keymaster.sendCredentialDidComm(credentialDid, bob, { name: 'Alice' }))
+            .resolves.toEqual(['credential-1']);
+
+        // Bob can read it because it was addressed to him, and what he gets is a
+        // credential rather than a pointer.
+        const { message } = await keymaster.unpackDidComm(packed, { name: 'Bob' });
+        expect(message.type).toBe('https://didcomm.org/issue-credential/3.0/issue-credential');
+
+        const attached = message.attachments[0].data.json;
+        expect(attached.id).toBe(credentialDid);
+        expect(attached.credentialSubject.id).toBe(bob);
+        expect(attached.issuer).toBeDefined();
+        // The signature travels with it, so a foreign holder can verify against
+        // the issuer's DID without holding anything of ours.
+        expect(attached.proof).toBeDefined();
+    });
+
+    it('accepts a credential that arrived over DIDComm', async () => {
+        await keymaster.createId('Alice');
+        const bob = await keymaster.createId('Bob');
+        await keymaster.setCurrentId('Alice');
+        const credentialDid = await issueTo(bob);
+        const vc = await keymaster.getCredential(credentialDid);
+
+        await keymaster.setCurrentId('Bob');
+        const message = {
+            type: 'https://didcomm.org/issue-credential/3.0/issue-credential',
+            body: {},
+            attachments: [{ data: { json: { id: credentialDid, ...vc } } }],
+        };
+
+        await expect(keymaster.acceptCredentialDidComm(message)).resolves.toBe(true);
+        await expect(keymaster.listCredentials()).resolves.toContain(credentialDid);
+    });
+
+    it('declines a credential with no did:cid to resolve', async () => {
+        // A credential from a foreign issuer carries no DID this wallet can look
+        // up, so there is nothing to hold. Saying so is better than reporting a
+        // success that stored nothing.
+        await keymaster.createId('Alice');
+
+        const foreign = {
+            type: 'https://didcomm.org/issue-credential/3.0/issue-credential',
+            body: {},
+            attachments: [{ data: { json: {
+                id: 'https://university.example/credentials/1872',
+                issuer: 'did:web:university.example',
+                credentialSubject: { id: 'did:key:z6Mk' },
+            } } }],
+        };
+
+        await expect(keymaster.acceptCredentialDidComm(foreign)).resolves.toBe(false);
+        await expect(keymaster.acceptCredentialDidComm({ body: {} })).resolves.toBe(false);
+    });
+});

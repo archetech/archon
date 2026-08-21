@@ -638,6 +638,30 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    async sendCredentialDidComm(
+        did: string,
+        to: string | string[],
+        options?: { name?: string; comment?: string; anoncrypt?: boolean }
+    ): Promise<string[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/credential/send`, { did, to, options });
+            return response.data.ids;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async acceptCredentialDidComm(message: Record<string, unknown>): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/didcomm/credential/accept`, { message });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async mediateDidComm(options?: { name?: string; endpoint?: string }): Promise<{ relayed: number; skipped: number }> {
         try {
             const response = await this.axios.post(`${this.API}/didcomm/mediate`, { options });

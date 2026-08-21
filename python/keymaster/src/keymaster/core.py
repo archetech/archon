@@ -38,6 +38,7 @@ from .crypto import (
     verify_sig,
 )
 from . import didcomm_crypto as dc
+from . import didcomm_protocols as dc_protocols
 
 
 LOGGER = logging.getLogger(__name__)
@@ -3309,6 +3310,52 @@ class Keymaster:
             return await self.add_to_held(credential_did)
         except Exception:
             return False
+
+    async def send_credential_didcomm(
+        self,
+        did: str,
+        to: str | list[str],
+        options: dict[str, Any] | None = None,
+    ) -> list[str]:
+        # Deliver an issued credential over DIDComm, the only way to reach a
+        # subject whose DID is not a did:cid: send_credential posts a Notice
+        # carrying the credential DID, and a foreign holder can neither resolve
+        # that DID nor decrypt what it points at (issue_credential encrypts to the
+        # ISSUER when the subject is not managed). So this carries the credential.
+        #
+        # The attachment is the signed VC plus `id`, the credential's own DID --
+        # a W3C VC property, and a DID is a URI -- so a foreign agent sees a
+        # conformant credential while an Archon holder can still accept it.
+        options = options or {}
+        credential_did = await self.lookup_did(did)
+        vc = await self.get_credential(credential_did)
+
+        if not vc:
+            raise InvalidParameterError("did")
+
+        message = dc_protocols.issue_credential_message(
+            {"id": credential_did, **vc},
+            comment=options.get("comment"),
+        )
+
+        return await self.send_didcomm(
+            message,
+            to,
+            {"name": options.get("name"), "anoncrypt": options.get("anoncrypt")},
+        )
+
+    async def accept_credential_didcomm(self, message: dict[str, Any]) -> bool:
+        # The attachment carries the credential's DID as `id`; resolving,
+        # decrypting and checking the subject is the existing path.
+        attached = dc_protocols.attached_json(message)
+        credential_did = attached.get("id") if isinstance(attached, dict) else None
+
+        if not isinstance(credential_did, str) or not self.is_managed_did(credential_did):
+            # A credential from a foreign issuer has no did:cid to resolve, so
+            # there is nothing for this wallet to hold.
+            return False
+
+        return await self.accept_credential(credential_did)
 
     async def get_credential(self, identifier: str) -> dict[str, Any] | None:
         did = await self.lookup_did(identifier)

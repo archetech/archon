@@ -1,3 +1,4 @@
+import { attachedJson, issueCredentialMessage } from './didcomm-protocols.js';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
@@ -3616,6 +3617,57 @@ export default class Keymaster implements KeymasterInterface {
         };
 
         return this.createNotice(message, { registry, validUntil, ...options });
+    }
+
+    // Deliver an issued credential over DIDComm, which is the only way to reach a
+    // subject whose DID is not a did:cid. sendCredential cannot: it posts a Notice
+    // carrying the credential DID, and a foreign holder can neither resolve that
+    // DID nor decrypt what it points at -- issueCredential encrypts to the ISSUER
+    // when the subject is not managed. So this carries the credential itself.
+    //
+    // The attachment is the signed VC plus `id`, the credential's own DID. `id` is
+    // a W3C VC property and a DID is a URI, so a foreign agent sees a conformant
+    // credential while an Archon holder can still acceptCredential(id). The
+    // recipient verifies `proof` by resolving the issuer's did:cid, which any
+    // Universal Resolver carrying the did:cid driver can do.
+    async sendCredentialDidComm(
+        did: string,
+        to: string | string[],
+        options: { name?: string; comment?: string; anoncrypt?: boolean } = {}
+    ): Promise<string[]> {
+        const credentialDid = await this.lookupDID(did);
+        const vc = await this.getCredential(credentialDid);
+
+        if (!vc) {
+            throw new InvalidParameterError('did');
+        }
+
+        const message = issueCredentialMessage(
+            { id: credentialDid, ...vc },
+            options.comment ? { comment: options.comment } : {}
+        );
+
+        return this.sendDidComm(message as unknown as Record<string, unknown>, to, {
+            name: options.name,
+            anoncrypt: options.anoncrypt,
+        });
+    }
+
+    // Accept a credential that arrived over DIDComm. The attachment carries the
+    // credential's DID as `id`; everything else about acceptance -- resolving,
+    // decrypting, checking the subject -- is the existing path.
+    async acceptCredentialDidComm(message: Record<string, unknown>): Promise<boolean> {
+        const attached = attachedJson(message as { attachments?: Array<{ data?: { json?: unknown } }> });
+        const credentialDid = attached?.id;
+
+        if (typeof credentialDid !== 'string' || !this.isManagedDID(credentialDid)) {
+            // A credential from a foreign issuer has no did:cid to resolve, so
+            // there is nothing for this wallet to hold. Callers should show it
+            // rather than pretend it was accepted.
+            return false;
+        }
+
+        return this.acceptCredential(credentialDid);
     }
 
     private isManagedDID(value: string): boolean {
