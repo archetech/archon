@@ -12,7 +12,7 @@ import {
     FormControl,
     TextField,
 } from "@mui/material";
-import DisplayDID from "./DisplayDID";
+import { DisplayDID } from "@didcid/wallet-ui";
 import { useThemeContext } from "../contexts/ContextProviders";
 
 function IssueTab() {

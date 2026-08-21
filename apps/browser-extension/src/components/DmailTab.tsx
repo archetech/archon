@@ -49,10 +49,11 @@ import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import TextInputModal from "../modals/TextInputModal";
 import WarningModal from "../modals/WarningModal";
-import CopyResolveDID from "./CopyResolveDID";
-import CopyDID from "./CopyDID";
-import DmailSearchModal, { AdvancedSearchParams } from "../modals/DmailSearchModal";
-import DisplayDID from "./DisplayDID";
+import { CopyResolveDID } from "@didcid/wallet-ui";
+import { CopyDID } from "@didcid/wallet-ui";
+import { DmailSearchModal } from "@didcid/wallet-ui";
+import type { AdvancedSearchParams } from "@didcid/wallet-ui";
+import { DisplayDID } from "@didcid/wallet-ui";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import { VersionNavigator } from "@didcid/wallet-ui";
 

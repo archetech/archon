@@ -5,7 +5,7 @@ import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { Edit } from "@mui/icons-material";
 import TextInputModal from "../modals/TextInputModal";
-import CopyResolveDID from "./CopyResolveDID";
+import { CopyResolveDID } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 
 const SchemaTab = ()=> {

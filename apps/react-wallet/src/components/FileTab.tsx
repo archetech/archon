@@ -9,7 +9,7 @@ import { FileAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import { VersionNavigator } from "@didcid/wallet-ui";
 import TextInputModal from "../modals/TextInputModal";
-import CopyResolveDID from "./CopyResolveDID";
+import { CopyResolveDID } from "@didcid/wallet-ui";
 import { useThemeContext } from "../contexts/ContextProviders";
 import {
     DEFAULT_GATEKEEPER_URL,

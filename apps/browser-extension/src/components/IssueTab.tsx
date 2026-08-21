@@ -11,7 +11,7 @@ import {
     MenuItem,
     TextField,
 } from "@mui/material";
-import DisplayDID from "./DisplayDID";
+import { DisplayDID } from "@didcid/wallet-ui";
 
 function IssueTab() {
     const { keymaster } = useWalletContext();

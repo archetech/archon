@@ -2,15 +2,27 @@ import React, { createContext, Dispatch, ReactNode, SetStateAction, useContext, 
 import { WalletProvider } from "@didcid/wallet-ui";
 import { VariablesProvider } from "@didcid/wallet-ui";
 import { AuthProvider } from "./AuthContext";
-import { RefreshMode, UIProvider, openBrowserValues } from "./UIContext";
+import { RefreshMode, UIProvider, openBrowserValues, useUIContext } from "./UIContext";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { Box } from "@mui/material";
 import { requestBrowserRefresh } from "../utils/utils";
-import { SnackbarProvider } from "@didcid/wallet-ui";
+import { SnackbarProvider, ViewerNavigationProvider } from "@didcid/wallet-ui";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
 import PassphraseModal from "../modals/PassphraseModal";
 import WarningModal from "../modals/WarningModal";
-import MnemonicModal from "../modals/MnemonicModal";
+import { MnemonicModal } from "@didcid/wallet-ui";
+
+// Supplies "open this DID in the viewer" to the shared components, which cannot
+// reach a UIContext -- the two wallets keep their own. Here it opens the
+// full-page view in a chrome tab; react-wallet switches its own tab instead.
+function ViewerNavigation({ children }: { children: ReactNode }) {
+    const { openBrowserWindow } = useUIContext();
+    return (
+        <ViewerNavigationProvider openDidViewer={did => openBrowserWindow({ did, tab: "viewer" })}>
+            {children}
+        </ViewerNavigationProvider>
+    );
+}
 
 const walletStore = new WalletChrome();
 
@@ -146,7 +158,9 @@ export function ContextProviders(
                                         setBrowserRefresh={setBrowserRefresh}
                                         setOpenBrowser={setOpenBrowser}
                                     >
-                                        {children}
+                                        <ViewerNavigation>
+                                            {children}
+                                        </ViewerNavigation>
                                     </UIProvider>
                                 </AuthProvider>
                             </VariablesProvider>

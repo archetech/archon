@@ -19,7 +19,7 @@ import {Delete, Edit} from "@mui/icons-material";
 import WarningModal from "../modals/WarningModal";
 import { Group } from '@didcid/keymaster/types'
 import TextInputModal from "../modals/TextInputModal";
-import CopyResolveDID from "./CopyResolveDID";
+import { CopyResolveDID } from "@didcid/wallet-ui";
 import { useThemeContext } from "../contexts/ContextProviders";
 
 const GroupsTab = () => {

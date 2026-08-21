@@ -6,7 +6,7 @@ import {
 import { useWalletContext } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
-import MnemonicModal from "../modals/MnemonicModal";
+import { MnemonicModal } from "@didcid/wallet-ui";
 import PassphraseModal from "../modals/PassphraseModal";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
 

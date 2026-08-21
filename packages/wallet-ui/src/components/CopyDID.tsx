@@ -6,10 +6,13 @@ import {
 import {
     ContentCopy,
 } from "@mui/icons-material";
-import { useUIContext } from "../contexts/UIContext";
+import { useWalletData } from "../hooks/useWalletData";
 
 const CopyDID = ({ did } : { did: string}) => {
-    const { handleCopyDID } = useUIContext();
+    // handleCopyDID comes from the shared data hook rather than a UIContext:
+    // the two wallets keep their own UIContexts, but both re-export this same
+    // function from here, so the component needs neither of them.
+    const { handleCopyDID } = useWalletData();
 
     return (
         <Box>

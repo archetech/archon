@@ -1,7 +1,7 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { WalletProvider } from "@didcid/wallet-ui";
 import { VariablesProvider } from "@didcid/wallet-ui";
-import { UIProvider } from "./UIContext";
+import { UIProvider, useUIContext } from "./UIContext";
 import { ThemeProvider } from "@mui/material/styles";
 import { Box, CssBaseline, useMediaQuery } from "@mui/material";
 import { createAppTheme } from "../theme";
@@ -10,14 +10,14 @@ import { useDeepLinks } from "../hooks/useDeepLinks";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import PassphraseModal from "../modals/PassphraseModal";
 import WarningModal from "../modals/WarningModal";
-import MnemonicModal from "../modals/MnemonicModal";
+import { MnemonicModal } from "@didcid/wallet-ui";
 import { DEFAULT_GATEKEEPER_URL, GATEKEEPER_KEY } from "../constants";
 import {
     getSessionPassphrase,
     setSessionPassphrase,
     clearSessionPassphrase,
 } from "../utils/sessionPassphrase";
-import { SnackbarProvider } from "@didcid/wallet-ui";
+import { SnackbarProvider, ViewerNavigationProvider } from "@didcid/wallet-ui";
 
 // Renders nothing: it exists to run the deep-link handler inside the wallet
 // provider, since the handler needs the wallet to be ready before it opens a
@@ -25,6 +25,18 @@ import { SnackbarProvider } from "@didcid/wallet-ui";
 function DeepLinks() {
     useDeepLinks();
     return null;
+}
+
+// Supplies "open this DID in the viewer" to the shared components, which cannot
+// reach a UIContext -- the two wallets keep their own. Here it switches the
+// wallet's own tab; the extension opens a chrome tab instead.
+function ViewerNavigation({ children }: { children: ReactNode }) {
+    const { setOpenBrowser } = useUIContext();
+    return (
+        <ViewerNavigationProvider openDidViewer={did => setOpenBrowser({ did, tab: "viewer" })}>
+            {children}
+        </ViewerNavigationProvider>
+    );
 }
 
 const walletStore = new WalletWeb();
@@ -137,7 +149,9 @@ export function ContextProviders(
                             >
                                 <VariablesProvider>
                                     <UIProvider>
-                                        {children}
+                                        <ViewerNavigation>
+                                            {children}
+                                        </ViewerNavigation>
                                     </UIProvider>
                                 </VariablesProvider>
                                 {/* After the subtree, not before it. This drains

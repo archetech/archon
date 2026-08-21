@@ -35,8 +35,8 @@ import PollResultsModal from "../modals/PollResultsModal";
 import {PollConfig, PollResults} from "@didcid/keymaster/types";
 import TextInputModal from "../modals/TextInputModal";
 import WarningModal from "../modals/WarningModal";
-import CopyResolveDID from "./CopyResolveDID";
-import DisplayDID from "./DisplayDID";
+import { CopyResolveDID } from "@didcid/wallet-ui";
+import { DisplayDID } from "@didcid/wallet-ui";
 import { useThemeContext } from "../contexts/ContextProviders";
 import PageHeader from "./layout/PageHeader";
 

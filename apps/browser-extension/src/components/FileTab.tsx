@@ -9,7 +9,7 @@ import { FileAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import { VersionNavigator } from "@didcid/wallet-ui";
 import TextInputModal from "../modals/TextInputModal";
-import CopyResolveDID from "./CopyResolveDID";
+import { CopyResolveDID } from "@didcid/wallet-ui";
 
 function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;

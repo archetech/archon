@@ -7,7 +7,7 @@ import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import JsonViewer from "./JsonViewer";
 import { requestBrowserRefresh } from "../utils/utils";
-import DisplayDID from "./DisplayDID";
+import { DisplayDID } from "@didcid/wallet-ui";
 
 function HeldTab() {
     const [open, setOpen] = useState<boolean>(false);

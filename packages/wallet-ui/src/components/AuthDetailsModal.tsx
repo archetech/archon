@@ -7,7 +7,8 @@ import {
     DialogTitle,
     TextField,
     IconButton,
-    InputAdornment
+    InputAdornment,
+    Tooltip
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 
@@ -72,7 +73,11 @@ const AuthDetailsModal: React.FC<AuthDetailsProps> = ({
                     fullWidth
                     value={service}
                     onChange={(e) => setService(e.target.value)}
-                    InputProps={{ readOnly }}
+                    slotProps={{
+                        input: {
+                            readOnly,
+                        },
+                    }}
                 />
                 <TextField
                     margin="dense"
@@ -80,7 +85,11 @@ const AuthDetailsModal: React.FC<AuthDetailsProps> = ({
                     fullWidth
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    InputProps={{ readOnly }}
+                    slotProps={{
+                        input: {
+                            readOnly,
+                        },
+                    }}
                 />
                 <TextField
                     margin="dense"
@@ -89,19 +98,23 @@ const AuthDetailsModal: React.FC<AuthDetailsProps> = ({
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    InputProps={{
-                        readOnly,
-                        endAdornment: (
-                            <InputAdornment position="end">
-                                <IconButton
-                                    onClick={handleClickShowPassword}
-                                    onMouseDown={handleMouseDownPassword}
-                                    edge="end"
-                                >
-                                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                                </IconButton>
-                            </InputAdornment>
-                        ),
+                    slotProps={{
+                        input: {
+                            readOnly,
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Tooltip title="Show password">
+                                        <IconButton
+                                            onClick={handleClickShowPassword}
+                                            onMouseDown={handleMouseDownPassword}
+                                            edge="end"
+                                        >
+                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                        </IconButton>
+                                    </Tooltip>
+                                </InputAdornment>
+                            ),
+                        }
                     }}
                 />
             </DialogContent>

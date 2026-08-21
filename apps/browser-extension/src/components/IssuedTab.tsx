@@ -10,7 +10,7 @@ import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
 import JsonViewer from "./JsonViewer";
-import DisplayDID from "./DisplayDID";
+import { DisplayDID } from "@didcid/wallet-ui";
 
 function IssuedTab() {
     const { keymaster } = useWalletContext();

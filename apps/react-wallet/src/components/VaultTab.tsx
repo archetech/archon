@@ -18,12 +18,12 @@ import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
-import AuthDetailsModal from "../modals/AuthDetailsModal";
+import { AuthDetailsModal } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
-import DmailDialog from "./DmailDialog";
+import { DmailDialog } from "@didcid/wallet-ui";
 import { DmailMessage } from '@didcid/keymaster/types';
-import CopyResolveDID from "./CopyResolveDID";
+import { CopyResolveDID } from "@didcid/wallet-ui";
 import { useThemeContext } from "../contexts/ContextProviders";
 
 function VaultTab() {

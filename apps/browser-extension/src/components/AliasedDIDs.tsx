@@ -37,7 +37,7 @@ import { useSnackbar } from "@didcid/wallet-ui";
 import { requestBrowserRefresh } from "../utils/utils";
 import TextInputModal from "../modals/TextInputModal";
 import { SelectInputModal } from "@didcid/wallet-ui";
-import CopyResolveDID from "./CopyResolveDID";
+import { CopyResolveDID } from "@didcid/wallet-ui";
 
 function AliasedDIDs() {
     const [removeOpen, setRemoveOpen] = useState<boolean>(false);

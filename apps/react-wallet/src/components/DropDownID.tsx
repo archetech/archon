@@ -10,7 +10,7 @@ import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
-import CopyDID from "./CopyDID";
+import { CopyDID } from "@didcid/wallet-ui";
 import GatekeeperClient from "@didcid/clients/gatekeeper";
 import type { FileAsset, ImageAsset } from "@didcid/keymaster/types";
 import {
