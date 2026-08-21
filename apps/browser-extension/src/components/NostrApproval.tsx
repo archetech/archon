@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Button, Checkbox, FormControlLabel, Typography, CircularProgress } from "@mui/material";
-import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
 
 interface NostrApprovalProps {
     requestId: string;

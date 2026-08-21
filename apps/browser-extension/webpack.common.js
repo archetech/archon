@@ -15,7 +15,14 @@ module.exports = {
     module: {
         rules: [
             {
-                use: "ts-loader",
+                // transpileOnly: type checking happens in `npm run typecheck`,
+                // not here. Since the shared wallet-ui components brought MUI's
+                // real generics into scope, checking inside the bundle recursed
+                // deep enough to blow the stack -- and did it for the Firefox
+                // build while Chrome squeaked through, which is the signature of
+                // a threshold rather than a type error. Transpiling is also
+                // several times faster, and tsc remains the authority.
+                use: { loader: "ts-loader", options: { transpileOnly: true } },
                 test: /\.tsx?$/,
                 exclude: /node_modules/,
             },
@@ -54,6 +61,16 @@ module.exports = {
     resolve: {
         extensions: [".ts", ".tsx", ".js"],
         alias: {
+            "@didcid/wallet-ui": path.resolve(__dirname, "../../packages/wallet-ui/src/index.ts"),
+            // wallet-ui-dedupe: the shared package sits outside this app, so its
+            // React/MUI imports must resolve to this app's copies rather than a
+            // second set from the repo root.
+            "@mui/material": path.resolve(__dirname, "node_modules/@mui/material"),
+            "@mui/icons-material": path.resolve(__dirname, "node_modules/@mui/icons-material"),
+            "@emotion/react": path.resolve(__dirname, "node_modules/@emotion/react"),
+            "@emotion/styled": path.resolve(__dirname, "node_modules/@emotion/styled"),
+            "react": path.resolve(__dirname, "node_modules/react"),
+            "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),
             "@didcid/common/errors": path.resolve(__dirname, "../../packages/common/dist/esm/errors.js"),
             "@didcid/clients/gatekeeper": path.resolve(__dirname, "../../packages/clients/dist/esm/gatekeeper-client.js"),

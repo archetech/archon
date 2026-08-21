@@ -27,10 +27,10 @@ import {
     HowToVote,
     PersonAdd,
 } from "@mui/icons-material";
-import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import PollResultsModal from "../modals/PollResultsModal";
 import {PollConfig, PollResults} from "@didcid/keymaster/types";
 import TextInputModal from "../modals/TextInputModal";

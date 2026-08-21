@@ -10,9 +10,9 @@ import {
     Typography,
 } from "@mui/material";
 import { Add, Delete, Edit, Save, Close } from "@mui/icons-material";
-import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
+import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
 import PageHeader from "./layout/PageHeader";
 

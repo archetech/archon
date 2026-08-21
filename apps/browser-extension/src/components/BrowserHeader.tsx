@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, IconButton, Typography, Switch } from "@mui/material";
 import { DarkMode, LightMode, Menu } from "@mui/icons-material";
 import { useThemeContext } from "../contexts/ContextProviders";

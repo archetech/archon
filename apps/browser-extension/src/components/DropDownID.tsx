@@ -6,10 +6,10 @@ import {
     MenuItem,
 } from "@mui/material";
 import { ArrowDropDown } from "@mui/icons-material";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { requestBrowserRefresh } from "../utils/utils";
 import CopyDID from "./CopyDID";
 import GatekeeperClient from "@didcid/clients/gatekeeper";

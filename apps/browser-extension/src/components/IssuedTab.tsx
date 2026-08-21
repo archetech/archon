@@ -1,13 +1,13 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
     Box,
     Button,
     TextField,
 } from "@mui/material";
-import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
 import JsonViewer from "./JsonViewer";
 import DisplayDID from "./DisplayDID";

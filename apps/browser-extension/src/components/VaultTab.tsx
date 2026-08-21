@@ -1,4 +1,4 @@
-import React, {ChangeEvent, useRef, useState} from "react";
+import {ChangeEvent, useRef, useState} from "react";
 import {
     Autocomplete,
     Box,
@@ -13,10 +13,10 @@ import {
 import {
     Edit,
 } from "@mui/icons-material";
-import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import AuthDetailsModal from "../modals/AuthDetailsModal";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";

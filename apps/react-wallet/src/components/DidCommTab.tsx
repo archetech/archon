@@ -10,9 +10,9 @@ import {
     encodeOutOfBandInvitation, outOfBandInvitation, trustPing, trustPingResponse
 } from "@didcid/keymaster/didcomm-protocols";
 import type { DidCommReceivedMessage } from "@didcid/keymaster/types";
-import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { scanQrText } from "../utils/utils";
 import { loadRefreshIntervalSeconds } from "../contexts/UIContext";
 import PageHeader from "./layout/PageHeader";

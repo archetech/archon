@@ -1,7 +1,7 @@
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import { jsonViewTheme } from "./layout/jsonViewTheme";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
 import { Badge, Create, DriveFileRenameOutline, Image, Login, LoopOutlined, PermIdentity, RestoreOutlined, SaveAltOutlined, SwapHorizOutlined, DeleteOutline } from "@mui/icons-material";
 import PageHeader from "./layout/PageHeader";
@@ -10,11 +10,11 @@ import EmptyState from "./layout/EmptyState";
 import ActionMenu from "./layout/ActionMenu";
 import { useUIContext } from "../contexts/UIContext";
 import { useThemeContext } from "../contexts/ContextProviders";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
 import TextInputModal from "../modals/TextInputModal";
-import SelectInputModal from "../modals/SelectInputModal";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { SelectInputModal } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import type { AddressCheckResult, AddressInfo, FileAsset, ImageAsset, NostrKeys } from "@didcid/keymaster/types";
 import GatekeeperClient from "@didcid/clients/gatekeeper";
 import {

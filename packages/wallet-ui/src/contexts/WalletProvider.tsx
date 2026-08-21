@@ -13,23 +13,8 @@ import Keymaster from "@didcid/keymaster";
 import { WalletBase, StoredWallet } from '@didcid/keymaster/types';
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
 import CipherWeb from "@didcid/cipher";
-import WalletWeb from "@didcid/keymaster/wallet/web";
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
-import PassphraseModal from "../modals/PassphraseModal";
-import WarningModal from "../modals/WarningModal";
-import MnemonicModal from "../modals/MnemonicModal";
 import { encryptWithPassphrase } from '@didcid/cipher/passphrase';
-import { takeDeepLink } from '../utils/deepLinkQueue';
-import { extractAlias, extractDid } from '../utils/utils';
-import {
-    DEFAULT_GATEKEEPER_URL,
-    GATEKEEPER_KEY,
-} from "../constants"
-import {
-    getSessionPassphrase,
-    setSessionPassphrase,
-    clearSessionPassphrase,
-} from "../utils/sessionPassphrase";
 
 const gatekeeper = new DrawbridgeClient();
 const cipher = new CipherWeb();
@@ -46,13 +31,51 @@ interface WalletContextValue {
     keymaster: Keymaster | null;
     hasLightning: boolean;
     hasDidComm: boolean;
+    // Extension-only host mode; false in a wallet that has no full-page view.
+    isBrowser: boolean;
+    reloadBrowserWallet: () => Promise<void>;
+}
+
+// Where the passphrase lives between sessions. react-wallet keeps it in its own
+// session storage; the extension's popup is destroyed on close, so it asks the
+// background script. Neither belongs in shared code.
+export interface WalletSession {
+    get: () => string | Promise<string>;
+    set: (passphrase: string) => void | Promise<void>;
+    clear: () => void | Promise<void>;
+}
+
+// The modals are injected as components rather than shared, because the two
+// wallets style their dialogs differently (#893 restyled react-wallet's and not
+// the extension's) and a refactor should not quietly restyle either. Only the
+// props this provider passes are specified here.
+export interface WalletModalComponents {
+    Passphrase: React.ComponentType<any>;
+    Warning: React.ComponentType<any>;
+    Mnemonic: React.ComponentType<any>;
+}
+
+export interface WalletProviderProps {
+    children: ReactNode;
+    // The wallet backend: WalletWeb in a page, WalletChrome in an extension.
+    walletStore: WalletBase;
+    session: WalletSession;
+    // Resolved per app: localStorage here, chrome.storage.sync there.
+    resolveGatekeeperUrl: () => string | Promise<string>;
+    modals: WalletModalComponents;
+    // Extension-only: its full-page view behaves differently from its popup.
+    // Undefined in a wallet that has no such mode.
+    isBrowser?: boolean;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
 
 const INCORRECT_PASSPHRASE = "Incorrect passphrase";
 
-export function WalletProvider({ children }: { children: ReactNode }) {
+export function WalletProvider(
+    { children, walletStore, session, resolveGatekeeperUrl, modals, isBrowser = false }: WalletProviderProps
+) {
+    const { Passphrase: PassphraseModal, Warning: WarningModal, Mnemonic: MnemonicModal } = modals;
     const [passphraseErrorText, setPassphraseErrorText] = useState<string>("");
     const [pendingMnemonic, setPendingMnemonic] = useState<string>("");
     const [pendingWallet, setPendingWallet] = useState<unknown>(null);
@@ -74,8 +97,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
     const keymasterRef = useRef<Keymaster | null>(null);
 
-    const walletWeb = new WalletWeb();
-
     useEffect(() => {
         async function init() {
             await initialiseServices()
@@ -86,16 +107,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }, []);
 
     async function initialiseWallet() {
-        const walletData = await walletWeb.loadWallet();
+        const walletData = await walletStore.loadWallet();
 
-        const pass = getSessionPassphrase();
+        const pass = await session.get();
         if (!pendingMnemonic && pass) {
             const res = await rebuildKeymaster(pass);
             if (res) {
                 return;
             }
             setPassphraseErrorText("");
-            clearSessionPassphrase();
+            await session.clear();
         }
 
         if (!walletData || pendingMnemonic) {
@@ -107,9 +128,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
 
     async function initialiseServices() {
-        const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
-        localStorage.setItem(GATEKEEPER_KEY, gatekeeperUrl);
         try {
+            const gatekeeperUrl = await resolveGatekeeperUrl();
             await gatekeeper.connect({ url: gatekeeperUrl });
             setHasLightning(await gatekeeper.isLightningSupported());
         } catch (error) {
@@ -152,13 +172,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
         setRefreshFlag(r => r + 1);
         setIsReady(true);
-        setSessionPassphrase(passphrase);
+        await session.set(passphrase);
 
         return true;
     };
 
     async function rebuildKeymaster(passphrase: string) {
-        return await buildKeymaster(walletWeb, passphrase);
+        return await buildKeymaster(walletStore, passphrase);
     }
 
     async function handlePassphraseSubmit(passphrase: string) {
@@ -173,7 +193,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, passphrase });
                 // check pass
                 await km.loadWallet();
-                await walletWeb.saveWallet(pendingWallet as StoredWallet, true);
+                await walletStore.saveWallet(pendingWallet as StoredWallet, true);
             } catch (error: any) {
                 const message = error?.message || String(error);
                 if (message.includes('Incorrect passphrase')) {
@@ -193,67 +213,32 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setPendingMnemonic("");
         setPassphraseErrorText("");
 
-        const walletData = await walletWeb.loadWallet();
+        const walletData = await walletStore.loadWallet();
         if (walletData) {
             setModalAction(null);
         }
     }
 
-    function openEvent(detail: { did?: string | null; alias?: string }, type: string) {
-        const evt = new CustomEvent(type, { detail });
-        window.dispatchEvent(evt);
-    }
+    // Deep links (archon:// URLs opened by the OS) are react-wallet's alone --
+    // it is the Capacitor app that can be launched by one. That handling lives
+    // in its own useDeepLinks hook rather than here, so this provider carries no
+    // code the other wallet can never run.
 
-    function parsePrefix(url: string): { action?: string, did?: string | null, alias?: string } {
-        try {
-            const u = new URL(url.replace(/^archon:\/\//, 'https://'));
-            const action = (u.hostname || u.pathname.replace(/^\//, '') || '').toLowerCase();
-            const aliasResult = extractAlias(url);
-            if (aliasResult) {
-                return { action, did: aliasResult.did, alias: aliasResult.alias };
-            }
-            const did = extractDid(url);
-            return { action, did };
-        } catch {
-            const aliasResult = extractAlias(url);
-            if (aliasResult) {
-                return { did: aliasResult.did, alias: aliasResult.alias };
-            }
-            return { did: extractDid(url) };
-        }
-    }
-
-    useEffect(() => {
-        if (!isReady) {
+    // The extension's full-page view can be reloaded while the popup holds the
+    // passphrase; a wallet with no such mode leaves isBrowser false and this is
+    // a no-op.
+    async function reloadBrowserWallet() {
+        if (!isBrowser) {
             return;
         }
 
-        const handleQueued = () => {
-            const url = takeDeepLink();
-            if (!url) {
-                return;
-            }
+        const pass = await session.get();
+        if (!pass) {
+            return;
+        }
 
-            const { action, did, alias } = parsePrefix(url);
-
-            if (action === 'accept' && did) {
-                if (alias) {
-                    openEvent({ did, alias }, "archon:openAlias");
-                    return;
-                }
-                openEvent({ did }, "archon:openAccept");
-                return;
-            }
-
-            if (did) {
-                openEvent({ did }, "archon:openAuth");
-            }
-        };
-
-        handleQueued();
-        window.addEventListener('archon:deepLinkQueued', handleQueued);
-        return () => window.removeEventListener('archon:deepLinkQueued', handleQueued);
-    }, [isReady]);
+        await rebuildKeymaster(pass);
+    }
 
     async function handleWalletUploadFile(uploaded: unknown) {
         setPendingWallet(uploaded);
@@ -294,8 +279,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
     async function handleResetPassphraseSubmit(newPassphrase: string) {
         try {
-            const walletWeb = new WalletWeb();
-            const km = new Keymaster({ gatekeeper, wallet: walletWeb, cipher, passphrase: newPassphrase });
+            const km = new Keymaster({ gatekeeper, wallet: walletStore, cipher, passphrase: newPassphrase });
             await km.newWallet(undefined, true);
             setShowResetSetup(false);
             await rebuildKeymaster(newPassphrase);
@@ -307,10 +291,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     async function handleRecoverMnemonicSubmit(mnemonic: string) {
         setMnemonicErrorText("");
         try {
-            const walletWeb = new WalletWeb();
             let stored = pendingWallet && isWalletEncFile(pendingWallet)
                 ? pendingWallet
-                : await walletWeb.loadWallet();
+                : await walletStore.loadWallet();
 
             if (!isWalletEncFile(stored)) {
                 setMnemonicErrorText('Recovery not available for this wallet type.');
@@ -334,10 +317,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             return;
         }
         try {
-            const walletWeb = new WalletWeb();
             const base = pendingWallet && isWalletEncFile(pendingWallet)
                 ? pendingWallet
-                : await walletWeb.loadWallet();
+                : await walletStore.loadWallet();
 
             if (!isWalletEncFile(base)) {
                 setPassphraseErrorText('Recovery not available for this wallet type.');
@@ -351,7 +333,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 enc: base.enc
             };
 
-            await walletWeb.saveWallet(updated, true);
+            await walletStore.saveWallet(updated, true);
             setRecoveredMnemonic("");
             setShowRecoverSetup(false);
             await rebuildKeymaster(newPassphrase);
@@ -372,6 +354,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         keymaster: keymasterRef.current,
         hasLightning,
         hasDidComm,
+        isBrowser,
+        reloadBrowserWallet,
     };
 
     return (

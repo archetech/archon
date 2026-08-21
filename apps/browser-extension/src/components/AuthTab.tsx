@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
     Divider, MenuItem, Paper, Select, TextField, Typography
 } from "@mui/material";
 import { CheckCircle, Login, Warning } from "@mui/icons-material";
 import axios from "axios";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useAuthContext } from "../contexts/AuthContext";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
 
 interface AutoLoginState {
     responseDID: string;

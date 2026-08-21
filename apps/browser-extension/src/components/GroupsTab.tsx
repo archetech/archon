@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {Box, Button, Divider, IconButton, MenuItem, Select, TextField, Tooltip, Typography} from "@mui/material";
-import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import {Delete, Edit} from "@mui/icons-material";
 import WarningModal from "../modals/WarningModal";
 import { Group } from '@didcid/keymaster/types'

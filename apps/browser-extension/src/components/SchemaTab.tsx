@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Button, IconButton, MenuItem, Select, TextField, Tooltip } from "@mui/material";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { Edit } from "@mui/icons-material";
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 
 const SchemaTab = ()=> {
     const { keymaster } = useWalletContext();

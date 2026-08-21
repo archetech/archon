@@ -1,14 +1,14 @@
 import { ChangeEvent, useEffect, useState } from "react";
 import { Box, Button, FormControl, IconButton, MenuItem, Select, Tooltip } from "@mui/material";
 import { Edit } from "@mui/icons-material";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useVariablesContext } from "../contexts/VariablesProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { ImageFileAsset, FileAsset, ImageAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import GatekeeperClient from "@didcid/clients/gatekeeper";
-import VersionNavigator from "./VersionNavigator";
+import { VersionNavigator } from "@didcid/wallet-ui";
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";
 import { useThemeContext } from "../contexts/ContextProviders";

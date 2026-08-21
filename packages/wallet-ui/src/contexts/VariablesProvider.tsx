@@ -1,6 +1,5 @@
-import React, { createContext, Dispatch, ReactNode, SetStateAction, useContext, useState } from "react";
-import { useWalletContext } from "./WalletProvider";
-import {DmailItem} from "@didcid/keymaster/types";
+import { createContext, Dispatch, ReactNode, SetStateAction, useContext, useState } from "react";
+import { DmailItem } from "@didcid/keymaster/types";
 
 interface VariablesContextValue {
     currentId: string;
@@ -75,7 +74,16 @@ interface VariablesContextValue {
 
 const VariablesContext = createContext<VariablesContextValue | null>(null);
 
-export function VariablesProvider({ children }: { children: ReactNode }) {
+// Persisting this state is a platform capability, not a feature of the state
+// itself. The extension's popup is destroyed every time it closes, so it writes
+// through to chrome storage and reads back on open; react-wallet keeps a live
+// page and persists nothing. Supplying `store` opts in -- omit it and every
+// setter below is a plain state update.
+export type VariablesStore = (key: string, value: string | boolean) => Promise<void>;
+
+export function VariablesProvider(
+    { children, store }: { children: ReactNode; store?: VariablesStore }
+) {
     const [currentId, setCurrentIdState] = useState<string>("");
     const [validId, setValidId] = useState<boolean>(false);
     const [currentDID, setCurrentDID] = useState<string>("");
@@ -108,8 +116,6 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     const [alias, setAliasState] = useState<string>("");
     const [aliasDID, setAliasDIDState] = useState<string>("");
     const [dmailList, setDmailList] = useState<Record<string, DmailItem>>({});
-    const { isBrowser } = useWalletContext();
-
     async function setHeldDID(value: string) {
         setHeldDIDState(value);
         await storeState("heldDID", value);
@@ -164,14 +170,7 @@ export function VariablesProvider({ children }: { children: ReactNode }) {
     }
 
     async function storeState(key: string, value: string | boolean) {
-        if (isBrowser) {
-            return;
-        }
-        await chrome.runtime.sendMessage({
-            action: "STORE_STATE",
-            key,
-            value,
-        });
+        await store?.(key, value);
     }
 
     const value: VariablesContextValue = {

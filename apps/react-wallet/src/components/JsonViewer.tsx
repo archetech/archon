@@ -17,12 +17,12 @@ import {
     LockOpen,
     ManageSearch,
 } from "@mui/icons-material";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useThemeContext } from "../contexts/ContextProviders";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
-import VersionNavigator from "./VersionNavigator";
+import { VersionNavigator } from "@didcid/wallet-ui";
 
 function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { browserTab: string, browserSubTab?: string, showResolveField?: boolean }) {
     const { darkMode } = useThemeContext();

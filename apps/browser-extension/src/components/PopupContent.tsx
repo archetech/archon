@@ -32,7 +32,7 @@ import {
     Schema,
     Settings,
 } from "@mui/icons-material";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useThemeContext } from "../contexts/ContextProviders";
 import IdentitiesTab from "./IdentitiesTab";

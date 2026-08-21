@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { ContextProviders } from "./contexts/ContextProviders";
 import PopupContent from "./components/PopupContent";

@@ -8,17 +8,10 @@ import React, {
     useEffect,
     useState
 } from "react";
-import {
-    AttachFile,
-    Email,
-    Image,
-    Login,
-    PictureAsPdf,
-    Token,
-} from '@mui/icons-material';
-import { useWalletContext } from "./WalletProvider";
-import { useVariablesContext } from "./VariablesProvider";
-import { useSnackbar } from "./SnackbarProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
+import { useWalletData } from "@didcid/wallet-ui";
+import { useSnackbar } from "@didcid/wallet-ui";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 
 const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
@@ -88,39 +81,26 @@ export function UIProvider(
     const { setError } = useSnackbar();
     const {
         currentId,
-        setCurrentId,
-        setCurrentDID,
-        setValidId,
-        setIdList,
-        setUnresolvedIdList,
         setRegistries,
-        credentialSchema,
-        setCredentialSchema,
-        setCredentialString,
-        setCredentialDID,
-        setHeldList,
-        setIssuedList,
-        setIssuedString,
         setAliasList,
-        setAliasRegistry,
-        setUnresolvedList,
-        setGroupList,
-        setSchemaList,
-        setVaultList,
-        credentialSubject,
-        setCredentialSubject,
-        setAgentList,
         setPollList,
-        setSelectedIssued,
-        setImageList,
-        setFileList,
-        setIssuedStringOriginal,
-        setIssuedEdit,
         setAlias,
         setDmailList,
         setAliasDID,
-        setManifest,
     } = useVariablesContext();
+
+    // The wallet-data layer, shared with the other wallet: these were identical
+    // (or near enough) in both UIContexts. What stays here is the UI model.
+    const {
+        refreshAliases,
+        refreshCurrentID,
+        refreshHeld,
+        updateManifest,
+        arraysEqual,
+        getVaultItemIcon,
+        handleCopyDID,
+    } = useWalletData();
+
 
     const walletWeb = new WalletWeb();
     const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(() => loadRefreshIntervalSeconds());
@@ -144,9 +124,6 @@ export function UIProvider(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refreshFlag]);
 
-    function arraysEqual(a: string[], b: string[]): boolean {
-        return a.length === b.length && a.every((v, i) => v === b[i]);
-    }
 
     useEffect(() => {
         const refresh = async () => {
@@ -262,26 +239,6 @@ export function UIProvider(
         return () => window.removeEventListener('archon:refresh-interval-change', handleRefreshIntervalChange);
     }, []);
 
-    async function getValidIds() {
-        const valid: string[] = [];
-        const invalid: string[] = [];
-
-        if (!keymaster) {
-            return { valid, invalid };
-        }
-
-        const allIds = await keymaster.listIds();
-        for (const alias of allIds) {
-            try {
-                await keymaster.resolveDID(alias);
-                valid.push(alias);
-            } catch {
-                invalid.push(alias);
-            }
-        }
-
-        return { valid, invalid };
-    }
 
     useEffect(() => {
         const onOpenAuth = (e: Event) => {
@@ -340,136 +297,8 @@ export function UIProvider(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentId, pendingTab]);
 
-    async function refreshHeld() {
-        if (!keymaster) {
-            return;
-        }
-        try {
-            const heldList = await keymaster.listCredentials();
-            setHeldList(heldList);
-        } catch (error: any) {
-            setError(error);
-        }
-    }
 
-    async function refreshIssued() {
-        if (!keymaster) {
-            return;
-        }
-        try {
-            const issuedList = await keymaster.listIssued();
-            setIssuedList(issuedList);
-            setIssuedString("");
-        } catch (error: any) {
-            setError(error);
-        }
-    }
 
-    async function refreshAliases(cid?: string) {
-        if (!keymaster) {
-            return;
-        }
-
-        let aliasList: Record<string, string> = {};
-        let unresolvedList: Record<string, string> = {};
-        const registryMap: Record<string, string> = {};
-
-        const allNames = await keymaster.listAliases();
-        const allNamesSorted = Object.fromEntries(
-            Object.entries(allNames).sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-        );
-
-        const { valid: agentList, invalid } = await getValidIds();
-
-        setIdList([...agentList]);
-        setUnresolvedIdList(invalid);
-        setValidId(agentList.includes(cid ?? currentId));
-
-        const schemaList = [];
-        const imageList = [];
-        const groupList = [];
-        const vaultList = [];
-        const pollList = [];
-        const fileList = [];
-
-        for (const [name, did] of Object.entries(allNamesSorted)) {
-            try {
-                const doc = await keymaster.resolveDID(name);
-                aliasList[name] = did;
-
-                const reg = doc.didDocumentRegistration?.registry;
-                if (reg) {
-                    registryMap[name] = reg;
-                }
-
-                const data = doc.didDocumentData as Record<string, unknown>;
-
-                if (doc.didDocumentRegistration?.type === 'agent') {
-                    agentList.push(name);
-                    continue;
-                }
-
-                if (data.group) {
-                    groupList.push(name);
-                    continue;
-                }
-
-                if (data.schema) {
-                    schemaList.push(name);
-                    continue;
-                }
-
-                if (data.image) {
-                    imageList.push(name);
-                    continue;
-                }
-
-                if (data.file) {
-                    fileList.push(name);
-                    continue;
-                }
-
-                if (data.vault) {
-                    const isPoll = await keymaster.testPoll(name);
-                    if (isPoll) {
-                        pollList.push(name);
-                    } else {
-                        vaultList.push(name);
-                    }
-                    continue;
-                }
-            }
-            catch {
-                unresolvedList[name] = did;
-            }
-        }
-
-        setAliasList(aliasList);
-        setUnresolvedList(unresolvedList);
-        setAliasRegistry(registryMap);
-
-        const uniqueSortedAgents = [...new Set(agentList)]
-            .sort((a, b) => a.localeCompare(b));
-        setAgentList(uniqueSortedAgents);
-
-        if (!agentList.includes(credentialSubject)) {
-            setCredentialSubject("");
-            setCredentialString("");
-        }
-
-        setGroupList(groupList);
-        setSchemaList(schemaList);
-
-        if (!schemaList.includes(credentialSchema)) {
-            setCredentialSchema("");
-            setCredentialString("");
-        }
-
-        setImageList(imageList);
-        setFileList(fileList);
-        setVaultList(vaultList);
-        setPollList(pollList);
-    }
 
     async function resetCurrentID() {
         setOpenBrowser({
@@ -478,83 +307,10 @@ export function UIProvider(
         await refreshCurrentID();
     }
 
-    async function refreshCurrentDID(cid: string) {
-        if (!keymaster) {
-            return;
-        }
-        try {
-            const docs = await keymaster.resolveDID(cid);
-            if (!docs.didDocument || !docs.didDocument.id) {
-                setError("Failed to set current DID and manifest");
-                return;
-            }
-            setCurrentDID(docs.didDocument.id);
 
-            const docData = docs.didDocumentData as { manifest?: Record<string, unknown> };
-            setManifest(docData.manifest);
-        } catch (error: any) {
-            setError(error);
-        }
-    }
 
-    async function refreshCurrentIDInternal(cid: string) {
-        if (!keymaster) {
-            return;
-        }
-        await setCurrentId(cid);
-        await refreshHeld();
-        await refreshCurrentDID(cid);
-        await refreshAliases(cid);
-        await refreshIssued();
-    }
 
-    function wipeUserState() {
-        setCurrentId("");
-        setCurrentDID("");
-        setManifest({});
-        setAliasList({});
-        setSchemaList([]);
-        setAgentList([]);
-        setHeldList([]);
-        setIssuedList([]);
-        setIssuedString("");
-        setVaultList([]);
-        setPollList([]);
-        setAlias("");
-        setAliasDID("");
-    }
 
-    function wipeState() {
-        setCredentialDID("");
-        setCredentialString("");
-        setCredentialSubject("");
-        setCredentialSchema("");
-        setIssuedString("");
-        setSelectedIssued("");
-        setIssuedStringOriginal("");
-        setIssuedEdit(false);
-    }
-
-    async function refreshCurrentID() {
-        if (!keymaster) {
-            return;
-        }
-        try {
-            const cid = await keymaster.getCurrentId();
-            if (cid) {
-                await refreshCurrentIDInternal(cid);
-            } else {
-                wipeUserState();
-            }
-
-            wipeState()
-        } catch (error: any) {
-            setError(error);
-            return false;
-        }
-
-        return true;
-    }
 
     async function refreshAll() {
         if (!keymaster) {
@@ -575,56 +331,8 @@ export function UIProvider(
         }
     }
 
-    function handleCopyDID(did: string) {
-        navigator.clipboard.writeText(did).catch((err) => {
-            setError(err.message || String(err));
-        });
-    }
 
-    function getVaultItemIcon(name: string, item: any) {
-        const iconStyle = { verticalAlign: 'middle', marginRight: 4 };
 
-        if (!item || !item.type) {
-            return <AttachFile style={iconStyle} />;
-        }
-
-        if (item.type.startsWith('image/')) {
-            return <Image style={iconStyle} />;
-        }
-
-        if (item.type === 'application/pdf') {
-            return <PictureAsPdf style={iconStyle} />;
-        }
-
-        if (item.type === 'application/json') {
-            if (name.startsWith('login:')) {
-                return <Login style={iconStyle} />;
-            }
-
-            if (name === 'dmail') {
-                return <Email style={iconStyle} />;
-            }
-
-            return <Token style={iconStyle} />;
-        }
-
-        // Add more types as needed, e.g. images, PDF, etc.
-        return <AttachFile style={iconStyle} />;
-    }
-
-    async function updateManifest() {
-        if (!keymaster) {
-            return;
-        }
-
-        try {
-            const id = await keymaster.fetchIdInfo();
-            const docs = await keymaster.resolveDID(id.did);
-            setManifest((docs.didDocumentData as { manifest?: Record<string, unknown> }).manifest);
-        } catch (error: any) {
-            setError(error);
-        }
-    }
 
     const value: UIContextValue = {
         selectedTab,

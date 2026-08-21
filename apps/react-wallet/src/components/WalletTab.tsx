@@ -3,8 +3,8 @@ import {
     Box,
     Button,
 } from "@mui/material";
-import { useWalletContext } from "../contexts/WalletProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useSnackbar } from "@didcid/wallet-ui";
 import WarningModal from "../modals/WarningModal";
 import MnemonicModal from "../modals/MnemonicModal";
 import PassphraseModal from "../modals/PassphraseModal";

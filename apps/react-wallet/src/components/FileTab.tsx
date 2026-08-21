@@ -1,13 +1,13 @@
 import { ChangeEvent, useEffect, useState } from "react";
 import { Box, Button, FormControl, IconButton, LinearProgress, MenuItem, Select, Tooltip, Typography } from "@mui/material";
 import { Download, Edit } from "@mui/icons-material";
-import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useVariablesContext } from "../contexts/VariablesProvider";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useVariablesContext } from "@didcid/wallet-ui";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { FileAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
-import VersionNavigator from "./VersionNavigator";
+import { VersionNavigator } from "@didcid/wallet-ui";
 import TextInputModal from "../modals/TextInputModal";
 import CopyResolveDID from "./CopyResolveDID";
 import { useThemeContext } from "../contexts/ContextProviders";

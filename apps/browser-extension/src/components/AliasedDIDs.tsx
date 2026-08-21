@@ -30,13 +30,13 @@ import {
     TransferWithinAStation,
     MoveUp,
 } from "@mui/icons-material";
-import { useWalletContext } from "../contexts/WalletProvider";
-import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletContext } from "@didcid/wallet-ui";
+import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useSnackbar } from "@didcid/wallet-ui";
 import { requestBrowserRefresh } from "../utils/utils";
 import TextInputModal from "../modals/TextInputModal";
-import SelectInputModal from "../modals/SelectInputModal";
+import { SelectInputModal } from "@didcid/wallet-ui";
 import CopyResolveDID from "./CopyResolveDID";
 
 function AliasedDIDs() {
