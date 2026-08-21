@@ -323,20 +323,22 @@ describe('/api/v1 DID routes', () => {
         expect(response.body).toEqual({ error: 'DID not found' });
     });
 
+    // The universal resolver is only consulted for FOREIGN methods, so these use
+    // did:web rather than this node's own method (see the did:cid case below).
     it('falls back to the universal resolver when resolution returns an error', async () => {
         const { app, gatekeeper } = mount({ fallbackURL: 'https://resolver.test/' });
         gatekeeper.resolveDID = jest.fn<any>().mockResolvedValue({
             didDocument: {},
             didResolutionMetadata: { error: 'notFound' },
         });
-        const upstream = { didDocument: { id: 'did:cid:abc' } };
+        const upstream = { didDocument: { id: 'did:web:example.com' } };
         global.fetch = jest.fn<any>().mockResolvedValue({ ok: true, json: async () => upstream });
 
-        const response = await request(app).get('/api/v1/did/did:cid:abc');
+        const response = await request(app).get('/api/v1/did/did:web:example.com');
         expect(response.status).toBe(200);
         expect(response.body).toEqual(upstream);
         expect(global.fetch).toHaveBeenCalledWith(
-            'https://resolver.test/1.0/identifiers/did%3Acid%3Aabc',
+            'https://resolver.test/1.0/identifiers/did%3Aweb%3Aexample.com',
             expect.objectContaining({ signal: expect.anything() }),
         );
     });
@@ -347,16 +349,49 @@ describe('/api/v1 DID routes', () => {
         const notOk = mount({ fallbackURL: 'https://resolver.test' });
         notOk.gatekeeper.resolveDID = jest.fn<any>().mockResolvedValue(errorDoc);
         global.fetch = jest.fn<any>().mockResolvedValue({ ok: false });
-        const first = await request(notOk.app).get('/api/v1/did/did:cid:abc');
+        const first = await request(notOk.app).get('/api/v1/did/did:web:example.com');
         expect(first.status).toBe(200);
         expect(first.body).toEqual(errorDoc);
 
         const threw = mount({ fallbackURL: 'https://resolver.test' });
         threw.gatekeeper.resolveDID = jest.fn<any>().mockResolvedValue(errorDoc);
         global.fetch = jest.fn<any>().mockRejectedValue(new Error('network down'));
-        const second = await request(threw.app).get('/api/v1/did/did:cid:abc');
+        const second = await request(threw.app).get('/api/v1/did/did:web:example.com');
         expect(second.status).toBe(200);
         expect(second.body).toEqual(errorDoc);
+    });
+
+    it('skips the universal resolver for DIDs of its own method', async () => {
+        // A universal resolver has no driver for this node's own method, so asking
+        // it about our DIDs only burns fallbackTimeout. The node is the authority.
+        const { app, gatekeeper } = mount({ fallbackURL: 'https://resolver.test' });
+        const errorDoc = { didDocument: {}, didResolutionMetadata: { error: 'notFound' } };
+        gatekeeper.resolveDID = jest.fn<any>().mockResolvedValue(errorDoc);
+        global.fetch = jest.fn<any>();
+
+        const response = await request(app).get('/api/v1/did/did:cid:abc');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(errorDoc);
+        expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('still consults the universal resolver for foreign methods when a prefix is set', async () => {
+        // Guards against the skip being too broad: only our own prefix is exempt.
+        const { app, gatekeeper } = mount({
+            fallbackURL: 'https://resolver.test',
+            didPrefix: 'did:cid',
+        });
+        gatekeeper.resolveDID = jest.fn<any>().mockResolvedValue({
+            didDocument: {},
+            didResolutionMetadata: { error: 'notFound' },
+        });
+        const upstream = { didDocument: { id: 'did:ethr:0xabc' } };
+        global.fetch = jest.fn<any>().mockResolvedValue({ ok: true, json: async () => upstream });
+
+        const response = await request(app).get('/api/v1/did/did:ethr:0xabc');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(upstream);
+        expect(global.fetch).toHaveBeenCalled();
     });
 
     it('sends non-create operations to updateDID', async () => {
@@ -389,7 +424,8 @@ describe('/api/v1 DID routes', () => {
         gatekeeper.resolveDID = jest.fn<any>().mockResolvedValue(errorDoc);
         global.fetch = jest.fn<any>();
 
-        const response = await request(app).get('/api/v1/did/did:cid:abc');
+        // Foreign method, so the missing fallbackURL is the only reason to skip.
+        const response = await request(app).get('/api/v1/did/did:web:example.com');
         expect(response.status).toBe(200);
         expect(response.body).toEqual(errorDoc);
         expect(global.fetch).not.toHaveBeenCalled();

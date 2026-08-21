@@ -451,11 +451,25 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
      *       500:
      *         description: Internal Server Error.
      */
+    // The universal resolver is for FOREIGN DID methods (did:web, did:ethr, ...).
+    // This gatekeeper is itself an authority for its own method, so when a local
+    // resolve of one of our own DIDs fails, an external universal resolver has
+    // nothing to add: it has no driver for our method and the request simply
+    // burns the full fallbackTimeout before failing. Skipping it here removes
+    // that stall and lets the confirm fallback -- another Archon gatekeeper,
+    // which *can* resolve our DIDs -- be tried immediately instead.
+    // Falls open: with no configured prefix nothing counts as our own method, so
+    // the fallback behaves exactly as it did before this guard existed.
+    function isOwnMethod(did: string): boolean {
+        const prefix = (config.didPrefix ?? '').replace(/:+$/, '');
+        return prefix.length > 0 && did.startsWith(`${prefix}:`);
+    }
+
     async function resolveFromUniversalResolver(did: string): Promise<any | null> {
-        if (!config.fallbackURL) {
+        if (!config.fallbackURL || isOwnMethod(did)) {
             return null;
         }
-    
+
         try {
             const baseURL = config.fallbackURL.replace(/\/+$/, '');
             const url = `${baseURL}/1.0/identifiers/${encodeURIComponent(did)}`;
