@@ -27,18 +27,18 @@ import {
     HowToVote,
     PersonAdd,
 } from "@mui/icons-material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useWalletData } from "@didcid/wallet-ui";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { PollResultsModal } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletData } from "../hooks/useWalletData";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import PollResultsModal from "./PollResultsModal";
 import {PollConfig, PollResults} from "@didcid/keymaster/types";
-import { TextInputModal } from "@didcid/wallet-ui";
-import { WarningModal } from "@didcid/wallet-ui";
-import { CopyResolveDID } from "@didcid/wallet-ui";
-import { DisplayDID } from "@didcid/wallet-ui";
-import { useThemeContext } from "../contexts/ContextProviders";
-import { PageHeader } from "@didcid/wallet-ui";
+import TextInputModal from "./TextInputModal";
+import WarningModal from "./WarningModal";
+import CopyResolveDID from "./CopyResolveDID";
+import DisplayDID from "./DisplayDID";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
+import PageHeader from "./layout/PageHeader";
 
 const PollsTab: React.FC = () => {
     const { keymaster } = useWalletContext();
@@ -55,7 +55,7 @@ const PollsTab: React.FC = () => {
         pollList,
     } = useVariablesContext();
     const { refreshAliases } = useWalletData();
-    const { isTabletUp } = useThemeContext();
+    const isTabletUp = useIsTabletUp();
     const [registry, setRegistry] = useState<string>("hyperswarm");
     const [pollName, setPollName] = useState<string>("");
     const [description, setDescription] = useState<string>("");

@@ -16,6 +16,7 @@
       "@didcid/wallet-ui": ["../../packages/wallet-ui/src/index.ts"],
       "@uiw/react-json-view": ["./node_modules/@uiw/react-json-view"],
       "@uiw/react-json-view/*": ["./node_modules/@uiw/react-json-view/*"],
+      "qrcode.react": ["./node_modules/qrcode.react"],
       "@mui/material": ["./node_modules/@mui/material"],
       "@mui/material/*": ["./node_modules/@mui/material/*"],
       "@mui/icons-material": ["./node_modules/@mui/icons-material"],

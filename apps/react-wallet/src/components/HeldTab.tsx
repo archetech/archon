@@ -6,7 +6,7 @@ import { useWalletContext } from "@didcid/wallet-ui";
 import { useVariablesContext } from "@didcid/wallet-ui";
 import { useUIContext } from "../contexts/UIContext";
 import { useSnackbar } from "@didcid/wallet-ui";
-import JsonViewer from "./JsonViewer";
+import { JsonViewer } from "@didcid/wallet-ui";
 import { DisplayDID } from "@didcid/wallet-ui";
 import {scanQrCode} from "../utils/utils";
 import { Badge } from "@mui/icons-material";

@@ -12,6 +12,8 @@ export interface PlatformCapabilities {
     // Returns the scanned text, or null if the scan failed or was cancelled.
     // Undefined when this host has no camera -- callers should not offer a scan.
     scanQr?: () => Promise<string | null>;
+    // Scans a QR carrying an alias and its DID. Undefined without a camera.
+    scanAliasQr?: () => Promise<{ alias: string; did: string } | null>;
     // Tell the host's other views that wallet state changed. Undefined where
     // there are no other views.
     requestRefresh?: () => void;

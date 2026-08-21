@@ -5,7 +5,7 @@ import React, {
     useState
 } from "react";
 import JsonView from '@uiw/react-json-view';
-import { jsonViewTheme } from "@didcid/wallet-ui";
+import { jsonViewTheme } from "./layout/jsonViewTheme";
 import {
     Box,
     TextField,
@@ -17,15 +17,15 @@ import {
     LockOpen,
     ManageSearch,
 } from "@mui/icons-material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
-import { useThemeContext } from "../contexts/ContextProviders";
-import { useSnackbar } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletNavigation } from "../contexts/WalletNavigation";
+import { useIsDarkMode } from "../hooks/useIsTabletUp";
+import { useSnackbar } from "../contexts/SnackbarProvider";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
-import { VersionNavigator } from "@didcid/wallet-ui";
+import VersionNavigator from "./VersionNavigator";
 
 function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { browserTab: string, browserSubTab?: string, showResolveField?: boolean }) {
-    const { darkMode } = useThemeContext();
+    const darkMode = useIsDarkMode();
     const [aliasDocs, setAliasDocs] = useState<Record<string, unknown> | undefined>(undefined);
     const [aliasDocsVersion, setAliasDocsVersion] = useState<number>(1);
     const [aliasDocsVersionMax, setAliasDocsVersionMax] = useState<number>(1);
@@ -33,7 +33,7 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
     const [currentDid, setCurrentDid] = useState<string>("");
     const { keymaster } = useWalletContext();
     const { setError } = useSnackbar();
-    const { openBrowser, setOpenBrowser } = useUIContext();
+    const { openView, pendingView, clearPendingView } = useWalletNavigation();
     const [canDecrypt, setCanDecrypt] = useState(false);
     const [decryptedCache, setDecryptedCache] = useState<Record<string, unknown> | null>(null);
 
@@ -71,11 +71,11 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
     }
 
     useEffect(() => {
-        if (!openBrowser) {
+        if (!pendingView) {
             return;
         }
 
-        const { did, tab, subTab, contents, clearState } = openBrowser;
+        const { did, tab, subTab, contents, clearState } = pendingView;
 
         if (clearState) {
             setAliasDocs(undefined);
@@ -110,13 +110,13 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
             setFormDid(did);
         }
 
-        setOpenBrowser(undefined);
+        clearPendingView?.();
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [openBrowser]);
+    }, [pendingView]);
 
     async function handleResolveDID(did?: string) {
-        setOpenBrowser({
+        openView({
             did: did || formDid,
             tab: browserTab === "wallet" ? "viewer" : browserTab,
             subTab: browserSubTab,

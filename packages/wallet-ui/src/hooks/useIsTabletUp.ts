@@ -13,3 +13,10 @@ export function useIsTabletUp(): boolean {
     const isMin768 = useMediaQuery('(min-width:768px)');
     return isMdUp || isMin768;
 }
+
+// Dark mode from the MUI theme rather than an app context: both wallets set the
+// palette mode on the ThemeProvider they already wrap everything in, so a shared
+// component can read it there and needs nothing injected.
+export function useIsDarkMode(): boolean {
+    return useTheme().palette.mode === 'dark';
+}

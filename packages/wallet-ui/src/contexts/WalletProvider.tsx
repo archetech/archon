@@ -40,6 +40,10 @@ interface WalletContextValue {
     // Extension-only host mode; false in a wallet that has no full-page view.
     isBrowser: boolean;
     reloadBrowserWallet: () => Promise<void>;
+    // The node this wallet is talking to, as resolved by the host. Shared
+    // components that build a URL against it (file upload, image download) read
+    // it here rather than from an app's constants and storage.
+    gatekeeperUrl: string;
 }
 
 // Where the passphrase lives between sessions. react-wallet keeps it in its own
@@ -88,6 +92,7 @@ export function WalletProvider(
     // the gate inside Keymaster: show the surface and let the operation fail late
     // rather than hiding it against every older node.
     const [hasDidComm, setHasDidComm] = useState<boolean>(true);
+    const [gatekeeperUrl, setGatekeeperUrl] = useState<string>("");
 
     const keymasterRef = useRef<Keymaster | null>(null);
 
@@ -124,6 +129,7 @@ export function WalletProvider(
     async function initialiseServices() {
         try {
             const gatekeeperUrl = await resolveGatekeeperUrl();
+            setGatekeeperUrl(gatekeeperUrl);
             await gatekeeper.connect({ url: gatekeeperUrl });
             setHasLightning(await gatekeeper.isLightningSupported());
         } catch (error) {
@@ -350,6 +356,7 @@ export function WalletProvider(
         hasDidComm,
         isBrowser,
         reloadBrowserWallet,
+        gatekeeperUrl,
     };
 
     return (

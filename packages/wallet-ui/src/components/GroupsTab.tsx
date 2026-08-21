@@ -11,16 +11,17 @@ import {
     Tooltip,
     Typography
 } from "@mui/material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletData } from "../hooks/useWalletData";
+import { useWalletNavigation } from "../contexts/WalletNavigation";
+import { useSnackbar } from "../contexts/SnackbarProvider";
 import {Delete, Edit} from "@mui/icons-material";
-import { WarningModal } from "@didcid/wallet-ui";
+import WarningModal from "./WarningModal";
 import { Group } from '@didcid/keymaster/types'
-import { TextInputModal } from "@didcid/wallet-ui";
-import { CopyResolveDID } from "@didcid/wallet-ui";
-import { useThemeContext } from "../contexts/ContextProviders";
+import TextInputModal from "./TextInputModal";
+import CopyResolveDID from "./CopyResolveDID";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 const GroupsTab = () => {
     const { keymaster } = useWalletContext();
@@ -30,10 +31,8 @@ const GroupsTab = () => {
         aliasList,
         registries,
     } = useVariablesContext();
-    const {
-        refreshAliases,
-        setOpenBrowser
-    } = useUIContext();
+    const { refreshAliases } = useWalletData();
+    const { openView } = useWalletNavigation();
 
     const [registry, setRegistry] = useState<string>('hyperswarm');
     const [groupName, setGroupName] = useState<string>('');
@@ -45,7 +44,7 @@ const GroupsTab = () => {
     const [open, setOpen] = useState<boolean>(false);
     const [renameOpen, setRenameOpen] = useState<boolean>(false);
     const [renameOldName, setRenameOldName] = useState<string>("");
-    const { isTabletUp } = useThemeContext();
+    const isTabletUp = useIsTabletUp();
 
     async function createGroup() {
         if (!keymaster) {
@@ -80,7 +79,7 @@ const GroupsTab = () => {
             const group = await keymaster.getGroup(groupName);
             setSelectedGroup(group);
             setMemberDID('');
-            setOpenBrowser({
+            openView({
                 tab: "groups",
             });
         } catch (error: any) {
@@ -112,7 +111,7 @@ const GroupsTab = () => {
         }
         if (removeDID === jsonDID) {
             setJsonDID('');
-            setOpenBrowser({
+            openView({
                 tab: "groups",
             });
         }
@@ -302,7 +301,7 @@ const GroupsTab = () => {
                             color="primary"
                             size="small"
                             onClick={() => {
-                                setOpenBrowser({
+                                openView({
                                     did: memberDID,
                                     tab: "viewer"
                                 })

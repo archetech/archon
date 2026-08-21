@@ -1,8 +1,8 @@
-import {ChangeEvent, useRef, useState} from "react";
+import {ChangeEvent, useEffect, useRef, useState} from "react";
 import {
     Autocomplete,
     Box,
-    Button,
+    Button, FormControl,
     IconButton,
     MenuItem,
     Select,
@@ -12,17 +12,19 @@ import {
 } from "@mui/material";
 import {
     Edit,
+    Close,
 } from "@mui/icons-material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useWalletData } from "@didcid/wallet-ui";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { AuthDetailsModal } from "@didcid/wallet-ui";
-import { WarningModal } from "@didcid/wallet-ui";
-import { TextInputModal } from "@didcid/wallet-ui";
-import { DmailDialog } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletData } from "../hooks/useWalletData";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import AuthDetailsModal from "./AuthDetailsModal";
+import WarningModal from "./WarningModal";
+import TextInputModal from "./TextInputModal";
+import DmailDialog from "./DmailDialog";
 import { DmailMessage } from '@didcid/keymaster/types';
-import { CopyResolveDID } from "@didcid/wallet-ui";
+import CopyResolveDID from "./CopyResolveDID";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 function VaultTab() {
     const [registry, setRegistry] = useState<string>('hyperswarm');
@@ -55,12 +57,13 @@ function VaultTab() {
     const { setError, setSuccess } = useSnackbar();
     const {
         currentDID,
+        registries,
         agentList,
         aliasList,
         vaultList,
-        registries,
     } = useVariablesContext();
     const { getVaultItemIcon, refreshAliases } = useWalletData();
+    const isTabletUp = useIsTabletUp();
 
     function removeVaultMember(did: string): void {
         showWarning(
@@ -124,6 +127,24 @@ function VaultTab() {
         }
     }
 
+    useEffect(() => {
+        const check = async () => {
+            if (!keymaster || !selectedVaultName) {
+                return;
+            }
+
+            try {
+                const docs = await keymaster.resolveDID(selectedVaultName);
+                setSelectedVaultOwned(docs.didDocument?.controller === currentDID);
+            } catch {
+                setSelectedVaultOwned(false);
+            }
+        }
+
+        check();
+
+    }, [keymaster, currentDID, selectedVaultName])
+
     function isVaultItemFile(item: any) {
         return item.type !== 'application/json';
     }
@@ -141,7 +162,7 @@ function VaultTab() {
             }
 
             // Create a Blob from the buffer
-            const blob = new Blob([buffer as any]);
+            const blob = new Blob([new Uint8Array(buffer)]);
             // Create a temporary link to trigger the download
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
@@ -164,7 +185,7 @@ function VaultTab() {
             if (result) {
                 await refreshVault(selectedVaultName);
             } else {
-                setError(`Cannot add vault owner`);
+                setError(`Cannot add vault owner as a member. The owner is a member by default.`);
             }
         } catch (error: any) {
             setError(error);
@@ -212,19 +233,19 @@ function VaultTab() {
             return;
         }
 
-        const alias = vaultName.trim();
-        if (alias in aliasList) {
-            setError(`${alias} already in use`);
+        const name = vaultName.trim();
+        if (name in aliasList) {
+            setError(`${name} already in use`);
             return;
         }
 
         setVaultName('');
         try {
-            await keymaster.createVault({ registry, alias });
+            await keymaster.createVault({ registry, alias: name });
 
             await refreshAliases();
-            setSelectedVaultName(alias);
-            await refreshVault(alias);
+            setSelectedVaultName(name);
+            await refreshVault(name);
         } catch (error: any) {
             setError(error);
         }
@@ -341,30 +362,40 @@ function VaultTab() {
     const MemberRow = ({ did }: { did: string }) => (
         <Box
             key={did}
-            className="flex-box"
             display="flex"
-            flexDirection="row"
             alignItems="center"
-            sx={{ mb: 1, ml: 1 }}
+            sx={{ mb: 1, width: "100%", overflow: "hidden" }}
         >
+            {selectedVaultOwned &&
+                <Tooltip title="Remove member">
+                    <span>
+                        <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => removeVaultMember(did)}
+                        >
+                            <Close fontSize="small" />
+                        </IconButton>
+                    </span>
+                </Tooltip>
+            }
+
+            <CopyResolveDID did={did} />
+
             <Typography
                 variant="body2"
-                sx={{ fontFamily: "Courier", flexGrow: 1, mr: 1 }}
+                sx={{
+                    fontFamily: "Courier",
+                    ml: 1,
+                    flex: 1,
+                    minWidth: 0,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                }}
             >
                 {did}
             </Typography>
-            {selectedVaultOwned &&
-                <Button
-                    variant="contained"
-                    size="small"
-                    color="primary"
-                    onClick={() => removeVaultMember(did)}
-                    className="button-right"
-                >
-                    Remove
-                </Button>
-            }
-            <CopyResolveDID did={did} />
         </Box>
     );
 
@@ -388,9 +419,8 @@ function VaultTab() {
             </Typography>
             {isVaultItemFile(item) ? (
                 <Button
-                    variant="contained"
+                    variant="outlined"
                     size="small"
-                    color="primary"
                     onClick={() => downloadVaultItem(name)}
                     sx={{ mr: 1 }}
                 >
@@ -398,9 +428,8 @@ function VaultTab() {
                 </Button>
             ) : (
                 <Button
-                    variant="contained"
+                    variant="outlined"
                     size="small"
-                    color="primary"
                     onClick={() => revealVaultItem(name)}
                     sx={{ mr: 1 }}
                 >
@@ -409,9 +438,9 @@ function VaultTab() {
             )}
             {selectedVaultOwned &&
                 <Button
-                    variant="contained"
+                    variant="outlined"
                     size="small"
-                    color="primary"
+                    color="error"
                     onClick={() => removeVaultItem(name)}
                 >
                     Remove
@@ -431,17 +460,17 @@ function VaultTab() {
             return;
         }
 
-        const alias = newName.trim();
-        if (alias in aliasList) {
-            setError(`${alias} already in use`);
+        const name = newName.trim();
+        if (name in aliasList) {
+            setError(`${name} already in use`);
             return;
         }
 
         try {
-            await keymaster.addAlias(alias, aliasList[selectedVaultName]);
+            await keymaster.addAlias(name, aliasList[selectedVaultName]);
             await keymaster.removeAlias(selectedVaultName);
             await refreshAliases();
-            setSelectedVaultName(alias);
+            setSelectedVaultName(name);
             setRenameOldName("");
             setSuccess("Vault renamed");
         } catch (error: any) {
@@ -450,7 +479,7 @@ function VaultTab() {
     };
 
     return (
-        <Box>
+        <Box display="flex" flexDirection="column" sx={{ mt: 1, gap: 0, width: isTabletUp ? '70%' : '100%' }}>
             <DmailDialog
                 open={revealDmailOpen}
                 onClose={() => setRevealDmailOpen(false)}
@@ -492,49 +521,65 @@ function VaultTab() {
                 readOnly
             />
 
-            <Box display="flex" flexDirection="column">
-                <Box className="flex-box mt-2">
-                    <TextField
-                        label="Vault Name"
-                        style={{ flex: "0 0 400px" }}
-                        className="text-field single-line"
-                        size="small"
-                        value={vaultName}
-                        onChange={(e) => setVaultName(e.target.value)}
-                        slotProps={{
-                            htmlInput: {
-                                maxLength: 30,
-                            },
-                        }}
-                    />
-                    <Select
-                        value={registry}
-                        size="small"
-                        variant="outlined"
-                        className="select-small"
-                        onChange={(event) => setRegistry(event.target.value)}
-                    >
-                        {registries.map((registry: string, index: number) => (
-                            <MenuItem value={registry} key={index}>
-                                {registry}
-                            </MenuItem>
-                        ))}
-                    </Select>
+            <Box display="flex" flexDirection="column" sx={{ mb: 2, gap: 0 }}>
+                <TextField
+                    label="Vault Name"
+                    size="small"
+                    sx={{
+                        borderBottomLeftRadius: 0,
+                        borderBottomRightRadius: 0,
+                    }}
+                    value={vaultName}
+                    onChange={(e) => setVaultName(e.target.value)}
+                    slotProps={{
+                        htmlInput: {
+                            maxLength: 32,
+                        },
+                    }}
+                />
+                <Box display="flex" flexDirection="row" sx={{ gap: 0, width: "100%" }}>
+                    <FormControl fullWidth>
+                        <Select
+                            value={registry}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                                borderTopLeftRadius: 0,
+                                borderTopRightRadius: 0,
+                                borderBottomRightRadius: 0,
+                            }}
+                            onChange={(event) => setRegistry(event.target.value)}
+                        >
+                            {registries.map((registry: string, index: number) => (
+                                <MenuItem value={registry} key={index}>
+                                    {registry}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
                     <Button
                         variant="contained"
                         color="primary"
                         size="small"
-                        className="button-right"
+                        fullWidth
+                        sx={{
+                            borderTopLeftRadius: 0,
+                            borderTopRightRadius: 0,
+                            borderBottomLeftRadius: 0,
+                        }}
                         onClick={createVault}
                         disabled={!vaultName || !registry}
                     >
-                        Create Vault
+                        Create
                     </Button>
                 </Box>
-                {vaultList && (
-                    <Box className="flex-box mt-2">
+            </Box>
+
+            {vaultList && (
+                <Box className="flex-box" sx={{ display: "flex", alignItems: "center", width: "100%", flexWrap: "nowrap" }}>
+                    <FormControl sx={{ flex: 1, minWidth: 0 }}>
                         <Select
-                            sx={{ width: "300px" }}
                             value={selectedVaultName}
                             displayEmpty
                             size="small"
@@ -547,19 +592,21 @@ function VaultTab() {
                             <MenuItem value="" disabled>
                                 Select vault
                             </MenuItem>
-                            {vaultList.map((alias) => (
-                                <MenuItem value={alias} key={alias}>
-                                    {alias}
+                            {vaultList.map((name) => (
+                                <MenuItem value={name} key={name}>
+                                    {name}
                                 </MenuItem>
                             ))}
                         </Select>
-                        <Tooltip title="Rename Vault">
+                    </FormControl>
+
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0, whiteSpace: "nowrap" }}>
+                        <Tooltip title="Rename">
                             <span>
                                 <IconButton
                                     size="small"
                                     onClick={openRenameModal}
                                     disabled={!selectedVaultName}
-                                    sx={{ ml: 1 }}
                                 >
                                     <Edit fontSize="small" />
                                 </IconButton>
@@ -568,94 +615,105 @@ function VaultTab() {
 
                         <CopyResolveDID did={aliasList[selectedVaultName]} />
                     </Box>
-                )}
+                </Box>
+            )}
 
-                {selectedVault && (
-                    <Box display="flex" flexDirection="column">
-                        <Typography variant="h5" component="h5" sx={{ my: 2 }}>
-                            {`Members`}
-                        </Typography>
+            {selectedVault && (
+                <Box display="flex" flexDirection="column">
+                    <Typography variant="h5" component="h5" sx={{ my: 2 }}>
+                        {`Members`}
+                    </Typography>
 
-                        {selectedVaultOwned &&
-                            <Box display="flex" flexDirection="row" sx={{ mb: 2 }}>
-                                <Autocomplete
-                                    freeSolo
-                                    options={agentList || []}
-                                    value={vaultMember}
-                                    onChange={(_e, newVal) => setVaultMember(newVal || "")}
-                                    onInputChange={(_e, newInput) => setVaultMember(newInput)}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label="Name or DID"
-                                            sx={{ width: 500 }}
-                                            size="small"
-                                            slotProps={{
-                                                htmlInput: {
-                                                    ...params.inputProps,
-                                                    maxLength: 80,
-                                                },
-                                            }}
-                                        />
-                                    )}
-                                />
+                    {selectedVaultOwned &&
+                        <Box sx={{ display: "flex", gap: 0, width: "100%", mb: 2 }}>
+                            <Autocomplete
+                                freeSolo
+                                options={agentList || []}
+                                value={vaultMember}
+                                onChange={(_e, newVal) => setVaultMember(newVal || "")}
+                                onInputChange={(_e, newInput) => setVaultMember(newInput)}
+                                sx={{
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                        borderTopRightRadius: 0,
+                                        borderBottomRightRadius: 0,
+                                    },
+                                    flex: 1,
+                                    minWidth: 0
+                                }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        fullWidth
+                                        label="Name or DID"
+                                        size="small"
+                                        slotProps={{
+                                            htmlInput: {
+                                                ...params.inputProps,
+                                                maxLength: 80,
+                                            },
+                                        }}
+                                    />
+                                )}
+                            />
 
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    size="small"
-                                    onClick={() => addVaultMember(vaultMember)}
-                                    disabled={!vaultMember}
-                                    className="button-right"
-                                >
-                                    Add
-                                </Button>
-                            </Box>
-                        }
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                size="small"
+                                onClick={() => addVaultMember(vaultMember)}
+                                disabled={!vaultMember}
+                                sx={{
+                                    borderTopLeftRadius: 0,
+                                    borderBottomLeftRadius: 0
+                                }}
+                            >
+                                Add
+                            </Button>
+                        </Box>
+                    }
 
-                        {selectedVault.members.map((did: string) => (
-                            <MemberRow did={did} key={did} />
-                        ))}
+                    {selectedVault.members.map((did: string) => (
+                        <MemberRow did={did} key={did} />
+                    ))}
 
-                        <Typography variant="h5" component="h5" sx={{ my: 2 }}>
-                            Items
-                        </Typography>
+                    <Typography variant="h5" component="h5" sx={{ my: 2 }}>
+                        Items
+                    </Typography>
 
-                        {selectedVaultOwned &&
-                            <Box className="flex-box mt-1" sx={{ mb: 2 }}>
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    size="small"
-                                    onClick={() => document.getElementById("vaultItemUpload")?.click()}
-                                    className="button-left"
-                                >
-                                    Upload
-                                </Button>
-                                <input
-                                    type="file"
-                                    id="vaultItemUpload"
-                                    style={{ display: "none" }}
-                                    onChange={uploadVaultItem}
-                                />
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    size="small"
-                                    onClick={() => setEditLoginOpen(true)}
-                                    className="button-right"
-                                >
-                                    Add login
-                                </Button>
-                            </Box>
-                        }
+                    {selectedVaultOwned &&
+                        <Box className="flex-box mt-1" sx={{ mb: 2 }}>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                size="small"
+                                onClick={() => document.getElementById("vaultItemUpload")?.click()}
+                                className="button-left"
+                            >
+                                Upload
+                            </Button>
+                            <input
+                                type="file"
+                                id="vaultItemUpload"
+                                style={{ display: "none" }}
+                                onChange={uploadVaultItem}
+                            />
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                size="small"
+                                onClick={() => setEditLoginOpen(true)}
+                                className="button-right"
+                            >
+                                Add login
+                            </Button>
+                        </Box>
+                    }
 
-                        {Object.entries(selectedVault.vaultItems).map(([name, item]) => (
-                            <ItemRow name={name} item={item} key={name} />
-                        ))}
-                    </Box>
-                )}
-            </Box>
+                    {Object.entries(selectedVault.vaultItems).map(([name, item]) => (
+                        <ItemRow name={name} item={item} key={name} />
+                    ))}
+                </Box>
+            )}
         </Box>
     );
 }

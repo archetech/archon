@@ -1,26 +1,22 @@
 import { ChangeEvent, useEffect, useState } from "react";
 import { Box, Button, FormControl, IconButton, MenuItem, Select, Tooltip } from "@mui/material";
 import { Edit } from "@mui/icons-material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useWalletData } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useSnackbar } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletData } from "../hooks/useWalletData";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useSnackbar } from "../contexts/SnackbarProvider";
 import { ImageFileAsset, FileAsset, ImageAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import GatekeeperClient from "@didcid/clients/gatekeeper";
-import { VersionNavigator } from "@didcid/wallet-ui";
-import { TextInputModal } from "@didcid/wallet-ui";
-import { CopyResolveDID } from "@didcid/wallet-ui";
-import { useThemeContext } from "../contexts/ContextProviders";
-import {
-    DEFAULT_GATEKEEPER_URL,
-    GATEKEEPER_KEY
-} from "../constants"
+import VersionNavigator from "./VersionNavigator";
+import TextInputModal from "./TextInputModal";
+import CopyResolveDID from "./CopyResolveDID";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 const gatekeeper = new GatekeeperClient();
 
 const ImageTab = () => {
-    const { keymaster } = useWalletContext();
+    const { keymaster, gatekeeperUrl } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
     const { refreshAliases } = useWalletData();
     const {
@@ -28,7 +24,7 @@ const ImageTab = () => {
         aliasList,
         registries,
     } = useVariablesContext();
-    const { isTabletUp } = useThemeContext();
+    const isTabletUp = useIsTabletUp();
     const [registry, setRegistry] = useState<string>('hyperswarm');
     const [selectedImageName, setSelectedImageName] = useState<string>('');
     const [selectedImage, setSelectedImage] = useState<ImageFileAsset | null>(null);
@@ -41,8 +37,7 @@ const ImageTab = () => {
 
     useEffect(() => {
         const init = async () => {
-            const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY);
-            await gatekeeper.connect({ url: gatekeeperUrl || DEFAULT_GATEKEEPER_URL });
+            await gatekeeper.connect({ url: gatekeeperUrl });
         }
         init();
         // eslint-disable-next-line react-hooks/exhaustive-deps

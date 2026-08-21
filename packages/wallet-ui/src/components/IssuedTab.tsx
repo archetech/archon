@@ -4,13 +4,13 @@ import {
     Button,
     TextField,
 } from "@mui/material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { WarningModal } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletNavigation } from "../contexts/WalletNavigation";
+import WarningModal from "./WarningModal";
 import JsonViewer from "./JsonViewer";
-import { DisplayDID } from "@didcid/wallet-ui";
+import DisplayDID from "./DisplayDID";
+import { useSnackbar } from "../contexts/SnackbarProvider";
 
 function IssuedTab() {
     const { keymaster } = useWalletContext();
@@ -27,21 +27,16 @@ function IssuedTab() {
         setIssuedStringOriginal,
         setSelectedIssued,
     } = useVariablesContext();
-    const {
-        setOpenBrowser
-    } = useUIContext();
+    const { openView } = useWalletNavigation();
     const [open, setOpen] = useState<boolean>(false);
     const [revokeDID, setRevokeDID] = useState<string>("");
 
     async function resolveIssued(did: string) {
-        if (setOpenBrowser) {
-            setOpenBrowser({
-                title: "",
-                did,
-                tab: "credentials",
-                subTab: "issued",
-            });
-        }
+        openView({
+            did,
+            tab: "credentials",
+            subTab: "issued",
+        });
         setSelectedIssued(did);
         setIssuedEdit(false);
     }
@@ -88,14 +83,10 @@ function IssuedTab() {
                 setIssuedEdit(false);
                 setIssuedString("");
                 setIssuedStringOriginal("");
-                if (setOpenBrowser) {
-                    setOpenBrowser({
-                        title: "",
-                        did: "",
-                        tab: "credentials",
-                        subTab: "issued",
-                    });
-                }
+                openView({
+                    tab: "credentials",
+                    subTab: "issued",
+                });
             }
         } catch (error: any) {
             setError(error);
@@ -129,13 +120,11 @@ function IssuedTab() {
                         key={index}
                         display="flex"
                         flexDirection="column"
-                        sx={{
-                            mb: 2,
-                            alignItems: "center",
-                        }}
+                        alignItems="stretch"
+                        sx={{ mb: 2 }}
                     >
                         <DisplayDID did={did} />
-                        <Box className="flex-row" sx={{ width: '80%'}}>
+                        <Box className="flex-row">
                             <Button
                                 variant="contained"
                                 color="primary"
@@ -176,29 +165,29 @@ function IssuedTab() {
                     </Box>
                 ))}
             </Box>
-            {selectedIssued && <>
-                <DisplayDID did={selectedIssued} />
-                {(issuedEdit && issuedString) ? (
-                    <TextField
-                        value={issuedString}
-                        onChange={(e) => setIssuedString(e.target.value)}
-                        multiline
-                        rows={20}
-                        fullWidth
-                        variant="outlined"
-                        slotProps={{
-                            input: {
-                                style: {
-                                    fontSize: "1em",
-                                    fontFamily: "Courier, monospace",
-                                },
-                            }
-                        }}
-                    />
-                ) : (
-                    <JsonViewer browserTab="credentials" browserSubTab="issued" />
-                )}
-            </>
+            {selectedIssued &&
+                <Box>
+                    {(issuedEdit && issuedString) ? (
+                        <TextField
+                            value={issuedString}
+                            onChange={(e) => setIssuedString(e.target.value)}
+                            multiline
+                            rows={20}
+                            fullWidth
+                            variant="outlined"
+                            slotProps={{
+                                input: {
+                                    style: {
+                                        fontSize: "1em",
+                                        fontFamily: "Courier, monospace",
+                                    },
+                                }
+                            }}
+                        />
+                    ) : (
+                        <JsonViewer browserTab="credentials" browserSubTab="issued" />
+                    )}
+                </Box>
             }
         </Box>
     );

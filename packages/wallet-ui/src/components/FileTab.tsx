@@ -1,20 +1,16 @@
 import { ChangeEvent, useEffect, useState } from "react";
 import { Box, Button, FormControl, IconButton, LinearProgress, MenuItem, Select, Tooltip, Typography } from "@mui/material";
 import { Download, Edit } from "@mui/icons-material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useWalletData } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useSnackbar } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useWalletData } from "../hooks/useWalletData";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useSnackbar } from "../contexts/SnackbarProvider";
 import { FileAsset } from "@didcid/keymaster/types";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
-import { VersionNavigator } from "@didcid/wallet-ui";
-import { TextInputModal } from "@didcid/wallet-ui";
-import { CopyResolveDID } from "@didcid/wallet-ui";
-import { useThemeContext } from "../contexts/ContextProviders";
-import {
-    DEFAULT_GATEKEEPER_URL,
-    GATEKEEPER_KEY
-} from "../constants"
+import VersionNavigator from "./VersionNavigator";
+import TextInputModal from "./TextInputModal";
+import CopyResolveDID from "./CopyResolveDID";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
@@ -24,7 +20,7 @@ function formatBytes(bytes: number): string {
 }
 
 const FileTab = () => {
-    const { keymaster } = useWalletContext();
+    const { keymaster, gatekeeperUrl } = useWalletContext();
     const { setError, setSuccess } = useSnackbar();
     const { refreshAliases } = useWalletData();
     const {
@@ -32,7 +28,7 @@ const FileTab = () => {
         aliasList,
         registries,
     } = useVariablesContext();
-    const { isTabletUp } = useThemeContext();
+    const isTabletUp = useIsTabletUp();
     const [registry, setRegistry] = useState<string>("hyperswarm");
     const [selectedFileName, setSelectedFileName] = useState<string>("");
     const [selectedFile, setSelectedFile] = useState<FileAsset | null>(null);
@@ -77,7 +73,6 @@ const FileTab = () => {
     }
 
     function streamFileToGatekeeper(file: File): Promise<string> {
-        const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.upload.onprogress = (e) => {
@@ -179,7 +174,6 @@ const FileTab = () => {
             return;
         }
 
-        const gatekeeperUrl = localStorage.getItem(GATEKEEPER_KEY) || DEFAULT_GATEKEEPER_URL;
         const filename = encodeURIComponent(selectedFile.filename || 'download.bin');
         const type = encodeURIComponent(selectedFile.type || 'application/octet-stream');
         const url = `${gatekeeperUrl}/api/v1/ipfs/stream/${selectedFile.cid}?filename=${filename}&type=${type}`;

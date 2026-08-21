@@ -13,7 +13,7 @@ import {
     Tooltip,
     Typography,
 } from "@mui/material";
-import { WarningModal } from "@didcid/wallet-ui";
+import WarningModal from "./WarningModal";
 import {
     ArrowDropDown,
     Article,
@@ -32,15 +32,16 @@ import {
     TransferWithinAStation,
     MoveUp,
 } from "@mui/icons-material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useUIContext } from "../contexts/UIContext";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { TextInputModal } from "@didcid/wallet-ui";
-import { SelectInputModal } from "@didcid/wallet-ui";
-import { CopyResolveDID } from "@didcid/wallet-ui";
-import { scanAliasQrCode } from "../utils/utils";
-import { PageHeader } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useWalletData } from "../hooks/useWalletData";
+import { useWalletNavigation } from "../contexts/WalletNavigation";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import TextInputModal from "./TextInputModal";
+import SelectInputModal from "./SelectInputModal";
+import CopyResolveDID from "./CopyResolveDID";
+import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
+import PageHeader from "./layout/PageHeader";
 
 function AliasedDIDs() {
     const [removeOpen, setRemoveOpen] = useState<boolean>(false);
@@ -90,14 +91,12 @@ function AliasedDIDs() {
         unresolvedList,
         vaultList,
     } = useVariablesContext();
-    const {
-        openBrowser,
-        setOpenBrowser,
-        refreshAliases,
-    } = useUIContext();
+    const { refreshAliases } = useWalletData();
+    const { openView, pendingView } = useWalletNavigation();
+    const { scanAliasQr } = usePlatformCapabilities();
 
     async function scanAliasQR() {
-        const result = await scanAliasQrCode();
+        const result = await scanAliasQr?.();
         if (!result) {
             setError("No alias link found in QR code");
             return;
@@ -145,10 +144,10 @@ function AliasedDIDs() {
     }, [aliasList, aliasRegistry, unresolvedList, nameSearch, filter, registryFilter]);
 
     useEffect(() => {
-        if (!openBrowser) {
+        if (!pendingView) {
             return;
         }
-        const { did, tab } = openBrowser;
+        const { did, tab } = pendingView;
 
         if (tab !== "aliases") {
             return;
@@ -157,7 +156,7 @@ function AliasedDIDs() {
         if (did) {
             setAliasDID(did);
         }
-    }, [openBrowser, setAliasDID]);
+    }, [pendingView, setAliasDID]);
 
     const allVisibleNames = mergedEntries.map(([name]) => name);
     const allSelectedOnPage = allVisibleNames.every((n) => selected.has(n));
@@ -201,7 +200,7 @@ function AliasedDIDs() {
             else if (resolvedName) {
                 setAlias(resolvedName);
             }
-            setOpenBrowser({
+            openView({
                 did,
                 tab: "viewer"
             });

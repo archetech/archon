@@ -7,7 +7,7 @@ import { Box, CssBaseline, useMediaQuery } from "@mui/material";
 import { createAppTheme } from "../theme";
 import { SafeAreaProvider, useSafeArea } from "./SafeAreaContext";
 import { useDeepLinks } from "../hooks/useDeepLinks";
-import { scanQrText } from "../utils/utils";
+import { scanAliasQrCode, scanQrText } from "../utils/utils";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import { DEFAULT_GATEKEEPER_URL, GATEKEEPER_KEY } from "../constants";
 import {
@@ -151,7 +151,7 @@ export function ContextProviders(
                                         <Navigation>
                                             {/* This wallet is the Capacitor app, so it
                                                 is the one with a camera. */}
-                                            <PlatformCapabilitiesProvider scanQr={scanQrText}>
+                                            <PlatformCapabilitiesProvider scanQr={scanQrText} scanAliasQr={scanAliasQrCode}>
                                                 {children}
                                             </PlatformCapabilitiesProvider>
                                         </Navigation>
