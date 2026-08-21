@@ -1,6 +1,12 @@
 import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { socksDispatcher } from 'fetch-socks';
+// Aliased rather than shadowing the global fetch, which the rest of this file
+// uses with DOM-typed bodies. socksDispatcher is built on fetch-socks's undici
+// (>=7), and Node's built-in fetch hands it a v6-era request handler that it
+// rejects with "invalid onRequestStart method" -- a bare `TypeError: fetch
+// failed` in milliseconds, long before any Tor round trip. See #916.
+import { fetch as socksFetch } from 'undici';
 import multer from 'multer';
 
 import type Keymaster from '@didcid/keymaster';
@@ -1072,7 +1078,8 @@ export function createHeraldRoutes(ctx: HeraldContext): {
                 });
             }
 
-            const response = await fetch(invoiceUrl, fetchOptions);
+            // socksFetch: this request may carry a SOCKS dispatcher (#916).
+            const response = await socksFetch(invoiceUrl, fetchOptions);
             if (!response.ok) {
                 res.json({ status: 'ERROR', reason: 'Lightning service returned an error' });
                 return;

@@ -6,6 +6,14 @@ import { timingSafeEqual } from 'crypto';
 import { Counter, Gauge, collectDefaultMetrics, register } from 'prom-client';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
 import { socksDispatcher } from 'fetch-socks';
+// Aliased rather than shadowing the global fetch, which the rest of this file
+// uses with DOM-typed bodies. socksDispatcher is built on fetch-socks's undici
+// (>=7), and Node's built-in fetch hands it a v6-era request handler that it
+// rejects with "invalid onRequestStart method" -- surfacing as a bare
+// `TypeError: fetch failed` in milliseconds, long before any Tor round trip.
+// Anything dispatched through SOCKS must therefore use this fetch. See #916.
+import { fetch as socksFetch } from 'undici';
+
 import { Redis } from 'ioredis';
 
 import config from './config.js';
@@ -579,7 +587,8 @@ async function main(): Promise<void> {
                     });
                 }
 
-                const invoiceResponse = await fetch(invoiceUrl.toString(), fetchOptions);
+                // socksFetch: this request may carry a SOCKS dispatcher (#916).
+                const invoiceResponse = await socksFetch(invoiceUrl.toString(), fetchOptions);
                 if (invoiceResponse.status >= 300 && invoiceResponse.status < 400) {
                     res.status(502).json({
                         error: `Invoice request failed: endpoint redirected (${invoiceResponse.status}); redirects are not followed`,
@@ -587,7 +596,8 @@ async function main(): Promise<void> {
                     return;
                 }
                 if (!invoiceResponse.ok) {
-                    const error = await invoiceResponse.json().catch(() => ({ error: invoiceResponse.statusText }));
+                    // undici's json() is typed unknown, unlike the DOM's any.
+                    const error = await invoiceResponse.json().catch(() => ({ error: invoiceResponse.statusText })) as { error?: string };
                     res.status(502).json({ error: `Invoice request failed: ${error.error || invoiceResponse.statusText}` });
                     return;
                 }

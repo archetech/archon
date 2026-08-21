@@ -6,6 +6,13 @@ import crypto from 'crypto';
 import express, { type Express } from 'express';
 import cors from 'cors';
 import { socksDispatcher } from 'fetch-socks';
+// Aliased rather than shadowing the global fetch, which the rest of this
+// service (and its tests) still use. socksDispatcher is built on fetch-socks's
+// undici (>=7), and Node's built-in fetch hands it a v6-era request handler that
+// it rejects with "invalid onRequestStart method" -- surfacing as a bare
+// `TypeError: fetch failed` in about 10ms, which reads like an unreachable Tor
+// destination rather than a wiring bug. See #916.
+import { fetch as socksFetch } from 'undici';
 import type { Cipher } from '@didcid/cipher/types';
 import { MailboxFullError, MailboxStore } from './store.js';
 import { recipientDidsFromEnvelope, verifyChallengeSignature, type Resolver } from './mailbox.js';
@@ -222,7 +229,10 @@ export function createApp(deps: AppDeps): Express {
             }
 
             const target = `${endpoint.replace(/\/+$/, '')}/api/v1/messages`;
-            const response = await fetch(target, fetchOptions);
+            // Only the SOCKS-dispatched path needs undici's fetch; clearnet stays
+            // on the built-in one, which the rest of the service uses.
+            const doFetch = fetchOptions.dispatcher ? socksFetch : fetch;
+            const response = await doFetch(target, fetchOptions);
             if (response.status >= 300 && response.status < 400) {
                 // Say what happened: a bare "failed: 307" reads like the recipient
                 // is broken rather than like a rule we enforce.

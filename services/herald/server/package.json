@@ -23,7 +23,8 @@
     "ioredis": "^5.10.1",
     "jose": "^6.2.8",
     "morgan": "^1.11.0",
-    "multer": "^2.2.0"
+    "multer": "^2.2.0",
+    "undici": "^7.28.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.18",
