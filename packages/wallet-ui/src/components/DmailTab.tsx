@@ -1064,9 +1064,16 @@ const DmailTab: React.FC = () => {
                     <Autocomplete
                         freeSolo
                         options={agentList || []}
-                        value={sendTo}
+                        // inputValue rather than value: for a freeSolo Autocomplete
+                        // the visible text is the input value, so clearing after Add
+                        // has to clear this.
+                        inputValue={sendTo}
                         sx={{ flex: 1, minWidth: 300 }}
-                        onInputChange={(_, v) => setSendTo(v.trim())}
+                        // Not trimmed per keystroke -- that ate the space in a
+                        // two-word alias as it was typed, so "Alice Smith" arrived
+                        // as "AliceSmith" and such an alias could not be typed here
+                        // at all. Trimmed where the value is committed instead.
+                        onInputChange={(_, v) => setSendTo(v)}
                         renderInput={(params) => (
                             <TextField {...params} label="Recipient (name or DID)" />
                         )}
@@ -1074,10 +1081,11 @@ const DmailTab: React.FC = () => {
 
                     <Button
                         variant="outlined"
-                        disabled={!sendTo}
+                        disabled={!sendTo.trim()}
                         onClick={() => {
-                            if (sendTo && !sendToList.includes(sendTo)) {
-                                setSendToList([...sendToList, sendTo]);
+                            const recipient = sendTo.trim();
+                            if (recipient && !sendToList.includes(recipient)) {
+                                setSendToList([...sendToList, recipient]);
                             }
                             setSendTo("");
                         }}
@@ -1099,9 +1107,16 @@ const DmailTab: React.FC = () => {
                     <Autocomplete
                         freeSolo
                         options={agentList || []}
-                        value={sendCc}
+                        // inputValue rather than value: for a freeSolo Autocomplete
+                        // the visible text is the input value, so clearing after Add
+                        // has to clear this.
+                        inputValue={sendCc}
                         sx={{ flex: 1, minWidth: 300 }}
-                        onInputChange={(_, v) => setSendCc(v.trim())}
+                        // Not trimmed per keystroke -- that ate the space in a
+                        // two-word alias as it was typed, so "Alice Smith" arrived
+                        // as "AliceSmith" and such an alias could not be typed here
+                        // at all. Trimmed where the value is committed instead.
+                        onInputChange={(_, v) => setSendCc(v)}
                         renderInput={(params) => (
                             <TextField {...params} label="CC (optional)" />
                         )}
@@ -1109,10 +1124,11 @@ const DmailTab: React.FC = () => {
 
                     <Button
                         variant="outlined"
-                        disabled={!sendCc}
+                        disabled={!sendCc.trim()}
                         onClick={() => {
-                            if (sendCc && !sendCcList.includes(sendCc)) {
-                                setSendCcList([...sendCcList, sendCc]);
+                            const recipient = sendCc.trim();
+                            if (recipient && !sendCcList.includes(recipient)) {
+                                setSendCcList([...sendCcList, recipient]);
                             }
                             setSendCc("");
                         }}
