@@ -9,7 +9,7 @@ import {
 import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useSnackbar } from "../contexts/SnackbarProvider";
-import { useWalletNavigation } from "../contexts/WalletNavigation";
+import { useOptionalWalletNavigation } from "../contexts/WalletNavigation";
 import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
 
 // The half of each wallet's UIContext that is about wallet *data* rather than
@@ -31,7 +31,9 @@ import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
 export function useWalletData() {
     const { keymaster } = useWalletContext();
     const { setError } = useSnackbar();
-    const { resetView } = useWalletNavigation();
+    // Optional: each app's UIProvider calls this hook, and it sits above the
+    // navigation provider. See useOptionalWalletNavigation.
+    const { resetView } = useOptionalWalletNavigation();
     const { restoreSession, requestRefresh } = usePlatformCapabilities();
     const {
         currentId,

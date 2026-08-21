@@ -54,10 +54,27 @@ export function WalletNavigationProvider(
     );
 }
 
+// For components, which are always rendered inside the provider: a missing one
+// is a wiring mistake and should say so loudly.
 export function useWalletNavigation(): WalletNavigation {
     const ctx = useContext(WalletNavigationContext);
     if (!ctx) {
         throw new Error("useWalletNavigation must be used within WalletNavigationProvider");
     }
     return ctx;
+}
+
+// For code that may run ABOVE the provider. useWalletData is the case: each
+// app's UIProvider calls it, and the navigation provider has to be mounted
+// *inside* UIProvider because it reads that very context to know how this host
+// opens a view. Requiring the provider there is circular, and threw
+// "useWalletNavigation must be used within WalletNavigationProvider" on first
+// render -- a blank page in both wallets, which neither the build nor the types
+// noticed.
+//
+// Above the provider the navigation actions are simply absent, which is
+// accurate: there is nothing to navigate yet. Components calling the same
+// functions from inside get the real ones.
+export function useOptionalWalletNavigation(): Partial<WalletNavigation> {
+    return useContext(WalletNavigationContext) ?? {};
 }

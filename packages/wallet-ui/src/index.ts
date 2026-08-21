@@ -53,3 +53,4 @@ export { default as AuthTab } from './components/AuthTab';
 export { default as DmailTab } from './components/DmailTab';
 export { default as IdentitiesTab } from './components/IdentitiesTab';
 export { default as DidCommTab } from './components/DidCommTab';
+export { useOptionalWalletNavigation } from './contexts/WalletNavigation';
