@@ -1,23 +1,26 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { WalletProvider } from "@didcid/wallet-ui";
 import { VariablesProvider } from "@didcid/wallet-ui";
-import { UIProvider } from "./UIContext";
+import { UIProvider, useUIContext, loadRefreshIntervalSeconds } from "./UIContext";
 import { ThemeProvider } from "@mui/material/styles";
 import { Box, CssBaseline, useMediaQuery } from "@mui/material";
 import { createAppTheme } from "../theme";
 import { SafeAreaProvider, useSafeArea } from "./SafeAreaContext";
 import { useDeepLinks } from "../hooks/useDeepLinks";
+import { scanAliasQrCode, scanQrText } from "../utils/utils";
+import { dispatchDeepLink } from "../utils/deepLinkQueue";
 import WalletWeb from "@didcid/keymaster/wallet/web";
-import PassphraseModal from "../modals/PassphraseModal";
-import WarningModal from "../modals/WarningModal";
-import MnemonicModal from "../modals/MnemonicModal";
 import { DEFAULT_GATEKEEPER_URL, GATEKEEPER_KEY } from "../constants";
 import {
     getSessionPassphrase,
     setSessionPassphrase,
     clearSessionPassphrase,
 } from "../utils/sessionPassphrase";
-import { SnackbarProvider } from "@didcid/wallet-ui";
+import {
+    PlatformCapabilitiesProvider,
+    SnackbarProvider,
+    WalletNavigationProvider,
+} from "@didcid/wallet-ui";
 
 // Renders nothing: it exists to run the deep-link handler inside the wallet
 // provider, since the handler needs the wallet to be ready before it opens a
@@ -25,6 +28,38 @@ import { SnackbarProvider } from "@didcid/wallet-ui";
 function DeepLinks() {
     useDeepLinks();
     return null;
+}
+
+// Supplies navigation to the shared components, which cannot reach a UIContext
+// -- the two wallets keep their own. This wallet has a single window, so
+// everything switches its own tab.
+function Navigation({ children }: { children: ReactNode }) {
+    const {
+        openBrowser,
+        setOpenBrowser,
+        pendingChallenge,
+        setPendingChallenge,
+        pendingHeldDID,
+        setPendingHeldDID,
+    } = useUIContext();
+    return (
+        <WalletNavigationProvider
+            openView={view => setOpenBrowser(view)}
+            pendingView={openBrowser}
+            clearPendingView={() => setOpenBrowser(undefined)}
+            resetView={() => setOpenBrowser({ clearState: true })}
+            // Deep links are this wallet's alone, so it is the only host that
+            // supplies these; the extension leaves them undefined and the screens
+            // that read them simply never fire.
+            pendingChallenge={pendingChallenge}
+            setPendingChallenge={setPendingChallenge}
+            pendingHeldDID={pendingHeldDID}
+            setPendingHeldDID={setPendingHeldDID}
+            dispatchDeepLink={dispatchDeepLink}
+        >
+            {children}
+        </WalletNavigationProvider>
+    );
 }
 
 const walletStore = new WalletWeb();
@@ -44,12 +79,6 @@ function resolveGatekeeperUrl() {
     localStorage.setItem(GATEKEEPER_KEY, url);
     return url;
 }
-
-const walletModals = {
-    Passphrase: PassphraseModal,
-    Warning: WarningModal,
-    Mnemonic: MnemonicModal,
-};
 
 // The shared SnackbarProvider takes the inset as a number rather than reaching
 // for a context that only exists here: this wallet runs as a Capacitor app and
@@ -133,11 +162,20 @@ export function ContextProviders(
                                 walletStore={walletStore}
                                 session={walletSession}
                                 resolveGatekeeperUrl={resolveGatekeeperUrl}
-                                modals={walletModals}
                             >
                                 <VariablesProvider>
                                     <UIProvider>
-                                        {children}
+                                        <Navigation>
+                                            {/* This wallet is the Capacitor app, so it
+                                                is the one with a camera. */}
+                                            <PlatformCapabilitiesProvider
+                                                scanQr={scanQrText}
+                                                scanAliasQr={scanAliasQrCode}
+                                                loadRefreshInterval={async () => loadRefreshIntervalSeconds()}
+                                            >
+                                                {children}
+                                            </PlatformCapabilitiesProvider>
+                                        </Navigation>
                                     </UIProvider>
                                 </VariablesProvider>
                                 {/* After the subtree, not before it. This drains

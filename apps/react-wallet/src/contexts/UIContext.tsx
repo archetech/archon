@@ -14,11 +14,14 @@ import { useWalletData } from "@didcid/wallet-ui";
 import { useSnackbar } from "@didcid/wallet-ui";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 
+
+
 const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
 const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
 
-// Exported so a screen that polls only while it is open (the DIDComm inbox) can
-// honour the same interval the background refresh uses.
+// This wallet keeps the interval in localStorage. The extension uses the same
+// key in chrome.storage.sync, which is why the shared code takes it as a
+// capability instead of reading storage itself.
 export function loadRefreshIntervalSeconds() {
     const saved = localStorage.getItem(REFRESH_INTERVAL_STORAGE_KEY);
     const parsed = Number(saved);

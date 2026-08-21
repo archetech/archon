@@ -9,8 +9,8 @@ import {
     GATEKEEPER_KEY,
 } from "../constants";
 import packageJson from "../../package.json";
-import PageHeader from "./layout/PageHeader";
-import Section from "./layout/Section";
+import { PageHeader } from "@didcid/wallet-ui";
+import { Section } from "@didcid/wallet-ui";
 
 const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
 const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;

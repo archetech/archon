@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Box, Tab } from "@mui/material";
+import { Box, Switch, Tab } from "@mui/material";
 import { TabContext, TabList, TabPanel } from "@mui/lab";
 import {
     AccountBalanceWallet,
     Badge,
     Bolt,
+    DarkMode,
+    Forum,
+    LightMode,
     Email,
     Key,
     List,
@@ -15,28 +18,31 @@ import {
     Token,
     Tune,
 } from "@mui/icons-material";
-import CredentialsTab from "./CredentialsTab";
+import { CredentialsTab } from "@didcid/wallet-ui";
 import WalletTab from "./WalletTab";
 import SettingsTab from "./SettingsTab";
-import IdentitiesTab from "./IdentitiesTab";
-import BrowserHeader from "./BrowserHeader";
-import JsonViewer from "./JsonViewer";
+import { IdentitiesTab } from "@didcid/wallet-ui";
+import { BrowserHeader } from "@didcid/wallet-ui";
+import { JsonViewer } from "@didcid/wallet-ui";
 import { useWalletContext } from "@didcid/wallet-ui";
+import { useThemeContext } from "../contexts/ContextProviders";
 import { useUIContext } from "../contexts/UIContext";
 import { useVariablesContext } from "@didcid/wallet-ui";
-import AliasedDIDs from "./AliasedDIDs";
-import AssetsTab from "./AssetsTab";
-import DmailTab from "./DmailTab";
-import LightningTab from "./LightningTab";
-import PollTab from "./PollTab";
-import AuthTab from "./AuthTab";
-import PropertiesTab from "./PropertiesTab";
+import { AliasedDIDs } from "@didcid/wallet-ui";
+import { AssetsTab } from "@didcid/wallet-ui";
+import { DmailTab } from "@didcid/wallet-ui";
+import { LightningTab } from "@didcid/wallet-ui";
+import { DidCommTab } from "@didcid/wallet-ui";
+import { PollTab } from "@didcid/wallet-ui";
+import { AuthTab } from "@didcid/wallet-ui";
+import { PropertiesTab } from "@didcid/wallet-ui";
 
 function BrowserContent() {
     const [menuOpen, setMenuOpen] = useState<boolean>(false);
     const [didRun, setDidRun] = useState<boolean>(false);
     const [refresh, setRefresh] = useState<number>(0);
-    const { isBrowser, hasLightning } = useWalletContext();
+    const { isBrowser, hasLightning, hasDidComm } = useWalletContext();
+    const { darkMode, handleDarkModeToggle } = useThemeContext();
     const { currentId, validId } = useVariablesContext();
     const { openBrowser, setOpenBrowser } = useUIContext();
 
@@ -178,7 +184,24 @@ function BrowserContent() {
 
     return (
         <Box className="rootContainer">
-            <BrowserHeader menuOpen={menuOpen} toggleMenuOpen={toggleMenuOpen} />
+            <BrowserHeader
+                menuOpen={menuOpen}
+                toggleMenuOpen={toggleMenuOpen}
+                actions={
+                    // This view's only theme control: the extension's Settings has
+                    // none, so losing this would leave the full-page wallet unable
+                    // to change theme without opening the popup.
+                    <>
+                        <LightMode sx={{ ml: 2, mr: 1 }} />
+                        <Switch
+                            checked={darkMode}
+                            onChange={handleDarkModeToggle}
+                            color="default"
+                        />
+                        <DarkMode sx={{ ml: 1 }} />
+                    </>
+                }
+            />
             <TabContext value={activeTab}>
                 <Box
                     className="layoutContainer"
@@ -259,6 +282,17 @@ function BrowserContent() {
                                     icon={<Tune />}
                                     label={menuOpen ? "Properties" : ""}
                                     value="properties"
+                                    iconPosition="start"
+                                    className="sidebarTab"
+                                    sx={{ gap: 0.25 }}
+                                />
+                            )}
+
+                            {displayComponent && hasDidComm && (
+                                <Tab
+                                    icon={<Forum />}
+                                    label={menuOpen ? "DIDComm" : ""}
+                                    value="didcomm"
                                     iconPosition="start"
                                     className="sidebarTab"
                                     sx={{ gap: 0.25 }}
@@ -354,6 +388,12 @@ function BrowserContent() {
                         {displayComponent && (
                             <TabPanel value="properties" sx={{ p: 0 }}>
                                 <PropertiesTab />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && hasDidComm && (
+                            <TabPanel value="didcomm" sx={{ p: 0 }}>
+                                <DidCommTab />
                             </TabPanel>
                         )}
 

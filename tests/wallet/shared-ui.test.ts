@@ -59,6 +59,18 @@ describe('shared wallet UI', () => {
         expect(shadowed).toStrictEqual([]);
     });
 
+    // Each app's UIProvider calls useWalletData, and the navigation provider is
+    // mounted *inside* UIProvider because it reads that context to know how the
+    // host opens a view. So useWalletData must not require the navigation
+    // context: requiring it threw on first render and blanked both wallets, and
+    // neither the builds nor the types said a word.
+    it('does not require the navigation context from code that runs above it', () => {
+        const source = readFileSync(join(SHARED_DIR, 'hooks/useWalletData.tsx'), 'utf-8');
+
+        expect(source).toContain('useOptionalWalletNavigation');
+        expect(source).not.toMatch(/\buseWalletNavigation\b(?!\w)/);
+    });
+
     it('reaches for no platform capability the other wallet lacks', () => {
         // The wallets differ in what their host can do: Capacitor (camera, safe
         // area) on one side, chrome.* on the other. A shared component that

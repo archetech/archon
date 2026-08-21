@@ -2,15 +2,55 @@ import React, { createContext, Dispatch, ReactNode, SetStateAction, useContext, 
 import { WalletProvider } from "@didcid/wallet-ui";
 import { VariablesProvider } from "@didcid/wallet-ui";
 import { AuthProvider } from "./AuthContext";
-import { RefreshMode, UIProvider, openBrowserValues } from "./UIContext";
+import { RefreshMode, UIProvider, openBrowserValues, useUIContext } from "./UIContext";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { Box } from "@mui/material";
 import { requestBrowserRefresh } from "../utils/utils";
-import { SnackbarProvider } from "@didcid/wallet-ui";
+import {
+    PlatformCapabilitiesProvider,
+    SnackbarProvider,
+    WalletNavigationProvider,
+    useWalletContext,
+} from "@didcid/wallet-ui";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
-import PassphraseModal from "../modals/PassphraseModal";
-import WarningModal from "../modals/WarningModal";
-import MnemonicModal from "../modals/MnemonicModal";
+
+// Supplies navigation to the shared components, which cannot reach a UIContext
+// -- the two wallets keep their own. This extension has two hosts: the
+// full-page view can switch in place like the wallet does, the popup cannot and
+// opens a chrome tab instead. Deciding that here is what lets the components
+// stop asking `isBrowser && setOpenBrowser ? ... : openBrowserWindow(...)`
+// individually.
+// Both seams in one place, because both are answered from this UIContext and a
+// component can only read it from inside the provider.
+function HostSeams({ children }: { children: ReactNode }) {
+    const { openBrowser, setOpenBrowser, openBrowserWindow, refreshStored } = useUIContext();
+    const { isBrowser } = useWalletContext();
+    return (
+        <WalletNavigationProvider
+            openView={view => {
+                if (isBrowser && setOpenBrowser) {
+                    setOpenBrowser(view);
+                } else {
+                    openBrowserWindow(view);
+                }
+            }}
+            pendingView={openBrowser}
+            clearPendingView={setOpenBrowser ? () => setOpenBrowser(undefined) : undefined}
+            // Only the full-page view has state to reset; the popup has none.
+            resetView={setOpenBrowser ? () => setOpenBrowser({ clearState: true }) : undefined}
+        >
+            {/* No camera here; the wallet's other views need telling when state
+                changes, and the popup restores the view it had when it closed. */}
+            <PlatformCapabilitiesProvider
+                requestRefresh={() => requestBrowserRefresh(isBrowser)}
+                restoreSession={refreshStored}
+                loadRefreshInterval={loadRefreshInterval}
+            >
+                {children}
+            </PlatformCapabilitiesProvider>
+        </WalletNavigationProvider>
+    );
+}
 
 const walletStore = new WalletChrome();
 
@@ -36,17 +76,28 @@ async function resolveGatekeeperUrl() {
     return gatekeeperUrl as string;
 }
 
-const walletModals = {
-    Passphrase: PassphraseModal,
-    Warning: WarningModal,
-    Mnemonic: MnemonicModal,
-};
-
 // The popup is destroyed whenever it closes, so the state the user was looking
 // at has to be written through to the background script and read back on open.
 // Passed to the shared VariablesProvider rather than reached for inside it: the
 // full-page browser view keeps a live page and persists nothing, which is why
 // the store is omitted there.
+// The same key react-wallet keeps in localStorage, but this host keeps it in
+// chrome.storage.sync -- which is why the shared code asks rather than reads.
+const REFRESH_INTERVAL_STORAGE_KEY = 'ARCHON_REFRESH_INTERVAL_SECONDS';
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 30;
+
+async function loadRefreshInterval(): Promise<number> {
+    const result = await chrome.storage.sync.get([REFRESH_INTERVAL_STORAGE_KEY]);
+    const saved = result[REFRESH_INTERVAL_STORAGE_KEY];
+    const parsed = Number(saved);
+
+    if (saved === undefined || !Number.isFinite(parsed) || parsed < 0) {
+        return DEFAULT_REFRESH_INTERVAL_SECONDS;
+    }
+
+    return Math.floor(parsed);
+}
+
 async function storeExtensionState(key: string, value: string | boolean) {
     await chrome.runtime.sendMessage({ action: "STORE_STATE", key, value });
 }
@@ -133,7 +184,6 @@ export function ContextProviders(
                             walletStore={walletStore}
                             session={walletSession}
                             resolveGatekeeperUrl={resolveGatekeeperUrl}
-                            modals={walletModals}
                         >
                             <VariablesProvider store={isBrowser ? undefined : storeExtensionState}>
                                 <AuthProvider>
@@ -146,7 +196,9 @@ export function ContextProviders(
                                         setBrowserRefresh={setBrowserRefresh}
                                         setOpenBrowser={setOpenBrowser}
                                     >
-                                        {children}
+                                        <HostSeams>
+                                            {children}
+                                        </HostSeams>
                                     </UIProvider>
                                 </AuthProvider>
                             </VariablesProvider>

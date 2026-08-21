@@ -31,6 +31,42 @@ for one of those directly cannot be shared, so the capability is injected
 instead: `SnackbarProvider` takes a `topOffset` because only react-wallet has a
 safe-area inset to honour.
 
+## What is deliberately not here
+
+Four files stay as two copies, and will:
+
+- **UIContext** — the two wallets model different UIs. The extension coordinates
+  a popup with a full-page view (RefreshMode, chrome.tabs, an auth context);
+  react-wallet has one window and its own deep-link pendings. Everything
+  underneath that -- the wallet-data layer -- is in `useWalletData` here.
+- **ContextProviders** — each app's composition root, where its own hosts,
+  capabilities and seams are wired.
+- **SettingsTab** — configures the host: its version, its theme toggle, where it
+  keeps the gatekeeper URL.
+- **WalletTab** — the host's storage and files: Capacitor filesystem and share
+  on one side, chrome.storage and a blob download on the other.
+
+Sharing any of them would produce a file made mostly of questions about which
+host is running, which is worse than two files that each say one thing.
+
+## Capabilities are a two-sided contract
+
+A capability is only half done when the host supplies it. Review of the first
+pass found three failures of the other half, all of them silent:
+
+- `requestRefresh` was supplied and never called, so mutations from the
+  extension's popup stopped refreshing its open full-page view.
+- `scanQr` was consumed with `scanQr?.()` while the button rendered
+  unconditionally, so the extension offered a control that could only report a
+  failed scan. If a capability can be absent, hide the affordance.
+- the refresh interval was read from `localStorage` by shared code on the
+  assumption both wallets stored it there. They use the same *key* in different
+  *storage* -- the extension's is `chrome.storage.sync`, and asynchronous -- so
+  the extension silently got the default forever. It is a capability now.
+
+None of these broke a build or a type. Assume anything a host does differently
+is invisible to tooling and check both sides by hand.
+
 ## What does not belong here
 
 Anything importing `@capacitor/*`, `chrome.*`, or an app's own context. Those

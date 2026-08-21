@@ -60,17 +60,14 @@ module.exports = {
     ],
     resolve: {
         extensions: [".ts", ".tsx", ".js"],
+        // This app's node_modules first, for every file webpack compiles --
+        // including @didcid/wallet-ui, which lives outside the app and would
+        // otherwise resolve React and MUI from the repo root, giving the bundle a
+        // second copy of each (two emotion caches, broken theming). Unlike an
+        // alias this leaves package export subpaths working.
+        modules: [path.resolve(__dirname, "node_modules"), "node_modules"],
         alias: {
             "@didcid/wallet-ui": path.resolve(__dirname, "../../packages/wallet-ui/src/index.ts"),
-            // wallet-ui-dedupe: the shared package sits outside this app, so its
-            // React/MUI imports must resolve to this app's copies rather than a
-            // second set from the repo root.
-            "@mui/material": path.resolve(__dirname, "node_modules/@mui/material"),
-            "@mui/icons-material": path.resolve(__dirname, "node_modules/@mui/icons-material"),
-            "@emotion/react": path.resolve(__dirname, "node_modules/@emotion/react"),
-            "@emotion/styled": path.resolve(__dirname, "node_modules/@emotion/styled"),
-            "react": path.resolve(__dirname, "node_modules/react"),
-            "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),
             "@didcid/common/errors": path.resolve(__dirname, "../../packages/common/dist/esm/errors.js"),
             "@didcid/clients/gatekeeper": path.resolve(__dirname, "../../packages/clients/dist/esm/gatekeeper-client.js"),
@@ -82,7 +79,11 @@ module.exports = {
             "@didcid/keymaster/types": path.resolve(__dirname, "../../packages/keymaster/dist/types/types.d.js"),
             "@didcid/keymaster/search": path.resolve(__dirname, "../../packages/keymaster/dist/esm/search-client.js"),
             "@didcid/cipher/passphrase": path.resolve(__dirname, "../../packages/cipher/dist/esm/passphrase.js"),
-            "@didcid/keymaster": path.resolve(__dirname, "../../packages/keymaster/dist/esm/keymaster.js"),
+            // Exact ($): without it this alias also captures subpath imports like
+            // "@didcid/keymaster/didcomm-protocols" and rewrites them to
+            // keymaster.js/didcomm-protocols. Exact leaves subpaths to the
+            // package's own exports.
+            "@didcid/keymaster$": path.resolve(__dirname, "../../packages/keymaster/dist/esm/keymaster.js"),
         },
         fallback: {
             buffer: require.resolve("buffer")
