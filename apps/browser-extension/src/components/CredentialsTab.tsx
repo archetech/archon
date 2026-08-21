@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Stack, Tab, Tabs } from "@mui/material";
 import { TabContext, TabPanel } from "@mui/lab";
-import IssueTab from "./IssueTab";
+import { IssueTab } from "@didcid/wallet-ui";
 import IssuedTab from "./IssuedTab";
 import HeldTab from "./HeldTab";
 

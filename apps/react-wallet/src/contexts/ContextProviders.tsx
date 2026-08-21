@@ -7,6 +7,7 @@ import { Box, CssBaseline, useMediaQuery } from "@mui/material";
 import { createAppTheme } from "../theme";
 import { SafeAreaProvider, useSafeArea } from "./SafeAreaContext";
 import { useDeepLinks } from "../hooks/useDeepLinks";
+import { scanQrText } from "../utils/utils";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import { DEFAULT_GATEKEEPER_URL, GATEKEEPER_KEY } from "../constants";
 import {
@@ -14,7 +15,11 @@ import {
     setSessionPassphrase,
     clearSessionPassphrase,
 } from "../utils/sessionPassphrase";
-import { SnackbarProvider, ViewerNavigationProvider } from "@didcid/wallet-ui";
+import {
+    PlatformCapabilitiesProvider,
+    SnackbarProvider,
+    WalletNavigationProvider,
+} from "@didcid/wallet-ui";
 
 // Renders nothing: it exists to run the deep-link handler inside the wallet
 // provider, since the handler needs the wallet to be ready before it opens a
@@ -24,15 +29,19 @@ function DeepLinks() {
     return null;
 }
 
-// Supplies "open this DID in the viewer" to the shared components, which cannot
-// reach a UIContext -- the two wallets keep their own. Here it switches the
-// wallet's own tab; the extension opens a chrome tab instead.
-function ViewerNavigation({ children }: { children: ReactNode }) {
-    const { setOpenBrowser } = useUIContext();
+// Supplies navigation to the shared components, which cannot reach a UIContext
+// -- the two wallets keep their own. This wallet has a single window, so
+// everything switches its own tab.
+function Navigation({ children }: { children: ReactNode }) {
+    const { openBrowser, setOpenBrowser } = useUIContext();
     return (
-        <ViewerNavigationProvider openDidViewer={did => setOpenBrowser({ did, tab: "viewer" })}>
+        <WalletNavigationProvider
+            openView={view => setOpenBrowser(view)}
+            pendingView={openBrowser}
+            clearPendingView={() => setOpenBrowser(undefined)}
+        >
             {children}
-        </ViewerNavigationProvider>
+        </WalletNavigationProvider>
     );
 }
 
@@ -139,9 +148,13 @@ export function ContextProviders(
                             >
                                 <VariablesProvider>
                                     <UIProvider>
-                                        <ViewerNavigation>
-                                            {children}
-                                        </ViewerNavigation>
+                                        <Navigation>
+                                            {/* This wallet is the Capacitor app, so it
+                                                is the one with a camera. */}
+                                            <PlatformCapabilitiesProvider scanQr={scanQrText}>
+                                                {children}
+                                            </PlatformCapabilitiesProvider>
+                                        </Navigation>
                                     </UIProvider>
                                 </VariablesProvider>
                                 {/* After the subtree, not before it. This drains

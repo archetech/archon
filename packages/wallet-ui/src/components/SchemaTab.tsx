@@ -1,13 +1,13 @@
 import { useState } from "react";
 import {Box, Button, FormControl, IconButton, MenuItem, Select, TextField, Tooltip} from "@mui/material";
-import { useWalletContext } from "@didcid/wallet-ui";
-import {useSnackbar} from "@didcid/wallet-ui";
-import { useWalletData } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import { useWalletData } from "../hooks/useWalletData";
+import { useVariablesContext } from "../contexts/VariablesProvider";
 import { Edit } from "@mui/icons-material";
-import { TextInputModal } from "@didcid/wallet-ui";
-import { CopyResolveDID } from "@didcid/wallet-ui";
-import { useThemeContext } from "../contexts/ContextProviders";
+import TextInputModal from "./TextInputModal";
+import CopyResolveDID from "./CopyResolveDID";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 const SchemaTab = ()=> {
     const { keymaster } = useWalletContext();
@@ -21,7 +21,7 @@ const SchemaTab = ()=> {
         aliasList,
         schemaList,
     } = useVariablesContext();
-    const { isTabletUp } = useThemeContext();
+    const isTabletUp = useIsTabletUp();
     const [registry, setRegistry] = useState<string>('hyperswarm');
     const [schemaName, setSchemaName] = useState<string>('');
     const [selectedSchemaName, setSelectedSchemaName] = useState<string>('');

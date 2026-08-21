@@ -2,12 +2,12 @@ import React, { useEffect, useState } from "react";
 import { Box, Tab } from "@mui/material";
 import {TabContext, TabList, TabPanel} from "@mui/lab";
 import {ControlPointDuplicate, Description, Groups, Image, Lock, Schema} from "@mui/icons-material";
-import SchemaTab from "./SchemaTab";
+import { SchemaTab } from "@didcid/wallet-ui";
 import ImageTab from "./ImageTab";
 import FileTab from "./FileTab";
 import GroupsTab from "./GroupsTab";
 import VaultTab from "./VaultTab";
-import CloneAssetTab from "./CloneAssetTab";
+import { CloneAssetTab } from "@didcid/wallet-ui";
 
 function AssetsTab({ subTab }: {subTab: string}) {
     const [assetSubTab, setAssetSubTab] = useState<string>("schemas");

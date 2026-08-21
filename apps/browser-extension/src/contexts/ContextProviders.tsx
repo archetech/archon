@@ -6,18 +6,37 @@ import { RefreshMode, UIProvider, openBrowserValues, useUIContext } from "./UICo
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { Box } from "@mui/material";
 import { requestBrowserRefresh } from "../utils/utils";
-import { SnackbarProvider, ViewerNavigationProvider } from "@didcid/wallet-ui";
+import {
+    PlatformCapabilitiesProvider,
+    SnackbarProvider,
+    WalletNavigationProvider,
+    useWalletContext,
+} from "@didcid/wallet-ui";
 import WalletChrome from "@didcid/keymaster/wallet/chrome";
 
-// Supplies "open this DID in the viewer" to the shared components, which cannot
-// reach a UIContext -- the two wallets keep their own. Here it opens the
-// full-page view in a chrome tab; react-wallet switches its own tab instead.
-function ViewerNavigation({ children }: { children: ReactNode }) {
-    const { openBrowserWindow } = useUIContext();
+// Supplies navigation to the shared components, which cannot reach a UIContext
+// -- the two wallets keep their own. This extension has two hosts: the
+// full-page view can switch in place like the wallet does, the popup cannot and
+// opens a chrome tab instead. Deciding that here is what lets the components
+// stop asking `isBrowser && setOpenBrowser ? ... : openBrowserWindow(...)`
+// individually.
+function Navigation({ children }: { children: ReactNode }) {
+    const { openBrowser, setOpenBrowser, openBrowserWindow } = useUIContext();
+    const { isBrowser } = useWalletContext();
     return (
-        <ViewerNavigationProvider openDidViewer={did => openBrowserWindow({ did, tab: "viewer" })}>
+        <WalletNavigationProvider
+            openView={view => {
+                if (isBrowser && setOpenBrowser) {
+                    setOpenBrowser(view);
+                } else {
+                    openBrowserWindow(view);
+                }
+            }}
+            pendingView={openBrowser}
+            clearPendingView={setOpenBrowser ? () => setOpenBrowser(undefined) : undefined}
+        >
             {children}
-        </ViewerNavigationProvider>
+        </WalletNavigationProvider>
     );
 }
 
@@ -148,9 +167,15 @@ export function ContextProviders(
                                         setBrowserRefresh={setBrowserRefresh}
                                         setOpenBrowser={setOpenBrowser}
                                     >
-                                        <ViewerNavigation>
-                                            {children}
-                                        </ViewerNavigation>
+                                        <Navigation>
+                                            {/* No camera here; the wallet's other
+                                                views need telling when state changes. */}
+                                            <PlatformCapabilitiesProvider
+                                                requestRefresh={() => requestBrowserRefresh(isBrowser)}
+                                            >
+                                                {children}
+                                            </PlatformCapabilitiesProvider>
+                                        </Navigation>
                                     </UIProvider>
                                 </AuthProvider>
                             </VariablesProvider>

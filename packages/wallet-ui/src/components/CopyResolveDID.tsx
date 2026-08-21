@@ -6,11 +6,11 @@ import {
 import {
     ManageSearch
 } from "@mui/icons-material";
-import { useViewerNavigation } from "../contexts/ViewerNavigation";
+import { useWalletNavigation } from "../contexts/WalletNavigation";
 import CopyDID from "./CopyDID";
 
 const CopyResolveDID = ({ did } : { did: string}) => {
-    const { openDidViewer } = useViewerNavigation();
+    const { openView } = useWalletNavigation();
 
     return (
         <Box display="flex" flexDirection="row">
@@ -19,7 +19,7 @@ const CopyResolveDID = ({ did } : { did: string}) => {
             <Tooltip title="Resolve">
                 <span>
                     <IconButton size="small"
-                        onClick={() => openDidViewer(did)}
+                        onClick={() => openView({ did, tab: "viewer" })}
                         disabled={!did}
                     >
                         <ManageSearch fontSize="small" />

@@ -1,22 +1,27 @@
 import { useEffect, useState } from "react";
-import { useWalletContext } from "@didcid/wallet-ui";
-import { useVariablesContext } from "@didcid/wallet-ui";
-import { useSnackbar } from "@didcid/wallet-ui";
-import { CredentialForm } from "@didcid/wallet-ui";
+import { useWalletContext } from "../contexts/WalletProvider";
+import { useVariablesContext } from "../contexts/VariablesProvider";
+import { useSnackbar } from "../contexts/SnackbarProvider";
+import CredentialForm from "./CredentialForm";
 import {
     Autocomplete,
     Box,
     Button,
     Select,
     MenuItem,
+    FormControl,
     TextField,
 } from "@mui/material";
-import { DisplayDID } from "@didcid/wallet-ui";
+import DisplayDID from "./DisplayDID";
+import { useIsTabletUp } from "../hooks/useIsTabletUp";
 
 function IssueTab() {
     const { keymaster } = useWalletContext();
     const { setError } = useSnackbar();
     const {
+        registries,
+        registry,
+        setRegistry,
         agentList,
         credentialDID,
         credentialSchema,
@@ -28,10 +33,8 @@ function IssueTab() {
         setCredentialString,
         setCredentialSubject,
         setIssuedList,
-        registries,
-        registry,
-        setRegistry,
     } = useVariablesContext();
+    const isTabletUp = useIsTabletUp();
 
     const [schemaObject, setSchemaObject] = useState<any>(null);
     const [isFormValid, setIsFormValid] = useState<boolean>(false);
@@ -94,40 +97,39 @@ function IssueTab() {
     }, [credentialString]);
 
     return (
-        <Box>
-            <Box className="flex-row" sx={{ mb: 2 }}>
+        <Box sx={{ width: isTabletUp ? '70%' : '100%' }}>
+            <Box display="flex" flexDirection="column" sx={{ mb: 2 }}>
                 <Autocomplete
                     freeSolo
                     options={agentList || []}
                     value={credentialSubject}
                     onInputChange={(_e, value) => setCredentialSubject(value.trim())}
-                    style={{ width: "300px" }}
                     renderInput={(params) => (
                         <TextField
                             {...params}
                             label="Subject (name, DID, or URI)"
                             size="small"
                             variant="outlined"
-                            className="select-small-left"
+                            className="select-small-top"
                         />
                     )}
                 />
                 <Select
-                    style={{ width: "300px" }}
                     value={credentialSchema}
                     onChange={(event) =>
                         setCredentialSchema(event.target.value)
                     }
+                    size="small"
                     displayEmpty
                     variant="outlined"
-                    className="select-small"
+                    className="select-small-middle"
                 >
                     <MenuItem value="" disabled>
                         Select schema
                     </MenuItem>
-                    {schemaList.map((alias, index) => (
-                        <MenuItem value={alias} key={index}>
-                            {alias}
+                    {schemaList.map((name, index) => (
+                        <MenuItem value={name} key={index}>
+                            {name}
                         </MenuItem>
                     ))}
                 </Select>
@@ -136,8 +138,7 @@ function IssueTab() {
                     color="primary"
                     onClick={editCredential}
                     disabled={!credentialSubject || !credentialSchema}
-                    size="small"
-                    className="button-right"
+                    className="button-bottom"
                 >
                     Edit Credential
                 </Button>
@@ -154,8 +155,9 @@ function IssueTab() {
                     />
                     <Box
                         display="flex"
-                        alignItems="center"
-                        sx={{ gap: 0, my: 2 }}
+                        flexDirection="row"
+                        alignItems="stretch"
+                        sx={{ gap: 0, my: 2, width: "100%" }}
                     >
                         <Button
                             variant="contained"
@@ -163,23 +165,25 @@ function IssueTab() {
                             onClick={issueCredential}
                             className="button-left"
                             disabled={!isFormValid}
+                            fullWidth
                         >
-                            Issue Credential
+                            Issue
                         </Button>
-                        <Select
-                            style={{ width: "300px" }}
-                            value={registry}
-                            className="select-small-right"
-                            onChange={(event) =>
-                                setRegistry(event.target.value)
-                            }
-                        >
-                            {registries.map((registry, index) => (
-                                <MenuItem value={registry} key={index}>
-                                    {registry}
-                                </MenuItem>
-                            ))}
-                        </Select>
+                        <FormControl fullWidth>
+                            <Select
+                                value={registry}
+                                className="select-small-right"
+                                onChange={(event) =>
+                                    setRegistry(event.target.value)
+                                }
+                            >
+                                {registries.map((registry, index) => (
+                                    <MenuItem value={registry} key={index}>
+                                        {registry}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                     </Box>
                     {credentialDID &&
                         <DisplayDID did={credentialDID} />
