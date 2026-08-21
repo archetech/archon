@@ -155,14 +155,32 @@ describe('LNURLp callback over Tor', () => {
 
     it('routes an .onion endpoint through the configured SOCKS proxy', async () => {
         const { app } = withEndpoint('http://abcd.onion/invoice');
-        const fetchMock = jest.fn<any>().mockResolvedValue({ ok: true, json: async () => ({ pr: 'lnbc1' }) });
-        global.fetch = fetchMock as any;
+        // The onion request must use undici's fetch, not the global one: a
+        // dispatcher built on fetch-socks's undici is rejected by Node's built-in
+        // fetch with "invalid onRequestStart method" (#916). Failing that way here
+        // is what a regression would look like, so the global fetch is left as a
+        // trap -- if the onion path ever goes back through it, this test sees no
+        // call on socksFetchMock and fails.
+        const socksFetchMock = jest.fn<any>().mockResolvedValue({ ok: true, json: async () => ({ pr: 'lnbc1' }) });
+        const { socksEgress } = await import('../../services/herald/server/src/routes');
+        const realSocksFetch = socksEgress.fetch;
+        socksEgress.fetch = socksFetchMock as any;
+        const globalTrap = jest.fn<any>();
+        global.fetch = globalTrap as any;
 
-        const response = await request(app).get('/api/lnurlp/alice/callback?amount=100000');
+        try {
+            const response = await request(app).get('/api/lnurlp/alice/callback?amount=100000');
 
-        expect(response.body).toMatchObject({ pr: 'lnbc1' });
-        // A dispatcher is attached only for .onion destinations.
-        expect(fetchMock.mock.calls[0][1].dispatcher).toBeDefined();
+            expect(response.body).toMatchObject({ pr: 'lnbc1' });
+            // The global fetch is left as a trap: if the onion path ever goes back
+            // through it, the dispatcher is rejected at runtime (#916), so seeing a
+            // call here is the regression.
+            expect(globalTrap).not.toHaveBeenCalled();
+            // A dispatcher is attached only for .onion destinations.
+            expect(socksFetchMock.mock.calls[0][1].dispatcher).toBeDefined();
+        } finally {
+            socksEgress.fetch = realSocksFetch;
+        }
     });
 
     it('does not attach a proxy dispatcher for a clearnet endpoint', async () => {

@@ -6,9 +6,23 @@ import crypto from 'crypto';
 import express, { type Express } from 'express';
 import cors from 'cors';
 import { socksDispatcher } from 'fetch-socks';
+// Aliased rather than shadowing the global fetch, which the rest of this
+// service (and its tests) still use. socksDispatcher is built on fetch-socks's
+// undici (>=7), and Node's built-in fetch hands it a v6-era request handler that
+// it rejects with "invalid onRequestStart method" -- surfacing as a bare
+// `TypeError: fetch failed` in about 10ms, which reads like an unreachable Tor
+// destination rather than a wiring bug. See #916.
+import { fetch as socksFetch } from 'undici';
 import type { Cipher } from '@didcid/cipher/types';
 import { MailboxFullError, MailboxStore } from './store.js';
 import { recipientDidsFromEnvelope, verifyChallengeSignature, type Resolver } from './mailbox.js';
+
+// An object, so tests can substitute it. SOCKS-dispatched requests deliberately
+// bypass globalThis.fetch, so a test cannot observe them by stubbing that -- and
+// mocking the 'undici' module does not work either, since this file resolves it
+// from the service's own node_modules while a test resolves it from the repo
+// root. Two different modules, one mock.
+export const socksEgress = { fetch: socksFetch };
 
 export interface AppDeps {
     store: MailboxStore;
@@ -222,7 +236,10 @@ export function createApp(deps: AppDeps): Express {
             }
 
             const target = `${endpoint.replace(/\/+$/, '')}/api/v1/messages`;
-            const response = await fetch(target, fetchOptions);
+            // Only the SOCKS-dispatched path needs undici's fetch; clearnet stays
+            // on the built-in one, which the rest of the service uses.
+            const doFetch = fetchOptions.dispatcher ? socksEgress.fetch : fetch;
+            const response = await doFetch(target, fetchOptions);
             if (response.status >= 300 && response.status < 400) {
                 // Say what happened: a bare "failed: 307" reads like the recipient
                 // is broken rather than like a rule we enforce.

@@ -1,6 +1,12 @@
 import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { socksDispatcher } from 'fetch-socks';
+// Aliased rather than shadowing the global fetch, which the rest of this file
+// uses with DOM-typed bodies. socksDispatcher is built on fetch-socks's undici
+// (>=7), and Node's built-in fetch hands it a v6-era request handler that it
+// rejects with "invalid onRequestStart method" -- a bare `TypeError: fetch
+// failed` in milliseconds, long before any Tor round trip. See #916.
+import { fetch as socksFetch } from 'undici';
 import multer from 'multer';
 
 import type Keymaster from '@didcid/keymaster';
@@ -23,6 +29,13 @@ import {
     WALLET_URL,
     WEBHOOK_SECRET,
 } from './config.js';
+
+// An object, so tests can substitute it. SOCKS-dispatched requests deliberately
+// bypass globalThis.fetch, so a test cannot observe them by stubbing that --
+// and mocking the 'undici' module does not work either, because this file
+// resolves it from the service's own node_modules while a test resolves it from
+// the repo root. Two different modules, one mock.
+export const socksEgress = { fetch: socksFetch };
 
 // Mutable state owned by the bootstrap in index.ts. Routes read it through this
 // object because it is populated after the routes are registered.
@@ -1072,7 +1085,10 @@ export function createHeraldRoutes(ctx: HeraldContext): {
                 });
             }
 
-            const response = await fetch(invoiceUrl, fetchOptions);
+            // Only the SOCKS-dispatched path needs undici's fetch; clearnet stays
+            // on the built-in one, which the rest of this service uses (#916).
+            const doFetch = fetchOptions.dispatcher ? socksEgress.fetch : fetch;
+            const response = await doFetch(invoiceUrl, fetchOptions);
             if (!response.ok) {
                 res.json({ status: 'ERROR', reason: 'Lightning service returned an error' });
                 return;
