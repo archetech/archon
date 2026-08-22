@@ -2,6 +2,7 @@ import nock from 'nock';
 import KeymasterClient from '@didcid/clients/keymaster';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import {Seed, WalletEncFile, WalletFile} from "@didcid/keymaster/types";
+import type { PollConfig } from "@didcid/clients/keymaster-types";
 
 const KeymasterURL = 'http://keymaster.org';
 const ServerError = { message: 'Server error' };
@@ -3066,17 +3067,19 @@ describe('pollTemplate', () => {
 });
 
 describe('createPoll', () => {
-    const mockPoll = {
-        "type": "poll",
-        "version": 1,
-        "description": "What is this poll about?",
-        "roster": "DID of the eligible voter group",
-        "options": [
+    // A v2 PollConfig. This fixture was still the v1 shape -- `type`, `version: 1`
+    // and `roster` -- which the current API would reject; nock answers whatever
+    // is sent, so nothing noticed.
+    const mockPoll: PollConfig = {
+        version: 2,
+        name: "Test poll",
+        description: "What is this poll about?",
+        options: [
             "yes",
             "no",
             "abstain"
         ],
-        "deadline": "2025-04-04T10:06:49.417Z"
+        deadline: "2025-04-04T10:06:49.417Z"
     };
     const mockDID = 'did:mock:poll';
 
@@ -3726,7 +3729,7 @@ describe('createFileStream', () => {
             .reply(200, { did: 'mockDid' });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const did = await keymaster.createFileStream(mockStream('hello'), { name: 'file.txt' });
+        const did = await keymaster.createFileStream(mockStream('hello'), { filename: 'file.txt' });
 
         expect(did).toBe('mockDid');
     });
@@ -3739,7 +3742,7 @@ describe('createFileStream', () => {
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
         try {
-            await keymaster.createFileStream(mockStream('hello'), { name: 'file.txt' });
+            await keymaster.createFileStream(mockStream('hello'), { filename: 'file.txt' });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -3789,7 +3792,7 @@ describe('updateFileStream', () => {
             .reply(200, { ok: true });
 
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
-        const ok = await keymaster.updateFileStream(mockDID, mockStream('hello'), { name: 'file.txt' });
+        const ok = await keymaster.updateFileStream(mockDID, mockStream('hello'), { filename: 'file.txt' });
 
         expect(ok).toBe(true);
     });
@@ -3802,7 +3805,7 @@ describe('updateFileStream', () => {
         const keymaster = await KeymasterClient.create({ url: KeymasterURL });
 
         try {
-            await keymaster.updateFileStream(mockDID, mockStream('hello'), { name: 'file.txt' });
+            await keymaster.updateFileStream(mockDID, mockStream('hello'), { filename: 'file.txt' });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

@@ -90,11 +90,28 @@
       ],
       "@didcid/mcp-server": [
         "packages/mcp-server/src/index.ts"
+      ],
+      // Each service carries its own @types/express, so an app built from the
+      // root copy and a Router built from a service copy are different nominal
+      // types and `app.use(path, router)` has no matching overload. Pinning the
+      // express types to one copy makes the whole program agree.
+      "express": [
+        "node_modules/@types/express"
+      ],
+      "express-serve-static-core": [
+        "node_modules/@types/express-serve-static-core"
       ]
     }
   },
   "include": [
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    // Ambient declarations belonging to the services the tests import: module
+    // shims for untyped packages, and the express-session augmentation herald
+    // relies on. They are not reachable through an import, so without naming
+    // them here the program reports errors the services themselves have
+    // already answered.
+    "services/**/src/declarations.d.ts",
+    "services/**/src/express.d.ts"
   ],
   "exclude": [
     "node_modules"

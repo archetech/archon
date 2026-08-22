@@ -9,11 +9,40 @@ export const DISCOVER_FEATURES_QUERIES_TYPE = 'https://didcomm.org/discover-feat
 export const DISCOVER_FEATURES_DISCLOSE_TYPE = 'https://didcomm.org/discover-features/2.0/disclose';
 export const OUT_OF_BAND_INVITATION_TYPE = 'https://didcomm.org/out-of-band/2.0/invitation';
 
+// The DIDComm v2 attachment. This type is exported from the package, so it
+// models the whole spec shape rather than only the JSON attachments built here:
+// narrowing it to those would reject valid base64 and link attachments that
+// callers could previously assign through the plaintext's index signature.
+// Both levels stay open for the same reason.
+export interface DidCommAttachmentData {
+    jws?: unknown;
+    hash?: string;
+    links?: string[];
+    base64?: string;
+    json?: unknown;
+    [key: string]: unknown;
+}
+
+export interface DidCommAttachment {
+    id?: string;
+    description?: string;
+    filename?: string;
+    media_type?: string;
+    format?: string;
+    lastmod_time?: number;
+    byte_count?: number;
+    data?: DidCommAttachmentData;
+    [key: string]: unknown;
+}
+
 export interface DidCommPlaintext {
     type: string;
     body: Record<string, unknown>;
     thid?: string;
     from?: string;
+    // Declared rather than left to the index signature below, which would type
+    // it `unknown` and force a cast at every read.
+    attachments?: DidCommAttachment[];
     [key: string]: unknown;
 }
 
@@ -88,7 +117,7 @@ export const PRESENT_PROOF_PRESENTATION_TYPE = 'https://didcomm.org/present-proo
 export const VC_ATTACHMENT_FORMAT = 'aries/ld-proof-vc@v1.0';
 export const VP_ATTACHMENT_FORMAT = 'dif/presentation-exchange/submission@v1.0';
 
-function jsonAttachment(id: string, format: string, json: object) {
+function jsonAttachment(id: string, format: string, json: object): DidCommAttachment {
     return { id, media_type: 'application/json', format, data: { json } };
 }
 
@@ -137,7 +166,7 @@ export function presentationMessage(presentation: object, options: { thid?: stri
 }
 
 // Extract the JSON payload (VC or VP) carried in a credential/proof message.
-export function attachedJson(message: { attachments?: Array<{ data?: { json?: unknown } }> }, index = 0): any {
+export function attachedJson(message: Pick<DidCommPlaintext, 'attachments'>, index = 0): any {
     return message?.attachments?.[index]?.data?.json;
 }
 

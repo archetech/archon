@@ -139,7 +139,7 @@ describe('DrawbridgeClient', () => {
 
     it('throws non-HTTP error messages unchanged', async () => {
         const client = await DrawbridgeClient.create({ url: DrawbridgeURL });
-        (client as any).axios.post = jest.fn().mockRejectedValue(new Error('socket down'));
+        (client as any).axios.post = jest.fn<any>().mockRejectedValue(new Error('socket down'));
 
         try {
             await client.getLightningBalance('invoice');

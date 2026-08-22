@@ -1,4 +1,4 @@
-import { archon, resetAll, freshWalletWithId } from './helpers';
+import { archon, resetAll, freshWalletWithId } from './helpers.ts';
 
 afterAll(async () => {
     await resetAll();

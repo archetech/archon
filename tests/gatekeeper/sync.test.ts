@@ -750,7 +750,7 @@ describe('processEvents', () => {
         await gatekeeper.importBatch(events);
         const response = await gatekeeper.processEvents();
 
-        expect(response.added + response.merged).toBe(2);
+        expect(response.added! + response.merged!).toBe(2);
 
         const confirmedDoc = await gatekeeper.resolveDID(did);
         expect(confirmedDoc.didDocumentMetadata!.versionSequence).toBe('2');

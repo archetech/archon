@@ -157,7 +157,7 @@ export function createIdentifiersRouter(
             }
         }
 
-        const doc = await gatekeeper.resolveDID(req.params.did, options);
+        const doc = await gatekeeper.resolveDID(req.params.did as string, options);
 
         if (doc.didResolutionMetadata?.error) {
             const status = doc.didResolutionMetadata.error === 'invalidDid' ? 400 : 404;

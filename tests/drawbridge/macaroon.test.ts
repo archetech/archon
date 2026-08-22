@@ -8,9 +8,9 @@ import {
     isCaveatSatisfied,
     verifyMacaroon,
     verifyPreimage,
-} from '../../services/drawbridge/server/src/macaroon';
-import { InvalidMacaroonError } from '../../services/drawbridge/server/src/errors';
-import type { L402CaveatSet } from '../../services/drawbridge/server/src/types';
+} from '../../services/drawbridge/server/src/macaroon.ts';
+import { InvalidMacaroonError } from '../../services/drawbridge/server/src/errors.ts';
+import type { L402CaveatSet } from '../../services/drawbridge/server/src/types.ts';
 
 const secret = 'root-secret-for-tests';
 const location = 'drawbridge.test';

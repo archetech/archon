@@ -238,7 +238,10 @@ describe('verifyResponse', () => {
 
         await keymaster.setCurrentId('Alice');
         const credential2 = (await keymaster.getCredential(vc1))!;
-        credential2.credential = { email: 'updated@email.com' };
+        // The claims live in credentialSubject; assigning a bare `credential`
+        // field wrote somewhere the credential does not read, so the test named
+        // "if credential is updated" was not updating one.
+        credential2.credentialSubject!.email = 'updated@email.com';
         await keymaster.updateCredential(vc1, credential2);
 
         await keymaster.setCurrentId('Victor');

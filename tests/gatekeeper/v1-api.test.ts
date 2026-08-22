@@ -1,9 +1,9 @@
 import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
-import { createV1Router } from '../../services/gatekeeper/server/src/v1-router';
-import { checkAdminApiKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/gatekeeper/server/src/v1-admin';
-import defaultConfig from '../../services/gatekeeper/server/src/config';
+import { createV1Router } from '../../services/gatekeeper/server/src/v1-router.ts';
+import { checkAdminApiKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/gatekeeper/server/src/v1-admin.ts';
+import defaultConfig from '../../services/gatekeeper/server/src/config.js';
 
 const adminKey = 'test-admin-key';
 const testConfig = {
@@ -25,36 +25,36 @@ function streamChunks(chunks: Array<Buffer | string>) {
 
 function createMockGatekeeper() {
     return {
-        createDID: jest.fn().mockResolvedValue('did:cid:new'),
-        updateDID: jest.fn().mockResolvedValue(true),
-        generateDID: jest.fn().mockResolvedValue('did:cid:generated'),
-        resolveDID: jest.fn().mockResolvedValue({ didDocument: { id: 'did:cid:abc' }, didResolutionMetadata: {} }),
-        getDIDs: jest.fn().mockResolvedValue(['did:cid:abc']),
-        removeDIDs: jest.fn().mockResolvedValue(true),
-        exportDIDs: jest.fn().mockResolvedValue([[{ did: 'did:cid:abc' }]]),
-        importDIDs: jest.fn().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
-        exportBatch: jest.fn().mockResolvedValue([{ did: 'did:cid:abc' }]),
-        importBatch: jest.fn().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
-        importBatchByCids: jest.fn().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
-        getQueue: jest.fn().mockResolvedValue([{ type: 'create' }]),
-        clearQueue: jest.fn().mockResolvedValue([]),
-        listRegistries: jest.fn().mockResolvedValue(['local', 'pin']),
-        resetDb: jest.fn().mockResolvedValue(undefined),
-        verifyDb: jest.fn().mockResolvedValue({ total: 1, verified: 1, expired: 0, invalid: 0 }),
-        processEvents: jest.fn().mockResolvedValue({ added: 1, merged: 0, rejected: 0, pending: 0 }),
-        addJSON: jest.fn().mockResolvedValue('cid-json'),
-        getJSON: jest.fn().mockResolvedValue({ hello: 'world' }),
-        addText: jest.fn().mockResolvedValue('cid-text'),
-        getText: jest.fn().mockResolvedValue('hello'),
-        addData: jest.fn().mockResolvedValue('cid-data'),
-        getData: jest.fn().mockResolvedValue(Buffer.from('bytes')),
-        addDataStream: jest.fn().mockResolvedValue('cid-stream'),
-        getDataStream: jest.fn().mockReturnValue(streamChunks(['streamed'])),
-        getBlock: jest.fn().mockResolvedValue({ hash: 'abc', height: 7, time: 123 }),
-        addBlock: jest.fn().mockResolvedValue(true),
-        searchDocs: jest.fn().mockResolvedValue(['did:cid:abc']),
-        queryDocs: jest.fn().mockResolvedValue(['did:cid:abc']),
-        checkDIDs: jest.fn().mockResolvedValue({
+        createDID: jest.fn<any>().mockResolvedValue('did:cid:new'),
+        updateDID: jest.fn<any>().mockResolvedValue(true),
+        generateDID: jest.fn<any>().mockResolvedValue('did:cid:generated'),
+        resolveDID: jest.fn<any>().mockResolvedValue({ didDocument: { id: 'did:cid:abc' }, didResolutionMetadata: {} }),
+        getDIDs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
+        removeDIDs: jest.fn<any>().mockResolvedValue(true),
+        exportDIDs: jest.fn<any>().mockResolvedValue([[{ did: 'did:cid:abc' }]]),
+        importDIDs: jest.fn<any>().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
+        exportBatch: jest.fn<any>().mockResolvedValue([{ did: 'did:cid:abc' }]),
+        importBatch: jest.fn<any>().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
+        importBatchByCids: jest.fn<any>().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
+        getQueue: jest.fn<any>().mockResolvedValue([{ type: 'create' }]),
+        clearQueue: jest.fn<any>().mockResolvedValue([]),
+        listRegistries: jest.fn<any>().mockResolvedValue(['local', 'pin']),
+        resetDb: jest.fn<any>().mockResolvedValue(undefined),
+        verifyDb: jest.fn<any>().mockResolvedValue({ total: 1, verified: 1, expired: 0, invalid: 0 }),
+        processEvents: jest.fn<any>().mockResolvedValue({ added: 1, merged: 0, rejected: 0, pending: 0 }),
+        addJSON: jest.fn<any>().mockResolvedValue('cid-json'),
+        getJSON: jest.fn<any>().mockResolvedValue({ hello: 'world' }),
+        addText: jest.fn<any>().mockResolvedValue('cid-text'),
+        getText: jest.fn<any>().mockResolvedValue('hello'),
+        addData: jest.fn<any>().mockResolvedValue('cid-data'),
+        getData: jest.fn<any>().mockResolvedValue(Buffer.from('bytes')),
+        addDataStream: jest.fn<any>().mockResolvedValue('cid-stream'),
+        getDataStream: jest.fn<any>().mockReturnValue(streamChunks(['streamed'])),
+        getBlock: jest.fn<any>().mockResolvedValue({ hash: 'abc', height: 7, time: 123 }),
+        addBlock: jest.fn<any>().mockResolvedValue(true),
+        searchDocs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
+        queryDocs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
+        checkDIDs: jest.fn<any>().mockResolvedValue({
             total: 0,
             byType: { agents: 0, assets: 0, confirmed: 0, unconfirmed: 0, ephemeral: 0, invalid: 0 },
             byRegistry: {},

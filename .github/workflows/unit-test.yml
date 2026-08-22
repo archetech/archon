@@ -30,6 +30,14 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      # tsconfig.json covers tests/, but nothing ran tsc over it: the build
+      # script compiles the workspace packages only, and isolatedModules means
+      # ts-jest transpiles per file without cross-file checking. So a test
+      # fixture typed against a production interface was a guard nothing
+      # enforced, and 416 errors had accumulated unseen (#923).
+      - name: Typecheck tests
+        run: npm run typecheck
+
       - name: Run unit tests
         run: npm test
 

@@ -14,14 +14,14 @@ import {
     setupTransparentWallet,
     validateOpReturnData,
     zecToZats,
-} from '../../services/mediators/zcash-wallet/src/zcash-wallet';
-import { deriveTransparentAddress } from '../../services/mediators/zcash-wallet/src/derivation';
-import type { RpcClient } from '../../services/mediators/zcash-wallet/src/zcash-rpc';
+} from '../../services/mediators/zcash-wallet/src/zcash-wallet.ts';
+import { deriveTransparentAddress } from '../../services/mediators/zcash-wallet/src/derivation.ts';
+import type { RpcClient } from '../../services/mediators/zcash-wallet/src/zcash-rpc.ts';
 
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const FIRST_ADDRESS = deriveTransparentAddress(TEST_MNEMONIC, 'mainnet', 0, 0);
 
-function createRpcMock(overrides?: Partial<Record<string, any>>): RpcClient & { command: jest.Mock } {
+function createRpcMock(overrides?: Partial<Record<string, any>>): RpcClient & { command: jest.Mock<any> } {
     const command = jest.fn(async (method: string, params?: any[]) => {
         if (overrides && method in overrides) {
             const override = overrides[method];
@@ -52,7 +52,7 @@ function createRpcMock(overrides?: Partial<Record<string, any>>): RpcClient & { 
         }
     });
 
-    return { command } as RpcClient & { command: jest.Mock };
+    return { command } as RpcClient & { command: jest.Mock<any> };
 }
 
 describe('zcash-wallet RPC-backed behavior', () => {

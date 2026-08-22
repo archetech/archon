@@ -6,8 +6,8 @@ import {
     deletePendingL402Invoice,
     getPendingL402Invoice,
     savePendingL402Invoice,
-} from '../../services/drawbridge/server/src/lightning-mediator-client';
-import { LightningUnavailableError } from '../../services/drawbridge/server/src/errors';
+} from '../../services/drawbridge/server/src/lightning-mediator-client.ts';
+import { LightningUnavailableError } from '../../services/drawbridge/server/src/errors.ts';
 
 const baseUrl = 'http://lightning-mediator:4224';
 const originalFetch = global.fetch;
@@ -29,7 +29,7 @@ describe('lightning mediator client requests', () => {
 
         await expect(createL402Invoice(baseUrl, 100, 'memo')).resolves.toEqual(invoice);
 
-        const [url, init] = fetchMock.mock.calls[0];
+        const [url, init] = fetchMock.mock.calls[0] as [string, any];
         expect(String(url)).toBe(`${baseUrl}/api/v1/l402/invoice`);
         expect(init.method).toBe('POST');
         expect(JSON.parse(init.body)).toEqual({ amountSat: 100, memo: 'memo' });
@@ -56,7 +56,7 @@ describe('lightning mediator client requests', () => {
 
         await expect(deletePendingL402Invoice(baseUrl, 'a/b')).resolves.toBeUndefined();
         expect(String(fetchMock.mock.calls[0][0])).toBe(`${baseUrl}/api/v1/l402/pending/a%2Fb`);
-        expect(fetchMock.mock.calls[0][1].method).toBe('DELETE');
+        expect((fetchMock.mock.calls[0][1] as any).method).toBe('DELETE');
     });
 
     it('raises LightningUnavailableError with the upstream error message', async () => {

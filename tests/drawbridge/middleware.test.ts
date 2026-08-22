@@ -2,9 +2,9 @@ import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 
-import { createSubscriptionMiddleware } from '../../services/drawbridge/server/src/middleware/subscription-auth';
-import { checkAndRecordRequest, checkLimit } from '../../services/drawbridge/server/src/rate-limiter';
-import type { DrawbridgeStore, RateLimitResult } from '../../services/drawbridge/server/src/types';
+import { createSubscriptionMiddleware } from '../../services/drawbridge/server/src/middleware/subscription-auth.ts';
+import { checkAndRecordRequest, checkLimit } from '../../services/drawbridge/server/src/rate-limiter.ts';
+import type { DrawbridgeStore, RateLimitResult } from '../../services/drawbridge/server/src/types.ts';
 
 describe('subscription auth middleware', () => {
     function mount() {
@@ -82,7 +82,7 @@ describe('combined auth middleware', () => {
     } as any;
 
     it('defaults to L402 only — the subscription stub is excluded', async () => {
-        const { createAuthMiddleware } = await import('../../services/drawbridge/server/src/middleware/auth');
+        const { createAuthMiddleware } = await import('../../services/drawbridge/server/src/middleware/auth.ts');
 
         // The subscription-auth stub (#121) accepts any X-Subscription-DID
         // header without verification; it must never be in the default chain.
@@ -93,7 +93,7 @@ describe('combined auth middleware', () => {
     });
 
     it('prepends the subscription stub only when explicitly enabled', async () => {
-        const { createAuthMiddleware } = await import('../../services/drawbridge/server/src/middleware/auth');
+        const { createAuthMiddleware } = await import('../../services/drawbridge/server/src/middleware/auth.ts');
 
         const chain = createAuthMiddleware(l402Options, { subscriptionAuthEnabled: true });
 

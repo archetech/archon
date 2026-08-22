@@ -1,4 +1,4 @@
-import { getXpub, getMasterFingerprint, getCoinType, getHDKeyVersions, buildDescriptors, deriveAddress } from '../../services/mediators/satoshi-wallet/src/derivation';
+import { getXpub, getMasterFingerprint, getCoinType, getHDKeyVersions, buildDescriptors, deriveAddress } from '../../services/mediators/satoshi-wallet/src/derivation.ts';
 
 // BIP-39 test mnemonic (DO NOT use for real funds)
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';

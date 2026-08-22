@@ -69,7 +69,7 @@ beforeEach(async () => {
         cipher,
         allowInsecureEgress: true,
     }));
-    await new Promise<void>(resolve => { server = app.listen(0, resolve); });
+    await new Promise<void>(resolve => { server = app.listen(0, () => resolve()); });
     const port = (server.address() as any).port;
     const nodeURL = `http://localhost:${port}`;
     endpoint = `${nodeURL}/didcomm`;

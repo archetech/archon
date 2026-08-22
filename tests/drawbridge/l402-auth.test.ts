@@ -6,24 +6,24 @@ import type {
     PaymentRecord,
     PendingInvoiceData,
     RateLimitResult,
-} from '../../services/drawbridge/server/src/types';
+} from '../../services/drawbridge/server/src/types.ts';
 
-const mockCreateMacaroon = jest.fn();
-const mockVerifyMacaroon = jest.fn();
-const mockExtractCaveats = jest.fn();
-const mockGetMacaroonId = jest.fn();
-const mockVerifyPreimage = jest.fn();
-const mockCheckLimit = jest.fn();
-const mockCheckAndRecordRequest = jest.fn();
-const mockRouteToScope = jest.fn();
-const mockGetPriceForOperation = jest.fn();
-const mockCreateL402Invoice = jest.fn();
-const mockCheckL402Invoice = jest.fn();
-const mockSavePendingL402Invoice = jest.fn();
-const mockGetPendingL402Invoice = jest.fn();
-const mockDeletePendingL402Invoice = jest.fn();
+const mockCreateMacaroon = jest.fn<any>();
+const mockVerifyMacaroon = jest.fn<any>();
+const mockExtractCaveats = jest.fn<any>();
+const mockGetMacaroonId = jest.fn<any>();
+const mockVerifyPreimage = jest.fn<any>();
+const mockCheckLimit = jest.fn<any>();
+const mockCheckAndRecordRequest = jest.fn<any>();
+const mockRouteToScope = jest.fn<any>();
+const mockGetPriceForOperation = jest.fn<any>();
+const mockCreateL402Invoice = jest.fn<any>();
+const mockCheckL402Invoice = jest.fn<any>();
+const mockSavePendingL402Invoice = jest.fn<any>();
+const mockGetPendingL402Invoice = jest.fn<any>();
+const mockDeletePendingL402Invoice = jest.fn<any>();
 
-jest.unstable_mockModule('../../services/drawbridge/server/src/macaroon', () => ({
+jest.unstable_mockModule('../../services/drawbridge/server/src/macaroon.ts', () => ({
     createMacaroon: mockCreateMacaroon,
     verifyMacaroon: mockVerifyMacaroon,
     extractCaveats: mockExtractCaveats,
@@ -31,17 +31,17 @@ jest.unstable_mockModule('../../services/drawbridge/server/src/macaroon', () => 
     verifyPreimage: mockVerifyPreimage,
 }));
 
-jest.unstable_mockModule('../../services/drawbridge/server/src/rate-limiter', () => ({
+jest.unstable_mockModule('../../services/drawbridge/server/src/rate-limiter.ts', () => ({
     checkLimit: mockCheckLimit,
     checkAndRecordRequest: mockCheckAndRecordRequest,
 }));
 
-jest.unstable_mockModule('../../services/drawbridge/server/src/pricing', () => ({
+jest.unstable_mockModule('../../services/drawbridge/server/src/pricing.ts', () => ({
     routeToScope: mockRouteToScope,
     getPriceForOperation: mockGetPriceForOperation,
 }));
 
-jest.unstable_mockModule('../../services/drawbridge/server/src/lightning-mediator-client', () => ({
+jest.unstable_mockModule('../../services/drawbridge/server/src/lightning-mediator-client.ts', () => ({
     createL402Invoice: mockCreateL402Invoice,
     checkL402Invoice: mockCheckL402Invoice,
     savePendingL402Invoice: mockSavePendingL402Invoice,
@@ -55,7 +55,7 @@ const {
     handleRevokeMacaroon,
     handleL402Status,
     handleGetPayments,
-} = await import('../../services/drawbridge/server/src/middleware/l402-auth');
+} = await import('../../services/drawbridge/server/src/middleware/l402-auth.ts');
 const {
     DrawbridgeError,
     PaymentRequiredError,
@@ -65,7 +65,7 @@ const {
     RateLimitExceededError,
     InsufficientScopeError,
     LightningUnavailableError,
-} = await import('../../services/drawbridge/server/src/errors');
+} = await import('../../services/drawbridge/server/src/errors.ts');
 
 type MockResponse = {
     statusCode: number;
@@ -135,6 +135,10 @@ function createMockStore(): DrawbridgeStore {
         checkRateLimit: jest.fn(async () => rateLimitResult),
         recordRequest: jest.fn(async () => {}),
         checkAndRecordRequest: jest.fn(async () => rateLimitResult),
+        // The cost-weighted variant. Absent from this fake, so anything reaching
+        // it in a test would have hit `undefined is not a function` rather than
+        // a missing-method failure anyone could read.
+        checkAndRecordCost: jest.fn(async () => rateLimitResult),
     };
 }
 
@@ -152,7 +156,7 @@ function createOptions(store: DrawbridgeStore): L402Options {
         rateLimitWindowSeconds: 60,
         store,
         logger: {
-            error: jest.fn(),
+            error: jest.fn<any>(),
         },
     };
 }
@@ -190,7 +194,7 @@ describe('Drawbridge L402 mediator integration', () => {
             ip: '127.0.0.1',
         } as any;
         const res = createMockResponse();
-        const next = jest.fn();
+        const next = jest.fn<any>();
 
         mockCreateL402Invoice.mockResolvedValue({
             paymentRequest: 'lnbc1challenge',
@@ -229,7 +233,7 @@ describe('Drawbridge L402 mediator integration', () => {
             headers: {},
         } as any;
         const res = createMockResponse();
-        const next = jest.fn();
+        const next = jest.fn<any>();
 
         await middleware(req, res as any, next);
 
@@ -247,7 +251,7 @@ describe('Drawbridge L402 mediator integration', () => {
             subscriptionAuth: true,
         } as any;
         const res = createMockResponse();
-        const next = jest.fn();
+        const next = jest.fn<any>();
 
         await middleware(req, res as any, next);
 
@@ -266,7 +270,7 @@ describe('Drawbridge L402 mediator integration', () => {
             ip: '127.0.0.1',
         } as any;
         const res = createMockResponse();
-        const next = jest.fn();
+        const next = jest.fn<any>();
 
         mockCheckLimit.mockResolvedValue({
             allowed: false,
@@ -309,7 +313,7 @@ describe('Drawbridge L402 mediator integration', () => {
             paymentHash: 'a'.repeat(64),
         });
 
-        await middleware(req, res as any, jest.fn());
+        await middleware(req, res as any, jest.fn<any>());
 
         expect(res.statusCode).toBe(402);
         expect(res.body.error).toBe('Payment required');
@@ -340,7 +344,7 @@ describe('Drawbridge L402 mediator integration', () => {
             paymentHash: 'a'.repeat(64),
         });
 
-        await middleware(req, res as any, jest.fn());
+        await middleware(req, res as any, jest.fn<any>());
 
         expect(res.statusCode).toBe(402);
         expect(res.body.error).toBe('Payment required');
@@ -358,7 +362,7 @@ describe('Drawbridge L402 mediator integration', () => {
             ip: '127.0.0.1',
         } as any;
         const res = createMockResponse();
-        const next = jest.fn();
+        const next = jest.fn<any>();
 
         await middleware(req, res as any, next);
 
@@ -380,7 +384,7 @@ describe('Drawbridge L402 mediator integration', () => {
             ip: '127.0.0.1',
         } as any;
         const res = createMockResponse();
-        const next = jest.fn();
+        const next = jest.fn<any>();
 
         await store.saveMacaroon({
             id: 'mac-123',
@@ -414,7 +418,7 @@ describe('Drawbridge L402 mediator integration', () => {
             ip: '127.0.0.1',
         } as any;
         const res = createMockResponse();
-        const next = jest.fn();
+        const next = jest.fn<any>();
 
         await store.saveMacaroon({
             id: 'mac-123',
@@ -450,7 +454,7 @@ describe('Drawbridge L402 mediator integration', () => {
             ip: '127.0.0.1',
         } as any;
         const res = createMockResponse();
-        const next = jest.fn();
+        const next = jest.fn<any>();
 
         await store.saveMacaroon({
             id: 'mac-123',
@@ -486,7 +490,7 @@ describe('Drawbridge L402 mediator integration', () => {
             ip: '127.0.0.1',
         } as any;
         const res = createMockResponse();
-        const next = jest.fn();
+        const next = jest.fn<any>();
 
         await store.saveMacaroon({
             id: 'mac-123',
@@ -523,7 +527,7 @@ describe('Drawbridge L402 mediator integration', () => {
     it('passes authenticated requests through and increments usage on successful finish', async () => {
         const store = createMockStore();
         const options = createOptions(store);
-        const successHook = jest.fn();
+        const successHook = jest.fn<any>();
         options.hooks = { onMacaroonVerification: successHook };
         const middleware = createL402Middleware(options);
         let finishHandler: (() => void) | undefined;
@@ -594,7 +598,7 @@ describe('Drawbridge L402 mediator integration', () => {
         });
         mockCheckAndRecordRequest.mockRejectedValueOnce(new InsufficientScopeError('resolveDID'));
 
-        await middleware(req, res as any, jest.fn());
+        await middleware(req, res as any, jest.fn<any>());
 
         expect(res.statusCode).toBe(403);
         expect(res.body).toEqual({ error: 'Insufficient scope: resolveDID' });
@@ -614,7 +618,7 @@ describe('Drawbridge L402 mediator integration', () => {
 
         mockCreateL402Invoice.mockRejectedValueOnce(new LightningUnavailableError());
 
-        await middleware(req, res as any, jest.fn());
+        await middleware(req, res as any, jest.fn<any>());
 
         expect(res.statusCode).toBe(503);
         expect(res.body).toEqual({ error: 'Lightning service unavailable' });
@@ -634,7 +638,7 @@ describe('Drawbridge L402 mediator integration', () => {
 
         mockCreateL402Invoice.mockRejectedValueOnce(new Error('boom'));
 
-        await middleware(req, res as any, jest.fn());
+        await middleware(req, res as any, jest.fn<any>());
 
         expect(res.statusCode).toBe(500);
         expect(res.body).toEqual({ error: 'Internal Drawbridge error' });
@@ -644,7 +648,7 @@ describe('Drawbridge L402 mediator integration', () => {
     it('adds pricing headers and challenge hook metadata for priced operations', async () => {
         const store = createMockStore();
         const options = createOptions(store);
-        const challengeHook = jest.fn();
+        const challengeHook = jest.fn<any>();
         options.hooks = { onChallenge: challengeHook };
         options.pricing = {
             operations: {
@@ -675,7 +679,7 @@ describe('Drawbridge L402 mediator integration', () => {
             paymentHash: 'b'.repeat(64),
         });
 
-        await middleware(req, res as any, jest.fn());
+        await middleware(req, res as any, jest.fn<any>());
 
         expect(res.headers.get('X-L402-Price')).toBe('25');
         expect(res.headers.get('X-L402-Operation')).toBe('resolveDID');

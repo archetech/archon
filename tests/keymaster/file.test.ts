@@ -4,7 +4,22 @@ import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import HeliaClient from '@didcid/ipfs/helia';
+import type { FileAsset } from '@didcid/clients/keymaster-types';
 import { generateCID } from '@didcid/ipfs/utils';
+
+// didDocumentData is `unknown` on a resolved document, so the shape being read
+// has to be named. Same idiom as vault.test.ts and credential.test.ts.
+function fileAsset(doc: { didDocumentData?: unknown }): FileAsset {
+    return (doc.didDocumentData as { file: FileAsset }).file;
+}
+
+// The stream APIs declare AsyncIterable<Uint8Array>; a Buffer is not one, even
+// though the consumer happens to tolerate it. Passing what the signature asks
+// for exercises the declared contract instead of relying on that leniency.
+async function* streamOf(data: Buffer): AsyncIterable<Uint8Array> {
+    yield new Uint8Array(data);
+}
+
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -276,7 +291,7 @@ describe('createFileStream', () => {
         const filename = 'streamed.txt';
 
         await keymaster.createId('Bob');
-        const did = await keymaster.createFileStream(data, {
+        const did = await keymaster.createFileStream(streamOf(data), {
             filename,
             contentType: 'text/plain',
             bytes: data.length,
@@ -301,12 +316,12 @@ describe('createFileStream', () => {
         const data = Buffer.from('default options test', 'utf-8');
 
         await keymaster.createId('Bob');
-        const did = await keymaster.createFileStream(data, { bytes: data.length });
+        const did = await keymaster.createFileStream(streamOf(data), { bytes: data.length });
         const doc = await keymaster.resolveDID(did);
 
-        expect(doc.didDocumentData.file.filename).toBe('file');
-        expect(doc.didDocumentData.file.type).toBe('application/octet-stream');
-        expect(doc.didDocumentData.file.bytes).toBe(20);
+        expect(fileAsset(doc).filename).toBe('file');
+        expect(fileAsset(doc).type).toBe('application/octet-stream');
+        expect(fileAsset(doc).bytes).toBe(20);
     });
 });
 
@@ -320,7 +335,7 @@ describe('updateFileStream', () => {
 
         await keymaster.createId('Bob');
         await keymaster.createFile(data_v1, { alias: name, filename });
-        const ok = await keymaster.updateFileStream(name, data_v2, {
+        const ok = await keymaster.updateFileStream(name, streamOf(data_v2), {
             filename,
             contentType: 'text/plain',
             bytes: data_v2.length,
@@ -328,8 +343,8 @@ describe('updateFileStream', () => {
         const doc = await keymaster.resolveDID(name);
 
         expect(ok).toBe(true);
-        expect(doc.didDocumentData.file.cid).toBe(cid);
-        expect(doc.didDocumentData.file.bytes).toBe(19);
+        expect(fileAsset(doc).cid).toBe(cid);
+        expect(fileAsset(doc).bytes).toBe(19);
         expect(doc.didDocumentMetadata!.versionSequence).toBe("2");
     });
 });

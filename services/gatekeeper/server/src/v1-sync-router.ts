@@ -319,7 +319,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      */
     router.get('/queue/:registry', requireAdminKey, async (req, res) => {
         try {
-            const queue = await gatekeeper.getQueue(req.params.registry);
+            const queue = await gatekeeper.getQueue(req.params.registry as string);
             res.json(queue);
         } catch (error: any) {
             console.error(error);
@@ -397,7 +397,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     router.post('/queue/:registry/clear', requireAdminKey, async (req, res) => {
         try {
             const events = req.body;
-            const queue = await gatekeeper.clearQueue(req.params.registry, events);
+            const queue = await gatekeeper.clearQueue(req.params.registry as string, events);
             res.json(queue);
         } catch (error: any) {
             console.error(error);

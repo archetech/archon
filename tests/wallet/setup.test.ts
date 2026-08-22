@@ -1,24 +1,27 @@
 import { jest } from '@jest/globals';
-import { buildDescriptors } from '../../services/mediators/satoshi-wallet/src/derivation';
+import { buildDescriptors } from '../../services/mediators/satoshi-wallet/src/derivation.ts';
 
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
 // Mock the setupWatchOnlyWallet logic without importing btc-wallet.ts.
 // We test that the correct RPC calls are made with the right arguments.
 
+// jest.Mock without a type argument returns `unknown`, so every result read off
+// this client needed a cast. `any` matches the jest.fn<any>() convention used
+// throughout these tests.
 type MockBtcClient = {
-    command: jest.Mock;
-    listDescriptors: jest.Mock;
-    getDescriptorInfo: jest.Mock;
-    importDescriptors: jest.Mock;
+    command: jest.Mock<any>;
+    listDescriptors: jest.Mock<any>;
+    getDescriptorInfo: jest.Mock<any>;
+    importDescriptors: jest.Mock<any>;
 };
 
 function createMockClient(): MockBtcClient {
     return {
-        command: jest.fn(),
-        listDescriptors: jest.fn(),
-        getDescriptorInfo: jest.fn(),
-        importDescriptors: jest.fn(),
+        command: jest.fn<any>(),
+        listDescriptors: jest.fn<any>(),
+        getDescriptorInfo: jest.fn<any>(),
+        importDescriptors: jest.fn<any>(),
     };
 }
 
@@ -225,7 +228,8 @@ describe('setupWatchOnlyWallet', () => {
 
         await setupWatchOnlyWallet(btcClient, TEST_MNEMONIC, 'signet', 'test-wallet', 20);
 
-        const importCall = btcClient.importDescriptors.mock.calls[0][0];
+        // mock.calls args are `unknown` even on a jest.Mock<any>.
+        const importCall = btcClient.importDescriptors.mock.calls[0][0] as any[];
         expect(importCall).toHaveLength(2);
         expect(importCall[0].internal).toBe(false);
         expect(importCall[1].internal).toBe(true);

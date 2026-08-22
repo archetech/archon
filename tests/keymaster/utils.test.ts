@@ -6,6 +6,7 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { ExpectedExceptionError, UnknownIDError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
 import { DidCidDocument } from "@didcid/gatekeeper/types";
+import type { EcdsaJwkPublic } from "@didcid/cipher/types";
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;
@@ -316,8 +317,9 @@ describe('rotateKeys', () => {
             doc = await keymaster.resolveDID(alice);
             vm = doc.didDocument!.verificationMethod![0];
 
-            expect(pubkey.x !== vm.publicKeyJwk!.x).toBe(true);
-            expect(pubkey.y !== vm.publicKeyJwk!.y).toBe(true);
+            const rotated = vm.publicKeyJwk! as EcdsaJwkPublic;
+            expect(pubkey.x !== rotated.x).toBe(true);
+            expect((pubkey as EcdsaJwkPublic).y !== rotated.y).toBe(true);
 
             pubkey = vm.publicKeyJwk!;
         }

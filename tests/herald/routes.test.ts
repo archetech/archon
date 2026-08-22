@@ -20,7 +20,7 @@ let warnSpy: any;
 let errorSpy: any;
 
 beforeAll(async () => {
-    ({ createHeraldRoutes } = await import('../../services/herald/server/src/routes'));
+    ({ createHeraldRoutes } = await import('../../services/herald/server/src/routes.ts'));
 });
 
 beforeEach(() => {

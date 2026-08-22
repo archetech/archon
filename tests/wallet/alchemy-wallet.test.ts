@@ -1,4 +1,4 @@
-import { normalizeHostedUtxos } from '../../services/mediators/satoshi-wallet/src/utxo-normalizer';
+import { normalizeHostedUtxos } from '../../services/mediators/satoshi-wallet/src/utxo-normalizer.ts';
 
 describe('Alchemy wallet backend', () => {
     it('normalizes common UTXO response shapes', () => {
