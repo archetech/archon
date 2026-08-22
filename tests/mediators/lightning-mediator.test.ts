@@ -3,9 +3,13 @@ import request from 'supertest';
 import { createApp, socksEgress, type AppDeps } from '../../services/mediators/lightning/src/lightning-mediator.ts';
 import { LightningPaymentError } from '../../services/mediators/lightning/src/errors.ts';
 import type {
+    LightningInvoice,
     LightningMediatorConfig,
     LightningPaymentRecord,
+    LightningPaymentResult,
     LightningStore,
+    LnbitsPayment,
+    LnbitsWallet,
     PendingInvoiceData,
 } from '../../services/mediators/lightning/src/types.ts';
 
@@ -96,21 +100,45 @@ function baseConfig(overrides: Partial<LightningMediatorConfig> = {}): Lightning
     };
 }
 
+// The clients normalize LNBits' and CLN's raw fields, and the routes pass what
+// they return straight to the caller -- so a fake returning the RAW shape would
+// let a test assert a response production can never emit. `satisfies` puts the
+// real types back in front of the compiler, which `jest.fn<any>` erases.
+const WALLET = { walletId: 'wallet-1', adminKey: 'admin-key', invoiceKey: 'invoice-key' } satisfies LnbitsWallet;
+const LNBITS_INVOICE = { paymentRequest: 'lnbc1invoice', paymentHash: 'hash-1' };
+const PAYMENT = {
+    paymentHash: 'hash-1',
+    amount: 21,
+    fee: 0,
+    memo: 'test',
+    time: '2026-01-01T00:00:00.000Z',
+    pending: false,
+    status: 'success',
+} satisfies LnbitsPayment;
+const CLN_INVOICE = {
+    paymentRequest: 'lnbc1l402',
+    paymentHash: 'hash-l402',
+    amountSat: 21,
+    expiry: 3600,
+    label: 'lightning-mediator-test',
+} satisfies LightningInvoice;
+const CLN_UNPAID = { paid: false, paymentHash: 'hash-l402' } satisfies LightningPaymentResult;
+
 function fakeLnbits() {
     return {
-        createWallet: jest.fn<any>().mockResolvedValue({ id: 'wallet-1', adminkey: 'admin', inkey: 'invoice' }),
+        createWallet: jest.fn<any>().mockResolvedValue(WALLET),
         getBalance: jest.fn<any>().mockResolvedValue(4200),
-        createInvoice: jest.fn<any>().mockResolvedValue({ paymentRequest: 'lnbc1invoice', paymentHash: 'hash-1' }),
-        payInvoice: jest.fn<any>().mockResolvedValue({ paid: true, paymentHash: 'hash-1' }),
-        getPayments: jest.fn<any>().mockResolvedValue([{ paymentHash: 'hash-1' }]),
-        checkPayment: jest.fn<any>().mockResolvedValue({ paid: true }),
+        createInvoice: jest.fn<any>().mockResolvedValue(LNBITS_INVOICE),
+        payInvoice: jest.fn<any>().mockResolvedValue({ paymentHash: 'hash-1' }),
+        getPayments: jest.fn<any>().mockResolvedValue([PAYMENT]),
+        checkPayment: jest.fn<any>().mockResolvedValue({ paid: true, status: 'success' }),
     };
 }
 
 function fakeCln() {
     return {
-        createInvoice: jest.fn<any>().mockResolvedValue({ bolt11: 'lnbc1l402', paymentHash: 'hash-l402' }),
-        checkInvoice: jest.fn<any>().mockResolvedValue({ paid: false }),
+        createInvoice: jest.fn<any>().mockResolvedValue(CLN_INVOICE),
+        checkInvoice: jest.fn<any>().mockResolvedValue(CLN_UNPAID),
     };
 }
 
@@ -277,7 +305,8 @@ describe('LNBits wallet routes', () => {
 
         const named = await post(app, '/api/v1/lightning/wallet', { name: 'alice' });
         expect(named.status).toBe(200);
-        expect(named.body.id).toBe('wallet-1');
+        // The normalized shape the client returns, not LNBits' raw id/adminkey/inkey.
+        expect(named.body).toStrictEqual(WALLET);
 
         await post(app, '/api/v1/lightning/wallet', {});
 
@@ -315,7 +344,13 @@ describe('invoice and payment routes', () => {
     it('requires an invoice key and a positive amount', async () => {
         const { app, lnbits } = build();
 
-        for (const body of [{}, { invoiceKey: 'inkey' }, { invoiceKey: 'inkey', amount: 0 }, { invoiceKey: 'inkey', amount: -5 }, { invoiceKey: 'inkey', amount: 1.5 }, { invoiceKey: 'inkey', amount: 'abc' }]) {
+        // Quoted values matter as much as numeric ones: JSON carries whichever
+        // the caller sent, and parseInt used to take the leading digits of
+        // anything -- '1.5' as 1, '100abc' as 100 -- so an invoice could be
+        // created for a different amount than was asked for, silently.
+        const amounts: unknown[] = [0, -5, 1.5, 'abc', '1.5', '100abc', '0', '-5', ' ', '', true, null, {}];
+
+        for (const body of [{}, { invoiceKey: 'inkey' }, ...amounts.map(amount => ({ invoiceKey: 'inkey', amount }))]) {
             const response = await post(app, '/api/v1/lightning/invoice', body);
             expect([JSON.stringify(body), response.status]).toStrictEqual([JSON.stringify(body), 400]);
         }
@@ -323,12 +358,26 @@ describe('invoice and payment routes', () => {
         expect(lnbits.createInvoice).not.toHaveBeenCalled();
     });
 
+    it('applies the same rule to the zap, L402 and public invoice amounts', async () => {
+        // One parser serves them all, so a laxness in it is a laxness everywhere.
+        const { app } = build();
+
+        const zap = await post(app, '/api/v1/lightning/zap', { adminKey: 'k', did: 'alice@example.com', amount: '100abc' });
+        expect(zap.status).toBe(400);
+
+        const l402 = await post(app, '/api/v1/l402/invoice', { amountSat: '1.5' });
+        expect(l402.status).toBe(400);
+
+        const publicInvoice = await request(app).get(`/invoice/${encodeURIComponent('did:cid:alice')}?amount=100abc`);
+        expect(publicInvoice.status).toBe(400);
+    });
+
     it('creates an invoice, coercing a numeric string amount', async () => {
         const { app, lnbits } = build();
         const response = await post(app, '/api/v1/lightning/invoice', { invoiceKey: 'inkey', amount: '100', memo: 'coffee' });
 
         expect(response.status).toBe(200);
-        expect(response.body.paymentRequest).toBe('lnbc1invoice');
+        expect(response.body).toStrictEqual(LNBITS_INVOICE);
         expect(lnbits.createInvoice).toHaveBeenCalledWith('http://lnbits:5000', 'inkey', 100, 'coffee');
     });
 
@@ -351,7 +400,8 @@ describe('invoice and payment routes', () => {
 
         const response = await post(app, '/api/v1/lightning/payment', { invoiceKey: 'inkey', paymentHash: 'hash-1' });
         expect(response.status).toBe(200);
-        expect(response.body).toStrictEqual({ paid: true, paymentHash: 'hash-1' });
+        // The route merges the hash the caller asked about into the status.
+        expect(response.body).toStrictEqual({ paid: true, status: 'success', paymentHash: 'hash-1' });
     });
 
     it('lists payments for an admin key', async () => {
@@ -361,7 +411,7 @@ describe('invoice and payment routes', () => {
 
         const response = await post(app, '/api/v1/lightning/payments', { adminKey: 'k' });
         expect(response.status).toBe(200);
-        expect(response.body.payments).toStrictEqual([{ paymentHash: 'hash-1' }]);
+        expect(response.body.payments).toStrictEqual([PAYMENT]);
     });
 });
 
@@ -733,7 +783,7 @@ describe('L402 invoice routes', () => {
 
         const created = await post(app, '/api/v1/l402/invoice', { amountSat: 21, memo: 'access' });
         expect(created.status).toBe(200);
-        expect(created.body.bolt11).toBe('lnbc1l402');
+        expect(created.body).toStrictEqual(CLN_INVOICE);
         expect(cln.createInvoice).toHaveBeenCalledWith({ restUrl: 'https://cln:3001', rune: 'test-rune' }, 21, 'access');
 
         cln.createInvoice.mockRejectedValueOnce(new Error('cln unreachable'));
@@ -749,7 +799,7 @@ describe('L402 invoice routes', () => {
 
         const checked = await post(app, '/api/v1/l402/check', { paymentHash: 'hash-l402' });
         expect(checked.status).toBe(200);
-        expect(checked.body).toStrictEqual({ paid: false });
+        expect(checked.body).toStrictEqual(CLN_UNPAID);
 
         cln.checkInvoice.mockRejectedValueOnce(new Error('cln unreachable'));
         expect((await post(app, '/api/v1/l402/check', { paymentHash: 'hash-l402' })).status).toBe(502);
@@ -800,7 +850,7 @@ describe('L402 pending invoice lifecycle', () => {
         }
 
         // Non-positive numerics are rejected on the same path.
-        for (const bad of [{ amountSat: 0 }, { expiresAt: -1 }, { createdAt: 'soon' }, { scope: 'read' }]) {
+        for (const bad of [{ amountSat: 0 }, { expiresAt: -1 }, { createdAt: 'soon' }, { scope: 'read' }, { amountSat: '21.9' }, { expiresAt: '1800000000x' }]) {
             const response = await post(app, '/api/v1/l402/pending', { ...pending, ...bad });
             expect([JSON.stringify(bad), response.status]).toStrictEqual([JSON.stringify(bad), 400]);
         }

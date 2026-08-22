@@ -86,8 +86,21 @@ async function fetchHttpsOnly(target: string, init?: RequestInit): Promise<Respo
     throw new Error(`too many redirects (${MAX_LNURL_REDIRECTS})`);
 }
 
+// parseInt stops at the first character it cannot use, so '1.5' arrived as 1
+// and '100abc' as 100 -- a different amount than the caller asked for, silently,
+// on routes that create invoices and gate paid access. Require the whole string
+// to be an integer rather than accepting whatever prefix happens to parse.
 function parsePositiveInteger(value: unknown): number | null {
-    const parsed = typeof value === 'number' ? value : parseInt(String(value), 10);
+    if (typeof value === 'number') {
+        return Number.isInteger(value) && value > 0 ? value : null;
+    }
+
+    // Only strings otherwise: Number(true) is 1, and a boolean is not an amount.
+    if (typeof value !== 'string' || !/^\d+$/.test(value.trim())) {
+        return null;
+    }
+
+    const parsed = Number(value.trim());
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
