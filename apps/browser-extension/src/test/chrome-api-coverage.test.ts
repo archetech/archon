@@ -67,12 +67,18 @@ describe('chrome API stub', () => {
     });
 
     it('covers every chrome member the extension source touches', () => {
-        // Type-only references (chrome.runtime.MessageSender,
-        // chrome.storage.StorageChange) are erased before anything runs, so
-        // they need no stub. They are capitalised, which is how they are told
-        // apart from real calls.
+        // Named explicitly rather than inferred from capitalisation: these two
+        // are erased before anything runs, but chrome.runtime.OnInstalledReason
+        // .INSTALL is a real constant the background script compares against,
+        // and a capitalisation rule would excuse it -- so deleting it from the
+        // stub would leave this green.
+        const typeOnly = new Set([
+            'runtime.MessageSender',
+            'storage.StorageChange',
+        ]);
+
         const missing = usedPaths()
-            .filter(segments => !/^[A-Z]/.test(segments[segments.length - 1]))
+            .filter(segments => !typeOnly.has(segments.join('.')))
             .map(segments => resolve((globalThis as any).chrome, segments))
             .filter(result => !result.ok)
             .map(result => result.missingAt)
