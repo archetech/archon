@@ -55,27 +55,50 @@ function workflowFiles(): string[] {
     return readdirSync(WORKFLOW_DIR).filter(name => /\.ya?ml$/.test(name));
 }
 
+// The env vars prebuild-install reads, derived from the script's own target
+// list so the two cannot drift: adding a third native module there makes this
+// require it in the Dockerfiles too. prebuild-install lowercases the package
+// name and replaces every non-alphanumeric character with an underscore, so
+// `@ipshipyard/node-datachannel` becomes ipshipyard_node_datachannel.
+function expectedPrebuildVars(): string[] {
+    const script = readFileSync(join('scripts', 'prefetch-prebuilds.mjs'), 'utf-8');
+    const targets = [...script.matchAll(/\bname:\s*'([^']+)'/g)].map(m => m[1]);
+
+    expect(targets.length).toBeGreaterThan(0);
+
+    return targets.map(name => `npm_config_${name.replace(/^@/, '').replace(/[^a-zA-Z0-9]/g, '_')}_local_prebuilds`);
+}
+
 describe('native prebuild seeding', () => {
     it('finds workflows to check', () => {
         // Guard the guard: an empty listing would make the check below vacuous.
         expect(workflowFiles().length).toBeGreaterThan(0);
     });
 
-    it('seeds ./prebuilds in every job that builds a Docker image', () => {
+    it('seeds ./prebuilds before the first image build in every job that builds one', () => {
+        // Position matters, not mere presence: a prefetch step sitting after
+        // the build has already let that build fall back to the network, and a
+        // guard that only asked "is it in this job somewhere" would call that
+        // fine.
         const unseeded: string[] = [];
 
         for (const file of workflowFiles()) {
             for (const { id, steps } of jobs(file)) {
-                const builds = steps.some(step =>
+                const firstBuild = steps.findIndex(step =>
                     BUILD_PATTERNS.some(pattern => pattern.test(stepText(step)))
                 );
 
-                if (!builds) {
+                if (firstBuild === -1) {
                     continue;
                 }
 
-                if (!steps.some(step => stepText(step).includes(PREFETCH))) {
-                    unseeded.push(`${file}:${id}`);
+                const prefetch = steps.findIndex(step => stepText(step).includes(PREFETCH));
+
+                if (prefetch === -1) {
+                    unseeded.push(`${file}:${id} (no prefetch step)`);
+                }
+                else if (prefetch > firstBuild) {
+                    unseeded.push(`${file}:${id} (prefetch at step ${prefetch}, after build at ${firstBuild})`);
                 }
             }
         }
@@ -89,23 +112,29 @@ describe('native prebuild seeding', () => {
         expect(readdirSync('scripts')).toContain('prefetch-prebuilds.mjs');
     });
 
-    it('points every seeded image at the directory it seeds', () => {
+    it('points every seeded image at the directory it seeds, for every module', () => {
         // Seeding is useless unless the Dockerfile copies ./prebuilds in and
-        // tells prebuild-install to look there. A Dockerfile that copies the
-        // directory without setting the env var silently falls back to the
-        // network -- the failure this all exists to prevent.
-        const mismatched: string[] = [];
+        // tells prebuild-install to look there. Each module is checked by name:
+        // matching any *_local_prebuilds assignment would stay green if
+        // sqlite3's were dropped while node-datachannel's remained -- and
+        // sqlite3 is the module #913 is actually about.
+        const expected = expectedPrebuildVars();
+        const problems: string[] = [];
 
         for (const name of readdirSync('docker').filter(f => f.startsWith('Dockerfile.'))) {
             const source = readFileSync(join('docker', name), 'utf-8');
             const copies = /COPY\s+prebuilds\//.test(source);
-            const points = /_local_prebuilds=/.test(source);
+            const missing = expected.filter(variable => !source.includes(`${variable}=/prebuilds`));
 
-            if (copies !== points) {
-                mismatched.push(`${name} (copies=${copies}, points=${points})`);
+            if (copies && missing.length) {
+                problems.push(`${name} copies prebuilds/ but does not set ${missing.join(', ')}`);
+            }
+
+            if (!copies && missing.length < expected.length) {
+                problems.push(`${name} points at /prebuilds but never copies it in`);
             }
         }
 
-        expect(mismatched).toStrictEqual([]);
+        expect(problems).toStrictEqual([]);
     });
 });
