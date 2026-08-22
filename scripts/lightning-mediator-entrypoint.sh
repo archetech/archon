@@ -14,4 +14,4 @@ else
     echo "[lightning-mediator] No bundled CLN rune found at $RUNE_FILE"
 fi
 
-exec node dist/lightning-mediator.js
+exec node dist/index.js

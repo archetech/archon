@@ -3,7 +3,7 @@
   "version": "0.12.0",
   "type": "module",
   "description": "Archon Lightning mediator",
-  "main": "dist/lightning-mediator.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "echo \"Error: no test specified\" && exit 1"
