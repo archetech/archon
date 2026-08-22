@@ -797,6 +797,58 @@ class StubService:
         self.calls.append(("revoke_credential", identifier))
         return True
 
+    async def get_node_capabilities(self):
+        self.calls.append(("get_node_capabilities",))
+        return {"didcomm": True, "lightning": False}
+
+    async def publish_address(self, address=None, name=None) -> bool:
+        self.calls.append(("publish_address", address, name))
+        return True
+
+    async def unpublish_address(self, name=None) -> bool:
+        self.calls.append(("unpublish_address", name))
+        return True
+
+    async def publish_didcomm(self, endpoint=None, name=None, routing_keys=None) -> bool:
+        self.calls.append(("publish_didcomm", endpoint, name, routing_keys))
+        return True
+
+    async def unpublish_didcomm(self, name=None) -> bool:
+        self.calls.append(("unpublish_didcomm", name))
+        return True
+
+    async def pack_didcomm(self, message, to, options=None) -> str:
+        self.calls.append(("pack_didcomm", message, to, options))
+        return "packed-envelope"
+
+    async def unpack_didcomm(self, packed, options=None):
+        self.calls.append(("unpack_didcomm", packed, options))
+        return {"message": {"body": {"content": "hello"}}, "metadata": {"sender": "did:test:alice"}}
+
+    async def send_didcomm(self, message, to, options=None):
+        self.calls.append(("send_didcomm", message, to, options))
+        return ["msg-1"]
+
+    async def receive_didcomm(self, options=None):
+        self.calls.append(("receive_didcomm", options))
+        return [{"id": "msg-1", "message": {"body": {"content": "hello"}}}]
+
+    async def ack_didcomm(self, ids, options=None) -> int:
+        self.calls.append(("ack_didcomm", ids, options))
+        return 1
+
+    async def mediate_didcomm(self, options=None):
+        self.calls.append(("mediate_didcomm", options))
+        return {"forwarded": 2}
+
+    async def send_credential_didcomm(self, did, to, options=None):
+        self.calls.append(("send_credential_didcomm", did, to, options))
+        return ["msg-2"]
+
+    async def accept_credential_didcomm(self, message) -> bool:
+        self.calls.append(("accept_credential_didcomm", message))
+        return True
+
 
 @pytest.fixture
 def stub_service(monkeypatch: pytest.MonkeyPatch) -> StubService:
@@ -1469,4 +1521,84 @@ def test_poll_handlers(stub_service: StubService):
         ("add_poll_voter", "did:test:poll", "did:test:alice"),
         ("list_poll_voters", "did:test:poll"),
         ("remove_poll_voter", "did:test:poll", "did:test:alice"),
+    ]
+
+
+def test_capabilities_handler(stub_service: StubService):
+    assert run(app_module.capabilities()) == {"capabilities": {"didcomm": True, "lightning": False}}
+    assert stub_service.calls == [("get_node_capabilities",)]
+
+
+def test_address_publish_handlers(stub_service: StubService):
+    published = run(app_module.publish_address({"address": "bc1qtest", "name": "Alice"}))
+    unpublished = run(app_module.unpublish_address({"name": "Alice"}))
+    # The JS client sends no body at all for the bare case, so an absent body
+    # must not be a 422.
+    default = run(app_module.unpublish_address())
+
+    assert published == {"ok": True}
+    assert unpublished == {"ok": True}
+    assert default == {"ok": True}
+    assert stub_service.calls == [
+        ("publish_address", "bc1qtest", "Alice"),
+        ("unpublish_address", "Alice"),
+        ("unpublish_address", None),
+    ]
+
+
+def test_didcomm_handlers(stub_service: StubService):
+    # #920: none of these routes existed, so every SDK didcomm call 404'd against
+    # the Python flavor while working against the JS one.
+    message = {"type": "https://didcomm.org/basicmessage/2.0/message", "body": {"content": "hello"}}
+
+    published = run(app_module.publish_didcomm({"endpoint": "https://node.test/didcomm", "name": "Alice", "routingKeys": ["did:test:mediator"]}))
+    unpublished = run(app_module.unpublish_didcomm({"name": "Alice"}))
+    packed = run(app_module.pack_didcomm({"message": message, "to": "did:test:bob", "options": {"name": "Alice"}}))
+    unpacked = run(app_module.unpack_didcomm({"packed": "packed-envelope", "options": {"name": "Bob"}}))
+    sent = run(app_module.send_didcomm({"message": message, "to": ["did:test:bob"], "options": {"name": "Alice"}}))
+    received = run(app_module.receive_didcomm({"options": {"name": "Bob"}}))
+    acked = run(app_module.ack_didcomm({"ids": ["msg-1"], "options": {"name": "Bob"}}))
+    mediated = run(app_module.mediate_didcomm({"options": {"name": "Alice"}}))
+    credential_sent = run(app_module.send_credential_didcomm({"did": "did:test:credential", "to": "did:web:example.com", "options": {"name": "Alice"}}))
+    credential_accepted = run(app_module.accept_credential_didcomm({"message": message}))
+
+    # The response envelopes are the contract the SDK reads by key, so they are
+    # asserted whole rather than by presence.
+    assert published == {"ok": True}
+    assert unpublished == {"ok": True}
+    assert packed == {"packed": "packed-envelope"}
+    assert unpacked == {"result": {"message": {"body": {"content": "hello"}}, "metadata": {"sender": "did:test:alice"}}}
+    assert sent == {"ids": ["msg-1"]}
+    assert received == {"results": [{"id": "msg-1", "message": {"body": {"content": "hello"}}}]}
+    assert acked == {"acknowledged": 1}
+    assert mediated == {"result": {"forwarded": 2}}
+    assert credential_sent == {"ids": ["msg-2"]}
+    assert credential_accepted == {"ok": True}
+
+    assert stub_service.calls == [
+        # routingKeys is camelCase on the wire and snake_case in the library.
+        ("publish_didcomm", "https://node.test/didcomm", "Alice", ["did:test:mediator"]),
+        ("unpublish_didcomm", "Alice"),
+        ("pack_didcomm", message, "did:test:bob", {"name": "Alice"}),
+        ("unpack_didcomm", "packed-envelope", {"name": "Bob"}),
+        ("send_didcomm", message, ["did:test:bob"], {"name": "Alice"}),
+        ("receive_didcomm", {"name": "Bob"}),
+        ("ack_didcomm", ["msg-1"], {"name": "Bob"}),
+        ("mediate_didcomm", {"name": "Alice"}),
+        ("send_credential_didcomm", "did:test:credential", "did:web:example.com", {"name": "Alice"}),
+        ("accept_credential_didcomm", message),
+    ]
+
+
+def test_didcomm_handlers_tolerate_an_absent_body(stub_service: StubService):
+    # receive/mediate/unpublish take no required argument, and the JS clients
+    # send no body for them. FastAPI would 422 a required body parameter.
+    run(app_module.unpublish_didcomm())
+    run(app_module.receive_didcomm())
+    run(app_module.mediate_didcomm())
+
+    assert stub_service.calls == [
+        ("unpublish_didcomm", None),
+        ("receive_didcomm", None),
+        ("mediate_didcomm", None),
     ]

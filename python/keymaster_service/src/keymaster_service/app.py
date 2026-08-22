@@ -160,6 +160,11 @@ async def registries() -> dict[str, list[str]]:
     return {"registries": await service.list_registries()}
 
 
+@protected_api.get("/capabilities")
+async def capabilities() -> dict[str, Any]:
+    return {"capabilities": await service.get_node_capabilities()}
+
+
 @protected_api.get("/wallet")
 async def wallet() -> dict[str, Any]:
     return {"wallet": await service.load_wallet()}
@@ -298,6 +303,20 @@ async def import_address(body: dict[str, Any]) -> dict[str, Any]:
 @protected_api.get("/addresses/check/{address}")
 async def check_address(address: str) -> dict[str, Any]:
     return await service.check_address(address)
+
+
+# Declared ahead of the `/addresses/{address}` templates below: FastAPI matches
+# in declaration order, so a later literal loses to an earlier parameter and
+# `DELETE /addresses/publish` would arrive as a removal of an address literally
+# named "publish".
+@protected_api.post("/addresses/publish")
+async def publish_address(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.publish_address(body.get("address"), body.get("name"))}
+
+
+@protected_api.delete("/addresses/publish")
+async def unpublish_address(body: dict[str, Any] | None = None) -> dict[str, bool]:
+    return {"ok": await service.unpublish_address((body or {}).get("name"))}
 
 
 @protected_api.post("/addresses")
@@ -810,6 +829,14 @@ async def view_poll(poll: str) -> dict[str, Any]:
     return {"poll": await service.view_poll(poll)}
 
 
+# Ahead of `/polls/{poll}/send`: FastAPI matches in declaration order, so this
+# was previously unreachable -- a ballot send arrived as send_poll(poll="ballot").
+# The JS router has always declared it in this order.
+@protected_api.post("/polls/ballot/send")
+async def send_ballot(body: dict[str, Any]) -> dict[str, str]:
+    return {"did": await service.send_ballot(body["ballot"], body["poll"])}
+
+
 @protected_api.post("/polls/{poll}/send")
 async def send_poll(poll: str) -> dict[str, str]:
     return {"did": await service.send_poll(poll)}
@@ -833,11 +860,6 @@ async def publish_poll(poll: str, body: dict[str, Any] | None = None) -> dict[st
 @protected_api.post("/polls/{poll}/unpublish")
 async def unpublish_poll(poll: str) -> dict[str, bool]:
     return {"ok": await service.unpublish_poll(poll)}
-
-
-@protected_api.post("/polls/ballot/send")
-async def send_ballot(body: dict[str, Any]) -> dict[str, str]:
-    return {"did": await service.send_ballot(body["ballot"], body["poll"])}
 
 
 @protected_api.get("/polls/ballot/{did}")
@@ -908,6 +930,62 @@ async def response_verify(body: dict[str, Any]) -> dict[str, Any]:
 @app.get("/metrics")
 async def metrics() -> Response:
     return PlainTextResponse(generate_latest().decode("utf-8"), media_type=CONTENT_TYPE_LATEST)
+
+
+# The DIDComm surface, mirroring services/keymaster/server/src/keymaster-didcomm-router.ts.
+# The `keymaster` library has implemented all of this since #633; only this
+# routing layer was missing, which made every SDK didcomm call 404 against the
+# Python flavor while working against the JS one (#920).
+
+
+@protected_api.post("/didcomm/publish")
+async def publish_didcomm(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.publish_didcomm(body.get("endpoint"), body.get("name"), body.get("routingKeys"))}
+
+
+@protected_api.delete("/didcomm/publish")
+async def unpublish_didcomm(body: dict[str, Any] | None = None) -> dict[str, bool]:
+    return {"ok": await service.unpublish_didcomm((body or {}).get("name"))}
+
+
+@protected_api.post("/didcomm/pack")
+async def pack_didcomm(body: dict[str, Any]) -> dict[str, str]:
+    return {"packed": await service.pack_didcomm(body.get("message"), body.get("to"), body.get("options"))}
+
+
+@protected_api.post("/didcomm/unpack")
+async def unpack_didcomm(body: dict[str, Any]) -> dict[str, Any]:
+    return {"result": await service.unpack_didcomm(body.get("packed"), body.get("options"))}
+
+
+@protected_api.post("/didcomm/send")
+async def send_didcomm(body: dict[str, Any]) -> dict[str, Any]:
+    return {"ids": await service.send_didcomm(body.get("message"), body.get("to"), body.get("options"))}
+
+
+@protected_api.post("/didcomm/receive")
+async def receive_didcomm(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {"results": await service.receive_didcomm((body or {}).get("options"))}
+
+
+@protected_api.post("/didcomm/ack")
+async def ack_didcomm(body: dict[str, Any]) -> dict[str, Any]:
+    return {"acknowledged": await service.ack_didcomm(body.get("ids"), body.get("options"))}
+
+
+@protected_api.post("/didcomm/mediate")
+async def mediate_didcomm(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {"result": await service.mediate_didcomm((body or {}).get("options"))}
+
+
+@protected_api.post("/didcomm/credential/send")
+async def send_credential_didcomm(body: dict[str, Any]) -> dict[str, Any]:
+    return {"ids": await service.send_credential_didcomm(body.get("did"), body.get("to"), body.get("options"))}
+
+
+@protected_api.post("/didcomm/credential/accept")
+async def accept_credential_didcomm(body: dict[str, Any]) -> dict[str, bool]:
+    return {"ok": await service.accept_credential_didcomm(body.get("message"))}
 
 
 app.include_router(public_api)
