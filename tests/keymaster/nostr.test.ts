@@ -6,9 +6,20 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { UnknownIDError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
 import { bech32 } from 'bech32';
-// The root has @noble/curves 2.x, which exports './secp256k1.js' only, while
-// packages/cipher pins 1.9.7 where the extensionless specifier still resolves.
-// jest finds the file either way; the type resolver does not.
+// Deliberately a DIFFERENT copy of @noble/curves than the one that signed:
+// packages/cipher pins 1.9.7, and this resolves the root's 2.x. Nostr
+// signatures have to be verifiable by other people's software, so checking
+// them with an independent implementation is the point rather than an
+// accident -- it is what makes this an interop test instead of a round trip
+// through one library.
+//
+// The root dependency is declared for that reason (#925). It used to arrive
+// only because @libp2p/crypto happened to hoist it, so a dependency change
+// could have quietly collapsed both sides onto one copy and this would have
+// kept passing while proving nothing.
+//
+// The explicit '.js' is required: 2.x exports './secp256k1.js' only, where
+// 1.x still resolved the extensionless specifier.
 import { schnorr } from '@noble/curves/secp256k1.js';
 
 let ipfs: HeliaClient;
