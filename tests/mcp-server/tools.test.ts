@@ -281,6 +281,8 @@ function mockRuntime(overrides: Record<string, unknown> = {}) {
         receiveDidComm: jest.fn().mockResolvedValue([{ body: 'hello' }]),
         ackDidComm: jest.fn().mockResolvedValue(1),
         mediateDidComm: jest.fn().mockResolvedValue({ forwarded: 1 }),
+        sendCredentialDidComm: jest.fn().mockResolvedValue(['msg-1']),
+        acceptCredentialDidComm: jest.fn().mockResolvedValue(true),
         ...overrides,
     };
 

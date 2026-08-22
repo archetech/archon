@@ -8,13 +8,14 @@ import { useWalletContext } from "../contexts/WalletProvider";
 import { useVariablesContext } from "../contexts/VariablesProvider";
 import { useWalletNavigation } from "../contexts/WalletNavigation";
 import WarningModal from "./WarningModal";
+import TextInputModal from "./TextInputModal";
 import JsonViewer from "./JsonViewer";
 import DisplayDID from "./DisplayDID";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 
 function IssuedTab() {
     const { keymaster } = useWalletContext();
-    const { setError } = useSnackbar();
+    const { setError, setSuccess } = useSnackbar();
     const {
         issuedEdit,
         issuedList,
@@ -29,6 +30,8 @@ function IssuedTab() {
     } = useVariablesContext();
     const { openView } = useWalletNavigation();
     const [open, setOpen] = useState<boolean>(false);
+    const [sendDidCommOpen, setSendDidCommOpen] = useState<boolean>(false);
+    const [sendDidCommDID, setSendDidCommDID] = useState<string>("");
     const [revokeDID, setRevokeDID] = useState<string>("");
 
     async function resolveIssued(did: string) {
@@ -104,8 +107,52 @@ function IssuedTab() {
         setOpen(true);
     };
 
+    // DIDComm rather than sendCredential's Notice: a Notice carries the
+    // credential's DID, which a subject outside did:cid can neither resolve nor
+    // decrypt. This carries the credential itself, so it reaches them (#905).
+    async function sendOverDidComm(recipientInput: string) {
+        const recipient = recipientInput.trim();
+
+        if (!recipient) {
+            setError("Enter a recipient DID or alias");
+            return;
+        }
+
+        if (!keymaster) {
+            return;
+        }
+
+        try {
+            // Resolve first so an unknown alias fails before any crypto, and so a
+            // DID travels in the envelope rather than a local name.
+            const docs = await keymaster.resolveDID(recipient);
+            const to = docs.didDocument?.id;
+
+            if (!to) {
+                setError(`Could not resolve ${recipient}`);
+                return;
+            }
+
+            await keymaster.sendCredentialDidComm(sendDidCommDID, to);
+            setSuccess("Credential sent");
+            setSendDidCommOpen(false);
+        } catch (error: any) {
+            setError(error);
+        }
+    }
+
     return (
         <Box>
+            <TextInputModal
+                isOpen={sendDidCommOpen}
+                title="Send credential over DIDComm"
+                description="Delivers the credential itself, so it reaches a subject whose DID is not a did:cid."
+                label="Recipient (DID or alias)"
+                confirmText="Send"
+                onSubmit={sendOverDidComm}
+                onClose={() => setSendDidCommOpen(false)}
+            />
+
             <WarningModal
                 title="Revoke Credential"
                 warningText="Are you sure you want to revoke the credential?"
@@ -149,6 +196,18 @@ function IssuedTab() {
                                 disabled={did !== selectedIssued || !issuedEdit || issuedString === issuedStringOriginal}
                             >
                                 Update
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                className="button large regular"
+                                onClick={() => {
+                                    setSendDidCommDID(did);
+
+                                    setSendDidCommOpen(true);
+                                }}
+                            >
+                                Send
                             </Button>
                             <Button
                                 variant="contained"

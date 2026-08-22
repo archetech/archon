@@ -38,6 +38,7 @@ from .crypto import (
     verify_sig,
 )
 from . import didcomm_crypto as dc
+from . import didcomm_protocols as dc_protocols
 
 
 LOGGER = logging.getLogger(__name__)
@@ -3309,6 +3310,65 @@ class Keymaster:
             return await self.add_to_held(credential_did)
         except Exception:
             return False
+
+    async def send_credential_didcomm(
+        self,
+        did: str,
+        to: str | list[str],
+        options: dict[str, Any] | None = None,
+    ) -> list[str]:
+        # Deliver an issued credential over DIDComm, the only way to reach a
+        # subject whose DID is not a did:cid: send_credential posts a Notice
+        # carrying the credential DID, and a foreign holder can neither resolve
+        # that DID nor decrypt what it points at (issue_credential encrypts to the
+        # ISSUER when the subject is not managed). So this carries the credential.
+        #
+        # The attachment is the signed VC exactly as issued, and the credential's
+        # own DID travels in the body: the proof covers every field but `proof`,
+        # so an `id` added after signing would make the credential fail
+        # verification for the very recipient this message exists to reach.
+        options = options or {}
+        credential_did = await self.lookup_did(did)
+        vc = await self.get_credential(credential_did)
+
+        if not vc:
+            raise InvalidParameterError("did")
+
+        message = dc_protocols.issue_credential_message(
+            vc,
+            comment=options.get("comment"),
+            credential_did=credential_did,
+        )
+
+        return await self.send_didcomm(
+            message,
+            to,
+            {"name": options.get("name"), "anoncrypt": options.get("anoncrypt")},
+        )
+
+    async def accept_credential_didcomm(self, message: dict[str, Any]) -> bool:
+        # The body names the credential's DID; resolving, decrypting and
+        # checking the subject is the existing path.
+        body = message.get("body") if isinstance(message, dict) else None
+        credential_did = body.get("credential_did") if isinstance(body, dict) else None
+
+        if not isinstance(credential_did, str) or not self.is_managed_did(credential_did):
+            # A credential from a foreign issuer has no did:cid to resolve, so
+            # there is nothing for this wallet to hold.
+            return False
+
+        # The DID rides outside the signed credential, so nothing on the wire
+        # binds the two together: a sender could attach one credential and name
+        # another. Both would have to be genuinely issued to this holder for
+        # accept_credential to take them, so this is not forgery -- but storing
+        # something other than what the user was shown is still wrong.
+        attached = dc_protocols.attached_json(message)
+        resolved = await self.get_credential(credential_did)
+
+        if not resolved or hash_json(resolved) != hash_json(attached):
+            return False
+
+        return await self.accept_credential(credential_did)
 
     async def get_credential(self, identifier: str) -> dict[str, Any] | None:
         did = await self.lookup_did(identifier)

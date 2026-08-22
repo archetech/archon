@@ -410,6 +410,111 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
         }
     });
 
+    /**
+     * @swagger
+     * /didcomm/credential/send:
+     *   post:
+     *     summary: Deliver an issued credential over DIDComm (issue-credential 3.0).
+     *     description: >
+     *       Sends the credential itself, not a reference. This is the only way to
+     *       reach a subject whose DID is not a `did:cid`, since such a holder can
+     *       neither resolve a credential DID nor decrypt what it points at.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - did
+     *               - to
+     *             properties:
+     *               did:
+     *                 type: string
+     *                 description: The issued credential's DID.
+     *               to:
+     *                 oneOf:
+     *                   - type: string
+     *                   - type: array
+     *                     items:
+     *                       type: string
+     *               options:
+     *                 type: object
+     *                 properties:
+     *                   name:
+     *                     type: string
+     *                   comment:
+     *                     type: string
+     *                   anoncrypt:
+     *                     type: boolean
+     *     responses:
+     *       200:
+     *         description: The stored message ids, one per recipient.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 ids:
+     *                   type: array
+     *                   items:
+     *                     type: string
+     *       400:
+     *         description: Bad request.
+     */
+    router.post('/didcomm/credential/send', async (req, res) => {
+        try {
+            const { did, to, options } = req.body || {};
+            const ids = await getKeymaster().sendCredentialDidComm(did, to, options);
+            res.json({ ids });
+        } catch (error: any) {
+            res.status(400).send({ error: error.toString() });
+        }
+    });
+
+    /**
+     * @swagger
+     * /didcomm/credential/accept:
+     *   post:
+     *     summary: Accept a credential that arrived over DIDComm.
+     *     description: >
+     *       Reads the credential DID from the message body and accepts it.
+     *       Returns false for a credential from a foreign issuer, which has no
+     *       `did:cid` for this wallet to resolve and hold.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - message
+     *             properties:
+     *               message:
+     *                 type: object
+     *                 description: The unpacked issue-credential plaintext.
+     *     responses:
+     *       200:
+     *         description: Whether the credential was added to the wallet.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 ok:
+     *                   type: boolean
+     *       400:
+     *         description: Bad request.
+     */
+    router.post('/didcomm/credential/accept', async (req, res) => {
+        try {
+            const { message } = req.body || {};
+            const ok = await getKeymaster().acceptCredentialDidComm(message);
+            res.json({ ok });
+        } catch (error: any) {
+            res.status(400).send({ error: error.toString() });
+        }
+    });
 
     return router;
 }

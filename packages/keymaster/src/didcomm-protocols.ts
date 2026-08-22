@@ -100,12 +100,24 @@ export function requestCredential(thid?: string, comment?: string): DidCommPlain
     return { type: ISSUE_CREDENTIAL_REQUEST_TYPE, ...(thid ? { thid } : {}), body: comment ? { comment } : {} };
 }
 
-export function issueCredentialMessage(credential: object, options: { thid?: string; comment?: string } = {}): DidCommPlaintext {
+// `credentialDid` is an Archon-specific hint, and it rides in the body rather
+// than inside the credential on purpose: the proof covers every field of the VC
+// except `proof` itself, so adding an `id` after signing would make the
+// credential fail verification for exactly the foreign recipient this message
+// exists to reach. The attachment must travel byte-for-byte as it was signed.
+export function issueCredentialMessage(
+    credential: object,
+    options: { thid?: string; comment?: string; credentialDid?: string } = {}
+): DidCommPlaintext {
     const attachId = 'vc-1';
     return {
         type: ISSUE_CREDENTIAL_TYPE,
         ...(options.thid ? { thid: options.thid } : {}),
-        body: { ...(options.comment ? { comment: options.comment } : {}), formats: [{ attach_id: attachId, format: VC_ATTACHMENT_FORMAT }] },
+        body: {
+            ...(options.comment ? { comment: options.comment } : {}),
+            ...(options.credentialDid ? { credential_did: options.credentialDid } : {}),
+            formats: [{ attach_id: attachId, format: VC_ATTACHMENT_FORMAT }],
+        },
         attachments: [jsonAttachment(attachId, VC_ATTACHMENT_FORMAT, credential)],
     };
 }

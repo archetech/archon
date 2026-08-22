@@ -987,6 +987,20 @@ async def cmd_send_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
     _print_json(await km.send_didcomm(message, _didcomm_recipients(args.to), _didcomm_pack_options(args)))
 
 
+async def cmd_send_credential_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    ids = await km.send_credential_didcomm(
+        args.did,
+        _didcomm_recipients(args.to),
+        {"anoncrypt": args.anoncrypt, "comment": args.comment, "name": args.name},
+    )
+    _print_json(ids)
+
+
+async def cmd_accept_credential_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
+    message = json.loads(Path(args.file).read_text(encoding="utf-8"))
+    _print_json({"ok": await km.accept_credential_didcomm(message)})
+
+
 async def cmd_receive_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
     _print_json(await km.receive_didcomm({"name": args.name, "endpoint": args.endpoint, "ack": args.ack}))
 
@@ -1389,6 +1403,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--anoncrypt", action="store_true", help="anonymous sender (anoncrypt instead of authcrypt)")
     sp.add_argument("-e", "--encryption", help="content encryption: A256CBC-HS512 | XC20P | A256GCM")
     sp.add_argument("-n", "--name", help="sender identity name (defaults to current)")
+    sp = add("send-credential-didcomm", "Deliver an issued credential over DIDComm (reaches subjects whose DID is not did:cid)", cmd_send_credential_didcomm)
+    sp.add_argument("did")
+    sp.add_argument("to")
+    sp.add_argument("--anoncrypt", action="store_true", help="anonymous sender (anoncrypt instead of authcrypt)")
+    sp.add_argument("-c", "--comment", help="comment to include with the credential")
+    sp.add_argument("-n", "--name", help="sender identity name (defaults to current)")
+    sp = add("accept-credential-didcomm", "Accept a credential received over DIDComm (JSON file containing the unpacked message)", cmd_accept_credential_didcomm)
+    sp.add_argument("file")
     sp = add("receive-didcomm", "Fetch and unpack queued DIDComm messages from the current ID's mailbox", cmd_receive_didcomm)
     sp.add_argument("-n", "--name", help="identity name (defaults to current)")
     sp.add_argument("--endpoint", help="override the mailbox endpoint")

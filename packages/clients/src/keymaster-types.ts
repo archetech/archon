@@ -453,6 +453,15 @@ export interface KeymasterInterface {
     receiveDidComm(options?: { name?: string; endpoint?: string; ack?: boolean }): Promise<DidCommReceivedMessage[]>;
     ackDidComm(ids: string[], options?: { name?: string; endpoint?: string }): Promise<number>;
     mediateDidComm(options?: { name?: string; endpoint?: string }): Promise<{ relayed: number; skipped: number }>;
+    // Credential exchange over DIDComm (issue-credential 3.0). The only way to
+    // reach a subject whose DID is not a did:cid -- sendCredential's Notice
+    // carries a DID such a holder can neither resolve nor decrypt.
+    sendCredentialDidComm(
+        did: string,
+        to: string | string[],
+        options?: { name?: string; comment?: string; anoncrypt?: boolean }
+    ): Promise<string[]>;
+    acceptCredentialDidComm(message: Record<string, unknown>): Promise<boolean>;
 
     // Nostr
     addNostr(id?: string): Promise<NostrKeys>;

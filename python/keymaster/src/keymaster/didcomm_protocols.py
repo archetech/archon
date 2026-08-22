@@ -108,9 +108,21 @@ def request_credential(thid: str | None = None, comment: str | None = None) -> d
     return _with_thid({"type": ISSUE_CREDENTIAL_REQUEST_TYPE, "body": {"comment": comment} if comment else {}}, thid)
 
 
-def issue_credential_message(credential: dict[str, Any], thid: str | None = None, comment: str | None = None) -> dict[str, Any]:
+# `credential_did` is an Archon-specific hint, and it rides in the body rather
+# than inside the credential on purpose: the proof covers every field of the VC
+# except `proof` itself, so adding an `id` after signing would make the
+# credential fail verification for exactly the foreign recipient this message
+# exists to reach. The attachment must travel byte-for-byte as it was signed.
+def issue_credential_message(
+    credential: dict[str, Any],
+    thid: str | None = None,
+    comment: str | None = None,
+    credential_did: str | None = None,
+) -> dict[str, Any]:
     attach_id = "vc-1"
     body: dict[str, Any] = {"formats": [{"attach_id": attach_id, "format": VC_ATTACHMENT_FORMAT}]}
+    if credential_did:
+        body = {"credential_did": credential_did, **body}
     if comment:
         body = {"comment": comment, **body}
     return _with_thid(

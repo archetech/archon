@@ -528,3 +528,108 @@ def test_coordinate_mediation_builders():
     response = p.keylist_update_response([{"recipient_did": "did:cid:bob", "action": "add", "result": "success"}], "u-1")
     assert response["thid"] == "u-1" and response["body"]["updated"][0]["result"] == "success"
     assert p.keylist(["did:cid:bob"])["body"]["keys"][0] == {"recipient_did": "did:cid:bob"}
+
+
+def test_accept_credential_didcomm_requires_a_resolvable_did():
+    # A credential from a foreign issuer carries no did:cid for this wallet to
+    # look up, so there is nothing to hold -- saying so beats reporting a success
+    # that stored nothing. Mirrors the JS keymaster (#905).
+    import asyncio
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+
+    foreign = {
+        "type": "https://didcomm.org/issue-credential/3.0/issue-credential",
+        "body": {"credential_did": "https://university.example/credentials/1872"},
+        "attachments": [{"data": {"json": {
+            "id": "https://university.example/credentials/1872",
+            "issuer": "did:web:university.example",
+        }}}],
+    }
+
+    assert asyncio.run(km.accept_credential_didcomm(foreign)) is False
+    assert asyncio.run(km.accept_credential_didcomm({"body": {}})) is False
+
+
+def test_send_credential_didcomm_carries_the_credential_not_a_reference(monkeypatch):
+    # The whole point: a foreign holder cannot resolve or decrypt a credential
+    # DID, so the message must contain the signed VC itself.
+    import asyncio
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+
+    vc = {
+        "@context": ["https://www.w3.org/ns/credentials/v2"],
+        "type": ["VerifiableCredential"],
+        "issuer": "did:cid:alice",
+        "credentialSubject": {"id": "did:web:example.com"},
+        "proof": {"proofValue": "sig"},
+    }
+
+    sent: dict = {}
+
+    async def fake_send(message, to, options=None):
+        sent["message"] = message
+        sent["to"] = to
+        return ["msg-1"]
+
+    monkeypatch.setattr(km, "lookup_did", _async_return("did:cid:credential"))
+    monkeypatch.setattr(km, "get_credential", _async_return(vc))
+    monkeypatch.setattr(km, "send_didcomm", fake_send)
+
+    assert asyncio.run(
+        km.send_credential_didcomm("did:cid:credential", "did:web:example.com")
+    ) == ["msg-1"]
+
+    # The DID is named in the body, and the credential travels byte-for-byte as
+    # it was signed: the proof covers every field but `proof`, so an `id` added
+    # afterwards would break verification for the recipient this exists to reach.
+    assert sent["message"]["body"]["credential_did"] == "did:cid:credential"
+
+    attached = sent["message"]["attachments"][0]["data"]["json"]
+    assert attached == vc
+
+
+def test_accept_credential_didcomm_refuses_a_credential_it_did_not_show(monkeypatch):
+    # Nothing on the wire binds the body's DID to the attachment, so a sender can
+    # name one credential and display another.
+    import asyncio
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+
+    resolved = {"type": ["VerifiableCredential"], "issuer": "did:cid:alice"}
+    shown = {"type": ["VerifiableCredential"], "issuer": "did:cid:mallory"}
+
+    accepted: list[str] = []
+
+    async def fake_accept(did):
+        accepted.append(did)
+        return True
+
+    monkeypatch.setattr(km, "get_credential", _async_return(resolved))
+    monkeypatch.setattr(km, "accept_credential", fake_accept)
+
+    message = {
+        "type": "https://didcomm.org/issue-credential/3.0/issue-credential",
+        "body": {"credential_did": "did:cid:credential"},
+        "attachments": [{"data": {"json": shown}}],
+    }
+
+    assert asyncio.run(km.accept_credential_didcomm(message)) is False
+    assert accepted == []
+
+    message["attachments"][0]["data"]["json"] = resolved
+    assert asyncio.run(km.accept_credential_didcomm(message)) is True
+    assert accepted == ["did:cid:credential"]

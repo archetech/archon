@@ -1397,6 +1397,24 @@ def publish_didcomm(endpoint=None, name=None, routing_keys=None):
     return response["ok"]
 
 
+def send_credential_didcomm(did, to, options=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/didcomm/credential/send",
+        json={"did": did, "to": to, "options": options},
+    )
+    return response["ids"]
+
+
+def accept_credential_didcomm(message):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/didcomm/credential/accept",
+        json={"message": message},
+    )
+    return response["ok"]
+
+
 def unpublish_didcomm(name=None):
     response = proxy_request(
         "DELETE",

@@ -6,7 +6,8 @@ import {
 import { ContentCopy, Forum, Inbox, QrCodeScanner } from "@mui/icons-material";
 import { QRCodeSVG } from "qrcode.react";
 import {
-    BASIC_MESSAGE_TYPE, TRUST_PING_TYPE, basicMessage, decodeOutOfBandInvitation,
+    BASIC_MESSAGE_TYPE, ISSUE_CREDENTIAL_TYPE, TRUST_PING_TYPE, attachedJson,
+    basicMessage, decodeOutOfBandInvitation,
     encodeOutOfBandInvitation, outOfBandInvitation, trustPing, trustPingResponse
 } from "@didcid/keymaster/didcomm-protocols";
 import type { DidCommReceivedMessage } from "@didcid/keymaster/types";
@@ -66,6 +67,9 @@ function messageLabel(type?: string): string {
     if (type === TRUST_PING_TYPE) {
         return "Trust ping";
     }
+    if (type === ISSUE_CREDENTIAL_TYPE) {
+        return "Credential";
+    }
     return type || "Unknown";
 }
 
@@ -78,6 +82,43 @@ function authenticatedSender(received: DidCommReceivedMessage): string | undefin
         return undefined;
     }
     return received.metadata.sender.split('#')[0];
+}
+
+// The credential is the thing the user cares about, so show what it asserts
+// rather than the envelope that carried it.
+function CredentialSummary({ message }: { message: DidCommPlaintext }) {
+    const vc = attachedJson(message as { attachments?: Array<{ data?: { json?: unknown } }> });
+
+    if (!vc) {
+        return (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                This credential message carries no credential.
+            </Typography>
+        );
+    }
+
+    const types: string[] = Array.isArray(vc.type) ? vc.type : [];
+    const kind = types.filter(t => t !== "VerifiableCredential").join(", ") || "Verifiable credential";
+
+    return (
+        <Box sx={{ mt: 1 }}>
+            <Typography variant="body1">{kind}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-all" }}>
+                Issued by {vc.issuer ?? "unknown"}
+            </Typography>
+            {vc.validUntil && (
+                <Typography variant="body2" color="text.secondary">
+                    Valid until {new Date(vc.validUntil).toLocaleString()}
+                </Typography>
+            )}
+            <Box
+                component="pre"
+                sx={{ mt: 1, p: 1, borderRadius: 1, bgcolor: "action.hover", fontSize: "0.75rem", overflowX: "auto", m: 0 }}
+            >
+                {JSON.stringify(vc.credentialSubject ?? {}, null, 2)}
+            </Box>
+        </Box>
+    );
 }
 
 function formatTime(created?: number): string {
@@ -393,6 +434,33 @@ function DidCommTab() {
         setActiveTab("compose");
     }
 
+    async function acceptCredential(received: DidCommReceivedMessage) {
+        if (!keymaster) return;
+
+        setBusy(true);
+        try {
+            const accepted = await keymaster.acceptCredentialDidComm(
+                received.message as Record<string, unknown>,
+            );
+
+            if (accepted) {
+                setSuccess("Credential added to your wallet");
+                await dismiss([received.id]);
+                return;
+            }
+
+            // A credential from a foreign issuer has no did:cid for this wallet to
+            // resolve, so there is nothing to hold. Say so rather than report a
+            // success that stored nothing -- the message stays in the inbox where
+            // its contents can still be read.
+            setError("This credential has no DID this wallet can resolve, so it cannot be held");
+        } catch (error: any) {
+            setError(error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
     async function dismiss(ids: string[]) {
         if (!keymaster || !ids.length) return;
 
@@ -467,6 +535,11 @@ function DidCommTab() {
                                 Reply
                             </Button>
                         )}
+                        {message.type === ISSUE_CREDENTIAL_TYPE && (
+                            <Button size="small" onClick={() => acceptCredential(received)} disabled={busy}>
+                                Accept
+                            </Button>
+                        )}
                         <Button size="small" color="error" onClick={() => dismiss([received.id])} disabled={busy}>
                             Dismiss
                         </Button>
@@ -477,7 +550,9 @@ function DidCommTab() {
                     From: {sender || (claimed ? `${claimed} (unverified)` : "unknown")}
                 </Typography>
 
-                {message.type === BASIC_MESSAGE_TYPE ? (
+                {message.type === ISSUE_CREDENTIAL_TYPE ? (
+                    <CredentialSummary message={message} />
+                ) : message.type === BASIC_MESSAGE_TYPE ? (
                     <Typography variant="body1" sx={{ mt: 1, whiteSpace: "pre-wrap" }}>
                         {String(message.body?.content ?? "")}
                     </Typography>

@@ -2140,6 +2140,41 @@ program
     });
 
 program
+    .command('send-credential-didcomm <did> <to>')
+    .description('Deliver an issued credential over DIDComm (reaches subjects whose DID is not did:cid)')
+    .option('--anoncrypt', 'anonymous sender (anoncrypt instead of authcrypt)')
+    .option('-c, --comment <text>', 'comment to include with the credential')
+    .option('-n, --name <name>', 'sender identity name (defaults to current)')
+    .action(async (did, to, options) => {
+        try {
+            const recipients = to.includes(',') ? to.split(',').map((s: string) => s.trim()) : to;
+            const ids = await keymaster.sendCredentialDidComm(did, recipients, {
+                anoncrypt: options.anoncrypt,
+                comment: options.comment,
+                name: options.name,
+            });
+            console.log(JSON.stringify(ids, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('accept-credential-didcomm <file>')
+    .description('Accept a credential received over DIDComm (JSON file containing the unpacked message)')
+    .action(async (file) => {
+        try {
+            const message = JSON.parse(fs.readFileSync(file).toString());
+            const ok = await keymaster.acceptCredentialDidComm(message);
+            console.log(JSON.stringify({ ok }, null, 4));
+        }
+        catch (error: any) {
+            console.error(error.error || error.message || error);
+        }
+    });
+
+program
     .command('receive-didcomm')
     .description('Fetch and unpack queued DIDComm messages from the current identity mailbox')
     .option('-n, --name <name>', 'identity name (defaults to current)')
