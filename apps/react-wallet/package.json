@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "android:run": "vite build --mode android && npx cap sync android && npx cap run android",
-    "android:build": "vite build --mode production && npx cap sync android && cd android && ./gradlew assembleDebug"
+    "android:build": "vite build --mode production && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "test": "vitest run --config vitest.config.ts"
   },
   "author": "Peter Bushnell",
   "license": "MIT",
@@ -35,13 +36,18 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.4.4",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.6",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@vitejs/plugin-react": "^6.1.0",
     "esbuild": "^0.28.2",
+    "jsdom": "^26.1.0",
     "typescript": "^5.9.3",
-    "vite": "^8.2.1"
+    "vite": "^8.2.1",
+    "vitest": "^3.2.7"
   },
   "overrides": {
     "@xmldom/xmldom": "^0.8.13"
