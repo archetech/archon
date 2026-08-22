@@ -91,6 +91,87 @@ describe('GET /1.0/identifiers/:did (conformant resolution)', () => {
         expect(didJson.body.didResolutionMetadata.retrieved).toBeUndefined();
     });
 
+    it('serves application/did-resolution when the client asks for it', async () => {
+        // #770: did+ld+json and did+json describe a DID *document*, and this
+        // endpoint answers with the resolution triple. A client that names the
+        // resolution media type gets it labelled correctly.
+        const res = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', 'application/did-resolution');
+
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toBe('application/did-resolution');
+        expect(res.headers.vary).toContain('Accept');
+
+        // Parsed by hand: application/did-resolution is not a media type generic
+        // JSON clients auto-parse, which is part of why it stays opt-in.
+        const body = JSON.parse(res.text);
+        expect(Object.keys(body).sort()).toStrictEqual([
+            'didDocument',
+            'didDocumentMetadata',
+            'didResolutionMetadata',
+        ]);
+        // The metadata field still reports the DOCUMENT representation: it
+        // describes what was returned inside the envelope, not the envelope.
+        expect(body.didResolutionMetadata.contentType).toBe('application/did+ld+json');
+        expect(body.didDocument.id).toBe(agentDid);
+    });
+
+    it('leaves the document media types as the default', async () => {
+        // Universal Resolver drivers expect these, so naming did-resolution has
+        // to be opt-in rather than a change of default.
+        const noAccept = await request(app).get(`/1.0/identifiers/${agentDid}`);
+        expect(noAccept.headers['content-type']).toBe('application/did+ld+json');
+
+        // A wildcard satisfies the document types but must not select the
+        // resolution envelope.
+        const wildcard = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', '*/*');
+        expect(wildcard.headers['content-type']).toBe('application/did+ld+json');
+
+        const applicationWildcard = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', 'application/*');
+        expect(applicationWildcard.headers['content-type']).toBe('application/did+ld+json');
+
+        // A wildcard alongside a lower-q explicit type: the wildcard gives every
+        // document type q=1, which beats the named did+json at q=0.5. Pinned
+        // because it is what a lenient UR driver sends.
+        const outrankingWildcard = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', '*/*;q=1, application/did+json;q=0.5');
+        expect(outrankingWildcard.headers['content-type']).toBe('application/did+ld+json');
+    });
+
+    it('honours q-values between the resolution envelope and the document types', async () => {
+        const preferResolution = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', 'application/did+ld+json;q=0.5, application/did-resolution;q=1');
+        expect(preferResolution.headers['content-type']).toBe('application/did-resolution');
+        expect(JSON.parse(preferResolution.text).didDocument.id).toBe(agentDid);
+
+        const preferDocument = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', 'application/did-resolution;q=0.4, application/did+json;q=0.9');
+        expect(preferDocument.headers['content-type']).toBe('application/did+json');
+        expect(preferDocument.body.didResolutionMetadata.contentType).toBe('application/did+json');
+    });
+
+    it('answers representationNotSupported when it can produce nothing the client accepts', async () => {
+        // #770: any Accept used to be satisfied with JSON-LD and a 200, which
+        // contradicted the supportedContentTypes published in the DID test suite
+        // fixture. The result stays triple-shaped, as errors do on this surface.
+        const res = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', 'application/xml');
+
+        expect(res.status).toBe(406);
+        expect(res.body.didResolutionMetadata.error).toBe('representationNotSupported');
+        expect(res.body.didDocument).toBeNull();
+        expect(res.body.didDocumentMetadata).toStrictEqual({});
+    });
+
     it('resolves an asset to the triple only (no inline data/registration)', async () => {
         const res = await request(app).get(`/1.0/identifiers/${assetDid}`);
 
