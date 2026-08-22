@@ -7,5 +7,14 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@mui/icons-material": "^7.3.9",
+    "@mui/lab": "^7.0.1-beta.19",
+    "@mui/material": "^7.3.5",
+    "@uiw/react-json-view": "^2.0.0-alpha.39",
+    "axios": "^1.18.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.8"
   }
 }
