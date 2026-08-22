@@ -18,13 +18,13 @@ export default defineConfig({
     // here keeps the test path independent of that.
     esbuild: { jsx: 'automatic' },
     resolve: {
-        // wallet-ui declares no dependencies of its own and is consumed as
-        // source, so its bare imports resolve upward from packages/ and never
-        // reach this app's node_modules -- where the only copy lives. webpack
-        // handles that with `resolve.modules`; in vite, listing them here makes
-        // resolution happen from the app root, which is also what stops a
-        // second copy of React or MUI loading (two MUI instances means two
-        // emotion caches). Same list the react-wallet vite config carries.
+        // wallet-ui is consumed as source from outside this app, so without
+        // this its imports resolve to the copies npm installs at the root for
+        // its peerDependencies rather than to this app's. Listing them here
+        // makes resolution happen from the app root, which is what keeps a
+        // single copy of React and MUI in play -- two MUI instances means two
+        // emotion caches. Same list the react-wallet vite config carries, and
+        // the counterpart of webpack's `resolve.modules`.
         dedupe: ['@mui/lab', 'qrcode.react', '@uiw/react-json-view', '@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled', 'react', 'react-dom'],
         alias: {
             '@didcid/wallet-ui': path.join(packages, 'wallet-ui/src/index.ts'),
