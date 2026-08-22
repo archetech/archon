@@ -37,14 +37,14 @@ describe('filecoin mediator queue processing', () => {
             const op = operation('ok');
             const cleared: Operation[][] = [];
             const gatekeeper = {
-                getQueue: jest.fn().mockResolvedValue([op]),
+                getQueue: jest.fn<any>().mockResolvedValue([op]),
                 clearQueue: jest.fn(async (_registry: string, ops: Operation[]) => {
                     cleared.push(ops);
                     return true;
                 }),
-                addJSON: jest.fn().mockResolvedValue('bagaaieraok'),
+                addJSON: jest.fn<any>().mockResolvedValue('bagaaieraok'),
             };
-            const walletPin = jest.fn().mockResolvedValue({ status: 'pinned' });
+            const walletPin = jest.fn<any>().mockResolvedValue({ status: 'pinned' });
 
             const result = await processFilecoinQueue('pin', gatekeeper, store, cipher, walletPin);
 
@@ -58,11 +58,11 @@ describe('filecoin mediator queue processing', () => {
         await withStore(async (store) => {
             const op = operation('fail');
             const gatekeeper = {
-                getQueue: jest.fn().mockResolvedValue([op]),
-                clearQueue: jest.fn(),
-                addJSON: jest.fn().mockResolvedValue('bagaaierafail'),
+                getQueue: jest.fn<any>().mockResolvedValue([op]),
+                clearQueue: jest.fn<any>(),
+                addJSON: jest.fn<any>().mockResolvedValue('bagaaierafail'),
             };
-            const walletPin = jest.fn().mockRejectedValue(new Error('too many requests'));
+            const walletPin = jest.fn<any>().mockRejectedValue(new Error('too many requests'));
 
             const result = await processFilecoinQueue('pin', gatekeeper, store, cipher, walletPin);
 

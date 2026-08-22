@@ -105,6 +105,7 @@ describe('mcp server config', () => {
             passphrase: 'secret',
             defaultRegistry: undefined,
             readOnly: false,
+            inlineLimit: 16 * 1024,
         }) as { disconnect?: () => Promise<void> };
 
         await wallet.disconnect?.();
@@ -124,6 +125,7 @@ describe('mcp server config', () => {
             passphrase: 'secret',
             defaultRegistry: undefined,
             readOnly: false,
+            inlineLimit: 16 * 1024,
         });
 
         await wallet.saveWallet({ version: 2, seed: {}, counter: 0, ids: {} });
@@ -141,6 +143,7 @@ describe('mcp server config', () => {
             passphrase: undefined,
             defaultRegistry: undefined,
             readOnly: false,
+            inlineLimit: 16 * 1024,
         });
 
         expect(runtime.node.url).toBe('http://127.0.0.1:1');
@@ -159,6 +162,7 @@ describe('mcp server config', () => {
             passphrase: 'secret',
             defaultRegistry: 'hyperswarm',
             readOnly: false,
+            inlineLimit: 16 * 1024,
         });
 
         expect(runtime.node.url).toBe('http://127.0.0.1:1');

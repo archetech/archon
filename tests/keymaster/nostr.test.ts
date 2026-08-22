@@ -6,7 +6,10 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { UnknownIDError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
 import { bech32 } from 'bech32';
-import { schnorr } from '@noble/curves/secp256k1';
+// The root has @noble/curves 2.x, which exports './secp256k1.js' only, while
+// packages/cipher pins 1.9.7 where the extensionless specifier still resolves.
+// jest finds the file either way; the type resolver does not.
+import { schnorr } from '@noble/curves/secp256k1.js';
 
 let ipfs: HeliaClient;
 let gatekeeper: Gatekeeper;

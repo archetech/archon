@@ -1,4 +1,4 @@
-import { archon, resetAll, freshWalletWithId, dockerExec } from './helpers';
+import { archon, resetAll, freshWalletWithId, dockerExec } from './helpers.ts';
 
 afterAll(async () => {
     await resetAll();

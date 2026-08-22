@@ -23,7 +23,7 @@ let warnSpy: any;
 let errorSpy: any;
 
 beforeAll(async () => {
-    ({ createHeraldRoutes } = await import('../../services/herald/server/src/routes'));
+    ({ createHeraldRoutes } = await import('../../services/herald/server/src/routes.ts'));
 });
 
 beforeEach(() => {
@@ -162,7 +162,7 @@ describe('LNURLp callback over Tor', () => {
         // trap -- if the onion path ever goes back through it, this test sees no
         // call on socksFetchMock and fails.
         const socksFetchMock = jest.fn<any>().mockResolvedValue({ ok: true, json: async () => ({ pr: 'lnbc1' }) });
-        const { socksEgress } = await import('../../services/herald/server/src/routes');
+        const { socksEgress } = await import('../../services/herald/server/src/routes.ts');
         const realSocksFetch = socksEgress.fetch;
         socksEgress.fetch = socksFetchMock as any;
         const globalTrap = jest.fn<any>();
@@ -177,7 +177,7 @@ describe('LNURLp callback over Tor', () => {
             // call here is the regression.
             expect(globalTrap).not.toHaveBeenCalled();
             // A dispatcher is attached only for .onion destinations.
-            expect(socksFetchMock.mock.calls[0][1].dispatcher).toBeDefined();
+            expect((socksFetchMock.mock.calls[0][1] as any).dispatcher).toBeDefined();
         } finally {
             socksEgress.fetch = realSocksFetch;
         }
@@ -190,6 +190,6 @@ describe('LNURLp callback over Tor', () => {
 
         await request(app).get('/api/lnurlp/alice/callback?amount=100000');
 
-        expect(fetchMock.mock.calls[0][1].dispatcher).toBeUndefined();
+        expect((fetchMock.mock.calls[0][1] as any).dispatcher).toBeUndefined();
     });
 });

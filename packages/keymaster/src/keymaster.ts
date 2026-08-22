@@ -1,4 +1,4 @@
-import { attachedJson, issueCredentialMessage } from './didcomm-protocols.js';
+import { attachedJson, issueCredentialMessage, type DidCommPlaintext } from './didcomm-protocols.js';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
@@ -3673,7 +3673,7 @@ export default class Keymaster implements KeymasterInterface {
         // another. Both would have to be genuinely issued to this holder for
         // acceptCredential to take them, so this is not forgery -- but storing
         // something other than what the user was shown is still wrong.
-        const attached = attachedJson(message as { attachments?: Array<{ data?: { json?: unknown } }> });
+        const attached = attachedJson(message as DidCommPlaintext);
         const resolved = await this.getCredential(credentialDid);
 
         if (!resolved || this.cipher.hashJSON(resolved) !== this.cipher.hashJSON(attached)) {

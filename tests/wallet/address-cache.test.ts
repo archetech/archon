@@ -1,14 +1,14 @@
 import { jest } from '@jest/globals';
 
 type BtcClientMock = {
-    command: jest.Mock;
-    getNewAddress: jest.Mock;
+    command: jest.Mock<any>;
+    getNewAddress: jest.Mock<any>;
 };
 
 function createMockClient(): BtcClientMock {
     return {
-        command: jest.fn(),
-        getNewAddress: jest.fn(),
+        command: jest.fn<any>(),
+        getNewAddress: jest.fn<any>(),
     };
 }
 
@@ -24,7 +24,7 @@ async function getReceiveAddress(btcClient: BtcClientMock): Promise<string> {
     }
 
     cachedReceiveAddress = await btcClient.getNewAddress('receive', 'bech32');
-    return cachedReceiveAddress;
+    return cachedReceiveAddress as string;
 }
 
 describe('Address caching', () => {

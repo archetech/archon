@@ -1,4 +1,4 @@
-import { redactUrl } from '../../services/mediators/satoshi-wallet/src/url-redaction';
+import { redactUrl } from '../../services/mediators/satoshi-wallet/src/url-redaction.ts';
 
 describe('redactUrl', () => {
     it('redacts Alchemy path keys', () => {

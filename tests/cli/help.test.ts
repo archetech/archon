@@ -1,4 +1,4 @@
-import { archon } from './helpers';
+import { archon } from './helpers.ts';
 
 describe('help', () => {
     test('help output contains expected commands', async () => {

@@ -2,6 +2,14 @@ import nock from 'nock';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 
+// The stream APIs declare AsyncIterable<Uint8Array>; a Buffer is not one, even
+// though the consumer happens to tolerate it. Passing what the signature asks
+// for exercises the declared contract instead of relying on that leniency.
+async function* streamOf(data: Buffer): AsyncIterable<Uint8Array> {
+    yield new Uint8Array(data);
+}
+
+
 const GatekeeperURL = 'http://gatekeeper.org';
 const ServerError = { message: 'Server error' };
 const MockDID = 'did:mock:1234';
@@ -894,7 +902,7 @@ describe('addDataStream', () => {
             .reply(200, mockCID);
 
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
-        const cid = await gatekeeper.addDataStream(Buffer.from('stream data'));
+        const cid = await gatekeeper.addDataStream(streamOf(Buffer.from('stream data')));
 
         expect(cid).toStrictEqual(mockCID);
     });
@@ -907,7 +915,7 @@ describe('addDataStream', () => {
         const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
 
         try {
-            await gatekeeper.addDataStream(Buffer.from('stream data'));
+            await gatekeeper.addDataStream(streamOf(Buffer.from('stream data')));
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

@@ -1,4 +1,4 @@
-import { archon, resetAll, freshWalletWithId, parseDid } from './helpers';
+import { archon, resetAll, freshWalletWithId, parseDid } from './helpers.ts';
 
 let schemaDid: string;
 

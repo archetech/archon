@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 
-const mockCreate = jest.fn();
+const mockCreate = jest.fn<any>();
 
 jest.unstable_mockModule('kubo-rpc-client', () => ({
     create: mockCreate,
@@ -216,7 +216,7 @@ describe('KuboClient JSON blocks', () => {
 
         // CIDv1 with the json codec, base32-encoded.
         expect(cid).toMatch(/^bagaaie/);
-        const [buf, options] = rpc.block.put.mock.calls[0];
+        const [buf, options] = rpc.block.put.mock.calls[0] as unknown as [Uint8Array, { cid: { toString(): string } }];
         expect(jsonCodec.decode(buf)).toEqual({ hello: 'world' });
         expect(options.cid.toString()).toBe(cid);
     });

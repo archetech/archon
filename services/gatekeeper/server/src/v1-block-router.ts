@@ -45,7 +45,7 @@ export function createBlockRouter(options: CreateV1RouterOptions): express.Route
      */
     router.get('/block/:registry/latest', async (req, res) => {
         try {
-            const { registry } = req.params;
+            const registry = req.params.registry as string;
             const block = await gatekeeper.getBlock(registry);
             res.json(block);
         } catch (error: any) {
@@ -164,7 +164,7 @@ export function createBlockRouter(options: CreateV1RouterOptions): express.Route
      */
     router.post('/block/:registry', requireAdminKey, async (req, res) => {
         try {
-            const { registry } = req.params;
+            const registry = req.params.registry as string;
             const block = req.body;
             const ok = await gatekeeper.addBlock(registry, block);
             res.json(ok);

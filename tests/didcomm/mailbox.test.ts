@@ -9,6 +9,7 @@ import { packEncrypted } from '@didcid/cipher/didcomm';
 import { MailboxFullError, MemoryMailboxStore, RedisMailboxStore } from '../../services/didcomm/server/src/store.ts';
 import { recipientDidsFromEnvelope, verifyChallengeSignature } from '../../services/didcomm/server/src/mailbox.ts';
 import { createApp, socksEgress } from '../../services/didcomm/server/src/didcomm-api.ts';
+import type { Cipher } from '@didcid/cipher/types';
 import express from 'express';
 import request from 'supertest';
 
@@ -307,7 +308,7 @@ describe('deposit route capacity', () => {
             expect(response.status).toBe(200);
             expect(globalTrap).not.toHaveBeenCalled();
             expect(socksFetchMock).toHaveBeenCalledTimes(1);
-            expect(socksFetchMock.mock.calls[0][1].dispatcher).toBeDefined();
+            expect((socksFetchMock.mock.calls[0][1] as any).dispatcher).toBeDefined();
         }
         finally {
             socksEgress.fetch = realSocksFetch;
@@ -671,7 +672,10 @@ describe('verifyChallengeSignature', () => {
         await expect(verifyChallengeSignature(
             {
                 resolver: gatekeeper,
-                cipher: { ...cipher, verifySig: () => { throw new Error('bad signature'); } },
+                // Spreading a class instance copies no prototype methods, so
+                // this is not a whole Cipher -- but verifyChallengeSignature
+                // reaches only for verifySig, which is the one made to throw.
+                cipher: { ...cipher, verifySig: () => { throw new Error('bad signature'); } } as unknown as Cipher,
             },
             { did: await keymaster.createId('VerifierError'), challenge: 'challenge', signature: 'sig' }
         )).resolves.toBe(false);

@@ -4,8 +4,8 @@ import {
     getPriceForOperation,
     loadPricingFromEnv,
     routeToScope,
-} from '../../services/drawbridge/server/src/pricing';
-import type { OperationPricingConfig } from '../../services/drawbridge/server/src/types';
+} from '../../services/drawbridge/server/src/pricing.ts';
+import type { OperationPricingConfig } from '../../services/drawbridge/server/src/types.ts';
 
 describe('routeToScope', () => {
     it('maps exact routes to their scope', () => {

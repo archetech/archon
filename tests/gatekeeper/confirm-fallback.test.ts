@@ -3,7 +3,7 @@ import {
     CONFIRM_FALLBACK_HEADER,
     resolveFromConfirmFallback,
     shouldTryConfirmFallback,
-} from '../../services/gatekeeper/server/src/confirm-fallback';
+} from '../../services/gatekeeper/server/src/confirm-fallback.ts';
 import { DidCidDocument } from '@didcid/gatekeeper/types';
 
 const DID = 'did:cid:zTestDid';
@@ -52,7 +52,7 @@ describe('confirmed resolution fallback', () => {
         expect(result).toEqual(confirmedDoc);
         expect(fetchImpl).toHaveBeenCalledTimes(1);
 
-        const [url, init] = fetchImpl.mock.calls[0];
+        const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, any];
         expect(String(url)).toBe('https://peer.example/api/v1/did/did%3Acid%3AzTestDid?versionTime=2026-05-14T00%3A00%3A00Z&versionSequence=2&confirm=true&verify=true');
         expect(init?.headers).toStrictEqual({ [CONFIRM_FALLBACK_HEADER]: '1' });
     });

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { archon, resetAll, parseDid, dockerExec } from './helpers';
+import { archon, resetAll, parseDid, dockerExec } from './helpers.ts';
 
 const exec = promisify(execFile);
 

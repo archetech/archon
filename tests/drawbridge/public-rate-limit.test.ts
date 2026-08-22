@@ -2,8 +2,8 @@ import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 
-import { publicRateLimit, isMeaningfulSource } from '../../services/drawbridge/server/src/middleware/public-rate-limit';
-import type { DrawbridgeStore, RateLimitResult } from '../../services/drawbridge/server/src/types';
+import { publicRateLimit, isMeaningfulSource } from '../../services/drawbridge/server/src/middleware/public-rate-limit.ts';
+import type { DrawbridgeStore, RateLimitResult } from '../../services/drawbridge/server/src/types.ts';
 
 // A store that actually counts, so the buckets can be driven independently
 // rather than stubbed to a fixed verdict.

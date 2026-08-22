@@ -2,8 +2,8 @@ import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 
-import { createV1Router } from '../../services/drawbridge/server/src/v1-router';
-import defaultConfig from '../../services/drawbridge/server/src/config';
+import { createV1Router } from '../../services/drawbridge/server/src/v1-router.ts';
+import defaultConfig from '../../services/drawbridge/server/src/config.ts';
 
 type Method = 'GET' | 'POST';
 

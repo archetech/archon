@@ -1,5 +1,5 @@
-import { deriveTransparentAddress, getCoinType, getXpub } from '../../services/mediators/zcash-wallet/src/derivation';
-import { validateOpReturnData, zatsToZec, zecToZats } from '../../services/mediators/zcash-wallet/src/zcash-wallet';
+import { deriveTransparentAddress, getCoinType, getXpub } from '../../services/mediators/zcash-wallet/src/derivation.ts';
+import { validateOpReturnData, zatsToZec, zecToZats } from '../../services/mediators/zcash-wallet/src/zcash-wallet.ts';
 
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 

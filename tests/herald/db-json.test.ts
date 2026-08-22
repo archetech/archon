@@ -3,8 +3,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { DbJson } from '../../services/herald/server/src/db/json';
-import type { ReplyToken } from '../../services/herald/server/src/db/interfaces';
+import { DbJson } from '../../services/herald/server/src/db/json.ts';
+import type { ReplyToken } from '../../services/herald/server/src/db/interfaces.ts';
 
 let tmpDir: string;
 let dbPath: string;

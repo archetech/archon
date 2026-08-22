@@ -6,7 +6,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import HeliaClient from '@didcid/ipfs/helia';
 import TestHelper from './helper.ts';
 import { InvalidOperationError } from '@didcid/common/errors';
-import { createIdentifiersRouter } from '../../services/gatekeeper/server/src/identifiers-router';
+import { createIdentifiersRouter } from '../../services/gatekeeper/server/src/identifiers-router.ts';
 
 const mockConsole = {
     log: (): void => { },

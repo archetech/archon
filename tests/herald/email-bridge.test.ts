@@ -1,12 +1,12 @@
 import { jest } from '@jest/globals';
 
-import { EmailBridge } from '../../services/herald/server/src/email-bridge';
+import { EmailBridge } from '../../services/herald/server/src/email-bridge.ts';
 import type {
     DatabaseInterface,
     EmailMapping,
     ReplyToken,
-} from '../../services/herald/server/src/db/interfaces';
-import type { EmailServiceInterface } from '../../services/herald/server/src/email/interfaces';
+} from '../../services/herald/server/src/db/interfaces.ts';
+import type { EmailServiceInterface } from '../../services/herald/server/src/email/interfaces.ts';
 
 const config = {
     domain: 'archon.test',

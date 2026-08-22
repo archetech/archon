@@ -1,4 +1,4 @@
-import { archon } from './helpers';
+import { archon } from './helpers.ts';
 
 describe('registries', () => {
     test('list-registries prints supported registries one per line', async () => {

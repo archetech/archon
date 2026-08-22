@@ -24,7 +24,7 @@ let memberImpl: (did: string) => any = (_did: string) => null;
 
 beforeAll(async () => {
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const { createOAuthRoutes } = await import('../../services/herald/server/src/oauth/index');
+    const { createOAuthRoutes } = await import('../../services/herald/server/src/oauth/index.ts');
 
     const router = createOAuthRoutes(
         () => keymasterImpl,

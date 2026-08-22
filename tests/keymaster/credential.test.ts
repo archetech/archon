@@ -737,7 +737,7 @@ describe('external credentialSubject', () => {
         const credentialDid = await keymaster.createSchema(mockSchema);
         const boundCredential = await keymaster.bindCredential('mailto:bob@example.com', { schema: credentialDid });
 
-        expect(boundCredential.credentialSubject.id).toBe('mailto:bob@example.com');
+        expect(boundCredential.credentialSubject!.id).toBe('mailto:bob@example.com');
     });
 
     it('should bind credential with https: URI subject', async () => {
@@ -746,7 +746,7 @@ describe('external credentialSubject', () => {
         const credentialDid = await keymaster.createSchema(mockSchema);
         const boundCredential = await keymaster.bindCredential('https://example.com/users/bob', { schema: credentialDid });
 
-        expect(boundCredential.credentialSubject.id).toBe('https://example.com/users/bob');
+        expect(boundCredential.credentialSubject!.id).toBe('https://example.com/users/bob');
     });
 
     it('should issue credential with non-DID subject and issuer can decrypt', async () => {
@@ -835,7 +835,7 @@ describe('external credentialSubject', () => {
         const didKey = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
         const boundCredential = await keymaster.bindCredential(didKey, { schema: credentialDid });
 
-        expect(boundCredential.credentialSubject.id).toBe(didKey);
+        expect(boundCredential.credentialSubject!.id).toBe(didKey);
 
         const did = await keymaster.issueCredential(boundCredential);
         const credential = await keymaster.getCredential(did);
