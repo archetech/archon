@@ -93,6 +93,12 @@ const config = {
     ],
     testPathIgnorePatterns: [
         "/node_modules/",
+        // The wallets' render tests belong to vitest, which each app runs from
+        // its own config with its own aliases and a jsdom environment. Jest
+        // collects them otherwise and dies on `exports is not defined`, because
+        // they import from 'vitest' and this project is ESM+ts-jest. Run them
+        // with `npm run test:wallets`.
+        "/apps/",
         "/kc-app/",
         "/client/",
         "/tests/cli/",
