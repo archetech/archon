@@ -425,6 +425,9 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
      *         application/json:
      *           schema:
      *             type: object
+     *             required:
+     *               - did
+     *               - to
      *             properties:
      *               did:
      *                 type: string
@@ -475,7 +478,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
      *   post:
      *     summary: Accept a credential that arrived over DIDComm.
      *     description: >
-     *       Reads the credential DID from the message attachment and accepts it.
+     *       Reads the credential DID from the message body and accepts it.
      *       Returns false for a credential from a foreign issuer, which has no
      *       `did:cid` for this wallet to resolve and hold.
      *     requestBody:
@@ -484,6 +487,8 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
      *         application/json:
      *           schema:
      *             type: object
+     *             required:
+     *               - message
      *             properties:
      *               message:
      *                 type: object

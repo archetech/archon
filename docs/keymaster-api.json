@@ -2967,6 +2967,10 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "did",
+                  "to"
+                ],
                 "properties": {
                   "did": {
                     "type": "string",
@@ -3032,13 +3036,16 @@
     "/didcomm/credential/accept": {
       "post": {
         "summary": "Accept a credential that arrived over DIDComm.",
-        "description": "Reads the credential DID from the message attachment and accepts it. Returns false for a credential from a foreign issuer, which has no `did:cid` for this wallet to resolve and hold.\n",
+        "description": "Reads the credential DID from the message body and accepts it. Returns false for a credential from a foreign issuer, which has no `did:cid` for this wallet to resolve and hold.\n",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "message"
+                ],
                 "properties": {
                   "message": {
                     "type": "object",

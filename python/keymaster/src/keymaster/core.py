@@ -3323,9 +3323,10 @@ class Keymaster:
         # that DID nor decrypt what it points at (issue_credential encrypts to the
         # ISSUER when the subject is not managed). So this carries the credential.
         #
-        # The attachment is the signed VC plus `id`, the credential's own DID --
-        # a W3C VC property, and a DID is a URI -- so a foreign agent sees a
-        # conformant credential while an Archon holder can still accept it.
+        # The attachment is the signed VC exactly as issued, and the credential's
+        # own DID travels in the body: the proof covers every field but `proof`,
+        # so an `id` added after signing would make the credential fail
+        # verification for the very recipient this message exists to reach.
         options = options or {}
         credential_did = await self.lookup_did(did)
         vc = await self.get_credential(credential_did)
@@ -3334,8 +3335,9 @@ class Keymaster:
             raise InvalidParameterError("did")
 
         message = dc_protocols.issue_credential_message(
-            {"id": credential_did, **vc},
+            vc,
             comment=options.get("comment"),
+            credential_did=credential_did,
         )
 
         return await self.send_didcomm(
@@ -3345,14 +3347,25 @@ class Keymaster:
         )
 
     async def accept_credential_didcomm(self, message: dict[str, Any]) -> bool:
-        # The attachment carries the credential's DID as `id`; resolving,
-        # decrypting and checking the subject is the existing path.
-        attached = dc_protocols.attached_json(message)
-        credential_did = attached.get("id") if isinstance(attached, dict) else None
+        # The body names the credential's DID; resolving, decrypting and
+        # checking the subject is the existing path.
+        body = message.get("body") if isinstance(message, dict) else None
+        credential_did = body.get("credential_did") if isinstance(body, dict) else None
 
         if not isinstance(credential_did, str) or not self.is_managed_did(credential_did):
             # A credential from a foreign issuer has no did:cid to resolve, so
             # there is nothing for this wallet to hold.
+            return False
+
+        # The DID rides outside the signed credential, so nothing on the wire
+        # binds the two together: a sender could attach one credential and name
+        # another. Both would have to be genuinely issued to this holder for
+        # accept_credential to take them, so this is not forgery -- but storing
+        # something other than what the user was shown is still wrong.
+        attached = dc_protocols.attached_json(message)
+        resolved = await self.get_credential(credential_did)
+
+        if not resolved or hash_json(resolved) != hash_json(attached):
             return False
 
         return await self.accept_credential(credential_did)

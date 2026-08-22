@@ -544,7 +544,7 @@ def test_accept_credential_didcomm_requires_a_resolvable_did():
 
     foreign = {
         "type": "https://didcomm.org/issue-credential/3.0/issue-credential",
-        "body": {},
+        "body": {"credential_did": "https://university.example/credentials/1872"},
         "attachments": [{"data": {"json": {
             "id": "https://university.example/credentials/1872",
             "issuer": "did:web:university.example",
@@ -589,7 +589,47 @@ def test_send_credential_didcomm_carries_the_credential_not_a_reference(monkeypa
         km.send_credential_didcomm("did:cid:credential", "did:web:example.com")
     ) == ["msg-1"]
 
+    # The DID is named in the body, and the credential travels byte-for-byte as
+    # it was signed: the proof covers every field but `proof`, so an `id` added
+    # afterwards would break verification for the recipient this exists to reach.
+    assert sent["message"]["body"]["credential_did"] == "did:cid:credential"
+
     attached = sent["message"]["attachments"][0]["data"]["json"]
-    assert attached["id"] == "did:cid:credential"
-    assert attached["issuer"] == "did:cid:alice"
-    assert attached["proof"] == {"proofValue": "sig"}
+    assert attached == vc
+
+
+def test_accept_credential_didcomm_refuses_a_credential_it_did_not_show(monkeypatch):
+    # Nothing on the wire binds the body's DID to the attachment, so a sender can
+    # name one credential and display another.
+    import asyncio
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+
+    resolved = {"type": ["VerifiableCredential"], "issuer": "did:cid:alice"}
+    shown = {"type": ["VerifiableCredential"], "issuer": "did:cid:mallory"}
+
+    accepted: list[str] = []
+
+    async def fake_accept(did):
+        accepted.append(did)
+        return True
+
+    monkeypatch.setattr(km, "get_credential", _async_return(resolved))
+    monkeypatch.setattr(km, "accept_credential", fake_accept)
+
+    message = {
+        "type": "https://didcomm.org/issue-credential/3.0/issue-credential",
+        "body": {"credential_did": "did:cid:credential"},
+        "attachments": [{"data": {"json": shown}}],
+    }
+
+    assert asyncio.run(km.accept_credential_didcomm(message)) is False
+    assert accepted == []
+
+    message["attachments"][0]["data"]["json"] = resolved
+    assert asyncio.run(km.accept_credential_didcomm(message)) is True
+    assert accepted == ["did:cid:credential"]

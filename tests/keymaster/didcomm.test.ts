@@ -1001,13 +1001,23 @@ describe('credential exchange over DIDComm', () => {
         const { message } = await keymaster.unpackDidComm(packed, { name: 'Bob' });
         expect(message.type).toBe('https://didcomm.org/issue-credential/3.0/issue-credential');
 
+        // The DID is named in the body, NOT inside the credential: the proof
+        // covers every field but `proof`, so an `id` added after signing would
+        // make the credential fail verification for the very recipient this
+        // message exists to reach.
+        expect(message.body.credential_did).toBe(credentialDid);
+
         const attached = message.attachments[0].data.json;
-        expect(attached.id).toBe(credentialDid);
+        expect(attached.id).toBeUndefined();
         expect(attached.credentialSubject.id).toBe(bob);
         expect(attached.issuer).toBeDefined();
         // The signature travels with it, so a foreign holder can verify against
-        // the issuer's DID without holding anything of ours.
+        // the issuer's DID without holding anything of ours. Asserting that a
+        // proof is merely PRESENT would pass even if the transmitted credential
+        // no longer matched what was signed, which is the whole point of sending
+        // the credential rather than a reference.
         expect(attached.proof).toBeDefined();
+        await expect(keymaster.verifyProof(attached)).resolves.toBe(true);
     });
 
     it('accepts a credential that arrived over DIDComm', async () => {
@@ -1020,12 +1030,36 @@ describe('credential exchange over DIDComm', () => {
         await keymaster.setCurrentId('Bob');
         const message = {
             type: 'https://didcomm.org/issue-credential/3.0/issue-credential',
-            body: {},
-            attachments: [{ data: { json: { id: credentialDid, ...vc } } }],
+            body: { credential_did: credentialDid },
+            attachments: [{ data: { json: vc } }],
         };
 
         await expect(keymaster.acceptCredentialDidComm(message)).resolves.toBe(true);
         await expect(keymaster.listCredentials()).resolves.toContain(credentialDid);
+    });
+
+    it('refuses a credential that is not the one it showed', async () => {
+        // Nothing on the wire binds the body's DID to the attachment, so a
+        // sender can name one credential and display another. Both must be
+        // genuinely issued to this holder for acceptCredential to take them, so
+        // this is not forgery -- but storing something other than what the user
+        // was shown is still wrong.
+        await keymaster.createId('Alice');
+        const bob = await keymaster.createId('Bob');
+        await keymaster.setCurrentId('Alice');
+        const shown = await issueTo(bob);
+        const named = await issueTo(bob);
+        const shownVc = await keymaster.getCredential(shown);
+
+        await keymaster.setCurrentId('Bob');
+        const message = {
+            type: 'https://didcomm.org/issue-credential/3.0/issue-credential',
+            body: { credential_did: named },
+            attachments: [{ data: { json: shownVc } }],
+        };
+
+        await expect(keymaster.acceptCredentialDidComm(message)).resolves.toBe(false);
+        await expect(keymaster.listCredentials()).resolves.not.toContain(named);
     });
 
     it('declines a credential with no did:cid to resolve', async () => {
@@ -1036,7 +1070,7 @@ describe('credential exchange over DIDComm', () => {
 
         const foreign = {
             type: 'https://didcomm.org/issue-credential/3.0/issue-credential',
-            body: {},
+            body: { credential_did: 'https://university.example/credentials/1872' },
             attachments: [{ data: { json: {
                 id: 'https://university.example/credentials/1872',
                 issuer: 'did:web:university.example',
