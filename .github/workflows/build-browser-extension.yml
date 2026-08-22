@@ -35,6 +35,11 @@ jobs:
           cd ./apps/browser-extension
           npm run typecheck
 
+      - name: Render tests
+        run: |
+          cd ./apps/browser-extension
+          npm test
+
       - name: Build Chrome extension
         run: |
           cd ./apps/browser-extension

@@ -30,6 +30,11 @@ jobs:
           cd ./apps/react-wallet
           npm ci
 
+      - name: Render tests
+        run: |
+          cd ./apps/react-wallet
+          npm test
+
       - name: Build extension
         run: |
           cd ./apps/react-wallet

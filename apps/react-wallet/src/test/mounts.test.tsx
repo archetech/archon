@@ -1,0 +1,93 @@
+import { describe, it, expect } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ContextProviders } from '../contexts/ContextProviders';
+
+// #914: nothing in this repo rendered a component, so a crash on first render
+// shipped with every check green. That is not hypothetical -- on #912 both
+// wallets rendered a blank page:
+//
+//   Uncaught Error: useWalletNavigation must be used within WalletNavigationProvider
+//       at useWalletData -> at UIProvider
+//
+// and the commit passed tsc in both apps, eslint, the vite build, the webpack
+// build, 84 wallet tests and all 30 CI checks. A human opening the app found it.
+//
+// The cause was a provider-ordering cycle: UIProvider called a hook that
+// required a context mounted inside UIProvider. Types cannot see that -- the
+// hook's signature is satisfied either way, and the failure is a runtime
+// useContext returning null.
+//
+// So the assertion here is deliberately weak. "It mounts" is the property that
+// was missing; what it renders is a different question, and pinning that here
+// would make this test fragile against ordinary UI work without catching
+// anything more.
+
+// Mounting alone stops at the passphrase modal, because WalletProvider gates
+// its children behind isReady and a wallet with no stored data is correctly not
+// ready. That matters more than it sounds: UIProvider -- the provider that
+// caused #912 -- lives INSIDE that gate, so a test that only mounts never runs
+// the hook that threw. Verified by reintroducing the bug against an
+// earlier version of this file, which stayed green.
+//
+// So the tree has to be taken through setup to be worth anything.
+async function completeSetup() {
+    const user = userEvent.setup();
+
+    // Anchored regexes: MUI folds the required marker into the label text, so
+    // these read "Passphrase *" and "Confirm Passphrase *", and a plain
+    // 'Passphrase' matches neither.
+    await user.type(await screen.findByLabelText(/^Passphrase/), PASSPHRASE);
+    await user.type(await screen.findByLabelText(/^Confirm Passphrase/), PASSPHRASE);
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+}
+
+const PASSPHRASE = 'render-smoke-test-passphrase';
+
+describe('react-wallet provider tree', () => {
+    it('mounts without throwing', () => {
+        expect(() =>
+            render(
+                <ContextProviders>
+                    <div data-testid="child">child</div>
+                </ContextProviders>
+            )
+        ).not.toThrow();
+    });
+
+    it('reaches its first real screen', async () => {
+        // Mounting without throwing is not enough on its own: a tree that
+        // rendered null everywhere would satisfy the check above while showing
+        // the user the same blank page. So assert it gets somewhere.
+        //
+        // Not the children, though -- WalletProvider gates those behind
+        // isReady, and a wallet with no stored data is correctly not ready. Its
+        // first screen is the passphrase prompt, which is what a new user
+        // actually sees.
+        render(
+            <ContextProviders>
+                <div data-testid="child">child</div>
+            </ContextProviders>
+        );
+
+        expect(await screen.findByText('Set a Passphrase')).toBeInTheDocument();
+    });
+
+    it('renders its children once the wallet is ready', async () => {
+        // The assertion that actually covers #912: reaching this point means
+        // UIProvider mounted and useWalletData ran, which is where the
+        // provider-ordering cycle threw.
+        render(
+            <ContextProviders>
+                <div data-testid="child">child</div>
+            </ContextProviders>
+        );
+
+        await completeSetup();
+
+        await waitFor(
+            () => expect(screen.getByTestId('child')).toBeInTheDocument(),
+            { timeout: 20000 }
+        );
+    }, 30000);
+});
