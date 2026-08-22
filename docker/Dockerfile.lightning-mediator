@@ -27,4 +27,4 @@ ENV GIT_COMMIT=$GIT_COMMIT
 
 EXPOSE 4235
 
-CMD ["node", "dist/lightning-mediator.js"]
+CMD ["node", "dist/index.js"]

@@ -1,10 +1,8 @@
-import express from 'express';
+import express, { type Express } from 'express';
 import morgan from 'morgan';
 import pino from 'pino';
-import { readFile } from 'fs/promises';
 import { timingSafeEqual } from 'crypto';
 import { Counter, Gauge, collectDefaultMetrics, register } from 'prom-client';
-import GatekeeperClient from '@didcid/clients/gatekeeper';
 import { socksDispatcher } from 'fetch-socks';
 // Aliased rather than shadowing the global fetch, which the rest of this file
 // uses with DOM-typed bodies. socksDispatcher is built on fetch-socks's undici
@@ -14,14 +12,15 @@ import { socksDispatcher } from 'fetch-socks';
 // Anything dispatched through SOCKS must therefore use this fetch. See #916.
 import { fetch as socksFetch } from 'undici';
 
-import { Redis } from 'ioredis';
-
-import config from './config.js';
 import { LightningPaymentError } from './errors.js';
-import * as cln from './lightning.js';
-import * as lnbits from './lnbits.js';
-import { RedisStore } from './store.js';
-import type { PendingInvoiceData, ReadinessStatus } from './types.js';
+import type * as clnModule from './lightning.js';
+import type * as lnbitsModule from './lnbits.js';
+import type {
+    LightningMediatorConfig,
+    LightningStore,
+    PendingInvoiceData,
+    ReadinessStatus,
+} from './types.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -33,63 +32,14 @@ const httpRequestsTotal = new Counter({
     labelNames: ['method', 'route', 'status'],
 });
 
-const lightningMediatorVersionInfo = new Gauge({
+export const lightningMediatorVersionInfo = new Gauge({
     name: 'lightning_mediator_version_info',
     help: 'Lightning mediator version information',
     labelNames: ['version', 'commit'],
 });
 
-let serviceVersion = 'unknown';
-const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
-const TOR_HOSTNAME_FILE = '/data/tor/hostname';
 const ARCHON_ADMIN_HEADER = 'x-archon-admin-key';
 
-readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
-    const pkg = JSON.parse(data);
-    serviceVersion = pkg.version;
-    lightningMediatorVersionInfo.set({ version: serviceVersion, commit: serviceCommit }, 1);
-}).catch(() => {
-    lightningMediatorVersionInfo.set({ version: 'unknown', commit: serviceCommit }, 1);
-});
-
-async function checkRedis(redisUrl: string): Promise<boolean> {
-    let redis: Redis | undefined;
-    try {
-        redis = new Redis(redisUrl, {
-            lazyConnect: true,
-            enableOfflineQueue: false,
-            maxRetriesPerRequest: 1,
-            connectTimeout: 3000,
-        });
-        await redis.connect();
-        const pong = await redis.ping();
-        return pong === 'PONG';
-    } catch {
-        return false;
-    } finally {
-        if (redis) {
-            try {
-                await redis.quit();
-            } catch {
-                redis.disconnect();
-            }
-        }
-    }
-}
-
-let gatekeeperPromise: Promise<any> | undefined;
-
-function getGatekeeper() {
-    if (!gatekeeperPromise) {
-        gatekeeperPromise = GatekeeperClient.create({
-            url: config.gatekeeperUrl,
-            waitUntilReady: true,
-            chatty: false,
-        });
-    }
-
-    return gatekeeperPromise;
-}
 
 function normalizePath(path: string): string {
     return path
@@ -136,88 +86,123 @@ async function fetchHttpsOnly(target: string, init?: RequestInit): Promise<Respo
     throw new Error(`too many redirects (${MAX_LNURL_REDIRECTS})`);
 }
 
+// parseInt stops at the first character it cannot use, so '1.5' arrived as 1
+// and '100abc' as 100 -- a different amount than the caller asked for, silently,
+// on routes that create invoices and gate paid access. Require the whole string
+// to be an integer rather than accepting whatever prefix happens to parse.
 function parsePositiveInteger(value: unknown): number | null {
-    const parsed = typeof value === 'number' ? value : parseInt(String(value), 10);
+    if (typeof value === 'number') {
+        return Number.isInteger(value) && value > 0 ? value : null;
+    }
+
+    // Only strings otherwise: Number(true) is 1, and a boolean is not an amount.
+    if (typeof value !== 'string' || !/^\d+$/.test(value.trim())) {
+        return null;
+    }
+
+    const parsed = Number(value.trim());
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-let cachedPublicHost: string | undefined;
-
-async function getPublicHost(): Promise<string | undefined> {
-    if (cachedPublicHost) {
-        return cachedPublicHost;
-    }
-
-    if (config.drawbridgePublicHost) {
-        cachedPublicHost = config.drawbridgePublicHost;
-        return cachedPublicHost;
-    }
-
-    if (config.publicHost) {
-        cachedPublicHost = config.publicHost;
-        return cachedPublicHost;
-    }
-
-    try {
-        const onion = (await readFile(TOR_HOSTNAME_FILE, 'utf-8')).trim();
-        if (onion) {
-            cachedPublicHost = `http://${onion}:${config.drawbridgePort}`;
-            logger.info({ publicHost: cachedPublicHost }, 'Resolved public host from Tor hostname');
-            return cachedPublicHost;
-        }
-    } catch {
-        // File not available yet
-    }
-
-    return undefined;
+// Everything the routes reach outside themselves, taken as parameters so a test
+// can drive them with fakes. This is the shape services/didcomm/server uses;
+// before it, main() built the app, the store and the listener in one function
+// and exported nothing, so all 17 routes were untestable (#909).
+export interface Resolver {
+    resolveDID(did: string): Promise<any>;
 }
 
-async function buildReadinessStatus(): Promise<ReadinessStatus> {
-    const redisReady = await checkRedis(config.redisUrl);
-
-    return {
-        ready: redisReady,
-        dependencies: {
-            redis: redisReady,
-            clnConfigured: Boolean(config.clnRune && config.clnRestUrl),
-            lnbitsConfigured: Boolean(config.lnbitsUrl),
-        },
-    };
+export interface AppDeps {
+    config: LightningMediatorConfig;
+    store: LightningStore;
+    // Lazy, because production resolves a gatekeeper that may not be up yet and
+    // no route should pay for that at startup.
+    getResolver: () => Promise<Resolver>;
+    lnbits: Pick<typeof lnbitsModule, 'createWallet' | 'getBalance' | 'createInvoice' | 'payInvoice' | 'getPayments' | 'checkPayment'>;
+    cln: Pick<typeof clnModule, 'createInvoice' | 'checkInvoice'>;
+    // What /ready reports. Injected so a test needs no Redis to ask.
+    readiness: () => Promise<ReadinessStatus>;
+    version: { version: string; commit: string };
+    // Reads the Tor hidden-service hostname. A function so the file is not a
+    // hard dependency of building the app.
+    readTorHostname: () => Promise<string>;
 }
 
-function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction) {
-    if (!config.adminApiKey) {
-        res.status(403).json({ error: 'Admin API key not configured' });
-        return;
-    }
+// SOCKS-dispatched requests deliberately bypass globalThis.fetch, so a test
+// cannot observe them by stubbing that. Held on an object so it can be
+// substituted instead -- the same reason services/didcomm/server does it.
+export const socksEgress = { fetch: socksFetch };
 
-    const adminHeader = req.headers[ARCHON_ADMIN_HEADER];
-    const key = typeof adminHeader === 'string'
-        ? adminHeader
-        : Array.isArray(adminHeader)
-            ? adminHeader[0]
-            : null;
 
-    if (!key) {
-        res.status(401).json({ error: 'Admin API key required' });
-        return;
-    }
-
-    const keyBuf = Buffer.from(key);
-    const expectedBuf = Buffer.from(config.adminApiKey);
-
-    if (keyBuf.length !== expectedBuf.length || !timingSafeEqual(keyBuf, expectedBuf)) {
-        res.status(401).json({ error: 'Invalid admin API key' });
-        return;
-    }
-
-    next();
-}
-
-async function main(): Promise<void> {
+export function createApp(deps: AppDeps): Express {
+    const { config, store, lnbits, cln } = deps;
     const app = express();
     const v1router = express.Router();
-    const store = new RedisStore(config.redisUrl);
+
+    // Cached per app instance rather than per module: a module-level cache
+    // leaks the first config's answer into every later app, which is wrong for
+    // any process that builds more than one (and silently couples tests).
+    let cachedPublicHost: string | undefined;
+
+    async function getPublicHost(): Promise<string | undefined> {
+        if (cachedPublicHost) {
+            return cachedPublicHost;
+        }
+
+        if (config.drawbridgePublicHost) {
+            cachedPublicHost = config.drawbridgePublicHost;
+            return cachedPublicHost;
+        }
+
+        if (config.publicHost) {
+            cachedPublicHost = config.publicHost;
+            return cachedPublicHost;
+        }
+
+        try {
+            const onion = (await deps.readTorHostname()).trim();
+            if (onion) {
+                cachedPublicHost = `http://${onion}:${config.drawbridgePort}`;
+                logger.info({ publicHost: cachedPublicHost }, 'Resolved public host from Tor hostname');
+                return cachedPublicHost;
+            }
+        } catch {
+            // File not available yet
+        }
+
+        return undefined;
+    }
+
+    function requireAdminKey(req: express.Request, res: express.Response, next: express.NextFunction) {
+        if (!config.adminApiKey) {
+            res.status(403).json({ error: 'Admin API key not configured' });
+            return;
+        }
+
+        const adminHeader = req.headers[ARCHON_ADMIN_HEADER];
+        const key = typeof adminHeader === 'string'
+            ? adminHeader
+            : Array.isArray(adminHeader)
+                ? adminHeader[0]
+                : null;
+
+        if (!key) {
+            res.status(401).json({ error: 'Admin API key required' });
+            return;
+        }
+
+        const keyBuf = Buffer.from(key);
+        const expectedBuf = Buffer.from(config.adminApiKey);
+
+        // Equal-length compare first: timingSafeEqual throws on a length
+        // mismatch, and the length of a rejected key is not a secret.
+        if (keyBuf.length !== expectedBuf.length || !timingSafeEqual(keyBuf, expectedBuf)) {
+            res.status(401).json({ error: 'Invalid admin API key' });
+            return;
+        }
+
+        next();
+    }
 
     app.use(express.json({ limit: '1mb' }));
     app.use(morgan('dev'));
@@ -234,12 +219,12 @@ async function main(): Promise<void> {
     });
 
     app.get('/ready', async (_req, res) => {
-        const status = await buildReadinessStatus();
+        const status = await deps.readiness();
         res.status(status.ready ? 200 : 503).json(status);
     });
 
     app.get('/version', (_req, res) => {
-        res.json({ version: serviceVersion, commit: serviceCommit });
+        res.json({ version: deps.version.version, commit: deps.version.commit });
     });
 
     app.get('/metrics', async (_req, res) => {
@@ -528,7 +513,7 @@ async function main(): Promise<void> {
                     return;
                 }
             } else {
-                const gatekeeper = await getGatekeeper();
+                const gatekeeper = await deps.getResolver();
                 const doc = await gatekeeper.resolveDID(did);
                 const services = doc.didDocument?.service || [];
                 const lightningService = services.find((service: any) => service.type === 'Lightning');
@@ -589,7 +574,7 @@ async function main(): Promise<void> {
 
                 // Only the SOCKS-dispatched path needs undici's fetch; clearnet and
                 // the internal loopback shortcut stay on the built-in one (#916).
-                const doFetch = fetchOptions.dispatcher ? socksFetch : fetch;
+                const doFetch = fetchOptions.dispatcher ? socksEgress.fetch : fetch;
                 const invoiceResponse = await doFetch(invoiceUrl.toString(), fetchOptions);
                 if (invoiceResponse.status >= 300 && invoiceResponse.status < 400) {
                     res.status(502).json({
@@ -774,12 +759,5 @@ async function main(): Promise<void> {
 
     app.use('/api/v1', v1router);
 
-    app.listen(config.port, config.bindAddress, () => {
-        logger.info(`Lightning mediator v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${config.port}`);
-    });
+    return app;
 }
-
-main().catch((error: unknown) => {
-    logger.error({ err: error }, 'Failed to start lightning mediator');
-    process.exit(1);
-});
