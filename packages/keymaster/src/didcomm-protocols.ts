@@ -9,13 +9,30 @@ export const DISCOVER_FEATURES_QUERIES_TYPE = 'https://didcomm.org/discover-feat
 export const DISCOVER_FEATURES_DISCLOSE_TYPE = 'https://didcomm.org/discover-features/2.0/disclose';
 export const OUT_OF_BAND_INVITATION_TYPE = 'https://didcomm.org/out-of-band/2.0/invitation';
 
-// An attachment as this codebase builds them: the spec allows more, but only
-// these fields are ever written or read here.
+// The DIDComm v2 attachment. This type is exported from the package, so it
+// models the whole spec shape rather than only the JSON attachments built here:
+// narrowing it to those would reject valid base64 and link attachments that
+// callers could previously assign through the plaintext's index signature.
+// Both levels stay open for the same reason.
+export interface DidCommAttachmentData {
+    jws?: unknown;
+    hash?: string;
+    links?: string[];
+    base64?: string;
+    json?: unknown;
+    [key: string]: unknown;
+}
+
 export interface DidCommAttachment {
     id?: string;
+    description?: string;
+    filename?: string;
     media_type?: string;
     format?: string;
-    data?: { json?: unknown };
+    lastmod_time?: number;
+    byte_count?: number;
+    data?: DidCommAttachmentData;
+    [key: string]: unknown;
 }
 
 export interface DidCommPlaintext {
