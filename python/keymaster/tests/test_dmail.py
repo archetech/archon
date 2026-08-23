@@ -40,6 +40,37 @@ def test_verify_tag_list_and_recipients(testbed, monkeypatch: pytest.MonkeyPatch
     assert asset.startswith("did:")
 
 
+def test_create_dmail_without_cc(testbed):
+    # #424: a message with no cc field failed with "Invalid parameter: list" --
+    # verify_recipient_list rejecting None, reported under the name of its own
+    # argument rather than the field the caller left out.
+    keymaster = testbed.keymaster
+    run(keymaster.create_id("Alice"))
+
+    did = run(keymaster.create_dmail({
+        "to": ["Alice"],
+        "subject": "Re: test",
+        "body": "RSVP confirmed.",
+    }))
+
+    assert did
+    # Normalised on the way in, so readers never see the absence.
+    assert run(keymaster.get_dmail_message(did))["cc"] == []
+
+
+def test_create_dmail_names_the_field_for_a_bad_recipient_list(testbed):
+    keymaster = testbed.keymaster
+    run(keymaster.create_id("Alice"))
+
+    for message, field in [
+        ({"to": "Alice", "subject": "s", "body": "b"}, "dmail.to"),
+        ({"to": ["Alice"], "cc": "Bob", "subject": "s", "body": "b"}, "dmail.cc"),
+    ]:
+        with pytest.raises(KeymasterError) as excinfo:
+            run(keymaster.create_dmail(message))
+        assert str(excinfo.value) == f"Invalid parameter: {field}"
+
+
 def test_create_list_send_and_import_dmail(testbed):
     keymaster = testbed.keymaster
     alice = run(keymaster.create_id("Alice"))
