@@ -2987,8 +2987,11 @@ class Keymaster:
         # verify_recipient_list as None and fail with "Invalid parameter: list"
         # -- a message naming an internal argument rather than the field the
         # caller left out (#424).
-        to_list = message.get("to") or []
-        cc_list = message.get("cc") or []
+        # `in` rather than `.get(...) or []`: the latter also swallows None, "",
+        # 0 and False, which would accept as empty what TypeScript rejects as a
+        # non-list -- and these two must not disagree.
+        to_list = message["to"] if "to" in message else []
+        cc_list = message["cc"] if "cc" in message else []
         verified_to = await self.verify_recipient_list(cast(list[str], to_list), "dmail.to")
         verified_cc = await self.verify_recipient_list(cast(list[str], cc_list), "dmail.cc")
 

@@ -5365,8 +5365,13 @@ export default class Keymaster implements KeymasterInterface {
         // verifyRecipientList as undefined and fail with "Invalid parameter:
         // list" -- a message naming an internal argument rather than the field
         // the caller left out (#424).
-        const to = await this.verifyRecipientList(message.to ?? [], 'dmail.to');
-        const cc = await this.verifyRecipientList(message.cc ?? [], 'dmail.cc');
+        //
+        // Only an ABSENT field defaults. A present one is validated whatever it
+        // holds, so `"cc": null` still fails as the non-list it is: the bug was
+        // an omitted field, and relaxing anything else would quietly widen what
+        // the endpoint accepts.
+        const to = await this.verifyRecipientList(message.to === undefined ? [] : message.to, 'dmail.to');
+        const cc = await this.verifyRecipientList(message.cc === undefined ? [] : message.cc, 'dmail.cc');
 
         if (to.length === 0) {
             throw new InvalidParameterError('dmail.to');

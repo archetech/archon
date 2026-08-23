@@ -58,6 +58,20 @@ def test_create_dmail_without_cc(testbed):
     assert run(keymaster.get_dmail_message(did))["cc"] == []
 
 
+def test_create_dmail_rejects_a_present_cc_that_is_not_a_list(testbed):
+    # Only an ABSENT cc defaults. This matrix must match the TypeScript one in
+    # tests/keymaster/dmail.test.ts exactly: an earlier version of this fix used
+    # `.get("cc") or []` here, which accepted None, "", 0 and False while
+    # TypeScript rejected them.
+    keymaster = testbed.keymaster
+    run(keymaster.create_id("Alice"))
+
+    for cc in [None, "", 0, False, "Bob", 42, {}]:
+        with pytest.raises(KeymasterError) as excinfo:
+            run(keymaster.create_dmail({"to": ["Alice"], "cc": cc, "subject": "s", "body": "b"}))
+        assert str(excinfo.value) == "Invalid parameter: dmail.cc"
+
+
 def test_create_dmail_names_the_field_for_a_bad_recipient_list(testbed):
     keymaster = testbed.keymaster
     run(keymaster.create_id("Alice"))

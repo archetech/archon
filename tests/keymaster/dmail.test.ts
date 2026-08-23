@@ -275,6 +275,27 @@ describe('createDmail', () => {
         expect(stored!.cc).toStrictEqual([]);
     });
 
+    it('should reject a present cc that is not a list, whatever it holds', async () => {
+        // Only an ABSENT cc defaults. Everything present is validated, so
+        // `"cc": null` fails as the non-list it is rather than being treated as
+        // an omission -- the reported bug was a missing field, and widening
+        // that to every falsey value would quietly loosen the endpoint.
+        //
+        // Pinned as a matrix because the Python port must answer identically:
+        // an earlier version of this fix used `.get("cc") or []` there, which
+        // accepted null, "", 0 and false while TypeScript rejected them.
+        await keymaster.createId('Alice');
+
+        for (const cc of [null, '', 0, false, 'Bob', 42, {}]) {
+            try {
+                await keymaster.createDmail({ to: ['Alice'], cc, subject: 's', body: 'b' } as any);
+                throw new ExpectedExceptionError();
+            } catch (error: any) {
+                expect(error.message).toBe('Invalid parameter: dmail.cc');
+            }
+        }
+    });
+
     it('should name the field when a recipient list is not a list', async () => {
         await keymaster.createId('Alice');
 
