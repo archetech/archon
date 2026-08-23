@@ -356,6 +356,14 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
         .send()
         .await?;
     assert_eq!(response.status().as_u16(), 406);
+    // Accept selected this response, so a cache must key on it.
+    assert_eq!(
+        response
+            .headers()
+            .get("vary")
+            .and_then(|value| value.to_str().ok()),
+        Some("Accept")
+    );
     let doc = response.json::<Value>().await?;
     assert_eq!(
         doc["didResolutionMetadata"]["error"],
@@ -363,6 +371,46 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
     );
     assert!(doc["didDocument"].is_null());
     assert_eq!(doc["didDocumentMetadata"].as_object().unwrap().len(), 0);
+
+    // RFC 7231 5.3.2: the most specific matching range supplies the quality.
+    // Taking the highest q across all matching ranges instead would give the
+    // excluded type q=1 from the wildcard and serve exactly what the client
+    // refused.
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header(
+            "accept",
+            "application/did+ld+json;q=0, application/did+json;q=0.5, */*;q=1",
+        )
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("application/did+json"),
+        "an explicit q=0 must exclude a type even when a wildcard would allow it"
+    );
+
+    // And when q=0 excludes everything this endpoint can produce, that is a 406.
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header(
+            "accept",
+            "application/did+ld+json;q=0, application/did+json;q=0, */*;q=1",
+        )
+        .send()
+        .await?;
+    assert_eq!(response.status().as_u16(), 406);
+    let doc = response.json::<Value>().await?;
+    assert_eq!(
+        doc["didResolutionMetadata"]["error"],
+        "representationNotSupported"
+    );
 
     Ok(())
 }

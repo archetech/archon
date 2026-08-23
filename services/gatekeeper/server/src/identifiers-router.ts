@@ -83,13 +83,23 @@ function negotiateDidContentType(req: express.Request): Negotiated | undefined {
     return undefined;
 }
 
+// RFC 7231 5.3.2: "If more than one media range applies to a given type, the
+// most specific reference has precedence." So the quality for a candidate comes
+// from the most specific entry that matches it -- NOT the highest q across all
+// matching entries. The difference decides `application/did+ld+json;q=0,
+// application/did+json;q=0.5, */*;q=1`: taking the maximum gives the excluded
+// type q=1 from the wildcard and serves exactly what the client refused.
+const EXACT = 3;
+const TYPE_WILDCARD = 2;
+const GLOBAL_WILDCARD = 1;
+
 function acceptQuality(
     accept: string,
     candidate: string,
     options: { allowWildcard?: boolean } = {}
 ): { quality: number; order: number } | undefined {
     const allowWildcard = options.allowWildcard !== false;
-    let best: { quality: number; order: number } | undefined;
+    let best: { specificity: number; quality: number; order: number } | undefined;
     const normalizedCandidate = candidate.toLowerCase();
 
     accept.split(',').forEach((part, order) => {
@@ -107,18 +117,36 @@ function acceptQuality(
             }
         }
 
-        const matches = media === normalizedCandidate
-            || (allowWildcard && (media === 'application/*' || media === '*/*'));
-        if (!matches || quality <= 0) {
+        const specificity = media === normalizedCandidate
+            ? EXACT
+            : media === 'application/*'
+                ? TYPE_WILDCARD
+                : media === '*/*'
+                    ? GLOBAL_WILDCARD
+                    : 0;
+
+        if (!specificity || (!allowWildcard && specificity !== EXACT)) {
             return;
         }
 
-        if (!best || quality > best.quality || (quality === best.quality && order < best.order)) {
-            best = { quality, order };
+        // Deliberately no `quality <= 0` filter here: a q=0 on the most specific
+        // entry is the client excluding this type, and must beat a permissive
+        // wildcard rather than be skipped over in favour of one.
+        const better = !best
+            || specificity > best.specificity
+            || (specificity === best.specificity
+                && (quality > best.quality || (quality === best.quality && order < best.order)));
+
+        if (better) {
+            best = { specificity, quality, order };
         }
     });
 
-    return best;
+    if (!best || best.quality <= 0) {
+        return undefined;
+    }
+
+    return { quality: best.quality, order: best.order };
 }
 
 function sendDidResolutionJson(res: express.Response, contentType: string, body: unknown): void {
@@ -311,6 +339,10 @@ export function createIdentifiersRouter(
                 // The client named representations, none of which this endpoint
                 // produces. Previously any Accept was satisfied with JSON-LD and a
                 // 200, which contradicted the supportedContentTypes we publish (#770).
+                // Vary, because this response was selected by Accept: without it
+                // a cache can serve the 406 to a client that would have been
+                // satisfied, or vice versa.
+                res.vary('Accept');
                 res.status(406).json({
                     didDocument: null,
                     didResolutionMetadata: { error: 'representationNotSupported' },

@@ -170,6 +170,31 @@ describe('GET /1.0/identifiers/:did (conformant resolution)', () => {
         expect(res.body.didResolutionMetadata.error).toBe('representationNotSupported');
         expect(res.body.didDocument).toBeNull();
         expect(res.body.didDocumentMetadata).toStrictEqual({});
+        // Accept selected this response, so a cache must key on it.
+        expect(res.headers.vary).toContain('Accept');
+    });
+
+    it('lets an explicit q=0 exclude a type a wildcard would otherwise allow', async () => {
+        // RFC 7231 5.3.2: the most specific matching range supplies the quality.
+        // Taking the highest q across all matching ranges instead would give the
+        // excluded type q=1 from the wildcard and serve exactly what the client
+        // refused.
+        const res = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', 'application/did+ld+json;q=0, application/did+json;q=0.5, */*;q=1');
+
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toBe('application/did+json');
+        expect(res.body.didResolutionMetadata.contentType).toBe('application/did+json');
+    });
+
+    it('answers 406 when q=0 excludes everything it can produce', async () => {
+        const res = await request(app)
+            .get(`/1.0/identifiers/${agentDid}`)
+            .set('Accept', 'application/did+ld+json;q=0, application/did+json;q=0, */*;q=1');
+
+        expect(res.status).toBe(406);
+        expect(res.body.didResolutionMetadata.error).toBe('representationNotSupported');
     });
 
     it('resolves an asset to the triple only (no inline data/registration)', async () => {

@@ -1311,15 +1311,19 @@ pub(crate) async fn conformant_resolve_did(
                     406,
                     start.elapsed().as_secs_f64(),
                 );
-                return (
+                // Vary, because this response was selected by Accept: without it
+                // a cache can serve the 406 to a client that would have been
+                // satisfied, or vice versa. json_response_with_content_type sets
+                // it on every negotiated success, so the error must match.
+                return json_response_with_content_type(
                     StatusCode::NOT_ACCEPTABLE,
-                    Json(json!({
+                    json!({
                         "didDocument": Value::Null,
                         "didResolutionMetadata": { "error": "representationNotSupported" },
                         "didDocumentMetadata": {}
-                    })),
-                )
-                    .into_response();
+                    }),
+                    "application/json",
+                );
             };
             let content_type = negotiated.content_type;
             let mut did_resolution_metadata = doc
@@ -1511,12 +1515,22 @@ fn negotiate_did_content_type(headers: &HeaderMap) -> Option<Negotiated> {
     }
 }
 
+// RFC 7231 5.3.2: "If more than one media range applies to a given type, the
+// most specific reference has precedence." So the quality for a candidate comes
+// from the most specific entry that matches it -- NOT the highest q across all
+// matching entries. The difference decides `application/did+ld+json;q=0,
+// application/did+json;q=0.5, */*;q=1`: taking the maximum gives the excluded
+// type q=1 from the wildcard and serves exactly what the client refused.
+const EXACT: u8 = 3;
+const TYPE_WILDCARD: u8 = 2;
+const GLOBAL_WILDCARD: u8 = 1;
+
 fn accept_quality(accept: &str, candidate: &str) -> Option<(f32, usize)> {
     accept_quality_inner(accept, candidate, true)
 }
 
 fn accept_quality_inner(accept: &str, candidate: &str, allow_wildcard: bool) -> Option<(f32, usize)> {
-    let mut best = None;
+    let mut best: Option<(u8, f32, usize)> = None;
     let normalized_candidate = candidate.to_ascii_lowercase();
 
     for (order, part) in accept.split(',').enumerate() {
@@ -1537,21 +1551,39 @@ fn accept_quality_inner(accept: &str, candidate: &str, allow_wildcard: bool) -> 
             }
         }
 
-        let matches = media == normalized_candidate
-            || (allow_wildcard && (media == "application/*" || media == "*/*"));
-        if !matches || q <= 0.0 {
+        let specificity = if media == normalized_candidate {
+            EXACT
+        } else if media == "application/*" {
+            TYPE_WILDCARD
+        } else if media == "*/*" {
+            GLOBAL_WILDCARD
+        } else {
+            0
+        };
+
+        if specificity == 0 || (!allow_wildcard && specificity != EXACT) {
             continue;
         }
 
+        // Deliberately no `q <= 0.0` filter here: a q=0 on the most specific
+        // entry is the client excluding this type, and must beat a permissive
+        // wildcard rather than be skipped over in favour of one.
         if best
-            .map(|(best_q, best_order)| q > best_q || (q == best_q && order < best_order))
+            .map(|(best_spec, best_q, best_order)| {
+                specificity > best_spec
+                    || (specificity == best_spec
+                        && (q > best_q || (q == best_q && order < best_order)))
+            })
             .unwrap_or(true)
         {
-            best = Some((q, order));
+            best = Some((specificity, q, order));
         }
     }
 
-    best
+    match best {
+        Some((_, q, order)) if q > 0.0 => Some((q, order)),
+        _ => None,
+    }
 }
 
 fn json_response_with_content_type(
