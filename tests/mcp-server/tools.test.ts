@@ -516,20 +516,21 @@ describe('mcp server tools', () => {
         expect(expectFail(await dmail({ message: { to: ['did:cid:bob'], subject: '', body: 'b' } }))).toMatch(/subject/);
     });
 
-    it('defaults an omitted dmail cc to an empty list', async () => {
+    it('passes an omitted dmail cc through untouched', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
         registerArchonTools(server, runtime as any, baseConfig);
 
-        // keymaster's verifyRecipientList throws InvalidParameterError('list') on a missing
-        // cc, which reads as a bug rather than a missing field. Defaulting is strictly more
-        // permissive than the old behaviour, so nothing that worked before breaks.
+        // This schema used to default cc, purely to dodge keymaster throwing
+        // InvalidParameterError('list') on an absent one. That is fixed at the
+        // root (#424), so the tool now forwards what the caller sent and
+        // keymaster normalises it -- one layer doing the job instead of two.
         expectOk(await server.tools.get('archon_create_dmail')!.handler({
             message: { to: ['did:cid:bob'], subject: 'hi', body: 'hello' },
         }));
 
         expect(runtime.keymaster.createDmail).toHaveBeenCalledWith(
-            { to: ['did:cid:bob'], cc: [], subject: 'hi', body: 'hello' },
+            { to: ['did:cid:bob'], subject: 'hi', body: 'hello' },
             undefined
         );
     });

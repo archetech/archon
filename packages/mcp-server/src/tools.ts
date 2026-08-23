@@ -139,9 +139,11 @@ const PollConfigSchema = z.object({
 });
 const DmailMessageSchema = z.object({
     to: z.array(z.string()).min(1),
-    // Defaulted rather than required: keymaster throws InvalidParameterError('list') when
-    // cc is absent, which is a confusing failure for an omitted optional-looking field.
-    cc: z.array(z.string()).default([]),
+    // Optional, matching DmailMessage. This used to carry a default purely to
+    // dodge keymaster throwing InvalidParameterError('list') on an absent cc;
+    // that is fixed at the root now (#424), so the schema can simply describe
+    // the field instead of working around a bug in the layer beneath it.
+    cc: z.array(z.string()).optional(),
     subject: z.string().min(1),
     body: z.string().min(1),
     reference: z.string().optional(),

@@ -1270,7 +1270,7 @@ export function createHeraldRoutes(ctx: HeraldContext): {
                 }
 
                 // Path 2: Compose new email via "[email to addr] subject" convention
-                if (ctx.serviceDID && (item.message.to.includes(ctx.serviceDID) || item.message.cc.includes(ctx.serviceDID))) {
+                if (ctx.serviceDID && (item.message.to.includes(ctx.serviceDID) || (item.message.cc ?? []).includes(ctx.serviceDID))) {
                     const emailToMatch = item.message.subject.match(/^\[email to ([^\]]+)\]\s*(.*)/i);
                     if (emailToMatch) {
                         const toEmail = emailToMatch[1].trim();

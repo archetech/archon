@@ -255,6 +255,65 @@ describe('verifyDmail', () => {
 });
 
 describe('createDmail', () => {
+    it('should create a dmail when cc is omitted', async () => {
+        // #424: a JSON file with no cc field failed with "Invalid parameter:
+        // list" -- verifyRecipientList rejecting undefined, reported under the
+        // name of its own argument rather than the field the caller left out.
+        await keymaster.createId('Alice');
+
+        const mock = {
+            to: ['Alice'],
+            subject: 'Re: test',
+            body: 'RSVP confirmed.',
+        } as DmailMessage;
+
+        const did = await keymaster.createDmail(mock);
+        expect(did).toBeDefined();
+
+        // Normalised on the way in, so readers never see the absence.
+        const stored = await keymaster.getDmailMessage(did);
+        expect(stored!.cc).toStrictEqual([]);
+    });
+
+    it('should reject a present cc that is not a list, whatever it holds', async () => {
+        // Only an ABSENT cc defaults. Everything present is validated, so
+        // `"cc": null` fails as the non-list it is rather than being treated as
+        // an omission -- the reported bug was a missing field, and widening
+        // that to every falsey value would quietly loosen the endpoint.
+        //
+        // Pinned as a matrix because the Python port must answer identically:
+        // an earlier version of this fix used `.get("cc") or []` there, which
+        // accepted null, "", 0 and false while TypeScript rejected them.
+        await keymaster.createId('Alice');
+
+        for (const cc of [null, '', 0, false, 'Bob', 42, {}]) {
+            try {
+                await keymaster.createDmail({ to: ['Alice'], cc, subject: 's', body: 'b' } as any);
+                throw new ExpectedExceptionError();
+            } catch (error: any) {
+                expect(error.message).toBe('Invalid parameter: dmail.cc');
+            }
+        }
+    });
+
+    it('should name the field when a recipient list is not a list', async () => {
+        await keymaster.createId('Alice');
+
+        for (const [message, field] of [
+            [{ to: 'Alice', subject: 's', body: 'b' }, 'dmail.to'],
+            [{ to: ['Alice'], cc: 'Bob', subject: 's', body: 'b' }, 'dmail.cc'],
+        ] as [any, string][]) {
+            try {
+                await keymaster.createDmail(message);
+                throw new ExpectedExceptionError();
+            } catch (error: any) {
+                // Not "Invalid parameter: list", which named an internal
+                // argument and left the caller guessing which field was wrong.
+                expect(error.message).toBe(`Invalid parameter: ${field}`);
+            }
+        }
+    });
+
     it('should create a valid dmail', async () => {
         await keymaster.createId('Alice');
         await keymaster.createId('Bob');

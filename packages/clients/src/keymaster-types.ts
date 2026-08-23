@@ -341,7 +341,12 @@ export interface WaitUntilReadyOptions {
 
 export interface DmailMessage {
     to: string[];
-    cc: string[];
+    // Optional on the way in: a JSON file, a REST body or a Python caller can
+    // omit it, and declaring it required only ever constrained TypeScript
+    // callers while everyone else got "Invalid parameter: list" (#424).
+    // verifyDmail normalises it to an array, so a message that has been through
+    // it always carries one -- see DmailItem, where cc stays required.
+    cc?: string[];
     subject: string;
     body: string;
     reference?: string;

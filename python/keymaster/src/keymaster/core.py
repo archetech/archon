@@ -2881,9 +2881,11 @@ class Keymaster:
 
         return verified
 
-    async def verify_recipient_list(self, recipients: list[str]) -> list[str]:
+    # `field` names the caller's field in errors. It defaults to the old value so
+    # the other callers of this method keep their existing messages.
+    async def verify_recipient_list(self, recipients: list[str], field: str = "list") -> list[str]:
         if not isinstance(recipients, list):
-            raise KeymasterError("Invalid parameter: list")
+            raise KeymasterError(f"Invalid parameter: {field}")
 
         wallet = await self.load_wallet()
         aliases = wallet.get("aliases", {})
@@ -2980,10 +2982,18 @@ class Keymaster:
         return True
 
     async def verify_dmail(self, message: dict[str, Any]) -> dict[str, Any]:
-        to_list = message.get("to")
-        cc_list = message.get("cc")
-        verified_to = await self.verify_recipient_list(cast(list[str], to_list))
-        verified_cc = await self.verify_recipient_list(cast(list[str], cc_list))
+        # cc defaults because it is genuinely optional on the wire: a JSON file,
+        # a REST body or a CLI caller can omit it. It used to reach
+        # verify_recipient_list as None and fail with "Invalid parameter: list"
+        # -- a message naming an internal argument rather than the field the
+        # caller left out (#424).
+        # `in` rather than `.get(...) or []`: the latter also swallows None, "",
+        # 0 and False, which would accept as empty what TypeScript rejects as a
+        # non-list -- and these two must not disagree.
+        to_list = message["to"] if "to" in message else []
+        cc_list = message["cc"] if "cc" in message else []
+        verified_to = await self.verify_recipient_list(cast(list[str], to_list), "dmail.to")
+        verified_cc = await self.verify_recipient_list(cast(list[str], cc_list), "dmail.cc")
 
         if not verified_to:
             raise KeymasterError("Invalid parameter: dmail.to")

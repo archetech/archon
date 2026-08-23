@@ -5249,7 +5249,7 @@ export default class Keymaster implements KeymasterInterface {
             const sender = didToName[controller] ?? controller;
             const date = docs.didDocumentMetadata?.updated ?? '';
             const to = message.to.map(did => didToName[did] ?? did);
-            const cc = message.cc.map(did => didToName[did] ?? did);
+            const cc = (message.cc ?? []).map(did => didToName[did] ?? did);
             const attachments = await this.listDmailAttachments(did);
 
             dmailList[did] = {
@@ -5312,9 +5312,11 @@ export default class Keymaster implements KeymasterInterface {
         return true;
     }
 
-    async verifyRecipientList(list: string[]): Promise<string[]> {
+    // `field` names the caller's field in errors. It defaults to the old value so
+    // the other callers of this method keep their existing messages.
+    async verifyRecipientList(list: string[], field = 'list'): Promise<string[]> {
         if (!Array.isArray(list)) {
-            throw new InvalidParameterError('list');
+            throw new InvalidParameterError(field);
         }
 
         const nameList = await this.listAliases({ includeIDs: true });
@@ -5356,9 +5358,20 @@ export default class Keymaster implements KeymasterInterface {
         return newList;
     }
 
-    async verifyDmail(message: DmailMessage): Promise<DmailMessage> {
-        const to = await this.verifyRecipientList(message.to);
-        const cc = await this.verifyRecipientList(message.cc);
+    async verifyDmail(message: DmailMessage): Promise<DmailMessage & { cc: string[] }> {
+        // cc defaults because it is genuinely optional on the wire: a JSON file,
+        // a REST body or a Python caller can omit it, and only TypeScript
+        // callers were ever forced to pass one. It used to reach
+        // verifyRecipientList as undefined and fail with "Invalid parameter:
+        // list" -- a message naming an internal argument rather than the field
+        // the caller left out (#424).
+        //
+        // Only an ABSENT field defaults. A present one is validated whatever it
+        // holds, so `"cc": null` still fails as the non-list it is: the bug was
+        // an omitted field, and relaxing anything else would quietly widen what
+        // the endpoint accepts.
+        const to = await this.verifyRecipientList(message.to === undefined ? [] : message.to, 'dmail.to');
+        const cc = await this.verifyRecipientList(message.cc === undefined ? [] : message.cc, 'dmail.cc');
 
         if (to.length === 0) {
             throw new InvalidParameterError('dmail.to');
@@ -5429,7 +5442,7 @@ export default class Keymaster implements KeymasterInterface {
         const registry = this.ephemeralRegistry;
         const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Default to 7 days
         const message: NoticeMessage = {
-            to: [...dmail.to, ...dmail.cc],
+            to: [...dmail.to, ...(dmail.cc ?? [])],
             dids: [did],
         };
 
