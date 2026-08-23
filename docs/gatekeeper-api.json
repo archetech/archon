@@ -2477,6 +2477,9 @@
           "404": {
             "description": "The DID does not exist or cannot be resolved (error in didResolutionMetadata)."
           },
+          "406": {
+            "description": "The Accept header names only representations this endpoint cannot produce (representationNotSupported in didResolutionMetadata). Supported values are application/did+ld+json, application/did+json and application/did-resolution.\n"
+          },
           "500": {
             "description": "Internal Server Error."
           }

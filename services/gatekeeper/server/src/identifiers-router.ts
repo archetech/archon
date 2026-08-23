@@ -18,30 +18,88 @@ function classifyResolveError(error: unknown): { status: number; resolutionError
 
 const DID_LD_JSON = 'application/did+ld+json';
 const DID_JSON = 'application/did+json';
+// The media type for a resolution result. did+ld+json and did+json describe a DID
+// *document*; this endpoint answers with the {didDocument, didResolutionMetadata,
+// didDocumentMetadata} triple, which is a different thing (#770).
+const DID_RESOLUTION = 'application/did-resolution';
 
-function preferredDidContentType(req: express.Request): typeof DID_LD_JSON | typeof DID_JSON {
+type DocumentRepresentation = typeof DID_LD_JSON | typeof DID_JSON;
+
+interface Negotiated {
+    // What goes on the wire.
+    contentType: string;
+    // What didResolutionMetadata.contentType reports. Always a document
+    // representation: that field describes the representation of the returned
+    // document, not the shape of the envelope around it.
+    representation: DocumentRepresentation;
+}
+
+// Returns undefined when the client asked for something this endpoint cannot
+// produce, which the caller reports as representationNotSupported.
+//
+// A client gets application/did-resolution only by naming it. The default stays
+// the document media types, because that is what Universal Resolver drivers in
+// the wild expect and changing it silently would break them.
+function negotiateDidContentType(req: express.Request): Negotiated | undefined {
     const accept = req.get('accept');
 
     if (!accept) {
-        return DID_LD_JSON;
+        return { contentType: DID_LD_JSON, representation: DID_LD_JSON };
     }
 
+    const resolution = acceptQuality(accept, DID_RESOLUTION, { allowWildcard: false });
     const ld = acceptQuality(accept, DID_LD_JSON);
     const json = acceptQuality(accept, DID_JSON);
 
-    if (ld && json) {
-        return json.quality > ld.quality || (json.quality === ld.quality && json.order < ld.order)
-            ? DID_JSON
-            : DID_LD_JSON;
+    // Wildcards satisfy the document types but never select the resolution
+    // envelope, so `Accept: */*` keeps behaving exactly as before. Belt and
+    // braces rather than load-bearing: acceptQuality takes the best match across
+    // entries, so a wildcard gives the document types whatever quality it gives
+    // the envelope, and the tie below favours the document. Stated explicitly so
+    // a future change to that scoring cannot quietly hand `*/*` the envelope.
+    const document: DocumentRepresentation | undefined = (ld && json)
+        ? (json.quality > ld.quality || (json.quality === ld.quality && json.order < ld.order) ? DID_JSON : DID_LD_JSON)
+        : json ? DID_JSON
+            : ld ? DID_LD_JSON
+                : undefined;
+
+    if (resolution && document) {
+        const documentQuality = document === DID_JSON ? json! : ld!;
+        const resolutionWins = resolution.quality > documentQuality.quality
+            || (resolution.quality === documentQuality.quality && resolution.order < documentQuality.order);
+        return resolutionWins
+            ? { contentType: DID_RESOLUTION, representation: DID_LD_JSON }
+            : { contentType: document, representation: document };
     }
-    if (json) {
-        return DID_JSON;
+
+    if (resolution) {
+        return { contentType: DID_RESOLUTION, representation: DID_LD_JSON };
     }
-    return DID_LD_JSON;
+
+    if (document) {
+        return { contentType: document, representation: document };
+    }
+
+    return undefined;
 }
 
-function acceptQuality(accept: string, candidate: string): { quality: number; order: number } | undefined {
-    let best: { quality: number; order: number } | undefined;
+// RFC 7231 5.3.2: "If more than one media range applies to a given type, the
+// most specific reference has precedence." So the quality for a candidate comes
+// from the most specific entry that matches it -- NOT the highest q across all
+// matching entries. The difference decides `application/did+ld+json;q=0,
+// application/did+json;q=0.5, */*;q=1`: taking the maximum gives the excluded
+// type q=1 from the wildcard and serves exactly what the client refused.
+const EXACT = 3;
+const TYPE_WILDCARD = 2;
+const GLOBAL_WILDCARD = 1;
+
+function acceptQuality(
+    accept: string,
+    candidate: string,
+    options: { allowWildcard?: boolean } = {}
+): { quality: number; order: number } | undefined {
+    const allowWildcard = options.allowWildcard !== false;
+    let best: { specificity: number; quality: number; order: number } | undefined;
     const normalizedCandidate = candidate.toLowerCase();
 
     accept.split(',').forEach((part, order) => {
@@ -59,17 +117,36 @@ function acceptQuality(accept: string, candidate: string): { quality: number; or
             }
         }
 
-        const matches = media === normalizedCandidate || media === 'application/*' || media === '*/*';
-        if (!matches || quality <= 0) {
+        const specificity = media === normalizedCandidate
+            ? EXACT
+            : media === 'application/*'
+                ? TYPE_WILDCARD
+                : media === '*/*'
+                    ? GLOBAL_WILDCARD
+                    : 0;
+
+        if (!specificity || (!allowWildcard && specificity !== EXACT)) {
             return;
         }
 
-        if (!best || quality > best.quality || (quality === best.quality && order < best.order)) {
-            best = { quality, order };
+        // Deliberately no `quality <= 0` filter here: a q=0 on the most specific
+        // entry is the client excluding this type, and must beat a permissive
+        // wildcard rather than be skipped over in favour of one.
+        const better = !best
+            || specificity > best.specificity
+            || (specificity === best.specificity
+                && (quality > best.quality || (quality === best.quality && order < best.order)));
+
+        if (better) {
+            best = { specificity, quality, order };
         }
     });
 
-    return best;
+    if (!best || best.quality <= 0) {
+        return undefined;
+    }
+
+    return { quality: best.quality, order: best.order };
 }
 
 function sendDidResolutionJson(res: express.Response, contentType: string, body: unknown): void {
@@ -231,6 +308,11 @@ export function createIdentifiersRouter(
      *         description: The DID is syntactically invalid (error in didResolutionMetadata).
      *       404:
      *         description: The DID does not exist or cannot be resolved (error in didResolutionMetadata).
+     *       406:
+     *         description: >
+     *           The Accept header names only representations this endpoint cannot produce
+     *           (representationNotSupported in didResolutionMetadata). Supported values are
+     *           application/did+ld+json, application/did+json and application/did-resolution.
      *       500:
      *         description: Internal Server Error.
      */
@@ -251,12 +333,29 @@ export function createIdentifiersRouter(
             // Conformant result: only the standard triple. The method-specific data and
             // registration objects are dereferenced via their own resource paths.
             const { didDocument, didResolutionMetadata, didDocumentMetadata } = result.doc;
-            const contentType = preferredDidContentType(req);
+            const negotiated = negotiateDidContentType(req);
+
+            if (!negotiated) {
+                // The client named representations, none of which this endpoint
+                // produces. Previously any Accept was satisfied with JSON-LD and a
+                // 200, which contradicted the supportedContentTypes we publish (#770).
+                // Vary, because this response was selected by Accept: without it
+                // a cache can serve the 406 to a client that would have been
+                // satisfied, or vice versa.
+                res.vary('Accept');
+                res.status(406).json({
+                    didDocument: null,
+                    didResolutionMetadata: { error: 'representationNotSupported' },
+                    didDocumentMetadata: {},
+                });
+                return;
+            }
+
             const stableDidResolutionMetadata = { ...(didResolutionMetadata ?? {}) };
             delete stableDidResolutionMetadata.retrieved;
-            stableDidResolutionMetadata.contentType = contentType;
+            stableDidResolutionMetadata.contentType = negotiated.representation;
 
-            sendDidResolutionJson(res, contentType, {
+            sendDidResolutionJson(res, negotiated.contentType, {
                 didDocument,
                 didResolutionMetadata: stableDidResolutionMetadata,
                 didDocumentMetadata: normalizeDidDocumentMetadata(didDocumentMetadata),

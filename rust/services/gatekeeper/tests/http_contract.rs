@@ -264,6 +264,154 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
         "application/did+json"
     );
 
+    // #770: did+ld+json and did+json describe a DID *document*, and this endpoint
+    // answers with the resolution triple. A client that names the resolution media
+    // type gets it labelled correctly; the document types stay the default because
+    // Universal Resolver drivers expect them.
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header("accept", "application/did-resolution")
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("application/did-resolution")
+    );
+    let doc = response.json::<Value>().await?;
+    assert_eq!(doc.as_object().unwrap().len(), 3);
+    assert_eq!(doc["didDocument"]["id"], did);
+    // Still the DOCUMENT representation: that field describes what is inside the
+    // envelope, not the envelope itself.
+    assert_eq!(
+        doc["didResolutionMetadata"]["contentType"],
+        "application/did+ld+json"
+    );
+
+    // A wildcard satisfies the document types but must not select the envelope.
+    for accept in ["*/*", "application/*"] {
+        let response = service
+            .client
+            .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+            .header("accept", accept)
+            .send()
+            .await?;
+        assert_eq!(
+            response
+                .headers()
+                .get("content-type")
+                .and_then(|value| value.to_str().ok()),
+            Some("application/did+ld+json"),
+            "wildcard {accept} must not select the resolution envelope"
+        );
+    }
+
+    // A wildcard alongside a lower-q explicit type. Both flavors answer
+    // did+ld+json: the wildcard gives every document type q=1, which beats the
+    // explicitly named did+json at q=0.5. Pinned because it is what a lenient UR
+    // driver sends and the two implementations must not drift on it.
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header("accept", "*/*;q=1, application/did+json;q=0.5")
+        .send()
+        .await?;
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("application/did+ld+json")
+    );
+
+    // q-values decide between the envelope and the document types.
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header(
+            "accept",
+            "application/did-resolution;q=0.4, application/did+json;q=0.9",
+        )
+        .send()
+        .await?;
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("application/did+json")
+    );
+
+    // #770: any Accept used to be satisfied with JSON-LD and a 200, which
+    // contradicted the supportedContentTypes published in the DID test suite
+    // fixture. The result stays triple-shaped, as errors do on this surface.
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header("accept", "application/xml")
+        .send()
+        .await?;
+    assert_eq!(response.status().as_u16(), 406);
+    // Accept selected this response, so a cache must key on it.
+    assert_eq!(
+        response
+            .headers()
+            .get("vary")
+            .and_then(|value| value.to_str().ok()),
+        Some("Accept")
+    );
+    let doc = response.json::<Value>().await?;
+    assert_eq!(
+        doc["didResolutionMetadata"]["error"],
+        "representationNotSupported"
+    );
+    assert!(doc["didDocument"].is_null());
+    assert_eq!(doc["didDocumentMetadata"].as_object().unwrap().len(), 0);
+
+    // RFC 7231 5.3.2: the most specific matching range supplies the quality.
+    // Taking the highest q across all matching ranges instead would give the
+    // excluded type q=1 from the wildcard and serve exactly what the client
+    // refused.
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header(
+            "accept",
+            "application/did+ld+json;q=0, application/did+json;q=0.5, */*;q=1",
+        )
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok()),
+        Some("application/did+json"),
+        "an explicit q=0 must exclude a type even when a wildcard would allow it"
+    );
+
+    // And when q=0 excludes everything this endpoint can produce, that is a 406.
+    let response = service
+        .client
+        .get(format!("{}/1.0/identifiers/{did}", service.root_url))
+        .header(
+            "accept",
+            "application/did+ld+json;q=0, application/did+json;q=0, */*;q=1",
+        )
+        .send()
+        .await?;
+    assert_eq!(response.status().as_u16(), 406);
+    let doc = response.json::<Value>().await?;
+    assert_eq!(
+        doc["didResolutionMetadata"]["error"],
+        "representationNotSupported"
+    );
+
     Ok(())
 }
 

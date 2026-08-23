@@ -1300,7 +1300,32 @@ pub(crate) async fn conformant_resolve_did(
     let start = Instant::now();
     match resolve_conformant(&state, &did, &query).await {
         Ok(doc) => {
-            let content_type = preferred_did_content_type(&headers);
+            let Some(negotiated) = negotiate_did_content_type(&headers) else {
+                // The client named representations, none of which this endpoint
+                // produces. Previously any Accept was satisfied with JSON-LD and a
+                // 200, which contradicted the supportedContentTypes we publish (#770).
+                record_metrics(
+                    &state,
+                    "GET",
+                    "/1.0/identifiers/:did",
+                    406,
+                    start.elapsed().as_secs_f64(),
+                );
+                // Vary, because this response was selected by Accept: without it
+                // a cache can serve the 406 to a client that would have been
+                // satisfied, or vice versa. json_response_with_content_type sets
+                // it on every negotiated success, so the error must match.
+                return json_response_with_content_type(
+                    StatusCode::NOT_ACCEPTABLE,
+                    json!({
+                        "didDocument": Value::Null,
+                        "didResolutionMetadata": { "error": "representationNotSupported" },
+                        "didDocumentMetadata": {}
+                    }),
+                    "application/json",
+                );
+            };
+            let content_type = negotiated.content_type;
             let mut did_resolution_metadata = doc
                 .get("didResolutionMetadata")
                 .cloned()
@@ -1309,10 +1334,10 @@ pub(crate) async fn conformant_resolve_did(
                 metadata.remove("retrieved");
                 metadata.insert(
                     "contentType".to_string(),
-                    Value::String(content_type.to_string()),
+                    Value::String(negotiated.representation.to_string()),
                 );
             } else {
-                did_resolution_metadata = json!({ "contentType": content_type });
+                did_resolution_metadata = json!({ "contentType": negotiated.representation });
             }
             let triple = json!({
                 "didDocument": doc.get("didDocument").cloned().unwrap_or(Value::Null),
@@ -1409,36 +1434,103 @@ fn build_registration_resource(doc: &Value) -> Value {
     registration
 }
 
-fn preferred_did_content_type(headers: &HeaderMap) -> &'static str {
-    const DID_LD_JSON: &str = "application/did+ld+json";
-    const DID_JSON: &str = "application/did+json";
+const DID_LD_JSON: &str = "application/did+ld+json";
+const DID_JSON: &str = "application/did+json";
+// The media type for a resolution result. did+ld+json and did+json describe a DID
+// *document*; this endpoint answers with the {didDocument, didResolutionMetadata,
+// didDocumentMetadata} triple, which is a different thing (#770).
+const DID_RESOLUTION: &str = "application/did-resolution";
 
+/// What goes on the wire, and what didResolutionMetadata.contentType reports.
+/// The latter is always a document representation: that field describes the
+/// representation of the returned document, not the shape of the envelope.
+struct Negotiated {
+    content_type: &'static str,
+    representation: &'static str,
+}
+
+/// Returns None when the client asked for something this endpoint cannot
+/// produce, which the caller reports as representationNotSupported.
+///
+/// A client gets application/did-resolution only by naming it. The default stays
+/// the document media types, because that is what Universal Resolver drivers in
+/// the wild expect and changing it silently would break them.
+fn negotiate_did_content_type(headers: &HeaderMap) -> Option<Negotiated> {
     let Some(accept) = headers
         .get(header::ACCEPT)
         .and_then(|value| value.to_str().ok())
     else {
-        return DID_LD_JSON;
+        return Some(Negotiated {
+            content_type: DID_LD_JSON,
+            representation: DID_LD_JSON,
+        });
     };
 
+    // Wildcards satisfy the document types but never select the resolution
+    // envelope, so `Accept: */*` keeps behaving exactly as before. Belt and
+    // braces rather than load-bearing: accept_quality takes the best match across
+    // entries, so a wildcard gives the document types whatever quality it gives
+    // the envelope, and the tie below favours the document. Stated explicitly so
+    // a future change to that scoring cannot quietly hand `*/*` the envelope.
+    let resolution = accept_quality_inner(accept, DID_RESOLUTION, false);
     let ld = accept_quality(accept, DID_LD_JSON);
     let json = accept_quality(accept, DID_JSON);
 
-    match (ld, json) {
+    let document = match (ld, json) {
         (Some((ld_q, ld_order)), Some((json_q, json_order))) => {
             if json_q > ld_q || (json_q == ld_q && json_order < ld_order) {
-                DID_JSON
+                Some((DID_JSON, (json_q, json_order)))
             } else {
-                DID_LD_JSON
+                Some((DID_LD_JSON, (ld_q, ld_order)))
             }
         }
-        (Some(_), None) => DID_LD_JSON,
-        (None, Some(_)) => DID_JSON,
-        (None, None) => DID_LD_JSON,
+        (Some(ld_hit), None) => Some((DID_LD_JSON, ld_hit)),
+        (None, Some(json_hit)) => Some((DID_JSON, json_hit)),
+        (None, None) => None,
+    };
+
+    match (resolution, document) {
+        (Some((res_q, res_order)), Some((doc_type, (doc_q, doc_order)))) => {
+            if res_q > doc_q || (res_q == doc_q && res_order < doc_order) {
+                Some(Negotiated {
+                    content_type: DID_RESOLUTION,
+                    representation: DID_LD_JSON,
+                })
+            } else {
+                Some(Negotiated {
+                    content_type: doc_type,
+                    representation: doc_type,
+                })
+            }
+        }
+        (Some(_), None) => Some(Negotiated {
+            content_type: DID_RESOLUTION,
+            representation: DID_LD_JSON,
+        }),
+        (None, Some((doc_type, _))) => Some(Negotiated {
+            content_type: doc_type,
+            representation: doc_type,
+        }),
+        (None, None) => None,
     }
 }
 
+// RFC 7231 5.3.2: "If more than one media range applies to a given type, the
+// most specific reference has precedence." So the quality for a candidate comes
+// from the most specific entry that matches it -- NOT the highest q across all
+// matching entries. The difference decides `application/did+ld+json;q=0,
+// application/did+json;q=0.5, */*;q=1`: taking the maximum gives the excluded
+// type q=1 from the wildcard and serves exactly what the client refused.
+const EXACT: u8 = 3;
+const TYPE_WILDCARD: u8 = 2;
+const GLOBAL_WILDCARD: u8 = 1;
+
 fn accept_quality(accept: &str, candidate: &str) -> Option<(f32, usize)> {
-    let mut best = None;
+    accept_quality_inner(accept, candidate, true)
+}
+
+fn accept_quality_inner(accept: &str, candidate: &str, allow_wildcard: bool) -> Option<(f32, usize)> {
+    let mut best: Option<(u8, f32, usize)> = None;
     let normalized_candidate = candidate.to_ascii_lowercase();
 
     for (order, part) in accept.split(',').enumerate() {
@@ -1459,21 +1551,39 @@ fn accept_quality(accept: &str, candidate: &str) -> Option<(f32, usize)> {
             }
         }
 
-        let matches =
-            media == normalized_candidate || media == "application/*" || media == "*/*";
-        if !matches || q <= 0.0 {
+        let specificity = if media == normalized_candidate {
+            EXACT
+        } else if media == "application/*" {
+            TYPE_WILDCARD
+        } else if media == "*/*" {
+            GLOBAL_WILDCARD
+        } else {
+            0
+        };
+
+        if specificity == 0 || (!allow_wildcard && specificity != EXACT) {
             continue;
         }
 
+        // Deliberately no `q <= 0.0` filter here: a q=0 on the most specific
+        // entry is the client excluding this type, and must beat a permissive
+        // wildcard rather than be skipped over in favour of one.
         if best
-            .map(|(best_q, best_order)| q > best_q || (q == best_q && order < best_order))
+            .map(|(best_spec, best_q, best_order)| {
+                specificity > best_spec
+                    || (specificity == best_spec
+                        && (q > best_q || (q == best_q && order < best_order)))
+            })
             .unwrap_or(true)
         {
-            best = Some((q, order));
+            best = Some((specificity, q, order));
         }
     }
 
-    best
+    match best {
+        Some((_, q, order)) if q > 0.0 => Some((q, order)),
+        _ => None,
+    }
 }
 
 fn json_response_with_content_type(

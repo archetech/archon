@@ -357,12 +357,27 @@ The method-specific `confirmed` and `timestamp` fields are **not** DID Core docu
 
 ### Representations
 
-The resolver negotiates the DID document representation from the `Accept` request header, and echoes the selected media type in both the `Content-Type` response header and `didResolutionMetadata.contentType`:
+The resolver negotiates from the `Accept` request header:
 
-| `Accept` | Representation |
-|----------|----------------|
-| `application/did+ld+json` (or absent) | JSON-LD — the default |
-| `application/did+json` | Plain JSON |
+| `Accept` | `Content-Type` | `didResolutionMetadata.contentType` |
+|----------|----------------|-------------------------------------|
+| absent, `*/*`, `application/*` | `application/did+ld+json` | `application/did+ld+json` |
+| `application/did+ld+json` | `application/did+ld+json` | `application/did+ld+json` |
+| `application/did+json` | `application/did+json` | `application/did+json` |
+| `application/did-resolution` | `application/did-resolution` | `application/did+ld+json` |
+| anything else | — | 406 `representationNotSupported` |
+
+`application/did+ld+json` and `application/did+json` are DID **document**
+representation media types, and this endpoint returns the resolution result
+triple. A client that wants the result labelled for what it is asks for
+`application/did-resolution`; the document types remain the default because
+Universal Resolver drivers expect them. Note that `didResolutionMetadata.contentType`
+always reports a document representation — that field describes the representation
+of the document inside the envelope, not the envelope.
+
+An `Accept` naming only media types this endpoint cannot produce is answered
+`406` with `didResolutionMetadata.error` set to `representationNotSupported`,
+rather than silently returning JSON-LD.
 
 Responses set `Vary: Accept`. This applies to the resolution result only; the `/data` and `/registration` resources are plain `application/json`.
 
