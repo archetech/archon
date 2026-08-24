@@ -413,6 +413,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     // package. These are stable DIDComm protocol URIs.
     const BASIC_MESSAGE_TYPE = 'https://didcomm.org/basicmessage/2.0/message';
     const TRUST_PING_TYPE = 'https://didcomm.org/trust-ping/2.0/ping';
+    const ISSUE_CREDENTIAL_TYPE = 'https://didcomm.org/issue-credential/3.0/issue-credential';
     const TRUST_PING_RESPONSE_TYPE = 'https://didcomm.org/trust-ping/2.0/ping-response';
 
     const [didcommTab, setDidcommTab] = useState('inbox');
@@ -424,6 +425,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [didcommInviteInput, setDidcommInviteInput] = useState('');
     const [didcommDecodedInvite, setDidcommDecodedInvite] = useState(null);
     const [didcommMessages, setDidcommMessages] = useState([]);
+    const [sendCredentialDidCommOpen, setSendCredentialDidCommOpen] = useState(false);
+    const [sendCredentialDidCommDID, setSendCredentialDidCommDID] = useState('');
     const [didcommInboxLoading, setDidcommInboxLoading] = useState(false);
     // A ref, not the loading flag: the poll's interval callback closes over the
     // render that created it, so a state read there would always be stale. Keyed
@@ -736,6 +739,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
         if (type === TRUST_PING_TYPE) {
             return 'Trust ping';
+        }
+        if (type === ISSUE_CREDENTIAL_TYPE) {
+            return 'Credential';
         }
         return type || 'Unknown';
     }
@@ -2828,6 +2834,67 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
+    // The DIDComm counterpart of sendIssued. sendCredential posts a Notice
+    // carrying the credential's DID, which only a did:cid holder can resolve and
+    // decrypt; this carries the signed credential itself, which is the only way
+    // to reach a subject whose DID is not a did:cid.
+    async function sendCredentialOverDidComm(recipientInput) {
+        const recipient = recipientInput.trim();
+
+        // This modal's confirm button is always enabled, so an empty submit
+        // reaches here. Returning quietly would leave the dialog open with no
+        // indication of why nothing happened.
+        if (!recipient) {
+            showError("Enter a recipient DID or alias");
+            return;
+        }
+
+        try {
+            // Resolve first so an unknown alias fails before any crypto, and so
+            // a DID travels in the envelope rather than a local name. Matches
+            // the shared wallet UI (packages/wallet-ui IssuedTab).
+            const docs = await keymaster.resolveDID(recipient);
+            const to = docs.didDocument?.id;
+
+            if (!to) {
+                showError(`Could not resolve ${recipient}`);
+                return;
+            }
+
+            await keymaster.sendCredentialDidComm(sendCredentialDidCommDID, to);
+            showSuccess("Credential sent over DIDComm");
+            setSendCredentialDidCommOpen(false);
+            setSendCredentialDidCommDID('');
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    async function acceptCredentialFromDidComm(received) {
+        setDidcommBusy(true);
+
+        try {
+            const accepted = await keymaster.acceptCredentialDidComm(received.message);
+
+            if (accepted) {
+                showSuccess("Credential added to your wallet");
+                await refreshHeld();
+                await dismissDidComm([received.id]);
+                return;
+            }
+
+            // A credential from a foreign issuer has no did:cid for this wallet
+            // to resolve, so there is nothing to hold. Say so rather than report
+            // a success that stored nothing; the message stays in the inbox
+            // where its contents can still be read.
+            showError("This credential has no DID this wallet can resolve, so it cannot be held");
+        } catch (error) {
+            showError(error);
+        } finally {
+            setDidcommBusy(false);
+        }
+    }
+
     useEffect(() => {
         if (selectedDmailDID && dmailList[selectedDmailDID]) {
             setSelectedDmail(dmailList[selectedDmailDID]);
@@ -4811,6 +4878,16 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     <Button variant="contained" onClick={handlePromptOk}>OK</Button>
                 </DialogActions>
             </Dialog>
+
+            <TextInputModal
+                isOpen={sendCredentialDidCommOpen}
+                title="Send credential over DIDComm"
+                description="Enter the recipient's DID or alias. The credential itself is sent, so a subject outside this network can read it."
+                label="Recipient"
+                confirmText="Send"
+                onSubmit={sendCredentialOverDidComm}
+                onClose={() => setSendCredentialDidCommOpen(false)}
+            />
 
             <TextInputModal
                 isOpen={importNostrOpen}
@@ -6950,6 +7027,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                                         Send
                                                                     </Button>
                                                                 </Grid>
+                                                                <Grid item>
+                                                                    <Button
+                                                                        variant="contained"
+                                                                        color="primary"
+                                                                        onClick={() => {
+                                                                            setSendCredentialDidCommDID(did);
+                                                                            setSendCredentialDidCommOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        Send over DIDComm
+                                                                    </Button>
+                                                                </Grid>
                                                             </Grid>
                                                         </TableCell>
                                                     </TableRow>
@@ -8011,6 +8100,15 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                                     disabled={didcommBusy}
                                                                 >
                                                                     Reply
+                                                                </Button>
+                                                            }
+                                                            {message.type === ISSUE_CREDENTIAL_TYPE &&
+                                                                <Button
+                                                                    size="small"
+                                                                    onClick={() => acceptCredentialFromDidComm(received)}
+                                                                    disabled={didcommBusy}
+                                                                >
+                                                                    Accept
                                                                 </Button>
                                                             }
                                                             <Button
