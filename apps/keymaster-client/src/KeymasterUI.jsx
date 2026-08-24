@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
     Alert,
     Autocomplete,
     Box,
@@ -59,7 +56,6 @@ import {
     Drafts,
     Edit,
     Email,
-    ExpandMore,
     Forward,
     HowToVote,
     Image,
