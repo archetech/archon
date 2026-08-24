@@ -107,19 +107,19 @@ function App() {
         const walletWeb = new WalletWeb();
         const walletMemory = new WalletJsonMemory();
 
-        if (uploadAction && pendingWallet) {
-            if (modalAction === 'decrypt') {
-                await walletMemory.saveWallet(pendingWallet, true);
+        // One condition rather than two nested ifs: the outer had no else and
+        // nothing else in its body, so the nesting carried no information.
+        if (uploadAction && pendingWallet && modalAction === 'decrypt') {
+            await walletMemory.saveWallet(pendingWallet, true);
 
-                try {
-                    const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, passphrase });
-                    // check pass
-                    await km.loadWallet();
-                    await walletWeb.saveWallet(pendingWallet, true);
-                } catch {
-                    setPassphraseErrorText('Incorrect passphrase');
-                    return;
-                }
+            try {
+                const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, passphrase });
+                // check pass
+                await km.loadWallet();
+                await walletWeb.saveWallet(pendingWallet, true);
+            } catch {
+                setPassphraseErrorText('Incorrect passphrase');
+                return;
             }
         }
 

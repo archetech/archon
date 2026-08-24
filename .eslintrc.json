@@ -24,5 +24,18 @@
         ],
         "sonarjs/no-duplicate-string": "off",
         "sonarjs/prefer-single-boolean-return": "off"
-    }
+    },
+    // `eslint .` only expands directories to extensions it knows about: .js by
+    // default, plus any named in an `overrides.files` pattern. eslint-config-react-app
+    // contributes `**/*.ts?(x)`, which is why .ts and .tsx were linted and .jsx
+    // silently was not -- 15 files, including two 8400-line KeymasterUI copies,
+    // invisible to every check in the repo. This override adds no rules; naming
+    // the extension is the whole point. See #935.
+    "overrides": [
+        {
+            "files": [
+                "**/*.jsx"
+            ]
+        }
+    ]
 }
