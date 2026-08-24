@@ -1,5 +1,5 @@
 // The demo wallets cannot import @didcid/keymaster -- the server-wallet demo
-// depends only on the thin client package -- so apps/*/src/oobCodec.mjs carries
+// depends only on the thin client package -- so packages/keymaster-ui carries
 // its own copy of the out-of-band invitation encoding.
 //
 // Duplicated wire formats drift, and this one would drift silently: an
@@ -15,8 +15,8 @@ import {
     decodeOutOfBandInvitation as uiDecode,
     encodeOutOfBandInvitation as uiEncode,
     outOfBandInvitation as uiInvitation,
-} from '../../apps/keymaster-client/src/oobCodec.mjs';
-import { readFileSync } from 'fs';
+} from '../../packages/keymaster-ui/src/oobCodec.mjs';
+import { existsSync } from 'fs';
 
 // Non-ASCII is where a byte-oriented btoa and a Buffer-based encoder are most
 // likely to disagree, so every case carries some.
@@ -51,11 +51,14 @@ describe('demo wallet out-of-band codec', () => {
         expect(uiDecode(bare)).toStrictEqual(invitation);
     });
 
-    // gatekeeper-client and keymaster-client keep byte-identical sources
-    // (AGENTS.md), and only one of the two copies is exercised above.
-    it('is identical in both demo wallets', () => {
-        const keymasterClient = readFileSync('apps/keymaster-client/src/oobCodec.mjs', 'utf-8');
-        const gatekeeperClient = readFileSync('apps/gatekeeper-client/src/oobCodec.mjs', 'utf-8');
-        expect(gatekeeperClient).toBe(keymasterClient);
+    // This used to assert the two demo wallets' copies were byte-identical.
+    // They now share one, so the stronger guarantee is that neither grows a
+    // local copy back -- a re-added file would be exercised by nothing and free
+    // to drift, which is what the old assertion existed to prevent (#99).
+    it('exists once, with no app-local copies', () => {
+        const local = ['apps/keymaster-client/src/oobCodec.mjs', 'apps/gatekeeper-client/src/oobCodec.mjs']
+            .filter(path => existsSync(path));
+
+        expect(local).toStrictEqual([]);
     });
 });

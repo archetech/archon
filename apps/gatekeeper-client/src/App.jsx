@@ -8,12 +8,11 @@ import WalletWeb from '@didcid/keymaster/wallet/web';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
-import KeymasterUI from './KeymasterUI.jsx';
 import PassphraseModal from './PassphraseModal';
-import WarningModal from './WarningModal';
+import { KeymasterUI, WarningModal } from '@didcid/keymaster-ui';
 import MnemonicModal from './MnemonicModal';
 import { encryptWithPassphrase } from '@didcid/cipher/passphrase';
-import './App.css';
+import '@didcid/keymaster-ui/App.css';
 
 globalThis.Buffer = Buffer;
 

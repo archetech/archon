@@ -1,0 +1,20 @@
+{
+  "name": "@didcid/keymaster-ui",
+  "version": "0.12.0",
+  "description": "The Keymaster demo UI shared by the standalone client apps",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.js",
+    "./App.css": "./src/App.css"
+  },
+  "peerDependencies": {
+    "@mui/icons-material": "^7.3.5",
+    "@mui/material": "^7.3.5",
+    "axios": "^1.19.0",
+    "buffer": "^6.0.3",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.8"
+  }
+}

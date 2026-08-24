@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import KeymasterClient from '@didcid/clients/keymaster';
-import KeymasterUI from './KeymasterUI.jsx';
+import { KeymasterUI } from '@didcid/keymaster-ui';
 import LoginModal from './LoginModal.jsx';
-import './App.css';
+import '@didcid/keymaster-ui/App.css';
 
 const STORAGE_KEY = 'KEYMASTER_URL';
 const defaultPort = import.meta.env.VITE_SERVER_PORT || '4226';
