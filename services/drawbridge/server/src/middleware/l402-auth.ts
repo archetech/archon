@@ -302,7 +302,10 @@ export async function handlePaymentCompletion(
     req: Request,
     res: Response
 ): Promise<void> {
-    const { paymentHash, preimage } = req.body;
+    // Only the hash comes from the client. A preimage it supplied would be
+    // worthless as proof -- the authoritative one is fetched from the mediator
+    // below and verified against this hash.
+    const { paymentHash } = req.body;
 
     if (!paymentHash) {
         res.status(400).json({ error: 'paymentHash is required' });

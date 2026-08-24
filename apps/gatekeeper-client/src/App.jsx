@@ -107,19 +107,17 @@ function App() {
         const walletWeb = new WalletWeb();
         const walletMemory = new WalletJsonMemory();
 
-        if (uploadAction && pendingWallet) {
-            if (modalAction === 'decrypt') {
-                await walletMemory.saveWallet(pendingWallet, true);
+        if (uploadAction && pendingWallet && modalAction === 'decrypt') {
+            await walletMemory.saveWallet(pendingWallet, true);
 
-                try {
-                    const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, passphrase });
-                    // check pass
-                    await km.loadWallet();
-                    await walletWeb.saveWallet(pendingWallet, true);
-                } catch {
-                    setPassphraseErrorText('Incorrect passphrase');
-                    return;
-                }
+            try {
+                const km = new Keymaster({ gatekeeper, wallet: walletMemory, cipher, passphrase });
+                // check pass
+                await km.loadWallet();
+                await walletWeb.saveWallet(pendingWallet, true);
+            } catch {
+                setPassphraseErrorText('Incorrect passphrase');
+                return;
             }
         }
 

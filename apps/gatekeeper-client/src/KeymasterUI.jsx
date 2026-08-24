@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
     Alert,
     Autocomplete,
     Box,
@@ -59,7 +56,6 @@ import {
     Drafts,
     Edit,
     Email,
-    ExpandMore,
     Forward,
     HowToVote,
     Image,
@@ -4672,16 +4668,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         for (const [did, item] of Object.entries(dmailList)) {
             const has = (tag) => item.tags.includes(tag);
             const not = (tag) => !has(tag);
+            // Neither deleted nor archived, i.e. still in the working set. The
+            // three live tabs share this; archive and trash each define their own.
+            const live = not(DmailTags.DELETED) && not(DmailTags.ARCHIVED);
 
-            if (dmailTab === 'inbox' && has(DmailTags.INBOX) && not(DmailTags.DELETED) && not(DmailTags.ARCHIVED)) {
-                filtered[did] = item;
-            } else if (dmailTab === 'outbox' && has(DmailTags.SENT) && not(DmailTags.DELETED) && not(DmailTags.ARCHIVED)) {
-                filtered[did] = item;
-            } else if (dmailTab === 'drafts' && has(DmailTags.DRAFT) && not(DmailTags.DELETED) && not(DmailTags.ARCHIVED)) {
-                filtered[did] = item;
-            } else if (dmailTab === 'archive' && has(DmailTags.ARCHIVED) && not(DmailTags.DELETED)) {
-                filtered[did] = item;
-            } else if (dmailTab === 'trash' && has(DmailTags.DELETED)) {
+            const matchesTab = {
+                inbox: () => has(DmailTags.INBOX) && live,
+                outbox: () => has(DmailTags.SENT) && live,
+                drafts: () => has(DmailTags.DRAFT) && live,
+                archive: () => has(DmailTags.ARCHIVED) && not(DmailTags.DELETED),
+                trash: () => has(DmailTags.DELETED),
+            };
+
+            if (matchesTab[dmailTab]?.()) {
                 filtered[did] = item;
             }
         }
@@ -5139,7 +5138,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         </Grid>
                                     </Grid>
                                     <TableContainer component={Paper} style={{ maxHeight: '260px', overflow: 'auto', marginBottom: '8px' }}>
-                                            <Table stickyHeader style={{ width: '100%', tableLayout: 'fixed' }}>
+                                        <Table stickyHeader style={{ width: '100%', tableLayout: 'fixed' }}>
                                             <colgroup>
                                                 <col />
                                                 <col style={{ width: '220px' }} />
@@ -5900,49 +5899,49 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                         selectVersion={selectImageVersion}
                                                     />
                                                     <div className="container">
-                                                    <div className="left-pane">
-                                                        <img src={selectedImageURL} alt={selectedImageName} style={{ width: '100%', height: 'auto' }} />
-                                                    </div>
-                                                    <div className="right-pane">
-                                                        <TableContainer>
-                                                            <Table>
-                                                                <TableBody>
-                                                                    <TableRow>
-                                                                        <TableCell>DID</TableCell>
-                                                                        <TableCell>{selectedImageDocs.didDocument.id}</TableCell>
-                                                                    </TableRow>
-                                                                    <TableRow>
-                                                                        <TableCell>CID</TableCell>
-                                                                        <TableCell>{selectedImage.file.cid}</TableCell>
-                                                                    </TableRow>
-                                                                    <TableRow>
-                                                                        <TableCell>Created</TableCell>
-                                                                        <TableCell>{selectedImageDocs.didDocumentMetadata.created}</TableCell>
-                                                                    </TableRow>
-                                                                    <TableRow>
-                                                                        <TableCell>Updated</TableCell>
-                                                                        <TableCell>{selectedImageDocs.didDocumentMetadata.updated || selectedImageDocs.didDocumentMetadata.created}</TableCell>
-                                                                    </TableRow>
-                                                                    <TableRow>
-                                                                        <TableCell>Version</TableCell>
-                                                                        <TableCell>{selectedImageDocs.didDocumentMetadata.version} of {imageVersionMax}</TableCell>
-                                                                    </TableRow>
-                                                                    <TableRow>
-                                                                        <TableCell>File size</TableCell>
-                                                                        <TableCell>{selectedImage.file.bytes} bytes</TableCell>
-                                                                    </TableRow>
-                                                                    <TableRow>
-                                                                        <TableCell>Image size</TableCell>
-                                                                        <TableCell>{selectedImage.image.width} x {selectedImage.image.height} pixels</TableCell>
-                                                                    </TableRow>
-                                                                    <TableRow>
-                                                                        <TableCell>Image type</TableCell>
-                                                                        <TableCell>{selectedImage.file.type}</TableCell>
-                                                                    </TableRow>
-                                                                </TableBody>
-                                                            </Table>
-                                                        </TableContainer>
-                                                    </div>
+                                                        <div className="left-pane">
+                                                            <img src={selectedImageURL} alt={selectedImageName} style={{ width: '100%', height: 'auto' }} />
+                                                        </div>
+                                                        <div className="right-pane">
+                                                            <TableContainer>
+                                                                <Table>
+                                                                    <TableBody>
+                                                                        <TableRow>
+                                                                            <TableCell>DID</TableCell>
+                                                                            <TableCell>{selectedImageDocs.didDocument.id}</TableCell>
+                                                                        </TableRow>
+                                                                        <TableRow>
+                                                                            <TableCell>CID</TableCell>
+                                                                            <TableCell>{selectedImage.file.cid}</TableCell>
+                                                                        </TableRow>
+                                                                        <TableRow>
+                                                                            <TableCell>Created</TableCell>
+                                                                            <TableCell>{selectedImageDocs.didDocumentMetadata.created}</TableCell>
+                                                                        </TableRow>
+                                                                        <TableRow>
+                                                                            <TableCell>Updated</TableCell>
+                                                                            <TableCell>{selectedImageDocs.didDocumentMetadata.updated || selectedImageDocs.didDocumentMetadata.created}</TableCell>
+                                                                        </TableRow>
+                                                                        <TableRow>
+                                                                            <TableCell>Version</TableCell>
+                                                                            <TableCell>{selectedImageDocs.didDocumentMetadata.version} of {imageVersionMax}</TableCell>
+                                                                        </TableRow>
+                                                                        <TableRow>
+                                                                            <TableCell>File size</TableCell>
+                                                                            <TableCell>{selectedImage.file.bytes} bytes</TableCell>
+                                                                        </TableRow>
+                                                                        <TableRow>
+                                                                            <TableCell>Image size</TableCell>
+                                                                            <TableCell>{selectedImage.image.width} x {selectedImage.image.height} pixels</TableCell>
+                                                                        </TableRow>
+                                                                        <TableRow>
+                                                                            <TableCell>Image type</TableCell>
+                                                                            <TableCell>{selectedImage.file.type}</TableCell>
+                                                                        </TableRow>
+                                                                    </TableBody>
+                                                                </Table>
+                                                            </TableContainer>
+                                                        </div>
                                                     </div>
                                                 </>
                                             }
@@ -6380,26 +6379,26 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
                                     <Box sx={{ mt: 2 }}>
                                         {!createdPollDid && (
-                                        <>
-                                        <Select
-                                            value={registry}
-                                            onChange={(e) => setRegistry(e.target.value)}
-                                            sx={{ minWidth: 200, mb: 2 }}
-                                        >
-                                            {registries.map((r) => (
-                                                <MenuItem key={r} value={r}>
-                                                    {r}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                        <Button
-                                            variant="contained"
-                                            onClick={handleCreatePoll}
-                                            sx={{ mr: 1 }}
-                                        >
+                                            <>
+                                                <Select
+                                                    value={registry}
+                                                    onChange={(e) => setRegistry(e.target.value)}
+                                                    sx={{ minWidth: 200, mb: 2 }}
+                                                >
+                                                    {registries.map((r) => (
+                                                        <MenuItem key={r} value={r}>
+                                                            {r}
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                                <Button
+                                                    variant="contained"
+                                                    onClick={handleCreatePoll}
+                                                    sx={{ mr: 1 }}
+                                                >
                                             Create
-                                        </Button>
-                                        </>
+                                                </Button>
+                                            </>
                                         )}
                                         <Button
                                             variant="outlined"
@@ -7766,7 +7765,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         <Box>
                                             {lightningWalletError ?
                                                 <Typography color="error">{lightningWalletError}</Typography>
-                                            :
+                                                :
                                                 <Typography variant="h6">
                                                     Balance: {(lightningBalance ?? 0).toLocaleString()} sats
                                                 </Typography>
@@ -7836,20 +7835,20 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                         const date = d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` : '—';
                                                         const displayStatus = p.status === 'success' ? 'settled'
                                                             : p.status === 'failed' ? 'failed'
-                                                            : (p.expiry && new Date(p.expiry) < new Date()) ? 'expired'
-                                                            : 'pending';
+                                                                : (p.expiry && new Date(p.expiry) < new Date()) ? 'expired'
+                                                                    : 'pending';
                                                         if (!lightningStatusFilter[displayStatus]) return null;
                                                         const statusColor = displayStatus === 'settled' ? 'inherit'
                                                             : displayStatus === 'failed' ? 'error.main'
-                                                            : 'text.secondary';
+                                                                : 'text.secondary';
                                                         return (
-                                                        <TableRow key={i}>
-                                                            <TableCell>{date}</TableCell>
-                                                            <TableCell align="right">{p.amount}</TableCell>
-                                                            <TableCell align="right">{p.fee > 0 ? p.fee : ''}</TableCell>
-                                                            <TableCell><Box component="span" sx={{ color: statusColor }}>{displayStatus}</Box></TableCell>
-                                                            <TableCell>{p.memo || '—'}</TableCell>
-                                                        </TableRow>
+                                                            <TableRow key={i}>
+                                                                <TableCell>{date}</TableCell>
+                                                                <TableCell align="right">{p.amount}</TableCell>
+                                                                <TableCell align="right">{p.fee > 0 ? p.fee : ''}</TableCell>
+                                                                <TableCell><Box component="span" sx={{ color: statusColor }}>{displayStatus}</Box></TableCell>
+                                                                <TableCell>{p.memo || '—'}</TableCell>
+                                                            </TableRow>
                                                         );
                                                     })}
                                                 </TableBody>
@@ -8006,14 +8005,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             {loadingZap ? 'Zapping...' : 'Zap'}
                                         </Button>
                                     </Box>
-                                        {zapResult &&
+                                    {zapResult &&
                                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
                                                 <Typography variant="body2"><strong>Status:</strong> {zapResult.paid ? 'Settled' : zapResult.status === 'failed' ? 'Failed' : 'Pending'}</Typography>
                                                 <Typography variant="body2"><strong>Payment Hash:</strong> {zapResult.paymentHash}</Typography>
                                                 {zapResult.preimage &&
                                                     <Typography variant="body2"><strong>Preimage (Proof):</strong> {zapResult.preimage}</Typography>
-                                            }
-                                        </Box>
+                                                }
+                                            </Box>
                                     }
                                 </Box>
                             }
@@ -8306,75 +8305,75 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
                             {didcommTab === 'endpoint' &&
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                <Typography variant="body2" sx={{ opacity: 0.7 }}>
                                 Publish a messaging endpoint so other agents can send encrypted DIDComm messages to this identity.
-                            </Typography>
+                                </Typography>
 
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                <Typography variant="subtitle2">Published</Typography>
-                                {didcommStatus
-                                    ? <>
-                                        {didcommStatus.endpoint
-                                            ? <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-                                                <strong>Endpoint:</strong> {didcommStatus.endpoint}
-                                            </Typography>
-                                            : <Typography variant="body2">
-                                                <strong>Endpoint:</strong> key only (others can encrypt to this identity but have nowhere to deliver)
-                                            </Typography>
-                                        }
-                                        {didcommStatus.routingKeys.length > 0 &&
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                    <Typography variant="subtitle2">Published</Typography>
+                                    {didcommStatus
+                                        ? <>
+                                            {didcommStatus.endpoint
+                                                ? <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                                    <strong>Endpoint:</strong> {didcommStatus.endpoint}
+                                                </Typography>
+                                                : <Typography variant="body2">
+                                                    <strong>Endpoint:</strong> key only (others can encrypt to this identity but have nowhere to deliver)
+                                                </Typography>
+                                            }
+                                            {didcommStatus.routingKeys.length > 0 &&
                                             <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
                                                 <strong>Routing keys:</strong> {didcommStatus.routingKeys.join(', ')}
                                             </Typography>
-                                        }
-                                        <Typography variant="body2">
-                                            <strong>Key agreement:</strong> {didcommStatus.keyAgreement ? 'published' : 'missing'}
-                                        </Typography>
-                                    </>
-                                    : <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                            }
+                                            <Typography variant="body2">
+                                                <strong>Key agreement:</strong> {didcommStatus.keyAgreement ? 'published' : 'missing'}
+                                            </Typography>
+                                        </>
+                                        : <Typography variant="body2" sx={{ opacity: 0.7 }}>
                                         Nothing published for this identity yet.
-                                    </Typography>
-                                }
-                            </Box>
+                                        </Typography>
+                                    }
+                                </Box>
 
-                            <TextField
-                                label="Endpoint URL (optional)"
-                                value={didcommEndpoint}
-                                onChange={(e) => setDidcommEndpoint(e.target.value)}
-                                disabled={didcommBusy}
-                                placeholder="https://relay.example/didcomm"
-                                helperText="Leave blank to use this node's own relay."
-                                fullWidth
-                            />
-
-                            <TextField
-                                label="Routing keys (optional, comma separated)"
-                                value={didcommRoutingKeys}
-                                onChange={(e) => setDidcommRoutingKeys(e.target.value)}
-                                disabled={didcommBusy}
-                                placeholder="did:cid:mediator#key-agreement-1"
-                                helperText="Set these when delivery goes through a mediator; senders then wrap messages in a Forward."
-                                fullWidth
-                            />
-
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    onClick={publishDidComm}
+                                <TextField
+                                    label="Endpoint URL (optional)"
+                                    value={didcommEndpoint}
+                                    onChange={(e) => setDidcommEndpoint(e.target.value)}
                                     disabled={didcommBusy}
-                                >
-                                    {didcommStatus ? 'Update' : 'Publish'}
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    color="primary"
-                                    onClick={unpublishDidComm}
-                                    disabled={didcommBusy || !didcommStatus}
-                                >
+                                    placeholder="https://relay.example/didcomm"
+                                    helperText="Leave blank to use this node's own relay."
+                                    fullWidth
+                                />
+
+                                <TextField
+                                    label="Routing keys (optional, comma separated)"
+                                    value={didcommRoutingKeys}
+                                    onChange={(e) => setDidcommRoutingKeys(e.target.value)}
+                                    disabled={didcommBusy}
+                                    placeholder="did:cid:mediator#key-agreement-1"
+                                    helperText="Set these when delivery goes through a mediator; senders then wrap messages in a Forward."
+                                    fullWidth
+                                />
+
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={publishDidComm}
+                                        disabled={didcommBusy}
+                                    >
+                                        {didcommStatus ? 'Update' : 'Publish'}
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        color="primary"
+                                        onClick={unpublishDidComm}
+                                        disabled={didcommBusy || !didcommStatus}
+                                    >
                                     Unpublish
-                                </Button>
-                            </Box>
+                                    </Button>
+                                </Box>
                             </Box>
                             }
                         </Box>

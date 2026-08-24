@@ -196,18 +196,18 @@ async function runApiFixtures() {
             fixture.compareMode === 'jsonLoose'
                 ? normalizeJson(ts.body)
                 : fixture.compareMode === 'errorText'
-                  ? normalizeErrorText(ts.body)
-                : fixture.compareMode === 'jsonSet'
-                  ? normalizeSetLikeJson(ts.body)
-                  : ts.body;
+                    ? normalizeErrorText(ts.body)
+                    : fixture.compareMode === 'jsonSet'
+                        ? normalizeSetLikeJson(ts.body)
+                        : ts.body;
         const rightBody =
             fixture.compareMode === 'jsonLoose'
                 ? normalizeJson(rust.body)
                 : fixture.compareMode === 'errorText'
-                  ? normalizeErrorText(rust.body)
-                : fixture.compareMode === 'jsonSet'
-                  ? normalizeSetLikeJson(rust.body)
-                  : rust.body;
+                    ? normalizeErrorText(rust.body)
+                    : fixture.compareMode === 'jsonSet'
+                        ? normalizeSetLikeJson(rust.body)
+                        : rust.body;
         assertEqual(`${fixture.name} body`, leftBody, rightBody);
         console.log(`ok api ${fixture.name}`);
     }
@@ -223,8 +223,8 @@ async function runApiFlows() {
                 flow.bodyFrom.file === 'proof-vectors.json'
                     ? proofVectors
                     : flow.bodyFrom.file === 'deterministic-vectors.json'
-                      ? deterministicVectors
-                      : null;
+                        ? deterministicVectors
+                        : null;
             if (!source) {
                 throw new Error(`Unsupported bodyFrom file: ${flow.bodyFrom.file}`);
             }
@@ -258,18 +258,18 @@ async function runApiFlows() {
             compareMode === 'jsonLoose'
                 ? normalizeJson(ts.body)
                 : compareMode === 'errorText'
-                  ? normalizeErrorText(ts.body)
-                : compareMode === 'jsonSet'
-                  ? normalizeSetLikeJson(ts.body)
-                  : ts.body;
+                    ? normalizeErrorText(ts.body)
+                    : compareMode === 'jsonSet'
+                        ? normalizeSetLikeJson(ts.body)
+                        : ts.body;
         const rightBody =
             compareMode === 'jsonLoose'
                 ? normalizeJson(rust.body)
                 : compareMode === 'errorText'
-                  ? normalizeErrorText(rust.body)
-                : compareMode === 'jsonSet'
-                  ? normalizeSetLikeJson(rust.body)
-                  : rust.body;
+                    ? normalizeErrorText(rust.body)
+                    : compareMode === 'jsonSet'
+                        ? normalizeSetLikeJson(rust.body)
+                        : rust.body;
         assertEqual(`${flow.name} body`, leftBody, rightBody);
 
         if (flow.capture?.key) {
@@ -356,7 +356,11 @@ async function runMetricsChecks() {
     }
 
     for (const route of metricsFixture.requiredNormalizedRoutes) {
-        if (!rustMetrics.includes(`route=\"${route}\"`) && !rustMetrics.includes(`route="${route}"`)) {
+        // One check, not two: inside a template literal `\"` is just `"`, so the
+        // former operand was the same expression as the latter. A raw Prometheus
+        // scrape writes labels as route="value", so that is the only form there
+        // is to look for.
+        if (!rustMetrics.includes(`route="${route}"`)) {
             console.warn(`warn metrics route label not yet observed in Rust scrape: ${route}`);
         }
     }
