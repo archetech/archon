@@ -34,7 +34,8 @@
     "overrides": [
         {
             "files": [
-                "**/*.jsx"
+                "**/*.jsx",
+                "**/*.mjs"
             ]
         }
     ]

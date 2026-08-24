@@ -13,25 +13,52 @@ import { join } from 'path';
 
 const CONFIG = '.eslintrc.json';
 
-// The extensions this repo actually ships source in. Anything here must be
-// reachable by `eslint .`, whether through the default, a preset, or an override.
-const REQUIRED = ['.js', '.jsx', '.ts', '.tsx'];
+// Extensions `eslint .` must reach, whether through its default, a preset, or an
+// override in the config.
+const LINTED = ['.js', '.jsx', '.mjs', '.ts', '.tsx'];
 
-function sourceExtensions(dir: string, found = new Set<string>()): Set<string> {
+// Extensions present in the source trees that are deliberately not JavaScript to
+// lint -- assets, config, docs, and the Android build. Each entry is a decision
+// someone made; an extension in neither list fails the test rather than slipping
+// in unlinted, which is the whole point.
+const NOT_LINTABLE = [
+    '.css', '.env', '.html', '.ico', '.json', '.md', '.png', '.sh', '.svg',
+    '.txt', '.webmanifest', '.webp', '.xml',
+];
+
+// Build output, dependencies, and the native project trees. The Android and iOS
+// directories are whole Gradle/Xcode projects -- their .java, .gradle and .jar
+// files are not JavaScript anyone would lint, and enumerating them would bury
+// the extensions this test is actually asking about.
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'android', 'ios', 'public', 'static']);
+
+// Collects whatever extensions are there, deliberately without reference to
+// LINTED. An earlier version matched only /\.(js|jsx|ts|tsx)$/ -- so it could
+// never discover a fifth extension, which is exactly what it claimed to guard
+// against, while two unlinted .mjs files sat in the tree it was scanning.
+function extensionsIn(dir: string, found = new Set<string>()): Set<string> {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'build') {
+        if (SKIP_DIRS.has(entry.name)) {
             continue;
         }
 
         const path = join(dir, entry.name);
+
         if (entry.isDirectory()) {
-            sourceExtensions(path, found);
+            extensionsIn(path, found);
+            continue;
         }
-        else {
-            const match = /\.(js|jsx|ts|tsx)$/.exec(entry.name);
-            if (match) {
-                found.add(`.${match[1]}`);
-            }
+
+        // Dotfiles are configuration, never lintable source, and their names do
+        // not decompose the same way: .env.android would otherwise be read as an
+        // ".android" extension, which is not a thing.
+        if (entry.name.startsWith('.')) {
+            continue;
+        }
+
+        const dot = entry.name.lastIndexOf('.');
+        if (dot > 0) {
+            found.add(entry.name.slice(dot));
         }
     }
 
@@ -63,11 +90,29 @@ describe('lint scope', () => {
         expect(overridesSection()).toContain('.jsx');
     });
 
-    it('covers every extension this repo has source in', () => {
-        // If a fifth extension appears -- .mjs, .cjs -- it needs the same
-        // treatment, and this fails rather than letting it in unlinted.
-        const present = [...sourceExtensions('apps'), ...sourceExtensions('packages')];
+    it('has decided about every extension in the source trees', () => {
+        // A new one -- .cjs, .vue, .svelte -- lands here as a failure asking
+        // whether it is JavaScript that needs linting. That question going
+        // unasked is how .jsx stayed invisible.
+        const present = [
+            ...extensionsIn('apps'),
+            ...extensionsIn('packages'),
+            ...extensionsIn('scripts'),
+        ];
 
-        expect([...new Set(present)].sort()).toStrictEqual(REQUIRED.slice().sort());
+        const decided = new Set([...LINTED, ...NOT_LINTABLE]);
+        const undecided = [...new Set(present)].filter(extension => !decided.has(extension)).sort();
+
+        expect(undecided).toStrictEqual([]);
+    });
+
+    it('names every lintable extension the default does not cover', () => {
+        // eslint's default is .js; eslint-config-react-app adds **/*.ts?(x).
+        // Everything else has to be named explicitly or it is silently skipped.
+        const overrides = overridesSection();
+
+        for (const extension of ['.jsx', '.mjs']) {
+            expect(overrides).toContain(extension);
+        }
     });
 });
