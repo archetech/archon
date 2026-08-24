@@ -4676,9 +4676,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             // three live tabs share this; archive and trash each define their own.
             const live = () => not(DmailTags.DELETED) && not(DmailTags.ARCHIVED);
 
-            // A dispatch table rather than an if/else chain whose every branch
-            // assigned the same thing -- which is what it always was, and what
-            // sonarjs/no-duplicated-branches was pointing at.
             const matchesTab = {
                 inbox: () => has(DmailTags.INBOX) && live(),
                 outbox: () => has(DmailTags.SENT) && live(),

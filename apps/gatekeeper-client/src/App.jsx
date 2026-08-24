@@ -107,8 +107,6 @@ function App() {
         const walletWeb = new WalletWeb();
         const walletMemory = new WalletJsonMemory();
 
-        // One condition rather than two nested ifs: the outer had no else and
-        // nothing else in its body, so the nesting carried no information.
         if (uploadAction && pendingWallet && modalAction === 'decrypt') {
             await walletMemory.saveWallet(pendingWallet, true);
 
