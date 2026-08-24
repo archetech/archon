@@ -2838,14 +2838,29 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     // carrying the credential's DID, which only a did:cid holder can resolve and
     // decrypt; this carries the signed credential itself, which is the only way
     // to reach a subject whose DID is not a did:cid.
-    async function sendCredentialOverDidComm(recipient) {
-        const to = recipient.trim();
+    async function sendCredentialOverDidComm(recipientInput) {
+        const recipient = recipientInput.trim();
 
-        if (!to) {
+        // This modal's confirm button is always enabled, so an empty submit
+        // reaches here. Returning quietly would leave the dialog open with no
+        // indication of why nothing happened.
+        if (!recipient) {
+            showError("Enter a recipient DID or alias");
             return;
         }
 
         try {
+            // Resolve first so an unknown alias fails before any crypto, and so
+            // a DID travels in the envelope rather than a local name. Matches
+            // the shared wallet UI (packages/wallet-ui IssuedTab).
+            const docs = await keymaster.resolveDID(recipient);
+            const to = docs.didDocument?.id;
+
+            if (!to) {
+                showError(`Could not resolve ${recipient}`);
+                return;
+            }
+
             await keymaster.sendCredentialDidComm(sendCredentialDidCommDID, to);
             showSuccess("Credential sent over DIDComm");
             setSendCredentialDidCommOpen(false);
