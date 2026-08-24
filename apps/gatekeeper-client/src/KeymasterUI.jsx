@@ -4674,12 +4674,12 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             const not = (tag) => !has(tag);
             // Neither deleted nor archived, i.e. still in the working set. The
             // three live tabs share this; archive and trash each define their own.
-            const live = () => not(DmailTags.DELETED) && not(DmailTags.ARCHIVED);
+            const live = not(DmailTags.DELETED) && not(DmailTags.ARCHIVED);
 
             const matchesTab = {
-                inbox: () => has(DmailTags.INBOX) && live(),
-                outbox: () => has(DmailTags.SENT) && live(),
-                drafts: () => has(DmailTags.DRAFT) && live(),
+                inbox: () => has(DmailTags.INBOX) && live,
+                outbox: () => has(DmailTags.SENT) && live,
+                drafts: () => has(DmailTags.DRAFT) && live,
                 archive: () => has(DmailTags.ARCHIVED) && not(DmailTags.DELETED),
                 trash: () => has(DmailTags.DELETED),
             };
