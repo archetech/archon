@@ -144,6 +144,12 @@ export interface CredentialSchema {
 export interface VerifiableCredential {
     "@context": string[];
     type: string[];
+    // The DID of the asset holding this credential, set by issueCredential
+    // after the asset exists and covered by the issuer's signature, so a reader
+    // can tell where the credential lives and check it for revocation (#108).
+    // Optional because credentials issued before that existed do not carry it;
+    // absent means unbound rather than invalid.
+    id?: string;
     issuer: string;
     validFrom: string;
     validUntil?: string;

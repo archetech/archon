@@ -3590,11 +3590,30 @@ export default class Keymaster implements KeymasterInterface {
         const signed = await this.addProof(credential);
         const subjectId = credential.credentialSubject!.id;
 
-        if (this.isManagedDID(subjectId)) {
-            return this.encryptJSON(signed, subjectId, { ...options, includeHash: true });
-        }
+        const did = this.isManagedDID(subjectId)
+            ? await this.encryptJSON(signed, subjectId, { ...options, includeHash: true })
+            : await this.encryptJSON(signed, id.did, { ...options, includeHash: true, encryptForSender: false });
 
-        return this.encryptJSON(signed, id.did, { ...options, includeHash: true, encryptForSender: false });
+        // Bind the credential to the asset holding it, under the issuer's own
+        // signature. Without this a credential says nothing about where it
+        // lives, so a holder can copy a revoked one -- genuinely issued,
+        // correctly signed, and still verifying -- under a fresh asset DID and
+        // present it as current. Signature, issuer and subject all check out,
+        // because the credential is authentic; only the pointer lies, and the
+        // pointer was the one part nobody signed (#108).
+        //
+        // Two steps rather than one because the DID is the CID of the operation
+        // that creates the asset, so it cannot be known before the asset
+        // exists. That is only true of the create operation: updateDID appends
+        // to the same chain and leaves the identifier alone, so re-signing the
+        // credential with its own DID does not move it.
+        //
+        // `id` is a standard optional property of a W3C Verifiable Credential,
+        // so a verifier that knows nothing about Archon still reads it as the
+        // credential's identifier.
+        await this.updateCredential(did, { ...credential, id: did } as VerifiableCredential);
+
+        return did;
     }
 
     async sendCredential(
@@ -3630,10 +3649,11 @@ export default class Keymaster implements KeymasterInterface {
     // DID nor decrypt what it points at -- issueCredential encrypts to the ISSUER
     // when the subject is not managed. So this carries the credential itself.
     //
-    // The attachment is the signed VC exactly as issued, and the credential's own
-    // DID rides in the body instead: the proof covers every field but `proof`, so
-    // an `id` added afterwards would make the credential fail verification for the
-    // very recipient this exists to reach. The recipient verifies `proof` by
+    // The attachment is the signed VC exactly as issued, and it names its own
+    // asset DID: issueCredential embeds `id` before signing, so the identifier is
+    // covered by the proof rather than added after it (#108). `credential_did`
+    // stays in the body, which is where the protocol expects the hint and what an
+    // Archon holder reads to acceptCredential. The recipient verifies `proof` by
     // resolving the issuer's did:cid, which any Universal Resolver carrying the
     // did:cid driver can do; an Archon holder reads the body to acceptCredential.
     async sendCredentialDidComm(
@@ -3673,11 +3693,16 @@ export default class Keymaster implements KeymasterInterface {
             return false;
         }
 
-        // The DID rides outside the signed credential, so nothing on the wire
-        // binds the two together: a sender could attach one credential and name
-        // another. Both would have to be genuinely issued to this holder for
+        // A sender could attach one credential and name another in the body.
+        // Both would have to be genuinely issued to this holder for
         // acceptCredential to take them, so this is not forgery -- but storing
         // something other than what the user was shown is still wrong.
+        //
+        // The credential now names its own asset under the issuer's signature
+        // (#108), so `attached.id` would disagree with `credentialDid` on a
+        // mismatch. Comparing the full content still catches strictly more:
+        // it also rejects an attachment that names the right DID but differs
+        // from what that DID actually holds.
         const attached = attachedJson(message as DidCommPlaintext);
         const resolved = await this.getCredential(credentialDid);
 

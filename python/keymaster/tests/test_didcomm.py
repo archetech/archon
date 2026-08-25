@@ -589,9 +589,11 @@ def test_send_credential_didcomm_carries_the_credential_not_a_reference(monkeypa
         km.send_credential_didcomm("did:cid:credential", "did:web:example.com")
     ) == ["msg-1"]
 
-    # The DID is named in the body, and the credential travels byte-for-byte as
-    # it was signed: the proof covers every field but `proof`, so an `id` added
-    # afterwards would break verification for the recipient this exists to reach.
+    # The DID is named in the body, where the protocol expects the hint, and the
+    # credential travels byte-for-byte as it was signed. It also names its own
+    # asset DID: issue_credential embeds `id` before signing, so the identifier
+    # is covered by the proof rather than added after it (#108). This test hands
+    # in its own VC, so what arrives is whatever was passed.
     assert sent["message"]["body"]["credential_did"] == "did:cid:credential"
 
     attached = sent["message"]["attachments"][0]["data"]["json"]
@@ -599,8 +601,11 @@ def test_send_credential_didcomm_carries_the_credential_not_a_reference(monkeypa
 
 
 def test_accept_credential_didcomm_refuses_a_credential_it_did_not_show(monkeypatch):
-    # Nothing on the wire binds the body's DID to the attachment, so a sender can
-    # name one credential and display another.
+    # A sender can name one credential in the body and attach another. The
+    # credential now names its own asset under the issuer's signature (#108), so
+    # the two would disagree -- but comparing the full content catches strictly
+    # more, including an attachment that names the right DID and differs from
+    # what that DID holds.
     import asyncio
     from keymaster.core import Keymaster
 

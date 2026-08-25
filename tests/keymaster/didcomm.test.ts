@@ -1001,14 +1001,20 @@ describe('credential exchange over DIDComm', () => {
         const { message } = await keymaster.unpackDidComm(packed, { name: 'Bob' });
         expect(message.type).toBe('https://didcomm.org/issue-credential/3.0/issue-credential');
 
-        // The DID is named in the body, NOT inside the credential: the proof
-        // covers every field but `proof`, so an `id` added after signing would
-        // make the credential fail verification for the very recipient this
-        // message exists to reach.
+        // The DID is named in the body, where the issue-credential protocol puts
+        // it, and again inside the credential as its `id`. Those used to be
+        // alternatives: an `id` written after signing would have broken the
+        // proof, which covers every field but `proof` itself. issueCredential
+        // now sets it before signing -- it re-signs once the asset exists and
+        // its DID is known -- so the credential carries its own identifier and
+        // still verifies (#108). The assertion below proves the second half.
         expect(message.body.credential_did).toBe(credentialDid);
 
         const attached = message.attachments[0].data.json;
-        expect(attached.id).toBeUndefined();
+        // Self-describing on the wire: a recipient holding only the attachment
+        // knows which asset it came from, without trusting whoever handed it
+        // over to have named it honestly.
+        expect(attached.id).toBe(credentialDid);
         expect(attached.credentialSubject.id).toBe(bob);
         expect(attached.issuer).toBeDefined();
         // The signature travels with it, so a foreign holder can verify against
@@ -1039,11 +1045,15 @@ describe('credential exchange over DIDComm', () => {
     });
 
     it('refuses a credential that is not the one it showed', async () => {
-        // Nothing on the wire binds the body's DID to the attachment, so a
-        // sender can name one credential and display another. Both must be
-        // genuinely issued to this holder for acceptCredential to take them, so
-        // this is not forgery -- but storing something other than what the user
-        // was shown is still wrong.
+        // A sender can name one credential in the body and attach another. Both
+        // must be genuinely issued to this holder for acceptCredential to take
+        // them, so this is not forgery -- but storing something other than what
+        // the user was shown is still wrong.
+        //
+        // The credential now names its own asset under the issuer's signature
+        // (#108), so the two would disagree on a mismatch. Comparing the full
+        // content catches strictly more: an attachment naming the right DID but
+        // differing from what that DID holds is also refused.
         await keymaster.createId('Alice');
         const bob = await keymaster.createId('Bob');
         await keymaster.setCurrentId('Alice');

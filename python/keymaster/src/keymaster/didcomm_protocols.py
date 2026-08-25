@@ -108,11 +108,17 @@ def request_credential(thid: str | None = None, comment: str | None = None) -> d
     return _with_thid({"type": ISSUE_CREDENTIAL_REQUEST_TYPE, "body": {"comment": comment} if comment else {}}, thid)
 
 
-# `credential_did` is an Archon-specific hint, and it rides in the body rather
-# than inside the credential on purpose: the proof covers every field of the VC
-# except `proof` itself, so adding an `id` after signing would make the
-# credential fail verification for exactly the foreign recipient this message
-# exists to reach. The attachment must travel byte-for-byte as it was signed.
+# `credential_did` is an Archon-specific hint carried in the body, where the
+# issue-credential protocol expects it.
+#
+# It used to be the only place the DID appeared. The proof covers every field of
+# the VC except `proof` itself, so an `id` written after signing would have made
+# the credential fail verification for exactly the foreign recipient this
+# message exists to reach. issue_credential now sets `id` *before* signing -- it
+# re-signs once the asset exists and its DID is known -- so the attachment
+# carries its own identifier and still verifies (#108).
+#
+# The attachment must still travel byte-for-byte as it was signed.
 def issue_credential_message(
     credential: dict[str, Any],
     thid: str | None = None,

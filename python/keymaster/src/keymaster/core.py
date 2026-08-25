@@ -2866,8 +2866,26 @@ class Keymaster:
         signed = await self.add_proof(credential)
         subject_id = credential.get("credentialSubject", {}).get("id")
         if self.is_managed_did(subject_id):
-            return await self.encrypt_json(signed, subject_id, {**options, "includeHash": True})
-        return await self.encrypt_json(signed, id_info["did"], {**options, "includeHash": True, "encryptForSender": False})
+            did = await self.encrypt_json(signed, subject_id, {**options, "includeHash": True})
+        else:
+            did = await self.encrypt_json(
+                signed, id_info["did"], {**options, "includeHash": True, "encryptForSender": False}
+            )
+
+        # Bind the credential to the asset holding it, under the issuer's own
+        # signature. Without this a credential says nothing about where it
+        # lives, so a holder can copy a revoked one -- genuinely issued,
+        # correctly signed, still verifying -- under a fresh asset DID and
+        # present it as current. Only the pointer lies, and the pointer was the
+        # one part nobody signed (#108).
+        #
+        # Two steps rather than one because the DID is the CID of the operation
+        # that creates the asset, so it cannot be known before the asset exists.
+        # That is only true of the create operation: updating appends to the
+        # same chain and leaves the identifier alone.
+        await self.update_credential(did, {**credential, "id": did})
+
+        return did
 
     def verify_tag_list(self, tags: list[str]) -> list[str]:
         if not isinstance(tags, list):
@@ -3340,10 +3358,11 @@ class Keymaster:
         # that DID nor decrypt what it points at (issue_credential encrypts to the
         # ISSUER when the subject is not managed). So this carries the credential.
         #
-        # The attachment is the signed VC exactly as issued, and the credential's
-        # own DID travels in the body: the proof covers every field but `proof`,
-        # so an `id` added after signing would make the credential fail
-        # verification for the very recipient this message exists to reach.
+        # The attachment is the signed VC exactly as issued, and it names its own
+        # asset DID: issue_credential embeds `id` before signing, so the
+        # identifier is covered by the proof rather than added after it (#108).
+        # `credential_did` stays in the body, which is where the protocol expects
+        # the hint and what an Archon holder reads to accept_credential.
         options = options or {}
         credential_did = await self.lookup_did(did)
         vc = await self.get_credential(credential_did)
@@ -3374,11 +3393,16 @@ class Keymaster:
             # there is nothing for this wallet to hold.
             return False
 
-        # The DID rides outside the signed credential, so nothing on the wire
-        # binds the two together: a sender could attach one credential and name
-        # another. Both would have to be genuinely issued to this holder for
+        # A sender could attach one credential and name another in the body.
+        # Both would have to be genuinely issued to this holder for
         # accept_credential to take them, so this is not forgery -- but storing
         # something other than what the user was shown is still wrong.
+        #
+        # The credential now names its own asset under the issuer's signature
+        # (#108), so `attached["id"]` would disagree with `credential_did` on a
+        # mismatch. Comparing the full content still catches strictly more: it
+        # also rejects an attachment that names the right DID but differs from
+        # what that DID actually holds.
         attached = dc_protocols.attached_json(message)
         resolved = await self.get_credential(credential_did)
 
