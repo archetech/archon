@@ -331,7 +331,7 @@ Traditional DID systems treat identities as static containers for cryptographic 
 1. **Schema-Free**: No predefined structure—applications define their own data schemas
 2. **Cryptographically Bound**: All data is signed by the DID controller, ensuring authenticity
 3. **Version-Controlled**: Every change creates a new version with full audit trail
-4. **Replicated**: Data is content-addressed and synchronized across registries; a content address guarantees integrity, while availability depends on nodes continuing to hold the operation (§10.3)
+4. **Replicated**: Data is content-addressed and, depending on the registry chosen, synchronized across nodes (§3.2); a content address guarantees integrity, while availability depends on nodes continuing to hold the operation (§10.3)
 5. **Controller-Owned**: Only the DID controller can modify the data
 
 ### 6.3 Use Cases Enabled by didDocumentData
@@ -505,7 +505,7 @@ Controllers should therefore treat anything written to `didDocumentData` as perm
 
 | Approach | Storage | Verifiability | Cost | Flexibility |
 |----------|---------|---------------|------|-------------|
-| **didDocumentData** | Content-addressed, node-replicated | Signed by the controller | No registry fee on Hyperswarm; per-batch registry fee otherwise | Schema-free |
+| **didDocumentData** | Content-addressed; replication depends on the registry (§3.2) | Signed by the controller | No registry fee on Hyperswarm; per-batch fee on blockchain registries | Schema-free |
 | Off-chain with hash | External systems | Hash-only | Variable | Full |
 | Service endpoints | External URLs | None | Variable | Full |
 | On-chain storage | Blockchain | Full | High | Limited |
@@ -1037,7 +1037,7 @@ Master Seed (BIP-39 Mnemonic)
                                        for DIDComm v2 messaging
 ```
 
-Each identity occupies its own hardened account. Signing keys live on the `change = 0` branch and are indexed, so key rotation advances to the next index rather than deriving from a new account. The X25519 key-agreement key used for DIDComm v2 messaging is derived on the `change = 1` branch, which keeps it from ever colliding with a signing key. Both are deterministic from the seed, so recovering the mnemonic recovers every identity and its messaging key without additional backup material.
+Each identity occupies its own hardened account. Signing keys live on the `change = 0` branch and are indexed, so key rotation advances to the next index rather than deriving from a new account. The X25519 key-agreement key used for DIDComm v2 messaging is derived on the `change = 1` branch, which keeps it from ever colliding with a signing key. Both are deterministic from the seed: a given account and index always regenerate the same keys, so the messaging key needs no backup of its own. Regenerating keys is not the same as recovering identities, however. The mapping from name to DID, account and key index lives in wallet metadata, and restoring it requires a wallet or per-identity backup that the controller published beforehand — a mnemonic on its own yields an empty wallet.
 
 **Key Types:**
 - **ECDSA secp256k1**: Primary signing algorithm
@@ -1116,8 +1116,8 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 **IPFS Network**
 - Content retrieval via IPFS libp2p, addressed by CID
 - A CID verifies the integrity of what it returns; it does not guarantee that anyone still holds it
-- Operations remain retrievable for as long as at least one node pins or caches them, which full nodes do by storing every operation they validate (§11.1)
-- No single node is privileged for content access, so any node holding an operation can serve it
+- Availability depends on some node continuing to hold the operation and serve it; a node that validates an operation stores it in its own database, while pinning it to IPFS is a separate and configurable step
+- No node is privileged for content access, so any node that holds an operation and serves it can satisfy a request
 
 ### 11.3 Synchronization
 
@@ -1211,7 +1211,7 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 
 | Feature | did:cid (Archon) | did:btc | did:web | did:key |
 |---------|------------------|---------|---------|---------|
-| Creation Cost | No registry fee (Hyperswarm) | ~$1-10 | No registry fee | No registry fee |
+| Creation Cost | No registry fee (Hyperswarm) | On-chain transaction fee | No registry fee | No registry fee |
 | Creation Speed | Instant | Minutes | Instant | Instant |
 | Update Support | Yes | Yes | Yes | No |
 | Decentralized | Full | Full | Partial | Full |
