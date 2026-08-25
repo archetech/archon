@@ -77,7 +77,7 @@ Archon's fundamental insight is that DID creation and DID updates have fundament
 
 **Creation** requires:
 - Speed (immediate availability)
-- Low/zero cost (enabling mass adoption)
+- Low or no registry fee (enabling mass adoption)
 - Decentralization (no gatekeepers)
 
 **Updates** require:
@@ -316,7 +316,7 @@ All DID state changes occur through signed operations:
 
 ### 6.1 Beyond the W3C Standard
 
-One of Archon's most powerful innovations is the `didDocumentData` field—an extension to the standard DID document structure that enables arbitrary application data to be stored alongside the identity itself. While the W3C DID Core specification defines the structure of `didDocument` and `didDocumentMetadata`, it also explicitly supports extensibility through additional properties.
+One of Archon's principal extensions is the `didDocumentData` field—an extension to the standard DID document structure that enables arbitrary application data to be stored alongside the identity itself. While the W3C DID Core specification defines the structure of `didDocument` and `didDocumentMetadata`, it also explicitly supports extensibility through additional properties.
 
 The W3C DID specification states that DID methods may add custom properties beyond the core specification, provided they support lossless conversion between representations. Archon leverages this extensibility to introduce `didDocumentData`: a flexible, schema-free container for application-specific data that travels with the DID throughout its lifecycle.
 
@@ -331,7 +331,7 @@ Traditional DID systems treat identities as static containers for cryptographic 
 1. **Schema-Free**: No predefined structure—applications define their own data schemas
 2. **Cryptographically Bound**: All data is signed by the DID controller, ensuring authenticity
 3. **Version-Controlled**: Every change creates a new version with full audit trail
-4. **Decentrally Stored**: Data is distributed via IPFS and synchronized across registries
+4. **Replicated**: Data is content-addressed and, depending on the registry chosen, synchronized across nodes (§3.2); a content address guarantees integrity, while availability depends on nodes continuing to hold the operation (§10.3)
 5. **Controller-Owned**: Only the DID controller can modify the data
 
 ### 6.3 Use Cases Enabled by didDocumentData
@@ -495,18 +495,22 @@ All data in `didDocumentData` inherits the security properties of the DID system
 - **Integrity**: Every change is cryptographically signed and content-addressed
 - **Non-Repudiation**: The signature proves the controller authorized the data
 - **Auditability**: Full version history is preserved through the operation chain
-- **Revocation**: If the DID is revoked, `didDocumentData` is cleared, ensuring data lifecycle management
+- **Revocation**: Revoking a DID appends a `delete` operation, after which resolution returns an empty `didDocumentData` and marks the document deactivated
+
+**Revocation is not erasure.** The operation chain is append-only, so a revocation adds a version rather than removing earlier ones. Everything published in an earlier version remains in the operation history, in whatever IPFS pins and caches hold those operations, and in any copies third parties have already retrieved. Time-travel resolution (§8.1) to a version before the revocation still returns the earlier `didDocumentData` in full — the same property that makes the audit trail trustworthy makes revocation a change of current state, not a deletion.
+
+Controllers should therefore treat anything written to `didDocumentData` as permanently published. Data that may later need to be withdrawn belongs behind a reference rather than in the field itself: an encrypted payload whose key can be destroyed, or a pointer to storage the controller operates.
 
 ### 6.6 Comparison with Alternatives
 
 | Approach | Storage | Verifiability | Cost | Flexibility |
 |----------|---------|---------------|------|-------------|
-| **didDocumentData** | Decentralized (IPFS) | Full (DID signatures) | Zero/Low | Unlimited |
+| **didDocumentData** | Content-addressed; replication depends on the registry (§3.2) | Signed by the controller | No registry fee on Hyperswarm; per-batch fee on blockchain registries | Schema-free |
 | Off-chain with hash | External systems | Hash-only | Variable | Full |
 | Service endpoints | External URLs | None | Variable | Full |
 | On-chain storage | Blockchain | Full | High | Limited |
 
-The `didDocumentData` approach provides the best combination: decentralized storage with full verifiability, minimal cost, and unlimited flexibility.
+The comparisons above are qualitative summaries rather than measurements. The `didDocumentData` approach trades the availability guarantees of a hosted system for controller-signed verifiability and, on Hyperswarm, no per-operation registry fee.
 
 ---
 
@@ -555,7 +559,7 @@ Blockchain registries provide cryptographic finality through proof-of-work:
 
 ### 7.4 Blockchain Timestamping
 
-One of Archon's most powerful features is automatic cryptographic timestamping for DID operations registered on block-producing registries. When a DID operation is anchored to Bitcoin, Zcash, Ethereum, Solana, or another blockchain registry, it inherits an immutable, independently verifiable timestamp from the block in which it was confirmed.
+Archon provides automatic cryptographic timestamping for DID operations registered on block-producing registries. When a DID operation is anchored to Bitcoin, Zcash, Ethereum, Solana, or another blockchain registry, it inherits an immutable, independently verifiable timestamp from the block in which it was confirmed.
 
 #### How Timestamping Works
 
@@ -1024,15 +1028,16 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 ```
 Master Seed (BIP-39 Mnemonic)
         │
-        ├── m/44'/0'/0'  (Bitcoin keys)
-        ├── m/84'/0'/0'  (Native SegWit)
-        ├── m/86'/0'/0'  (Taproot)
-        └── m/390'/0'/0' (DID signing keys)
+        └── m/44'/0'/{account}'        one hardened account per identity
                   │
-                  ├── Identity 1
-                  ├── Identity 2
-                  └── Identity N
+                  ├── .../0/{index}    signing key (change = 0)
+                  │                    rotation advances the index (§8.8)
+                  │
+                  └── .../1/0          X25519 key agreement (change = 1)
+                                       for DIDComm v2 messaging
 ```
+
+Each identity occupies its own hardened account. Signing keys live on the `change = 0` branch and are indexed, so key rotation advances to the next index rather than deriving from a new account. The X25519 key-agreement key used for DIDComm v2 messaging is derived on the `change = 1` branch, which keeps it from ever colliding with a signing key. Both are deterministic from the seed: a given account and index always regenerate the same keys, so the messaging key needs no backup of its own. Recovery builds on the same property. The wallet's seed bank is a DID whose creation operation is itself derived from the seed, so it resolves to the same identifier every time — a controller who has taken a wallet backup can therefore restore every identity from the mnemonic alone, with no DID, file, or other material to keep alongside it. What the mnemonic cannot do is reconstruct identities that were never backed up: key regeneration is deterministic, but the mapping from name to DID, account and key index lives in wallet metadata and comes back only from a published backup.
 
 **Key Types:**
 - **ECDSA secp256k1**: Primary signing algorithm
@@ -1109,9 +1114,10 @@ This creates a self-certifying identifier: the DID itself proves the integrity o
 - Encrypted connections established via noise protocol
 
 **IPFS Network**
-- Content retrieval via IPFS libp2p
-- Global availability of DID operations
-- No single point of failure for content access
+- Content retrieval via IPFS libp2p, addressed by CID
+- A CID verifies the integrity of what it returns; it does not guarantee that anyone still holds it
+- Availability depends on some node continuing to hold the operation and serve it; a node that validates an operation stores it in its own database, while pinning it to IPFS is a separate and configurable step
+- No node is privileged for content access, so any node that holds an operation and serves it can satisfy a request
 
 ### 11.3 Synchronization
 
@@ -1203,40 +1209,44 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 
 ### 13.1 Feature Comparison
 
-| Feature | did:cid (Archon) | did:btc | did:web | did:key |
+| Feature | did:cid (Archon) | did:btcr | did:webvh | did:key |
 |---------|------------------|---------|---------|---------|
-| Creation Cost | Free | ~$1-10 | Free | Free |
+| Creation Cost | No registry fee (Hyperswarm) | On-chain transaction fee | No registry fee | No registry fee |
 | Creation Speed | Instant | Minutes | Instant | Instant |
 | Update Support | Yes | Yes | Yes | No |
 | Decentralized | Full | Full | Partial | Full |
-| Finality Options | Multiple | Strong | None | N/A |
+| Finality Options | Multiple | Strong | Optional witnesses | N/A |
 | Credential Support | Full | Limited | Full | Limited |
-| Key Recovery | BIP-39 | Varies | N/A | N/A |
-| Arbitrary Data Storage | Yes (didDocumentData) | No | External only | No |
+| Key Recovery | BIP-39 | Varies | Optional pre-rotation | N/A |
+| Arbitrary Data Storage | Yes (didDocumentData) | External only | External only | No |
 | Blockchain Timestamps | Automatic (with bounds) | Implicit | No | No |
-| Time-Travel Resolution | Yes | No | No | No |
+| Time-Travel Resolution | Yes | No | Yes | No |
 | Built-in Messaging | Yes (D-Mail) | No | No | No |
 | Lightning Payments | Yes (L402 + Zaps) | No | No | No |
 | API Monetization | Yes (L402) | No | No | No |
 | Tor Hidden Services | Yes | No | No | No |
 | Voting/Governance | Yes | No | No | No |
 
+The graded entries above — "Full", "Partial", "Strong", "Limited", "Multiple", "Varies" — are the authors' qualitative reading of each method's published specification at the time of writing, not measured results, and the columns for other methods summarize their specifications rather than any particular implementation. Cost rows state registry fees only; they exclude the cost of operating or reaching a node, and any domain or hosting a method requires. Readers comparing methods for a specific deployment should consult each method's specification directly.
+
 ### 13.2 Architectural Comparison
 
-**did:btc**
-- Anchors DID state directly to Bitcoin transactions
-- Strong finality but creation and updates inherit Bitcoin fee and confirmation constraints
-- Best suited to identities that need direct Bitcoin-level anchoring
+**did:btcr**
+- Anchors DID state directly to Bitcoin transactions, an update being made by spending the current output
+- Strong finality, but creation and updates inherit Bitcoin fee and confirmation constraints
+- The DID document is referenced by a URL in the transaction's `OP_RETURN` rather than stored on chain, so the document's availability rests off chain even though its ordering does not
+- Registered in the W3C DID method registry, though the specification has remained a Community Group draft since 2019
 
 **did:ion**
 - Uses the Sidetree protocol to batch many DID operations into periodic Bitcoin anchors
 - Reduces per-operation chain cost compared with direct on-chain methods
 - Still depends on Bitcoin anchor cadence for finality
 
-**did:web**
-- Relies on DNS and HTTPS
-- Centralized at the domain level
-- No inherent finality or ordering
+**did:webvh**
+- `did:web` plus a verifiable history: every DID document version is chained to its predecessor and to a self-certifying identifier embedded in the DID, so the log of updates can be verified rather than trusted
+- Still resolved through DNS and HTTPS, so control ultimately rests on the domain
+- Offers optional pre-rotation keys and optional witness approval of updates, but no external anchor, so ordering is attested by the log and its witnesses rather than by a chain
+- Entries here follow the did:webvh v1.0 specification published by the Decentralized Identity Foundation; it supersedes did:web, which it remains backwards compatible with
 
 **did:key**
 - Simple, deterministic from public key
@@ -1244,9 +1254,9 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 - Limited to ephemeral use cases
 
 **did:cid (Archon)**
-- Free, instant creation via IPFS
-- Optional blockchain finality for updates
-- Best of both worlds approach
+- Instant creation with no registry fee on Hyperswarm
+- Optional blockchain anchoring for updates, at that registry's fee and confirmation time (§3.2)
+- Lets a controller choose the finality and cost trade-off per identity rather than inheriting one
 
 ---
 
