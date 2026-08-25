@@ -135,15 +135,35 @@ async function checkManifestCredential(
             return { status: 'unverified', reason: 'signature does not verify' };
         }
 
-        // The manifest holds a copy of the credential, so revoking the
-        // credential asset leaves that copy in place and looking healthy.
+        // Everything below rests on the signature having been checked, and the
+        // order is load-bearing rather than incidental. The proof covers the
+        // whole credential except `proof` itself, so until it verifies, no
+        // field is the issuer's word for anything -- `id` included. A redacted
+        // copy can never verify, which means its `id` is an unsigned string a
+        // holder may rewrite at will, along with the key it is filed under.
         //
-        // Best effort, and worth being clear about why: nothing in the proof
-        // binds a credential to the asset DID it was stored under, and the
-        // manifest key is controller data, so an owner can re-key a revoked
-        // credential under a fresh asset and this lookup will follow them
-        // there. It catches the ordinary case and cannot be relied on against
-        // someone trying to avoid it.
+        // Reading revocation before this point looked like an improvement,
+        // since `id` textually survives redaction. It is not: a revoked
+        // redacted credential re-keyed to a fresh active asset would agree with
+        // itself and be reported as merely unreadable rather than revoked.
+        // Same verdict, misleading reason.
+
+        // The manifest key says which asset holds this credential, and the key
+        // is unsigned controller data. A credential issued since #108 names its
+        // own asset as `id`, so now that the signature has been checked the two
+        // can be compared: disagreement means the entry sits under an asset the
+        // issuer never put it in, whose revocation state says nothing about
+        // this credential.
+        if (typeof vc.id === 'string' && vc.id !== credentialDid) {
+            return { status: 'unverified', reason: 'filed under an asset it does not name' };
+        }
+
+        // Sound where the credential names its asset. Where it does not --
+        // anything issued before #108 -- this is best effort: an owner can
+        // re-key a revoked credential under a fresh asset and the lookup
+        // follows them there. Absence of `id` means unbound, not invalid, so
+        // those credentials keep working rather than being marked down for
+        // their age.
         const doc = await keymaster.resolveDID(credentialDid);
 
         if (doc?.didDocumentMetadata?.deactivated) {
