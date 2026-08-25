@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import ts from 'typescript';
 
 // #919 added DIDComm credential exchange to the wallets and left the standalone
 // clients without it. Nothing went red: eslint did not read .jsx (#939), tsc does
@@ -62,6 +63,10 @@ const ABSENT_FROM_CLIENTS: Record<string, string> = {
 };
 
 function sourceFiles(dir: string, found: string[] = []): string[] {
+    // A missing root yields nothing here so that the surface-root test below
+    // can report it by name. Letting readdirSync throw instead would abort the
+    // whole suite at module scope, before any test runs, and an ENOENT stack is
+    // a poor way to learn that a directory moved.
     if (!existsSync(dir)) {
         return found;
     }
@@ -70,14 +75,17 @@ function sourceFiles(dir: string, found: string[] = []): string[] {
         const path = join(dir, entry.name);
 
         if (entry.isDirectory()) {
-            if (!['node_modules', 'dist', 'build'].includes(entry.name)) {
+            // Test scaffolding is not part of what a UI offers anybody. The
+            // directory needs excluding as well as the filename pattern:
+            // apps/browser-extension/src/test/setup.ts is named like ordinary
+            // source, and a helper there that drove a Keymaster would read as a
+            // capability the UI ships.
+            if (!['node_modules', 'dist', 'build', 'test', 'tests', '__tests__', '__mocks__'].includes(entry.name)) {
                 sourceFiles(path, found);
             }
             continue;
         }
 
-        // Tests are excluded: a capability exercised only by a test is not one
-        // the UI offers anybody.
         if (/\.(ts|tsx|js|jsx|mjs)$/.test(entry.name) && !/\.test\./.test(entry.name)) {
             found.push(path);
         }
@@ -86,26 +94,59 @@ function sourceFiles(dir: string, found: string[] = []): string[] {
     return found;
 }
 
-function withoutComments(source: string): string {
-    return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+function scriptKind(file: string): ts.ScriptKind {
+    if (file.endsWith('.tsx')) {
+        return ts.ScriptKind.TSX;
+    }
+    if (file.endsWith('.ts')) {
+        return ts.ScriptKind.TS;
+    }
+    if (file.endsWith('.jsx')) {
+        return ts.ScriptKind.JSX;
+    }
+    return ts.ScriptKind.JS;
 }
 
-// Every `<receiver>.<method>(` in a surface, receiver kept so the caller can
-// decide what it is.
-function calls(surface: keyof typeof SURFACES): Array<{ receiver: string, method: string }> {
+// Every `<receiver>.<method>(` in a file, found by parsing rather than by
+// matching text. The difference is not cosmetic: a JSX attribute in this very
+// tree reads accept="image/*", and a regex that strips block comments takes
+// that as an opener and deletes everything up to the next */ -- 2711 lines of
+// KeymasterUI.jsx, 47% of the file, silently unscanned. A capability added in
+// that region would evade this guard entirely, which is the exact failure it
+// exists to prevent. The parser knows a string from a comment; a regex does not.
+function callsIn(file: string): Array<{ receiver: string, method: string }> {
+    const source = ts.createSourceFile(
+        file,
+        readFileSync(file, 'utf-8'),
+        ts.ScriptTarget.Latest,
+        false,
+        scriptKind(file),
+    );
+
     const found: Array<{ receiver: string, method: string }> = [];
 
-    for (const dir of SURFACES[surface]) {
-        for (const file of sourceFiles(dir)) {
-            const source = withoutComments(readFileSync(file, 'utf-8'));
-
-            for (const match of source.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*([A-Za-z_$][\w$]*)\s*\(/g)) {
-                found.push({ receiver: match[1], method: match[2] });
-            }
+    function visit(node: ts.Node): void {
+        if (
+            ts.isCallExpression(node)
+            && ts.isPropertyAccessExpression(node.expression)
+            && ts.isIdentifier(node.expression.expression)
+        ) {
+            found.push({
+                receiver: node.expression.expression.text,
+                method: node.expression.name.text,
+            });
         }
+
+        ts.forEachChild(node, visit);
     }
 
+    visit(source);
+
     return found;
+}
+
+function calls(surface: keyof typeof SURFACES): Array<{ receiver: string, method: string }> {
+    return SURFACES[surface].flatMap(dir => sourceFiles(dir).flatMap(callsIn));
 }
 
 function capabilities(surface: keyof typeof SURFACES): Set<string> {
@@ -116,17 +157,33 @@ function capabilities(surface: keyof typeof SURFACES): Set<string> {
     );
 }
 
+// Method names declared on the implementation classes, read from the AST for
+// the same reason as above.
 function implementedMethods(): Set<string> {
     const found = new Set<string>();
 
     for (const file of IMPLEMENTATIONS) {
-        const source = readFileSync(file, 'utf-8');
+        const source = ts.createSourceFile(
+            file,
+            readFileSync(file, 'utf-8'),
+            ts.ScriptTarget.Latest,
+            false,
+            ts.ScriptKind.TS,
+        );
 
-        // Class members at one level of indentation. Deeper matches would pick
-        // up ordinary calls inside method bodies.
-        for (const match of source.matchAll(/^ {4}(?:async\s+)?([A-Za-z][\w$]*)\s*\(/gm)) {
-            found.add(match[1]);
+        function visit(node: ts.Node): void {
+            if (ts.isClassDeclaration(node)) {
+                for (const member of node.members) {
+                    if (ts.isMethodDeclaration(member) && ts.isIdentifier(member.name)) {
+                        found.add(member.name.text);
+                    }
+                }
+            }
+
+            ts.forEachChild(node, visit);
         }
+
+        visit(source);
     }
 
     return found;
@@ -137,6 +194,16 @@ const clients = capabilities('clients');
 const union = new Set([...wallets, ...clients]);
 
 describe('UI capability parity', () => {
+    it('has a surface root for every directory it claims to scan', () => {
+        // A misspelled or moved root would otherwise scan as empty, and the
+        // aggregate count below would still clear its threshold on the strength
+        // of the shared package alone -- so a whole app could drop out of
+        // coverage without anything failing.
+        const missing = Object.values(SURFACES).flat().filter(dir => !existsSync(dir));
+
+        expect(missing).toStrictEqual([]);
+    });
+
     it('finds capabilities in both surfaces', () => {
         // Guard the guard. A regex or a path that stopped matching would empty
         // both sets, and every check below would pass by finding no gap at all.
