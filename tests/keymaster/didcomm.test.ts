@@ -1045,11 +1045,15 @@ describe('credential exchange over DIDComm', () => {
     });
 
     it('refuses a credential that is not the one it showed', async () => {
-        // Nothing on the wire binds the body's DID to the attachment, so a
-        // sender can name one credential and display another. Both must be
-        // genuinely issued to this holder for acceptCredential to take them, so
-        // this is not forgery -- but storing something other than what the user
-        // was shown is still wrong.
+        // A sender can name one credential in the body and attach another. Both
+        // must be genuinely issued to this holder for acceptCredential to take
+        // them, so this is not forgery -- but storing something other than what
+        // the user was shown is still wrong.
+        //
+        // The credential now names its own asset under the issuer's signature
+        // (#108), so the two would disagree on a mismatch. Comparing the full
+        // content catches strictly more: an attachment naming the right DID but
+        // differing from what that DID holds is also refused.
         await keymaster.createId('Alice');
         const bob = await keymaster.createId('Bob');
         await keymaster.setCurrentId('Alice');

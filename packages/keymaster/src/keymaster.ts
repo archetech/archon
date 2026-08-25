@@ -3649,10 +3649,11 @@ export default class Keymaster implements KeymasterInterface {
     // DID nor decrypt what it points at -- issueCredential encrypts to the ISSUER
     // when the subject is not managed. So this carries the credential itself.
     //
-    // The attachment is the signed VC exactly as issued, and the credential's own
-    // DID rides in the body instead: the proof covers every field but `proof`, so
-    // an `id` added afterwards would make the credential fail verification for the
-    // very recipient this exists to reach. The recipient verifies `proof` by
+    // The attachment is the signed VC exactly as issued, and it names its own
+    // asset DID: issueCredential embeds `id` before signing, so the identifier is
+    // covered by the proof rather than added after it (#108). `credential_did`
+    // stays in the body, which is where the protocol expects the hint and what an
+    // Archon holder reads to acceptCredential. The recipient verifies `proof` by
     // resolving the issuer's did:cid, which any Universal Resolver carrying the
     // did:cid driver can do; an Archon holder reads the body to acceptCredential.
     async sendCredentialDidComm(
@@ -3692,11 +3693,16 @@ export default class Keymaster implements KeymasterInterface {
             return false;
         }
 
-        // The DID rides outside the signed credential, so nothing on the wire
-        // binds the two together: a sender could attach one credential and name
-        // another. Both would have to be genuinely issued to this holder for
+        // A sender could attach one credential and name another in the body.
+        // Both would have to be genuinely issued to this holder for
         // acceptCredential to take them, so this is not forgery -- but storing
         // something other than what the user was shown is still wrong.
+        //
+        // The credential now names its own asset under the issuer's signature
+        // (#108), so `attached.id` would disagree with `credentialDid` on a
+        // mismatch. Comparing the full content still catches strictly more:
+        // it also rejects an attachment that names the right DID but differs
+        // from what that DID actually holds.
         const attached = attachedJson(message as DidCommPlaintext);
         const resolved = await this.getCredential(credentialDid);
 

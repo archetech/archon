@@ -129,11 +129,17 @@ export function requestCredential(thid?: string, comment?: string): DidCommPlain
     return { type: ISSUE_CREDENTIAL_REQUEST_TYPE, ...(thid ? { thid } : {}), body: comment ? { comment } : {} };
 }
 
-// `credentialDid` is an Archon-specific hint, and it rides in the body rather
-// than inside the credential on purpose: the proof covers every field of the VC
-// except `proof` itself, so adding an `id` after signing would make the
-// credential fail verification for exactly the foreign recipient this message
-// exists to reach. The attachment must travel byte-for-byte as it was signed.
+// `credentialDid` is an Archon-specific hint carried in the body, where the
+// issue-credential protocol expects it.
+//
+// It used to be the only place the DID appeared. The proof covers every field
+// of the VC except `proof` itself, so an `id` written after signing would have
+// made the credential fail verification for exactly the foreign recipient this
+// message exists to reach. issueCredential now sets `id` *before* signing --
+// it re-signs once the asset exists and its DID is known -- so the attachment
+// carries its own identifier and still verifies (#108).
+//
+// The attachment must still travel byte-for-byte as it was signed.
 export function issueCredentialMessage(
     credential: object,
     options: { thid?: string; comment?: string; credentialDid?: string } = {}
