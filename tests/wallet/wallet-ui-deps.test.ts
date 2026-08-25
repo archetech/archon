@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import ts from 'typescript';
 
 // packages/wallet-ui is consumed as source by both wallets and declared nothing
 // (#928). It worked only because each app happened to have every package
@@ -35,23 +36,69 @@ function packageOf(specifier: string): string {
     return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
 }
 
+// Module specifiers read from the AST, which sees two things the previous
+// scanner could not.
+//
+// It stripped comments with a regex first. Three files here carry a JSX
+// attribute reading accept="image/*", and a block-comment regex takes that
+// `/*` as an opener and runs to the next `*/`. None of the three currently has
+// a block comment anywhere after the attribute, so no match forms and nothing
+// is deleted -- appending one ordinary comment to ImageTab.tsx is enough to
+// make it swallow 132 lines. The same pattern silently deleted 47% of
+// KeymasterUI.jsx on the other surface, which does have comments below its
+// attributes (#941). A parser knows a string from a comment.
+//
+// And it matched only `from '...'`, so a dynamic import() was invisible to it
+// however the file was laid out.
 function importedPackages(): string[] {
     const found = new Set<string>();
 
     for (const file of sourceFiles(SRC)) {
-        // Comments stripped first: these files name packages in prose, and only
-        // a real import should count.
-        const source = readFileSync(file, 'utf-8')
-            .replace(/\/\*[\s\S]*?\*\//g, '')
-            .replace(/\/\/.*$/gm, '');
+        const source = ts.createSourceFile(
+            file,
+            readFileSync(file, 'utf-8'),
+            ts.ScriptTarget.Latest,
+            false,
+            file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+        );
 
-        for (const match of source.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)) {
-            const specifier = match[1];
-            if (specifier.startsWith('.') || specifier.startsWith('node:')) {
-                continue;
+        function specifierOf(node: ts.Node): string | undefined {
+            // `import x from 'p'` and `export { x } from 'p'`.
+            if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+                && node.moduleSpecifier
+                && ts.isStringLiteral(node.moduleSpecifier)) {
+                return node.moduleSpecifier.text;
             }
-            found.add(packageOf(specifier));
+
+            // `await import('p')`, which the old `from` pattern never saw.
+            if (ts.isCallExpression(node)
+                && node.expression.kind === ts.SyntaxKind.ImportKeyword
+                && node.arguments.length > 0
+                && ts.isStringLiteral(node.arguments[0])) {
+                return node.arguments[0].text;
+            }
+
+            // `import('p').Type` in a type position, likewise.
+            if (ts.isImportTypeNode(node)
+                && ts.isLiteralTypeNode(node.argument)
+                && ts.isStringLiteral(node.argument.literal)) {
+                return node.argument.literal.text;
+            }
+
+            return undefined;
         }
+
+        function visit(node: ts.Node): void {
+            const specifier = specifierOf(node);
+
+            if (specifier && !specifier.startsWith('.') && !specifier.startsWith('node:')) {
+                found.add(packageOf(specifier));
+            }
+
+            ts.forEachChild(node, visit);
+        }
+
+        visit(source);
     }
 
     return [...found].sort();
