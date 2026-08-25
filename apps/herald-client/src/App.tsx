@@ -418,35 +418,28 @@ function StatusPill({ label, tone }: { label: string, tone: string }) {
 }
 
 // A manifest entry is whatever its subject published there, so an unverified
-// one is a claim rather than a credential. Invalid entries are marked rather
-// than hidden: dropping them silently tells the reader nothing, and leaves the
+// one is a claim rather than a credential. Two states only: "Verified" is a
+// statement the server is willing to make, and anything else is a refusal to
+// make it, with the reason saying which. Failing entries are marked rather than
+// hidden -- dropping them silently tells the reader nothing, and leaves the
 // subject unaware that something in their manifest does not check out (#945).
+//
+// Most honest credentials land in the second state, because publishing without
+// revealing strips the claims the signature covers. That is a property of the
+// proof format rather than a fault in the credential, which is why the reason
+// matters more than the badge.
 const CREDENTIAL_STATUS: Record<string, { label: string, background: string, color: string, title: string }> = {
-    valid: {
+    verified: {
         label: 'Verified',
         background: '#dcfce7',
         color: '#166534',
-        title: 'The issuer\'s signature checks out against their DID document.',
+        title: 'Issued to this identity, and the issuer\'s signature checks out against their DID document.',
     },
-    revoked: {
-        label: 'Revoked',
-        background: '#fef3c7',
-        color: '#92400e',
-        title: 'Signed by the issuer, who has since revoked it.',
-    },
-    invalid: {
-        label: 'Invalid',
-        background: '#fee2e2',
-        color: '#991b1b',
-        title: 'The signature does not check out. Treat this as a claim the subject published, not a credential someone issued.',
-    },
-    // Distinct from invalid on purpose: nothing was disproved here, we simply
-    // could not reach the issuer to check.
-    unverifiable: {
+    unverified: {
         label: 'Unverified',
         background: '#f1f5f9',
         color: '#475569',
-        title: 'This could not be checked, so nothing is known either way.',
+        title: 'This could not be confirmed, so treat it as a claim rather than a credential.',
     },
 };
 
@@ -460,24 +453,34 @@ function CredentialStatusChip({ status, reason }: { status?: string, reason?: st
     }
 
     return (
-        <Box
-            component="span"
-            title={reason ? `${style.title} (${reason})` : style.title}
-            sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                px: 1,
-                height: 22,
-                borderRadius: 999,
-                backgroundColor: style.background,
-                color: style.color,
-                fontSize: '0.6875rem',
-                fontWeight: 700,
-                letterSpacing: '0.01em',
-                whiteSpace: 'nowrap',
-            }}
-        >
-            {style.label}
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+            <Box
+                component="span"
+                title={style.title}
+                sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    px: 1,
+                    height: 22,
+                    borderRadius: 999,
+                    backgroundColor: style.background,
+                    color: style.color,
+                    fontSize: '0.6875rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.01em',
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                {style.label}
+            </Box>
+            {/* The reason carries the information the badge deliberately does
+                not: a redacted publication and a forged issuer are both
+                unverified, and only this says which. */}
+            {reason && (
+                <Typography component="span" sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    {reason}
+                </Typography>
+            )}
         </Box>
     );
 }

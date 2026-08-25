@@ -1050,85 +1050,105 @@ describe('herald member lookup', () => {
     // renders it under a "Credentials" heading. Verifying before display is the
     // whole point of these (#945).
     describe('verifies published credentials', () => {
-        const manifestOf = (vc: any) => ({
-            didDocument: { id: 'did:cid:alice' },
-            didDocumentData: { manifest: { 'did:cid:vc': vc } },
+        const ALICE = 'did:cid:alice';
+
+        const manifestOf = (manifest: any) => ({
+            didDocument: { id: ALICE },
+            didDocumentData: { manifest },
         });
 
-        const signedBy = (issuer: string, signer = issuer) => ({
-            issuer,
-            proof: { verificationMethod: `${signer}#key-1` },
+        // A credential as issued: subject is the profile owner, claims intact,
+        // and the proof names the issuer.
+        const issued = (overrides: any = {}) => ({
+            issuer: 'did:cid:issuer',
+            credentialSubject: { id: ALICE, member: true },
+            proof: { verificationMethod: 'did:cid:issuer#key-1' },
+            ...overrides,
         });
 
         function mountWith(vc: any, { verifyProof = true, deactivated = false } = {}) {
-            const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+            const db = createDb({ [ALICE]: { name: 'alice' } });
             const keymaster = {
                 resolveDID: jest.fn<any>().mockImplementation(async (did: string) =>
                     did === 'did:cid:vc'
                         ? { didDocumentMetadata: { deactivated } }
-                        : manifestOf(vc)),
+                        : manifestOf({ 'did:cid:vc': vc })),
                 verifyProof: jest.fn<any>().mockResolvedValue(verifyProof),
             };
             return mount({ db, keymaster });
         }
 
-        it('marks a properly signed credential valid', async () => {
-            const { app } = mountWith(signedBy('did:cid:issuer'));
+        const statusOf = async (app: any) =>
+            (await request(app).get('/api/member/alice')).body.credentialStatus['did:cid:vc'];
 
-            const response = await request(app).get('/api/member/alice');
-
-            expect(response.body.credentialStatus['did:cid:vc']).toStrictEqual({ status: 'valid' });
+        it('marks a properly signed credential verified', async () => {
+            expect(await statusOf(mountWith(issued()).app)).toStrictEqual({ status: 'verified' });
         });
 
-        // The forgery this check exists for. verifyProof validates the
-        // signature against whoever the proof names, so a credential claiming a
-        // reputable issuer while signed with the subject's own key verifies
-        // happily. Marking that "valid" would launder it.
-        it('marks a credential whose issuer is not the signer invalid', async () => {
-            const { app } = mountWith(signedBy('did:cid:bank', 'did:cid:alice'));
+        // publishCredential defaults reveal to false and strips the claim
+        // values after the issuer signed, so the signature cannot match. That
+        // is the ordinary publication path -- calling it a bad signature would
+        // put a warning on most honest credentials.
+        it('reports a redacted publication as unverified, not as a bad signature', async () => {
+            const redacted = issued({ credentialSubject: { id: ALICE } });
+            const { app } = mountWith(redacted, { verifyProof: false });
 
-            const response = await request(app).get('/api/member/alice');
+            expect(await statusOf(app)).toStrictEqual({
+                status: 'unverified',
+                reason: 'published without its claims, so the signature cannot be checked',
+            });
+        });
 
-            expect(response.body.credentialStatus['did:cid:vc']).toStrictEqual({
-                status: 'invalid',
+        // The forgery this check exists for. verifyProof validates against
+        // whoever the proof names, so a credential claiming a reputable issuer
+        // while signed with the subject's own key verifies happily.
+        it('reports a credential whose issuer is not the signer', async () => {
+            const { app } = mountWith(issued({ issuer: 'did:cid:bank' }));
+
+            expect(await statusOf(app)).toStrictEqual({
+                status: 'unverified',
                 reason: 'issuer does not match the signing key',
             });
         });
 
-        it('marks a credential with no proof invalid', async () => {
-            const { app } = mountWith({ issuer: 'did:cid:issuer' });
+        // publishCredential refuses to publish someone else's credential, but
+        // writing didDocumentData directly does not go through it.
+        it('reports a credential issued to somebody else', async () => {
+            const { app } = mountWith(issued({ credentialSubject: { id: 'did:cid:bob', member: true } }));
 
-            const response = await request(app).get('/api/member/alice');
-
-            expect(response.body.credentialStatus['did:cid:vc'].status).toBe('invalid');
-            expect(response.body.credentialStatus['did:cid:vc'].reason).toBe('no proof');
+            expect(await statusOf(app)).toStrictEqual({
+                status: 'unverified',
+                reason: 'issued to a different subject',
+            });
         });
 
-        it('marks a credential whose signature fails invalid', async () => {
-            const { app } = mountWith(signedBy('did:cid:issuer'), { verifyProof: false });
+        it('reports a credential with no proof', async () => {
+            const { app } = mountWith({ issuer: 'did:cid:issuer', credentialSubject: { id: ALICE, member: true } });
 
-            const response = await request(app).get('/api/member/alice');
+            expect(await statusOf(app)).toStrictEqual({ status: 'unverified', reason: 'no proof' });
+        });
 
-            expect(response.body.credentialStatus['did:cid:vc']).toStrictEqual({
-                status: 'invalid',
+        it('reports a credential whose signature fails', async () => {
+            const { app } = mountWith(issued(), { verifyProof: false });
+
+            expect(await statusOf(app)).toStrictEqual({
+                status: 'unverified',
                 reason: 'signature does not verify',
             });
         });
 
-        // The manifest keeps its own copy of the credential, so revoking the
-        // asset leaves that copy looking healthy.
-        it('marks a revoked credential revoked rather than valid', async () => {
-            const { app } = mountWith(signedBy('did:cid:issuer'), { deactivated: true });
+        // The manifest keeps its own copy, so revoking the asset leaves that
+        // copy looking healthy.
+        it('reports a revoked credential', async () => {
+            const { app } = mountWith(issued(), { deactivated: true });
 
-            const response = await request(app).get('/api/member/alice');
-
-            expect(response.body.credentialStatus['did:cid:vc']).toStrictEqual({ status: 'revoked' });
+            expect(await statusOf(app)).toStrictEqual({ status: 'unverified', reason: 'revoked by the issuer' });
         });
 
-        it('reports unverifiable, not invalid, when the issuer cannot be resolved', async () => {
-            const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        it('reports rather than throws when the issuer cannot be resolved', async () => {
+            const db = createDb({ [ALICE]: { name: 'alice' } });
             const keymaster = {
-                resolveDID: jest.fn<any>().mockResolvedValue(manifestOf(signedBy('did:cid:issuer'))),
+                resolveDID: jest.fn<any>().mockResolvedValue(manifestOf({ 'did:cid:vc': issued() })),
                 verifyProof: jest.fn<any>().mockRejectedValue(new Error('unknown DID')),
             };
             const { app } = mount({ db, keymaster });
@@ -1136,22 +1156,45 @@ describe('herald member lookup', () => {
             const response = await request(app).get('/api/member/alice');
 
             expect(response.status).toBe(200);
-            // Not "invalid": nothing was disproved, we just could not check.
             expect(response.body.credentialStatus['did:cid:vc']).toStrictEqual({
-                status: 'unverifiable',
+                status: 'unverified',
                 reason: 'issuer could not be resolved',
             });
+        });
+
+        // The endpoint is public and the manifest is written by the profile's
+        // owner, so the work per request cannot be left to them.
+        it('checks at most fifty entries however long the manifest is', async () => {
+            const manifest: Record<string, any> = {};
+            for (let i = 0; i < 200; i++) {
+                manifest[`did:cid:vc${i}`] = issued();
+            }
+
+            const db = createDb({ [ALICE]: { name: 'alice' } });
+            const keymaster = {
+                resolveDID: jest.fn<any>().mockImplementation(async (did: string) =>
+                    did === ALICE ? manifestOf(manifest) : { didDocumentMetadata: {} }),
+                verifyProof: jest.fn<any>().mockResolvedValue(true),
+            };
+            const { app } = mount({ db, keymaster });
+
+            const response = await request(app).get('/api/member/alice');
+
+            expect(Object.keys(response.body.credentialStatus)).toHaveLength(50);
+            // All 200 are still rendered by the page; only the checking is capped.
+            expect(Object.keys(response.body.didDocumentData.manifest)).toHaveLength(200);
         });
 
         it('leaves the resolved document untouched', async () => {
             // Annotating a resolved DID document with fields of our own is the
             // conformance mistake #676 removed, so the status is a sibling.
-            const { app } = mountWith(signedBy('did:cid:issuer'));
+            const vc = issued();
+            const { app } = mountWith(vc);
 
             const response = await request(app).get('/api/member/alice');
 
-            expect(response.body.didDocumentData.manifest['did:cid:vc']).toStrictEqual(signedBy('did:cid:issuer'));
-            expect(response.body.didDocument).toStrictEqual({ id: 'did:cid:alice' });
+            expect(response.body.didDocumentData.manifest['did:cid:vc']).toStrictEqual(vc);
+            expect(response.body.didDocument).toStrictEqual({ id: ALICE });
         });
     });
 
