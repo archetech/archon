@@ -1209,18 +1209,18 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 
 ### 13.1 Feature Comparison
 
-| Feature | did:cid (Archon) | did:btc | did:web | did:key |
+| Feature | did:cid (Archon) | did:btc | did:webvh | did:key |
 |---------|------------------|---------|---------|---------|
 | Creation Cost | No registry fee (Hyperswarm) | On-chain transaction fee | No registry fee | No registry fee |
 | Creation Speed | Instant | Minutes | Instant | Instant |
 | Update Support | Yes | Yes | Yes | No |
 | Decentralized | Full | Full | Partial | Full |
-| Finality Options | Multiple | Strong | None | N/A |
+| Finality Options | Multiple | Strong | Optional witnesses | N/A |
 | Credential Support | Full | Limited | Full | Limited |
-| Key Recovery | BIP-39 | Varies | N/A | N/A |
+| Key Recovery | BIP-39 | Varies | Optional pre-rotation | N/A |
 | Arbitrary Data Storage | Yes (didDocumentData) | No | External only | No |
 | Blockchain Timestamps | Automatic (with bounds) | Implicit | No | No |
-| Time-Travel Resolution | Yes | No | No | No |
+| Time-Travel Resolution | Yes | No | Yes (versionId / versionTime) | No |
 | Built-in Messaging | Yes (D-Mail) | No | No | No |
 | Lightning Payments | Yes (L402 + Zaps) | No | No | No |
 | API Monetization | Yes (L402) | No | No | No |
@@ -1241,10 +1241,11 @@ The graded entries above — "Full", "Partial", "Strong", "Limited", "Multiple",
 - Reduces per-operation chain cost compared with direct on-chain methods
 - Still depends on Bitcoin anchor cadence for finality
 
-**did:web**
-- Relies on DNS and HTTPS
-- Centralized at the domain level
-- No inherent finality or ordering
+**did:webvh**
+- `did:web` plus a verifiable history: every DID document version is chained to its predecessor and to a self-certifying identifier embedded in the DID, so the log of updates can be verified rather than trusted
+- Still resolved through DNS and HTTPS, so control ultimately rests on the domain
+- Offers optional pre-rotation keys and optional witness approval of updates, but no external anchor, so ordering is attested by the log and its witnesses rather than by a chain
+- Entries here follow the did:webvh v1.0 specification published by the Decentralized Identity Foundation; it supersedes did:web, which it remains backwards compatible with
 
 **did:key**
 - Simple, deterministic from public key
