@@ -127,27 +127,42 @@ async function checkManifestCredential(
             return { status: 'unverified', reason: 'issuer does not match the signing key' };
         }
 
+        // The manifest key says which asset holds this credential, and the key
+        // is controller data. A credential issued since #108 names its own
+        // asset as `id`, under the issuer's signature, so the two can be
+        // compared: disagreement means the entry is filed under an asset the
+        // issuer never put it in, and the revocation state of that asset says
+        // nothing about this credential.
+        //
+        // Checked before the signature because it costs nothing and because a
+        // redacted credential still carries its `id` -- redaction strips the
+        // claim values and leaves the identifier alone.
+        const bound = typeof vc.id === 'string';
+
+        if (bound && vc.id !== credentialDid) {
+            return { status: 'unverified', reason: 'filed under an asset it does not name' };
+        }
+
+        // Revocation next, and ahead of the signature, because "revoked" tells
+        // a reader more than "cannot be checked" for a credential that is both.
+        //
+        // Sound where the credential is bound. Where it is not -- anything
+        // issued before #108 -- this is best effort: an owner can re-key a
+        // revoked credential under a fresh asset and the lookup follows them
+        // there. Absence of `id` means unbound, not invalid, so those
+        // credentials keep working rather than being marked down for their age.
+        const doc = await keymaster.resolveDID(credentialDid);
+
+        if (doc?.didDocumentMetadata?.deactivated) {
+            return { status: 'unverified', reason: 'revoked by the issuer' };
+        }
+
         if (isRedactedPublication(vc)) {
             return { status: 'unverified', reason: 'published without its claims, so the signature cannot be checked' };
         }
 
         if (!await keymaster.verifyProof(vc)) {
             return { status: 'unverified', reason: 'signature does not verify' };
-        }
-
-        // The manifest holds a copy of the credential, so revoking the
-        // credential asset leaves that copy in place and looking healthy.
-        //
-        // Best effort, and worth being clear about why: nothing in the proof
-        // binds a credential to the asset DID it was stored under, and the
-        // manifest key is controller data, so an owner can re-key a revoked
-        // credential under a fresh asset and this lookup will follow them
-        // there. It catches the ordinary case and cannot be relied on against
-        // someone trying to avoid it.
-        const doc = await keymaster.resolveDID(credentialDid);
-
-        if (doc?.didDocumentMetadata?.deactivated) {
-            return { status: 'unverified', reason: 'revoked by the issuer' };
         }
 
         return { status: 'verified' };

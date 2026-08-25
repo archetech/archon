@@ -1162,6 +1162,54 @@ describe('herald member lookup', () => {
             });
         });
 
+        // A credential issued since #108 names the asset holding it, under the
+        // issuer's signature, so the manifest key can be checked against it.
+        // Without that the key is unsigned controller data and a revoked
+        // credential can be re-keyed under a fresh, active asset.
+        describe('binding the entry to the asset it names', () => {
+            it('accepts a credential filed under the asset it names', async () => {
+                const { app } = mountWith(issued({ id: 'did:cid:vc' }));
+
+                expect(await statusOf(app)).toStrictEqual({ status: 'verified' });
+            });
+
+            it('refuses one filed under an asset it does not name', async () => {
+                // The credential is genuine and verifies; only the key lies.
+                const { app } = mountWith(issued({ id: 'did:cid:somewhere-else' }));
+
+                expect(await statusOf(app)).toStrictEqual({
+                    status: 'unverified',
+                    reason: 'filed under an asset it does not name',
+                });
+            });
+
+            it('makes the revocation lookup meaningful for a bound credential', async () => {
+                const { app } = mountWith(issued({ id: 'did:cid:vc' }), { deactivated: true });
+
+                expect(await statusOf(app)).toStrictEqual({ status: 'unverified', reason: 'revoked by the issuer' });
+            });
+
+            // Credentials issued before #108 carry no id. Absence means unbound,
+            // not invalid -- marking every older credential down for its age
+            // would be the same mistake as calling a redacted one a forgery.
+            it('still checks an unbound credential, best effort', async () => {
+                const { app } = mountWith(issued());
+
+                expect(await statusOf(app)).toStrictEqual({ status: 'verified' });
+            });
+        });
+
+        // Revocation is reported ahead of the signature, because a credential
+        // that is both revoked and unverifiable is better described as revoked.
+        // The id survives redaction, so this answer is available even when the
+        // signature is not.
+        it('reports a redacted credential as revoked rather than unreadable', async () => {
+            const redacted = issued({ id: 'did:cid:vc', credentialSubject: { id: ALICE } });
+            const { app } = mountWith(redacted, { verifyProof: false, deactivated: true });
+
+            expect(await statusOf(app)).toStrictEqual({ status: 'unverified', reason: 'revoked by the issuer' });
+        });
+
         // The endpoint is public and the manifest is written by the profile's
         // owner, so the work per request cannot be left to them.
         it('checks at most fifty entries however long the manifest is', async () => {
