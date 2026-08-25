@@ -2866,8 +2866,26 @@ class Keymaster:
         signed = await self.add_proof(credential)
         subject_id = credential.get("credentialSubject", {}).get("id")
         if self.is_managed_did(subject_id):
-            return await self.encrypt_json(signed, subject_id, {**options, "includeHash": True})
-        return await self.encrypt_json(signed, id_info["did"], {**options, "includeHash": True, "encryptForSender": False})
+            did = await self.encrypt_json(signed, subject_id, {**options, "includeHash": True})
+        else:
+            did = await self.encrypt_json(
+                signed, id_info["did"], {**options, "includeHash": True, "encryptForSender": False}
+            )
+
+        # Bind the credential to the asset holding it, under the issuer's own
+        # signature. Without this a credential says nothing about where it
+        # lives, so a holder can copy a revoked one -- genuinely issued,
+        # correctly signed, still verifying -- under a fresh asset DID and
+        # present it as current. Only the pointer lies, and the pointer was the
+        # one part nobody signed (#108).
+        #
+        # Two steps rather than one because the DID is the CID of the operation
+        # that creates the asset, so it cannot be known before the asset exists.
+        # That is only true of the create operation: updating appends to the
+        # same chain and leaves the identifier alone.
+        await self.update_credential(did, {**credential, "id": did})
+
+        return did
 
     def verify_tag_list(self, tags: list[str]) -> list[str]:
         if not isinstance(tags, list):

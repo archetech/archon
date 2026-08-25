@@ -176,6 +176,48 @@ describe('publishCredential', () => {
         expect(manifest[did]).toStrictEqual(vc);
     });
 
+    // A credential must say which asset holds it, under the issuer's signature.
+    // Otherwise nothing binds the two, and a holder can copy a revoked
+    // credential -- genuinely issued, correctly signed, still verifying --
+    // under a fresh asset DID and present it as current. Signature, issuer and
+    // subject all check out, because the credential is authentic; only the
+    // pointer lies, and the pointer was the part nobody signed (#108).
+    it('names its own DID, under the issuer\'s signature', async () => {
+        const bob = await keymaster.createId('Bob');
+        const schemaDid = await keymaster.createSchema(mockSchema);
+        const bound = await keymaster.bindCredential(bob, { schema: schemaDid });
+
+        const did = await keymaster.issueCredential(bound);
+        const vc = await keymaster.getCredential(did) as VerifiableCredential;
+
+        expect(vc.id).toBe(did);
+        // Embedded before signing rather than bolted on afterwards, so the
+        // binding is the issuer's statement and not something a later holder
+        // could have added. Asserting the id alone would pass either way.
+        expect(await keymaster.verifyProof(vc)).toBe(true);
+    });
+
+    // The binding has to survive publication, since a manifest entry is where
+    // a reader actually encounters it.
+    it('keeps its DID through publication, revealed or not', async () => {
+        const bob = await keymaster.createId('Bob');
+        const schemaDid = await keymaster.createSchema(mockSchema);
+        const bound = await keymaster.bindCredential(bob, { schema: schemaDid });
+        const did = await keymaster.issueCredential(bound);
+
+        await keymaster.publishCredential(did, { reveal: true });
+        const revealed = (((await keymaster.resolveDID(bob)).didDocumentData as any).manifest)[did];
+        expect(revealed.id).toBe(did);
+
+        // Redaction strips the claim values, so this copy cannot have its
+        // signature checked -- but it still names the asset it came from,
+        // which is what a revocation lookup needs.
+        await keymaster.publishCredential(did);
+        const redacted = (((await keymaster.resolveDID(bob)).didDocumentData as any).manifest)[did];
+        expect(redacted.id).toBe(did);
+        expect(Object.keys(redacted.credentialSubject!)).toStrictEqual(['id']);
+    });
+
     // Herald's public profile depends on this exact shape. A non-revealed
     // publication cannot verify -- the proof covers claims that were stripped
     // after signing -- so the profile recognises the redaction and says so,
@@ -534,7 +576,11 @@ describe('updateCredential', () => {
         expect(updated.validUntil).toBe(vc.validUntil);
 
         const doc = await keymaster.resolveDID(did);
-        expect(doc.didDocumentMetadata!.versionSequence).toBe("2");
+        // Three, not two: issuing a credential now takes two operations. The
+        // asset is created, and then updated with its own DID embedded and
+        // re-signed, because a DID derived from the create operation cannot be
+        // known before that operation exists (#108). This update is the third.
+        expect(doc.didDocumentMetadata!.versionSequence).toBe("3");
     });
 
     it('should throw exception on invalid parameters', async () => {

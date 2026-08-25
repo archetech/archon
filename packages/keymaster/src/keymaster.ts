@@ -3590,11 +3590,30 @@ export default class Keymaster implements KeymasterInterface {
         const signed = await this.addProof(credential);
         const subjectId = credential.credentialSubject!.id;
 
-        if (this.isManagedDID(subjectId)) {
-            return this.encryptJSON(signed, subjectId, { ...options, includeHash: true });
-        }
+        const did = this.isManagedDID(subjectId)
+            ? await this.encryptJSON(signed, subjectId, { ...options, includeHash: true })
+            : await this.encryptJSON(signed, id.did, { ...options, includeHash: true, encryptForSender: false });
 
-        return this.encryptJSON(signed, id.did, { ...options, includeHash: true, encryptForSender: false });
+        // Bind the credential to the asset holding it, under the issuer's own
+        // signature. Without this a credential says nothing about where it
+        // lives, so a holder can copy a revoked one -- genuinely issued,
+        // correctly signed, and still verifying -- under a fresh asset DID and
+        // present it as current. Signature, issuer and subject all check out,
+        // because the credential is authentic; only the pointer lies, and the
+        // pointer was the one part nobody signed (#108).
+        //
+        // Two steps rather than one because the DID is the CID of the operation
+        // that creates the asset, so it cannot be known before the asset
+        // exists. That is only true of the create operation: updateDID appends
+        // to the same chain and leaves the identifier alone, so re-signing the
+        // credential with its own DID does not move it.
+        //
+        // `id` is a standard optional property of a W3C Verifiable Credential,
+        // so a verifier that knows nothing about Archon still reads it as the
+        // credential's identifier.
+        await this.updateCredential(did, { ...credential, id: did } as VerifiableCredential);
+
+        return did;
     }
 
     async sendCredential(

@@ -38,6 +38,27 @@ def test_issue_get_and_list_issued_credential(testbed):
     assert run(testbed.keymaster.list_issued()) == [did]
 
 
+def test_issued_credential_names_its_own_did(testbed):
+    """A credential must say which asset holds it, under the issuer's signature.
+
+    Otherwise nothing binds the two: a holder can copy a revoked credential --
+    genuinely issued and still verifying -- under a fresh asset DID and present
+    it as current, because only the pointer lies and the pointer is the part
+    nobody signed (#108).
+    """
+    subject = run(testbed.keymaster.create_id("Bob"))
+    schema_did = run(testbed.keymaster.create_schema(MOCK_SCHEMA))
+    bound = run(testbed.keymaster.bind_credential(subject, {"schema": schema_did}))
+
+    did = run(testbed.keymaster.issue_credential(bound))
+    vc = run(testbed.keymaster.get_credential(did))
+
+    assert vc["id"] == did
+    # Embedded before signing rather than bolted on after, so the binding is
+    # the issuer's statement and not something a later holder could have added.
+    assert run(testbed.keymaster.verify_proof(vc)) is True
+
+
 def test_accept_and_list_held_credential(testbed):
     run(testbed.keymaster.create_id("Alice"))
     bob = run(testbed.keymaster.create_id("Bob"))
