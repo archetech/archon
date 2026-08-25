@@ -91,6 +91,12 @@ const BLOCKED_IPV4: Array<[string, number]> = [
     ['198.18.0.0', 15],    // benchmarking
     ['224.0.0.0', 4],      // multicast
     ['240.0.0.0', 4],      // reserved, incl. broadcast
+    // Documentation ranges. Not routable, so a name resolving into one is
+    // either a misconfiguration or an attempt at something; Python's
+    // ipaddress marks them private, and the two ports have to agree.
+    ['192.0.2.0', 24],     // TEST-NET-1
+    ['198.51.100.0', 24],  // TEST-NET-2
+    ['203.0.113.0', 24],   // TEST-NET-3
 ];
 
 function inRange(address: number, network: string, bits: number): boolean {
@@ -197,6 +203,17 @@ function isPrivateIpv6(bytes: number[]): boolean {
         return isPrivateIpv4(embedded);
     }
 
+    // ff00::/8 multicast -- not a unicast host, and never a lookup target.
+    if (bytes[0] === 0xff) {
+        return true;
+    }
+
+    // 2001:db8::/32, the documentation range, for the same reason as the
+    // IPv4 ones above.
+    if (bytes[0] === 0x20 && bytes[1] === 0x01 && bytes[2] === 0x0d && bytes[3] === 0xb8) {
+        return true;
+    }
+
     // fc00::/7 unique local, fe80::/10 link-local.
     if ((bytes[0] & 0xfe) === 0xfc) {
         return true;
@@ -237,6 +254,12 @@ export function isPrivateHostname(hostname: string): boolean {
 
 const MAX_REDIRECTS = 3;
 
+// The statuses fetch actually follows. Treating the whole 3xx range as a
+// redirect turns a 304 Not Modified -- which carries no Location and is not a
+// redirect at all -- into a "redirect with no location" error, where plain
+// fetch would simply have handed the response back.
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
 // Fetches over https, refusing any hop that is not https or that points at a
 // private target. Checking only the first URL is not enough: `fetch` follows
 // redirects on its own, so a public host answering 302 with a Location of
@@ -259,10 +282,7 @@ export async function fetchPublicHttps(target: string, init?: RequestInit): Prom
 
         const response = await fetch(current, { ...init, redirect: 'manual' });
 
-        // Follow only what is definitely a redirect. Testing for the negative
-        // instead would treat an absent or non-numeric status as one and go
-        // looking for a Location header that was never there.
-        if (!(response.status >= 300 && response.status < 400)) {
+        if (!REDIRECT_STATUSES.has(response.status)) {
             return response;
         }
 

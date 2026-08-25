@@ -1,5 +1,5 @@
 import { attachedJson, issueCredentialMessage, type DidCommPlaintext } from './didcomm-protocols.js';
-import { isPrivateHostname, fetchPublicHttps } from './net.js';
+import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
@@ -1984,7 +1984,7 @@ export default class Keymaster implements KeymasterInterface {
 
         for (const endpoint of this.addressApiEndpoints(domain, path)) {
             try {
-                const response = await fetch(endpoint, init);
+                const response = await fetchPublicHttps(endpoint, init);
 
                 if (response.ok) {
                     return response;
@@ -2013,7 +2013,7 @@ export default class Keymaster implements KeymasterInterface {
 
         for (const endpoint of this.addressApiEndpoints(domain, 'challenge')) {
             try {
-                const response = await fetch(endpoint);
+                const response = await fetchPublicHttps(endpoint);
 
                 if (!response.ok) {
                     lastError = await this.getResponseError(response, lastError);
@@ -2042,7 +2042,7 @@ export default class Keymaster implements KeymasterInterface {
     private async fetchAddressRelayAgent(domain: string): Promise<string | null> {
         for (const endpoint of this.addressApiEndpoints(domain, 'config')) {
             try {
-                const response = await fetch(endpoint);
+                const response = await fetchPublicHttps(endpoint);
 
                 if (!response.ok) {
                     continue;

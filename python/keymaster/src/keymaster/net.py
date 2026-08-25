@@ -19,6 +19,11 @@ import httpx
 
 MAX_REDIRECTS = 3
 
+# The statuses that are actually redirects. Treating the whole 3xx range as one
+# turns a 304 Not Modified -- which carries no Location -- into a "redirect with
+# no location" error, where httpx would simply have returned the response.
+REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+
 # Names that resolve inside a host or a private network by convention. This
 # cannot catch a public name pointed at a private address -- that is DNS
 # rebinding, and it needs resolve-then-pin rather than a string check.
@@ -161,8 +166,7 @@ async def fetch_public_https(
 
             response = await client.request(method, current, headers=headers, json=json_body)
 
-            # Follow only what is definitely a redirect.
-            if not (300 <= response.status_code < 400):
+            if response.status_code not in REDIRECT_STATUSES:
                 return response
 
             location = response.headers.get("location")

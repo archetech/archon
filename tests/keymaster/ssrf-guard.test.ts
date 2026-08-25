@@ -4,8 +4,9 @@ import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import HeliaClient from '@didcid/ipfs/helia';
+import { readFileSync } from 'fs';
 import { jest } from '@jest/globals';
-import { isPrivateHostname, fetchPublicHttps } from '../../packages/keymaster/src/net.js';
+import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
 
 // Remote name lookup fetches https://<domain>/.well-known/names from a domain
 // the caller supplies, which makes the target check the only thing standing
@@ -16,70 +17,32 @@ import { isPrivateHostname, fetchPublicHttps } from '../../packages/keymaster/sr
 // first list below walked straight past it, including 169.254.169.254, the
 // cloud metadata address the issue named first.
 
-describe('isPrivateHostname', () => {
-    describe('rejects', () => {
-        const cases: Array<[string, string]> = [
-            ['localhost', 'localhost'],
-            ['a trailing dot on localhost', 'localhost.'],
-            ['mixed case', 'LOCALHOST'],
-            ['loopback', '127.0.0.1'],
-            ['RFC 1918 ten', '10.0.0.1'],
-            ['RFC 1918 172', '172.16.0.1'],
-            ['RFC 1918 192.168', '192.168.1.1'],
-            ['link-local, the metadata address', '169.254.169.254'],
-            ['carrier-grade NAT', '100.64.0.1'],
-            ['this-host', '0.0.0.0'],
-            ['multicast', '224.0.0.1'],
-            ['IETF protocol assignments', '192.0.0.1'],
-            ['benchmarking', '198.18.0.1'],
-            // inet_aton accepts all of these and the resolver honours them, so
-            // a check that only understands dotted-decimal is not a check.
-            ['loopback as one decimal', '2130706433'],
-            ['loopback in octal', '0177.0.0.1'],
-            ['loopback in hex', '0x7f000001'],
-            ['loopback with implied bytes', '127.1'],
-            ['IPv6 loopback', '::1'],
-            ['IPv6 loopback in brackets', '[::1]'],
-            ['IPv6 unspecified', '::'],
-            ['IPv6 unique local', 'fc00::1'],
-            ['IPv6 link-local', 'fe80::1'],
-            ['IPv6 link-local with a zone', 'fe80::1%eth0'],
-            ['IPv4-mapped loopback', '[::ffff:127.0.0.1]'],
-            ['IPv4-mapped metadata address', '::ffff:169.254.169.254'],
-            ['a .internal name', 'metadata.google.internal'],
-            ['an mDNS name', 'printer.local'],
-            ['a .localhost name', 'api.localhost'],
-            ['the empty string', ''],
-        ];
+// Cases come from a fixture the Python suite reads too. When each port kept its
+// own list they agreed on everything either had thought of and diverged on six
+// neither had -- the IPv4 documentation ranges, IPv6 multicast, and 2001:db8::/32
+// (#252). A shared list is the only thing that makes "the ports agree" checkable
+// rather than asserted.
+const fixture = JSON.parse(readFileSync('tests/fixtures/private-hostnames.json', 'utf-8')) as {
+    blocked: string[];
+    allowed: string[];
+};
 
-        it.each(cases)('%s', (_label, hostname) => {
-            expect(isPrivateHostname(hostname)).toBe(true);
-        });
+describe('isPrivateHostname', () => {
+    it('has cases to check', () => {
+        // Guard the guard: an empty fixture would make both checks vacuous.
+        expect(fixture.blocked.length).toBeGreaterThan(30);
+        expect(fixture.allowed.length).toBeGreaterThan(10);
     });
 
-    describe('allows', () => {
-        // The guard is worthless if it also blocks the lookups it exists to
-        // permit, and the ranges next to the blocked ones are the easy mistake:
-        // 11.x is not 10.x, 172.32 is outside the /12, and 169.253 is not
-        // link-local.
-        const cases: Array<[string, string]> = [
-            ['an ordinary domain', 'example.com'],
-            ['a subdomain', 'names.example.org'],
-            ['a public resolver', '8.8.8.8'],
-            ['another public address', '1.1.1.1'],
-            ['a public IPv6 address', '2606:2800:220:1:248:1893:25c8:1946'],
-            ['the address above the RFC 1918 ten block', '11.0.0.1'],
-            ['the address below it', '9.255.255.255'],
-            ['just outside the 172.16/12 block', '172.32.0.1'],
-            ['just below it', '172.15.255.255'],
-            ['just outside link-local', '169.253.0.1'],
-            ['a name merely containing a blocked word', 'localhost.example.com'],
-            ['a punycode domain', 'xn--bcher-kva.example'],
-        ];
+    it.each(fixture.blocked)('rejects %j', (hostname) => {
+        expect(isPrivateHostname(hostname)).toBe(true);
+    });
 
-        it.each(cases)('%s', (_label, hostname) => {
-            expect(isPrivateHostname(hostname)).toBe(false);
-        });
+    // A guard that also blocks what it exists to permit is not usable, and the
+    // neighbours of the blocked ranges are the easy mistake: 11.x is not 10.x,
+    // 172.32 is outside the /12, 169.253 is not link-local.
+    it.each(fixture.allowed)('allows %j', (hostname) => {
+        expect(isPrivateHostname(hostname)).toBe(false);
     });
 });
 
@@ -175,6 +138,17 @@ describe('fetchPublicHttps re-checks every hop', () => {
 
         await expect(fetchPublicHttps('https://example.com/.well-known/names'))
             .rejects.toThrow(/too many redirects/);
+    });
+
+    // 304 sits in the 3xx range but is not a redirect and carries no Location.
+    // Treating the whole range as redirects turned it into a "redirect with no
+    // location" error, where plain fetch would have returned the response.
+    it.each([304, 300, 305])('returns a non-redirect 3xx (%i) rather than erroring', async (status) => {
+        global.fetch = jest.fn(async () => new Response(null, { status })) as any;
+
+        const response = await fetchPublicHttps('https://example.com/.well-known/names');
+
+        expect(response.status).toBe(status);
     });
 
     it('returns an ordinary response untouched', async () => {

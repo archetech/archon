@@ -9,69 +9,37 @@ account for in both.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
+import httpx
+
 import keymaster.core as core
+import keymaster.net as net
 from keymaster.net import fetch_public_https, is_private_hostname
 
 from .helpers import run
 
 
-# Every one of these walked past the prefix regex the TypeScript port used,
-# including 169.254.169.254 -- the cloud metadata address, and the first risk
-# the issue named.
-BLOCKED = [
-    "localhost",
-    "localhost.",
-    "LOCALHOST",
-    "127.0.0.1",
-    "10.0.0.1",
-    "172.16.0.1",
-    "192.168.1.1",
-    "169.254.169.254",
-    "100.64.0.1",
-    "0.0.0.0",
-    "224.0.0.1",
-    "192.0.0.1",
-    "198.18.0.1",
-    # inet_aton accepts these and the resolver honours them, while Python's
-    # ipaddress module rejects all four -- so they have to be parsed by hand
-    # or they are simply not seen.
-    "2130706433",
-    "0177.0.0.1",
-    "0x7f000001",
-    "127.1",
-    "::1",
-    "[::1]",
-    "::",
-    "fc00::1",
-    "fe80::1",
-    "fe80::1%eth0",
-    "[::ffff:127.0.0.1]",
-    "::ffff:169.254.169.254",
-    "metadata.google.internal",
-    "printer.local",
-    "api.localhost",
-    "",
-]
+# Cases come from a fixture the TypeScript suite reads too. When each port kept
+# its own list they agreed on everything either had thought of and diverged on
+# six neither had -- the IPv4 documentation ranges, IPv6 multicast, and
+# 2001:db8::/32, which ipaddress rejects and the hand-written TypeScript parser
+# did not. A shared list is what makes "the ports agree" checkable.
+_FIXTURE = json.loads(
+    (Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "private-hostnames.json").read_text()
+)
 
-# A guard that also blocks the lookups it exists to permit is not usable. The
-# neighbours of the blocked ranges are the easy mistake: 11.x is not 10.x,
-# 172.32 is outside the /12, and 169.253 is not link-local.
-ALLOWED = [
-    "example.com",
-    "names.example.org",
-    "8.8.8.8",
-    "1.1.1.1",
-    "2606:2800:220:1:248:1893:25c8:1946",
-    "11.0.0.1",
-    "9.255.255.255",
-    "172.32.0.1",
-    "172.15.255.255",
-    "169.253.0.1",
-    "localhost.example.com",
-    "xn--bcher-kva.example",
-]
+BLOCKED = _FIXTURE["blocked"]
+ALLOWED = _FIXTURE["allowed"]
+
+
+def test_fixture_has_cases() -> None:
+    # Guard the guard: an empty fixture would make both checks vacuous.
+    assert len(BLOCKED) > 30
+    assert len(ALLOWED) > 10
 
 
 @pytest.mark.parametrize("hostname", BLOCKED)
@@ -111,3 +79,25 @@ def test_fetch_public_https_refuses_a_private_first_hop() -> None:
 def test_fetch_public_https_refuses_a_non_https_target() -> None:
     with pytest.raises(ValueError, match="non-https"):
         run(fetch_public_https("GET", "http://example.com/.well-known/names"))
+
+
+@pytest.mark.parametrize("status", [304, 300, 305])
+def test_non_redirect_3xx_is_returned_not_treated_as_a_redirect(status: int, monkeypatch) -> None:
+    # 304 sits in the 3xx range but is not a redirect and carries no Location.
+    # Treating the whole range as redirects turned it into a "redirect with no
+    # location" error, where httpx would have returned the response.
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def request(self, method, url, headers=None, json=None):
+            return httpx.Response(status, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(net.httpx, "AsyncClient", lambda **kwargs: FakeClient())
+
+    response = run(fetch_public_https("GET", "https://example.com/.well-known/names"))
+
+    assert response.status_code == status

@@ -885,7 +885,7 @@ class Keymaster:
 
         for endpoint in self.address_api_endpoints(domain, path):
             try:
-                response = await self._http_request(method, endpoint, headers=headers, json_body=json_body)
+                response = await fetch_public_https(method, endpoint, headers=headers, json_body=json_body)
                 if 200 <= response.status_code < 300:
                     return response
                 last_response = response
@@ -903,7 +903,7 @@ class Keymaster:
 
         for endpoint in self.address_api_endpoints(domain, "challenge"):
             try:
-                response = await self._http_request("GET", endpoint)
+                response = await fetch_public_https("GET", endpoint)
                 if not (200 <= response.status_code < 300):
                     last_error = await self.get_response_error(response, last_error)
                     continue
@@ -922,7 +922,7 @@ class Keymaster:
     async def fetch_address_relay_agent(self, domain: str) -> str | None:
         for endpoint in self.address_api_endpoints(domain, "config"):
             try:
-                response = await self._http_request("GET", endpoint)
+                response = await fetch_public_https("GET", endpoint)
                 if not (200 <= response.status_code < 300):
                     continue
 

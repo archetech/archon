@@ -512,6 +512,44 @@ describe('zap to a Lightning Address (LUD-16)', () => {
         expect(lnbits.payInvoice).toHaveBeenCalledWith('http://lnbits:5000', 'k', 'lnbc1remote');
     });
 
+    // Both halves of this flow take their target from someone else: the domain
+    // comes out of the Lightning Address a caller supplies, and the callback URL
+    // is whatever the LNURL response says it is. fetchHttpsOnly refused a
+    // non-https hop but was happy to fetch anything on the local network that
+    // speaks TLS, so a zap could be aimed at a cloud metadata endpoint (#252).
+    it.each([
+        '169.254.169.254',
+        '127.0.0.1',
+        '[::1]',
+        '2130706433',
+    ])('refuses a Lightning Address at the private target %s', async (host) => {
+        const { app } = build();
+        const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+        const response = await zap(app, { adminKey: 'k', did: `alice@${host}`, amount: 100 });
+
+        expect(response.status).toBe(502);
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('refuses a callback URL pointing at a private target', async () => {
+        const { app, lnbits } = build();
+        const seen: string[] = [];
+
+        // The address resolves to a perfectly ordinary host, which then names a
+        // private callback -- the check has to run on the second hop too.
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+            seen.push(String(input));
+            return jsonResponse({ callback: 'https://169.254.169.254/latest/meta-data', minSendable: 1000, maxSendable: 1000000000 });
+        });
+
+        const response = await zap(app, { adminKey: 'k', did: 'alice@example.com', amount: 100 });
+
+        expect(response.status).toBe(502);
+        expect(seen).toStrictEqual(['https://example.com/.well-known/lnurlp/alice']);
+        expect(lnbits.payInvoice).not.toHaveBeenCalled();
+    });
+
     it('enforces the sendable bounds the remote service declares', async () => {
         const { app, lnbits } = build();
         jest.spyOn(globalThis, 'fetch').mockImplementation(async () =>

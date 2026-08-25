@@ -28,6 +28,11 @@
       "import": "./dist/esm/errors.js",
       "require": "./dist/cjs/errors.cjs",
       "types": "./dist/types/errors.d.ts"
+    },
+    "./net": {
+      "import": "./dist/esm/net.js",
+      "require": "./dist/cjs/net.cjs",
+      "types": "./dist/types/net.d.ts"
     }
   },
   "typesVersions": {
@@ -37,6 +42,9 @@
       ],
       "errors": [
         "./dist/types/errors.d.ts"
+      ],
+      "net": [
+        "./dist/types/net.d.ts"
       ]
     }
   },
