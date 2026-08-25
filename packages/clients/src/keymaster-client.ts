@@ -970,6 +970,19 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    // The endpoint and the Python SDK's verify_proof have both existed for a
+    // while; this client simply never exposed it, so a service holding a
+    // KeymasterClient could not verify a proof at all.
+    async verifyProof(json: unknown): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/keys/verify`, { json });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async verifyResponse(
         responseDID: string,
         options?: { retries?: number; delay?: number }

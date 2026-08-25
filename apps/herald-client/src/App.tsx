@@ -417,6 +417,71 @@ function StatusPill({ label, tone }: { label: string, tone: string }) {
     );
 }
 
+// A manifest entry is whatever its subject published there, so an unverified
+// one is a claim rather than a credential. Invalid entries are marked rather
+// than hidden: dropping them silently tells the reader nothing, and leaves the
+// subject unaware that something in their manifest does not check out (#945).
+const CREDENTIAL_STATUS: Record<string, { label: string, background: string, color: string, title: string }> = {
+    valid: {
+        label: 'Verified',
+        background: '#dcfce7',
+        color: '#166534',
+        title: 'The issuer\'s signature checks out against their DID document.',
+    },
+    revoked: {
+        label: 'Revoked',
+        background: '#fef3c7',
+        color: '#92400e',
+        title: 'Signed by the issuer, who has since revoked it.',
+    },
+    invalid: {
+        label: 'Invalid',
+        background: '#fee2e2',
+        color: '#991b1b',
+        title: 'The signature does not check out. Treat this as a claim the subject published, not a credential someone issued.',
+    },
+    // Distinct from invalid on purpose: nothing was disproved here, we simply
+    // could not reach the issuer to check.
+    unverifiable: {
+        label: 'Unverified',
+        background: '#f1f5f9',
+        color: '#475569',
+        title: 'This could not be checked, so nothing is known either way.',
+    },
+};
+
+function CredentialStatusChip({ status, reason }: { status?: string, reason?: string }) {
+    // No entry means the server did not report on this one; saying nothing is
+    // better than implying either answer.
+    const style = status ? CREDENTIAL_STATUS[status] : undefined;
+
+    if (!style) {
+        return null;
+    }
+
+    return (
+        <Box
+            component="span"
+            title={reason ? `${style.title} (${reason})` : style.title}
+            sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                px: 1,
+                height: 22,
+                borderRadius: 999,
+                backgroundColor: style.background,
+                color: style.color,
+                fontSize: '0.6875rem',
+                fontWeight: 700,
+                letterSpacing: '0.01em',
+                whiteSpace: 'nowrap',
+            }}
+        >
+            {style.label}
+        </Box>
+    );
+}
+
 function CountChip({ count }: { count: number }) {
     return (
         <Box sx={{
@@ -1894,6 +1959,9 @@ function ViewIdentity() {
     const documentData = memberData?.didDocumentData || {};
     // The manifest is a map of credential DID -> verifiable credential.
     const credentials = Object.entries(documentData.manifest || {});
+    // Reported alongside the document rather than inside it, so the resolved
+    // DID document stays exactly what the gatekeeper returned.
+    const credentialStatus = memberData?.credentialStatus || {};
     const nostr = documentData.nostr;
 
     const aliasWalletUrl = did && walletUrl
@@ -2103,9 +2171,15 @@ function ViewIdentity() {
                                     mb: index === credentials.length - 1 ? 0 : 1.5,
                                 }}
                             >
-                                <Typography sx={{ fontWeight: 700, fontSize: '0.9375rem', color: '#0f172a', mb: 1 }}>
-                                    {credentialType(credential)}
-                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                                    <Typography sx={{ fontWeight: 700, fontSize: '0.9375rem', color: '#0f172a' }}>
+                                        {credentialType(credential)}
+                                    </Typography>
+                                    <CredentialStatusChip
+                                        status={credentialStatus[credentialDid]?.status}
+                                        reason={credentialStatus[credentialDid]?.reason}
+                                    />
+                                </Box>
 
                                 {credentialClaims(credential).map(([key, value]) => (
                                     <Field key={key} label={humanizeKey(key)} value={formatClaim(value)} />

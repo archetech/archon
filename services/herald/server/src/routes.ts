@@ -46,6 +46,71 @@ export interface HeraldContext {
     serviceDID: string;
 }
 
+// A manifest entry is whatever its subject put there. `publishCredential`
+// checks the shape and that the caller is the subject, never the proof, and a
+// controller can write `didDocumentData` directly regardless -- so an entry
+// naming any issuer can be self-asserted. The public profile renders these
+// under a "Credentials" heading, where a stranger has no other way to tell a
+// signed credential from a claim (#945).
+//
+// Verified here rather than in the browser: the check has to resolve the
+// issuer's DID document, which needs the gatekeeper this service already
+// holds, and the client carries no keymaster.
+// `invalid` and `unverifiable` are kept apart deliberately. A credential whose
+// signature or issuer does not check out has been examined and failed, and a
+// reader should treat it as a claim someone made about themselves. One whose
+// issuer cannot be resolved has not been examined at all, and saying so is
+// honest where calling it invalid would not be.
+type CredentialCheck = {
+    status: 'valid' | 'invalid' | 'revoked' | 'unverifiable';
+    reason?: string;
+};
+
+async function checkManifestCredential(
+    keymaster: Keymaster | KeymasterClient,
+    credentialDid: string,
+    vc: any,
+): Promise<CredentialCheck> {
+    try {
+        const verificationMethod = vc?.proof?.verificationMethod;
+
+        if (typeof verificationMethod !== 'string') {
+            return { status: 'invalid', reason: 'no proof' };
+        }
+
+        // verifyProof checks the signature against whoever the proof names,
+        // which is not necessarily whoever the credential claims issued it.
+        // Without this comparison a credential saying `issuer: did:cid:bank`
+        // and signed with the subject's own key verifies happily, and marking
+        // that "valid" would launder the forgery rather than catch it.
+        const [signer] = verificationMethod.split('#');
+
+        if (!vc.issuer || vc.issuer !== signer) {
+            return { status: 'invalid', reason: 'issuer does not match the signing key' };
+        }
+
+        if (!await keymaster.verifyProof(vc)) {
+            return { status: 'invalid', reason: 'signature does not verify' };
+        }
+
+        // The manifest holds a copy of the credential, so revoking the
+        // credential asset leaves that copy in place and looking healthy.
+        const doc = await keymaster.resolveDID(credentialDid);
+
+        if (doc?.didDocumentMetadata?.deactivated) {
+            return { status: 'revoked' };
+        }
+
+        return { status: 'valid' };
+    }
+    catch (error: any) {
+        // An unresolvable issuer or a gatekeeper failure lands here. Nothing
+        // was disproved, so this is a gap in what we can tell the reader
+        // rather than a verdict on the credential.
+        return { status: 'unverifiable', reason: 'issuer could not be resolved' };
+    }
+}
+
 export function createHeraldRoutes(ctx: HeraldContext): {
     router: express.Router;
     startDmailPollLoop: () => void;
@@ -916,7 +981,18 @@ export function createHeraldRoutes(ctx: HeraldContext): {
             // Fetch DID document from gatekeeper
             const didDoc = await ctx.keymaster.resolveDID(memberDid);
 
-            res.json(didDoc);
+            // Reported alongside the document rather than inside it: the
+            // manifest is part of didDocumentData, and annotating a resolved
+            // DID document with fields of our own is the conformance mistake
+            // #676 removed.
+            const manifest = (didDoc.didDocumentData as { manifest?: Record<string, any> })?.manifest ?? {};
+            const credentialStatus: Record<string, CredentialCheck> = {};
+
+            for (const [credentialDid, vc] of Object.entries(manifest)) {
+                credentialStatus[credentialDid] = await checkManifestCredential(ctx.keymaster, credentialDid, vc);
+            }
+
+            res.json({ ...didDoc, credentialStatus });
         }
         catch (error: any) {
             console.log(error);
