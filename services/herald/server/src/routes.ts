@@ -127,42 +127,47 @@ async function checkManifestCredential(
             return { status: 'unverified', reason: 'issuer does not match the signing key' };
         }
 
-        // The manifest key says which asset holds this credential, and the key
-        // is controller data. A credential issued since #108 names its own
-        // asset as `id`, under the issuer's signature, so the two can be
-        // compared: disagreement means the entry is filed under an asset the
-        // issuer never put it in, and the revocation state of that asset says
-        // nothing about this credential.
-        //
-        // Checked before the signature because it costs nothing and because a
-        // redacted credential still carries its `id` -- redaction strips the
-        // claim values and leaves the identifier alone.
-        const bound = typeof vc.id === 'string';
-
-        if (bound && vc.id !== credentialDid) {
-            return { status: 'unverified', reason: 'filed under an asset it does not name' };
-        }
-
-        // Revocation next, and ahead of the signature, because "revoked" tells
-        // a reader more than "cannot be checked" for a credential that is both.
-        //
-        // Sound where the credential is bound. Where it is not -- anything
-        // issued before #108 -- this is best effort: an owner can re-key a
-        // revoked credential under a fresh asset and the lookup follows them
-        // there. Absence of `id` means unbound, not invalid, so those
-        // credentials keep working rather than being marked down for their age.
-        const doc = await keymaster.resolveDID(credentialDid);
-
-        if (doc?.didDocumentMetadata?.deactivated) {
-            return { status: 'unverified', reason: 'revoked by the issuer' };
-        }
-
         if (isRedactedPublication(vc)) {
             return { status: 'unverified', reason: 'published without its claims, so the signature cannot be checked' };
         }
 
         if (!await keymaster.verifyProof(vc)) {
             return { status: 'unverified', reason: 'signature does not verify' };
+        }
+
+        // Everything below rests on the signature having been checked, and the
+        // order is load-bearing rather than incidental. The proof covers the
+        // whole credential except `proof` itself, so until it verifies, no
+        // field is the issuer's word for anything -- `id` included. A redacted
+        // copy can never verify, which means its `id` is an unsigned string a
+        // holder may rewrite at will, along with the key it is filed under.
+        //
+        // Reading revocation before this point looked like an improvement,
+        // since `id` textually survives redaction. It is not: a revoked
+        // redacted credential re-keyed to a fresh active asset would agree with
+        // itself and be reported as merely unreadable rather than revoked.
+        // Same verdict, misleading reason.
+
+        // The manifest key says which asset holds this credential, and the key
+        // is unsigned controller data. A credential issued since #108 names its
+        // own asset as `id`, so now that the signature has been checked the two
+        // can be compared: disagreement means the entry sits under an asset the
+        // issuer never put it in, whose revocation state says nothing about
+        // this credential.
+        if (typeof vc.id === 'string' && vc.id !== credentialDid) {
+            return { status: 'unverified', reason: 'filed under an asset it does not name' };
+        }
+
+        // Sound where the credential names its asset. Where it does not --
+        // anything issued before #108 -- this is best effort: an owner can
+        // re-key a revoked credential under a fresh asset and the lookup
+        // follows them there. Absence of `id` means unbound, not invalid, so
+        // those credentials keep working rather than being marked down for
+        // their age.
+        const doc = await keymaster.resolveDID(credentialDid);
+
+        if (doc?.didDocumentMetadata?.deactivated) {
+            return { status: 'unverified', reason: 'revoked by the issuer' };
         }
 
         return { status: 'verified' };

@@ -1199,15 +1199,36 @@ describe('herald member lookup', () => {
             });
         });
 
-        // Revocation is reported ahead of the signature, because a credential
-        // that is both revoked and unverifiable is better described as revoked.
-        // The id survives redaction, so this answer is available even when the
-        // signature is not.
-        it('reports a redacted credential as revoked rather than unreadable', async () => {
+        // A redacted credential gets no revocation answer, and that is the
+        // honest one. Its `id` survives redaction textually, but the proof
+        // covers the whole credential except `proof` itself, so a copy that can
+        // never verify has no field the issuer stands behind -- `id` included.
+        //
+        // Reading revocation first looked like an improvement. It is not: a
+        // holder can re-key a revoked redacted credential to a fresh active
+        // asset, rewrite the matching `id`, and have it agree with itself. The
+        // verdict would still be unverified, but the reason would say
+        // unreadable when the truth is revoked.
+        it('makes no revocation claim about a credential it cannot verify', async () => {
             const redacted = issued({ id: 'did:cid:vc', credentialSubject: { id: ALICE } });
             const { app } = mountWith(redacted, { verifyProof: false, deactivated: true });
 
-            expect(await statusOf(app)).toStrictEqual({ status: 'unverified', reason: 'revoked by the issuer' });
+            expect(await statusOf(app)).toStrictEqual({
+                status: 'unverified',
+                reason: 'published without its claims, so the signature cannot be checked',
+            });
+        });
+
+        // The same order protects the binding check. A tampered `id` fails on
+        // the signature, which is the stronger statement -- reporting it as
+        // misfiled would imply the rest of the credential was sound.
+        it('catches a tampered id at the signature, not at the binding', async () => {
+            const { app } = mountWith(issued({ id: 'did:cid:vc' }), { verifyProof: false });
+
+            expect(await statusOf(app)).toStrictEqual({
+                status: 'unverified',
+                reason: 'signature does not verify',
+            });
         });
 
         // The endpoint is public and the manifest is written by the profile's
