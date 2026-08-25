@@ -1209,7 +1209,7 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 
 ### 13.1 Feature Comparison
 
-| Feature | did:cid (Archon) | did:btc | did:webvh | did:key |
+| Feature | did:cid (Archon) | did:btcr | did:webvh | did:key |
 |---------|------------------|---------|---------|---------|
 | Creation Cost | No registry fee (Hyperswarm) | On-chain transaction fee | No registry fee | No registry fee |
 | Creation Speed | Instant | Minutes | Instant | Instant |
@@ -1218,7 +1218,7 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 | Finality Options | Multiple | Strong | Optional witnesses | N/A |
 | Credential Support | Full | Limited | Full | Limited |
 | Key Recovery | BIP-39 | Varies | Optional pre-rotation | N/A |
-| Arbitrary Data Storage | Yes (didDocumentData) | No | External only | No |
+| Arbitrary Data Storage | Yes (didDocumentData) | External only | External only | No |
 | Blockchain Timestamps | Automatic (with bounds) | Implicit | No | No |
 | Time-Travel Resolution | Yes | No | Yes | No |
 | Built-in Messaging | Yes (D-Mail) | No | No | No |
@@ -1231,10 +1231,11 @@ The graded entries above — "Full", "Partial", "Strong", "Limited", "Multiple",
 
 ### 13.2 Architectural Comparison
 
-**did:btc**
-- Anchors DID state directly to Bitcoin transactions
-- Strong finality but creation and updates inherit Bitcoin fee and confirmation constraints
-- Best suited to identities that need direct Bitcoin-level anchoring
+**did:btcr**
+- Anchors DID state directly to Bitcoin transactions, an update being made by spending the current output
+- Strong finality, but creation and updates inherit Bitcoin fee and confirmation constraints
+- The DID document is referenced by a URL in the transaction's `OP_RETURN` rather than stored on chain, so the document's availability rests off chain even though its ordering does not
+- Registered in the W3C DID method registry, though the specification has remained a Community Group draft since 2019
 
 **did:ion**
 - Uses the Sidetree protocol to batch many DID operations into periodic Bitcoin anchors
