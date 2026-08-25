@@ -158,7 +158,9 @@ describe('importAddress', () => {
                 added: '2026-04-04T12:00:00.000Z',
             },
         });
-        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names');
+        // redirect: 'manual' is part of the contract, not incidental: following a
+        // redirect would land on a host the private-target check never saw (#252).
+        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names', { redirect: 'manual' });
     });
 });
 
@@ -191,7 +193,9 @@ describe('checkAddress', () => {
             available: false,
             did: 'did:cid:alice',
         });
-        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names/alice');
+        // redirect: 'manual' is part of the contract, not incidental: following a
+        // redirect would land on a host the private-target check never saw (#252).
+        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names/alice', { redirect: 'manual' });
     });
 
     it('should report when a domain does not appear to support names', async () => {

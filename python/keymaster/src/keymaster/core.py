@@ -11,6 +11,8 @@ from typing import Any, Protocol, cast
 from urllib.parse import urlparse
 
 import httpx
+
+from .net import fetch_public_https, is_private_hostname
 from bolt11 import decode as decode_bolt11
 from cryptography.exceptions import InvalidTag
 
@@ -820,6 +822,11 @@ class Keymaster:
             url = __import__("urllib.parse").parse.urlparse(candidate)
             if not url.netloc:
                 raise ValueError("missing hostname")
+            # Rejected here rather than at each call site: import_address and
+            # check_address both normalize through this method, and neither
+            # had any private-target check at all (#252).
+            if is_private_hostname(url.hostname or url.netloc):
+                raise ValueError("private address")
             return url.netloc.lower()
         except Exception as exc:
             raise KeymasterError("Invalid parameter: domain") from exc
@@ -966,7 +973,7 @@ class Keymaster:
     async def import_address(self, domain: str) -> dict[str, dict[str, Any]]:
         normalized_domain = self.normalize_address_domain(domain)
         current = await self.fetch_id_info()
-        response = await self._http_request("GET", f"https://{normalized_domain}/.well-known/names")
+        response = await fetch_public_https("GET", f"https://{normalized_domain}/.well-known/names")
         if not (200 <= response.status_code < 300):
             raise KeymasterError(await self.get_response_error(response, "Failed to import addresses"))
 
@@ -1002,7 +1009,7 @@ class Keymaster:
     async def check_address(self, address: str) -> dict[str, Any]:
         parsed = self.parse_address(address)
         try:
-            response = await self._http_request(
+            response = await fetch_public_https(
                 "GET", f"https://{parsed['domain']}/.well-known/names/{__import__('urllib.parse').parse.quote(parsed['name'])}"
             )
         except Exception:

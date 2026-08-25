@@ -1,4 +1,5 @@
 import { attachedJson, issueCredentialMessage, type DidCommPlaintext } from './didcomm-protocols.js';
+import { isPrivateHostname, fetchPublicHttps } from './net.js';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
@@ -132,10 +133,6 @@ function isValidDID(did: string): boolean {
     catch {
         return false;
     }
-}
-
-function isPrivateHostname(hostname: string): boolean {
-    return /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
 }
 
 const REMOTE_NAME_LOOKUP_TIMEOUT_MS = 2000;
@@ -1486,7 +1483,7 @@ export default class Keymaster implements KeymasterInterface {
         const timeout = setTimeout(() => controller.abort(), REMOTE_NAME_LOOKUP_TIMEOUT_MS);
 
         try {
-            const response = await fetch(url.toString(), { signal: controller.signal });
+            const response = await fetchPublicHttps(url.toString(), { signal: controller.signal });
 
             if (!response.ok) {
                 return null;
@@ -1905,6 +1902,14 @@ export default class Keymaster implements KeymasterInterface {
                 throw new Error('missing hostname');
             }
 
+            // Rejected here rather than at each call site: getAddress,
+            // importAddress and checkAddress all normalize through this
+            // method, and the guard used to sit on only one of the three
+            // paths that fetch a caller-supplied host (#252).
+            if (isPrivateHostname(url.hostname)) {
+                throw new InvalidParameterError('domain');
+            }
+
             return url.host.toLowerCase();
         }
         catch {
@@ -2104,7 +2109,7 @@ export default class Keymaster implements KeymasterInterface {
     async importAddress(domain: string): Promise<Record<string, AddressInfo>> {
         const normalizedDomain = this.normalizeAddressDomain(domain);
         const current = await this.fetchIdInfo();
-        const response = await fetch(`https://${normalizedDomain}/.well-known/names`);
+        const response = await fetchPublicHttps(`https://${normalizedDomain}/.well-known/names`);
 
         if (!response.ok) {
             throw new KeymasterError(await this.getResponseError(response, 'Failed to import addresses'));
@@ -2148,7 +2153,7 @@ export default class Keymaster implements KeymasterInterface {
 
         let response: Response;
         try {
-            response = await fetch(`https://${parsed.domain}/.well-known/names/${encodeURIComponent(parsed.name)}`);
+            response = await fetchPublicHttps(`https://${parsed.domain}/.well-known/names/${encodeURIComponent(parsed.name)}`);
         }
         catch {
             return {
