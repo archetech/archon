@@ -22,6 +22,7 @@ const Endpoints = {
     ids: '/api/v1/ids',
     ids_current: '/api/v1/ids/current',
     keys_rotate: '/api/v1/keys/rotate',
+    keys_verify: '/api/v1/keys/verify',
     keys_encrypt_message: '/api/v1/keys/encrypt/message',
     keys_decrypt_message: '/api/v1/keys/decrypt/message',
     keys_encrypt_json: '/api/v1/keys/encrypt/json',
@@ -2165,6 +2166,51 @@ describe('createResponse', () => {
 
         try {
             await keymaster.createResponse(mockChallenge);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('verifyProof', () => {
+    // The endpoint and the Python SDK's verify_proof both predate this client
+    // method, so a service holding a KeymasterClient could not verify a proof
+    // at all -- which is how Herald came to render published credentials
+    // without checking any of them (#945).
+    const mockCredential = { issuer: 'did:cid:issuer', proof: { verificationMethod: 'did:cid:issuer#key-1' } };
+
+    it('should verify a proof', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.keys_verify)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.verifyProof(mockCredential);
+
+        expect(ok).toBe(true);
+    });
+
+    it('should report an unverified proof rather than throwing', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.keys_verify)
+            .reply(200, { ok: false });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.verifyProof(mockCredential)).toBe(false);
+    });
+
+    it('should throw exception on verifyProof server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.keys_verify)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.verifyProof(mockCredential);
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

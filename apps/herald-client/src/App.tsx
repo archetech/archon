@@ -417,6 +417,74 @@ function StatusPill({ label, tone }: { label: string, tone: string }) {
     );
 }
 
+// A manifest entry is whatever its subject published there, so an unverified
+// one is a claim rather than a credential. Two states only: "Verified" is a
+// statement the server is willing to make, and anything else is a refusal to
+// make it, with the reason saying which. Failing entries are marked rather than
+// hidden -- dropping them silently tells the reader nothing, and leaves the
+// subject unaware that something in their manifest does not check out (#945).
+//
+// Most honest credentials land in the second state, because publishing without
+// revealing strips the claims the signature covers. That is a property of the
+// proof format rather than a fault in the credential, which is why the reason
+// matters more than the badge.
+const CREDENTIAL_STATUS: Record<string, { label: string, background: string, color: string, title: string }> = {
+    verified: {
+        label: 'Verified',
+        background: '#dcfce7',
+        color: '#166534',
+        title: 'Issued to this identity, and the issuer\'s signature checks out against their DID document.',
+    },
+    unverified: {
+        label: 'Unverified',
+        background: '#f1f5f9',
+        color: '#475569',
+        title: 'This could not be confirmed, so treat it as a claim rather than a credential.',
+    },
+};
+
+function CredentialStatusChip({ status, reason }: { status?: string, reason?: string }) {
+    // No entry means the server did not report on this one; saying nothing is
+    // better than implying either answer.
+    const style = status ? CREDENTIAL_STATUS[status] : undefined;
+
+    if (!style) {
+        return null;
+    }
+
+    return (
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+            <Box
+                component="span"
+                title={style.title}
+                sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    px: 1,
+                    height: 22,
+                    borderRadius: 999,
+                    backgroundColor: style.background,
+                    color: style.color,
+                    fontSize: '0.6875rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.01em',
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                {style.label}
+            </Box>
+            {/* The reason carries the information the badge deliberately does
+                not: a redacted publication and a forged issuer are both
+                unverified, and only this says which. */}
+            {reason && (
+                <Typography component="span" sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    {reason}
+                </Typography>
+            )}
+        </Box>
+    );
+}
+
 function CountChip({ count }: { count: number }) {
     return (
         <Box sx={{
@@ -1894,6 +1962,9 @@ function ViewIdentity() {
     const documentData = memberData?.didDocumentData || {};
     // The manifest is a map of credential DID -> verifiable credential.
     const credentials = Object.entries(documentData.manifest || {});
+    // Reported alongside the document rather than inside it, so the resolved
+    // DID document stays exactly what the gatekeeper returned.
+    const credentialStatus = memberData?.credentialStatus || {};
     const nostr = documentData.nostr;
 
     const aliasWalletUrl = did && walletUrl
@@ -2103,9 +2174,15 @@ function ViewIdentity() {
                                     mb: index === credentials.length - 1 ? 0 : 1.5,
                                 }}
                             >
-                                <Typography sx={{ fontWeight: 700, fontSize: '0.9375rem', color: '#0f172a', mb: 1 }}>
-                                    {credentialType(credential)}
-                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                                    <Typography sx={{ fontWeight: 700, fontSize: '0.9375rem', color: '#0f172a' }}>
+                                        {credentialType(credential)}
+                                    </Typography>
+                                    <CredentialStatusChip
+                                        status={credentialStatus[credentialDid]?.status}
+                                        reason={credentialStatus[credentialDid]?.reason}
+                                    />
+                                </Box>
 
                                 {credentialClaims(credential).map(([key, value]) => (
                                     <Field key={key} label={humanizeKey(key)} value={formatClaim(value)} />

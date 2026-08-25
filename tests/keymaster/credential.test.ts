@@ -176,6 +176,30 @@ describe('publishCredential', () => {
         expect(manifest[did]).toStrictEqual(vc);
     });
 
+    // Herald's public profile depends on this exact shape. A non-revealed
+    // publication cannot verify -- the proof covers claims that were stripped
+    // after signing -- so the profile recognises the redaction and says so,
+    // rather than reporting a failed signature on an honest credential (#945).
+    // If the redaction ever keeps more than the subject id, that check stops
+    // recognising it and every published credential starts looking broken.
+    it('keeps only the subject id when publishing without revealing', async () => {
+        const bob = await keymaster.createId('Bob');
+        const credentialDid = await keymaster.createSchema(mockSchema);
+        const boundCredential = await keymaster.bindCredential(bob, { schema: credentialDid });
+        const did = await keymaster.issueCredential(boundCredential);
+
+        await keymaster.publishCredential(did);
+
+        const doc = await keymaster.resolveDID(bob);
+        const manifest = (doc.didDocumentData as { manifest: Record<string, VerifiableCredential> }).manifest;
+
+        expect(Object.keys(manifest[did].credentialSubject!)).toStrictEqual(['id']);
+
+        // And the reason it cannot be verified: the signature covers the claims
+        // that publication removed.
+        expect(await keymaster.verifyProof(manifest[did])).toBe(false);
+    });
+
     it('should throw when did is not a verifiable credential', async () => {
         const bob = await keymaster.createId('Bob');
         const did = await keymaster.encryptJSON(mockJson, bob);

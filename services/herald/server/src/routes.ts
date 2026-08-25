@@ -46,6 +46,148 @@ export interface HeraldContext {
     serviceDID: string;
 }
 
+// A manifest entry is whatever its subject published there. `publishCredential`
+// checks the shape and that the caller is the subject, never the proof, and a
+// controller can write `didDocumentData` directly regardless -- so an entry
+// naming any issuer can be self-asserted. The public profile renders these
+// under a "Credentials" heading, where a stranger has no other way to tell a
+// signed credential from a claim (#945).
+//
+// Two answers only, and the asymmetry is the point: `verified` is a statement
+// we are willing to make, `unverified` is a refusal to make it. Everything we
+// cannot fully check -- a redaction, a forgery, a revocation, an issuer we
+// could not resolve -- is a refusal, distinguished by its reason rather than by
+// a third badge. That way no entry ever gets a green tick on the strength of a
+// check that did not happen.
+//
+// Verified here rather than in the browser: the check has to resolve the
+// issuer's DID document, which needs the gatekeeper this service already
+// holds, and the client carries no keymaster.
+type CredentialCheck = {
+    status: 'verified' | 'unverified';
+    reason?: string;
+};
+
+// A manifest can be as long as its owner likes, and this is a public endpoint,
+// so the work per request is bounded rather than left to the profile's author.
+const MAX_CHECKED_CREDENTIALS = 50;
+const CREDENTIAL_CHECK_CONCURRENCY = 5;
+const CREDENTIAL_CHECK_TIMEOUT_MS = 5000;
+
+// `publishCredential` without `reveal` strips the claim values *after* the
+// issuer signed, keeping only the subject id:
+//
+//     vc.credentialSubject = { id: vc.credentialSubject!.id };
+//
+// The proof covers the claims that were removed, so the signature cannot match
+// and never will -- verifying a subset of signed claims needs a selective
+// disclosure scheme, which this proof format does not have. That is the default
+// publication path, so treating a failed signature as a forgery would put a
+// warning on most honest credentials. Recognised and reported for what it is.
+function isRedactedPublication(vc: any): boolean {
+    const subject = vc?.credentialSubject;
+
+    if (!subject || typeof subject !== 'object') {
+        return false;
+    }
+
+    const keys = Object.keys(subject);
+
+    return keys.length === 1 && keys[0] === 'id';
+}
+
+async function checkManifestCredential(
+    keymaster: Keymaster | KeymasterClient,
+    memberDid: string,
+    credentialDid: string,
+    vc: any,
+): Promise<CredentialCheck> {
+    try {
+        // The manifest belongs to this profile, so a credential issued to
+        // somebody else does not describe its owner however well it is signed.
+        // `publishCredential` refuses to publish one, but writing
+        // `didDocumentData` directly does not go through it.
+        if (vc?.credentialSubject?.id !== memberDid) {
+            return { status: 'unverified', reason: 'issued to a different subject' };
+        }
+
+        const verificationMethod = vc?.proof?.verificationMethod;
+
+        if (typeof verificationMethod !== 'string') {
+            return { status: 'unverified', reason: 'no proof' };
+        }
+
+        // verifyProof checks the signature against whoever the proof names,
+        // which is not necessarily whoever the credential claims issued it.
+        // Without this comparison a credential saying `issuer: did:cid:bank`
+        // and signed with the subject's own key verifies happily.
+        const [signer] = verificationMethod.split('#');
+
+        if (!vc.issuer || vc.issuer !== signer) {
+            return { status: 'unverified', reason: 'issuer does not match the signing key' };
+        }
+
+        if (isRedactedPublication(vc)) {
+            return { status: 'unverified', reason: 'published without its claims, so the signature cannot be checked' };
+        }
+
+        if (!await keymaster.verifyProof(vc)) {
+            return { status: 'unverified', reason: 'signature does not verify' };
+        }
+
+        // The manifest holds a copy of the credential, so revoking the
+        // credential asset leaves that copy in place and looking healthy.
+        //
+        // Best effort, and worth being clear about why: nothing in the proof
+        // binds a credential to the asset DID it was stored under, and the
+        // manifest key is controller data, so an owner can re-key a revoked
+        // credential under a fresh asset and this lookup will follow them
+        // there. It catches the ordinary case and cannot be relied on against
+        // someone trying to avoid it.
+        const doc = await keymaster.resolveDID(credentialDid);
+
+        if (doc?.didDocumentMetadata?.deactivated) {
+            return { status: 'unverified', reason: 'revoked by the issuer' };
+        }
+
+        return { status: 'verified' };
+    }
+    catch (error: any) {
+        // An unresolvable issuer or a gatekeeper failure lands here. Nothing
+        // was disproved, so this is a gap in what we can tell the reader.
+        return { status: 'unverified', reason: 'issuer could not be resolved' };
+    }
+}
+
+// Runs the checks a few at a time. Serially, a profile with a long manifest and
+// slow resolutions holds a request open for as long as its author likes.
+async function checkManifest(
+    keymaster: Keymaster | KeymasterClient,
+    memberDid: string,
+    manifest: Record<string, any>,
+): Promise<Record<string, CredentialCheck>> {
+    const entries = Object.entries(manifest).slice(0, MAX_CHECKED_CREDENTIALS);
+    const results: Record<string, CredentialCheck> = {};
+
+    for (let start = 0; start < entries.length; start += CREDENTIAL_CHECK_CONCURRENCY) {
+        const batch = entries.slice(start, start + CREDENTIAL_CHECK_CONCURRENCY);
+
+        await Promise.all(batch.map(async ([credentialDid, vc]) => {
+            // A resolution that never returns would otherwise hold the whole
+            // response open.
+            const timeout = new Promise<CredentialCheck>(resolve =>
+                setTimeout(() => resolve({ status: 'unverified', reason: 'verification timed out' }), CREDENTIAL_CHECK_TIMEOUT_MS));
+
+            results[credentialDid] = await Promise.race([
+                checkManifestCredential(keymaster, memberDid, credentialDid, vc),
+                timeout,
+            ]);
+        }));
+    }
+
+    return results;
+}
+
 export function createHeraldRoutes(ctx: HeraldContext): {
     router: express.Router;
     startDmailPollLoop: () => void;
@@ -916,7 +1058,14 @@ export function createHeraldRoutes(ctx: HeraldContext): {
             // Fetch DID document from gatekeeper
             const didDoc = await ctx.keymaster.resolveDID(memberDid);
 
-            res.json(didDoc);
+            // Reported alongside the document rather than inside it: the
+            // manifest is part of didDocumentData, and annotating a resolved
+            // DID document with fields of our own is the conformance mistake
+            // #676 removed.
+            const manifest = (didDoc.didDocumentData as { manifest?: Record<string, any> })?.manifest ?? {};
+            const credentialStatus = await checkManifest(ctx.keymaster, memberDid, manifest);
+
+            res.json({ ...didDoc, credentialStatus });
         }
         catch (error: any) {
             console.log(error);
