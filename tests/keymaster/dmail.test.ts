@@ -130,7 +130,7 @@ describe('verifyRecipientList', () => {
         expect(aliases[remoteName]).toBeUndefined();
         expect(globalThis.fetch).toHaveBeenCalledWith(
             'https://archon.social/.well-known/names/atlas',
-            expect.objectContaining({ signal: expect.any(AbortSignal) }),
+            expect.objectContaining({ signal: expect.any(AbortSignal), redirect: 'manual' }),
         );
     });
 

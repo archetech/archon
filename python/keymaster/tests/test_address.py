@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import keymaster.core as core
 from keymaster import KeymasterError
 
 from .helpers import run
@@ -49,7 +50,7 @@ def test_import_address_stores_matching_remote_name(testbed, monkeypatch: pytest
         assert domain == "archon.social"
         return None
 
-    monkeypatch.setattr(testbed.keymaster, "_http_request", fake_request)
+    monkeypatch.setattr(core, "fetch_public_https", fake_request)
     monkeypatch.setattr(testbed.keymaster, "fetch_address_relay_agent", fake_relay)
     imported = run(testbed.keymaster.import_address("archon.social"))
 
@@ -70,7 +71,7 @@ def test_check_address_reports_available_claimed_unsupported_and_unreachable(tes
             raise RuntimeError("boom")
         return responses[url]
 
-    monkeypatch.setattr(testbed.keymaster, "_http_request", fake_request)
+    monkeypatch.setattr(core, "fetch_public_https", fake_request)
 
     assert run(testbed.keymaster.check_address("alice@archon.social"))["status"] == "available"
     assert run(testbed.keymaster.check_address("bob@archon.social")) == {

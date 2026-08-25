@@ -12,7 +12,8 @@ const config = {
     input: {
         'index': 'dist/esm/index.js',
         utils: 'dist/esm/utils.js',
-        errors: 'dist/esm/errors.js'
+        errors: 'dist/esm/errors.js',
+        net: 'dist/esm/net.js'
     },
     output: {
         dir: 'dist/cjs',

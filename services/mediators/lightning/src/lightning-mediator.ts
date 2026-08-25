@@ -12,6 +12,7 @@ import { socksDispatcher } from 'fetch-socks';
 // Anything dispatched through SOCKS must therefore use this fetch. See #916.
 import { fetch as socksFetch } from 'undici';
 
+import { isPrivateHostname } from '@didcid/common/net';
 import { LightningPaymentError } from './errors.js';
 import type * as clnModule from './lightning.js';
 import type * as lnbitsModule from './lnbits.js';
@@ -66,8 +67,19 @@ async function fetchHttpsOnly(target: string, init?: RequestInit): Promise<Respo
     let current = target;
 
     for (let hop = 0; hop <= MAX_LNURL_REDIRECTS; hop++) {
-        if (new URL(current).protocol !== 'https:') {
-            throw new Error(`refusing non-https hop to ${new URL(current).host}`);
+        const url = new URL(current);
+
+        if (url.protocol !== 'https:') {
+            throw new Error(`refusing non-https hop to ${url.host}`);
+        }
+
+        // The scheme check alone lets the request reach anything on this
+        // network that speaks TLS. Both callers take the target from a remote
+        // party: the domain half of a Lightning Address for the LNURL request,
+        // and for the invoice request the callback URL that LNURL response
+        // supplied outright. Neither is ours to trust (#252).
+        if (isPrivateHostname(url.hostname)) {
+            throw new Error(`refusing hop to private address ${url.hostname}`);
         }
 
         const response = await fetch(current, { ...init, redirect: 'manual' });
