@@ -1220,7 +1220,7 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 | Key Recovery | BIP-39 | Varies | Optional pre-rotation | N/A |
 | Arbitrary Data Storage | Yes (didDocumentData) | No | External only | No |
 | Blockchain Timestamps | Automatic (with bounds) | Implicit | No | No |
-| Time-Travel Resolution | Yes | No | Yes (versionId / versionTime) | No |
+| Time-Travel Resolution | Yes | No | Yes | No |
 | Built-in Messaging | Yes (D-Mail) | No | No | No |
 | Lightning Payments | Yes (L402 + Zaps) | No | No | No |
 | API Monetization | Yes (L402) | No | No | No |
