@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.3](https://github.com/archetech/archon/compare/@didcid/common@0.1.3...@didcid/common@0.3.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* **keymaster:** Check the target of remote name lookups, on every path ([#943](https://github.com/archetech/archon/issues/943)) ([fba693b](https://github.com/archetech/archon/commit/fba693bb63d1ed856ce1d2ef5ca3509c7699ed4c)), closes [#252](https://github.com/archetech/archon/issues/252)
+
+
+### Features
+
+* Add Lightning wallet support via LNbits integration ([#136](https://github.com/archetech/archon/issues/136)) ([#140](https://github.com/archetech/archon/issues/140)) ([4d99d5a](https://github.com/archetech/archon/commit/4d99d5ab8da20897e5aecf8557b271c3b1779d45))
+* expand MCP server toward Keymaster CLI parity ([#606](https://github.com/archetech/archon/issues/606)) ([8021d44](https://github.com/archetech/archon/commit/8021d4486d28003408234c2f33993389965d1dd1))
+
+
+
+
+
 ## [0.3.2](https://github.com/archetech/archon/compare/@didcid/common@0.1.3...@didcid/common@0.3.2) (2026-07-31)
 
 
