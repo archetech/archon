@@ -61,6 +61,41 @@ jobs:
             image: herald-client
           - dockerfile: docker/Dockerfile.gatekeeper-client
             image: drawbridge-client
+          # The twelve below were built by nothing until #954. Every Dockerfile
+          # in the repo is referenced by a compose file under docker/compose/,
+          # so each of these is a service somebody can bring up -- they were
+          # simply absent from the matrix, which meant a change breaking one of
+          # them passed every check. The bullseye -> bookworm -> trixie moves in
+          # #890 and #892 crossed two Debian generations without any of them
+          # being compiled once.
+          - dockerfile: docker/Dockerfile.didcomm
+            image: didcomm
+          - dockerfile: docker/Dockerfile.keymaster-py
+            image: keymaster-py
+          - dockerfile: docker/Dockerfile.gatekeeper-rust
+            image: gatekeeper-rust
+          - dockerfile: docker/Dockerfile.pinning
+            image: pinning-mediator
+          # Chain mediators and their wallet sidecars. Named for the chain
+          # rather than the network, the way satoshi/satoshi-wallet already are:
+          # compose picks the network (eth-sepolia, sol-devnet, zcash-mainnet),
+          # and one image serves all of them.
+          - dockerfile: docker/Dockerfile.ethereum
+            image: ethereum-mediator
+          - dockerfile: docker/Dockerfile.ethereum-wallet
+            image: ethereum-wallet
+          - dockerfile: docker/Dockerfile.solana
+            image: solana-mediator
+          - dockerfile: docker/Dockerfile.solana-wallet
+            image: solana-wallet
+          - dockerfile: docker/Dockerfile.zcash
+            image: zcash-mediator
+          - dockerfile: docker/Dockerfile.zcash-wallet
+            image: zcash-wallet
+          - dockerfile: docker/Dockerfile.filecoin
+            image: filecoin-mediator
+          - dockerfile: docker/Dockerfile.filecoin-wallet
+            image: filecoin-wallet
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
