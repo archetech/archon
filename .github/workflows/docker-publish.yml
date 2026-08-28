@@ -159,6 +159,17 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
+      # Read the commit from the checkout rather than from the event. On a
+      # dispatch, github.sha is the branch the workflow file came from, not the
+      # ref being built -- so a backfill of an older release stamped its images
+      # with the commit of whatever main happened to be, in both GIT_COMMIT and
+      # the OCI revision label. The services report that value at runtime, so
+      # the image claimed a commit it was not built from. Equal to github.sha on
+      # a push, so this is only ever more correct.
+      - name: Record the commit actually built
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       # arm64 RUN steps execute under emulation on an amd64 runner, so binfmt
       # has to be registered before buildx. Both workflows this replaces had
       # this step; the build-only workflow does not, because it is
@@ -197,6 +208,8 @@ jobs:
           tags: |
             type=raw,value=${{ needs.generate.outputs.VERSION }}
             type=raw,value=${{ needs.generate.outputs.CHANNEL }}
+          labels: |
+            org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
 
       - name: Build and push Docker images
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
@@ -208,7 +221,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           platforms: linux/amd64,linux/arm64
           build-args: |
-            GIT_COMMIT=${{ github.sha }}
+            GIT_COMMIT=${{ steps.source.outputs.sha }}
 
       - name: Run Anchore vulnerability scanner
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2
