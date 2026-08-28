@@ -51,13 +51,15 @@ jobs:
       matrix:
         include:
           - dockerfile: docker/Dockerfile.gatekeeper-ts
-            image: gatekeeper-typescript
+            image: gatekeeper-ts
             # Releases published this as plain `gatekeeper`, which reads as the
-            # only one when there are two implementations, and is not what
-            # compose pulls. Carried as an alias so existing pulls keep working.
+            # only one when there are two implementations. Carried as an alias
+            # so existing pulls keep working.
             alias: gatekeeper
           - dockerfile: docker/Dockerfile.keymaster-ts
-            image: keymaster
+            image: keymaster-ts
+            # As above: releases published this as plain `keymaster`.
+            alias: keymaster
           - dockerfile: services/herald/Dockerfile
             image: herald
           - dockerfile: docker/Dockerfile.drawbridge
@@ -101,9 +103,9 @@ jobs:
           - dockerfile: docker/Dockerfile.didcomm
             image: didcomm
           - dockerfile: docker/Dockerfile.keymaster-py
-            image: keymaster-python
+            image: keymaster-py
           - dockerfile: docker/Dockerfile.gatekeeper-rust
-            image: gatekeeper-rust
+            image: gatekeeper-rs
           - dockerfile: docker/Dockerfile.pinning
             image: pinning-mediator
           # Chain mediators and their wallet sidecars. Named for the chain

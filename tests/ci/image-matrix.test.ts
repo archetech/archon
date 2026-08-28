@@ -62,6 +62,24 @@ describe('docker image matrices', () => {
         }
     });
 
+    it('marks a language-specific image with its language', () => {
+        // Two implementations of the gatekeeper and two of the keymaster, so a
+        // bare name is ambiguous about which one it is. The suffix is the same
+        // one the Dockerfile carries.
+        const names = new Set(publish.map(e => e.image));
+
+        for (const pair of [['gatekeeper-ts', 'gatekeeper-rs'], ['keymaster-ts', 'keymaster-py']]) {
+            for (const n of pair) {
+                expect(names.has(n)).toBe(true);
+            }
+        }
+
+        // And the ambiguous forms survive only as aliases, never as the name a
+        // new image is published under.
+        expect(names.has('gatekeeper')).toBe(false);
+        expect(names.has('keymaster')).toBe(false);
+    });
+
     it('names images for the service, not the deployment', () => {
         // Compose picks the network -- eth-sepolia, sol-devnet, zcash-mainnet --
         // and one image serves all of them. A `zcash-mainnet-mediator` image
@@ -80,7 +98,8 @@ describe('docker image matrices', () => {
         const aliases = publish.filter(e => e.alias).map(e => `${e.image} <- ${e.alias}`).sort();
 
         expect(aliases).toStrictEqual([
-            'gatekeeper-typescript <- gatekeeper',
+            'gatekeeper-ts <- gatekeeper',
+            'keymaster-ts <- keymaster',
             'satoshi-mediator <- sat-mediator',
         ]);
     });
