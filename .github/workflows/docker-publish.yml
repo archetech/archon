@@ -16,6 +16,28 @@ on:
     branches: [ "pre-release" ]
     tags: [ "v*" ]
 
+  # A tag-triggered run uses the workflow file as it existed at that tag, so a
+  # release published before this workflow landed cannot be completed by
+  # re-running it -- the old file carries the old, shorter matrix. Dispatching
+  # from a branch that has this file, against a ref that has the source, is the
+  # only way to combine the two.
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Ref to build (tag, branch or SHA). Defaults to the dispatching ref."
+        required: false
+        type: string
+      version:
+        description: "Version tag to publish under, e.g. v0.12.0."
+        required: true
+        type: string
+      channel:
+        description: "Second tag to apply."
+        required: true
+        default: pre-release
+        type: choice
+        options: [pre-release, latest]
+
 env:
   REGISTRY: ghcr.io
 
@@ -32,7 +54,10 @@ jobs:
       - name: Determine version and channel
         id: channel
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+          if [[ -n "${{ inputs.version }}" ]]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "channel=${{ inputs.channel }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
             echo "channel=latest" >> "$GITHUB_OUTPUT"
           else
@@ -131,6 +156,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       # arm64 RUN steps execute under emulation on an amd64 runner, so binfmt
       # has to be registered before buildx. Both workflows this replaces had
