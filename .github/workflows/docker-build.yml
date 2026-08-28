@@ -32,9 +32,9 @@ jobs:
       matrix:
         include:
           - dockerfile: docker/Dockerfile.gatekeeper-ts
-            image: gatekeeper
+            image: gatekeeper-ts
           - dockerfile: docker/Dockerfile.keymaster-ts
-            image: keymaster
+            image: keymaster-ts
           - dockerfile: services/herald/Dockerfile
             image: herald
           - dockerfile: docker/Dockerfile.drawbridge
@@ -73,7 +73,7 @@ jobs:
           - dockerfile: docker/Dockerfile.keymaster-py
             image: keymaster-py
           - dockerfile: docker/Dockerfile.gatekeeper-rust
-            image: gatekeeper-rust
+            image: gatekeeper-rs
           - dockerfile: docker/Dockerfile.pinning
             image: pinning-mediator
           # Chain mediators and their wallet sidecars. Named for the chain

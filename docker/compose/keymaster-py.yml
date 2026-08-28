@@ -9,7 +9,7 @@ services:
       dockerfile: docker/Dockerfile.keymaster-py
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/keymaster-python
+    image: ghcr.io/archetech/keymaster-py
     environment:
       - ARCHON_KEYMASTER_PORT=4226
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}

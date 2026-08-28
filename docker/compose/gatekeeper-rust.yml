@@ -9,7 +9,7 @@ services:
       dockerfile: docker/Dockerfile.gatekeeper-rust
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: ghcr.io/archetech/gatekeeper-rust
+    image: ghcr.io/archetech/gatekeeper-rs
     environment:
       - ARCHON_GATEKEEPER_PORT=4224
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
