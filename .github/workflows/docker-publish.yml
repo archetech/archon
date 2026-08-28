@@ -51,7 +51,11 @@ jobs:
       matrix:
         include:
           - dockerfile: docker/Dockerfile.gatekeeper-ts
-            image: gatekeeper
+            image: gatekeeper-typescript
+            # Releases published this as plain `gatekeeper`, which reads as the
+            # only one when there are two implementations, and is not what
+            # compose pulls. Carried as an alias so existing pulls keep working.
+            alias: gatekeeper
           - dockerfile: docker/Dockerfile.keymaster-ts
             image: keymaster
           - dockerfile: services/herald/Dockerfile
@@ -97,7 +101,7 @@ jobs:
           - dockerfile: docker/Dockerfile.didcomm
             image: didcomm
           - dockerfile: docker/Dockerfile.keymaster-py
-            image: keymaster-py
+            image: keymaster-python
           - dockerfile: docker/Dockerfile.gatekeeper-rust
             image: gatekeeper-rust
           - dockerfile: docker/Dockerfile.pinning
@@ -125,6 +129,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      # arm64 RUN steps execute under emulation on an amd64 runner, so binfmt
+      # has to be registered before buildx. Both workflows this replaces had
+      # this step; the build-only workflow does not, because it is
+      # single-platform, and rebuilding from that base lost it.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e

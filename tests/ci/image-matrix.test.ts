@@ -74,11 +74,36 @@ describe('docker image matrices', () => {
     });
 
     it('keeps an alias only where one was already published', () => {
-        // sat-mediator is carried so pulls from before the rename keep working.
-        // A new alias is almost certainly a mistake: two package names for one
+        // Both are carried so pulls from before the rename keep working. A new
+        // alias is almost certainly a mistake: two package names for one
         // service is the confusion this test exists to prevent.
-        const aliases = publish.filter(e => e.alias).map(e => `${e.image} <- ${e.alias}`);
+        const aliases = publish.filter(e => e.alias).map(e => `${e.image} <- ${e.alias}`).sort();
 
-        expect(aliases).toStrictEqual(['satoshi-mediator <- sat-mediator']);
+        expect(aliases).toStrictEqual([
+            'gatekeeper-typescript <- gatekeeper',
+            'satoshi-mediator <- sat-mediator',
+        ]);
+    });
+
+    it('publishes every image the compose files pull', () => {
+        // The compose files under docker/compose are the consumers, so they
+        // decide the names. An image published as something else cannot be
+        // pulled by anyone following the repo's own deployment files -- which
+        // is how `keymaster-py` and `gatekeeper` came to be published under
+        // names no compose file references.
+        const composed = new Set(
+            execSync("grep -rhoE 'ghcr\\.io/archetech/[a-z0-9-]+' docker/compose", { encoding: 'utf-8' })
+                .split('\n')
+                .filter(Boolean)
+                .map(ref => ref.split('/').pop() as string),
+        );
+
+        // Hosted in the org but not built from a Dockerfile in this repo.
+        const foreign = new Set(['bitcoin-core', 'lnbits']);
+
+        const publishable = new Set(publish.flatMap(e => e.alias ? [e.image, e.alias] : [e.image]));
+        const unpullable = [...composed].filter(n => !foreign.has(n) && !publishable.has(n)).sort();
+
+        expect(unpullable).toStrictEqual([]);
     });
 });

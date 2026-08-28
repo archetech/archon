@@ -32,7 +32,7 @@ jobs:
       matrix:
         include:
           - dockerfile: docker/Dockerfile.gatekeeper-ts
-            image: gatekeeper
+            image: gatekeeper-typescript
           - dockerfile: docker/Dockerfile.keymaster-ts
             image: keymaster
           - dockerfile: services/herald/Dockerfile
@@ -71,7 +71,7 @@ jobs:
           - dockerfile: docker/Dockerfile.didcomm
             image: didcomm
           - dockerfile: docker/Dockerfile.keymaster-py
-            image: keymaster-py
+            image: keymaster-python
           - dockerfile: docker/Dockerfile.gatekeeper-rust
             image: gatekeeper-rust
           - dockerfile: docker/Dockerfile.pinning
