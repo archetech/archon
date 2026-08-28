@@ -104,6 +104,25 @@ describe('docker image matrices', () => {
         ]);
     });
 
+    it('takes the commit from the checkout, not from the event', () => {
+        // The publish workflow can be dispatched against a ref other than the
+        // branch carrying the workflow file, so `github.sha` there is the
+        // dispatching branch rather than the code being built. Using it stamped
+        // a v0.12.0 backfill with main's commit, in both GIT_COMMIT and the OCI
+        // revision label -- an image reporting a commit it was not built from,
+        // which is exactly the provenance confusion this repo has spent time
+        // untangling elsewhere.
+        const publishYaml = readFileSync(PUBLISH, 'utf-8');
+
+        // The expression, not the word: the comment explaining why this rule
+        // exists necessarily mentions github.sha.
+        const expressions = publishYaml.match(/\$\{\{[^}]*\}\}/g) ?? [];
+
+        expect(expressions.filter(e => e.includes('github.sha'))).toStrictEqual([]);
+        expect(publishYaml).toMatch(/GIT_COMMIT=\$\{\{ steps\.source\.outputs\.sha \}\}/);
+        expect(publishYaml).toMatch(/org\.opencontainers\.image\.revision=\$\{\{ steps\.source\.outputs\.sha \}\}/);
+    });
+
     it('publishes every image the compose files pull', () => {
         // The compose files under docker/compose are the consumers, so they
         // decide the names. An image published as something else cannot be
