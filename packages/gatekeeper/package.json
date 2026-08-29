@@ -1,6 +1,9 @@
 {
   "name": "@didcid/gatekeeper",
   "version": "0.6.3",
+  "engines": {
+    "node": "^22.13.0 || >=23.4.0"
+  },
   "description": "Archon Gatekeeper",
   "type": "module",
   "module": "./dist/esm/index.js",
@@ -121,9 +124,7 @@
     "canonicalize": "^2.0.0",
     "dotenv": "^16.4.5",
     "ioredis": "^5.4.1",
-    "mongodb": "^6.5.0",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7"
+    "mongodb": "^6.5.0"
   },
   "repository": {
     "type": "git",

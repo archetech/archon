@@ -209,7 +209,7 @@ describe('DbSqlite events', () => {
         await withDb(async db => {
             await db.addEvent(DID, event('op1'));
             // Corrupt the stored JSON so it parses to a non-array.
-            await (db as any).db.run('UPDATE dids SET events = ? WHERE id = ?', '{"not":"array"}', SUFFIX);
+            (db as any).db.prepare('UPDATE dids SET events = ? WHERE id = ?').run('{"not":"array"}', SUFFIX);
 
             await expect(db.getEvents(DID)).resolves.toEqual([]);
         });
@@ -276,7 +276,7 @@ describe('DbSqlite queue', () => {
     it('swallows a malformed queue row rather than throwing', async () => {
         await withDb(async db => {
             await db.queueOperation('local', operation('a'));
-            await (db as any).db.run('UPDATE queue SET ops = ? WHERE id = ?', '"not an array"', 'local');
+            (db as any).db.prepare('UPDATE queue SET ops = ? WHERE id = ?').run('"not an array"', 'local');
 
             await expect(db.getQueue('local')).resolves.toEqual([]);
         });
@@ -315,10 +315,9 @@ describe('DbSqlite blocks', () => {
         await withDb(async db => {
             // Simulate a database created before the column became INTEGER, where
             // SQLite stored the value as a string.
-            await (db as any).db.run(
-                'INSERT INTO blocks (registry, hash, height, time, txns) VALUES (?, ?, ?, ?, 0)',
-                'local', 'legacy', '42', '1700000042',
-            );
+            (db as any).db.prepare(
+                'INSERT INTO blocks (registry, hash, height, time, txns) VALUES (?, ?, ?, ?, 0)'
+            ).run('local', 'legacy', '42', '1700000042');
 
             const found = await db.getBlock('local', 'legacy');
             expect(found).toMatchObject({ hash: 'legacy', height: 42, time: 1700000042 });

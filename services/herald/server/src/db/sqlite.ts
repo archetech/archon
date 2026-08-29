@@ -1,13 +1,13 @@
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { DatabaseInterface, User, ReplyToken, EmailMapping } from './interfaces.js';
 
 export class DbSqlite implements DatabaseInterface {
-    private db: Database.Database;
+    private db: DatabaseSync;
     private readonly dbPath: string;
 
     constructor(dbPath: string = 'data/db.sqlite') {
         this.dbPath = dbPath;
-        this.db = new Database(this.dbPath);
+        this.db = new DatabaseSync(this.dbPath);
     }
 
     async init(): Promise<void> {
@@ -135,7 +135,7 @@ export class DbSqlite implements DatabaseInterface {
     async deleteExpiredReplyTokens(maxAgeMs: number): Promise<number> {
         const cutoff = new Date(Date.now() - maxAgeMs).toISOString();
         const result = this.db.prepare('DELETE FROM reply_tokens WHERE createdAt < ?').run(cutoff);
-        return result.changes;
+        return Number(result.changes);
     }
 
     async setEmailMapping(dmailDid: string, mapping: EmailMapping): Promise<void> {

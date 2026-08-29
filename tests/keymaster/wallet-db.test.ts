@@ -132,13 +132,18 @@ describe('WalletSQLite defaults and guards', () => {
 
     // NOTE: unlike WalletJson.saveWallet, which does mkdirSync(dataFolder,
     // {recursive:true}), WalletSQLite.connect never creates its folder — it opens
-    // `${dataFolder}/${file}` directly and sqlite fails with SQLITE_CANTOPEN if the
+    // `${dataFolder}/${file}` directly and sqlite cannot open the file if the
     // directory is absent. These tests therefore create `data/` first.
     it('does not create its data folder, unlike WalletJson', async () => {
         await withTempDir(async dir => {
-            const wallet = new WalletSQLite('wallet.db', join(dir, 'missing'));
+            const folder = join(dir, 'missing');
+            const wallet = new WalletSQLite('wallet.db', folder);
 
-            await expect(wallet.saveWallet(walletOne)).rejects.toThrow(/SQLITE_CANTOPEN/);
+            // The guarantee is that the folder is not created, so that is what
+            // is asserted; matching the driver's wording would break on a Node
+            // rephrasing even while the behaviour held.
+            await expect(wallet.saveWallet(walletOne)).rejects.toThrow();
+            expect(existsSync(folder)).toBe(false);
         });
     });
 

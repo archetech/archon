@@ -26,7 +26,6 @@ import path from 'node:path';
 // package's own `binary.napi_versions`); if a future bump changes it, the
 // download 404s and we fall back to fetching at npm-ci time.
 const TARGETS = [
-    { name: 'sqlite3', repo: 'TryGhost/node-sqlite3', napi: 6 },
     { name: '@ipshipyard/node-datachannel', repo: 'ipshipyard/js-node-datachannel', napi: 8 },
 ];
 
@@ -37,11 +36,10 @@ const OUT_DIR = path.resolve(process.env.PREBUILD_DIR || 'prebuilds');
 const RETRIES = 5;
 
 // Every version of a package installed anywhere in the repo, not just at the
-// root. The mediators pin their own versions -- satoshi installs sqlite3 5.1.7
-// while zcash, solana and ethereum install 6.0.1 -- and the prebuild filename
-// carries the version, so seeding only the root leaves those three fetching
-// over the network at npm-ci time, which is the path this script exists to
-// remove.
+// root. Services carry their own lockfiles and can pin a different version
+// than the root does, and the prebuild filename carries the version -- so
+// seeding only the root leaves those services fetching over the network at
+// npm-ci time, which is the path this script exists to remove.
 async function resolveVersions(locks, name) {
     const versions = new Set();
 

@@ -1,11 +1,10 @@
 import { StoredWallet } from '../types.js';
 import { AbstractBase } from './abstract-base.js';
-import sqlite3 from 'sqlite3';
-import { open, Database } from 'sqlite';
+import { DatabaseSync } from 'node:sqlite';
 
 export default class WalletSQLite extends AbstractBase {
     private readonly walletName: string;
-    private db: Database | null;
+    private db: DatabaseSync | null;
 
     static async create(walletFileName: string = 'wallet.db', dataFolder: string = 'data'): Promise<WalletSQLite> {
         const wallet = new WalletSQLite(walletFileName, dataFolder);
@@ -24,12 +23,9 @@ export default class WalletSQLite extends AbstractBase {
             return;
         }
 
-        this.db = await open({
-            filename: this.walletName,
-            driver: sqlite3.Database
-        });
+        this.db = new DatabaseSync(this.walletName);
 
-        await this.db.exec(`
+        this.db.exec(`
             CREATE TABLE IF NOT EXISTS wallet (
                 id INTEGER PRIMARY KEY,
                 data TEXT NOT NULL
@@ -39,7 +35,7 @@ export default class WalletSQLite extends AbstractBase {
 
     async disconnect(): Promise<void> {
         if (this.db) {
-            await this.db.close()
+            this.db.close()
             this.db = null
         }
     }
@@ -51,13 +47,13 @@ export default class WalletSQLite extends AbstractBase {
             throw new Error('DB failed to connect.')
         }
 
-        const exists = await this.db.get('SELECT 1 FROM wallet LIMIT 1');
+        const exists = this.db.prepare('SELECT 1 FROM wallet LIMIT 1').get();
         if (exists && !overwrite) {
             return false;
         }
 
-        await this.db.run('DELETE FROM wallet');
-        await this.db.run('INSERT INTO wallet (data) VALUES (?)', JSON.stringify(wallet));
+        this.db.exec('DELETE FROM wallet');
+        this.db.prepare('INSERT INTO wallet (data) VALUES (?)').run(JSON.stringify(wallet));
         return true;
     }
 
@@ -68,11 +64,11 @@ export default class WalletSQLite extends AbstractBase {
             throw new Error('DB failed to connect.')
         }
 
-        const row = await this.db.get('SELECT data FROM wallet LIMIT 1');
+        const row = this.db.prepare('SELECT data FROM wallet LIMIT 1').get();
         if (!row) {
             return null;
         }
 
-        return JSON.parse(row.data);
+        return JSON.parse(String(row.data));
     }
 }
