@@ -20,9 +20,7 @@ RUN npm run build
 
 COPY services/mediators/ethereum ./ethereum/
 WORKDIR /app/ethereum
-RUN npm ci \
-    && npm rebuild sqlite3 --build-from-source \
-    && npm run build
+RUN npm ci && npm run build
 
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
