@@ -139,10 +139,10 @@ describe('WalletSQLite defaults and guards', () => {
             const folder = join(dir, 'missing');
             const wallet = new WalletSQLite('wallet.db', folder);
 
-            // Asserted on the condition rather than the driver's wording: the
-            // guarantee is that the folder is not created, not how sqlite phrases
-            // its refusal.
-            await expect(wallet.saveWallet(walletOne)).rejects.toThrow(/unable to open database file/);
+            // The guarantee is that the folder is not created, so that is what
+            // is asserted; matching the driver's wording would break on a Node
+            // rephrasing even while the behaviour held.
+            await expect(wallet.saveWallet(walletOne)).rejects.toThrow();
             expect(existsSync(folder)).toBe(false);
         });
     });

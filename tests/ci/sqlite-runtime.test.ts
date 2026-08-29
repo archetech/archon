@@ -12,28 +12,46 @@ import { DatabaseSync } from 'node:sqlite';
 // These guards hold that arrangement in place.
 
 const SQLITE_FLOOR = [3, 49, 0];
-const NODE_SQLITE_FLOOR = '>=22.5.0';
+// node:sqlite landed in 22.5.0 but stayed behind --experimental-sqlite until
+// 22.13.0 / 23.4.0, so a `>=22.5.0` floor would admit runtimes where importing
+// it throws. This range is the one where the module loads unflagged.
+const NODE_SQLITE_RANGE = '^22.13.0 || >=23.4.0';
 
 function trackedFiles(pattern: string): string[] {
     return execSync(`git ls-files '${pattern}'`, { encoding: 'utf-8' }).split('\n').filter(Boolean);
 }
 
-function pinnedNodeVersions(): Map<string, Set<string>> {
+const EXACT_VERSION = /^(\d+\.\d+\.\d+)(?:$|[-+])/;
+
+// Every declared Node version, exact or not. Matching only well-formed pins
+// would let `FROM node:22` or `node-version: lts/*` vanish from the set
+// entirely, leaving the single-pin assertion green while the engine floats.
+function declaredNodeVersions(): { pins: Map<string, Set<string>>; loose: string[] } {
     const pins = new Map<string, Set<string>>([['dockerfile', new Set()], ['workflow', new Set()]]);
+    const loose: string[] = [];
+
+    const record = (kind: string, file: string, value: string) => {
+        const exact = EXACT_VERSION.exec(value);
+        if (exact) {
+            pins.get(kind)!.add(exact[1]);
+        } else {
+            loose.push(`${file}: ${value}`);
+        }
+    };
 
     for (const file of trackedFiles('*Dockerfile*')) {
-        for (const [, version] of readFileSync(file, 'utf-8').matchAll(/^FROM node:(\d+\.\d+\.\d+)/gm)) {
-            pins.get('dockerfile')!.add(version);
+        for (const [, tag] of readFileSync(file, 'utf-8').matchAll(/^FROM node:(\S+)/gm)) {
+            record('dockerfile', file, tag);
         }
     }
 
     for (const file of trackedFiles('.github/workflows/*')) {
-        for (const [, version] of readFileSync(file, 'utf-8').matchAll(/node-version:\s*['"]?(\d+\.\d+\.\d+)/g)) {
-            pins.get('workflow')!.add(version);
+        for (const [, value] of readFileSync(file, 'utf-8').matchAll(/node-version:\s*(.+)/g)) {
+            record('workflow', file, value.trim().replace(/^['"]|['"]$/g, ''));
         }
     }
 
-    return pins;
+    return { pins, loose };
 }
 
 describe('node:sqlite runtime', () => {
@@ -63,24 +81,26 @@ describe('node:sqlite runtime', () => {
         expect(`${row.v} >= ${SQLITE_FLOOR.join('.')}: ${atLeastFloor}`).toBe(`${row.v} >= ${SQLITE_FLOOR.join('.')}: true`);
     });
 
-    it('pins one Node version across every image and CI job', () => {
+    it('pins one exact Node version across every image and CI job', () => {
         // The engine follows Node, so a bump is the only way it can change.
         // One pin everywhere keeps that a single reviewable line rather than a
         // drift between what CI tests and what the images ship.
-        const pins = pinnedNodeVersions();
+        const { pins, loose } = declaredNodeVersions();
         const all = new Set([...pins.get('dockerfile')!, ...pins.get('workflow')!]);
 
+        expect(loose).toStrictEqual([]);
         expect(pins.get('dockerfile')!.size).toBeGreaterThan(0);
         expect(pins.get('workflow')!.size).toBeGreaterThan(0);
         expect([...all]).toHaveLength(1);
     });
 
     it('declares the Node floor node:sqlite needs on the packages that ship it', () => {
-        // Both are published, and their sqlite backends will not load below
-        // 22.5 -- without this, a consumer meets that as a module-not-found.
+        // Both are published, and their sqlite backends will not load on a
+        // runtime outside this range -- without it, a consumer meets that as a
+        // failed import rather than a clear npm error.
         for (const pkg of ['packages/gatekeeper', 'packages/keymaster']) {
             const manifest = JSON.parse(readFileSync(`${pkg}/package.json`, 'utf-8'));
-            expect(`${pkg}: ${manifest.engines?.node}`).toBe(`${pkg}: ${NODE_SQLITE_FLOOR}`);
+            expect(`${pkg}: ${manifest.engines?.node}`).toBe(`${pkg}: ${NODE_SQLITE_RANGE}`);
         }
     });
 });

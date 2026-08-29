@@ -2,7 +2,7 @@
   "name": "@didcid/keymaster",
   "version": "0.6.3",
   "engines": {
-    "node": ">=22.5.0"
+    "node": "^22.13.0 || >=23.4.0"
   },
   "description": "Archon Keymaster",
   "type": "module",
