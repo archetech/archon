@@ -1,10 +1,49 @@
-FROM rust:1.90-trixie AS builder
+# Builds on the builder's own architecture and cross-compiles, rather than
+# running the whole build under emulation. Nothing here needs to run as the
+# target architecture; only the output has to be built for it, and emulating a
+# Rust release build costs roughly fifteen times what cross-compiling does.
+FROM --platform=$BUILDPLATFORM rust:1.90-trixie AS builder
+
+# Set by buildx from --platform, normalised to amd64 / arm64.
+ARG TARGETARCH
 
 WORKDIR /build
+
+# Several dependencies compile C as part of their build: rusqlite is used with
+# `bundled`, so SQLite comes from source, and rustls pulls in ring, which brings
+# its own C. Both need a cross-toolchain for the target.
+#
+# libc6-dev-arm64-cross is not optional and is not pulled in by
+# --no-install-recommends. Without it the cross gcc runs, and its stdint.h
+# reaches the host's /usr/include and fails on bits/libc-header-start.h --
+# which reads as a missing header when it is a missing sysroot.
+RUN set -eux; \
+    case "$TARGETARCH" in \
+        amd64) echo x86_64-unknown-linux-gnu > /target ;; \
+        arm64) echo aarch64-unknown-linux-gnu > /target; \
+               apt-get update; \
+               apt-get install -y --no-install-recommends \
+                   gcc-aarch64-linux-gnu libc6-dev-arm64-cross; \
+               rm -rf /var/lib/apt/lists/* ;; \
+        *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    rustup target add "$(cat /target)"
+
+# Which compiler and linker cargo reaches for when the target is not the host.
+# Harmless on a native build, where the target triple matches and neither is
+# consulted.
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+    CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
+
 COPY rust/services/gatekeeper/Cargo.toml ./Cargo.toml
 COPY rust/services/gatekeeper/Cargo.lock ./Cargo.lock
 COPY rust/services/gatekeeper/src ./src
-RUN cargo build --release
+
+# Copied to a fixed path so the runtime stage does not need to know the triple.
+RUN set -eux; \
+    target="$(cat /target)"; \
+    cargo build --release --target "$target"; \
+    cp "target/$target/release/archon-rust-gatekeeper" /archon-rust-gatekeeper
 
 FROM debian:trixie-slim
 
@@ -14,7 +53,7 @@ RUN apt-get update \
 
 WORKDIR /app/gatekeeper
 
-COPY --from=builder /build/target/release/archon-rust-gatekeeper /usr/local/bin/archon-rust-gatekeeper
+COPY --from=builder /archon-rust-gatekeeper /usr/local/bin/archon-rust-gatekeeper
 
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
