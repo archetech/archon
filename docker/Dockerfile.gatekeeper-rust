@@ -1,10 +1,7 @@
-# The build stage runs on the builder's own architecture and cross-compiles to
-# the target, rather than running under emulation.
-#
-# Emulating it cost 59 minutes of a 63-minute publish -- a Rust release build
-# executed instruction-by-instruction through QEMU, while the other 26 images
-# finished inside that window (#957). Nothing here needs to run as the target
-# architecture; only the output has to be built for it.
+# Builds on the builder's own architecture and cross-compiles, rather than
+# running the whole build under emulation. Nothing here needs to run as the
+# target architecture; only the output has to be built for it, and emulating a
+# Rust release build costs roughly fifteen times what cross-compiling does.
 FROM --platform=$BUILDPLATFORM rust:1.90-trixie AS builder
 
 # Set by buildx from --platform, normalised to amd64 / arm64.
@@ -16,14 +13,10 @@ WORKDIR /build
 # `bundled`, so SQLite comes from source, and rustls pulls in ring, which brings
 # its own C. Both need a cross-toolchain for the target.
 #
-# The libc headers are a separate package from the compiler, and
-# --no-install-recommends does not pull them in. Without them the cross gcc runs
-# but its stdint.h reaches /usr/include and fails on bits/libc-header-start.h --
-# a confusing failure, because the compiler is plainly correct and the headers
-# are plainly the host's.
-#
-# The TLS dependencies are rustls rather than OpenSSL, which is what usually
-# makes this painful; ring is C but self-contained.
+# libc6-dev-arm64-cross is not optional and is not pulled in by
+# --no-install-recommends. Without it the cross gcc runs, and its stdint.h
+# reaches the host's /usr/include and fails on bits/libc-header-start.h --
+# which reads as a missing header when it is a missing sysroot.
 RUN set -eux; \
     case "$TARGETARCH" in \
         amd64) echo x86_64-unknown-linux-gnu > /target ;; \

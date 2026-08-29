@@ -21,14 +21,12 @@ jobs:
           calver=$(date +'%Y.%m.%d')
           echo "calver=$calver" >> $GITHUB_OUTPUT
 
-  # The publish workflow builds for arm64, and nothing else does -- so a change
-  # that breaks the cross-compile is invisible until a release. This leg exists
-  # because cross-compiling made it affordable: emulating a Rust build cost 59
-  # minutes, and building it natively for a foreign target does not (#957).
+  # The only job that builds for a foreign architecture. Without it, a change
+  # breaking the cross-compile is invisible until a release, since publishing is
+  # the only other thing that targets arm64.
   #
-  # No scan and no load: those need the image in the local daemon, which a
-  # foreign-architecture build cannot provide. Compiling is what is being
-  # checked here.
+  # No scan and no load: both need the image in the local daemon, which a
+  # foreign-architecture build cannot provide. Compiling is what is checked.
   cross_compile_arm64:
     runs-on: ubuntu-latest
     steps:
