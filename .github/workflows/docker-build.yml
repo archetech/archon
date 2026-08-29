@@ -54,6 +54,12 @@ jobs:
           context: .
           file: docker/Dockerfile.gatekeeper-rust
           platforms: linux/arm64
+          # Stops at the builder stage, which is the only one this job is
+          # asking about. Going further would run the runtime stage's apt-get
+          # under emulation -- 152s of it, to reach a COPY. The full image for
+          # this platform is assembled by the publish workflow, and the runtime
+          # stage is exercised natively by the amd64 leg below.
+          target: builder
           push: false
           cache-from: type=gha,scope=gatekeeper-rs-arm64
           cache-to: type=gha,mode=min,scope=gatekeeper-rs-arm64
