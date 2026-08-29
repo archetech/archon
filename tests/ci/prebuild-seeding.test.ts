@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
@@ -136,5 +137,49 @@ describe('native prebuild seeding', () => {
         }
 
         expect(problems).toStrictEqual([]);
+    });
+});
+
+// The seeded filename carries the package version, so a lockfile pinning a
+// different one gets nothing and falls back to the un-retried network fetch at
+// npm-ci time -- silently, because the build still succeeds. satoshi installs
+// sqlite3 5.1.7 while zcash, solana and ethereum install 6.0.1, and only the
+// root was being read.
+describe('prefetch covers every installed version', () => {
+    const TARGETS = ['sqlite3', '@ipshipyard/node-datachannel'];
+
+    function versionsOf(name: string): Set<string> {
+        const locks = execSync("git ls-files '*package-lock.json'", { encoding: 'utf-8' })
+            .split('\n')
+            .filter(Boolean);
+
+        const found = new Set<string>();
+
+        for (const lock of locks) {
+            const doc = JSON.parse(readFileSync(lock, 'utf-8'));
+            const version = doc.packages?.[`node_modules/${name}`]?.version;
+            if (version) {
+                found.add(version);
+            }
+        }
+
+        return found;
+    }
+
+    it('reads every tracked lockfile, not only the root', () => {
+        const script = readFileSync('scripts/prefetch-prebuilds.mjs', 'utf-8');
+
+        expect(script).toMatch(/git['"],\s*\['ls-files', '\*package-lock\.json'\]/);
+    });
+
+    it.each(TARGETS)('finds a version of %s to seed', (name) => {
+        // Guard the guard: a rename would make the check below vacuous.
+        expect(versionsOf(name).size).toBeGreaterThan(0);
+    });
+
+    it('has more than one sqlite3 version to cover, which is the case that broke', () => {
+        // If the versions are ever aligned this can go, but until then a
+        // root-only reader silently misses three mediators.
+        expect(versionsOf('sqlite3').size).toBeGreaterThan(1);
     });
 });

@@ -16,6 +16,7 @@
 
 import { createWriteStream } from 'node:fs';
 import { mkdir, readFile, rename, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import path from 'node:path';
@@ -35,9 +36,23 @@ const ARCHES = (process.env.PREBUILD_ARCH || 'x64,arm64').split(',');
 const OUT_DIR = path.resolve(process.env.PREBUILD_DIR || 'prebuilds');
 const RETRIES = 5;
 
-async function resolveVersion(lock, name) {
-    const entry = lock.packages?.[`node_modules/${name}`];
-    return entry?.version;
+// Every version of a package installed anywhere in the repo, not just at the
+// root. The mediators pin their own versions -- satoshi installs sqlite3 5.1.7
+// while zcash, solana and ethereum install 6.0.1 -- and the prebuild filename
+// carries the version, so seeding only the root leaves those three fetching
+// over the network at npm-ci time, which is the path this script exists to
+// remove.
+async function resolveVersions(locks, name) {
+    const versions = new Set();
+
+    for (const lock of locks) {
+        const version = lock.packages?.[`node_modules/${name}`]?.version;
+        if (version) {
+            versions.add(version);
+        }
+    }
+
+    return [...versions].sort();
 }
 
 // Mirrors prebuild-install's default URL template in util.js: the scope is
@@ -86,18 +101,24 @@ async function download(url, dest) {
     throw lastErr;
 }
 
-const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));
+// Tracked lockfiles only, so a stray one under node_modules or a build
+// directory cannot add versions nobody installs.
+const lockPaths = execFileSync('git', ['ls-files', '*package-lock.json'], { encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean);
+
+const locks = await Promise.all(lockPaths.map(async p => JSON.parse(await readFile(p, 'utf8'))));
 await mkdir(OUT_DIR, { recursive: true });
 
 let failed = 0;
 for (const target of TARGETS) {
-    const version = await resolveVersion(lock, target.name);
-    if (!version) {
-        console.warn(`! ${target.name} not found in package-lock.json, skipping`);
+    const versions = await resolveVersions(locks, target.name);
+    if (versions.length === 0) {
+        console.warn(`! ${target.name} not found in any lockfile, skipping`);
         continue;
     }
 
-    for (const arch of ARCHES) {
+    for (const [version, arch] of versions.flatMap(v => ARCHES.map(a => [v, a]))) {
         const { file, url } = assetFor(target, version, arch);
         try {
             await download(url, resolveInside(OUT_DIR, file));
