@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
 
-// sqlite3's install script is `prebuild-install -r napi || node-gyp rebuild`,
+// A native module's install script is `prebuild-install || node-gyp rebuild`,
 // and the node:*-slim images have no Python or C++ toolchain -- so any hiccup
 // fetching the prebuilt binary escalates into a source build that cannot
 // succeed, and `npm ci` fails. #879 removed the network from that path by
@@ -115,10 +115,8 @@ describe('native prebuild seeding', () => {
 
     it('points every seeded image at the directory it seeds, for every module', () => {
         // Seeding is useless unless the Dockerfile copies ./prebuilds in and
-        // tells prebuild-install to look there. Each module is checked by name:
-        // matching any *_local_prebuilds assignment would stay green if
-        // sqlite3's were dropped while node-datachannel's remained -- and
-        // sqlite3 is the module #913 is actually about.
+        // tells prebuild-install to look there. Each module is checked by name,
+        // so wiring up only one of two modules cannot pass.
         const expected = expectedPrebuildVars();
         const problems: string[] = [];
 
@@ -142,11 +140,10 @@ describe('native prebuild seeding', () => {
 
 // The seeded filename carries the package version, so a lockfile pinning a
 // different one gets nothing and falls back to the un-retried network fetch at
-// npm-ci time -- silently, because the build still succeeds. satoshi installs
-// sqlite3 5.1.7 while zcash, solana and ethereum install 6.0.1, and only the
-// root was being read.
+// npm-ci time -- silently, because the build still succeeds. Services carry
+// their own lockfiles, and only the root was being read.
 describe('prefetch covers every installed version', () => {
-    const TARGETS = ['sqlite3', '@ipshipyard/node-datachannel'];
+    const TARGETS = ['@ipshipyard/node-datachannel'];
 
     function versionsOf(name: string): Set<string> {
         const locks = execSync("git ls-files '*package-lock.json'", { encoding: 'utf-8' })
@@ -175,11 +172,5 @@ describe('prefetch covers every installed version', () => {
     it.each(TARGETS)('finds a version of %s to seed', (name) => {
         // Guard the guard: a rename would make the check below vacuous.
         expect(versionsOf(name).size).toBeGreaterThan(0);
-    });
-
-    it('has more than one sqlite3 version to cover, which is the case that broke', () => {
-        // If the versions are ever aligned this can go, but until then a
-        // root-only reader silently misses three mediators.
-        expect(versionsOf('sqlite3').size).toBeGreaterThan(1);
     });
 });

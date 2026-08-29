@@ -1,11 +1,10 @@
-import sqlite3 from 'sqlite3';
-import { open, Database } from 'sqlite';
+import { DatabaseSync } from 'node:sqlite';
 import { MediatorDb } from '../types.js';
 import AbstractDB from "./abstract-db.js";
 
 export default class JsonSQLite extends AbstractDB {
     private readonly fileName: string;
-    private db?: Database;
+    private db?: DatabaseSync;
 
     static async create(registry: string, dataFolder = 'data'): Promise<JsonSQLite> {
         const json = new JsonSQLite(registry, dataFolder);
@@ -19,12 +18,9 @@ export default class JsonSQLite extends AbstractDB {
     }
 
     async connect(): Promise<void> {
-        this.db = await open({
-            filename: this.fileName,
-            driver: sqlite3.Database
-        });
+        this.db = new DatabaseSync(this.fileName);
 
-        await this.db.exec(`
+        this.db.exec(`
             CREATE TABLE IF NOT EXISTS json (
                 id INTEGER PRIMARY KEY,
                 data TEXT NOT NULL
@@ -34,7 +30,7 @@ export default class JsonSQLite extends AbstractDB {
 
     async disconnect(): Promise<void> {
         if (this.db) {
-            await this.db.close();
+            this.db.close();
             this.db = undefined;
         }
     }
@@ -43,8 +39,8 @@ export default class JsonSQLite extends AbstractDB {
         if (!this.db) {
             throw new Error('SQLite database is not connected. Call connect() first.');
         }
-        await this.db.run('DELETE FROM json');
-        await this.db.run('INSERT INTO json (data) VALUES (?)', JSON.stringify(data));
+        this.db.exec('DELETE FROM json');
+        this.db.prepare('INSERT INTO json (data) VALUES (?)').run(JSON.stringify(data));
         return true;
     }
 
@@ -52,12 +48,12 @@ export default class JsonSQLite extends AbstractDB {
         if (!this.db) {
             throw new Error('SQLite database is not connected. Call connect() first.');
         }
-        const row = await this.db.get('SELECT data FROM json LIMIT 1');
+        const row = this.db.prepare('SELECT data FROM json LIMIT 1').get();
 
         if (!row) {
             return null;
         }
 
-        return JSON.parse(row.data) as MediatorDb;
+        return JSON.parse(String(row.data)) as MediatorDb;
     }
 }

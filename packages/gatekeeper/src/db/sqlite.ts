@@ -1,5 +1,4 @@
-import * as sqlite from 'sqlite';
-import sqlite3 from 'sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { InvalidDIDError } from '@didcid/common/errors';
 import { GatekeeperDb, GatekeeperEvent, Operation, BlockId, BlockInfo } from '../types.js'
 
@@ -17,7 +16,7 @@ const SQLITE_NOT_STARTED_ERROR = 'SQLite DB not open. Call start() first.';
 
 export default class DbSqlite implements GatekeeperDb {
     private readonly dbName: string;
-    private db: sqlite.Database | null;
+    private db: DatabaseSync | null;
 
     constructor(name: string, dataFolder: string = 'data') {
         this.dbName = `${dataFolder}/${name}.db`;
@@ -36,14 +35,14 @@ export default class DbSqlite implements GatekeeperDb {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR);
         }
-        await this.db.exec('BEGIN IMMEDIATE');
+        this.db.exec('BEGIN IMMEDIATE');
         try {
             const result = await fn();
-            await this.db.exec('COMMIT');
+            this.db.exec('COMMIT');
             return result;
         } catch (e) {
             try {
-                await this.db.exec('ROLLBACK');
+                this.db.exec('ROLLBACK');
             } catch {}
             throw e;
         }
@@ -61,22 +60,19 @@ export default class DbSqlite implements GatekeeperDb {
     }
 
     async start(): Promise<void> {
-        this.db = await sqlite.open({
-            filename: this.dbName,
-            driver: sqlite3.Database
-        });
+        this.db = new DatabaseSync(this.dbName);
 
-        await this.db.exec(`CREATE TABLE IF NOT EXISTS dids (
+        this.db.exec(`CREATE TABLE IF NOT EXISTS dids (
             id TEXT PRIMARY KEY,
             events TEXT
         )`);
 
-        await this.db.exec(`CREATE TABLE IF NOT EXISTS queue (
+        this.db.exec(`CREATE TABLE IF NOT EXISTS queue (
             id TEXT PRIMARY KEY,
             ops TEXT
         )`);
 
-        await this.db.exec(`CREATE TABLE IF NOT EXISTS blocks (
+        this.db.exec(`CREATE TABLE IF NOT EXISTS blocks (
                 registry TEXT NOT NULL,
                 hash TEXT NOT NULL,
                 height INTEGER NOT NULL,
@@ -88,7 +84,7 @@ export default class DbSqlite implements GatekeeperDb {
             CREATE UNIQUE INDEX IF NOT EXISTS idx_registry_height ON blocks (registry, height);
         `);
 
-        await this.db.exec(`CREATE TABLE IF NOT EXISTS operations (
+        this.db.exec(`CREATE TABLE IF NOT EXISTS operations (
             opid TEXT PRIMARY KEY,
             operation TEXT
         )`);
@@ -96,7 +92,7 @@ export default class DbSqlite implements GatekeeperDb {
 
     async stop(): Promise<void> {
         if (this.db) {
-            await this.db.close();
+            this.db.close();
             this.db = null;
         }
     }
@@ -108,10 +104,10 @@ export default class DbSqlite implements GatekeeperDb {
         }
         await this.runExclusive(async () => {
             await this.withTx(async () => {
-                await this.db!.run('DELETE FROM dids');
-                await this.db!.run('DELETE FROM queue');
-                await this.db!.run('DELETE FROM blocks');
-                await this.db!.run('DELETE FROM operations');
+                this.db!.exec('DELETE FROM dids');
+                this.db!.exec('DELETE FROM queue');
+                this.db!.exec('DELETE FROM blocks');
+                this.db!.exec('DELETE FROM operations');
             });
         });
     }
@@ -126,9 +122,9 @@ export default class DbSqlite implements GatekeeperDb {
                 const id = this.splitSuffix(did);
                 // Store operation separately if present
                 if (event.opid && event.operation) {
-                    await this.addOperationStrict(event.opid, event.operation);
+                    this.addOperationStrict(event.opid, event.operation);
                 }
-                const events = await this.getEventsStrictRaw(id);
+                const events = this.getEventsStrictRaw(id);
                 // Strip operation and store only opid reference
                 const { operation, ...strippedEvent } = event;
                 events.push(strippedEvent as GatekeeperEvent);
@@ -137,7 +133,7 @@ export default class DbSqlite implements GatekeeperDb {
         );
     }
 
-    private async setEventsStrict(id: string, events: GatekeeperEvent[]): Promise<number> {
+    private setEventsStrict(id: string, events: GatekeeperEvent[]): number {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR);
         }
@@ -145,43 +141,39 @@ export default class DbSqlite implements GatekeeperDb {
         const strippedEvents: GatekeeperEvent[] = [];
         for (const event of events) {
             if (event.opid && event.operation) {
-                await this.addOperationStrict(event.opid, event.operation);
+                this.addOperationStrict(event.opid, event.operation);
             }
             const { operation, ...stripped } = event;
             strippedEvents.push(stripped as GatekeeperEvent);
         }
-        const res = await this.db.run(
-            `INSERT OR REPLACE INTO dids(id, events) VALUES(?, ?)`,
-            id,
-            JSON.stringify(strippedEvents)
-        );
-        return res.changes ?? 0;
+        const res = this.db.prepare(
+            `INSERT OR REPLACE INTO dids(id, events) VALUES(?, ?)`
+        ).run(id, JSON.stringify(strippedEvents));
+        return Number(res.changes ?? 0);
     }
 
-    private async addOperationStrict(opid: string, op: Operation): Promise<void> {
+    private addOperationStrict(opid: string, op: Operation): void {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR);
         }
-        await this.db.run(
-            `INSERT OR REPLACE INTO operations(opid, operation) VALUES(?, ?)`,
-            opid,
-            JSON.stringify(op)
-        );
+        this.db.prepare(
+            `INSERT OR REPLACE INTO operations(opid, operation) VALUES(?, ?)`
+        ).run(opid, JSON.stringify(op));
     }
 
 
     async setEvents(did: string, events: GatekeeperEvent[]): Promise<number> {
         const id = this.splitSuffix(did);
         return this.runExclusive(() =>
-            this.withTx(() => this.setEventsStrict(id, events))
+            this.withTx(async () => this.setEventsStrict(id, events))
         );
     }
 
-    private async getEventsStrictRaw(id: string): Promise<GatekeeperEvent[]> {
+    private getEventsStrictRaw(id: string): GatekeeperEvent[] {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR);
         }
-        const row = await this.db!.get<DidsRow>('SELECT events FROM dids WHERE id = ?', id);
+        const row = this.db.prepare('SELECT events FROM dids WHERE id = ?').get(id) as DidsRow | undefined;
         if (!row) {
             return [];
         }
@@ -192,13 +184,13 @@ export default class DbSqlite implements GatekeeperDb {
         return events as GatekeeperEvent[];
     }
 
-    private async hydrateEvents(events: GatekeeperEvent[]): Promise<GatekeeperEvent[]> {
+    private hydrateEvents(events: GatekeeperEvent[]): GatekeeperEvent[] {
         const hydrated: GatekeeperEvent[] = [];
         for (const event of events) {
             if (event.operation) {
                 hydrated.push(event);
             } else if (event.opid) {
-                const operation = await this.getOperation(event.opid);
+                const operation = this.getOperationStrict(event.opid);
                 if (operation) {
                     hydrated.push({ ...event, operation });
                 } else {
@@ -218,7 +210,7 @@ export default class DbSqlite implements GatekeeperDb {
 
         try {
             const id = this.splitSuffix(did);
-            const events = await this.getEventsStrictRaw(id);
+            const events = this.getEventsStrictRaw(id);
             return this.hydrateEvents(events);
         } catch {
             return [];
@@ -233,8 +225,8 @@ export default class DbSqlite implements GatekeeperDb {
         return this.runExclusive(() =>
             this.withTx(async () => {
                 const id = this.splitSuffix(did);
-                const result = await this.db!.run('DELETE FROM dids WHERE id = ?', id);
-                return result.changes ?? 0;
+                const result = this.db!.prepare('DELETE FROM dids WHERE id = ?').run(id);
+                return Number(result.changes ?? 0);
             })
         );
     }
@@ -246,24 +238,22 @@ export default class DbSqlite implements GatekeeperDb {
 
         return this.runExclusive(async () =>
             this.withTx(async () => {
-                const ops = await this.getQueueStrict(registry);
+                const ops = this.getQueueStrict(registry);
                 ops.push(op);
-                await this.db!.run(
-                    `INSERT OR REPLACE INTO queue(id, ops) VALUES(?, ?)`,
-                    registry,
-                    JSON.stringify(ops)
-                );
+                this.db!.prepare(
+                    `INSERT OR REPLACE INTO queue(id, ops) VALUES(?, ?)`
+                ).run(registry, JSON.stringify(ops));
                 return ops.length;
             })
         );
     }
 
-    private async getQueueStrict(registry: string): Promise<Operation[]> {
+    private getQueueStrict(registry: string): Operation[] {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR);
         }
 
-        const row = await this.db.get<QueueRow>('SELECT ops FROM queue WHERE id = ?', registry);
+        const row = this.db.prepare('SELECT ops FROM queue WHERE id = ?').get(registry) as QueueRow | undefined;
         if (!row) {
             return [];
         }
@@ -282,7 +272,7 @@ export default class DbSqlite implements GatekeeperDb {
         }
 
         try {
-            return await this.getQueueStrict(registry);
+            return this.getQueueStrict(registry);
         } catch {
             return [];
         }
@@ -295,7 +285,7 @@ export default class DbSqlite implements GatekeeperDb {
 
         return this.runExclusive(async () =>
             this.withTx(async () => {
-                const oldQueue = await this.getQueueStrict(registry);
+                const oldQueue = this.getQueueStrict(registry);
 
                 const batchProofValues = new Set(
                     batch.map(b => b.proof?.proofValue).filter((p): p is string => p !== undefined)
@@ -303,11 +293,9 @@ export default class DbSqlite implements GatekeeperDb {
                 const newQueue = oldQueue.filter(
                     item => !batchProofValues.has(item.proof?.proofValue || '')
                 );
-                await this.db!.run(
-                    `INSERT OR REPLACE INTO queue(id, ops) VALUES(?, ?)`,
-                    registry,
-                    JSON.stringify(newQueue)
-                );
+                this.db!.prepare(
+                    `INSERT OR REPLACE INTO queue(id, ops) VALUES(?, ?)`
+                ).run(registry, JSON.stringify(newQueue));
                 return true;
             }).catch(err => {
                 console.error(err);
@@ -321,8 +309,8 @@ export default class DbSqlite implements GatekeeperDb {
             throw new Error(SQLITE_NOT_STARTED_ERROR)
         }
 
-        const rows = await this.db.all('SELECT id FROM dids');
-        return rows.map(row => row.id);
+        const rows = this.db.prepare('SELECT id FROM dids').all();
+        return rows.map(row => String(row.id));
     }
 
     async addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean> {
@@ -332,15 +320,10 @@ export default class DbSqlite implements GatekeeperDb {
 
         try {
             // Insert or replace the block information
-            await this.runExclusive(async () =>
-                await this.db!.run(
-                    `INSERT OR REPLACE INTO blocks (registry, hash, height, time, txns) VALUES (?, ?, ?, ?, ?)`,
-                    registry,
-                    blockInfo.hash,
-                    blockInfo.height,
-                    blockInfo.time,
-                    0
-                )
+            await this.runExclusive(() =>
+                this.db!.prepare(
+                    `INSERT OR REPLACE INTO blocks (registry, hash, height, time, txns) VALUES (?, ?, ?, ?, ?)`
+                ).run(registry, blockInfo.hash, blockInfo.height, blockInfo.time, 0)
             );
 
             return true;
@@ -359,22 +342,17 @@ export default class DbSqlite implements GatekeeperDb {
 
             if (blockId === undefined) {
                 // Return block with max height
-                blockRow = await this.db.get<BlockInfo>(
-                    `SELECT * FROM blocks WHERE registry = ? ORDER BY height DESC LIMIT 1`,
-                    registry
-                );
+                blockRow = this.db.prepare(
+                    `SELECT * FROM blocks WHERE registry = ? ORDER BY height DESC LIMIT 1`
+                ).get(registry) as BlockInfo | undefined;
             } else if (typeof blockId === 'number') {
-                blockRow = await this.db.get<BlockInfo>(
-                    `SELECT * FROM blocks WHERE registry = ? AND height = ?`,
-                    registry,
-                    blockId
-                );
+                blockRow = this.db.prepare(
+                    `SELECT * FROM blocks WHERE registry = ? AND height = ?`
+                ).get(registry, blockId) as BlockInfo | undefined;
             } else {
-                blockRow = await this.db.get<BlockInfo>(
-                    `SELECT * FROM blocks WHERE registry = ? AND hash = ?`,
-                    registry,
-                    blockId
-                );
+                blockRow = this.db.prepare(
+                    `SELECT * FROM blocks WHERE registry = ? AND hash = ?`
+                ).get(registry, blockId) as BlockInfo | undefined;
             }
 
             return blockRow ? this.normalizeBlock(blockRow) : null;
@@ -403,25 +381,26 @@ export default class DbSqlite implements GatekeeperDb {
 
         await this.runExclusive(() =>
             this.withTx(async () => {
-                await this.db!.run(
-                    `INSERT OR REPLACE INTO operations(opid, operation) VALUES(?, ?)`,
-                    opid,
-                    JSON.stringify(op)
-                );
+                this.db!.prepare(
+                    `INSERT OR REPLACE INTO operations(opid, operation) VALUES(?, ?)`
+                ).run(opid, JSON.stringify(op));
             })
         );
     }
 
-    async getOperation(opid: string): Promise<Operation | null> {
+    private getOperationStrict(opid: string): Operation | null {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR);
         }
 
-        const row = await this.db.get<{ operation: string }>(
-            'SELECT operation FROM operations WHERE opid = ?',
-            opid
-        );
+        const row = this.db.prepare(
+            'SELECT operation FROM operations WHERE opid = ?'
+        ).get(opid) as { operation: string } | undefined;
 
         return row ? JSON.parse(row.operation) : null;
+    }
+
+    async getOperation(opid: string): Promise<Operation | null> {
+        return this.getOperationStrict(opid);
     }
 }
