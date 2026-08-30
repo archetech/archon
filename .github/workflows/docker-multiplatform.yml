@@ -1,0 +1,167 @@
+name: Multi-platform build
+
+# Nothing on a PR builds for arm64. docker-build.yml is single-platform,
+# because the Anchore scan needs the image in the local daemon and a foreign
+# architecture cannot be loaded there; the one exception is the Rust
+# gatekeeper's cross-compile job. So the arm64 path for the other 26 images ran
+# only when publishing -- a v* tag or a push to pre-release -- which in 2026
+# meant roughly monthly, and twice respectively (#957).
+#
+# That put first execution of a foreign-architecture build at release time.
+# #880 was this shape: a base-image change broke the hyperswarm mediator on
+# glibc and surfaced only because that image happened to be in the set being
+# built. #956 was another: the QEMU setup step was lost while rebuilding the
+# publish workflow from the single-platform one, and all 42 checks passed with
+# it missing, because nothing in CI emulates an arm64 RUN.
+#
+# This builds everything for both platforms on a schedule and pushes nothing.
+# It proves the images compile; publishing stays where it is.
+
+on:
+  schedule:
+    # 07:00 UTC daily. Scheduled runs use the workflow file on the default
+    # branch, so this always tests main rather than the branch it was added on.
+    - cron: "0 7 * * *"
+
+  # So a change to a Dockerfile or a native dependency can be checked against
+  # arm64 on demand, rather than waiting for the next night or the next release.
+  workflow_dispatch:
+
+# A run takes long enough that two can overlap if one is dispatched while the
+# nightly is going. The later one wins; there is nothing to gain from both.
+concurrency:
+  group: multiplatform-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build_multiplatform:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      # One image failing to compile for arm64 says nothing about the other 26,
+      # and the point of the run is to learn about all of them.
+      fail-fast: false
+      matrix:
+        include:
+          - dockerfile: docker/Dockerfile.gatekeeper-ts
+            image: gatekeeper-ts
+            # Releases published this as plain `gatekeeper`, which reads as the
+            # only one when there are two implementations. Carried as an alias
+            # so existing pulls keep working.
+            alias: gatekeeper
+          - dockerfile: docker/Dockerfile.keymaster-ts
+            image: keymaster-ts
+            # As above: releases published this as plain `keymaster`.
+            alias: keymaster
+          - dockerfile: services/herald/Dockerfile
+            image: herald
+          - dockerfile: docker/Dockerfile.drawbridge
+            image: drawbridge
+          - dockerfile: docker/Dockerfile.hyperswarm
+            image: hyperswarm-mediator
+          - dockerfile: docker/Dockerfile.satoshi-wallet
+            image: satoshi-wallet
+          - dockerfile: docker/Dockerfile.satoshi
+            image: satoshi-mediator
+            # Released tags used to publish this one as `sat-mediator`, while
+            # pre-release published `satoshi-mediator` -- two package names for
+            # one service. `satoshi-mediator` is canonical, matching the
+            # Dockerfile and every other entry; the old name is published
+            # alongside it so existing pulls keep working, and can be dropped
+            # once nothing is using it.
+            alias: sat-mediator
+          - dockerfile: docker/Dockerfile.lightning-mediator
+            image: lightning-mediator
+          - dockerfile: docker/Dockerfile.cli
+            image: cli
+          - dockerfile: docker/Dockerfile.explorer
+            image: explorer
+          - dockerfile: docker/Dockerfile.gatekeeper-client
+            image: gatekeeper-client
+          - dockerfile: docker/Dockerfile.keymaster-client
+            image: keymaster-client
+          - dockerfile: docker/Dockerfile.react-wallet
+            image: react-wallet
+          - dockerfile: docker/Dockerfile.herald-client
+            image: herald-client
+          - dockerfile: docker/Dockerfile.gatekeeper-client
+            image: drawbridge-client
+          # The twelve below were built by nothing until #954. Every Dockerfile
+          # in the repo is referenced by a compose file under docker/compose/,
+          # so each of these is a service somebody can bring up -- they were
+          # simply absent from the matrix, which meant a change breaking one of
+          # them passed every check. The bullseye -> bookworm -> trixie moves in
+          # #890 and #892 crossed two Debian generations without any of them
+          # being compiled once.
+          - dockerfile: docker/Dockerfile.didcomm
+            image: didcomm
+          - dockerfile: docker/Dockerfile.keymaster-py
+            image: keymaster-py
+          - dockerfile: docker/Dockerfile.gatekeeper-rust
+            image: gatekeeper-rs
+          - dockerfile: docker/Dockerfile.pinning
+            image: pinning-mediator
+          # Chain mediators and their wallet sidecars. Named for the chain
+          # rather than the network, the way satoshi/satoshi-wallet already are:
+          # compose picks the network (eth-sepolia, sol-devnet, zcash-mainnet),
+          # and one image serves all of them.
+          - dockerfile: docker/Dockerfile.ethereum
+            image: ethereum-mediator
+          - dockerfile: docker/Dockerfile.ethereum-wallet
+            image: ethereum-wallet
+          - dockerfile: docker/Dockerfile.solana
+            image: solana-mediator
+          - dockerfile: docker/Dockerfile.solana-wallet
+            image: solana-wallet
+          - dockerfile: docker/Dockerfile.zcash
+            image: zcash-mediator
+          - dockerfile: docker/Dockerfile.zcash-wallet
+            image: zcash-wallet
+          - dockerfile: docker/Dockerfile.filecoin
+            image: filecoin-mediator
+          - dockerfile: docker/Dockerfile.filecoin-wallet
+            image: filecoin-wallet
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      # arm64 RUN steps execute under emulation on an amd64 runner, so binfmt
+      # has to be registered before buildx. Losing this step is what #956 did,
+      # invisibly.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.23.2"
+
+      # Seeds ./prebuilds for both architectures, so an npm ci inside the arm64
+      # leg takes a prebuilt binary rather than fetching one over an un-retried
+      # network call, or compiling it under emulation (#879, #913).
+      - name: Prefetch native prebuilds
+        run: node scripts/prefetch-prebuilds.mjs
+
+      - name: Build for amd64 and arm64
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          # Nothing is published and nothing is loaded: a multi-platform result
+          # cannot go into the local daemon, and this job is asking whether the
+          # image compiles, not what is in it. The Anchore scan stays on the
+          # single-platform build, which can load.
+          push: false
+          # Scoped away from docker-build.yml's per-image cache, which holds
+          # amd64 layers for the same images. Sharing the scope would have each
+          # workflow evicting the other's entries.
+          cache-from: type=gha,scope=multiplatform-${{ matrix.image }}
+          cache-to: type=gha,mode=min,scope=multiplatform-${{ matrix.image }}

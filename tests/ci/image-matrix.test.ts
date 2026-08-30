@@ -10,10 +10,12 @@ import { load } from 'js-yaml';
 // out under two different package names (#954).
 //
 // Nothing structural stops that happening again -- GitHub Actions has no way to
-// share a matrix between workflows -- so it is asserted here instead.
+// share a matrix between workflows -- so it is asserted here instead. There are
+// now three copies: build, publish, and the nightly multi-platform run.
 
 const BUILD = '.github/workflows/docker-build.yml';
 const PUBLISH = '.github/workflows/docker-publish.yml';
+const MULTIPLATFORM = '.github/workflows/docker-multiplatform.yml';
 
 type Entry = { dockerfile: string, image: string, alias?: string };
 
@@ -31,6 +33,7 @@ function matrixOf(path: string, job: string): Entry[] {
 
 const build = matrixOf(BUILD, 'build_test_images');
 const publish = matrixOf(PUBLISH, 'publish_images');
+const multiplatform = matrixOf(MULTIPLATFORM, 'build_multiplatform');
 
 describe('docker image matrices', () => {
     it('builds every Dockerfile in the repo', () => {
@@ -51,6 +54,16 @@ describe('docker image matrices', () => {
         const asPairs = (m: Entry[]) => m.map(e => `${e.dockerfile} -> ${e.image}`).sort();
 
         expect(asPairs(publish)).toStrictEqual(asPairs(build));
+    });
+
+    it('checks both architectures for exactly what it builds', () => {
+        // The nightly arm64 run carries a third copy of the same list (#957).
+        // An image added to the other two and missed here would not be compiled
+        // for a foreign architecture until a release, which is the gap that
+        // workflow exists to close.
+        const asPairs = (m: Entry[]) => m.map(e => `${e.dockerfile} -> ${e.image}`).sort();
+
+        expect(asPairs(multiplatform)).toStrictEqual(asPairs(build));
     });
 
     it('gives every image a distinct name', () => {
