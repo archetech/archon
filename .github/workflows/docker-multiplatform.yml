@@ -1,0 +1,135 @@
+name: Multi-platform build
+
+# Compiles every image for both platforms and pushes nothing, so that an arm64
+# break surfaces on a schedule rather than at release time.
+#
+# Nothing else in CI targets a foreign architecture: docker-build.yml is
+# single-platform because the Anchore scan needs the image in the local daemon,
+# which a foreign-architecture build cannot provide, and the only exception is
+# the Rust gatekeeper's cross-compile job. Without this workflow the arm64 path
+# for the other 26 images runs only when publishing (#957).
+
+on:
+  schedule:
+    # 07:00 UTC daily. Scheduled runs use the workflow file on the default
+    # branch, so this always tests main rather than the branch it was added on.
+    - cron: "0 7 * * *"
+
+  # So a change to a Dockerfile or a native dependency can be checked against
+  # arm64 on demand, rather than waiting for the next night or the next release.
+  workflow_dispatch:
+
+# A run takes long enough that two can overlap if one is dispatched while the
+# nightly is going. The later one wins; there is nothing to gain from both.
+concurrency:
+  group: multiplatform-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build_multiplatform:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      # One image failing to compile for arm64 says nothing about the other 26,
+      # and the point of the run is to learn about all of them.
+      fail-fast: false
+      matrix:
+        include:
+          - dockerfile: docker/Dockerfile.gatekeeper-ts
+            image: gatekeeper-ts
+          - dockerfile: docker/Dockerfile.keymaster-ts
+            image: keymaster-ts
+          - dockerfile: services/herald/Dockerfile
+            image: herald
+          - dockerfile: docker/Dockerfile.drawbridge
+            image: drawbridge
+          - dockerfile: docker/Dockerfile.hyperswarm
+            image: hyperswarm-mediator
+          - dockerfile: docker/Dockerfile.satoshi-wallet
+            image: satoshi-wallet
+          - dockerfile: docker/Dockerfile.satoshi
+            image: satoshi-mediator
+          - dockerfile: docker/Dockerfile.lightning-mediator
+            image: lightning-mediator
+          - dockerfile: docker/Dockerfile.cli
+            image: cli
+          - dockerfile: docker/Dockerfile.explorer
+            image: explorer
+          - dockerfile: docker/Dockerfile.gatekeeper-client
+            image: gatekeeper-client
+          - dockerfile: docker/Dockerfile.keymaster-client
+            image: keymaster-client
+          - dockerfile: docker/Dockerfile.react-wallet
+            image: react-wallet
+          - dockerfile: docker/Dockerfile.herald-client
+            image: herald-client
+          - dockerfile: docker/Dockerfile.gatekeeper-client
+            image: drawbridge-client
+          - dockerfile: docker/Dockerfile.didcomm
+            image: didcomm
+          - dockerfile: docker/Dockerfile.keymaster-py
+            image: keymaster-py
+          - dockerfile: docker/Dockerfile.gatekeeper-rust
+            image: gatekeeper-rs
+          - dockerfile: docker/Dockerfile.pinning
+            image: pinning-mediator
+          - dockerfile: docker/Dockerfile.ethereum
+            image: ethereum-mediator
+          - dockerfile: docker/Dockerfile.ethereum-wallet
+            image: ethereum-wallet
+          - dockerfile: docker/Dockerfile.solana
+            image: solana-mediator
+          - dockerfile: docker/Dockerfile.solana-wallet
+            image: solana-wallet
+          - dockerfile: docker/Dockerfile.zcash
+            image: zcash-mediator
+          - dockerfile: docker/Dockerfile.zcash-wallet
+            image: zcash-wallet
+          - dockerfile: docker/Dockerfile.filecoin
+            image: filecoin-mediator
+          - dockerfile: docker/Dockerfile.filecoin-wallet
+            image: filecoin-wallet
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      # arm64 RUN steps execute under emulation on an amd64 runner, so binfmt
+      # has to be registered before buildx. Without it the arm64 legs fail at
+      # the first RUN, and nothing else in CI would catch its absence.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.23.2"
+
+      # Seeds ./prebuilds for both architectures, so an npm ci inside the arm64
+      # leg takes a prebuilt binary rather than fetching one over an un-retried
+      # network call, or compiling it under emulation (#879, #913).
+      - name: Prefetch native prebuilds
+        run: node scripts/prefetch-prebuilds.mjs
+
+      - name: Build for amd64 and arm64
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          # Nothing is published and nothing is loaded: a multi-platform result
+          # cannot go into the local daemon, and this job is asking whether the
+          # image compiles, not what is in it. The Anchore scan stays on the
+          # single-platform build, which can load.
+          push: false
+          # Scoped away from docker-build.yml's per-image cache, which holds
+          # amd64 layers for the same images. Sharing the scope would have each
+          # workflow evicting the other's entries.
+          cache-from: type=gha,scope=multiplatform-${{ matrix.image }}
+          cache-to: type=gha,mode=min,scope=multiplatform-${{ matrix.image }}
