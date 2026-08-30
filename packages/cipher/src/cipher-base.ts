@@ -1,4 +1,5 @@
 import * as bip39 from 'bip39';
+import { HDKey } from '@scure/bip32';
 import * as secp from '@noble/secp256k1';
 import { schnorr } from '@noble/curves/secp256k1';
 import { x25519 } from '@noble/curves/ed25519';
@@ -18,9 +19,18 @@ const canonicalize = canonicalizeModule as unknown as (input: unknown) => string
 secp.etc.hmacSha256Sync = (k: Uint8Array, ...m: Uint8Array[]): Uint8Array => hmac(sha256, k, secp.etc.concatBytes(...m));
 
 export default abstract class CipherBase implements Cipher {
-    abstract generateHDKey(mnemonic: string): any;
-    abstract generateHDKeyJSON(json: HDKeyJSON): any;
+    // Only the source of randomness differs between environments; @scure/bip32
+    // is pure JS, so derivation is shared rather than implemented per platform.
     abstract generateRandomSalt(): string;
+
+    generateHDKey(mnemonic: string): HDKey {
+        const seed = bip39.mnemonicToSeedSync(mnemonic);
+        return HDKey.fromMasterSeed(seed);
+    }
+
+    generateHDKeyJSON(json: HDKeyJSON): HDKey {
+        return HDKey.fromJSON(json);
+    }
 
     generateMnemonic(): string {
         return bip39.generateMnemonic();
