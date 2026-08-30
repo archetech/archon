@@ -1,21 +1,13 @@
 name: Multi-platform build
 
-# Nothing on a PR builds for arm64. docker-build.yml is single-platform,
-# because the Anchore scan needs the image in the local daemon and a foreign
-# architecture cannot be loaded there; the one exception is the Rust
-# gatekeeper's cross-compile job. So the arm64 path for the other 26 images ran
-# only when publishing -- a v* tag or a push to pre-release -- which in 2026
-# meant roughly monthly, and twice respectively (#957).
+# Compiles every image for both platforms and pushes nothing, so that an arm64
+# break surfaces on a schedule rather than at release time.
 #
-# That put first execution of a foreign-architecture build at release time.
-# #880 was this shape: a base-image change broke the hyperswarm mediator on
-# glibc and surfaced only because that image happened to be in the set being
-# built. #956 was another: the QEMU setup step was lost while rebuilding the
-# publish workflow from the single-platform one, and all 42 checks passed with
-# it missing, because nothing in CI emulates an arm64 RUN.
-#
-# This builds everything for both platforms on a schedule and pushes nothing.
-# It proves the images compile; publishing stays where it is.
+# Nothing else in CI targets a foreign architecture: docker-build.yml is
+# single-platform because the Anchore scan needs the image in the local daemon,
+# which a foreign-architecture build cannot provide, and the only exception is
+# the Rust gatekeeper's cross-compile job. Without this workflow the arm64 path
+# for the other 26 images runs only when publishing (#957).
 
 on:
   schedule:
@@ -49,14 +41,8 @@ jobs:
         include:
           - dockerfile: docker/Dockerfile.gatekeeper-ts
             image: gatekeeper-ts
-            # Releases published this as plain `gatekeeper`, which reads as the
-            # only one when there are two implementations. Carried as an alias
-            # so existing pulls keep working.
-            alias: gatekeeper
           - dockerfile: docker/Dockerfile.keymaster-ts
             image: keymaster-ts
-            # As above: releases published this as plain `keymaster`.
-            alias: keymaster
           - dockerfile: services/herald/Dockerfile
             image: herald
           - dockerfile: docker/Dockerfile.drawbridge
@@ -67,13 +53,6 @@ jobs:
             image: satoshi-wallet
           - dockerfile: docker/Dockerfile.satoshi
             image: satoshi-mediator
-            # Released tags used to publish this one as `sat-mediator`, while
-            # pre-release published `satoshi-mediator` -- two package names for
-            # one service. `satoshi-mediator` is canonical, matching the
-            # Dockerfile and every other entry; the old name is published
-            # alongside it so existing pulls keep working, and can be dropped
-            # once nothing is using it.
-            alias: sat-mediator
           - dockerfile: docker/Dockerfile.lightning-mediator
             image: lightning-mediator
           - dockerfile: docker/Dockerfile.cli
@@ -90,13 +69,6 @@ jobs:
             image: herald-client
           - dockerfile: docker/Dockerfile.gatekeeper-client
             image: drawbridge-client
-          # The twelve below were built by nothing until #954. Every Dockerfile
-          # in the repo is referenced by a compose file under docker/compose/,
-          # so each of these is a service somebody can bring up -- they were
-          # simply absent from the matrix, which meant a change breaking one of
-          # them passed every check. The bullseye -> bookworm -> trixie moves in
-          # #890 and #892 crossed two Debian generations without any of them
-          # being compiled once.
           - dockerfile: docker/Dockerfile.didcomm
             image: didcomm
           - dockerfile: docker/Dockerfile.keymaster-py
@@ -105,10 +77,6 @@ jobs:
             image: gatekeeper-rs
           - dockerfile: docker/Dockerfile.pinning
             image: pinning-mediator
-          # Chain mediators and their wallet sidecars. Named for the chain
-          # rather than the network, the way satoshi/satoshi-wallet already are:
-          # compose picks the network (eth-sepolia, sol-devnet, zcash-mainnet),
-          # and one image serves all of them.
           - dockerfile: docker/Dockerfile.ethereum
             image: ethereum-mediator
           - dockerfile: docker/Dockerfile.ethereum-wallet
@@ -130,8 +98,8 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       # arm64 RUN steps execute under emulation on an amd64 runner, so binfmt
-      # has to be registered before buildx. Losing this step is what #956 did,
-      # invisibly.
+      # has to be registered before buildx. Without it the arm64 legs fail at
+      # the first RUN, and nothing else in CI would catch its absence.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8
 

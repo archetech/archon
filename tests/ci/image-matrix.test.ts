@@ -10,8 +10,8 @@ import { load } from 'js-yaml';
 // out under two different package names (#954).
 //
 // Nothing structural stops that happening again -- GitHub Actions has no way to
-// share a matrix between workflows -- so it is asserted here instead. There are
-// now three copies: build, publish, and the nightly multi-platform run.
+// share a matrix between workflows -- so it is asserted here instead. Three
+// copies exist: build, publish, and the nightly multi-platform run.
 
 const BUILD = '.github/workflows/docker-build.yml';
 const PUBLISH = '.github/workflows/docker-publish.yml';
