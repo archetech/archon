@@ -1,5 +1,5 @@
 import * as bip39 from 'bip39';
-import HDKey from 'hdkey';
+import { HDKey } from '@scure/bip32';
 import * as ecc from 'tiny-secp256k1';
 import { ECPairFactory } from 'ecpair';
 import * as bitcoin from 'bitcoinjs-lib';
@@ -376,7 +376,7 @@ export async function bumpTransactionFee(
             throw new Error(`Input ${i}: could not derive private key at ${path}`);
         }
 
-        const keyPair = ECPair.fromPrivateKey(child.privateKey, { network: btcNetwork });
+        const keyPair = ECPair.fromPrivateKey(Buffer.from(child.privateKey), { network: btcNetwork });
         psbt.signInput(i, keyPair);
     }
 
@@ -414,7 +414,7 @@ async function signAndBroadcast(
             throw new Error(`Input ${i}: could not derive private key at ${path}`);
         }
 
-        const keyPair = ECPair.fromPrivateKey(child.privateKey, { network: btcNetwork });
+        const keyPair = ECPair.fromPrivateKey(Buffer.from(child.privateKey), { network: btcNetwork });
         psbt.signInput(i, keyPair);
     }
 

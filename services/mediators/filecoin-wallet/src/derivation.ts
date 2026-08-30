@@ -1,5 +1,5 @@
 import * as bip39 from 'bip39';
-import HDKey from 'hdkey';
+import { HDKey } from '@scure/bip32';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { keccak_256 } from '@noble/hashes/sha3.js';
 
@@ -12,7 +12,7 @@ export function derivePrivateKey(mnemonic: string, derivationPath: string): `0x$
         throw new Error(`Could not derive Filecoin private key at ${derivationPath}`);
     }
 
-    return `0x${child.privateKey.toString('hex')}`;
+    return `0x${Buffer.from(child.privateKey).toString('hex')}`;
 }
 
 export function deriveAddress(mnemonic: string, derivationPath: string): string {

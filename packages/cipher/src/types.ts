@@ -1,5 +1,4 @@
-import type HDKeyNode from 'hdkey';
-import type HDKeyBrowser from '@didcid/browser-hdkey';
+import type { HDKey } from '@scure/bip32';
 
 export interface HDKeyJSON {
     xpriv: string,
@@ -64,8 +63,8 @@ export interface ProofOfWork {
 export interface Cipher {
     generateMnemonic(): string,
 
-    generateHDKey(mnemonic: string): HDKeyNode | HDKeyBrowser,
-    generateHDKeyJSON(json: HDKeyJSON): HDKeyNode | HDKeyBrowser,
+    generateHDKey(mnemonic: string): HDKey,
+    generateHDKeyJSON(json: HDKeyJSON): HDKey,
 
     generateJwk(privateKeyBytes: Uint8Array): EcdsaJwkPair,
     generateRandomJwk(): EcdsaJwkPair,

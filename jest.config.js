@@ -48,7 +48,6 @@ const config = {
         '^\\.\\/encryption\\.js$': '<rootDir>/packages/keymaster/src/encryption.ts',
         '^\\.\\/search-index\\.js$': '<rootDir>/packages/gatekeeper/src/search-index.ts',
         '^(\\.{1,2}/.*)\\.js$': '$1',
-        '^@didcid/browser-hdkey$': '<rootDir>/packages/browser-hdkey/lib/hdkey.js',
         '^@noble/curves/secp256k1$': '<rootDir>/node_modules/@noble/curves/secp256k1.js',
     },
     // Count untested files as 0% instead of leaving them invisible. Without this,
@@ -75,7 +74,6 @@ const config = {
         '!**/node.ts',
         '!**/db/web.ts',
         '!**/db/chrome.ts',
-        '!packages/browser-hdkey/src/**',
         // Storage backends that need a real server. Listed by path, not by glob:
         // packages/keymaster/src/db/sqlite.ts IS tested, so `!**/db/sqlite.ts`
         // would have silently hidden 27 covered lines.

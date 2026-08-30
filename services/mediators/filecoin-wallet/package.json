@@ -13,12 +13,12 @@
   "dependencies": {
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
+    "@scure/bip32": "^2.4.0",
     "axios": "^1.18.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.22.1",
     "filecoin-pin": "^0.21.0",
-    "hdkey": "^2.1.0",
     "morgan": "^1.11.0",
     "multiformats": "^13.3.7",
     "pino": "^9.14.0",
