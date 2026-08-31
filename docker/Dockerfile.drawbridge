@@ -1,9 +1,6 @@
-# The build needs devDependencies -- typescript, and the root's for the
-# mediators that have no local copy -- but the runtime needs none of them.
-# Removing them in a later layer would reclaim nothing, since layers are
-# additive, so the install and the prune have to end up in the same image
-# without the intermediate state: hence a builder stage that is thrown away
-# (#987).
+# The build needs devDependencies and the runtime needs none of them. Layers are
+# additive, so pruning in a later layer of one image reclaims nothing -- the
+# install has to happen in a stage that is discarded (#987).
 FROM node:22.23.2-trixie-slim AS builder
 
 WORKDIR /app

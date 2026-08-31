@@ -1,9 +1,8 @@
 // Serves a built single-page app over plain node:http.
 //
-// The client images used to run `vite preview`, which Vite documents as "do not
-// use this as a production server as it's not designed for it" -- and which
-// forced the whole dev toolchain into the runtime image to serve static files
-// (#987). This has no dependencies, so the runtime stage needs no node_modules.
+// Deliberately dependency-free: it is the whole runtime of the client images,
+// so anything imported here would have to be installed into them, and the point
+// is that they need no node_modules at all.
 //
 // Usage: node serve-static.mjs <root> [port]
 
@@ -45,8 +44,8 @@ function cacheControl(pathname) {
 }
 
 async function resolveFile(pathname) {
-    // decodeURIComponent can throw on a malformed escape; a bad URL is a 400,
-    // not a crash.
+    // decodeURIComponent throws on a malformed escape, so a bad URL resolves to
+    // no file rather than taking the process down.
     let decoded;
     try {
         decoded = decodeURIComponent(pathname);

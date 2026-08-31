@@ -20,10 +20,9 @@ ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
-# The build tooling stays in the builder. `vite preview`, which these images
-# used to run, is documented by Vite as "do not use this as a production server
-# as it's not designed for it" -- and needing it at runtime dragged the entire
-# dev dependency tree into the image to serve static files (#987).
+# Runtime carries the built assets and a dependency-free server, nothing else:
+# vite is a devDependency, and serving static files through it would mean
+# shipping the whole build toolchain (#987).
 FROM node:22.23.2-trixie-slim
 
 WORKDIR /app
