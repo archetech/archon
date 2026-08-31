@@ -9,7 +9,7 @@
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { join, resolve, extname, sep } from 'node:path';
+import { join, resolve, relative, extname, sep } from 'node:path';
 
 const root = resolve(process.argv[2] ?? 'dist');
 const port = Number(process.argv[3] ?? process.env.VITE_PORT ?? 8080);
@@ -36,11 +36,18 @@ const TYPES = {
     '.txt': 'text/plain; charset=utf-8',
 };
 
+// Decided from the file actually served, not the path asked for: an
+// extension-less request under /assets/ falls back to the shell, and marking
+// that immutable would pin a stale app in caches for a year.
+//
 // Vite fingerprints everything under /assets, so those can be cached
-// indefinitely. index.html must not be, or a deploy is invisible until the
-// browser decides to look again.
-function cacheControl(pathname) {
-    return pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
+// indefinitely. HTML never is, or a deploy stays invisible until the browser
+// decides to look again.
+function cacheControl(file) {
+    const inAssets = relative(root, file).startsWith('assets' + sep);
+    const isHtml = extname(file).toLowerCase() === '.html';
+
+    return inAssets && !isHtml ? 'public, max-age=31536000, immutable' : 'no-cache';
 }
 
 async function resolveFile(pathname) {
@@ -83,7 +90,18 @@ const server = createServer(async (req, res) => {
         return;
     }
 
-    const { pathname } = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+    // Parsed against a fixed base rather than the Host header, which is
+    // attacker-controlled: a value like `[` makes the base invalid, and the
+    // throw inside this async handler would take the process down. Only the
+    // path is wanted, so the authority is irrelevant.
+    let pathname;
+    try {
+        ({ pathname } = new URL(req.url ?? '/', 'http://localhost'));
+    } catch {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Bad request');
+        return;
+    }
+
     let file = await resolveFile(pathname);
 
     // Client-side routes have no file behind them, so anything that is not a
@@ -100,7 +118,7 @@ const server = createServer(async (req, res) => {
 
     res.writeHead(200, {
         'Content-Type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
-        'Cache-Control': cacheControl(pathname),
+        'Cache-Control': cacheControl(file),
         'X-Content-Type-Options': 'nosniff',
     });
 
