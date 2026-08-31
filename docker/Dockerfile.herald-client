@@ -29,6 +29,7 @@ WORKDIR /app
 
 COPY --from=builder /app/apps/herald-client/build ./dist
 COPY scripts/serve-static.mjs ./serve-static.mjs
+COPY scripts/serve-herald.mjs ./serve-herald.mjs
 
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
@@ -36,4 +37,4 @@ ENV GIT_COMMIT=$GIT_COMMIT
 ENV VITE_PORT=4231
 EXPOSE 4231
 
-CMD ["sh", "-c", "node serve-static.mjs dist ${VITE_PORT}"]
+CMD ["sh", "-c", "node serve-herald.mjs dist ${VITE_PORT}"]

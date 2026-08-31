@@ -5,15 +5,18 @@
 // is that they need no node_modules at all.
 //
 // Usage: node serve-static.mjs <root> [port]
+//
+// Also importable: createStaticHandler({ root, transformHtml }) returns the
+// request handler, so a wrapper can serve the same files while rewriting the
+// HTML shell -- which is how per-page metadata reaches crawlers that never run
+// the bundle (#975).
 
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { stat } from 'node:fs/promises';
 import { join, resolve, relative, extname, sep } from 'node:path';
 
-const root = resolve(process.argv[2] ?? 'dist');
-const port = Number(process.argv[3] ?? process.env.VITE_PORT ?? 8080);
-const host = process.env.HOST ?? '0.0.0.0';
 
 const TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -43,6 +46,8 @@ const TYPES = {
 // Vite fingerprints everything under /assets, so those can be cached
 // indefinitely. HTML never is, or a deploy stays invisible until the browser
 // decides to look again.
+export function createStaticHandler({ root, transformHtml }) {
+
 function cacheControl(file) {
     const inAssets = relative(root, file).startsWith('assets' + sep);
     const isHtml = extname(file).toLowerCase() === '.html';
@@ -84,7 +89,7 @@ async function resolveFile(pathname) {
     return null;
 }
 
-const server = createServer(async (req, res) => {
+return async function handle(req, res) {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
         res.writeHead(405, { 'Allow': 'GET, HEAD' }).end();
         return;
@@ -116,10 +121,25 @@ const server = createServer(async (req, res) => {
         return;
     }
 
+    const isHtml = extname(file).toLowerCase() === '.html';
+
+    // The shell is one small file and is rewritten per request when a wrapper
+    // asks for it, so it is read into memory rather than streamed. Everything
+    // else streams.
+    let body;
+    if (isHtml && transformHtml) {
+        try {
+            body = transformHtml(await readFile(file, 'utf-8'), pathname);
+        } catch {
+            body = undefined;
+        }
+    }
+
     res.writeHead(200, {
         'Content-Type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
         'Cache-Control': cacheControl(file),
         'X-Content-Type-Options': 'nosniff',
+        ...(body === undefined ? {} : { 'Content-Length': Buffer.byteLength(body) }),
     });
 
     if (req.method === 'HEAD') {
@@ -127,9 +147,23 @@ const server = createServer(async (req, res) => {
         return;
     }
 
-    createReadStream(file).on('error', () => res.destroy()).pipe(res);
-});
+    if (body !== undefined) {
+        res.end(body);
+        return;
+    }
 
-server.listen(port, host, () => {
-    console.log(`Serving ${root} on http://${host}:${port}`);
-});
+    createReadStream(file).on('error', () => res.destroy()).pipe(res);
+};
+
+}
+
+// Run directly rather than imported.
+if (import.meta.url === `file://${process.argv[1]}`) {
+    const root = resolve(process.argv[2] ?? 'dist');
+    const port = Number(process.argv[3] ?? process.env.VITE_PORT ?? 8080);
+    const host = process.env.HOST ?? '0.0.0.0';
+
+    createServer(createStaticHandler({ root })).listen(port, host, () => {
+        console.log(`Serving ${root} on http://${host}:${port}`);
+    });
+}

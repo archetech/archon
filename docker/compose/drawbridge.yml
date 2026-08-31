@@ -70,6 +70,10 @@ services:
     image: ghcr.io/archetech/herald-client
     environment:
       - VITE_PORT=4231
+      # Used to build the identity-page metadata crawlers read, since the
+      # bundle is not run by an unfurler (#975).
+      - ARCHON_HERALD_DOMAIN=${ARCHON_HERALD_DOMAIN:-localhost}
+      - ARCHON_HERALD_PUBLIC_URL=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_HERALD_CLIENT_PORT:-4231}:4231"
