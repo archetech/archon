@@ -45,6 +45,13 @@ WORKDIR /app/explorer
 
 COPY --from=builder /app/explorer ./
 
+# server.js reads this to decide the path it serves under, and the bundle was
+# built against the same value, so the two disagree unless the runtime carries
+# it as well. Compose also sets it in the environment, but the image has to be
+# consistent on its own.
+ARG VITE_EXPLORER_BASE=/explorer/
+ENV VITE_EXPLORER_BASE=$VITE_EXPLORER_BASE
+
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
 
