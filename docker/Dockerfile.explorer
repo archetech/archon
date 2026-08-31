@@ -1,5 +1,5 @@
 # Use the official Node.js as the base image
-FROM node:22.23.2-trixie-slim
+FROM node:22.23.2-trixie-slim AS builder
 
 # Set the working directory
 WORKDIR /app
@@ -32,10 +32,29 @@ ENV VITE_EXPLORER_BASE=$VITE_EXPLORER_BASE
 
 RUN npm run build
 
+# Drop dev dependencies once the bundle is built. The build tooling is
+# large -- vite, typescript and the react plugin -- and none of it is read
+# by server.js.
+RUN npm prune --omit=dev
+
+# server.js imports only express and dotenv, both of which resolve from the
+# service's own node_modules, so the root tree is not copied at all (#987).
+FROM node:22.23.2-trixie-slim
+
+WORKDIR /app/explorer
+
+COPY --from=builder /app/explorer ./
+
+# server.js reads this to decide the path it serves under, and the bundle was
+# built against the same value, so the two disagree unless the runtime carries
+# it as well. Compose also sets it in the environment, but the image has to be
+# consistent on its own.
+ARG VITE_EXPLORER_BASE=/explorer/
+ENV VITE_EXPLORER_BASE=$VITE_EXPLORER_BASE
+
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
 
 EXPOSE 4000
 
-# Run...
 CMD ["node", "server.js"]
