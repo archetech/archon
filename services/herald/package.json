@@ -9,6 +9,6 @@
     "build": "npm run build --prefix server"
   },
   "dependencies": {
-    "jose": "^6.2.9"
+    "jose": "^6.2.10"
   }
 }
