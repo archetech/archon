@@ -13,12 +13,12 @@
   "license": "MIT",
   "dependencies": {
     "@bitgo/utxo-lib": "^11.22.1",
+    "@scure/bip32": "^2.4.0",
     "axios": "^1.18.1",
     "bip39": "^3.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
-    "hdkey": "^2.1.0",
     "morgan": "^1.11.0",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",

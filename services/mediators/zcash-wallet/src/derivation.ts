@@ -1,5 +1,5 @@
 import * as bip39 from 'bip39';
-import HDKey from 'hdkey';
+import { HDKey } from '@scure/bip32';
 import { ECPair, address, crypto, networks } from '@bitgo/utxo-lib';
 import type { WalletNetwork } from './config.js';
 
@@ -50,7 +50,7 @@ export function deriveTransparentAddress(
         throw new Error(`Could not derive private key at m/44'/${getCoinType(network)}'/0'/${chain}/${index}`);
     }
 
-    const keyPair = ECPair.fromPrivateKey(child.privateKey);
+    const keyPair = ECPair.fromPrivateKey(Buffer.from(child.privateKey));
     const hash = crypto.hash160(keyPair.publicKey);
     const zecNetwork = getZcashNetwork(network);
     return address.toBase58Check(hash, zecNetwork.pubKeyHash, zecNetwork);

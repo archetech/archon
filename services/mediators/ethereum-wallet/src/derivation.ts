@@ -1,5 +1,5 @@
 import * as bip39 from 'bip39';
-import HDKey from 'hdkey';
+import { HDKey } from '@scure/bip32';
 import { Wallet } from 'ethers';
 
 export function derivePrivateKey(mnemonic: string, derivationPath: string): string {
@@ -11,7 +11,7 @@ export function derivePrivateKey(mnemonic: string, derivationPath: string): stri
         throw new Error(`Could not derive Ethereum private key at ${derivationPath}`);
     }
 
-    return `0x${child.privateKey.toString('hex')}`;
+    return `0x${Buffer.from(child.privateKey).toString('hex')}`;
 }
 
 export function deriveWallet(mnemonic: string, derivationPath: string): Wallet {

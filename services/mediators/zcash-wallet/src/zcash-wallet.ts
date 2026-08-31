@@ -397,7 +397,7 @@ async function buildSignAndBroadcast(
         txb.sign({
             prevOutScriptType: 'p2pkh',
             vin: index,
-            keyPair: ECPair.fromPrivateKey(child.privateKey),
+            keyPair: ECPair.fromPrivateKey(Buffer.from(child.privateKey)),
             hashType: Transaction.SIGHASH_ALL,
         });
     });

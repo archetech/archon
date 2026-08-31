@@ -43,9 +43,6 @@
       "@didcid/cipher/types": [
         "packages/cipher/src/types.ts"
       ],
-      "@didcid/browser-hdkey": [
-        "packages/browser-hdkey/lib/hdkey.js"
-      ],
       "@didcid/common/errors": [
         "packages/common/src/errors.ts"
       ],

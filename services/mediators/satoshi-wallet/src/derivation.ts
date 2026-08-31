@@ -1,5 +1,5 @@
 import * as bip39 from 'bip39';
-import HDKey from 'hdkey';
+import { HDKey } from '@scure/bip32';
 import * as bitcoin from 'bitcoinjs-lib';
 import type { WalletNetwork } from './config.js';
 
@@ -58,7 +58,7 @@ export function deriveAddress(
     }
 
     const payment = bitcoin.payments.p2wpkh({
-        pubkey: child.publicKey,
+        pubkey: Buffer.from(child.publicKey),
         network: getBtcNetwork(network),
     });
 
@@ -70,7 +70,7 @@ export function deriveAddress(
         address: payment.address,
         output: payment.output,
         path: derivePath(network, chain, index),
-        publicKey: child.publicKey,
+        publicKey: Buffer.from(child.publicKey),
     };
 }
 

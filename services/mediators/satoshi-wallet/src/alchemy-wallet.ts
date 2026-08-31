@@ -288,7 +288,7 @@ function deriveKeyPair(mnemonic: string, network: WalletNetwork, utxo: AlchemyWa
     if (!child.privateKey) {
         throw new Error(`Could not derive private key at ${utxo.path}`);
     }
-    return ECPair.fromPrivateKey(child.privateKey, { network: getBtcNetwork(network) });
+    return ECPair.fromPrivateKey(Buffer.from(child.privateKey), { network: getBtcNetwork(network) });
 }
 
 function sortUtxos(utxos: AlchemyWalletUtxo[]): AlchemyWalletUtxo[] {
