@@ -212,6 +212,9 @@ program
             const { registry } = options;
             const did = await keymaster.createId(name, { registry });
             console.log(did);
+            // A wallet is created on demand, so any create-id may be the run
+            // that made one. On stderr, so it cannot land in a piped DID.
+            console.error('Back up your wallet: keymaster show-mnemonic');
         }
         catch (error: any) {
             console.error(error.error || error.message || error);

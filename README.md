@@ -67,6 +67,17 @@ The installer:
 
 After setup it prints optional `.bashrc` and `.zshrc` snippets so users can persist the Node URL and, if they choose, the passphrase for future shells.
 
+Back up the wallet before putting anything in it. The wallet file holds the only
+copy of your keys, and every identity in it is derived from one recovery phrase:
+
+```bash
+keymaster show-mnemonic          # the 12 words that restore this wallet
+keymaster backup-wallet-file backup.json
+```
+
+`keymaster import-wallet "<phrase>"` restores a wallet from those words on
+another machine, and `restore-wallet-file` from the file.
+
 ### Local Development (for developers)
 
 If you're developing or working on Archon follow these additional steps after cloning.
