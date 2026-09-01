@@ -71,9 +71,13 @@ services:
     environment:
       - VITE_PORT=4231
       # Used to build the identity-page metadata crawlers read, since the
-      # bundle is not run by an unfurler (#975).
+      # bundle is not run by an unfurler (#975). The public URL is the origin
+      # serving this client -- conventionally names.<domain>, per the Caddy
+      # block in the deployment guide -- which is not the Drawbridge origin
+      # that fronts /names/*. Left empty, og:url is omitted rather than
+      # pointing previews at a host that does not serve the page.
       - ARCHON_HERALD_DOMAIN=${ARCHON_HERALD_DOMAIN:-localhost}
-      - ARCHON_HERALD_PUBLIC_URL=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
+      - ARCHON_HERALD_PUBLIC_URL=${ARCHON_HERALD_PUBLIC_URL:-}
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:
       - "${ARCHON_HERALD_CLIENT_PORT:-4231}:4231"

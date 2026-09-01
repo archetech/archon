@@ -48,6 +48,29 @@ afterAll(() => {
     rmSync(dir, { recursive: true, force: true });
 });
 
+// Starts a second instance with different configuration, to assert what the
+// tags look like when the deployment has not set an origin.
+async function withServer(env: NodeJS.ProcessEnv): Promise<string> {
+    const port = 8830 + Math.floor(Math.random() * 60);
+    const child = spawn('node', ['scripts/serve-herald.mjs', dir, String(port)], {
+        stdio: 'ignore',
+        env: { ...process.env, ARCHON_HERALD_PUBLIC_URL: '', ...env },
+    });
+
+    try {
+        for (let i = 0; i < 50; i++) {
+            try {
+                return await (await fetch(`http://127.0.0.1:${port}/id/david`)).text();
+            } catch {
+                await new Promise(r => setTimeout(r, 100));
+            }
+        }
+        throw new Error('server did not start');
+    } finally {
+        child.kill();
+    }
+}
+
 describe('serve-herald identity metadata', () => {
     it('names the identity in the title', async () => {
         expect(await html('/id/david')).toContain('<title>david@example.org</title>');
@@ -94,6 +117,17 @@ describe('serve-herald identity metadata', () => {
 
         expect(page).not.toContain('<script>alert(1)</script>');
         expect(page).toContain('<title>Name Service</title>');
+    });
+
+    it('omits og:url when no public origin is configured', async () => {
+        // The origin serving these pages is not the Drawbridge origin that
+        // fronts /names/*, so it cannot be derived from it. Unset, previews get
+        // a title and description but no link, rather than a link to a host
+        // that returns 404 for /id/<name>.
+        const bare = await withServer({ ARCHON_HERALD_DOMAIN: DOMAIN });
+
+        expect(bare).toContain('<title>david@example.org</title>');
+        expect(bare).not.toContain('og:url');
     });
 
     it('still serves assets and 404s a missing one', async () => {
