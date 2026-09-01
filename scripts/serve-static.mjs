@@ -48,112 +48,112 @@ const TYPES = {
 // decides to look again.
 export function createStaticHandler({ root, transformHtml }) {
 
-function cacheControl(file) {
-    const inAssets = relative(root, file).startsWith('assets' + sep);
-    const isHtml = extname(file).toLowerCase() === '.html';
+    function cacheControl(file) {
+        const inAssets = relative(root, file).startsWith('assets' + sep);
+        const isHtml = extname(file).toLowerCase() === '.html';
 
-    return inAssets && !isHtml ? 'public, max-age=31536000, immutable' : 'no-cache';
-}
+        return inAssets && !isHtml ? 'public, max-age=31536000, immutable' : 'no-cache';
+    }
 
-async function resolveFile(pathname) {
+    async function resolveFile(pathname) {
     // decodeURIComponent throws on a malformed escape, so a bad URL resolves to
     // no file rather than taking the process down.
-    let decoded;
-    try {
-        decoded = decodeURIComponent(pathname);
-    } catch {
-        return null;
-    }
-
-    // Join then verify the result is still inside root, so `..` segments and
-    // encoded separators cannot escape the served directory.
-    const candidate = resolve(join(root, decoded));
-    if (candidate !== root && !candidate.startsWith(root + sep)) {
-        return null;
-    }
-
-    try {
-        const info = await stat(candidate);
-        if (info.isFile()) {
-            return candidate;
-        }
-        if (info.isDirectory()) {
-            const index = join(candidate, 'index.html');
-            await stat(index);
-            return index;
-        }
-    } catch {
-        return null;
-    }
-
-    return null;
-}
-
-return async function handle(req, res) {
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-        res.writeHead(405, { 'Allow': 'GET, HEAD' }).end();
-        return;
-    }
-
-    // Parsed against a fixed base rather than the Host header, which is
-    // attacker-controlled: a value like `[` makes the base invalid, and the
-    // throw inside this async handler would take the process down. Only the
-    // path is wanted, so the authority is irrelevant.
-    let pathname;
-    try {
-        ({ pathname } = new URL(req.url ?? '/', 'http://localhost'));
-    } catch {
-        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Bad request');
-        return;
-    }
-
-    let file = await resolveFile(pathname);
-
-    // Client-side routes have no file behind them, so anything that is not a
-    // real asset falls back to the app shell. Requests that look like assets do
-    // not, or a missing bundle would arrive as HTML and fail confusingly.
-    if (!file && !extname(pathname)) {
-        file = await resolveFile('/index.html');
-    }
-
-    if (!file) {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
-        return;
-    }
-
-    const isHtml = extname(file).toLowerCase() === '.html';
-
-    // The shell is one small file and is rewritten per request when a wrapper
-    // asks for it, so it is read into memory rather than streamed. Everything
-    // else streams.
-    let body;
-    if (isHtml && transformHtml) {
+        let decoded;
         try {
-            body = transformHtml(await readFile(file, 'utf-8'), pathname);
+            decoded = decodeURIComponent(pathname);
         } catch {
-            body = undefined;
+            return null;
         }
+
+        // Join then verify the result is still inside root, so `..` segments and
+        // encoded separators cannot escape the served directory.
+        const candidate = resolve(join(root, decoded));
+        if (candidate !== root && !candidate.startsWith(root + sep)) {
+            return null;
+        }
+
+        try {
+            const info = await stat(candidate);
+            if (info.isFile()) {
+                return candidate;
+            }
+            if (info.isDirectory()) {
+                const index = join(candidate, 'index.html');
+                await stat(index);
+                return index;
+            }
+        } catch {
+            return null;
+        }
+
+        return null;
     }
 
-    res.writeHead(200, {
-        'Content-Type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
-        'Cache-Control': cacheControl(file),
-        'X-Content-Type-Options': 'nosniff',
-        ...(body === undefined ? {} : { 'Content-Length': Buffer.byteLength(body) }),
-    });
+    return async function handle(req, res) {
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+            res.writeHead(405, { 'Allow': 'GET, HEAD' }).end();
+            return;
+        }
 
-    if (req.method === 'HEAD') {
-        res.end();
-        return;
-    }
+        // Parsed against a fixed base rather than the Host header, which is
+        // attacker-controlled: a value like `[` makes the base invalid, and the
+        // throw inside this async handler would take the process down. Only the
+        // path is wanted, so the authority is irrelevant.
+        let pathname;
+        try {
+            ({ pathname } = new URL(req.url ?? '/', 'http://localhost'));
+        } catch {
+            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Bad request');
+            return;
+        }
 
-    if (body !== undefined) {
-        res.end(body);
-        return;
-    }
+        let file = await resolveFile(pathname);
 
-    createReadStream(file).on('error', () => res.destroy()).pipe(res);
-};
+        // Client-side routes have no file behind them, so anything that is not a
+        // real asset falls back to the app shell. Requests that look like assets do
+        // not, or a missing bundle would arrive as HTML and fail confusingly.
+        if (!file && !extname(pathname)) {
+            file = await resolveFile('/index.html');
+        }
+
+        if (!file) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
+            return;
+        }
+
+        const isHtml = extname(file).toLowerCase() === '.html';
+
+        // The shell is one small file and is rewritten per request when a wrapper
+        // asks for it, so it is read into memory rather than streamed. Everything
+        // else streams.
+        let body;
+        if (isHtml && transformHtml) {
+            try {
+                body = transformHtml(await readFile(file, 'utf-8'), pathname);
+            } catch {
+                body = undefined;
+            }
+        }
+
+        res.writeHead(200, {
+            'Content-Type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
+            'Cache-Control': cacheControl(file),
+            'X-Content-Type-Options': 'nosniff',
+            ...(body === undefined ? {} : { 'Content-Length': Buffer.byteLength(body) }),
+        });
+
+        if (req.method === 'HEAD') {
+            res.end();
+            return;
+        }
+
+        if (body !== undefined) {
+            res.end(body);
+            return;
+        }
+
+        createReadStream(file).on('error', () => res.destroy()).pipe(res);
+    };
 
 }
 
