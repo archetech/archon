@@ -1811,10 +1811,11 @@ program
     .action(async (id) => {
         try {
             const config = await keymaster.addLightning(id);
-            // The keys are already stored in the wallet by addLightning, so
-            // printing them only copies credentials into scrollback, shell
-            // history and CI logs. adminKey authorises spending -- it is what
-            // lightning-pay and lightning-zap use.
+            // adminKey spends: lightning-pay, lightning-zap and
+            // lightning-payments pass it. invoiceKey cannot -- it creates
+            // invoices and reads balance and payment status. addLightning has
+            // already persisted both to the wallet, so the summary reports the
+            // wallet id and leaves the credentials out of stdout.
             console.log(`Lightning wallet created (id ${config.walletId}).`);
             console.log('Keys are stored in your wallet. The admin key can spend from it.');
             console.log('Show them with: show-wallet');
