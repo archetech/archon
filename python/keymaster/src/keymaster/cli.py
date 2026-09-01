@@ -477,7 +477,15 @@ async def cmd_remove_nostr(km: Keymaster, args: argparse.Namespace) -> None:
 # Lightning -------------------------------------------------------------------
 
 async def cmd_add_lightning(km: Keymaster, args: argparse.Namespace) -> None:
-    _print_json(await km.add_lightning(args.id))
+    config = await km.add_lightning(args.id)
+    # adminKey spends: lightning-pay, lightning-zap and lightning-payments
+    # pass it. invoiceKey cannot -- it creates invoices and reads balance and
+    # payment status. add_lightning has already persisted both to the wallet,
+    # so the summary reports the wallet id and leaves the credentials out of
+    # stdout.
+    print(f"Lightning wallet created (id {config['walletId']}).")
+    print("Keys are stored in your wallet. The admin key can spend from it.")
+    print("Show them with: show-wallet")
 
 
 async def cmd_remove_lightning(km: Keymaster, args: argparse.Namespace) -> None:
