@@ -988,7 +988,13 @@ program
     .action(async (id) => {
         try {
             const config = await keymaster.addLightning(id);
-            console.log(JSON.stringify(config, null, 4));
+            // The keys are already stored in the wallet by addLightning, so
+            // printing them only copies credentials into scrollback, shell
+            // history and CI logs. adminKey authorises spending -- it is what
+            // lightning-pay and lightning-zap use.
+            console.log(`Lightning wallet created (id ${config.walletId}).`);
+            console.log('Keys are stored in your wallet. The admin key can spend from it.');
+            console.log('Show them with: show-wallet');
         }
         catch (error: any) {
             console.error(error.error || error.message || error);
