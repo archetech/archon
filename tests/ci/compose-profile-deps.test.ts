@@ -3,9 +3,10 @@ import { globSync } from 'fs';
 import { load } from 'js-yaml';
 
 // A service with no profile always starts; a gated one starts only when its
-// profile is selected. So an ungated service that requires a gated one waits on
-// something that need never arrive. Gated services depending on each other are
-// fine, being selected together.
+// profile is selected. So a required dependency on a gated service is only
+// satisfiable when every profile that starts the dependent also starts the
+// dependency -- an ungated dependent never qualifies, and a dependent gated
+// behind some other profile qualifies only if its profiles are a subset.
 
 const COMPOSE = globSync('docker/compose/*.yml').concat(globSync('docker-compose*.yml'));
 
@@ -34,13 +35,13 @@ function requiredDependencies(dependsOn: unknown): string[] {
 describe('compose profiles', () => {
     // Gathered across every fragment: a service is defined in one file and
     // depended on from another, so neither side alone shows the pairing.
-    const gated = new Set<string>();
+    const gated = new Map<string, Set<string>>();
     const dependencies: { from: string, on: string, path: string }[] = [];
 
     for (const path of COMPOSE) {
         for (const [name, service] of Object.entries(servicesOf(path))) {
             if (service?.profiles?.length) {
-                gated.add(name);
+                gated.set(name, new Set(service.profiles));
             }
             for (const on of requiredDependencies(service?.depends_on)) {
                 dependencies.push({ from: name, on, path });
@@ -50,14 +51,29 @@ describe('compose profiles', () => {
 
     it('reads the fragments it is meant to check', () => {
         expect(COMPOSE.length).toBeGreaterThan(10);
-        expect(gated.size).toBeGreaterThan(0);
         expect(dependencies.length).toBeGreaterThan(0);
+
+        // Named rather than counted: the assertion below stays green on any
+        // non-empty set, so a service losing its gate would go unnoticed.
+        expect([...gated.get('mongodb') ?? []]).toEqual(['mongodb']);
+        expect([...gated.get('hyperswarm-mediator') ?? []]).toEqual(['hyperswarm']);
     });
 
-    it('are not depended on by services that always start', () => {
+    it('are not required by services their profile does not start', () => {
         const unsatisfiable = dependencies
-            .filter(({ from, on }) => gated.has(on) && !gated.has(from))
-            .map(({ from, on, path }) => `${path}: ${from} always starts but requires ${on}, which is profile-gated`);
+            .filter(({ from, on }) => {
+                const target = gated.get(on);
+                if (!target) {
+                    return false;
+                }
+                const source = gated.get(from);
+                return !source || [...source].some(profile => !target.has(profile));
+            })
+            .map(({ from, on, path }) => {
+                const source = [...gated.get(from) ?? []];
+                const where = source.length ? `starts under ${source.join(',')}` : 'always starts';
+                return `${path}: ${from} ${where} but requires ${on}, gated behind ${[...gated.get(on)!].join(',')}`;
+            });
 
         expect([...new Set(unsatisfiable)].sort()).toEqual([]);
     });
