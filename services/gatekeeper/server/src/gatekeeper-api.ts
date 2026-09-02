@@ -114,9 +114,6 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
     const startTime = new Date();
     const app = express();
 
-    // cors() answers preflight itself -- it ends the OPTIONS request rather
-    // than calling next() -- so no wildcard OPTIONS route is needed. Express 5
-    // rejects a bare '*' path outright.
     app.use(cors());
 
     // HTTP request logging - use pino in production, morgan in development

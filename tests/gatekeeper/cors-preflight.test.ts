@@ -2,10 +2,9 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 import { createGatekeeperApp } from '../../services/gatekeeper/server/src/gatekeeper-api.ts';
 
-// The app used to register `app.options('*', cors())` alongside `app.use(cors())`.
-// That route was unreachable -- cors() ends the OPTIONS request itself rather
-// than calling next() -- and Express 5 rejects a bare '*' path, so the server
-// threw before it could listen (#1023). Removing it must not cost preflight.
+// cors() is mounted globally rather than behind a wildcard OPTIONS route: it
+// answers preflight itself, ending the request instead of calling next(). These
+// pin the browser-visible contract that arrangement has to satisfy.
 
 function createApp() {
     const { app } = createGatekeeperApp({
