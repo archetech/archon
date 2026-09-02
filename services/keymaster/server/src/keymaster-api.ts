@@ -130,8 +130,10 @@ if (process.env.NODE_ENV === 'production') {
 } else {
     app.use(morgan('dev'));
 }
+// cors() answers preflight itself -- it ends the OPTIONS request rather than
+// calling next() -- so no wildcard OPTIONS route is needed. Express 5 rejects
+// a bare '*' path outright.
 app.use(cors());
-app.options('*', cors());
 app.use(express.json());
 
 // Metrics middleware - track HTTP requests
