@@ -141,6 +141,9 @@ async def cmd_recover_wallet_did(km: Keymaster, args: argparse.Namespace) -> Non
 async def cmd_create_id(km: Keymaster, args: argparse.Namespace) -> None:
     opts = {"registry": args.registry} if args.registry else {}
     print(await km.create_id(args.name, opts or None))
+    # A wallet is created on demand, so any create-id may be the run that made
+    # one. On stderr, so it cannot land in a piped DID.
+    print("Back up your wallet: keymaster show-mnemonic", file=sys.stderr)
 
 
 async def cmd_resolve_id(km: Keymaster, args: argparse.Namespace) -> None:

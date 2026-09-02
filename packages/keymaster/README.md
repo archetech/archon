@@ -129,6 +129,9 @@ keymaster create-wallet
 # Create an identity
 keymaster create-id MyBot
 
+# Back it up -- these 12 words are the only way to restore the wallet
+keymaster show-mnemonic
+
 # List identities
 keymaster list-ids
 ```
