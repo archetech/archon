@@ -3,10 +3,9 @@ import { globSync } from 'fs';
 import { load } from 'js-yaml';
 
 // A service with no profile always starts; a gated one starts only when its
-// profile is selected. So an ungated service depending on a gated one waits on
-// something that need never arrive, and compose has no conditional depends_on
-// to express the pairing. Gated services depending on each other are fine --
-// they are selected together.
+// profile is selected. So an ungated service that requires a gated one waits on
+// something that need never arrive. Gated services depending on each other are
+// fine, being selected together.
 
 const COMPOSE = globSync('docker/compose/*.yml').concat(globSync('docker-compose*.yml'));
 
@@ -17,9 +16,9 @@ function servicesOf(path: string): Record<string, Service> {
     return doc?.services ?? {};
 }
 
-// `required: false` is the supported way to depend on a service that may not be
-// in the project: compose honours the ordering when it is running and skips it
-// otherwise. Only a required dependency can strand the dependent.
+// `required: false` depends on a service that may not be in the project: the
+// ordering is honoured when it runs and skipped otherwise. Only a required
+// dependency can strand the dependent.
 function requiredDependencies(dependsOn: unknown): string[] {
     if (Array.isArray(dependsOn)) {
         return dependsOn as string[];

@@ -42,8 +42,6 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
-        # Gated behind the mongodb profile, so honour the ordering when it is
-        # running and ignore it otherwise.
         required: false
       ipfs:
         condition: service_healthy
