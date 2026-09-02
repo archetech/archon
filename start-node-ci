@@ -44,13 +44,14 @@ RETRY_INTERVAL=5
 RETRY_COUNT=0
 
 while true; do
-  # Count total services defined
-  TOTAL_SERVICES="6"
+  # Which services start depends on the selected profiles, so take the total
+  # from the containers compose created rather than a fixed number.
+  TOTAL_SERVICES=$(docker compose ps --services | grep -c .)
 
   # Count lines with 'Up' in status
-  UP_COUNT=$(docker compose ps | grep 'Up' | wc -l)
+  UP_COUNT=$(docker compose ps | grep -c 'Up')
 
-  if [[ "$UP_COUNT" -eq "$TOTAL_SERVICES" ]]; then
+  if [[ "$TOTAL_SERVICES" -gt 0 && "$UP_COUNT" -eq "$TOTAL_SERVICES" ]]; then
     echo "✅ All containers are 'Up'"
     break
   fi
