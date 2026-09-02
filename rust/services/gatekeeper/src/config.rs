@@ -53,8 +53,8 @@ impl Config {
                 "ARCHON_GATEKEEPER_UPLOAD_LIMIT",
                 "10mb",
             ))?,
-            gc_interval_minutes: env_parse("ARCHON_GATEKEEPER_GC_INTERVAL", 15)?,
-            status_interval_minutes: env_parse("ARCHON_GATEKEEPER_STATUS_INTERVAL", 5)?,
+            gc_interval_minutes: env_parse("ARCHON_GATEKEEPER_GC_INTERVAL", 60)?,
+            status_interval_minutes: env_parse("ARCHON_GATEKEEPER_STATUS_INTERVAL", 1)?,
             admin_api_key: env::var("ARCHON_ADMIN_API_KEY").unwrap_or_default(),
             fallback_url: env_var_or_default(
                 "ARCHON_GATEKEEPER_FALLBACK_URL",

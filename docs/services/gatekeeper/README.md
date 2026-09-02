@@ -1054,13 +1054,13 @@ configurable intervals.
 
 ### 12.1 Status loop
 
-Interval: `ARCHON_GATEKEEPER_STATUS_INTERVAL` minutes (default 5).
+Interval: `ARCHON_GATEKEEPER_STATUS_INTERVAL` minutes (default 1).
 Runs `checkDIDs()` (the same code path as `GET /status`) and logs a status
 block to stdout. This loop also refreshes the DID-count Prometheus gauges.
 
 ### 12.2 GC loop
 
-Interval: `ARCHON_GATEKEEPER_GC_INTERVAL` minutes (default 15).
+Interval: `ARCHON_GATEKEEPER_GC_INTERVAL` minutes (default 60).
 Runs `verifyDb()` followed by `checkDids()`, so this loop also refreshes the
 DID-count Prometheus gauges:
 
@@ -1176,8 +1176,8 @@ registry segments are collapsed.
 | `ARCHON_GATEKEEPER_REGISTRIES` | unset | Comma-separated allowlist; empty/unset means `local,hyperswarm`. |
 | `ARCHON_GATEKEEPER_JSON_LIMIT` | `4mb` | JSON request-body size cap. |
 | `ARCHON_GATEKEEPER_UPLOAD_LIMIT` | `10mb` | Raw/text body cap on `/ipfs/text` and `/ipfs/data`. |
-| `ARCHON_GATEKEEPER_GC_INTERVAL` | `15` | GC loop interval in minutes (`0` disables). |
-| `ARCHON_GATEKEEPER_STATUS_INTERVAL` | `5` | Status loop interval in minutes (`0` disables). |
+| `ARCHON_GATEKEEPER_GC_INTERVAL` | `60` | GC loop interval in minutes (`0` disables). |
+| `ARCHON_GATEKEEPER_STATUS_INTERVAL` | `1` | Status loop interval in minutes (`0` disables). |
 | `ARCHON_ADMIN_API_KEY` | empty (**required**) | Admin API key. The service refuses to start without it; admin routes return 403 when unset. A warning is logged if it is shorter than 32 characters. Generate with `openssl rand -hex 32`. |
 | `ARCHON_GATEKEEPER_FALLBACK_URL` | `https://dev.uniresolver.io` | Universal resolver to consult on local notFound. Empty disables. |
 | `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` | `5000` | Fallback timeout in ms. |
