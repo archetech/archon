@@ -38,7 +38,9 @@ function requiredVariables(): Set<string> {
     for (const fragment of includedFragments()) {
         const text = readFileSync(fragment, 'utf-8');
         for (const [, name, fallback] of text.matchAll(INTERPOLATION)) {
-            if (!fallback) {
+            // ${VAR?err} and ${VAR:?err} carry no fallback -- compose demands the
+            // variable be set -- so they are required just as a bare ${VAR} is.
+            if (!fallback || fallback.startsWith('?') || fallback.startsWith(':?')) {
                 required.add(name);
             }
         }
