@@ -74,25 +74,44 @@ describe('minimal-sample.env', () => {
         expect(extra.sort()).toEqual([]);
     });
 
-    it('selects the profile of every service the fragments gate', () => {
-        const selected = readFileSync(SAMPLE, 'utf-8')
-            .match(/^COMPOSE_PROFILES=(.*)$/m)?.[1].split(',').map(p => p.trim()) ?? [];
+    it('selects the profile of every service its configuration requires', () => {
+        const text = readFileSync(SAMPLE, 'utf-8');
+        const selected = text.match(/^COMPOSE_PROFILES=(.*)$/m)?.[1].split(',').map(p => p.trim()) ?? [];
 
-        // A profile-gated service is silently absent when its profile is not
-        // selected: the stack comes up, minus the mediator that services the
-        // registry the gatekeeper is configured to publish to.
-        const gated = new Set<string>();
-        for (const fragment of includedFragments()) {
-            const doc = load(readFileSync(fragment, 'utf-8')) as any;
-            for (const service of Object.values(doc?.services ?? {}) as any[]) {
-                for (const profile of service?.profiles ?? []) {
-                    gated.add(profile);
+        // What a profile-gated service costs depends on the configuration: a
+        // gate is only wrong when something is configured to use the service
+        // behind it. Naming hyperswarm as a registry with no mediator running
+        // leaves DIDs unpublished; selecting the mongodb database with no
+        // mongodb running leaves the gatekeeper without a store.
+        const value = (name: string) => {
+            const fromSample = text.match(new RegExp(`^${name}=(.*)$`, 'm'))?.[1];
+            if (fromSample !== undefined) {
+                return fromSample;
+            }
+            for (const fragment of includedFragments()) {
+                const fallback = readFileSync(fragment, 'utf-8')
+                    .match(new RegExp(`\\$\\{${name}:-([^}]*)\\}`))?.[1];
+                if (fallback !== undefined) {
+                    return fallback;
                 }
+            }
+            return '';
+        };
+
+        const required = new Set<string>();
+        for (const name of ['ARCHON_GATEKEEPER_REGISTRIES', 'ARCHON_DEFAULT_REGISTRY']) {
+            if (value(name).split(',').map(r => r.trim()).includes('hyperswarm')) {
+                required.add('hyperswarm');
+            }
+        }
+        for (const name of ['ARCHON_GATEKEEPER_DB', 'ARCHON_KEYMASTER_DB']) {
+            if (value(name).trim() === 'mongodb') {
+                required.add('mongodb');
             }
         }
 
-        expect(gated.size).toBeGreaterThan(0);
-        expect([...gated].filter(p => !selected.includes(p)).sort()).toEqual([]);
+        expect(required.size).toBeGreaterThan(0);
+        expect([...required].filter(p => !selected.includes(p)).sort()).toEqual([]);
     });
 
     it('agrees with sample.env wherever both set the same variable', () => {

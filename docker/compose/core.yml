@@ -1,5 +1,9 @@
 services:
   mongodb:
+    # Only the mongodb setting of ARCHON_GATEKEEPER_DB / ARCHON_KEYMASTER_DB
+    # reaches this service, and mongo 5.0+ requires AVX, which not every
+    # x86_64 host has. Select the profile when a service is configured for it.
+    profiles: ["mongodb"]
     image: mongo:8.0
     volumes:
       - ../../data/mongodb:/data/db
