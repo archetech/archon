@@ -35,11 +35,13 @@ $ cp sample.env .env
 $ ./start-node
 ```
 
-To run only the core services, leave `COMPOSE_PROFILES` empty and use the
-default compose file:
+To run only the core services -- a gatekeeper, a keymaster and the hyperswarm
+mediator that publishes DIDs to peers -- use the minimal compose file and its
+own env sample, which carries just the variables that stack reads:
 
 ```bash
-COMPOSE_PROFILES= docker compose --env-file .env up
+$ cp minimal-sample.env .env
+$ docker compose --env-file .env -f docker/compose/minimal.yml up
 ```
 
 The default `docker-compose.yml` keeps optional fragments included, but gates
