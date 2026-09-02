@@ -115,7 +115,6 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
     const app = express();
 
     app.use(cors());
-    app.options('*', cors());
 
     // HTTP request logging - use pino in production, morgan in development
     if (options.httpLogging ?? process.env.NODE_ENV !== 'test') {

@@ -131,7 +131,6 @@ if (process.env.NODE_ENV === 'production') {
     app.use(morgan('dev'));
 }
 app.use(cors());
-app.options('*', cors());
 app.use(express.json());
 
 // Metrics middleware - track HTTP requests
