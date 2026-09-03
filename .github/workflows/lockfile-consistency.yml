@@ -77,3 +77,53 @@ jobs:
             printf '%b' "$missing_lockfiles"
             exit 1
           fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22.23.2"
+
+      - name: Pin npm 10.9.2
+        run: npm install --global npm@10.9.2
+
+      # A lockfile can satisfy the pairing above and still be unusable: a
+      # regeneration that prunes a nested version leaves an incompatible hoisted
+      # one behind, and npm ci refuses to install it. Resolving each changed
+      # lockfile reports that here rather than minutes later in the jobs that
+      # build from it.
+      - name: Resolve every changed lockfile
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed_lockfiles="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -E '(^|/)package-lock\.json$' || true)"
+
+          if [ -z "$changed_lockfiles" ]; then
+            echo "No lockfiles changed."
+            exit 0
+          fi
+
+          failed=""
+
+          while IFS= read -r lockfile; do
+            [ -z "$lockfile" ] && continue
+
+            # A lockfile deleted in this PR has nothing left to resolve.
+            [ -f "$lockfile" ] || continue
+
+            dir="$(dirname "$lockfile")"
+            echo "::group::npm ci --dry-run in $dir"
+            if ! (cd "$dir" && npm ci --dry-run --ignore-scripts); then
+              failed="${failed}${lockfile}\n"
+            fi
+            echo "::endgroup::"
+          done <<EOF
+          $changed_lockfiles
+          EOF
+
+          if [ -n "$failed" ]; then
+            echo "These lockfiles cannot be installed with npm ci:"
+            printf '%b' "$failed"
+            echo "Regenerate them with npm install rather than editing by hand."
+            exit 1
+          fi
