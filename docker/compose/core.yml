@@ -1,5 +1,8 @@
 services:
   mongodb:
+    # Reached only by the mongodb setting of ARCHON_GATEKEEPER_DB and
+    # ARCHON_KEYMASTER_DB. Mongo 5.0+ needs a CPU with AVX.
+    profiles: ["mongodb"]
     image: mongo:8.0
     volumes:
       - ../../data/mongodb:/data/db

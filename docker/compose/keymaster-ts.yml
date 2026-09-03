@@ -51,3 +51,4 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
+        required: false
