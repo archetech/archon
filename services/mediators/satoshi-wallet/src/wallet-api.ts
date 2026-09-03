@@ -177,6 +177,7 @@ async function main() {
     // Auto-setup: create watch-only wallet on startup
     const maxRetries = 12;
     let walletReady = false;
+    let descriptorMismatch: string | undefined;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const mnemonic = await fetchMnemonic();
@@ -185,6 +186,15 @@ async function main() {
             walletReady = true;
             break;
         } catch (error: any) {
+            // Fatal: the wallet watches a different seed's addresses. Retrying
+            // cannot change that, and serving addresses from it would take funds
+            // this node has no key for.
+            if (error.name === 'DescriptorMismatchError') {
+                logger.error(`Watch-only wallet does not match the current mnemonic: ${error.message}`);
+                descriptorMismatch = error.message;
+                break;
+            }
+
             // Fatal: bitcoind lacks sqlite support — descriptor wallets won't work
             if (error.message?.includes('sqlite')) {
                 logger.error(`Bitcoin node does not support descriptor wallets: ${error.message}`);
@@ -266,6 +276,13 @@ async function main() {
 
     // Receive address
     v1router.get('/wallet/address', requireAdminKey, async (_req, res) => {
+        // Refusing is the point of the check: an address served from a wallet
+        // built on another seed accepts funds nothing here can spend.
+        if (descriptorMismatch) {
+            res.status(503).json({ error: descriptorMismatch });
+            return;
+        }
+
         try {
             const mnemonic = config.backend === 'alchemy' ? await fetchMnemonic() : undefined;
             const address = await getReceiveAddress(btcClient, mnemonic, config.network);
