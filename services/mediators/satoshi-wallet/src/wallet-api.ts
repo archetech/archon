@@ -370,7 +370,8 @@ async function main() {
     // Wallet info / status
     v1router.get('/wallet/info', requireAdminKey, async (_req, res) => {
         try {
-            const status = await getWalletStatus(btcClient);
+            const mnemonic = config.backend === 'alchemy' ? undefined : await fetchMnemonic();
+            const status = await getWalletStatus(btcClient, mnemonic);
             res.json(status);
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get wallet info');

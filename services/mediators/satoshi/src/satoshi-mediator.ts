@@ -1109,23 +1109,32 @@ async function anchorBatch(): Promise<void> {
             }
 
             if (txid) {
+                // Recorded before the queue is touched. The transaction is already
+                // on the network and its fee already spent, so losing it here would
+                // have the next cycle broadcast a second one for the same batch.
+                const blockCount = await getChainBlockCount();
+
+                await jsonPersister.updateDb(async (db) => {
+                    (db.registered ??= []).push({
+                        did,
+                        txid: txid!
+                    });
+                    db.pending = {
+                        txids: [txid!],
+                        blockCount
+                    };
+                    db.lastExport = new Date().toISOString();
+                    delete db.pendingBatch;
+                });
+
+                satoshiBatchesAnchored.inc();
+
                 const ok = await gatekeeper.clearQueue(REGISTRY, covered);
 
-                if (ok) {
-                    satoshiBatchesAnchored.inc();
-                    const blockCount = await getChainBlockCount();
-                    await jsonPersister.updateDb(async (db) => {
-                        (db.registered ??= []).push({
-                            did,
-                            txid: txid!
-                        });
-                        db.pending = {
-                            txids: [txid!],
-                            blockCount
-                        };
-                        db.lastExport = new Date().toISOString();
-                        delete db.pendingBatch;
-                    });
+                if (!ok) {
+                    // The operations stay queued and will be batched again, which
+                    // costs another anchor but does not duplicate this one.
+                    console.warn(`Anchored batch ${did} but could not clear ${covered.length} operation(s) from the ${REGISTRY} queue`);
                 }
             }
         }

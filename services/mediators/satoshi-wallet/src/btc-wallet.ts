@@ -263,11 +263,12 @@ export async function estimateFee(
     return btcClient.estimateSmartFee(blocks || config.feeTarget, 'ECONOMICAL');
 }
 
-export async function getWalletStatus(btcClient: BtcClient): Promise<{
+export async function getWalletStatus(btcClient: BtcClient, mnemonic?: string): Promise<{
     network: WalletNetwork;
     walletName: string;
     ready: boolean;
     descriptorCount: number;
+    error?: string;
 }> {
     if (config.backend === 'alchemy') {
         return getAlchemyWalletStatus();
@@ -275,6 +276,24 @@ export async function getWalletStatus(btcClient: BtcClient): Promise<{
 
     try {
         const info: ListDescriptorsResult = await btcClient.listDescriptors(false);
+
+        // Descriptors being present is not readiness: a wallet built on another
+        // seed has them and can still sign nothing. Reporting ready here while
+        // /wallet/address answers 503 would give operators two answers.
+        if (mnemonic) {
+            try {
+                assertDescriptorsMatch(info.descriptors.map(d => d.desc), mnemonic, config.network, config.walletName);
+            } catch (error: any) {
+                return {
+                    network: config.network,
+                    walletName: config.walletName,
+                    ready: false,
+                    descriptorCount: info.descriptors.length,
+                    error: error.message,
+                };
+            }
+        }
+
         return {
             network: config.network,
             walletName: config.walletName,
