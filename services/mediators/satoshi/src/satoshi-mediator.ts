@@ -8,6 +8,7 @@ import JsonMongo from './db/mongo.js';
 import JsonSQLite from './db/sqlite.js';
 import config from './config.js';
 import { coveredOperations } from './batch.js';
+import { toFeeRate } from './fee.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
 import { DidRegistration } from '@didcid/gatekeeper/types';
@@ -860,7 +861,7 @@ async function retryFailedImports(): Promise<void> {
 
 export async function createOpReturnTxn(opReturnData: string): Promise<string | undefined> {
     const feeRate = await getHybridFeeRateSatPerVb();
-    console.log(`Anchoring with fee rate: ${feeRate.toFixed(1)} sat/vB`);
+    console.log(`Anchoring with fee rate: ${feeRate} sat/vB`);
     const txid = await walletAnchor(opReturnData, feeRate);
     console.log(`Transaction broadcast with txid: ${txid}`);
     return txid;
@@ -899,7 +900,11 @@ async function getHybridFeeRateSatPerVb(): Promise<number> {
     try {
         const estimate = await btcClient.estimateSmartFee(config.feeConf, 'ECONOMICAL');
         if (estimate.feerate) {
-            localSatPerVb = (estimate.feerate / 1000) * 1e8;
+            // BTC/kvB to sat/vB. The division and multiplication do not cancel in
+            // binary floating point -- 0.00003614 becomes 3.6140000000000003 --
+            // and Bitcoin Core rejects a fee_rate carrying more than three
+            // decimals as "Invalid amount", failing every anchor.
+            localSatPerVb = toFeeRate((estimate.feerate / 1000) * 1e8);
         }
     } catch (err: any) {
         console.warn(`estimateSmartFee failed, using fallback: ${err.message}`);
@@ -928,7 +933,7 @@ async function getHybridFeeRateSatPerVb(): Promise<number> {
         }
     }
 
-    return Math.max(localSatPerVb, oracleSatPerVb ?? 0);
+    return toFeeRate(Math.max(localSatPerVb, oracleSatPerVb ?? 0));
 }
 
 async function getEntryFromMempool(txids: string[]): Promise<{ entry: MempoolEntry, txid: string }> {

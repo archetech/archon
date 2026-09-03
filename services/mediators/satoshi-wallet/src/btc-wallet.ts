@@ -19,6 +19,7 @@ import config from './config.js';
 import type { WalletNetwork } from './config.js';
 import { buildDescriptors, getBtcNetwork } from './derivation.js';
 import { assertDescriptorsMatch } from './descriptor-check.js';
+import { toFeeRate } from './fee.js';
 import {
     anchorAlchemyData,
     bumpAlchemyTransactionFee,
@@ -352,7 +353,7 @@ export async function anchorData(
         0,
         {
             includeWatching: true,
-            fee_rate: feeRate || undefined,
+            fee_rate: feeRate ? toFeeRate(feeRate) : undefined,
             conf_target: feeRate ? undefined : config.feeTarget,
             replaceable: true,
             add_inputs: true,
@@ -378,7 +379,7 @@ export async function bumpTransactionFee(
 
     // psbtbumpfee returns a PSBT for watch-only wallets
     const bumpResult = await btcClient.command('psbtbumpfee', txid, {
-        ...(feeRate ? { fee_rate: feeRate } : {}),
+        ...(feeRate ? { fee_rate: toFeeRate(feeRate) } : {}),
     });
 
     const btcNetwork = getBtcNetwork(network);
@@ -481,7 +482,7 @@ export async function sendBtc(
         0,
         {
             includeWatching: true,
-            fee_rate: feeRate || undefined,
+            fee_rate: feeRate ? toFeeRate(feeRate) : undefined,
             conf_target: feeRate ? undefined : config.feeTarget,
             replaceable: true,
             subtractFeeFromOutputs: subtractFee ? [0] : [],
