@@ -7,6 +7,7 @@ import JsonRedis from './db/redis.js';
 import JsonMongo from './db/mongo.js';
 import JsonSQLite from './db/sqlite.js';
 import config from './config.js';
+import { coveredOperations } from './batch.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
 import { DidRegistration } from '@didcid/gatekeeper/types';
@@ -1024,12 +1025,6 @@ async function checkExportInterval(): Promise<boolean> {
     return (elapsedMinutes < config.exportInterval);
 }
 
-// Order is significant: the batch records the operations in the order they were
-// queued, so a differently ordered set is a different batch.
-function sameOpids(a: string[], b: string[]): boolean {
-    return a.length === b.length && a.every((opid, i) => opid === b[i]);
-}
-
 async function anchorBatch(): Promise<void> {
 
     if (await checkExportInterval()) {
@@ -1067,17 +1062,26 @@ async function anchorBatch(): Promise<void> {
                 const canonical = JSON.parse(cipher.canonicalizeJSON(op));
                 return gatekeeper.addJSON(canonical);
             }));
-            // An attempt that failed to broadcast left a batch asset behind. It
-            // describes these same operations, so anchoring it is what this attempt
-            // is for; minting another would publish a duplicate that nothing clears.
+            // A batch that has been created is authoritative until it anchors. It
+            // certifies one specific op-set, so re-cutting it whenever the queue
+            // moves would publish an asset nothing ever anchors or clears --
+            // operations queued during an outage go into the next batch instead.
             const db = await loadDb();
-            let did = db.pendingBatch && sameOpids(db.pendingBatch.opids, cids)
-                ? db.pendingBatch.did
-                : undefined;
+            const pending = db.pendingBatch;
+
+            let did = pending?.did;
+            let covered = coveredOperations(pending, operations, cids);
+
+            if (did && covered.length === 0) {
+                // Its operations have left the queue, so there is nothing to anchor.
+                console.warn(`Discarding batch ${did}: none of its operations remain queued`);
+                did = undefined;
+            }
 
             if (did) {
-                console.log(`Reusing batch ${did} from the previous attempt`);
+                console.log(`Reusing batch ${did} from the previous attempt (${covered.length} operation(s))`);
             } else {
+                covered = operations;
                 const batch = { version: 1, ops: cids };
                 did = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
                 const created = did;
@@ -1086,15 +1090,26 @@ async function anchorBatch(): Promise<void> {
                 });
             }
 
-            const txid = await createOpReturnTxn(did);
+            let txid: string | undefined;
+
+            try {
+                txid = await createOpReturnTxn(did);
+            } catch (error: any) {
+                // The wallet service answers 500 when it cannot sign or broadcast,
+                // so a failure arrives as a thrown request error rather than an
+                // absent txid. Both paths have to be counted.
+                satoshiAnchorFailures.inc();
+                console.warn(`Anchor attempt failed for batch ${did}: ${error.message}. Retrying it unchanged.`);
+                return;
+            }
 
             if (!txid) {
                 satoshiAnchorFailures.inc();
-                console.warn(`Anchor attempt failed for batch ${did}; retrying it unchanged next cycle`);
+                console.warn(`Anchor attempt for batch ${did} produced no transaction. Retrying it unchanged.`);
             }
 
             if (txid) {
-                const ok = await gatekeeper.clearQueue(REGISTRY, operations);
+                const ok = await gatekeeper.clearQueue(REGISTRY, covered);
 
                 if (ok) {
                     satoshiBatchesAnchored.inc();

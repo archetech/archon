@@ -255,8 +255,17 @@ async function main() {
             const mnemonic = await fetchMnemonic();
             const result = await setupWatchOnlyWallet(btcClient, mnemonic, config.network);
             walletSetupStatus.set(1);
+            // Recovery runs through this route, so a wallet that now validates has
+            // to lift the block startup put in place.
+            walletReady = true;
+            descriptorMismatch = undefined;
             res.json({ ok: true, network: config.network, ...result });
         } catch (error: any) {
+            if (error.name === 'DescriptorMismatchError') {
+                descriptorMismatch = error.message;
+            }
+            walletReady = false;
+            walletSetupStatus.set(0);
             logger.error({ err: error }, 'Wallet setup failed');
             res.status(500).json({ error: error.message });
         }
@@ -277,9 +286,13 @@ async function main() {
     // Receive address
     v1router.get('/wallet/address', requireAdminKey, async (_req, res) => {
         // Refusing is the point of the check: an address served from a wallet
-        // built on another seed accepts funds nothing here can spend.
-        if (descriptorMismatch) {
-            res.status(503).json({ error: descriptorMismatch });
+        // built on another seed accepts funds nothing here can spend. Setup
+        // failing for any other reason leaves the wallet equally unvalidated,
+        // and bitcoind will still answer from whatever descriptors it holds.
+        if (descriptorMismatch || !walletReady) {
+            res.status(503).json({
+                error: descriptorMismatch ?? 'Watch-only wallet is not set up; refusing to serve an address',
+            });
             return;
         }
 
