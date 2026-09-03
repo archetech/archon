@@ -1353,19 +1353,35 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedId, aliasList, imageList]);
 
-    useEffect(() => {
+    async function loadIdentityName() {
+        setIdentityNameValue('');
+        setIdentityNameInput('');
+        setIdentityNameError('');
+
         if (!selectedId) {
-            setIdentityNameValue('');
-            setIdentityNameInput('');
-            setIdentityNameError('');
             setIdentityNameLoading(false);
             return;
         }
 
-        setIdentityNameValue('');
-        setIdentityNameInput('');
-        setIdentityNameError('');
         setIdentityNameLoading(true);
+
+        try {
+            const identityDoc = await keymaster.resolveDID(selectedId);
+            const rawName = identityDoc?.didDocumentData?.name;
+            const nextName = typeof rawName === 'string' ? rawName : '';
+
+            setIdentityNameValue(nextName);
+            setIdentityNameInput(nextName);
+        } catch (error) {
+            setIdentityNameError(error.error || error.message || String(error));
+        } finally {
+            setIdentityNameLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        loadIdentityName();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedId]);
 
     async function applyAvatarCandidate() {
