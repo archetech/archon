@@ -1,5 +1,4 @@
-import { jest } from '@jest/globals';
-import { setupWatchOnlyWallet, descriptorKey } from '../../services/mediators/satoshi-wallet/src/btc-wallet.ts';
+import { assertDescriptorsMatch, descriptorKey } from '../../services/mediators/satoshi-wallet/src/descriptor-check.ts';
 import { buildDescriptors } from '../../services/mediators/satoshi-wallet/src/derivation.ts';
 
 // bitcoind holds no private keys for the watch-only wallet, so signing derives
@@ -10,43 +9,46 @@ import { buildDescriptors } from '../../services/mediators/satoshi-wallet/src/de
 const SEED_A = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const SEED_B = 'legal winner thank year wave sausage worth useful legal winner thank yellow';
 const NETWORK = 'mainnet';
+const WALLET = 'archon-watch-test';
 
-// bitcoind reports descriptors with a checksum appended and a range already
-// applied, so the stub mirrors that rather than echoing what we build.
-function asImported(descriptor: string) {
-    return { desc: `${descriptor}#abcdefgh`, timestamp: 0, active: true, range: [0, 1000], next: 0 };
-}
+// bitcoind reports descriptors with a checksum appended.
+const withChecksum = (descriptor: string) => `${descriptor}#abcdefgh`;
 
-function clientWith(descriptors: string[]) {
-    return {
-        command: jest.fn<any>().mockResolvedValue(undefined),
-        listDescriptors: jest.fn<any>().mockResolvedValue({ wallet_name: 'w', descriptors: descriptors.map(asImported) }),
-        getDescriptorInfo: jest.fn<any>(),
-        importDescriptors: jest.fn<any>(),
-    } as any;
-}
-
-describe('setupWatchOnlyWallet descriptor validation', () => {
-    it('accepts a wallet whose descriptors derive from the current mnemonic', async () => {
+describe('assertDescriptorsMatch', () => {
+    it('accepts descriptors derived from the current mnemonic', () => {
         const mine = buildDescriptors(SEED_A, NETWORK);
-        const result = await setupWatchOnlyWallet(clientWith([mine.external, mine.internal]), SEED_A, NETWORK);
 
-        expect(result.descriptors).toHaveLength(2);
+        expect(() => assertDescriptorsMatch(
+            [mine.external, mine.internal].map(withChecksum), SEED_A, NETWORK, WALLET,
+        )).not.toThrow();
     });
 
-    it('refuses a wallet built on a different seed', async () => {
+    it('rejects descriptors built on a different seed', () => {
         const theirs = buildDescriptors(SEED_B, NETWORK);
 
-        await expect(setupWatchOnlyWallet(clientWith([theirs.external, theirs.internal]), SEED_A, NETWORK))
-            .rejects.toThrow(/different seed/);
+        expect(() => assertDescriptorsMatch(
+            [theirs.external, theirs.internal].map(withChecksum), SEED_A, NETWORK, WALLET,
+        )).toThrow(/different seed/);
     });
 
-    it('refuses a descriptor with no key origin rather than skipping it', async () => {
-        // Valid, satisfies the /0/* and /1/* checks, and says nothing about the seed.
+    it('rejects a descriptor with no key origin rather than skipping it', () => {
+        // Valid, satisfies the /0/* and /1/* checks the setup already made, and
+        // says nothing about which seed it belongs to.
         const anonymous = 'wpkh(xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz/0/*)';
 
-        await expect(setupWatchOnlyWallet(clientWith([anonymous]), SEED_A, NETWORK))
-            .rejects.toThrow(/no key origin/);
+        expect(() => assertDescriptorsMatch([anonymous], SEED_A, NETWORK, WALLET))
+            .toThrow(/no key origin/);
+    });
+
+    it('accepts an empty wallet, which has nothing to contradict the mnemonic', () => {
+        expect(() => assertDescriptorsMatch([], SEED_A, NETWORK, WALLET)).not.toThrow();
+    });
+
+    it('names the wallet and both keys so the operator can act', () => {
+        const theirs = buildDescriptors(SEED_B, NETWORK);
+
+        expect(() => assertDescriptorsMatch([theirs.external], SEED_A, NETWORK, WALLET))
+            .toThrow(new RegExp(WALLET));
     });
 });
 
@@ -55,14 +57,13 @@ describe('descriptorKey', () => {
         const { external, internal } = buildDescriptors(SEED_A, NETWORK);
 
         expect(descriptorKey(external)).toBe(descriptorKey(internal));
-        expect(descriptorKey(`${external}#abcdefgh`)).toBe(descriptorKey(external));
+        expect(descriptorKey(withChecksum(external))).toBe(descriptorKey(external));
     });
 
     it('distinguishes seeds by more than the 32-bit fingerprint', () => {
         const a = descriptorKey(buildDescriptors(SEED_A, NETWORK).external)!;
         const b = descriptorKey(buildDescriptors(SEED_B, NETWORK).external)!;
 
-        expect(a).not.toBe(b);
         // The account xpub is compared too, so a fingerprint collision cannot pass.
         expect(a.split(']')[1]).not.toBe(b.split(']')[1]);
     });
