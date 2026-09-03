@@ -12,6 +12,14 @@ name: Build & Test Docker images
 on:
   pull_request:
 
+# Superseding pushes make earlier runs irrelevant: only the head commit's checks
+# gate a merge. Cancelling them on branches keeps a rapidly-iterated PR from
+# holding runners for commits nobody will merge. main is never cancelled, so its
+# builds and scans always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   build_test_images:
     name: build_test_images (${{ matrix.gatekeeper }} gatekeeper, ${{ matrix.keymaster }} keymaster)

@@ -3,6 +3,14 @@ name: Build Browser Extension
 on:
   push:
 
+# Superseding pushes make earlier runs irrelevant: only the head commit's checks
+# gate a merge. Cancelling them on branches keeps a rapidly-iterated PR from
+# holding runners for commits nobody will merge. main is never cancelled, so its
+# builds and scans always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   build-browser-extension:
     runs-on: ubuntu-latest
