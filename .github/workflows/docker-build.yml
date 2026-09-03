@@ -6,6 +6,14 @@ on:
 env:
   REGISTRY: ghcr.io
 
+# Superseding pushes make earlier runs irrelevant: only the head commit's checks
+# gate a merge. Cancelling them on branches keeps a rapidly-iterated PR from
+# holding runners for commits nobody will merge. main is never cancelled, so its
+# builds and scans always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -201,3 +209,23 @@ jobs:
           fail-build: false
           severity-cutoff: critical
           output-format: table
+
+  # A single context for branch protection to require. The matrix is 27 legs and
+  # grows with every new Dockerfile, so requiring the legs themselves would mean
+  # editing branch protection each time one is added -- the reason the sibling
+  # workflow rolls its matrix up the same way. arm64 is deliberately outside it:
+  # the nightly multi-platform run builds every image for linux/arm64.
+  image_build_result:
+    name: image build result
+    if: always()
+    needs: build_test_images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify every image built
+        run: |
+          result="${{ needs.build_test_images.result }}"
+          if [ "$result" != "success" ]; then
+            echo "build_test_images did not succeed (result: $result)"
+            exit 1
+          fi
+          echo "All image builds passed"

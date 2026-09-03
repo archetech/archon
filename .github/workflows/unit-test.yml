@@ -5,9 +5,21 @@ on:
     branches:
       - "**"
 
+# Superseding pushes make earlier runs irrelevant: only the head commit's checks
+# gate a merge. Cancelling them on branches keeps a rapidly-iterated PR from
+# holding runners for commits nobody will merge. main is never cancelled, so its
+# builds and scans always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # npm test runs jest --runInBand without --forceExit, so a leaked handle
+    # keeps the job alive rather than failing it. Without a bound that runs to
+    # the six-hour default.
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
