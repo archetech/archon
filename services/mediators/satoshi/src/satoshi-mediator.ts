@@ -417,6 +417,11 @@ const satoshiBatchesAnchored = new promClient.Counter({
     help: 'Successful batch anchors to blockchain',
 });
 
+const satoshiAnchorFailures = new promClient.Counter({
+    name: 'satoshi_anchor_failures_total',
+    help: 'Anchor attempts that produced no transaction',
+});
+
 const satoshiRbfBumps = new promClient.Counter({
     name: 'satoshi_rbf_bumps_total',
     help: 'Replace-by-fee fee bumps',
@@ -1019,6 +1024,12 @@ async function checkExportInterval(): Promise<boolean> {
     return (elapsedMinutes < config.exportInterval);
 }
 
+// Order is significant: the batch records the operations in the order they were
+// queued, so a differently ordered set is a different batch.
+function sameOpids(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((opid, i) => opid === b[i]);
+}
+
 async function anchorBatch(): Promise<void> {
 
     if (await checkExportInterval()) {
@@ -1056,9 +1067,31 @@ async function anchorBatch(): Promise<void> {
                 const canonical = JSON.parse(cipher.canonicalizeJSON(op));
                 return gatekeeper.addJSON(canonical);
             }));
-            const batch = { version: 1, ops: cids };
-            const did = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
+            // An attempt that failed to broadcast left a batch asset behind. It
+            // describes these same operations, so anchoring it is what this attempt
+            // is for; minting another would publish a duplicate that nothing clears.
+            const db = await loadDb();
+            let did = db.pendingBatch && sameOpids(db.pendingBatch.opids, cids)
+                ? db.pendingBatch.did
+                : undefined;
+
+            if (did) {
+                console.log(`Reusing batch ${did} from the previous attempt`);
+            } else {
+                const batch = { version: 1, ops: cids };
+                did = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
+                const created = did;
+                await jsonPersister.updateDb((data) => {
+                    data.pendingBatch = { did: created, opids: cids };
+                });
+            }
+
             const txid = await createOpReturnTxn(did);
+
+            if (!txid) {
+                satoshiAnchorFailures.inc();
+                console.warn(`Anchor attempt failed for batch ${did}; retrying it unchanged next cycle`);
+            }
 
             if (txid) {
                 const ok = await gatekeeper.clearQueue(REGISTRY, operations);
@@ -1076,6 +1109,7 @@ async function anchorBatch(): Promise<void> {
                             blockCount
                         };
                         db.lastExport = new Date().toISOString();
+                        delete db.pendingBatch;
                     });
                 }
             }
