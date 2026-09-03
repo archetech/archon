@@ -7,6 +7,8 @@ import JsonRedis from './db/redis.js';
 import JsonMongo from './db/mongo.js';
 import JsonSQLite from './db/sqlite.js';
 import config from './config.js';
+import { coveredOperations } from './batch.js';
+import { toFeeRate } from './fee.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
 import { DidRegistration } from '@didcid/gatekeeper/types';
@@ -415,6 +417,11 @@ const satoshiReorgs = new promClient.Counter({
 const satoshiBatchesAnchored = new promClient.Counter({
     name: 'satoshi_batches_anchored_total',
     help: 'Successful batch anchors to blockchain',
+});
+
+const satoshiAnchorFailures = new promClient.Counter({
+    name: 'satoshi_anchor_failures_total',
+    help: 'Anchor attempts that produced no transaction',
 });
 
 const satoshiRbfBumps = new promClient.Counter({
@@ -854,7 +861,7 @@ async function retryFailedImports(): Promise<void> {
 
 export async function createOpReturnTxn(opReturnData: string): Promise<string | undefined> {
     const feeRate = await getHybridFeeRateSatPerVb();
-    console.log(`Anchoring with fee rate: ${feeRate.toFixed(1)} sat/vB`);
+    console.log(`Anchoring with fee rate: ${feeRate} sat/vB`);
     const txid = await walletAnchor(opReturnData, feeRate);
     console.log(`Transaction broadcast with txid: ${txid}`);
     return txid;
@@ -893,7 +900,11 @@ async function getHybridFeeRateSatPerVb(): Promise<number> {
     try {
         const estimate = await btcClient.estimateSmartFee(config.feeConf, 'ECONOMICAL');
         if (estimate.feerate) {
-            localSatPerVb = (estimate.feerate / 1000) * 1e8;
+            // BTC/kvB to sat/vB. The division and multiplication do not cancel in
+            // binary floating point -- 0.00003614 becomes 3.6140000000000003 --
+            // and Bitcoin Core rejects a fee_rate carrying more than three
+            // decimals as "Invalid amount", failing every anchor.
+            localSatPerVb = toFeeRate((estimate.feerate / 1000) * 1e8);
         }
     } catch (err: any) {
         console.warn(`estimateSmartFee failed, using fallback: ${err.message}`);
@@ -922,7 +933,7 @@ async function getHybridFeeRateSatPerVb(): Promise<number> {
         }
     }
 
-    return Math.max(localSatPerVb, oracleSatPerVb ?? 0);
+    return toFeeRate(Math.max(localSatPerVb, oracleSatPerVb ?? 0));
 }
 
 async function getEntryFromMempool(txids: string[]): Promise<{ entry: MempoolEntry, txid: string }> {
@@ -1056,27 +1067,82 @@ async function anchorBatch(): Promise<void> {
                 const canonical = JSON.parse(cipher.canonicalizeJSON(op));
                 return gatekeeper.addJSON(canonical);
             }));
-            const batch = { version: 1, ops: cids };
-            const did = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
-            const txid = await createOpReturnTxn(did);
+            // A batch that has been created is authoritative until it anchors. It
+            // certifies one specific op-set, so re-cutting it whenever the queue
+            // moves would publish an asset nothing ever anchors or clears --
+            // operations queued during an outage go into the next batch instead.
+            const db = await loadDb();
+            const pending = db.pendingBatch;
+
+            let did = pending?.did;
+            let covered = coveredOperations(pending, operations, cids);
+
+            if (did && covered.length === 0) {
+                // Its operations have left the queue, so there is nothing to anchor.
+                console.warn(`Discarding batch ${did}: none of its operations remain queued`);
+                did = undefined;
+            }
+
+            if (did) {
+                console.log(`Reusing batch ${did} from the previous attempt (${covered.length} operation(s))`);
+            } else {
+                covered = operations;
+                const batch = { version: 1, ops: cids };
+                did = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
+                const created = did;
+                await jsonPersister.updateDb((data) => {
+                    data.pendingBatch = { did: created, opids: cids };
+                });
+            }
+
+            // Read before broadcasting. Anything fallible between the broadcast
+            // and the record risks losing a transaction already paid for, which
+            // is what has the next cycle anchor the same batch again.
+            const blockCount = await getChainBlockCount();
+
+            let txid: string | undefined;
+
+            try {
+                txid = await createOpReturnTxn(did);
+            } catch (error: any) {
+                // The wallet service answers 500 when it cannot sign or broadcast,
+                // so a failure arrives as a thrown request error rather than an
+                // absent txid. Both paths have to be counted.
+                satoshiAnchorFailures.inc();
+                console.warn(`Anchor attempt failed for batch ${did}: ${error.message}. Retrying it unchanged.`);
+                return;
+            }
+
+            if (!txid) {
+                satoshiAnchorFailures.inc();
+                console.warn(`Anchor attempt for batch ${did} produced no transaction. Retrying it unchanged.`);
+            }
 
             if (txid) {
-                const ok = await gatekeeper.clearQueue(REGISTRY, operations);
-
-                if (ok) {
-                    satoshiBatchesAnchored.inc();
-                    const blockCount = await getChainBlockCount();
-                    await jsonPersister.updateDb(async (db) => {
-                        (db.registered ??= []).push({
-                            did,
-                            txid: txid!
-                        });
-                        db.pending = {
-                            txids: [txid!],
-                            blockCount
-                        };
-                        db.lastExport = new Date().toISOString();
+                // Recorded before the queue is touched. The transaction is already
+                // on the network and its fee already spent, so losing it here would
+                // have the next cycle broadcast a second one for the same batch.
+                await jsonPersister.updateDb(async (db) => {
+                    (db.registered ??= []).push({
+                        did,
+                        txid: txid!
                     });
+                    db.pending = {
+                        txids: [txid!],
+                        blockCount
+                    };
+                    db.lastExport = new Date().toISOString();
+                    delete db.pendingBatch;
+                });
+
+                satoshiBatchesAnchored.inc();
+
+                const ok = await gatekeeper.clearQueue(REGISTRY, covered);
+
+                if (!ok) {
+                    // The operations stay queued and will be batched again, which
+                    // costs another anchor but does not duplicate this one.
+                    console.warn(`Anchored batch ${did} but could not clear ${covered.length} operation(s) from the ${REGISTRY} queue`);
                 }
             }
         }

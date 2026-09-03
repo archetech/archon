@@ -177,6 +177,7 @@ async function main() {
     // Auto-setup: create watch-only wallet on startup
     const maxRetries = 12;
     let walletReady = false;
+    let descriptorMismatch: string | undefined;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const mnemonic = await fetchMnemonic();
@@ -185,6 +186,15 @@ async function main() {
             walletReady = true;
             break;
         } catch (error: any) {
+            // Fatal: the wallet watches a different seed's addresses. Retrying
+            // cannot change that, and serving addresses from it would take funds
+            // this node has no key for.
+            if (error.name === 'DescriptorMismatchError') {
+                logger.error(`Watch-only wallet does not match the current mnemonic: ${error.message}`);
+                descriptorMismatch = error.message;
+                break;
+            }
+
             // Fatal: bitcoind lacks sqlite support — descriptor wallets won't work
             if (error.message?.includes('sqlite')) {
                 logger.error(`Bitcoin node does not support descriptor wallets: ${error.message}`);
@@ -229,9 +239,22 @@ async function main() {
         }
     }
 
-    if (walletReady) {
+    // Recovery through /wallet/setup can make the wallet ready long after
+    // startup gave up, so the collector starts once and skips its work until
+    // there is a wallet to measure, rather than being wired to that moment.
+    let metricsStarted = false;
+
+    function startMetrics() {
+        if (metricsStarted) {
+            return;
+        }
+        metricsStarted = true;
         updateMetrics();
         setInterval(updateMetrics, 60_000);
+    }
+
+    if (walletReady) {
+        startMetrics();
     }
 
     // Health / version
@@ -245,8 +268,18 @@ async function main() {
             const mnemonic = await fetchMnemonic();
             const result = await setupWatchOnlyWallet(btcClient, mnemonic, config.network);
             walletSetupStatus.set(1);
+            // Recovery runs through this route, so a wallet that now validates has
+            // to lift the block startup put in place.
+            walletReady = true;
+            descriptorMismatch = undefined;
+            startMetrics();
             res.json({ ok: true, network: config.network, ...result });
         } catch (error: any) {
+            if (error.name === 'DescriptorMismatchError') {
+                descriptorMismatch = error.message;
+            }
+            walletReady = false;
+            walletSetupStatus.set(0);
             logger.error({ err: error }, 'Wallet setup failed');
             res.status(500).json({ error: error.message });
         }
@@ -266,6 +299,17 @@ async function main() {
 
     // Receive address
     v1router.get('/wallet/address', requireAdminKey, async (_req, res) => {
+        // Refusing is the point of the check: an address served from a wallet
+        // built on another seed accepts funds nothing here can spend. Setup
+        // failing for any other reason leaves the wallet equally unvalidated,
+        // and bitcoind will still answer from whatever descriptors it holds.
+        if (descriptorMismatch || !walletReady) {
+            res.status(503).json({
+                error: descriptorMismatch ?? 'Watch-only wallet is not set up; refusing to serve an address',
+            });
+            return;
+        }
+
         try {
             const mnemonic = config.backend === 'alchemy' ? await fetchMnemonic() : undefined;
             const address = await getReceiveAddress(btcClient, mnemonic, config.network);
@@ -340,7 +384,8 @@ async function main() {
     // Wallet info / status
     v1router.get('/wallet/info', requireAdminKey, async (_req, res) => {
         try {
-            const status = await getWalletStatus(btcClient);
+            const mnemonic = config.backend === 'alchemy' ? undefined : await fetchMnemonic();
+            const status = await getWalletStatus(btcClient, mnemonic);
             res.json(status);
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get wallet info');

@@ -18,6 +18,8 @@ import BtcClient, {
 import config from './config.js';
 import type { WalletNetwork } from './config.js';
 import { buildDescriptors, getBtcNetwork } from './derivation.js';
+import { assertDescriptorsMatch } from './descriptor-check.js';
+import { toFeeRate } from './fee.js';
 import {
     anchorAlchemyData,
     bumpAlchemyTransactionFee,
@@ -107,6 +109,12 @@ export async function setupWatchOnlyWallet(
     const hasInternal = Boolean(existingInternal);
     const needsExternalImport = !hasExternal || (existingExternal ? needsDescriptorTopUp(existingExternal) : false);
     const needsInternalImport = !hasInternal || (existingInternal ? needsDescriptorTopUp(existingInternal) : false);
+
+    // bitcoind holds no private keys here, so signing derives them from the
+    // mnemonic at PSBT time. Descriptors built from a different seed therefore
+    // watch addresses this node can never spend from, while still handing them
+    // out for funding. Compare before trusting what is already imported.
+    assertDescriptorsMatch(existingDescs, mnemonic, network, config.walletName);
 
     if (!needsExternalImport && !needsInternalImport) {
         return {
@@ -256,11 +264,12 @@ export async function estimateFee(
     return btcClient.estimateSmartFee(blocks || config.feeTarget, 'ECONOMICAL');
 }
 
-export async function getWalletStatus(btcClient: BtcClient): Promise<{
+export async function getWalletStatus(btcClient: BtcClient, mnemonic?: string): Promise<{
     network: WalletNetwork;
     walletName: string;
     ready: boolean;
     descriptorCount: number;
+    error?: string;
 }> {
     if (config.backend === 'alchemy') {
         return getAlchemyWalletStatus();
@@ -268,11 +277,36 @@ export async function getWalletStatus(btcClient: BtcClient): Promise<{
 
     try {
         const info: ListDescriptorsResult = await btcClient.listDescriptors(false);
+
+        // Descriptors being present is not readiness: a wallet built on another
+        // seed has them and can still sign nothing. Reporting ready here while
+        // /wallet/address answers 503 would give operators two answers.
+        if (mnemonic) {
+            try {
+                assertDescriptorsMatch(info.descriptors.map(d => d.desc), mnemonic, config.network, config.walletName);
+            } catch (error: any) {
+                return {
+                    network: config.network,
+                    walletName: config.walletName,
+                    ready: false,
+                    descriptorCount: info.descriptors.length,
+                    error: error.message,
+                };
+            }
+        }
+
+        // Both branches are required. importDescriptors throws on the first
+        // failure, so a partial import leaves the external descriptor behind and
+        // a count alone would call that ready while setup had failed.
+        const hasExternal = info.descriptors.some(d => d.desc.includes('/0/*'));
+        const hasInternal = info.descriptors.some(d => d.desc.includes('/1/*'));
+
         return {
             network: config.network,
             walletName: config.walletName,
-            ready: info.descriptors.length > 0,
+            ready: hasExternal && hasInternal,
             descriptorCount: info.descriptors.length,
+            ...(hasExternal && hasInternal ? {} : { error: 'Wallet is missing a receive or change descriptor' }),
         };
     } catch {
         return {
@@ -326,7 +360,7 @@ export async function anchorData(
         0,
         {
             includeWatching: true,
-            fee_rate: feeRate || undefined,
+            fee_rate: feeRate ? toFeeRate(feeRate) : undefined,
             conf_target: feeRate ? undefined : config.feeTarget,
             replaceable: true,
             add_inputs: true,
@@ -352,7 +386,7 @@ export async function bumpTransactionFee(
 
     // psbtbumpfee returns a PSBT for watch-only wallets
     const bumpResult = await btcClient.command('psbtbumpfee', txid, {
-        ...(feeRate ? { fee_rate: feeRate } : {}),
+        ...(feeRate ? { fee_rate: toFeeRate(feeRate) } : {}),
     });
 
     const btcNetwork = getBtcNetwork(network);
@@ -455,7 +489,7 @@ export async function sendBtc(
         0,
         {
             includeWatching: true,
-            fee_rate: feeRate || undefined,
+            fee_rate: feeRate ? toFeeRate(feeRate) : undefined,
             conf_target: feeRate ? undefined : config.feeTarget,
             replaceable: true,
             subtractFeeFromOutputs: subtractFee ? [0] : [],
