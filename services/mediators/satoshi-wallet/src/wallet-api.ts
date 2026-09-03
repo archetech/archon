@@ -239,9 +239,22 @@ async function main() {
         }
     }
 
-    if (walletReady) {
+    // Recovery through /wallet/setup can make the wallet ready long after
+    // startup gave up, so the collector starts once and skips its work until
+    // there is a wallet to measure, rather than being wired to that moment.
+    let metricsStarted = false;
+
+    function startMetrics() {
+        if (metricsStarted) {
+            return;
+        }
+        metricsStarted = true;
         updateMetrics();
         setInterval(updateMetrics, 60_000);
+    }
+
+    if (walletReady) {
+        startMetrics();
     }
 
     // Health / version
@@ -259,6 +272,7 @@ async function main() {
             // to lift the block startup put in place.
             walletReady = true;
             descriptorMismatch = undefined;
+            startMetrics();
             res.json({ ok: true, network: config.network, ...result });
         } catch (error: any) {
             if (error.name === 'DescriptorMismatchError') {

@@ -37,6 +37,18 @@ export function assertDescriptorsMatch(
     const expectedKeys = new Set([expected.external, expected.internal].map(descriptorKey));
 
     for (const descriptor of existingDescriptors) {
+        // A descriptor whose spending policy needs a key this node does not hold
+        // -- a multisig naming ours as one cosigner, say -- would otherwise pass
+        // on its first key alone. Nothing here builds those, so this rejects a
+        // shape rather than repairing it.
+        if (!/^wpkh\(\[/.test(descriptor)) {
+            throw new DescriptorMismatchError(
+                `Wallet "${walletName}" holds a descriptor this node did not build ` +
+                `(${descriptor}). Only single-key wpkh descriptors with a key origin can ` +
+                `be checked. Remove or rename the wallet so it can be rebuilt.`
+            );
+        }
+
         const key = descriptorKey(descriptor);
 
         if (!key) {

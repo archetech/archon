@@ -1,4 +1,4 @@
-import { assertDescriptorsMatch, descriptorKey } from '../../services/mediators/satoshi-wallet/src/descriptor-check.ts';
+import { assertDescriptorsMatch, descriptorKey, DescriptorMismatchError } from '../../services/mediators/satoshi-wallet/src/descriptor-check.ts';
 import { buildDescriptors } from '../../services/mediators/satoshi-wallet/src/derivation.ts';
 
 // bitcoind holds no private keys for the watch-only wallet, so signing derives
@@ -37,7 +37,18 @@ describe('assertDescriptorsMatch', () => {
         const anonymous = 'wpkh(xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz/0/*)';
 
         expect(() => assertDescriptorsMatch([anonymous], SEED_A, NETWORK, WALLET))
-            .toThrow(/no key origin/);
+            .toThrow(DescriptorMismatchError);
+    });
+
+    it('rejects a policy needing a key this node does not hold', () => {
+        // Our key as first cosigner, so a check reading only the first key would
+        // accept it -- while the wallet cannot spend without the other signer.
+        const mine = buildDescriptors(SEED_A, NETWORK).external.replace(/^wpkh\(|\)$/g, '');
+        const theirs = buildDescriptors(SEED_B, NETWORK).external.replace(/^wpkh\(|\)$/g, '');
+        const shared = `wsh(sortedmulti(2,${mine},${theirs}))`;
+
+        expect(() => assertDescriptorsMatch([shared], SEED_A, NETWORK, WALLET))
+            .toThrow(DescriptorMismatchError);
     });
 
     it('accepts an empty wallet, which has nothing to contradict the mnemonic', () => {

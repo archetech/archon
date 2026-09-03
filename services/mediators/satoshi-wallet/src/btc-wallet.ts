@@ -295,11 +295,18 @@ export async function getWalletStatus(btcClient: BtcClient, mnemonic?: string): 
             }
         }
 
+        // Both branches are required. importDescriptors throws on the first
+        // failure, so a partial import leaves the external descriptor behind and
+        // a count alone would call that ready while setup had failed.
+        const hasExternal = info.descriptors.some(d => d.desc.includes('/0/*'));
+        const hasInternal = info.descriptors.some(d => d.desc.includes('/1/*'));
+
         return {
             network: config.network,
             walletName: config.walletName,
-            ready: info.descriptors.length > 0,
+            ready: hasExternal && hasInternal,
             descriptorCount: info.descriptors.length,
+            ...(hasExternal && hasInternal ? {} : { error: 'Wallet is missing a receive or change descriptor' }),
         };
     } catch {
         return {

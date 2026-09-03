@@ -1095,6 +1095,11 @@ async function anchorBatch(): Promise<void> {
                 });
             }
 
+            // Read before broadcasting. Anything fallible between the broadcast
+            // and the record risks losing a transaction already paid for, which
+            // is what has the next cycle anchor the same batch again.
+            const blockCount = await getChainBlockCount();
+
             let txid: string | undefined;
 
             try {
@@ -1117,8 +1122,6 @@ async function anchorBatch(): Promise<void> {
                 // Recorded before the queue is touched. The transaction is already
                 // on the network and its fee already spent, so losing it here would
                 // have the next cycle broadcast a second one for the same batch.
-                const blockCount = await getChainBlockCount();
-
                 await jsonPersister.updateDb(async (db) => {
                     (db.registered ??= []).push({
                         did,
