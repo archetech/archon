@@ -209,3 +209,26 @@ jobs:
           fail-build: false
           severity-cutoff: critical
           output-format: table
+
+  # A single context for branch protection to require. The matrix is 27 legs and
+  # grows with every new Dockerfile, so requiring the legs themselves would mean
+  # editing branch protection each time one is added -- the reason the sibling
+  # workflow rolls its matrix up the same way.
+  image_build_result:
+    name: image build result
+    if: always()
+    needs: [build_test_images, cross_compile_arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify every image built
+        run: |
+          for job in "build_test_images:${{ needs.build_test_images.result }}" \
+                     "cross_compile_arm64:${{ needs.cross_compile_arm64.result }}"; do
+            name="${job%%:*}"
+            result="${job#*:}"
+            if [ "$result" != "success" ]; then
+              echo "$name did not succeed (result: $result)"
+              exit 1
+            fi
+          done
+          echo "All image builds passed"
