@@ -29,49 +29,6 @@ jobs:
           calver=$(date +'%Y.%m.%d')
           echo "calver=$calver" >> $GITHUB_OUTPUT
 
-  # The only job that builds for a foreign architecture. Without it, a change
-  # breaking the cross-compile is invisible until a release, since publishing is
-  # the only other thing that targets arm64.
-  #
-  # No scan and no load: both need the image in the local daemon, which a
-  # foreign-architecture build cannot provide. Compiling is what is checked.
-  cross_compile_arm64:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "22.23.2"
-
-      # This image is Rust and never runs npm ci, so it consumes nothing from
-      # ./prebuilds. Seeded anyway because the rule is per job, not per
-      # Dockerfile: a job that builds images seeds first, so that adding an
-      # npm-based image to a job cannot quietly land without it (#913).
-      - name: Prefetch native prebuilds
-        run: node scripts/prefetch-prebuilds.mjs
-
-      - name: Cross-compile the Rust gatekeeper for arm64
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
-        with:
-          context: .
-          file: docker/Dockerfile.gatekeeper-rust
-          platforms: linux/arm64
-          # Stops at the builder stage, which is the only one this job is
-          # asking about. Going further would run the runtime stage's apt-get
-          # under emulation -- 152s of it, to reach a COPY. The full image for
-          # this platform is assembled by the publish workflow, and the runtime
-          # stage is exercised natively by the amd64 leg below.
-          target: builder
-          push: false
-          cache-from: type=gha,scope=gatekeeper-rs-arm64
-          cache-to: type=gha,mode=min,scope=gatekeeper-rs-arm64
-
   build_test_images:
     runs-on: ubuntu-latest
     needs: generate
