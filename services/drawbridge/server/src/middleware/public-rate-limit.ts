@@ -117,35 +117,59 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
         isDeposit = defaultIsDeposit,
     } = options;
 
-    const budgeted = depositPerSourceBytes !== undefined && depositGlobalBytes !== undefined;
+    // Omitting both byte budgets means the surface stores nothing and every
+    // request is a read. Omitting one is a typo, and silently accepting it
+    // would downgrade deposits to the request-count bucket -- switching off the
+    // budget that actually bounds them, which is exactly what having it is for.
+    const budgeted = depositPerSourceBytes !== undefined || depositGlobalBytes !== undefined;
+    if (budgeted && (depositPerSourceBytes === undefined || depositGlobalBytes === undefined)) {
+        throw new Error(
+            `publicRateLimit(${name}): depositPerSourceBytes and depositGlobalBytes must be given together`);
+    }
+    if (!budgeted && options.isDeposit) {
+        throw new Error(
+            `publicRateLimit(${name}): isDeposit has no effect without the deposit byte budgets`);
+    }
+
     const chargeAsDeposit = budgeted ? isDeposit : () => false;
 
     return async function publicRateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
         const source = req.ip || 'unknown';
         const keyed = isMeaningfulSource(source);
 
+        const deposit = chargeAsDeposit(req);
+        const bucket = deposit ? 'deposit' : 'read';
+        const cost = deposit ? requestBytes(req) : 1;
+
+        const charge = (key: string, max: number): Promise<RateLimitResult> => deposit
+            ? store.checkAndRecordCost(key, cost, max, windowSeconds)
+            : checkAndRecordRequest(store, key, max, windowSeconds);
+
         try {
-            const results: RateLimitResult[] = [];
+            let refused: RateLimitResult | undefined;
 
-            if (chargeAsDeposit(req)) {
-                const cost = requestBytes(req);
-                if (keyed) {
-                    results.push(await store.checkAndRecordCost(
-                        `${name}:deposit:src:${source}`, cost, depositPerSourceBytes!, windowSeconds));
+            if (keyed) {
+                const perSource = await charge(
+                    `${name}:${bucket}:src:${source}`,
+                    deposit ? depositPerSourceBytes! : readPerSourceMax);
+                if (!perSource.allowed) {
+                    refused = perSource;
                 }
-                results.push(await store.checkAndRecordCost(
-                    `${name}:deposit:global`, cost, depositGlobalBytes!, windowSeconds));
-            }
-            else {
-                if (keyed) {
-                    results.push(await checkAndRecordRequest(
-                        store, `${name}:read:src:${source}`, readPerSourceMax, windowSeconds));
-                }
-                results.push(await checkAndRecordRequest(
-                    store, `${name}:read:global`, readGlobalMax, windowSeconds));
             }
 
-            const refused = results.find(result => !result.allowed);
+            // A request refused by its per-source bucket never reaches the
+            // upstream, so it must not be charged to the global one. Charging it
+            // anyway would let a single source that is already being refused
+            // drain the budget meant to hold when sources are shared -- and the
+            // per-source ceiling would protect nothing but its own counter.
+            if (!refused) {
+                const global = await charge(
+                    `${name}:${bucket}:global`,
+                    deposit ? depositGlobalBytes! : readGlobalMax);
+                if (!global.allowed) {
+                    refused = global;
+                }
+            }
 
             if (refused) {
                 res.set('Retry-After', String(Math.max(1, refused.resetAt - Math.floor(Date.now() / 1000))));

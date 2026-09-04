@@ -163,22 +163,53 @@ describe('public rate limit middleware', () => {
         expect(keys).toEqual(['names:read:global']);
     });
 
-    it('ignores isDeposit when the byte budgets are absent', async () => {
-        const { store, keys } = countingStore();
-        const app = express();
-        app.use(express.json());
-        app.use('/names', publicRateLimit({
+    // Half a deposit configuration is a typo, and accepting it would switch off
+    // the budget that bounds deposits while looking configured. The limiters are
+    // built at startup, so this refuses the node rather than a request.
+    it.each([
+        ['depositPerSourceBytes', { depositPerSourceBytes: 1000 }],
+        ['depositGlobalBytes', { depositGlobalBytes: 5000 }],
+    ])('refuses a deposit budget given as %s alone', (_label, budget) => {
+        const { store } = countingStore();
+
+        expect(() => publicRateLimit({
+            store,
+            name: 'names',
+            readPerSourceMax: 2,
+            readGlobalMax: 100,
+            windowSeconds: 60,
+            ...budget as object,
+        } as any)).toThrow('must be given together');
+    });
+
+    it('refuses isDeposit without the byte budgets it selects', () => {
+        const { store } = countingStore();
+
+        expect(() => publicRateLimit({
             store,
             name: 'names',
             readPerSourceMax: 2,
             readGlobalMax: 100,
             windowSeconds: 60,
             isDeposit: () => true,
-        }), (_req, res) => res.json({ proxied: true }));
+        } as any)).toThrow('has no effect');
+    });
 
-        await request(app).post('/names/api/name').send({ name: 'alice' });
+    // The global bucket is what holds when sources are shared. Charging it for a
+    // request the per-source bucket already refused would let one source drain
+    // it while being refused, denying every other client on the surface.
+    it('does not charge the global bucket for a request refused per source', async () => {
+        const { store, keys } = countingStore({ 'didcomm:read:src:203.0.113.9': 1 });
+        const app = express();
+        app.use((req, _res, nextFn) => { Object.defineProperty(req, 'ip', { value: '203.0.113.9' }); nextFn(); });
+        app.use('/didcomm', publicRateLimit({ store, ...BASE } as any), (_req, res) => res.json({ proxied: true }));
 
-        expect(keys).toEqual(['names:read:global']);
+        expect((await request(app).get('/didcomm/api/v1/challenge')).status).toBe(200);
+        expect((await request(app).get('/didcomm/api/v1/challenge')).status).toBe(429);
+
+        // Two requests, but the global bucket was charged only for the one that
+        // was allowed through to the upstream.
+        expect(keys.filter(key => key === 'didcomm:read:global')).toHaveLength(1);
     });
 
     // The limiter exists to protect availability. If its own store is down,
@@ -272,16 +303,21 @@ describe('public route mounts', () => {
     // auth and the paid path's limiter, and /metrics is a local read.
     const EXEMPT = ['/api/v1', '/metrics'];
 
+    // Every way Express takes a mount, and both quote styles, so a route added
+    // as `app.post("/foo", handler)` is not simply invisible to the guard below.
+    const MOUNT = 'app\\.(?:use|all|get|post|put|patch|delete|head|options)\\(';
+
     it.each(Object.entries(PUBLIC_MOUNTS))('rate-limits %s with %s', (path, middleware) => {
-        const mount = source.match(
-            new RegExp(`app\\.(?:use|get)\\('${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}',\\s*([A-Za-z][A-Za-z0-9]*)`));
+        const quoted = `['"]${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`;
+        const mount = source.match(new RegExp(`${MOUNT}${quoted},\\s*([A-Za-z][A-Za-z0-9]*)`));
 
         expect(mount).not.toBeNull();
         expect(mount![1]).toBe(middleware);
     });
 
     it('knows every route mounted on the app', () => {
-        const mounted = [...source.matchAll(/app\.(?:use|get)\('(\/[^']*)'/g)].map(match => match[1]);
+        const mounted = [...source.matchAll(new RegExp(`${MOUNT}['"](/[^'"]*)['"]`, 'g'))]
+            .map(match => match[1]);
 
         expect(mounted.sort()).toEqual([...Object.keys(PUBLIC_MOUNTS), ...EXEMPT].sort());
     });

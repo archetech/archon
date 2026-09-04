@@ -129,6 +129,10 @@ container or any reverse proxy every request arrives from one private address
 and only the global bucket binds. See [DIDComm spec §5.2.1](../didcomm/README.md#521-rate-limiting-at-the-edge)
 for why keying on it anyway would be worse than not keying at all.
 
+A request refused by its per-source bucket is not charged to the global one:
+it never reaches the upstream, and charging it anyway would let a single source
+drain the shared budget while already being refused.
+
 Exceeding a budget returns `429` with `Retry-After` and `{ error, resetAt }`.
 If the limiter's own store is unreachable the check fails open — it protects
 availability and must not become the outage it prevents.
