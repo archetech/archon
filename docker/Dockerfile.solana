@@ -1,5 +1,11 @@
 FROM node:22.23.2-trixie-slim AS builder
 
+# ws's optional native accelerators, bufferutil and utf-8-validate, publish no
+# linux-arm64 prebuild, so on that architecture they are built from source or
+# silently skipped. They are optional, so skipping them is not a build failure --
+# it drops frame masking and UTF-8 validation to JS on a service whose RPC is
+# websocket-heavy. This is the only mediator with such a dependency; the rest
+# install nothing that needs a compiler.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
