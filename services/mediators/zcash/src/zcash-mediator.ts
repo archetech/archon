@@ -822,6 +822,11 @@ async function anchorBatch(): Promise<void> {
 
             const anchoredDid = did;
 
+            // The batch certifies a fixed op-set. Stamping it with the current
+            // queue instead would let a retry clear operations this anchor never
+            // covered, dropping them without ever writing them to a chain.
+            const anchoredOpids = pending?.did === anchoredDid ? pending.opids : cids;
+
             // Read before broadcasting. Anything fallible between the broadcast and
             // the record risks losing a transaction already paid for, which is what
             // has the next cycle anchor the same batch again.
@@ -863,7 +868,7 @@ async function anchorBatch(): Promise<void> {
                     data.lastExport = new Date().toISOString();
                     // Kept until the clear succeeds, stamped so a retry knows the
                     // transaction has already been sent.
-                    data.pendingBatch = { did: anchoredDid, opids: cids, txid: anchoredTxid };
+                    data.pendingBatch = { did: anchoredDid, opids: anchoredOpids, txid: anchoredTxid };
                 });
 
                 zcashBatchesAnchored.inc();

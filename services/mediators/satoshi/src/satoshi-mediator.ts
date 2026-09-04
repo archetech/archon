@@ -1110,6 +1110,11 @@ async function anchorBatch(): Promise<void> {
                 });
             }
 
+            // The batch certifies a fixed op-set. Stamping it with the current
+            // queue instead would let a retry clear operations this anchor never
+            // covered, dropping them without ever writing them to a chain.
+            const anchoredOpids = pending?.did === did ? pending.opids : cids;
+
             // Read before broadcasting. Anything fallible between the broadcast
             // and the record risks losing a transaction already paid for, which
             // is what has the next cycle anchor the same batch again.
@@ -1149,7 +1154,7 @@ async function anchorBatch(): Promise<void> {
                     db.lastExport = new Date().toISOString();
                     // Kept until the clear succeeds, stamped so a retry knows the
                     // transaction has already been sent.
-                    db.pendingBatch = { did: did!, opids: cids, txid: txid! };
+                    db.pendingBatch = { did: did!, opids: anchoredOpids, txid: txid! };
                 });
 
                 satoshiBatchesAnchored.inc();

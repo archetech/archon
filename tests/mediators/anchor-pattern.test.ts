@@ -52,12 +52,27 @@ describe.each(anchoringMediators())('$name mediator', ({ source }) => {
     });
 
     it('retries the clear without broadcasting again', () => {
-        const retry = source.indexOf('pending?.txid');
-        const broadcastGuard = source.indexOf('return;', retry);
+        // Anchored on the retry branch itself. `pending?.txid` also appears
+        // elsewhere in these files, and measuring from the wrong occurrence made
+        // an earlier version of this assertion vacuous.
+        const retry = source.indexOf('retrying the queue clear');
+        const after = source.slice(retry);
+
+        const returned = after.indexOf('return;');
+        const broadcast = after.search(/await (walletAnchor|createOpReturnTxn)\(/);
 
         expect(retry).toBeGreaterThan(-1);
-        // The early return keeps a second transaction from being sent.
-        expect(broadcastGuard).toBeGreaterThan(retry);
+        expect(broadcast).toBeGreaterThan(-1);
+        expect(returned).toBeGreaterThan(-1);
+        // The branch must return before it can reach the anchor call again.
+        expect(returned).toBeLessThan(broadcast);
+    });
+
+    it('stamps the batch with its own operations, not the queue', () => {
+        // Stamping the current queue lets the retry clear operations this anchor
+        // never certified, dropping them without writing them to a chain.
+        expect(source).toMatch(/pendingBatch = \{[^}]*opids: anchoredOpids/);
+        expect(source).toMatch(/anchoredOpids = pending\?\.did === \w+ \? pending\.opids : cids/);
     });
 
     it('records the transaction before clearing the queue', () => {
