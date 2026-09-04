@@ -39,8 +39,9 @@ describe.each(anchoringMediators())('$name mediator', ({ source }) => {
     it('reuses the batch asset it already published', () => {
         // Without this a failed anchor mints another asset for the same
         // operations on the next cycle, and the previous one is never anchored.
-        expect(source).toContain('pendingBatch');
-        expect(source).toContain('coveredOperations');
+        // Matching the identifier alone would be satisfied by the import.
+        expect(source).toMatch(/covered = coveredOperations\(pending, operations, cids\)/);
+        expect(source).toMatch(/const pending = db\.pendingBatch/);
     });
 
     it('keeps the pending batch until its operations are cleared', () => {
