@@ -128,13 +128,6 @@ export function UIProvider(
     }, [refreshFlag]);
 
 
-    useEffect(() => {
-        const refresh = async () => {
-            await refreshAll();
-        };
-        refresh();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     const refreshInbox = useCallback(async () => {
         if (!keymaster) {
