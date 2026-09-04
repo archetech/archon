@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
-import { SnackbarProvider, useSnackbar, useIsMounted } from '@didcid/wallet-ui';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { SnackbarProvider, useSnackbar, useIsMounted, whileMounted } from '@didcid/wallet-ui';
 
 // Refresh work awaits the network and is started from effects, so it can resolve
 // after its screen has gone. Reporting the error then raises a snackbar for a
@@ -32,6 +34,38 @@ describe('useIsMounted', () => {
         unmount();
 
         expect(isMounted()).toBe(false);
+    });
+});
+
+describe('whileMounted', () => {
+    it('passes the update through while mounted', () => {
+        const update = vi.fn();
+
+        whileMounted(update, () => true)('a value');
+
+        expect(update).toHaveBeenCalledWith('a value');
+    });
+
+    it('drops the update once unmounted', () => {
+        // What a rejected request does when its screen has already gone. There
+        // is nothing left to render, so the updater is what gets watched.
+        const update = vi.fn();
+
+        whileMounted(update, () => false)('a value');
+
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it('is what the snackbar reports through', () => {
+        // Guards the wiring rather than the behaviour: after unmount there is
+        // nothing left to observe, so the two tests above would keep passing if
+        // the provider quietly went back to calling the updater directly.
+        const source = readFileSync(
+            resolve(process.cwd(), '../../packages/wallet-ui/src/contexts/SnackbarProvider.tsx'),
+            'utf-8',
+        );
+
+        expect(source).toContain('whileMounted(setSnackbar, isMounted)');
     });
 });
 

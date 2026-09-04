@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useContext, useState } from "react";
-import { useIsMounted } from "../hooks/useIsMounted";
+import { useIsMounted, whileMounted } from "../hooks/useIsMounted";
 import { Alert, AlertColor, Snackbar } from "@mui/material";
 
 interface SnackbarContextValue {
@@ -34,11 +34,7 @@ export function SnackbarProvider(
     // A request that rejects after its screen has gone still reports the error.
     // Raising a snackbar for it is pointless in the browser and throws under
     // test, so late reports are dropped rather than rendered.
-    const show = (state: SnackbarState) => {
-        if (isMounted()) {
-            setSnackbar(state);
-        }
-    };
+    const show = whileMounted(setSnackbar, isMounted);
 
     const handleSnackbarClose = () => {
         setSnackbar((prev) => ({ ...prev, open: false }));

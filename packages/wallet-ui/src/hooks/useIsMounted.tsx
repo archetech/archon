@@ -17,3 +17,18 @@ export function useIsMounted(): () => boolean {
 
     return useCallback(() => mounted.current, []);
 }
+
+// The guard applied to a state update that may arrive late. Separate from the
+// provider so a test can watch the updater it protects: asserting that a report
+// after unmount is dropped needs something observable, and after unmount there
+// is nothing left to render.
+export function whileMounted<T>(
+    update: (value: T) => void,
+    isMounted: () => boolean,
+): (value: T) => void {
+    return (value: T) => {
+        if (isMounted()) {
+            update(value);
+        }
+    };
+}
