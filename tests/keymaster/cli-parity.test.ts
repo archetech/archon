@@ -133,4 +133,23 @@ describe('CLI parity across entry points', () => {
             expect(commandNames(scriptCli)).toContain(command);
         }
     });
+
+    // The rule covered commands and options only, so the three could differ in
+    // how they are configured without anything noticing. The Python CLI read
+    // nothing but os.environ while the other two loaded a .env, which made any
+    // documentation recommending one false for Python users (#1016).
+    it('all read a .env from the working directory', () => {
+        expect(packageCli).toMatch(/dotenv\.config\(\)/);
+        expect(scriptCli).toMatch(/dotenv\.config\(\)/);
+        // Matching `load_dotenv(` alone is satisfied by the definition of the
+        // wrapper, so this requires main to actually call it.
+        expect(pythonCli).toMatch(/def main\([^)]*\)[^:]*:\n\s+_load_dotenv\(\)/);
+    });
+
+    it('does not let the Python CLI search parent directories for one', () => {
+        // load_dotenv() with no argument resolves from the installed package's
+        // location rather than the caller's, so it would not find the user's
+        // .env at all. The other two read the working directory only.
+        expect(pythonCli).toMatch(/load_dotenv\(Path\.cwd\(\) \/ "\.env", override=False\)/);
+    });
 });

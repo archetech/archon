@@ -22,10 +22,15 @@ pip install -e python/keymaster
 
 ## CLI usage
 
+Configuration comes from the environment, or from a `.env` in the directory you
+run from, as with the JS CLI. A variable already exported wins over the file.
+
 ```bash
-export ARCHON_PASSPHRASE=your-passphrase
-export ARCHON_GATEKEEPER_URL=http://localhost:4224
-export ARCHON_WALLET_PATH=./wallet.json
+cat > .env <<'ENV'
+ARCHON_PASSPHRASE=your-passphrase
+ARCHON_GATEKEEPER_URL=http://localhost:4224
+ARCHON_WALLET_PATH=./wallet.json
+ENV
 
 keymaster --help
 keymaster create-wallet

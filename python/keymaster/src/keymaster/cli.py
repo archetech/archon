@@ -21,6 +21,8 @@ import json
 import os
 import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
 from typing import Any, Callable
 
 from keymaster.core import Keymaster
@@ -1498,7 +1500,22 @@ async def _run(args: argparse.Namespace) -> int:
         await gatekeeper.close()
 
 
+def _load_dotenv() -> None:
+    """Read .env from the working directory, as the JS CLI does.
+
+    Both CLIs are installed as ``keymaster`` and are parity-tested on their
+    command surface, so configuring one and not the other was a difference
+    nothing surfaced until someone tried it (#1016).
+
+    The path is given explicitly: ``load_dotenv()`` with no argument searches
+    parent directories, while ``dotenv.config()`` in the JS CLI reads only the
+    working directory. Neither overrides a variable already in the environment.
+    """
+    load_dotenv(Path.cwd() / ".env", override=False)
+
+
 def main(argv: list[str] | None = None) -> int:
+    _load_dotenv()
     parser = build_parser()
     args = parser.parse_args(argv)
     if not getattr(args, "command", None):
