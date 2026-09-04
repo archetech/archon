@@ -28,6 +28,7 @@ dependencies = [
   "bolt11==2.2.0",
   "coincurve==21.0.0",
   "cryptography==50.0.0",
+  "python-dotenv==1.2.3",
   "redis==5.2.1",
   "rfc8785==0.1.4"
 ]
