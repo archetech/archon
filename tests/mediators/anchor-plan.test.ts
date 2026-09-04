@@ -1,4 +1,18 @@
-import { planAnchor, coveredOperations } from '../../services/mediators/satoshi/src/batch.ts';
+import { readFileSync } from 'fs';
+import { planAnchor as satoshi, coveredOperations as satoshiCovered } from '../../services/mediators/satoshi/src/batch.ts';
+import { planAnchor as ethereum, coveredOperations as ethereumCovered } from '../../services/mediators/ethereum/src/batch.ts';
+import { planAnchor as solana, coveredOperations as solanaCovered } from '../../services/mediators/solana/src/batch.ts';
+import { planAnchor as zcash, coveredOperations as zcashCovered } from '../../services/mediators/zcash/src/batch.ts';
+
+// Each mediator is a standalone package with its own copy, so a suite that
+// imports one leaves the other three unexercised: breaking ethereum's copy to
+// re-broadcast an anchored batch passed every test in this directory.
+const IMPLEMENTATIONS = [
+    ['satoshi', satoshi, satoshiCovered],
+    ['ethereum', ethereum, ethereumCovered],
+    ['solana', solana, solanaCovered],
+    ['zcash', zcash, zcashCovered],
+] as const;
 
 // A batch asset is published before the transaction that anchors it can be
 // attempted, so every failure path has to be decided rather than improvised:
@@ -9,7 +23,7 @@ import { planAnchor, coveredOperations } from '../../services/mediators/satoshi/
 const OPS = ['op1', 'op2', 'op3'];
 const CIDS = ['cid1', 'cid2', 'cid3'];
 
-describe('planAnchor', () => {
+describe.each(IMPLEMENTATIONS)('%s planAnchor', (_name, planAnchor) => {
     it('mints when nothing is pending', () => {
         expect(planAnchor(undefined, OPS, CIDS)).toEqual({
             action: 'mint', covered: OPS, opids: CIDS,
@@ -66,12 +80,26 @@ describe('planAnchor', () => {
     });
 });
 
-describe('coveredOperations', () => {
+describe.each(IMPLEMENTATIONS)('%s coveredOperations', (_name, _plan, coveredOperations) => {
     it('covers the whole queue when no batch is pending', () => {
         expect(coveredOperations(undefined, OPS, CIDS)).toEqual(OPS);
     });
 
     it('covers nothing once the batch operations have left the queue', () => {
         expect(coveredOperations({ opids: ['gone'] }, OPS, CIDS)).toEqual([]);
+    });
+});
+
+describe('the four copies', () => {
+    it('are identical, so one reviewed change is four', () => {
+        // They are duplicated because the mediators are standalone packages with
+        // no shared dependency. Nothing but this stops them diverging.
+        const [reference, ...others] = IMPLEMENTATIONS.map(
+            ([name]) => readFileSync(`services/mediators/${name}/src/batch.ts`, 'utf-8'),
+        );
+
+        for (const other of others) {
+            expect(other).toBe(reference);
+        }
     });
 });
