@@ -9,7 +9,7 @@ import GatekeeperClient from '@didcid/clients/gatekeeper';
 
 import config from './config.js';
 import { RedisStore } from './store.js';
-import { publicRateLimit } from './middleware/public-rate-limit.js';
+import { byMethod, publicRateLimit } from './middleware/public-rate-limit.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import { createV1Router } from './v1-router.js';
@@ -398,8 +398,45 @@ async function main() {
         proxyLightningMediatorRequest,
     }));
 
+    // The public passthroughs below are unauthenticated by design and so can be
+    // driven for free; these bound how fast. Reads of the herald, resolver and
+    // lightning surfaces share one budget, the explorer gets its own because a
+    // page load is dozens of asset requests, and Herald's writes get a tight
+    // one of their own: a name claim mints a credential and consumes a name
+    // from a global namespace, so it is worth far less headroom than a read.
+    const publicReadRateLimit = publicRateLimit({
+        store,
+        name: 'public',
+        readPerSourceMax: config.publicReadPerSource,
+        readGlobalMax: config.publicReadGlobal,
+        windowSeconds: config.publicRateLimitWindow,
+        logger,
+    });
+
+    const explorerRateLimit = publicRateLimit({
+        store,
+        name: 'explorer',
+        readPerSourceMax: config.explorerReadPerSource,
+        readGlobalMax: config.explorerReadGlobal,
+        windowSeconds: config.publicRateLimitWindow,
+        logger,
+    });
+
+    const nameWriteRateLimit = publicRateLimit({
+        store,
+        name: 'names:write',
+        readPerSourceMax: config.nameWritePerSource,
+        readGlobalMax: config.nameWriteGlobal,
+        windowSeconds: config.publicRateLimitWindow,
+        logger,
+    });
+
+    // Herald is fronted by two mounts and carries both kinds of traffic, so the
+    // bucket is chosen per request rather than per route.
+    const heraldRateLimit = byMethod({ read: publicReadRateLimit, write: nameWriteRateLimit });
+
     // Public invoice endpoint — no auth required
-    app.get('/invoice/:did', async (req, res) => {
+    app.get('/invoice/:did', publicReadRateLimit, async (req, res) => {
         if (config.lightningMediatorURL === '') {
             res.status(501).json({ error: 'Lightning is not enabled on this node' });
             return;
@@ -412,7 +449,7 @@ async function main() {
         }
     });
 
-    app.use('/.well-known', async (req, res) => {
+    app.use('/.well-known', heraldRateLimit, async (req, res) => {
         try {
             await proxyHeraldRequest(req, res, '');
         } catch (error: any) {
@@ -421,7 +458,7 @@ async function main() {
         }
     });
 
-    app.use('/names', async (req, res) => {
+    app.use('/names', heraldRateLimit, async (req, res) => {
         if (config.heraldURL === '') {
             res.status(501).json({ error: 'Name resolution is not enabled on this node' });
             return;
@@ -442,7 +479,7 @@ async function main() {
     // the hop. Stripping it -- as /names and /didcomm do -- would serve an
     // index.html whose asset URLs point at /explorer/... on a server that no
     // longer answers there.
-    app.use('/explorer', async (req, res) => {
+    app.use('/explorer', explorerRateLimit, async (req, res) => {
         if (config.explorerURL === '') {
             res.status(501).json({ error: 'Explorer is not enabled on this node' });
             return;
@@ -491,7 +528,7 @@ async function main() {
     // the resolution triple, raw dereferenced resources, and status/error shapes — is
     // preserved unchanged. Intentionally open (no L402): public DID resolution for interop
     // with universal resolvers, which do not speak L402.
-    app.use('/1.0/identifiers', async (req, res) => {
+    app.use('/1.0/identifiers', publicReadRateLimit, async (req, res) => {
         try {
             await proxyRequest(req, res, config.gatekeeperURL, '');
         } catch (error: any) {

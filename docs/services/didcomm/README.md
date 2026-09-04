@@ -304,6 +304,10 @@ a request count is simply not the resource being consumed. Reads
 chatty, one poll being four requests, so 300/minute clears an active
 wallet comfortably.
 
+**A per-source refusal does not spend the global budget.** The refused request
+never reaches the relay, so charging it would let one source drain the bucket
+that is supposed to hold when sources are shared.
+
 **The per-source bucket applies only when the source identifies a client.**
 `trust proxy` is not configured, so a request via the bundled Tor container
 or any reverse proxy arrives from a private address that every such client

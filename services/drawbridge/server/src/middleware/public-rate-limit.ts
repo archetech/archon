@@ -1,22 +1,26 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, RequestHandler, Response, NextFunction } from 'express';
 import type { DrawbridgeStore, RateLimitResult } from '../types.js';
 import { checkAndRecordRequest } from '../rate-limiter.js';
 
 // Rate limiting for public passthroughs that carry no identity to key on.
 //
-// The DIDComm relay behind /didcomm has two routes that are unauthenticated by
-// design and cannot be otherwise: a sender must be able to reach a stranger's
-// mailbox, and GET /challenge is the first step of proving DID control. So the
-// per-DID keying used on the paid path does not apply here.
+// Drawbridge fronts several upstreams on routes that are unauthenticated by
+// design and cannot be otherwise: a DIDComm sender must be able to reach a
+// stranger's mailbox, a universal resolver does not speak L402, and a name
+// claim proves DID control rather than presenting a macaroon. So the per-DID
+// keying used on the paid path does not apply to any of them.
 //
-// Two things are limited separately, because they are not the same load:
+// A surface gets one budget, or two when its requests are not all the same
+// load:
 //
-//   deposits  POST of an envelope, up to the body limit (10mb here). Budgeted
-//             by BYTES, not requests -- a request ceiling generous enough for
-//             normal traffic still permits a couple of dozen max-size deposits,
-//             which is all it takes to fill the relay's storage cap.
-//   reads     challenge/fetch/remove polling. Cheap and chatty; one poll is
-//             four requests, so this ceiling has to clear an active wallet.
+//   reads     the ordinary traffic of the surface. Budgeted by REQUEST count.
+//             Often chatty -- a DIDComm poll is four requests and an explorer
+//             page load is dozens -- so a ceiling here has to clear normal use.
+//   deposits  requests that leave something behind upstream. Budgeted by
+//             BYTES, because a request ceiling generous enough for normal
+//             traffic still permits a couple of dozen max-size deposits, which
+//             is all it takes to fill the DIDComm relay's storage cap. Omit
+//             the byte budgets on a surface that stores nothing.
 //
 // Each is bucketed per-source and globally. Per-source is only applied when the
 // source is actually meaningful: `trust proxy` is not configured, so behind a
@@ -32,8 +36,11 @@ export interface PublicRateLimitOptions {
     name: string;
     readPerSourceMax: number;
     readGlobalMax: number;
-    depositPerSourceBytes: number;
-    depositGlobalBytes: number;
+    // Byte budgets for requests that store data upstream. Give both, for a
+    // surface with a deposit bucket, or neither, for one where every request is
+    // a read; anything else is refused at construction.
+    depositPerSourceBytes?: number;
+    depositGlobalBytes?: number;
     windowSeconds: number;
     // Requests that spend the byte budget rather than the read budget.
     isDeposit?: (req: Request) => boolean;
@@ -110,32 +117,59 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
         isDeposit = defaultIsDeposit,
     } = options;
 
+    // Omitting both byte budgets means the surface stores nothing and every
+    // request is a read. Omitting one is a typo, and silently accepting it
+    // would downgrade deposits to the request-count bucket -- switching off the
+    // budget that actually bounds them, which is exactly what having it is for.
+    const budgeted = depositPerSourceBytes !== undefined || depositGlobalBytes !== undefined;
+    if (budgeted && (depositPerSourceBytes === undefined || depositGlobalBytes === undefined)) {
+        throw new Error(
+            `publicRateLimit(${name}): depositPerSourceBytes and depositGlobalBytes must be given together`);
+    }
+    if (!budgeted && options.isDeposit) {
+        throw new Error(
+            `publicRateLimit(${name}): isDeposit has no effect without the deposit byte budgets`);
+    }
+
+    const chargeAsDeposit = budgeted ? isDeposit : () => false;
+
     return async function publicRateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
         const source = req.ip || 'unknown';
         const keyed = isMeaningfulSource(source);
 
+        const deposit = chargeAsDeposit(req);
+        const bucket = deposit ? 'deposit' : 'read';
+        const cost = deposit ? requestBytes(req) : 1;
+
+        const charge = (key: string, max: number): Promise<RateLimitResult> => deposit
+            ? store.checkAndRecordCost(key, cost, max, windowSeconds)
+            : checkAndRecordRequest(store, key, max, windowSeconds);
+
         try {
-            const results: RateLimitResult[] = [];
+            let refused: RateLimitResult | undefined;
 
-            if (isDeposit(req)) {
-                const cost = requestBytes(req);
-                if (keyed) {
-                    results.push(await store.checkAndRecordCost(
-                        `${name}:deposit:src:${source}`, cost, depositPerSourceBytes, windowSeconds));
+            if (keyed) {
+                const perSource = await charge(
+                    `${name}:${bucket}:src:${source}`,
+                    deposit ? depositPerSourceBytes! : readPerSourceMax);
+                if (!perSource.allowed) {
+                    refused = perSource;
                 }
-                results.push(await store.checkAndRecordCost(
-                    `${name}:deposit:global`, cost, depositGlobalBytes, windowSeconds));
-            }
-            else {
-                if (keyed) {
-                    results.push(await checkAndRecordRequest(
-                        store, `${name}:read:src:${source}`, readPerSourceMax, windowSeconds));
-                }
-                results.push(await checkAndRecordRequest(
-                    store, `${name}:read:global`, readGlobalMax, windowSeconds));
             }
 
-            const refused = results.find(result => !result.allowed);
+            // A request refused by its per-source bucket never reaches the
+            // upstream, so it must not be charged to the global one. Charging it
+            // anyway would let a single source that is already being refused
+            // drain the budget meant to hold when sources are shared -- and the
+            // per-source ceiling would protect nothing but its own counter.
+            if (!refused) {
+                const global = await charge(
+                    `${name}:${bucket}:global`,
+                    deposit ? depositGlobalBytes! : readGlobalMax);
+                if (!global.allowed) {
+                    refused = global;
+                }
+            }
 
             if (refused) {
                 res.set('Retry-After', String(Math.max(1, refused.resetAt - Math.floor(Date.now() / 1000))));
@@ -151,7 +185,7 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
             // unreachable, refusing every request would cause the outage it is
             // meant to prevent.
             //
-            // Note this leaves the relay's storage caps as the only bound, and
+            // Note this leaves the DIDComm relay's storage caps as the only bound, and
             // those are only globally bounding on the memory backend: redis
             // enforces the per-recipient cap only, which rotating recipient DIDs
             // sidesteps, unless the deployment gives it a dedicated instance
@@ -160,5 +194,18 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
         }
 
         next();
+    };
+}
+
+// A surface fronted by one mount can still carry two kinds of load: Herald
+// answers name lookups and claims on the same prefix, and a claim mints a
+// credential where a lookup reads one. The bucket is therefore chosen per
+// request. Everything outside the safe methods is a write, so a verb added to
+// the upstream later lands on the tighter budget rather than the looser one.
+export function byMethod(buckets: { read: RequestHandler, write: RequestHandler }): RequestHandler {
+    return (req, res, next) => {
+        const safe = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+        const bucket = safe ? buckets.read : buckets.write;
+        bucket(req, res, next);
     };
 }

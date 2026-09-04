@@ -1,8 +1,9 @@
 import { jest } from '@jest/globals';
+import { readFileSync } from 'fs';
 import express from 'express';
 import request from 'supertest';
 
-import { publicRateLimit, isMeaningfulSource } from '../../services/drawbridge/server/src/middleware/public-rate-limit.ts';
+import { byMethod, publicRateLimit, isMeaningfulSource } from '../../services/drawbridge/server/src/middleware/public-rate-limit.ts';
 import type { DrawbridgeStore, RateLimitResult } from '../../services/drawbridge/server/src/types.ts';
 
 // A store that actually counts, so the buckets can be driven independently
@@ -138,6 +139,79 @@ describe('public rate limit middleware', () => {
         expect(keys).toContain('didcomm:read:global');
     });
 
+    // Surfaces that store nothing upstream (Herald, the explorer, conformant
+    // resolution) omit the byte budgets. Without them there is no deposit
+    // bucket to charge, so every request has to land on the read budget --
+    // otherwise a POST would be charged against a ceiling that does not exist
+    // and pass unbounded.
+    // A request the default predicate would call a deposit, on a surface with no
+    // byte budget configured.
+    it('charges every request to the read budget when no byte budget is given', async () => {
+        const { store, keys } = countingStore();
+        const app = express();
+        app.use(express.json());
+        app.use('/names', publicRateLimit({
+            store,
+            name: 'names',
+            readPerSourceMax: 2,
+            readGlobalMax: 100,
+            windowSeconds: 60,
+        }), (_req, res) => res.json({ proxied: true }));
+
+        await request(app).post('/names/messages').send({ body: 'x' });
+
+        expect(keys).toEqual(['names:read:global']);
+    });
+
+    // Half a deposit configuration is a typo, and accepting it would switch off
+    // the budget that bounds deposits while looking configured. The limiters are
+    // built at startup, so this refuses the node rather than a request.
+    it.each([
+        ['depositPerSourceBytes', { depositPerSourceBytes: 1000 }],
+        ['depositGlobalBytes', { depositGlobalBytes: 5000 }],
+    ])('refuses a deposit budget given as %s alone', (_label, budget) => {
+        const { store } = countingStore();
+
+        expect(() => publicRateLimit({
+            store,
+            name: 'names',
+            readPerSourceMax: 2,
+            readGlobalMax: 100,
+            windowSeconds: 60,
+            ...budget as object,
+        } as any)).toThrow('must be given together');
+    });
+
+    it('refuses isDeposit without the byte budgets it selects', () => {
+        const { store } = countingStore();
+
+        expect(() => publicRateLimit({
+            store,
+            name: 'names',
+            readPerSourceMax: 2,
+            readGlobalMax: 100,
+            windowSeconds: 60,
+            isDeposit: () => true,
+        } as any)).toThrow('has no effect');
+    });
+
+    // The global bucket is what holds when sources are shared. Charging it for a
+    // request the per-source bucket already refused would let one source drain
+    // it while being refused, denying every other client on the surface.
+    it('does not charge the global bucket for a request refused per source', async () => {
+        const { store, keys } = countingStore({ 'didcomm:read:src:203.0.113.9': 1 });
+        const app = express();
+        app.use((req, _res, nextFn) => { Object.defineProperty(req, 'ip', { value: '203.0.113.9' }); nextFn(); });
+        app.use('/didcomm', publicRateLimit({ store, ...BASE } as any), (_req, res) => res.json({ proxied: true }));
+
+        expect((await request(app).get('/didcomm/api/v1/challenge')).status).toBe(200);
+        expect((await request(app).get('/didcomm/api/v1/challenge')).status).toBe(429);
+
+        // Two requests, but the global bucket was charged only for the one that
+        // was allowed through to the upstream.
+        expect(keys.filter(key => key === 'didcomm:read:global')).toHaveLength(1);
+    });
+
     // The limiter exists to protect availability. If its own store is down,
     // refusing everything would cause the outage it is meant to prevent.
     it('fails open when the store is unreachable', async () => {
@@ -168,6 +242,13 @@ describe('drawbridge rate limit config validation', () => {
         'ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_PER_SOURCE_BYTES',
         'ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES',
         'ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW',
+        'ARCHON_DRAWBRIDGE_PUBLIC_READ_PER_SOURCE',
+        'ARCHON_DRAWBRIDGE_PUBLIC_READ_GLOBAL',
+        'ARCHON_DRAWBRIDGE_EXPLORER_READ_PER_SOURCE',
+        'ARCHON_DRAWBRIDGE_EXPLORER_READ_GLOBAL',
+        'ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE',
+        'ARCHON_DRAWBRIDGE_NAME_WRITE_GLOBAL',
+        'ARCHON_DRAWBRIDGE_PUBLIC_RATE_LIMIT_WINDOW',
     ];
 
     async function loadWith(name: string, value: string) {
@@ -197,5 +278,84 @@ describe('drawbridge rate limit config validation', () => {
     it.each(numeric)('rejects a zero or negative %s at startup', async (name) => {
         expect(await loadWith(name, '0')).toContain(name);
         expect(await loadWith(name, '-5')).toContain(name);
+    });
+});
+
+// #979: five of the six public proxy mounts shipped without a limiter, because
+// nothing tied "mounted on `app`, outside the authenticated v1 router" to
+// "needs a bucket". This asserts that tie, so the next public route added
+// without one fails here rather than in production.
+describe('public route mounts', () => {
+    const source = readFileSync(
+        new URL('../../services/drawbridge/server/src/drawbridge-api.ts', import.meta.url), 'utf-8');
+
+    // path -> the middleware expected between the path and the handler.
+    const PUBLIC_MOUNTS: Record<string, string> = {
+        '/invoice/:did': 'publicReadRateLimit',
+        '/.well-known': 'heraldRateLimit',
+        '/names': 'heraldRateLimit',
+        '/explorer': 'explorerRateLimit',
+        '/didcomm': 'didcommRateLimit',
+        '/1.0/identifiers': 'publicReadRateLimit',
+    };
+
+    // Mounted on `app` but not a proxy: the authenticated router carries its own
+    // auth and the paid path's limiter, and /metrics is a local read.
+    const EXEMPT = ['/api/v1', '/metrics'];
+
+    // Every way Express takes a mount, and both quote styles, so a route added
+    // as `app.post("/foo", handler)` is not simply invisible to the guard below.
+    const MOUNT = 'app\\.(?:use|all|get|post|put|patch|delete|head|options)\\(\\s*';
+
+    it.each(Object.entries(PUBLIC_MOUNTS))('rate-limits %s with %s', (path, middleware) => {
+        const quoted = `['"]${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`;
+        const mount = source.match(new RegExp(`${MOUNT}${quoted},\\s*([A-Za-z][A-Za-z0-9]*)`));
+
+        expect(mount).not.toBeNull();
+        expect(mount![1]).toBe(middleware);
+    });
+
+    it('knows every route mounted on the app', () => {
+        const mounted = [...source.matchAll(new RegExp(`${MOUNT}['"](/[^'"]*)['"]`, 'g'))]
+            .map(match => match[1]);
+
+        expect(mounted.sort()).toEqual([...Object.keys(PUBLIC_MOUNTS), ...EXEMPT].sort());
+    });
+});
+
+// The split is the security-critical half of the Herald fix: a claim charged to
+// the read budget gets 120 a minute instead of 10. Asserting only that
+// `heraldRateLimit` is mounted would not notice that, so exercise the selector.
+describe('byMethod', () => {
+    function mountSplit() {
+        const { store, keys } = countingStore();
+        const read = publicRateLimit({
+            store, name: 'public', readPerSourceMax: 120, readGlobalMax: 1200, windowSeconds: 60,
+        });
+        const write = publicRateLimit({
+            store, name: 'names:write', readPerSourceMax: 10, readGlobalMax: 60, windowSeconds: 60,
+        });
+
+        const app = express();
+        app.use(express.json());
+        app.use('/names', byMethod({ read, write }), (_req, res) => res.json({ proxied: true }));
+
+        return { app, keys };
+    }
+
+    it.each(['get', 'head', 'options'] as const)('charges %s to the read budget', async (method) => {
+        const { app, keys } = mountSplit();
+
+        await request(app)[method]('/names/api/name');
+
+        expect(keys).toEqual(['public:read:global']);
+    });
+
+    it.each(['put', 'post', 'delete', 'patch'] as const)('charges %s to the write budget', async (method) => {
+        const { app, keys } = mountSplit();
+
+        await request(app)[method]('/names/api/name').send({ name: 'alice' });
+
+        expect(keys).toEqual(['names:write:read:global']);
     });
 });
