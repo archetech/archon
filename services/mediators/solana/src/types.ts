@@ -36,6 +36,17 @@ export interface MediatorDb {
     registered: RegisteredItem[];
     discovered: DiscoveredItem[];
     lastExport?: string;
+    // The batch asset created for the current export attempt. The anchor
+    // carries the DID, so it must exist before the transaction; keeping it
+    // here lets a failed attempt reuse the same asset instead of minting
+    // another one for the same operations.
+    pendingBatch?: {
+        did: string;
+        opids: string[];
+        // Set once the batch is anchored. Its operations are still queued, so
+        // the clear is outstanding; the transaction must not be sent again.
+        txid?: string;
+    };
     pending?: {
         txids?: string[];
         blockCount: number;

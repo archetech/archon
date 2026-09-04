@@ -1077,6 +1077,21 @@ async function anchorBatch(): Promise<void> {
             let did = pending?.did;
             let covered = coveredOperations(pending, operations, cids);
 
+            // Anchored on an earlier cycle, but its operations were not cleared.
+            // The transaction is on the network already, so this retries only the
+            // clear -- re-broadcasting would anchor the same batch twice.
+            if (pending?.txid) {
+                console.log(`Batch ${pending.did} is anchored; retrying the queue clear`);
+
+                if (covered.length === 0 || await gatekeeper.clearQueue(REGISTRY, covered)) {
+                    await jsonPersister.updateDb((data) => {
+                        delete data.pendingBatch;
+                    });
+                }
+
+                return;
+            }
+
             if (did && covered.length === 0) {
                 // Its operations have left the queue, so there is nothing to anchor.
                 console.warn(`Discarding batch ${did}: none of its operations remain queued`);
@@ -1094,6 +1109,11 @@ async function anchorBatch(): Promise<void> {
                     data.pendingBatch = { did: created, opids: cids };
                 });
             }
+
+            // The batch certifies a fixed op-set. Stamping it with the current
+            // queue instead would let a retry clear operations this anchor never
+            // covered, dropping them without ever writing them to a chain.
+            const anchoredOpids = pending?.did === did ? pending.opids : cids;
 
             // Read before broadcasting. Anything fallible between the broadcast
             // and the record risks losing a transaction already paid for, which
@@ -1132,16 +1152,20 @@ async function anchorBatch(): Promise<void> {
                         blockCount
                     };
                     db.lastExport = new Date().toISOString();
-                    delete db.pendingBatch;
+                    // Kept until the clear succeeds, stamped so a retry knows the
+                    // transaction has already been sent.
+                    db.pendingBatch = { did: did!, opids: anchoredOpids, txid: txid! };
                 });
 
                 satoshiBatchesAnchored.inc();
 
                 const ok = await gatekeeper.clearQueue(REGISTRY, covered);
 
-                if (!ok) {
-                    // The operations stay queued and will be batched again, which
-                    // costs another anchor but does not duplicate this one.
+                if (ok) {
+                    await jsonPersister.updateDb((data) => {
+                        delete data.pendingBatch;
+                    });
+                } else {
                     console.warn(`Anchored batch ${did} but could not clear ${covered.length} operation(s) from the ${REGISTRY} queue`);
                 }
             }

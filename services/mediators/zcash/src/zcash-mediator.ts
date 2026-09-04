@@ -7,6 +7,7 @@ import JsonRedis from './db/redis.js';
 import JsonMongo from './db/mongo.js';
 import JsonSQLite from './db/sqlite.js';
 import config from './config.js';
+import { coveredOperations } from './batch.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
 import { DidRegistration } from '@didcid/gatekeeper/types';
@@ -182,6 +183,11 @@ const zcashImportErrors = new promClient.Counter({
 const zcashReorgs = new promClient.Counter({
     name: 'zcash_reorgs_total',
     help: 'Chain reorganization events detected',
+});
+
+const zcashAnchorFailures = new promClient.Counter({
+    name: 'zcash_anchor_failures_total',
+    help: 'Anchor attempts that produced no transaction',
 });
 
 const zcashBatchesAnchored = new promClient.Counter({
@@ -771,27 +777,110 @@ async function anchorBatch(): Promise<void> {
                 const canonical = JSON.parse(cipher.canonicalizeJSON(op));
                 return gatekeeper.addJSON(canonical);
             }));
-            const batch = { version: 1, ops: cids };
-            const did = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
-            const txid = await createOpReturnTxn(did);
+            // A batch that has been created is authoritative until it anchors. It
+            // certifies one specific op-set, so re-cutting it whenever the queue
+            // moves would publish an asset nothing ever anchors or clears --
+            // operations queued during an outage go into the next batch instead.
+            const db = await loadDb();
+            const pending = db.pendingBatch;
+
+            let did = pending?.did;
+            let covered = coveredOperations(pending, operations, cids);
+
+            // Anchored on an earlier cycle, but its operations were not cleared.
+            // The transaction is on the network already, so this retries only the
+            // clear -- re-broadcasting would anchor the same batch twice.
+            if (pending?.txid) {
+                console.log(`Batch ${pending.did} is anchored; retrying the queue clear`);
+
+                if (covered.length === 0 || await gatekeeper.clearQueue(REGISTRY, covered)) {
+                    await jsonPersister.updateDb((data) => {
+                        delete data.pendingBatch;
+                    });
+                }
+
+                return;
+            }
+
+            if (did && covered.length === 0) {
+                // Its operations have left the queue, so there is nothing to anchor.
+                console.warn(`Discarding batch ${did}: none of its operations remain queued`);
+                did = undefined;
+            }
+
+            if (did) {
+                console.log(`Reusing batch ${did} from the previous attempt (${covered.length} operation(s))`);
+            } else {
+                covered = operations;
+                const batch = { version: 1, ops: cids };
+                did = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
+                const created = did;
+                await jsonPersister.updateDb((data) => {
+                    data.pendingBatch = { did: created, opids: cids };
+                });
+            }
+
+            const anchoredDid = did;
+
+            // The batch certifies a fixed op-set. Stamping it with the current
+            // queue instead would let a retry clear operations this anchor never
+            // covered, dropping them without ever writing them to a chain.
+            const anchoredOpids = pending?.did === anchoredDid ? pending.opids : cids;
+
+            // Read before broadcasting. Anything fallible between the broadcast and
+            // the record risks losing a transaction already paid for, which is what
+            // has the next cycle anchor the same batch again.
+            const blockCount = await zecClient.getBlockCount();
+
+            let txid: string | undefined;
+
+            try {
+                txid = await createOpReturnTxn(anchoredDid);
+            } catch (error: any) {
+                // The wallet service answers 500 when it cannot sign or broadcast,
+                // so a failure arrives as a thrown request error rather than an
+                // absent txid. Both paths have to be counted.
+                zcashAnchorFailures.inc();
+                console.warn(`Anchor attempt failed for batch ${anchoredDid}: ${error.message}. Retrying it unchanged.`);
+                return;
+            }
+
+            if (!txid) {
+                zcashAnchorFailures.inc();
+                console.warn(`Anchor attempt for batch ${anchoredDid} produced no transaction. Retrying it unchanged.`);
+            }
 
             if (txid) {
-                const ok = await gatekeeper.clearQueue(REGISTRY, operations);
+                // Recorded before the queue is touched. The transaction is already
+                // on the network and its fee already spent, so losing it here would
+                // have the next cycle broadcast a second one for the same batch.
+                const anchoredTxid = txid;
+
+                await jsonPersister.updateDb(async (data) => {
+                    (data.registered ??= []).push({
+                        did: anchoredDid,
+                        txid: anchoredTxid
+                    });
+                    data.pending = {
+                        txids: [anchoredTxid],
+                        blockCount
+                    };
+                    data.lastExport = new Date().toISOString();
+                    // Kept until the clear succeeds, stamped so a retry knows the
+                    // transaction has already been sent.
+                    data.pendingBatch = { did: anchoredDid, opids: anchoredOpids, txid: anchoredTxid };
+                });
+
+                zcashBatchesAnchored.inc();
+
+                const ok = await gatekeeper.clearQueue(REGISTRY, covered);
 
                 if (ok) {
-                    zcashBatchesAnchored.inc();
-                    const blockCount = await zecClient.getBlockCount();
-                    await jsonPersister.updateDb(async (db) => {
-                        (db.registered ??= []).push({
-                            did,
-                            txid: txid!
-                        });
-                        db.pending = {
-                            txids: [txid!],
-                            blockCount
-                        };
-                        db.lastExport = new Date().toISOString();
+                    await jsonPersister.updateDb((data) => {
+                        delete data.pendingBatch;
                     });
+                } else {
+                    console.warn(`Anchored batch ${anchoredDid} but could not clear ${covered.length} operation(s) from the ${REGISTRY} queue`);
                 }
             }
         }
