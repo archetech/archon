@@ -7,7 +7,7 @@ import JsonRedis from './db/redis.js';
 import JsonMongo from './db/mongo.js';
 import JsonSQLite from './db/sqlite.js';
 import config from './config.js';
-import { coveredOperations } from './batch.js';
+import { planAnchor } from './batch.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
 import { DidRegistration } from '@didcid/gatekeeper/types';
@@ -782,16 +782,14 @@ async function anchorBatch(): Promise<void> {
             // moves would publish an asset nothing ever anchors or clears --
             // operations queued during an outage go into the next batch instead.
             const db = await loadDb();
-            const pending = db.pendingBatch;
-
-            let did = pending?.did;
-            let covered = coveredOperations(pending, operations, cids);
+            const plan = planAnchor(db.pendingBatch, operations, cids);
+            const covered = plan.covered;
 
             // Anchored on an earlier cycle, but its operations were not cleared.
             // The transaction is on the network already, so this retries only the
             // clear -- re-broadcasting would anchor the same batch twice.
-            if (pending?.txid) {
-                console.log(`Batch ${pending.did} is anchored; retrying the queue clear`);
+            if (plan.action === 'clear') {
+                console.log(`Batch ${plan.did} is anchored; retrying the queue clear`);
 
                 if (covered.length === 0 || await gatekeeper.clearQueue(REGISTRY, covered)) {
                     await jsonPersister.updateDb((data) => {
@@ -802,30 +800,28 @@ async function anchorBatch(): Promise<void> {
                 return;
             }
 
-            if (did && covered.length === 0) {
-                // Its operations have left the queue, so there is nothing to anchor.
-                console.warn(`Discarding batch ${did}: none of its operations remain queued`);
-                did = undefined;
+            if (plan.discarded) {
+                console.warn(`Discarding batch ${plan.discarded}: none of its operations remain queued`);
             }
 
-            if (did) {
-                console.log(`Reusing batch ${did} from the previous attempt (${covered.length} operation(s))`);
+            let anchoredDid: string;
+
+            if (plan.action === 'reuse') {
+                anchoredDid = plan.did;
+                console.log(`Reusing batch ${anchoredDid} from the previous attempt (${covered.length} operation(s))`);
             } else {
-                covered = operations;
                 const batch = { version: 1, ops: cids };
-                did = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
-                const created = did;
+                anchoredDid = await keymaster.createAsset({ batch }, { registry: await batchDidRegistry(), controller: config.nodeID });
+                const created = anchoredDid;
                 await jsonPersister.updateDb((data) => {
                     data.pendingBatch = { did: created, opids: cids };
                 });
             }
 
-            const anchoredDid = did;
-
             // The batch certifies a fixed op-set. Stamping it with the current
             // queue instead would let a retry clear operations this anchor never
             // covered, dropping them without ever writing them to a chain.
-            const anchoredOpids = pending?.did === anchoredDid ? pending.opids : cids;
+            const anchoredOpids = plan.opids;
 
             // Read before broadcasting. Anything fallible between the broadcast and
             // the record risks losing a transaction already paid for, which is what

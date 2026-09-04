@@ -36,12 +36,13 @@ function anchoringMediators(): { name: string, source: string, path: string }[] 
 }
 
 describe.each(anchoringMediators())('$name mediator', ({ source }) => {
-    it('reuses the batch asset it already published', () => {
-        // Without this a failed anchor mints another asset for the same
-        // operations on the next cycle, and the previous one is never anchored.
-        // Matching the identifier alone would be satisfied by the import.
-        expect(source).toMatch(/covered = coveredOperations\(pending, operations, cids\)/);
-        expect(source).toMatch(/const pending = db\.pendingBatch/);
+    it('takes its decision from planAnchor', () => {
+        // What that decision should be is covered by anchor-plan.test.ts, which
+        // exercises the function directly. This only checks that the mediator
+        // asks it rather than improvising -- behaviour cannot reach that from
+        // here, since these modules cannot be imported (#1041).
+        expect(source).toMatch(/const plan = planAnchor\(db\.pendingBatch, operations, cids\)/);
+        expect(source).toMatch(/const covered = plan\.covered/);
     });
 
     it('keeps the pending batch until its operations are cleared', () => {
@@ -49,7 +50,9 @@ describe.each(anchoringMediators())('$name mediator', ({ source }) => {
         // queued. Forgetting the batch there has them minted and anchored a
         // second time once the transaction confirms.
         expect(source).toMatch(/pendingBatch = \{[^}]*txid:/);
-        expect(source).toMatch(/pending\?\.txid/);
+        // `pending?.txid` also appears elsewhere in these files, so the branch
+        // is identified by the decision it acts on.
+        expect(source).toMatch(/plan\.action === 'clear'/);
     });
 
     it('retries the clear without broadcasting again', () => {
@@ -73,7 +76,7 @@ describe.each(anchoringMediators())('$name mediator', ({ source }) => {
         // Stamping the current queue lets the retry clear operations this anchor
         // never certified, dropping them without writing them to a chain.
         expect(source).toMatch(/pendingBatch = \{[^}]*opids: anchoredOpids/);
-        expect(source).toMatch(/anchoredOpids = pending\?\.did === \w+ \? pending\.opids : cids/);
+        expect(source).toMatch(/const anchoredOpids = plan\.opids/);
     });
 
     it('records the transaction before clearing the queue', () => {
