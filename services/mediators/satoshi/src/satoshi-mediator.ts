@@ -1166,8 +1166,6 @@ async function anchorBatch(): Promise<void> {
                         delete data.pendingBatch;
                     });
                 } else {
-                    // The operations stay queued and will be batched again, which
-                    // costs another anchor but does not duplicate this one.
                     console.warn(`Anchored batch ${did} but could not clear ${covered.length} operation(s) from the ${REGISTRY} queue`);
                 }
             }

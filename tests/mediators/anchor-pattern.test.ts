@@ -78,7 +78,10 @@ describe.each(anchoringMediators())('$name mediator', ({ source }) => {
     it('records the transaction before clearing the queue', () => {
         // The transaction is on the network and its fee is spent by this point.
         // Losing it has the next cycle anchor the same batch again.
-        const persisted = source.search(/delete (db|data)\.pendingBatch/);
+        // Anchored on the stamp rather than on any delete: the first delete in
+        // these files belongs to the retry branch, which sits above the record
+        // and made an earlier version of this assertion measure nothing.
+        const persisted = source.search(/pendingBatch = \{[^}]*txid:/);
         const cleared = source.indexOf('clearQueue', persisted);
 
         expect(persisted).toBeGreaterThan(-1);
