@@ -18,7 +18,7 @@ import { createAddressRouter } from './keymaster-address-router.js';
 import { createAgentRouter } from './keymaster-agent-router.js';
 import { createAssetRouter } from './keymaster-asset-router.js';
 import { createChallengeRouter } from './keymaster-challenge-router.js';
-import { createRequireAdminKey } from './keymaster-admin.js';
+import { checkAdminApiKey, createRequireAdminKey } from './keymaster-admin.js';
 import { createCoreRouter } from './keymaster-core-router.js';
 import { createCredentialRouter } from './keymaster-credential-router.js';
 import { createDidCommRouter } from './keymaster-didcomm-router.js';
@@ -266,6 +266,21 @@ async function initWallet() {
     return wallet;
 }
 
+// Before the port is bound, and with an explicit exit: this process installs
+// uncaughtException and unhandledRejection handlers that log and continue, so a
+// throw raised from inside the listen callback would leave the server accepting
+// requests anyway.
+const adminKeyCheck = checkAdminApiKey(config.adminApiKey);
+
+if (adminKeyCheck.fatal) {
+    console.error(adminKeyCheck.fatal);
+    process.exit(1);
+}
+
+if (adminKeyCheck.warning) {
+    console.warn(adminKeyCheck.warning);
+}
+
 const port = config.keymasterPort;
 
 const server = app.listen(port, config.bindAddress, async () => {
@@ -290,11 +305,6 @@ const server = app.listen(port, config.bindAddress, async () => {
     });
     console.log(`Keymaster server v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
-    if (config.adminApiKey) {
-        console.log('Admin API key protection is ENABLED');
-    } else {
-        console.warn('Warning: ARCHON_ADMIN_API_KEY is not set — admin routes are unprotected');
-    }
 
     try {
         await waitForNodeId();

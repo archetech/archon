@@ -135,9 +135,15 @@ contract.
   require the `X-Archon-Admin-Key` header to match `ARCHON_ADMIN_API_KEY`.
 - Header missing/wrong → HTTP 401 `{ "error": "Unauthorized — valid admin
   API key required" }` (note the em dash; matches the Gatekeeper wording).
-- When `ARCHON_ADMIN_API_KEY` is empty, all routes are open
-  (development mode). Implementations MUST log a warning at startup in
-  this case.
+- `ARCHON_ADMIN_API_KEY` MUST be set. The header guard covers the whole v1
+  router rather than an admin subset, so an empty key would leave wallet,
+  identity, credential and Lightning operations reachable by anyone who can
+  open the port. Implementations MUST refuse to start, before binding the
+  port, and MUST exit non-zero. This matches Gatekeeper, which refuses on the
+  same variable in both its TypeScript and Rust ports.
+- An implementation whose app object can be constructed programmatically
+  without a key MUST refuse those requests with HTTP 403
+  `{ "error": "Admin API key not configured" }` rather than serving them.
 
 - Clients MUST send the key in `X-Archon-Admin-Key` and MUST NOT send it as
   `Authorization: Bearer <key>`. The TS service ignores `Authorization`

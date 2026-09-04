@@ -58,10 +58,6 @@ def parse_resolve_options(request: Request) -> dict[str, Any]:
 async def lifespan(_: FastAPI):
     LOGGER.info("Keymaster server v%s (%s) running on %s:%s", settings.service_version, settings.git_commit, settings.bind_address, settings.keymaster_port)
     LOGGER.info("Keymaster server persisting to %s", settings.keymaster_db)
-    if settings.admin_api_key:
-        LOGGER.info("Admin API key protection is ENABLED")
-    else:
-        LOGGER.warning("ARCHON_ADMIN_API_KEY is not set — admin routes are unprotected")
     set_service_version_info(settings.service_version, settings.git_commit)
     await service.startup()
     try:
@@ -123,8 +119,10 @@ async def generic_error_handler(_: Request, exc: Exception):
 
 
 async def require_admin_key(request: Request) -> None:
+    # Fail closed. The entry point refuses to start without ARCHON_ADMIN_API_KEY,
+    # so reaching this branch means the app was imported directly without one.
     if not settings.admin_api_key:
-        return
+        raise HTTPException(status_code=403, detail="Admin API key not configured")
     header_key = request.headers.get("x-archon-admin-key")
     auth_header = request.headers.get("authorization", "")
     bearer_key = auth_header[7:] if auth_header.lower().startswith("bearer ") else None

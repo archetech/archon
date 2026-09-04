@@ -24,7 +24,7 @@ import { createResponseRouter } from '../../services/keymaster/server/src/keymas
 import { createSchemaRouter } from '../../services/keymaster/server/src/keymaster-schema-router.ts';
 import { createSchemaTemplateRouter } from '../../services/keymaster/server/src/keymaster-schema-template-router.ts';
 import { createVaultRouter } from '../../services/keymaster/server/src/keymaster-vault-router.ts';
-import { createRequireAdminKey } from '../../services/keymaster/server/src/keymaster-admin.ts';
+import { checkAdminApiKey, createRequireAdminKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/keymaster/server/src/keymaster-admin.ts';
 import defaultConfig from '../../services/keymaster/server/src/config.js';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -514,8 +514,12 @@ describe('keymaster admin key middleware', () => {
         return header === undefined ? call : call.set('X-Archon-Admin-Key', header as string);
     }
 
-    it('passes through when no admin key is configured', async () => {
-        await expect(run({ adminApiKey: '' })).resolves.toMatchObject({ status: 200 });
+    // #1018: this used to call next(). The guard covers the entire v1 router,
+    // so passing through left wallet, identity, credential and Lightning
+    // operations open to anyone who could reach the port.
+    it('refuses when no admin key is configured', async () => {
+        await expect(run({ adminApiKey: '' })).resolves.toMatchObject({ status: 403 });
+        await expect(run({ adminApiKey: '' }, adminKey)).resolves.toMatchObject({ status: 403 });
     });
 
     it('rejects a missing or wrong key', async () => {
@@ -525,5 +529,37 @@ describe('keymaster admin key middleware', () => {
 
     it('accepts the configured key', async () => {
         await expect(run({}, adminKey)).resolves.toMatchObject({ status: 200 });
+    });
+
+    // A prefix of the configured key must not be accepted: timingSafeEqual
+    // throws on a length mismatch, so the comparison has to check length first.
+    it('rejects a key that is a prefix of the configured one', async () => {
+        await expect(run({}, adminKey.slice(0, -1))).resolves.toMatchObject({ status: 401 });
+    });
+});
+
+// Mirrors gatekeeper's checkAdminApiKey, so the two services refuse and warn on
+// the same configurations.
+describe('keymaster admin key startup check', () => {
+    it('is fatal when the key is unset', () => {
+        const result = checkAdminApiKey('');
+
+        expect(result.fatal).toContain('ARCHON_ADMIN_API_KEY must be set');
+        expect(result.fatal).toContain('openssl rand -hex 32');
+        expect(result.warning).toBeUndefined();
+    });
+
+    it('warns but does not block startup for a short key', () => {
+        const result = checkAdminApiKey('short-key');
+
+        expect(result.fatal).toBeUndefined();
+        expect(result.warning).toContain(`shorter than ${MIN_ADMIN_API_KEY_LENGTH}`);
+    });
+
+    it('accepts a key at the minimum length with no warning', () => {
+        const result = checkAdminApiKey('a'.repeat(MIN_ADMIN_API_KEY_LENGTH));
+
+        expect(result.fatal).toBeUndefined();
+        expect(result.warning).toBeUndefined();
     });
 });
