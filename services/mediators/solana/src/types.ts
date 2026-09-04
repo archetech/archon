@@ -43,6 +43,9 @@ export interface MediatorDb {
     pendingBatch?: {
         did: string;
         opids: string[];
+        // Set once the batch is anchored. Its operations are still queued, so
+        // the clear is outstanding; the transaction must not be sent again.
+        txid?: string;
     };
     pending?: {
         txids?: string[];

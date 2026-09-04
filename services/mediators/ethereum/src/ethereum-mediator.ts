@@ -733,6 +733,21 @@ async function anchorBatch(): Promise<void> {
             let did = pending?.did;
             let covered = coveredOperations(pending, operations, cids);
 
+            // Anchored on an earlier cycle, but its operations were not cleared.
+            // The transaction is on the network already, so this retries only the
+            // clear -- re-broadcasting would anchor the same batch twice.
+            if (pending?.txid) {
+                console.log(`Batch ${pending.did} is anchored; retrying the queue clear`);
+
+                if (covered.length === 0 || await gatekeeper.clearQueue(REGISTRY, covered)) {
+                    await jsonPersister.updateDb((data) => {
+                        delete data.pendingBatch;
+                    });
+                }
+
+                return;
+            }
+
             if (did && covered.length === 0) {
                 // Its operations have left the queue, so there is nothing to anchor.
                 console.warn(`Discarding batch ${did}: none of its operations remain queued`);
@@ -754,6 +769,11 @@ async function anchorBatch(): Promise<void> {
             const anchoredDid = did;
             const batchHash = batchHashForDid(anchoredDid);
 
+            // The batch encodes a fixed op-set, and the count goes on chain with
+            // it. Reusing a batch while the queue has moved must not describe it
+            // by the queue's current size.
+            const anchoredOpids = pending?.did === anchoredDid ? pending.opids : cids;
+
             // Read before broadcasting. Anything fallible between the broadcast and
             // the record risks losing a transaction already paid for, which is what
             // has the next cycle anchor the same batch again.
@@ -762,7 +782,7 @@ async function anchorBatch(): Promise<void> {
             let txid: string | undefined;
 
             try {
-                txid = await walletAnchor(anchoredDid, batchHash, cids.length);
+                txid = await walletAnchor(anchoredDid, batchHash, anchoredOpids.length);
             } catch (error: any) {
                 // The wallet service answers 500 when it cannot sign or broadcast,
                 // so a failure arrives as a thrown request error rather than an
@@ -785,16 +805,22 @@ async function anchorBatch(): Promise<void> {
 
                 await jsonPersister.updateDb((data) => {
                     (data.registered ??= []).push({ did: anchoredDid, txid: anchoredTxid, batchHash });
-                    data.pending = { txids: [anchoredTxid], blockCount, batchDid: anchoredDid, batchHash, opCount: cids.length };
+                    data.pending = { txids: [anchoredTxid], blockCount, batchDid: anchoredDid, batchHash, opCount: anchoredOpids.length };
                     data.lastExport = new Date().toISOString();
-                    delete data.pendingBatch;
+                    // Kept until the clear succeeds, stamped so a retry knows the
+                    // transaction has already been sent.
+                    data.pendingBatch = { did: anchoredDid, opids: anchoredOpids, txid: anchoredTxid };
                 });
 
                 ethereumBatchesAnchored.inc();
 
                 const ok = await gatekeeper.clearQueue(REGISTRY, covered);
 
-                if (!ok) {
+                if (ok) {
+                    await jsonPersister.updateDb((data) => {
+                        delete data.pendingBatch;
+                    });
+                } else {
                     console.warn(`Anchored batch ${anchoredDid} but could not clear ${covered.length} operation(s) from the ${REGISTRY} queue`);
                 }
             }

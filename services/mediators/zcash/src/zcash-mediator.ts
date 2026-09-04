@@ -787,6 +787,21 @@ async function anchorBatch(): Promise<void> {
             let did = pending?.did;
             let covered = coveredOperations(pending, operations, cids);
 
+            // Anchored on an earlier cycle, but its operations were not cleared.
+            // The transaction is on the network already, so this retries only the
+            // clear -- re-broadcasting would anchor the same batch twice.
+            if (pending?.txid) {
+                console.log(`Batch ${pending.did} is anchored; retrying the queue clear`);
+
+                if (covered.length === 0 || await gatekeeper.clearQueue(REGISTRY, covered)) {
+                    await jsonPersister.updateDb((data) => {
+                        delete data.pendingBatch;
+                    });
+                }
+
+                return;
+            }
+
             if (did && covered.length === 0) {
                 // Its operations have left the queue, so there is nothing to anchor.
                 console.warn(`Discarding batch ${did}: none of its operations remain queued`);
@@ -846,14 +861,20 @@ async function anchorBatch(): Promise<void> {
                         blockCount
                     };
                     data.lastExport = new Date().toISOString();
-                    delete data.pendingBatch;
+                    // Kept until the clear succeeds, stamped so a retry knows the
+                    // transaction has already been sent.
+                    data.pendingBatch = { did: anchoredDid, opids: cids, txid: anchoredTxid };
                 });
 
                 zcashBatchesAnchored.inc();
 
                 const ok = await gatekeeper.clearQueue(REGISTRY, covered);
 
-                if (!ok) {
+                if (ok) {
+                    await jsonPersister.updateDb((data) => {
+                        delete data.pendingBatch;
+                    });
+                } else {
                     console.warn(`Anchored batch ${anchoredDid} but could not clear ${covered.length} operation(s) from the ${REGISTRY} queue`);
                 }
             }

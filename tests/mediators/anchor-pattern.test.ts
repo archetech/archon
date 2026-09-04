@@ -43,8 +43,21 @@ describe.each(anchoringMediators())('$name mediator', ({ source }) => {
         expect(source).toContain('coveredOperations');
     });
 
-    it('clears the pending batch only once it is anchored', () => {
-        expect(source).toMatch(/delete (db|data)\.pendingBatch/);
+    it('keeps the pending batch until its operations are cleared', () => {
+        // An anchor that succeeds while clearQueue fails leaves the operations
+        // queued. Forgetting the batch there has them minted and anchored a
+        // second time once the transaction confirms.
+        expect(source).toMatch(/pendingBatch = \{[^}]*txid:/);
+        expect(source).toMatch(/pending\?\.txid/);
+    });
+
+    it('retries the clear without broadcasting again', () => {
+        const retry = source.indexOf('pending?.txid');
+        const broadcastGuard = source.indexOf('return;', retry);
+
+        expect(retry).toBeGreaterThan(-1);
+        // The early return keeps a second transaction from being sent.
+        expect(broadcastGuard).toBeGreaterThan(retry);
     });
 
     it('records the transaction before clearing the queue', () => {
