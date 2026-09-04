@@ -13,6 +13,10 @@ import {
 export { getXpub } from './derivation.js';
 
 const ZATS_PER_ZEC = 100_000_000;
+// Selects a version 4 (Sapling) transaction and its version group id. The
+// branch this constant names is not used: setConsensusBranchId replaces it with
+// the one the node reports. setDefaultsForVersion rejects a bare 4, so a
+// VERSION4_BRANCH_* value has to be the thing passed.
 const DEFAULT_TX_VERSION = bitgo.ZcashTransaction.VERSION4_BRANCH_NU6_1;
 const CHANGE_DUST_ZAT = 1_000;
 const ZIP317_FEE_ZAT_PER_ACTION = 5_000;
@@ -320,6 +324,32 @@ function normalizeUtxo(utxo: RawAddressUtxo, currentHeight: number): ZcashUtxo {
     };
 }
 
+// Zcash signatures commit to the consensus branch id (ZIP-243), so a signature
+// made under one network upgrade is rejected once the next activates -- as
+// ScriptInvalid, at consensus validation rather than at signing. Pinning a
+// branch in source therefore breaks anchoring at every upgrade, which is what
+// happened at NU6.2 (#1040).
+//
+// The node reports the branch the next block will use, so it is read from there
+// rather than chosen here.
+export async function consensusBranchIdFor(zecClient: RpcClient): Promise<number> {
+    const info = await zecClient.command<{ consensus?: { nextblock?: string } }>('getblockchaininfo');
+    const nextblock = info?.consensus?.nextblock;
+
+    if (!nextblock) {
+        throw new Error('Node did not report consensus.nextblock; cannot determine the branch to sign for');
+    }
+
+    // A branch id is exactly four bytes. parseInt would accept a valid prefix,
+    // so "37a5165bgarbage" and "1" both parse to something usable and would be
+    // signed with -- which is the opposite of refusing to guess.
+    if (!/^[0-9a-fA-F]{8}$/.test(nextblock)) {
+        throw new Error(`Node reported an unreadable consensus branch: ${nextblock}`);
+    }
+
+    return Number.parseInt(nextblock, 16);
+}
+
 async function buildSignAndBroadcast(
     zecClient: RpcClient,
     mnemonic: string,
@@ -360,6 +390,8 @@ async function buildSignAndBroadcast(
     const currentHeight = await zecClient.command<number>('getblockcount');
     const txb = bitgo.createTransactionBuilderForNetwork(getZcashNetwork(network)) as any;
     txb.setDefaultsForVersion(getZcashNetwork(network), DEFAULT_TX_VERSION);
+    // After setDefaultsForVersion, which sets a branch of its own.
+    txb.setConsensusBranchId(await consensusBranchIdFor(zecClient));
     txb.setExpiryHeight(currentHeight + 40);
 
     for (const utxo of selected) {

@@ -45,6 +45,10 @@ function createRpcMock(overrides?: Partial<Record<string, any>>): RpcClient & { 
             return { balance: 0, received: 0 };
         case 'getnetworkinfo':
             return { relayfee: 0.000001 };
+        case 'getblockchaininfo':
+            // Signing reads the branch from here rather than a pinned constant,
+            // so a stub without it makes the whole anchor path unreachable.
+            return { consensus: { chaintip: '37a5165b', nextblock: '37a5165b' } };
         case 'sendrawtransaction':
             return 'broadcast-txid';
         default:

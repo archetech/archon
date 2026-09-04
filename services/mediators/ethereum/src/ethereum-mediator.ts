@@ -78,6 +78,11 @@ async function walletAnchor(batchDid: string, batchHash: string, opCount: number
         { contract: config.contractAddress, batchDid, batchHash, opCount },
         { headers: walletHeaders() }
     );
+
+    // Announced for the same reason a failure is counted: without it a
+    // successful anchor and a cycle that did nothing look identical in the log.
+    console.log(`Transaction broadcast with txid: ${data.txid}`);
+
     return data.txid;
 }
 
