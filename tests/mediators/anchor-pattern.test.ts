@@ -89,6 +89,14 @@ describe.each(anchoringMediators())('$name mediator', ({ source }) => {
         expect(cleared).toBeGreaterThan(persisted);
     });
 
+    it('announces a broadcast', () => {
+        // Ethereum and solana counted their failures but said nothing on
+        // success, so an anchor that worked and a cycle that did nothing read
+        // identically. Silence in either direction is what let #1033 run for
+        // five days.
+        expect(source).toMatch(/Transaction broadcast with txid/);
+    });
+
     it('counts an anchor that produced no transaction', () => {
         // The wallet services answer 500, so the failure arrives thrown rather
         // than as an empty txid; both paths have to increment.
