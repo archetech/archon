@@ -1,5 +1,4 @@
 import { createContext, Dispatch, ReactNode, SetStateAction, useContext, useState } from "react";
-import { useIsMounted } from "../hooks/useIsMounted";
 import { DmailItem } from "@didcid/keymaster/types";
 
 interface VariablesContextValue {
@@ -85,7 +84,6 @@ export type VariablesStore = (key: string, value: string | boolean) => Promise<v
 export function VariablesProvider(
     { children, store }: { children: ReactNode; store?: VariablesStore }
 ) {
-    const isMounted = useIsMounted();
     const [currentId, setCurrentIdState] = useState<string>("");
     const [validId, setValidId] = useState<boolean>(false);
     const [currentDID, setCurrentDID] = useState<string>("");
@@ -175,82 +173,71 @@ export function VariablesProvider(
         await store?.(key, value);
     }
 
-    // Every set* here is called from refresh work that awaits the network, so any
-    // of them can fire after the component has gone. Guarding at this boundary
-    // covers all thirty-odd rather than each useState in turn.
-    function whileMounted<T extends (...args: never[]) => unknown>(setter: T): T {
-        return ((...args: Parameters<T>) => {
-            if (isMounted()) {
-                return setter(...args);
-            }
-        }) as T;
-    }
-
     const value: VariablesContextValue = {
         currentId,
-        setCurrentId: whileMounted(setCurrentId),
+        setCurrentId,
         validId,
-        setValidId: whileMounted(setValidId),
+        setValidId,
         currentDID,
-        setCurrentDID: whileMounted(setCurrentDID),
+        setCurrentDID,
         registry,
-        setRegistry: whileMounted(setRegistry),
+        setRegistry,
         registries,
-        setRegistries: whileMounted(setRegistries),
+        setRegistries,
         idList,
-        setIdList: whileMounted(setIdList),
+        setIdList,
         unresolvedIdList,
-        setUnresolvedIdList: whileMounted(setUnresolvedIdList),
+        setUnresolvedIdList,
         manifest,
-        setManifest: whileMounted(setManifest),
+        setManifest,
         heldDID,
-        setHeldDID: whileMounted(setHeldDID),
+        setHeldDID,
         heldList,
-        setHeldList: whileMounted(setHeldList),
+        setHeldList,
         groupList,
-        setGroupList: whileMounted(setGroupList),
+        setGroupList,
         imageList,
-        setImageList: whileMounted(setImageList),
+        setImageList,
         fileList,
-        setFileList: whileMounted(setFileList),
+        setFileList,
         schemaList,
-        setSchemaList: whileMounted(setSchemaList),
+        setSchemaList,
         vaultList,
-        setVaultList: whileMounted(setVaultList),
+        setVaultList,
         issuedList,
-        setIssuedList: whileMounted(setIssuedList),
+        setIssuedList,
         issuedString,
-        setIssuedString: whileMounted(setIssuedString),
+        setIssuedString,
         issuedStringOriginal,
-        setIssuedStringOriginal: whileMounted(setIssuedStringOriginal),
+        setIssuedStringOriginal,
         issuedEdit,
-        setIssuedEdit: whileMounted(setIssuedEdit),
+        setIssuedEdit,
         selectedIssued,
-        setSelectedIssued: whileMounted(setSelectedIssued),
+        setSelectedIssued,
         credentialDID,
-        setCredentialDID: whileMounted(setCredentialDID),
+        setCredentialDID,
         credentialSubject,
-        setCredentialSubject: whileMounted(setCredentialSubject),
+        setCredentialSubject,
         credentialSchema,
-        setCredentialSchema: whileMounted(setCredentialSchema),
+        setCredentialSchema,
         credentialString,
-        setCredentialString: whileMounted(setCredentialString),
+        setCredentialString,
         alias,
-        setAlias: whileMounted(setAlias),
+        setAlias,
         aliasDID,
-        setAliasDID: whileMounted(setAliasDID),
+        setAliasDID,
         aliasList,
-        setAliasList: whileMounted(setAliasList),
+        setAliasList,
         aliasRegistry,
-        setAliasRegistry: whileMounted(setAliasRegistry),
+        setAliasRegistry,
         unresolvedList,
-        setUnresolvedList: whileMounted(setUnresolvedList),
+        setUnresolvedList,
         agentList,
-        setAgentList: whileMounted(setAgentList),
+        setAgentList,
         pollList,
-        setPollList: whileMounted(setPollList),
+        setPollList,
         dmailList,
-        setDmailList: whileMounted(setDmailList),
+        setDmailList,
         storeState,
         resetCredentialState,
         refreshCredentialsStored,
