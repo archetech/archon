@@ -24,7 +24,7 @@ import { createResponseRouter } from '../../services/keymaster/server/src/keymas
 import { createSchemaRouter } from '../../services/keymaster/server/src/keymaster-schema-router.ts';
 import { createSchemaTemplateRouter } from '../../services/keymaster/server/src/keymaster-schema-template-router.ts';
 import { createVaultRouter } from '../../services/keymaster/server/src/keymaster-vault-router.ts';
-import { checkAdminApiKey, createRequireAdminKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/keymaster/server/src/keymaster-admin.ts';
+import { checkAdminApiKey, checkPassphrase, createRequireAdminKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/keymaster/server/src/keymaster-admin.ts';
 import defaultConfig from '../../services/keymaster/server/src/config.js';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -460,12 +460,15 @@ describe('keymaster public router', () => {
         expect(response.body).toEqual({ version: '9.9.9', commit: 'abc1234' });
     });
 
-    it('returns the admin key directly when no passphrase is configured', async () => {
+    // #1018: this used to return the admin key to any unauthenticated caller.
+    // /login is mounted ahead of the admin guard because it is how a client
+    // obtains the key, so a blank passphrase disclosed it to anyone.
+    it('refuses to return the admin key when no passphrase is configured', async () => {
         const { app } = mount();
 
         const response = await request(app).post('/login').send({});
-        expect(response.status).toBe(200);
-        expect(response.body).toEqual({ adminApiKey: adminKey });
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ error: 'Passphrase not configured' });
     });
 
     it('requires a matching passphrase when one is configured', async () => {
@@ -561,5 +564,15 @@ describe('keymaster admin key startup check', () => {
 
         expect(result.fatal).toBeUndefined();
         expect(result.warning).toBeUndefined();
+    });
+
+    // A blank passphrase made POST /login return the admin key to any caller,
+    // and /login is public by design because it is how a client obtains the key.
+    it('is fatal when the passphrase is unset', () => {
+        expect(checkPassphrase('').fatal).toContain('ARCHON_ENCRYPTED_PASSPHRASE must be set');
+    });
+
+    it('accepts any non-empty passphrase', () => {
+        expect(checkPassphrase('correct horse battery staple').fatal).toBeUndefined();
     });
 });

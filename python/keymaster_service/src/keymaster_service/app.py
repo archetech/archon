@@ -146,8 +146,11 @@ async def version() -> dict[str, str]:
 @public_api.post("/login")
 async def login(body: dict[str, Any]) -> dict[str, str]:
     passphrase = body.get("passphrase", "")
+    # Fail closed. The entry point refuses to start without
+    # ARCHON_ENCRYPTED_PASSPHRASE, so reaching this branch means the app was
+    # imported directly without one.
     if not settings.passphrase:
-        return {"adminApiKey": settings.admin_api_key or ""}
+        raise HTTPException(status_code=403, detail="Passphrase not configured")
     if passphrase != settings.passphrase:
         raise HTTPException(status_code=401, detail="Incorrect passphrase")
     return {"adminApiKey": settings.admin_api_key or ""}

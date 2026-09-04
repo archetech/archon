@@ -5,7 +5,7 @@ import sys
 
 import uvicorn
 
-from .admin import check_admin_api_key
+from .admin import check_admin_api_key, check_passphrase
 from .config import load_settings
 
 
@@ -17,14 +17,13 @@ def main() -> None:
 
     # Before uvicorn binds the port, so a refused configuration never reaches a
     # state where requests can be served.
-    check = check_admin_api_key(settings.admin_api_key)
+    for check in (check_admin_api_key(settings.admin_api_key), check_passphrase(settings.passphrase)):
+        if check.fatal:
+            print(check.fatal, file=sys.stderr)
+            raise SystemExit(1)
 
-    if check.fatal:
-        print(check.fatal, file=sys.stderr)
-        raise SystemExit(1)
-
-    if check.warning:
-        LOGGER.warning(check.warning)
+        if check.warning:
+            LOGGER.warning(check.warning)
 
     uvicorn.run("keymaster_service.app:app", host=settings.bind_address, port=settings.keymaster_port)
 

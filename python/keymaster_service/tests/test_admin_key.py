@@ -4,7 +4,11 @@ Mirrors the TypeScript service's `keymaster admin key startup check` suite, so
 the two flavors refuse and warn on the same configurations.
 """
 
-from keymaster_service.admin import MIN_ADMIN_API_KEY_LENGTH, check_admin_api_key
+from keymaster_service.admin import (
+    MIN_ADMIN_API_KEY_LENGTH,
+    check_admin_api_key,
+    check_passphrase,
+)
 
 
 def test_unset_key_is_fatal():
@@ -28,3 +32,14 @@ def test_key_at_minimum_length_is_accepted_silently():
 
     assert result.fatal is None
     assert result.warning is None
+
+
+def test_unset_passphrase_is_fatal():
+    result = check_passphrase("")
+
+    assert result.fatal is not None
+    assert "ARCHON_ENCRYPTED_PASSPHRASE must be set" in result.fatal
+
+
+def test_any_non_empty_passphrase_is_accepted():
+    assert check_passphrase("correct horse battery staple").fatal is None

@@ -9,7 +9,7 @@ const ARCHON_ADMIN_HEADER = 'x-archon-admin-key';
 // by an upgrade. `openssl rand -hex 32` (the documented generator) yields 64.
 export const MIN_ADMIN_API_KEY_LENGTH = 32;
 
-export interface AdminApiKeyCheck {
+export interface StartupCheck {
     // Set when the key is unusable and the process must not start.
     fatal?: string;
     // Set when the key works but is weak enough to be worth flagging.
@@ -28,7 +28,7 @@ export interface AdminApiKeyCheck {
  * Split out from the entry point so the rule is testable without spawning a
  * process.
  */
-export function checkAdminApiKey(adminApiKey: string): AdminApiKeyCheck {
+export function checkAdminApiKey(adminApiKey: string): StartupCheck {
     if (!adminApiKey) {
         return {
             fatal: 'ARCHON_ADMIN_API_KEY must be set — the API would otherwise be unauthenticated. Generate one with: openssl rand -hex 32',
@@ -38,6 +38,27 @@ export function checkAdminApiKey(adminApiKey: string): AdminApiKeyCheck {
     if (adminApiKey.length < MIN_ADMIN_API_KEY_LENGTH) {
         return {
             warning: `Warning: ARCHON_ADMIN_API_KEY is shorter than ${MIN_ADMIN_API_KEY_LENGTH} characters — regenerate it with: openssl rand -hex 32`,
+        };
+    }
+
+    return {};
+}
+
+/**
+ * Validate ARCHON_ENCRYPTED_PASSPHRASE at startup.
+ *
+ * Fail closed: the passphrase is both the wallet's encryption secret and the
+ * credential POST /login checks before handing back the admin API key. An empty
+ * one made /login return that key to any caller, and /login sits ahead of the
+ * admin guard because it is how a client obtains the key in the first place.
+ *
+ * The Keymaster constructor already rejects an empty passphrase, but it runs
+ * inside the listen callback where the throw does not stop the server.
+ */
+export function checkPassphrase(passphrase: string): StartupCheck {
+    if (!passphrase) {
+        return {
+            fatal: 'ARCHON_ENCRYPTED_PASSPHRASE must be set — POST /login would otherwise return the admin API key without checking it.',
         };
     }
 

@@ -100,9 +100,12 @@ export function createPublicRouter(options: CreateKeymasterRouterOptions): expre
     router.post('/login', async (req, res) => {
         const { passphrase } = req.body;
 
+        // Fail closed. The entry point refuses to start without
+        // ARCHON_ENCRYPTED_PASSPHRASE, so reaching this branch means the app was
+        // constructed programmatically without one -- never a reason to hand the
+        // admin key to an unauthenticated caller.
         if (!config.keymasterPassphrase) {
-            // No passphrase configured — return key directly (dev mode)
-            res.json({ adminApiKey: config.adminApiKey || '' });
+            res.status(403).json({ error: 'Passphrase not configured' });
             return;
         }
 
