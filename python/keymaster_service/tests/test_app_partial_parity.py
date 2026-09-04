@@ -879,10 +879,18 @@ def test_require_admin_key_accepts_header_and_bearer(monkeypatch: pytest.MonkeyP
     assert run(app_module.require_admin_key(app_module.Request(headers={"authorization": "Bearer secret"}))) is None
 
 
-def test_require_admin_key_is_noop_without_config(monkeypatch: pytest.MonkeyPatch):
+def test_require_admin_key_refuses_without_config(monkeypatch: pytest.MonkeyPatch):
+    """#1018: this used to be a no-op.
+
+    The guard covers the whole v1 router, not an admin subset, so passing
+    through left wallet, identity, credential and Lightning operations open.
+    The entry point now refuses to start without a key; reaching this branch
+    means the app was imported directly without one.
+    """
     monkeypatch.setattr(app_module.settings, "admin_api_key", "")
 
-    assert run(app_module.require_admin_key(app_module.Request(headers={}))) is None
+    with pytest.raises(app_module.HTTPException, match="Admin API key not configured"):
+        run(app_module.require_admin_key(app_module.Request(headers={})))
 
 
 def test_change_registry_handler(stub_service: StubService):
