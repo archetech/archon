@@ -9,7 +9,7 @@ import GatekeeperClient from '@didcid/clients/gatekeeper';
 
 import config from './config.js';
 import { RedisStore } from './store.js';
-import { publicRateLimit } from './middleware/public-rate-limit.js';
+import { byMethod, publicRateLimit } from './middleware/public-rate-limit.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import { createV1Router } from './v1-router.js';
@@ -433,10 +433,7 @@ async function main() {
 
     // Herald is fronted by two mounts and carries both kinds of traffic, so the
     // bucket is chosen per request rather than per route.
-    const heraldRateLimit: express.RequestHandler = (req, res, next) => {
-        const readOnly = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
-        return readOnly ? publicReadRateLimit(req, res, next) : nameWriteRateLimit(req, res, next);
-    };
+    const heraldRateLimit = byMethod({ read: publicReadRateLimit, write: nameWriteRateLimit });
 
     // Public invoice endpoint — no auth required
     app.get('/invoice/:did', publicReadRateLimit, async (req, res) => {

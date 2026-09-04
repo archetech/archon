@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import express from 'express';
 import request from 'supertest';
 
-import { publicRateLimit, isMeaningfulSource } from '../../services/drawbridge/server/src/middleware/public-rate-limit.ts';
+import { byMethod, publicRateLimit, isMeaningfulSource } from '../../services/drawbridge/server/src/middleware/public-rate-limit.ts';
 import type { DrawbridgeStore, RateLimitResult } from '../../services/drawbridge/server/src/types.ts';
 
 // A store that actually counts, so the buckets can be driven independently
@@ -305,7 +305,7 @@ describe('public route mounts', () => {
 
     // Every way Express takes a mount, and both quote styles, so a route added
     // as `app.post("/foo", handler)` is not simply invisible to the guard below.
-    const MOUNT = 'app\\.(?:use|all|get|post|put|patch|delete|head|options)\\(';
+    const MOUNT = 'app\\.(?:use|all|get|post|put|patch|delete|head|options)\\(\\s*';
 
     it.each(Object.entries(PUBLIC_MOUNTS))('rate-limits %s with %s', (path, middleware) => {
         const quoted = `['"]${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`;
@@ -320,5 +320,42 @@ describe('public route mounts', () => {
             .map(match => match[1]);
 
         expect(mounted.sort()).toEqual([...Object.keys(PUBLIC_MOUNTS), ...EXEMPT].sort());
+    });
+});
+
+// The split is the security-critical half of the Herald fix: a claim charged to
+// the read budget gets 120 a minute instead of 10. Asserting only that
+// `heraldRateLimit` is mounted would not notice that, so exercise the selector.
+describe('byMethod', () => {
+    function mountSplit() {
+        const { store, keys } = countingStore();
+        const read = publicRateLimit({
+            store, name: 'public', readPerSourceMax: 120, readGlobalMax: 1200, windowSeconds: 60,
+        });
+        const write = publicRateLimit({
+            store, name: 'names:write', readPerSourceMax: 10, readGlobalMax: 60, windowSeconds: 60,
+        });
+
+        const app = express();
+        app.use(express.json());
+        app.use('/names', byMethod({ read, write }), (_req, res) => res.json({ proxied: true }));
+
+        return { app, keys };
+    }
+
+    it.each(['get', 'head', 'options'] as const)('charges %s to the read budget', async (method) => {
+        const { app, keys } = mountSplit();
+
+        await request(app)[method]('/names/api/name');
+
+        expect(keys).toEqual(['public:read:global']);
+    });
+
+    it.each(['put', 'post', 'delete', 'patch'] as const)('charges %s to the write budget', async (method) => {
+        const { app, keys } = mountSplit();
+
+        await request(app)[method]('/names/api/name').send({ name: 'alice' });
+
+        expect(keys).toEqual(['names:write:read:global']);
     });
 });

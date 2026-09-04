@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, RequestHandler, Response, NextFunction } from 'express';
 import type { DrawbridgeStore, RateLimitResult } from '../types.js';
 import { checkAndRecordRequest } from '../rate-limiter.js';
 
@@ -194,5 +194,18 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
         }
 
         next();
+    };
+}
+
+// A surface fronted by one mount can still carry two kinds of load: Herald
+// answers name lookups and claims on the same prefix, and a claim mints a
+// credential where a lookup reads one. The bucket is therefore chosen per
+// request. Everything outside the safe methods is a write, so a verb added to
+// the upstream later lands on the tighter budget rather than the looser one.
+export function byMethod(buckets: { read: RequestHandler, write: RequestHandler }): RequestHandler {
+    return (req, res, next) => {
+        const safe = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+        const bucket = safe ? buckets.read : buckets.write;
+        bucket(req, res, next);
     };
 }
