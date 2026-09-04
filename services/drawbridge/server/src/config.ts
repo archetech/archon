@@ -72,6 +72,28 @@ const config = {
         process.env.ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES, 64 * 1024 * 1024),
     didcommRateLimitWindow: positiveInt('ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW',
         process.env.ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW, 60),
+    // The other public passthroughs -- Herald (/names, /.well-known), the
+    // explorer, and conformant DID resolution -- are unauthenticated for the
+    // same reason and need the same bound. They are split into three buckets
+    // rather than one because their traffic shapes do not mix: an explorer page
+    // load is dozens of asset requests and would swamp a budget shared with DID
+    // resolution, and a name claim is rare but makes Herald issue a credential
+    // and take a name out of a global namespace, so it is worth far less
+    // headroom than a read.
+    publicReadPerSource: positiveInt('ARCHON_DRAWBRIDGE_PUBLIC_READ_PER_SOURCE',
+        process.env.ARCHON_DRAWBRIDGE_PUBLIC_READ_PER_SOURCE, 120),
+    publicReadGlobal: positiveInt('ARCHON_DRAWBRIDGE_PUBLIC_READ_GLOBAL',
+        process.env.ARCHON_DRAWBRIDGE_PUBLIC_READ_GLOBAL, 1200),
+    explorerReadPerSource: positiveInt('ARCHON_DRAWBRIDGE_EXPLORER_READ_PER_SOURCE',
+        process.env.ARCHON_DRAWBRIDGE_EXPLORER_READ_PER_SOURCE, 600),
+    explorerReadGlobal: positiveInt('ARCHON_DRAWBRIDGE_EXPLORER_READ_GLOBAL',
+        process.env.ARCHON_DRAWBRIDGE_EXPLORER_READ_GLOBAL, 6000),
+    nameWritePerSource: positiveInt('ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE',
+        process.env.ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE, 10),
+    nameWriteGlobal: positiveInt('ARCHON_DRAWBRIDGE_NAME_WRITE_GLOBAL',
+        process.env.ARCHON_DRAWBRIDGE_NAME_WRITE_GLOBAL, 60),
+    publicRateLimitWindow: positiveInt('ARCHON_DRAWBRIDGE_PUBLIC_RATE_LIMIT_WINDOW',
+        process.env.ARCHON_DRAWBRIDGE_PUBLIC_RATE_LIMIT_WINDOW, 60),
     rateLimitWindow: positiveInt('ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW', process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW, 60),
 
     // Redis

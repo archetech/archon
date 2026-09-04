@@ -92,6 +92,47 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 | `*` | `/1.0/identifiers/**` | Forwarded verbatim to the Gatekeeper's standards-conformant DID resolution / dereferencing surface (`/1.0/identifiers/:did`, `/:did/data`, `/:did/registration`; see [Gatekeeper spec §2.6](../gatekeeper/README.md)). **Not paywalled** — public DID resolution for interop with universal resolvers, which do not speak L402. Proxied unchanged (no prefix stripped), so the Gatekeeper's resolution triple, raw dereferenced resources, and status/error shapes pass through intact. |
 | `GET` | `/metrics` | Prometheus exposition. |
 
+### 2.1.1 Rate limiting on the public routes
+
+The proxy routes above are unauthenticated by design — a universal resolver
+does not speak L402, a DIDComm sender must reach a stranger's mailbox, and a
+name claim proves DID control rather than presenting a macaroon. The paid
+path's limiter keys on the macaroon's DID and so cannot apply to any of them,
+which leaves the upstream's own limits as the only bound. Herald has none.
+
+Each surface therefore carries a bucket of its own, on the same middleware
+`/didcomm` uses:
+
+| Routes | Setting | Default | Budget |
+| --- | --- | --- | --- |
+| `/didcomm/**` | see [DIDComm spec §5.2.1](../didcomm/README.md#521-rate-limiting-at-the-edge) | | requests + bytes |
+| `/.well-known/*`, `GET /names/*`, `/1.0/identifiers/**`, `/invoice/:did` | `ARCHON_DRAWBRIDGE_PUBLIC_READ_PER_SOURCE` | 120 | requests, per source |
+| | `ARCHON_DRAWBRIDGE_PUBLIC_READ_GLOBAL` | 1200 | requests, whole bucket |
+| `/explorer/**` | `ARCHON_DRAWBRIDGE_EXPLORER_READ_PER_SOURCE` | 600 | requests, per source |
+| | `ARCHON_DRAWBRIDGE_EXPLORER_READ_GLOBAL` | 6000 | requests, whole bucket |
+| `POST\|PUT\|DELETE /names/*` | `ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE` | 10 | requests, per source |
+| | `ARCHON_DRAWBRIDGE_NAME_WRITE_GLOBAL` | 60 | requests, whole bucket |
+| all of the above | `ARCHON_DRAWBRIDGE_PUBLIC_RATE_LIMIT_WINDOW` | 60s | window |
+
+**The explorer is separate because it is chatty.** One page load is dozens of
+asset requests; sharing a budget with DID resolution would let a single visitor
+exhaust it.
+
+**Herald's writes are separate because they are expensive.** `PUT /names/api/name`
+makes Herald issue a verifiable credential and takes a name out of a global
+namespace that never refills. Control of a DID is free to obtain, so the write
+budget is deliberately small — 10 claims a minute clears any human.
+
+**Per-source keying applies only when the source identifies a client**, exactly
+as on `/didcomm`: `trust proxy` is not configured, so behind the bundled Tor
+container or any reverse proxy every request arrives from one private address
+and only the global bucket binds. See [DIDComm spec §5.2.1](../didcomm/README.md#521-rate-limiting-at-the-edge)
+for why keying on it anyway would be worse than not keying at all.
+
+Exceeding a budget returns `429` with `Retry-After` and `{ error, resetAt }`.
+If the limiter's own store is unreachable the check fails open — it protects
+availability and must not become the outage it prevents.
+
 ### 2.2 L402 admin routes
 
 | Method | Path | Notes |

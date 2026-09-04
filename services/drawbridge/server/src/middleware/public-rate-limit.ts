@@ -4,19 +4,23 @@ import { checkAndRecordRequest } from '../rate-limiter.js';
 
 // Rate limiting for public passthroughs that carry no identity to key on.
 //
-// The DIDComm relay behind /didcomm has two routes that are unauthenticated by
-// design and cannot be otherwise: a sender must be able to reach a stranger's
-// mailbox, and GET /challenge is the first step of proving DID control. So the
-// per-DID keying used on the paid path does not apply here.
+// Drawbridge fronts several upstreams on routes that are unauthenticated by
+// design and cannot be otherwise: a DIDComm sender must be able to reach a
+// stranger's mailbox, a universal resolver does not speak L402, and a name
+// claim proves DID control rather than presenting a macaroon. So the per-DID
+// keying used on the paid path does not apply to any of them.
 //
-// Two things are limited separately, because they are not the same load:
+// A surface gets one budget, or two when its requests are not all the same
+// load:
 //
-//   deposits  POST of an envelope, up to the body limit (10mb here). Budgeted
-//             by BYTES, not requests -- a request ceiling generous enough for
-//             normal traffic still permits a couple of dozen max-size deposits,
-//             which is all it takes to fill the relay's storage cap.
-//   reads     challenge/fetch/remove polling. Cheap and chatty; one poll is
-//             four requests, so this ceiling has to clear an active wallet.
+//   reads     the ordinary traffic of the surface. Budgeted by REQUEST count.
+//             Often chatty -- a DIDComm poll is four requests and an explorer
+//             page load is dozens -- so a ceiling here has to clear normal use.
+//   deposits  requests that leave something behind upstream. Budgeted by
+//             BYTES, because a request ceiling generous enough for normal
+//             traffic still permits a couple of dozen max-size deposits, which
+//             is all it takes to fill the DIDComm relay's storage cap. Omit
+//             the byte budgets on a surface that stores nothing.
 //
 // Each is bucketed per-source and globally. Per-source is only applied when the
 // source is actually meaningful: `trust proxy` is not configured, so behind a
@@ -32,8 +36,11 @@ export interface PublicRateLimitOptions {
     name: string;
     readPerSourceMax: number;
     readGlobalMax: number;
-    depositPerSourceBytes: number;
-    depositGlobalBytes: number;
+    // Byte budgets for requests that store data upstream. Both must be given
+    // for the deposit bucket to exist at all; without them every request is
+    // charged to the read budget, whatever `isDeposit` says.
+    depositPerSourceBytes?: number;
+    depositGlobalBytes?: number;
     windowSeconds: number;
     // Requests that spend the byte budget rather than the read budget.
     isDeposit?: (req: Request) => boolean;
@@ -110,6 +117,9 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
         isDeposit = defaultIsDeposit,
     } = options;
 
+    const budgeted = depositPerSourceBytes !== undefined && depositGlobalBytes !== undefined;
+    const chargeAsDeposit = budgeted ? isDeposit : () => false;
+
     return async function publicRateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
         const source = req.ip || 'unknown';
         const keyed = isMeaningfulSource(source);
@@ -117,14 +127,14 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
         try {
             const results: RateLimitResult[] = [];
 
-            if (isDeposit(req)) {
+            if (chargeAsDeposit(req)) {
                 const cost = requestBytes(req);
                 if (keyed) {
                     results.push(await store.checkAndRecordCost(
-                        `${name}:deposit:src:${source}`, cost, depositPerSourceBytes, windowSeconds));
+                        `${name}:deposit:src:${source}`, cost, depositPerSourceBytes!, windowSeconds));
                 }
                 results.push(await store.checkAndRecordCost(
-                    `${name}:deposit:global`, cost, depositGlobalBytes, windowSeconds));
+                    `${name}:deposit:global`, cost, depositGlobalBytes!, windowSeconds));
             }
             else {
                 if (keyed) {
@@ -151,7 +161,7 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
             // unreachable, refusing every request would cause the outage it is
             // meant to prevent.
             //
-            // Note this leaves the relay's storage caps as the only bound, and
+            // Note this leaves the DIDComm relay's storage caps as the only bound, and
             // those are only globally bounding on the memory backend: redis
             // enforces the per-recipient cap only, which rotating recipient DIDs
             // sidesteps, unless the deployment gives it a dedicated instance
