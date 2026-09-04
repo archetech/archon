@@ -32,8 +32,16 @@ describe('consensusBranchIdFor', () => {
             .rejects.toThrow(/consensus.nextblock/);
     });
 
-    it('refuses an unreadable branch', async () => {
-        await expect(consensusBranchIdFor(nodeReporting({ nextblock: 'not-hex' })))
-            .rejects.toThrow(/unreadable/);
+    it.each([
+        ['not-hex'],
+        // parseInt would take the valid prefix of these and sign with it.
+        ['37a5165bgarbage'],
+        ['0x37a5165b'],
+        ['1'],
+        ['37a5165'],
+        [''],
+    ])('refuses an unreadable branch: %j', async (nextblock) => {
+        await expect(consensusBranchIdFor(nodeReporting({ nextblock })))
+            .rejects.toThrow(/unreadable|consensus.nextblock/);
     });
 });

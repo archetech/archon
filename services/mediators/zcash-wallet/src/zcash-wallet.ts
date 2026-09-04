@@ -340,13 +340,14 @@ export async function consensusBranchIdFor(zecClient: RpcClient): Promise<number
         throw new Error('Node did not report consensus.nextblock; cannot determine the branch to sign for');
     }
 
-    const branchId = Number.parseInt(nextblock, 16);
-
-    if (!Number.isInteger(branchId)) {
+    // A branch id is exactly four bytes. parseInt would accept a valid prefix,
+    // so "37a5165bgarbage" and "1" both parse to something usable and would be
+    // signed with -- which is the opposite of refusing to guess.
+    if (!/^[0-9a-fA-F]{8}$/.test(nextblock)) {
         throw new Error(`Node reported an unreadable consensus branch: ${nextblock}`);
     }
 
-    return branchId;
+    return Number.parseInt(nextblock, 16);
 }
 
 async function buildSignAndBroadcast(
