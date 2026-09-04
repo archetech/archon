@@ -36,9 +36,9 @@ export interface PublicRateLimitOptions {
     name: string;
     readPerSourceMax: number;
     readGlobalMax: number;
-    // Byte budgets for requests that store data upstream. Both must be given
-    // for the deposit bucket to exist at all; without them every request is
-    // charged to the read budget, whatever `isDeposit` says.
+    // Byte budgets for requests that store data upstream. Give both, for a
+    // surface with a deposit bucket, or neither, for one where every request is
+    // a read; anything else is refused at construction.
     depositPerSourceBytes?: number;
     depositGlobalBytes?: number;
     windowSeconds: number;
