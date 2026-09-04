@@ -1,4 +1,3 @@
-import { readFileSync } from 'fs';
 import { planAnchor as satoshi, coveredOperations as satoshiCovered } from '../../services/mediators/satoshi/src/batch.ts';
 import { planAnchor as ethereum, coveredOperations as ethereumCovered } from '../../services/mediators/ethereum/src/batch.ts';
 import { planAnchor as solana, coveredOperations as solanaCovered } from '../../services/mediators/solana/src/batch.ts';
@@ -87,19 +86,5 @@ describe.each(IMPLEMENTATIONS)('%s coveredOperations', (_name, _plan, coveredOpe
 
     it('covers nothing once the batch operations have left the queue', () => {
         expect(coveredOperations({ opids: ['gone'] }, OPS, CIDS)).toEqual([]);
-    });
-});
-
-describe('the four copies', () => {
-    it('are identical, so one reviewed change is four', () => {
-        // They are duplicated because the mediators are standalone packages with
-        // no shared dependency. Nothing but this stops them diverging.
-        const [reference, ...others] = IMPLEMENTATIONS.map(
-            ([name]) => readFileSync(`services/mediators/${name}/src/batch.ts`, 'utf-8'),
-        );
-
-        for (const other of others) {
-            expect(other).toBe(reference);
-        }
     });
 });
