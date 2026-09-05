@@ -282,3 +282,12 @@ async def test_load_or_create_wallet_keeps_the_stored_wallet():
     ).load_or_create_wallet()
 
     assert again["seed"] == first["seed"]
+
+
+def test_wallet_not_found_error_is_on_the_package_surface():
+    """Callers turn this into a startup refusal, so it has to be importable
+    without reaching into keymaster.core."""
+    import keymaster
+
+    assert keymaster.WalletNotFoundError is WalletNotFoundError
+    assert "WalletNotFoundError" in keymaster.__all__

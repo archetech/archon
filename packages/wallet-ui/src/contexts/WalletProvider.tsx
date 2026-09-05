@@ -137,7 +137,11 @@ export function WalletProvider(
         }
     }
 
-    const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
+    // `provision` is set only by the first-run flow. A rebuild -- restoring a
+    // session, reloading the extension's page, rotating a passphrase -- must
+    // fail closed: a store that has been cleared underneath a live session is a
+    // lost wallet, and minting a replacement there is #1037 in the browser.
+    const buildKeymaster = async (wallet: WalletBase, passphrase: string, provision = false) => {
         const instance = new Keymaster({ gatekeeper, wallet, cipher, passphrase });
 
         if (pendingMnemonic) {
@@ -145,14 +149,16 @@ export function WalletProvider(
             await instance.recoverWallet();
         } else {
             try {
-                // Check pass & convert to v1 if needed. This surface owns
-                // first-run setup, so an empty store here is a new browser
-                // profile rather than a lost wallet.
-                await instance.loadOrCreateWallet();
+                // check pass & convert to v1 if needed
+                await (provision ? instance.loadOrCreateWallet() : instance.loadWallet());
             } catch (error: any) {
                 const message = error?.message || String(error);
                 if (message.includes('Incorrect passphrase')) {
                     setPassphraseErrorText(INCORRECT_PASSPHRASE);
+                } else if (message.includes('Wallet not found')) {
+                    // Nothing to decrypt. The caller falls through to setup
+                    // rather than showing this as a passphrase problem.
+                    return false;
                 } else {
                     setPassphraseErrorText(message);
                 }
@@ -179,8 +185,8 @@ export function WalletProvider(
         return true;
     };
 
-    async function rebuildKeymaster(passphrase: string) {
-        return await buildKeymaster(walletStore, passphrase);
+    async function rebuildKeymaster(passphrase: string, provision = false) {
+        return await buildKeymaster(walletStore, passphrase, provision);
     }
 
     async function handlePassphraseSubmit(passphrase: string) {
@@ -207,7 +213,11 @@ export function WalletProvider(
             }
         }
 
-        await rebuildKeymaster(passphrase);
+        // A passphrase chosen while the store is empty is the first-run flow:
+        // the one place a new browser profile gets a wallet.
+        const provision = !await walletStore.loadWallet();
+
+        await rebuildKeymaster(passphrase, provision);
     }
 
     async function handlePassphraseClose() {

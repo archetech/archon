@@ -290,6 +290,17 @@ for (const check of [checkAdminApiKey(config.adminApiKey), checkPassphrase(confi
 
 const port = config.keymasterPort;
 
+// Before the port is bound and before the blocking gatekeeper connect below:
+// a node told to fail closed on a missing wallet must say so immediately, not
+// sit with an open port waiting for an upstream that may never arrive.
+const walletStore = await initWallet();
+const walletMissing = !await walletStore.loadWallet();
+
+if (walletMissing && config.requireWallet) {
+    console.error(`No wallet in ${config.db} and ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new identity. Check that the data volume is mounted and ARCHON_KEYMASTER_DB matches the store this node was using.`);
+    process.exit(1);
+}
+
 // The port is bound before any of this runs, and the process-level handlers
 // below log rejections rather than ending the process -- so a failure here
 // would otherwise leave a server answering requests with no keymaster behind
@@ -305,7 +316,7 @@ const server = app.listen(port, config.bindAddress, async () => {
             chatty: true,
         });
 
-        const wallet = await initWallet();
+        const wallet = walletStore;
         const cipher = new CipherNode();
         const defaultRegistry = config.defaultRegistry;
 
@@ -320,12 +331,8 @@ const server = app.listen(port, config.bindAddress, async () => {
         // The one place this service provisions, so a fresh mnemonic is a
         // startup event with a log line and a counter rather than a side effect
         // of whichever request happened to read the wallet first (#1037).
-        if (!await wallet.loadWallet()) {
-            if (config.requireWallet) {
-                console.error(`No wallet in ${config.db} and ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new identity. Check that the data volume is mounted and ARCHON_KEYMASTER_DB matches the store this node was using.`);
-                process.exit(1);
-            }
-
+        // Refusing already happened above, before the port was bound.
+        if (walletMissing) {
             console.warn(`No wallet found in ${config.db} — creating one. If this node has run before, its store is missing and its identity has been replaced. Set ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal.`);
             await keymaster.loadOrCreateWallet();
             walletsCreatedTotal.inc();

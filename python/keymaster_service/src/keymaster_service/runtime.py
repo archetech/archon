@@ -43,28 +43,34 @@ class KeymasterService:
                 f"Unsupported ARCHON_KEYMASTER_DB for Python service: {self.settings.keymaster_db}"
             )
 
+        # Before the blocking gatekeeper connect below: a node told to fail
+        # closed on a missing wallet must say so immediately, not wait on an
+        # upstream that may never arrive.
+        wallet_missing = self.wallet_store.load_wallet() is None
+
+        if wallet_missing and self.settings.require_wallet:
+            raise KeymasterServiceError(
+                f"No wallet in {self.settings.keymaster_db} and "
+                "ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new "
+                "identity. Check that the data volume is mounted and "
+                "ARCHON_KEYMASTER_DB matches the store this node was using."
+            )
+
         await self.gatekeeper.connect(wait_until_ready=True, interval_seconds=5)
 
         # Provisioning happens here and nowhere else, so a fresh mnemonic is a
         # startup event with a log line and a counter rather than a side effect
         # of whichever request happened to read the wallet first (#1037).
-        if self.wallet_store.load_wallet() is None:
-            if self.settings.require_wallet:
-                raise KeymasterServiceError(
-                    f"No wallet in {self.settings.keymaster_db} and "
-                    "ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new "
-                    "identity. Check that the data volume is mounted and "
-                    "ARCHON_KEYMASTER_DB matches the store this node was using."
-                )
-
+        # Refusing already happened above, before the connect.
+        if wallet_missing:
             LOGGER.warning(
                 "No wallet found in %s — creating one. If this node has run before, its "
                 "store is missing and its identity has been replaced. Set "
                 "ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal.",
                 self.settings.keymaster_db,
             )
+            await self.keymaster.load_or_create_wallet()
             wallets_created_total.inc()
-            await self.keymaster.new_wallet()
         else:
             await self.keymaster.load_wallet()
         # Resolve the node ID in the background so the ASGI app can start
