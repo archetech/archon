@@ -40,7 +40,7 @@ program
     .description('Create a new wallet (or show existing wallet)')
     .action(async () => {
         try {
-            const wallet = await keymaster.loadWallet();
+            const wallet = await keymaster.loadOrCreateWallet();
             console.log(JSON.stringify(wallet, null, 4));
         }
         catch (error: any) {
@@ -210,6 +210,9 @@ program
     .action(async (name, options) => {
         try {
             const { registry } = options;
+            // create-id is allowed to run before a wallet exists, so it is one
+            // of the two commands that provision.
+            await keymaster.loadOrCreateWallet();
             const did = await keymaster.createId(name, { registry });
             console.log(did);
             // A wallet is created on demand, so any create-id may be the run
@@ -2294,13 +2297,10 @@ async function run() {
         }
 
         // Initialize keymaster
+        // No provisioning here: of the allowlisted commands, most create or
+        // replace a wallet themselves and one needs none at all. The two whose
+        // handlers assume a wallet exists provision in the handler.
         keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase });
-
-        if (!existing) {
-            // Only the allowlisted commands reach here, and they are the ones
-            // that exist to run before a wallet does.
-            await keymaster.loadOrCreateWallet();
-        }
 
         program.parse(process.argv);
     }

@@ -142,7 +142,8 @@ rather than provisioning. An operator whose node already holds an identity sets
 it, and is then protected from the cases above replacing that identity silently.
 
 Loading MUST NOT create. Provisioning is a separate call — `loadOrCreateWallet`
-in both the TypeScript and Python libraries — so it is visible at the call site
+in the TypeScript library, `load_or_create_wallet` in the Python one — so it is
+visible at the call site
 rather than governed by configuration read somewhere else. The surfaces that
 make it are the CLIs (for the commands on their own allowlist of things that may
 run before a wallet exists), the browser wallet's setup flow, and the services'

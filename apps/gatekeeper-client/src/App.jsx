@@ -66,12 +66,15 @@ function App() {
         init();
     }, []);
 
-    const buildKeymaster = async (wallet, passphrase) => {
+    // `provision` is set only by the first-run flow. A rebuild must fail closed:
+    // a browser store cleared underneath this app is a lost wallet, and minting
+    // a replacement there would replace the identity silently (#1037).
+    const buildKeymaster = async (wallet, passphrase, provision = false) => {
         const instance = new Keymaster({ gatekeeper, wallet, cipher, passphrase });
 
         try {
             // check pass & convert to v1 if needed
-            await instance.loadWallet();
+            await (provision ? instance.loadOrCreateWallet() : instance.loadWallet());
         } catch (error) {
             setPassphraseErrorText(error?.error || error?.message || 'Failed to load wallet');
             return;
@@ -94,10 +97,10 @@ function App() {
         setIsReady(true);
     };
 
-    async function rebuildKeymaster(passphrase) {
+    async function rebuildKeymaster(passphrase, provision = false) {
         const walletWeb = new WalletWeb();
         const walletCached = new WalletCache(walletWeb);
-        await buildKeymaster(walletCached, passphrase);
+        await buildKeymaster(walletCached, passphrase, provision);
     }
 
     async function handlePassphraseSubmit(passphrase) {
@@ -120,7 +123,11 @@ function App() {
             }
         }
 
-        await rebuildKeymaster(passphrase);
+        // A passphrase chosen while the store is empty is the first-run flow:
+        // the one place this app provisions.
+        const provision = !await walletWeb.loadWallet();
+
+        await rebuildKeymaster(passphrase, provision);
     }
 
     function handleStartReset() {

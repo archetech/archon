@@ -49,6 +49,11 @@ const keymaster = new Keymaster({
     passphrase
 });
 
+// Loading never creates. A surface that provisions -- a first run, a setup
+// flow -- says so; every other caller gets WalletNotFoundError on an empty
+// store, so a lost wallet is not silently replaced by a new identity.
+await keymaster.loadOrCreateWallet();
+
 const newId = await keymaster.createId('Bob');
 ```
 
@@ -82,6 +87,11 @@ const keymaster = new Keymaster({
     cipher,
     passphrase
 });
+
+// Loading never creates. A surface that provisions -- a first run, a setup
+// flow -- says so; every other caller gets WalletNotFoundError on an empty
+// store, so a lost wallet is not silently replaced by a new identity.
+await keymaster.loadOrCreateWallet();
 
 const newId = await keymaster.createId('Bob');
 ```
@@ -288,6 +298,11 @@ await keymaster.connect({
     intervalSeconds: 5,
     chatty: true
 });
+
+// Loading never creates. A surface that provisions -- a first run, a setup
+// flow -- says so; every other caller gets WalletNotFoundError on an empty
+// store, so a lost wallet is not silently replaced by a new identity.
+await keymaster.loadOrCreateWallet();
 
 const newId = await keymaster.createId('Bob');
 ```

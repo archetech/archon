@@ -68,7 +68,7 @@ WALLET_OPTIONAL_COMMANDS = {
 # ---------------------------------------------------------------------------
 
 async def cmd_create_wallet(km: Keymaster, args: argparse.Namespace) -> None:
-    wallet = await km.load_wallet()
+    wallet = await km.load_or_create_wallet()
     _print_json(wallet)
 
 
@@ -142,6 +142,9 @@ async def cmd_recover_wallet_did(km: Keymaster, args: argparse.Namespace) -> Non
 
 async def cmd_create_id(km: Keymaster, args: argparse.Namespace) -> None:
     opts = {"registry": args.registry} if args.registry else {}
+    # create-id is allowed to run before a wallet exists, so it is one of the
+    # two commands that provision.
+    await km.load_or_create_wallet()
     print(await km.create_id(args.name, opts or None))
     # A wallet is created on demand, so any create-id may be the run that made
     # one. On stderr, so it cannot land in a piped DID.
@@ -1490,11 +1493,6 @@ async def _run(args: argparse.Namespace) -> int:
             passphrase=passphrase,
             default_registry=default_registry or "hyperswarm",
         )
-
-        if not existing:
-            # Only the wallet-optional commands reach here, and they are the
-            # ones that exist to run before a wallet does.
-            await km.load_or_create_wallet()
 
         try:
             await args.handler(km, args)
