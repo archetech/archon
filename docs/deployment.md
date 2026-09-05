@@ -36,6 +36,9 @@ cd archon
 cp sample.env .env
 ```
 
+To try a node out before configuring the full stack, use the minimal compose
+file instead — see [§2](#2-core-node-did-only).
+
 Set your user/group IDs so containers run with the correct permissions:
 
 ```bash
@@ -65,7 +68,84 @@ mkdir -p data
 
 ## 2. Core Node (DID Only)
 
-The base `docker-compose.yml` always includes the optional compose fragments, but their services are gated by Docker Compose profiles. Leave `COMPOSE_PROFILES` empty to run only the core DID services: MongoDB, Redis, IPFS, Gatekeeper, and Keymaster.
+### Trying It Out: the Minimal Stack
+
+To see a node work before committing to the full configuration, use the minimal
+compose file and its own env sample:
+
+```bash
+git clone https://github.com/archetech/archon.git
+cd archon
+cp minimal-sample.env .env
+docker compose --env-file .env -f docker/compose/minimal.yml up
+```
+
+That starts six services — IPFS, Redis, Gatekeeper, Keymaster, the hyperswarm
+mediator, and the CLI container — and nothing else. `minimal-sample.env`
+carries only the variables that stack reads, with placeholders where a value is
+mandatory, so the node runs as copied. Replace both `CHANGE_ME` placeholders before the node
+holds anything you care about. `ARCHON_ADMIN_API_KEY` gates the API — generate
+one with `openssl rand -hex 32`. `ARCHON_ENCRYPTED_PASSPHRASE` encrypts the
+wallet mnemonic, and editing it later re-encrypts nothing: it leaves the
+existing wallet undecryptable, so rotate it with the CLI's `change-passphrase`
+first (see below) and then update the variable.
+
+### Driving the Node
+
+The CLI container is how you work with a node that has no UI. It idles, and the
+`./archon` script in the repository root execs into it. That script calls
+`docker compose` with no `-f`, so point it at this stack once per shell:
+
+```bash
+export COMPOSE_FILE=docker/compose/minimal.yml
+
+# Create an identity, published to the hyperswarm registry
+./archon create-id alice
+
+# List what the wallet holds, and resolve the DID back
+./archon list-ids
+./archon resolve-id alice
+```
+
+`./archon -h` lists the rest, and `./admin` and `./ipfs` reach the admin and
+IPFS CLIs the same way. The CLI reads `ARCHON_ADMIN_API_KEY` from the
+environment the compose file gives it, so it authenticates without further
+setup.
+
+The same operations are available over HTTP if you would rather not use the
+container. Gatekeeper answers on port 4224 and Keymaster on 4226:
+
+```bash
+# Gatekeeper is up
+curl -s localhost:4224/api/v1/version
+
+# Resolution is public — no admin key
+curl -s localhost:4224/1.0/identifiers/<did>
+```
+
+Keymaster's API requires `X-Archon-Admin-Key` on every route, so reach it with
+the value you set in `.env`.
+
+### How This Differs From the Full Stack
+
+This is a different stack from the profile-gated one below, in two ways worth
+knowing:
+
+- **It includes the hyperswarm mediator**, so DIDs are actually published to
+  peers. The base compose with no profiles has no registry mediator at all,
+  which means DIDs stay local.
+- **It does not include the optional fragments.** With `minimal-sample.env`,
+  `minimal.yml` resolves with no warnings at all, where the base compose emits
+  141 `variable is not set` warnings for values those fragments reference.
+
+Everything below describes the full `docker-compose.yml`, which is where to go
+once you want registries, a gateway, or the UIs. `minimal.yml` will not gain
+those, so moving on means copying `sample.env` and running plain
+`docker compose up` — the data directories and volumes carry over.
+
+### The Full Compose File
+
+The base `docker-compose.yml` always includes the optional compose fragments, but their services are gated by Docker Compose profiles. Leave `COMPOSE_PROFILES` empty to run only the core DID services: Redis, IPFS, Gatekeeper, and Keymaster. (MongoDB is itself behind the `mongodb` profile — Redis is the default database.)
 
 ### Enable Optional Services
 
