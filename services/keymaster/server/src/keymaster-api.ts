@@ -293,8 +293,21 @@ const port = config.keymasterPort;
 // Before the port is bound and before the blocking gatekeeper connect below:
 // a node told to fail closed on a missing wallet must say so immediately, not
 // sit with an open port waiting for an upstream that may never arrive.
-const walletStore = await initWallet();
-const walletMissing = !await walletStore.loadWallet();
+// Wrapped, because a rejection from a module-scope await reaches the
+// uncaughtException handler above, which logs and lets the process exit 0 --
+// looking like a clean shutdown while never having bound the port.
+async function openWalletStore() {
+    try {
+        const store = await initWallet();
+        return { store, missing: !await store.loadWallet() };
+    }
+    catch (error) {
+        console.error('Keymaster failed to open its wallet store:', error);
+        process.exit(1);
+    }
+}
+
+const { store: walletStore, missing: walletMissing } = await openWalletStore();
 
 if (walletMissing && config.requireWallet) {
     console.error(`No wallet in ${config.db} and ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new identity. Check that the data volume is mounted and ARCHON_KEYMASTER_DB matches the store this node was using.`);
