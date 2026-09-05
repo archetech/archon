@@ -213,9 +213,11 @@ export function WalletProvider(
             }
         }
 
-        // A passphrase chosen while the store is empty is the first-run flow:
-        // the one place a new browser profile gets a wallet.
-        const provision = !await walletStore.loadWallet();
+        // The first-run flow, and only it: the modal has to be the one that
+        // asks for a new passphrase, and the store still empty. A store that
+        // vanishes while the decrypt prompt is open is a lost wallet, not a
+        // first run, and must not be answered with a fresh identity.
+        const provision = modalAction === 'set-passphrase' && !await walletStore.loadWallet();
 
         await rebuildKeymaster(passphrase, provision);
     }

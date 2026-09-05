@@ -14,6 +14,7 @@
 
 import path from 'path';
 import fs from 'fs';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import WalletJson from '@didcid/keymaster/wallet/json';
@@ -76,6 +77,10 @@ try {
         walletData = await keymaster.loadWallet();
     }
     catch (error) {
+        if (!(error instanceof WalletNotFoundError)) {
+            throw error;
+        }
+
         console.error(`Error: no wallet at ${walletPath}`);
         console.error('Set ARCHON_WALLET_PATH, or create one with: keymaster create-wallet');
         process.exit(1);

@@ -2287,9 +2287,11 @@ async function run() {
         const walletOptionalCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file', 'list-registries'];
         const commandName = process.argv[2];
         const walletOptional = !commandName || walletOptionalCommands.includes(commandName);
-        const existing = await wallet.loadWallet();
 
-        if (!existing && !walletOptional) {
+        // Only read the store when its absence would be fatal. Reading parses
+        // it, so a corrupt wallet would otherwise block the very commands that
+        // exist to replace one.
+        if (!walletOptional && !await wallet.loadWallet()) {
             console.error(`Error: Wallet not found at ${walletPath}`);
             console.error('Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.');
             console.error('To create a new wallet, run: keymaster create-wallet');
