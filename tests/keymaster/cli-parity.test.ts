@@ -200,6 +200,41 @@ describe('wallet-optional command policy', () => {
     };
     const READS_THE_WALLET = /\.(loadWallet|mutateWallet|decryptMnemonic)\(/;
 
+    // argparse: handlers are `async def cmd_<name>` with hyphens as underscores;
+    // the block runs to the next top-level def.
+    function pythonCommandBlock(source: string, command: string): string {
+        const name = `cmd_${command.replace(/-/g, '_')}`;
+        const start = source.indexOf(`async def ${name}(`);
+        if (start === -1) {
+            return '';
+        }
+        const next = source.slice(start + 1).search(/\n(?:async )?def /);
+        return next === -1 ? source.slice(start) : source.slice(start, start + 1 + next);
+    }
+
+    const PY_HANDLES_ITS_OWN_WALLET: Record<string, RegExp | null> = {
+        'create-wallet': /load_or_create_wallet\(/,
+        'new-wallet': /new_wallet\(/,
+        'create-id': /load_or_create_wallet\(/,
+        'import-wallet': /new_wallet\(/,
+        'restore-wallet-file': /save_wallet\(/,
+        'list-registries': null,
+    };
+    const PY_READS_THE_WALLET = /\.(load_wallet|decrypt_mnemonic)\(/;
+
+    it.each(pyAllowlist)('%s handles the wallet itself in the Python CLI', (command) => {
+        expect(PY_HANDLES_ITS_OWN_WALLET).toHaveProperty(command);
+        const pattern = PY_HANDLES_ITS_OWN_WALLET[command];
+        const handler = pythonCommandBlock(pythonCli, command);
+        expect(handler).not.toBe('');
+
+        if (pattern === null) {
+            expect(handler).not.toMatch(PY_READS_THE_WALLET);
+        } else {
+            expect(handler).toMatch(pattern);
+        }
+    });
+
     it.each(jsAllowlist)('%s handles the wallet itself in the package CLI', (command) => {
         expect(HANDLES_ITS_OWN_WALLET).toHaveProperty(command);
         const pattern = HANDLES_ITS_OWN_WALLET[command];
