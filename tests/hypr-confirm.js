@@ -39,7 +39,8 @@ async function main() {
 
     const wallet = new WalletJson();
     const cipher = new CipherNode();
-    keymaster = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+    keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+    await keymaster.loadOrCreateWallet();
 
     const backup = await keymaster.loadWallet();
     await keymaster.newWallet(null, true);

@@ -28,16 +28,19 @@ afterAll(async () => {
     }
 });
 
-beforeEach(() => {
+beforeEach(async () => {
     const db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     cipher = new CipherNode();
     ownerWallet = new WalletJsonMemory();
     voterWallet = new WalletJsonMemory();
     outsiderWallet = new WalletJsonMemory();
-    owner = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet: ownerWallet, cipher, passphrase: 'owner' });
-    voter = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet: voterWallet, cipher, passphrase: 'voter' });
-    outsider = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet: outsiderWallet, cipher, passphrase: 'outsider' });
+    owner = new Keymaster({ gatekeeper, wallet: ownerWallet, cipher, passphrase: 'owner' });
+    await owner.loadOrCreateWallet();
+    voter = new Keymaster({ gatekeeper, wallet: voterWallet, cipher, passphrase: 'voter' });
+    await voter.loadOrCreateWallet();
+    outsider = new Keymaster({ gatekeeper, wallet: outsiderWallet, cipher, passphrase: 'outsider' });
+    await outsider.loadOrCreateWallet();
 });
 
 describe('pollTemplate', () => {

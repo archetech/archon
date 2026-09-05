@@ -67,12 +67,13 @@ describe('the public lookup methods reject private targets', () => {
     beforeEach(async () => {
         const db = new DbJsonMemory('test');
         const gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm'] });
-        keymaster = new Keymaster({ createWalletIfMissing: true,
+        keymaster = new Keymaster({
             gatekeeper,
             wallet: new WalletJsonMemory(),
             cipher: new CipherNode(),
             passphrase: 'passphrase',
         });
+        await keymaster.loadOrCreateWallet();
         await keymaster.createId('Alice', { registry: 'local' });
     });
 

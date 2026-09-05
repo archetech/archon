@@ -200,7 +200,6 @@ export default class Keymaster implements KeymasterInterface {
     private readonly defaultRegistry: string;
     private readonly ephemeralRegistry: string;
     private readonly maxAliasLength: number;
-    private readonly createWalletIfMissing: boolean;
     private readonly maxDataLength: number;
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
     // memoized. `undefined` = not yet fetched; `null` = node has no manifest
@@ -239,7 +238,6 @@ export default class Keymaster implements KeymasterInterface {
         // controlling agent is local.
         this.ephemeralRegistry = 'hyperswarm';
         this.maxAliasLength = options.maxAliasLength || 32;
-        this.createWalletIfMissing = options.createWalletIfMissing ?? false;
         this.maxDataLength = 8 * 1024; // 8 KB max data to store in a JSON object
     }
 
@@ -278,18 +276,15 @@ export default class Keymaster implements KeymasterInterface {
             return this._walletCache;
         }
 
-        let stored = await this.db.loadWallet() as WalletFile | null;
+        const stored = await this.db.loadWallet() as WalletFile | null;
 
         if (!stored) {
-            // Creating here would mint a fresh mnemonic on any read that finds
-            // the store empty -- an unmounted volume, a wiped database, a
-            // backend switch -- replacing the node's identity with nothing
-            // logged. Surfaces that provision a wallet say so; see #1037.
-            if (!this.createWalletIfMissing) {
-                throw new WalletNotFoundError();
-            }
-
-            stored = await this.newWallet();
+            // Reading never creates. Minting here would replace the node's
+            // identity on any read that finds the store empty -- an unmounted
+            // volume, a wiped database, a backend switch -- with nothing at the
+            // call site saying so. Callers that mean to provision call
+            // loadOrCreateWallet. See #1037.
+            throw new WalletNotFoundError();
         }
 
         const decrypted = await this.decryptWallet(stored);

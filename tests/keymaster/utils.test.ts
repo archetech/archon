@@ -27,12 +27,13 @@ afterAll(async () => {
     }
 });
 
-beforeEach(() => {
+beforeEach(async () => {
     const db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
-    keymaster = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+    keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+    await keymaster.loadOrCreateWallet();
 });
 
 describe('constructor', () => {
@@ -49,7 +50,7 @@ describe('constructor', () => {
 
         try {
             // @ts-expect-error Testing invalid usage, missing gatekeeper arg
-            new Keymaster({ createWalletIfMissing: true, wallet, cipher, passphrase: PASSPHRASE });
+            new Keymaster({ wallet, cipher, passphrase: PASSPHRASE });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -58,7 +59,7 @@ describe('constructor', () => {
 
         try {
             // @ts-expect-error Testing invalid usage, missing wallet arg
-            new Keymaster({ createWalletIfMissing: true, gatekeeper, cipher, passphrase: PASSPHRASE });
+            new Keymaster({ gatekeeper, cipher, passphrase: PASSPHRASE });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -67,7 +68,7 @@ describe('constructor', () => {
 
         try {
             // @ts-expect-error Testing invalid usage, missing cipher arg
-            new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, passphrase: PASSPHRASE });
+            new Keymaster({ gatekeeper, wallet, passphrase: PASSPHRASE });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -76,7 +77,7 @@ describe('constructor', () => {
 
         try {
             // @ts-expect-error Testing invalid usage, invalid gatekeeper arg
-            new Keymaster({ createWalletIfMissing: true, gatekeeper: {}, wallet, cipher, passphrase: PASSPHRASE });
+            new Keymaster({ gatekeeper: {}, wallet, cipher, passphrase: PASSPHRASE });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -85,7 +86,7 @@ describe('constructor', () => {
 
         try {
             // @ts-expect-error Testing invalid usage, invalid wallet arg
-            new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet: {}, cipher, passphrase: PASSPHRASE });
+            new Keymaster({ gatekeeper, wallet: {}, cipher, passphrase: PASSPHRASE });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -94,7 +95,7 @@ describe('constructor', () => {
 
         try {
             // @ts-expect-error Testing invalid usage, invalid cipher arg
-            new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher: {}, passphrase: PASSPHRASE });
+            new Keymaster({ gatekeeper, wallet, cipher: {}, passphrase: PASSPHRASE });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -103,7 +104,7 @@ describe('constructor', () => {
 
         try {
             // @ts-expect-error Testing invalid usage, missing passphrase arg
-            new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher });
+            new Keymaster({ gatekeeper, wallet, cipher });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
@@ -112,7 +113,7 @@ describe('constructor', () => {
 
         // Cover the ExpectedExceptionError class for completeness
         try {
-            new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+            new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
             throw new ExpectedExceptionError();
         }
         catch (error: any) {

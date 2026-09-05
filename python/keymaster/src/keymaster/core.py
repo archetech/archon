@@ -128,7 +128,6 @@ class Keymaster:
         default_registry: str = "hyperswarm",
         ephemeral_registry: str = "hyperswarm",
         max_alias_length: int = 32,
-        create_wallet_if_missing: bool = False,
     ):
         self.gatekeeper = gatekeeper
         self.wallet_store = wallet_store
@@ -138,7 +137,6 @@ class Keymaster:
         # controlling agent is local.
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
-        self.create_wallet_if_missing = create_wallet_if_missing
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache = None
@@ -186,14 +184,12 @@ class Keymaster:
 
         stored = self.wallet_store.load_wallet()
         if stored is None:
-            # Creating here would mint a fresh mnemonic on any read that finds
-            # the store empty -- an unmounted volume, a wiped database, a
-            # backend switch -- replacing the node's identity with nothing
-            # logged. Surfaces that provision a wallet say so; see #1037.
-            if not self.create_wallet_if_missing:
-                raise WalletNotFoundError("wallet store is empty")
-
-            stored = await self.new_wallet()
+            # Reading never creates. Minting here would replace the node's
+            # identity on any read that finds the store empty -- an unmounted
+            # volume, a wiped database, a backend switch -- with nothing at the
+            # call site saying so. Callers that mean to provision call
+            # load_or_create_wallet. See #1037.
+            raise WalletNotFoundError("wallet store is empty")
 
         decrypted = await self.decrypt_wallet(stored)
         self._wallet_cache = self._upgrade_wallet(decrypted)

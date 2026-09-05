@@ -1465,16 +1465,16 @@ async def _run(args: argparse.Namespace) -> int:
         data_folder=str(wallet_path_obj.parent) if wallet_path_obj.parent.as_posix() else ".",
     )
 
-    if args.command not in WALLET_OPTIONAL_COMMANDS:
-        existing = wallet_store.load_wallet()
-        if not existing:
-            print(f"Error: Wallet not found at {wallet_path}", file=sys.stderr)
-            print(
-                "Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.",
-                file=sys.stderr,
-            )
-            print("To create a new wallet, run: keymaster create-wallet", file=sys.stderr)
-            return 1
+    existing = wallet_store.load_wallet()
+
+    if not existing and args.command not in WALLET_OPTIONAL_COMMANDS:
+        print(f"Error: Wallet not found at {wallet_path}", file=sys.stderr)
+        print(
+            "Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.",
+            file=sys.stderr,
+        )
+        print("To create a new wallet, run: keymaster create-wallet", file=sys.stderr)
+        return 1
 
     gatekeeper = GatekeeperClient(gatekeeper_url)
     try:
@@ -1489,10 +1489,12 @@ async def _run(args: argparse.Namespace) -> int:
             wallet_store=wallet_store,
             passphrase=passphrase,
             default_registry=default_registry or "hyperswarm",
-            # The check above already decides which commands may run without a
-            # wallet, so this surface provisions on demand for exactly those.
-            create_wallet_if_missing=True,
         )
+
+        if not existing:
+            # Only the wallet-optional commands reach here, and they are the
+            # ones that exist to run before a wallet does.
+            await km.load_or_create_wallet()
 
         try:
             await args.handler(km, args)

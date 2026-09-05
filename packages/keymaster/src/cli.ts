@@ -2283,20 +2283,24 @@ async function run() {
         // Commands in this allowlist can run before a local wallet exists.
         const walletOptionalCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file', 'list-registries'];
         const commandName = process.argv[2];
-        if (commandName && !walletOptionalCommands.includes(commandName)) {
-            const existing = await wallet.loadWallet();
-            if (!existing) {
-                console.error(`Error: Wallet not found at ${walletPath}`);
-                console.error('Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.');
-                console.error('To create a new wallet, run: keymaster create-wallet');
-                process.exit(1);
-            }
+        const walletOptional = !commandName || walletOptionalCommands.includes(commandName);
+        const existing = await wallet.loadWallet();
+
+        if (!existing && !walletOptional) {
+            console.error(`Error: Wallet not found at ${walletPath}`);
+            console.error('Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.');
+            console.error('To create a new wallet, run: keymaster create-wallet');
+            process.exit(1);
         }
 
         // Initialize keymaster
-        // The allowlist above already decides which commands may run without a
-        // wallet, so this surface provisions on demand for exactly those.
-        keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase, createWalletIfMissing: true });
+        keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase });
+
+        if (!existing) {
+            // Only the allowlisted commands reach here, and they are the ones
+            // that exist to run before a wallet does.
+            await keymaster.loadOrCreateWallet();
+        }
 
         program.parse(process.argv);
     }

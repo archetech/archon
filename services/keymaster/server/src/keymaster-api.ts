@@ -309,29 +309,27 @@ const server = app.listen(port, config.bindAddress, async () => {
         const cipher = new CipherNode();
         const defaultRegistry = config.defaultRegistry;
 
-        // Provisioning happens here and nowhere else, so a fresh mnemonic is a
-        // startup event with a log line and a counter rather than a side effect
-        // of whichever request happened to read the wallet first (#1037).
-        const provisioned = !await wallet.loadWallet();
-
-        if (provisioned) {
-            if (config.requireWallet) {
-                console.error(`No wallet in ${config.db} and ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new identity. Check that the data volume is mounted and ARCHON_KEYMASTER_DB matches the store this node was using.`);
-                process.exit(1);
-            }
-
-            console.warn(`No wallet found in ${config.db} — creating one. If this node has run before, its store is missing and its identity has been replaced. Set ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal.`);
-            walletsCreatedTotal.inc();
-        }
-
         keymaster = new Keymaster({
             gatekeeper,
             wallet,
             cipher,
             defaultRegistry,
             passphrase: config.keymasterPassphrase,
-            createWalletIfMissing: provisioned,
         });
+
+        // The one place this service provisions, so a fresh mnemonic is a
+        // startup event with a log line and a counter rather than a side effect
+        // of whichever request happened to read the wallet first (#1037).
+        if (!await wallet.loadWallet()) {
+            if (config.requireWallet) {
+                console.error(`No wallet in ${config.db} and ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new identity. Check that the data volume is mounted and ARCHON_KEYMASTER_DB matches the store this node was using.`);
+                process.exit(1);
+            }
+
+            console.warn(`No wallet found in ${config.db} — creating one. If this node has run before, its store is missing and its identity has been replaced. Set ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal.`);
+            await keymaster.loadOrCreateWallet();
+            walletsCreatedTotal.inc();
+        }
     }
     catch (error) {
         console.error('Keymaster failed to start:', error);

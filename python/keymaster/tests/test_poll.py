@@ -20,10 +20,16 @@ class PollClients:
 
 def make_poll_clients() -> PollClients:
     gatekeeper = FakeGatekeeper()
+
+    def client(passphrase: str) -> Keymaster:
+        km = Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase=passphrase)
+        run(km.load_or_create_wallet())
+        return km
+
     return PollClients(
-        owner=Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase="owner-passphrase", create_wallet_if_missing=True),
-        voter=Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase="voter-passphrase", create_wallet_if_missing=True),
-        outsider=Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase="outsider-passphrase", create_wallet_if_missing=True),
+        owner=client("owner-passphrase"),
+        voter=client("voter-passphrase"),
+        outsider=client("outsider-passphrase"),
     )
 
 

@@ -138,17 +138,17 @@ export function WalletProvider(
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
-        // This surface owns first-run setup, so an empty store here is a new
-        // browser profile rather than a lost wallet.
-        const instance = new Keymaster({ gatekeeper, wallet, cipher, passphrase, createWalletIfMissing: true });
+        const instance = new Keymaster({ gatekeeper, wallet, cipher, passphrase });
 
         if (pendingMnemonic) {
             await instance.newWallet(pendingMnemonic, true);
             await instance.recoverWallet();
         } else {
             try {
-                // check pass & convert to v1 if needed
-                await instance.loadWallet();
+                // Check pass & convert to v1 if needed. This surface owns
+                // first-run setup, so an empty store here is a new browser
+                // profile rather than a lost wallet.
+                await instance.loadOrCreateWallet();
             } catch (error: any) {
                 const message = error?.message || String(error);
                 if (message.includes('Incorrect passphrase')) {

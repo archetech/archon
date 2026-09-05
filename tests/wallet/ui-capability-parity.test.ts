@@ -56,6 +56,7 @@ const ABSENT_FROM_WALLETS: Record<string, string> = {
 
 const ABSENT_FROM_CLIENTS: Record<string, string> = {
     fetchIdInfo: 'A convenience getter over what the clients already assemble from getCurrentId and resolveDID. Same information, fewer calls.',
+    loadOrCreateWallet: 'Provisioning a local store. A client talks to a service that already has one, and provisions over REST with POST /wallet/new.',
     getDmailMessage: 'The clients resolve the message DID directly rather than asking for it by name.',
     getGroup: 'The clients read groups through resolveAsset, which returns the same document.',
     getSchema: 'The clients read schemas through resolveAsset, as they do groups.',

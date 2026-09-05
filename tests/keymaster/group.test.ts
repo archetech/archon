@@ -23,12 +23,13 @@ afterAll(async () => {
     }
 });
 
-beforeEach(() => {
+beforeEach(async () => {
     const db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
-    keymaster = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+    keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+    await keymaster.loadOrCreateWallet();
 });
 
 describe('createGroup', () => {

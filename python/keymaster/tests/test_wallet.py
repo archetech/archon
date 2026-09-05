@@ -18,6 +18,20 @@ def test_load_wallet_creates_new_wallet(testbed):
     assert "mnemonicEnc" in wallet["seed"]
 
 
+def _cold(testbed, passphrase: str = "passphrase") -> Keymaster:
+    """An instance over the same store with no warmed cache.
+
+    The test bed provisions, so its keymaster already holds a decrypted wallet;
+    tests that write a payload into the store directly need a reader that will
+    actually go and fetch it.
+    """
+    return Keymaster(
+        gatekeeper=testbed.gatekeeper,
+        wallet_store=testbed.wallet_store,
+        passphrase=passphrase,
+    )
+
+
 def test_load_wallet_returns_cached_wallet(testbed):
     wallet1 = run(testbed.keymaster.load_wallet())
     wallet2 = run(testbed.keymaster.load_wallet())
@@ -35,7 +49,7 @@ def test_load_wallet_upgrades_legacy_names_and_v1_version(testbed):
     }
 
     assert testbed.wallet_store.save_wallet(legacy_wallet, overwrite=True) is True
-    loaded = run(testbed.keymaster.load_wallet())
+    loaded = run(_cold(testbed).load_wallet())
 
     assert loaded["version"] == 2
     assert "names" not in loaded
@@ -47,7 +61,7 @@ def test_load_wallet_rejects_unsupported_legacy_payload(testbed):
 
     assert testbed.wallet_store.save_wallet(corrupt_wallet, overwrite=True) is True
     with pytest.raises(KeymasterError, match="Unsupported wallet version"):
-        run(testbed.keymaster.load_wallet())
+        run(_cold(testbed).load_wallet())
 
 
 def test_save_wallet_respects_overwrite_flag(testbed):
@@ -90,7 +104,6 @@ def test_save_wallet_restore_into_warm_instance_does_not_corrupt(testbed):
         gatekeeper=testbed.gatekeeper,
         wallet_store=testbed.wallet_store,
         passphrase="passphrase",
-        create_wallet_if_missing=True,
     )
     restored = run(fresh.load_wallet())
     assert "Bob" in restored["ids"]
@@ -172,7 +185,6 @@ def test_change_passphrase_allows_reload_with_new_passphrase(testbed):
         gatekeeper=testbed.gatekeeper,
         wallet_store=testbed.wallet_store,
         passphrase="new-passphrase",
-        create_wallet_if_missing=True,
     )
     loaded = run(km2.load_wallet())
     assert "Bob" in loaded["ids"]
@@ -186,7 +198,6 @@ def test_change_passphrase_rejects_old_passphrase_after_rotation(testbed):
         gatekeeper=testbed.gatekeeper,
         wallet_store=testbed.wallet_store,
         passphrase="passphrase",
-        create_wallet_if_missing=True,
     )
     with pytest.raises(KeymasterError, match="Incorrect passphrase"):
         run(km2.load_wallet())
@@ -251,18 +262,6 @@ async def test_load_wallet_refuses_an_empty_store_by_default():
 
     with pytest.raises(WalletNotFoundError):
         await km.load_wallet()
-
-
-@pytest.mark.asyncio
-async def test_load_wallet_creates_when_the_surface_provisions():
-    km = Keymaster(
-        gatekeeper=FakeGatekeeper(),
-        wallet_store=FakeWalletStore(),
-        passphrase="pass",
-        create_wallet_if_missing=True,
-    )
-
-    assert (await km.load_wallet())["seed"] is not None
 
 
 @pytest.mark.asyncio

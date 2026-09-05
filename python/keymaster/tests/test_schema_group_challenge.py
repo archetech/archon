@@ -140,13 +140,14 @@ def test_create_and_verify_challenge_response(testbed):
 
 
 def _keymaster(**kwargs):
-    return Keymaster(
+    km = Keymaster(
         gatekeeper=FakeGatekeeper(),
         wallet_store=FakeWalletStore(),
         passphrase="passphrase",
         **kwargs,
-        create_wallet_if_missing=True,
     )
+    run(km.load_or_create_wallet())
+    return km
 
 
 def _registry_of(km, did):

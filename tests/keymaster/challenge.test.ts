@@ -24,12 +24,13 @@ afterAll(async () => {
     }
 });
 
-beforeEach(() => {
+beforeEach(async () => {
     const db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
-    keymaster = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+    keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+    await keymaster.loadOrCreateWallet();
 });
 
 describe('createChallenge', () => {
@@ -65,10 +66,11 @@ describe('createChallenge', () => {
     it('should not downgrade a non-local agent when the default registry is local', async () => {
         // The mirror case: the default is `local` but the agent is not, so the challenge still
         // lands somewhere that propagates to a remote verifier.
-        const localKeymaster = new Keymaster({ createWalletIfMissing: true,
+        const localKeymaster = new Keymaster({
             gatekeeper, wallet: new WalletJsonMemory(), cipher,
             passphrase: 'passphrase', defaultRegistry: 'local',
         });
+        await localKeymaster.loadOrCreateWallet();
         await localKeymaster.createId('Alice', { registry: 'hyperswarm' });
         const did = await localKeymaster.createChallenge();
         const doc = await localKeymaster.resolveDID(did);
