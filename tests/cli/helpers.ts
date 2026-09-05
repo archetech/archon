@@ -6,14 +6,10 @@ const exec = promisify(execFile);
 /**
  * Run an archon CLI command via docker compose (no TTY).
  * Returns trimmed stdout.
- *
- * Invoked the way the deployment guide tells operators to, so the `archon`
- * wrapper the image installs on PATH is covered by these tests rather than
- * only by the documentation.
  */
 export async function archon(...args: string[]): Promise<string> {
     const { stdout } = await exec(
-        'docker', ['compose', 'exec', '-T', 'cli', 'archon', ...args],
+        'docker', ['compose', 'exec', '-T', 'cli', 'node', 'scripts/archon-cli.js', ...args],
     );
     return stdout.trim();
 }

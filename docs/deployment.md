@@ -92,22 +92,25 @@ first (see below) and then update the variable.
 
 ### Driving the Node
 
-The CLI container is how you work with a node that has no UI. It idles until
-you exec into it:
+The CLI container is how you work with a node that has no UI. It idles, and the
+`./archon` script in the repository root execs into it. That script calls
+`docker compose` with no `-f`, so point it at this stack once per shell:
 
 ```bash
+export COMPOSE_FILE=docker/compose/minimal.yml
+
 # Create an identity, published to the hyperswarm registry
-docker compose -f docker/compose/minimal.yml exec cli archon create-id alice
+./archon create-id alice
 
 # List what the wallet holds, and resolve the DID back
-docker compose -f docker/compose/minimal.yml exec cli archon list-ids
-docker compose -f docker/compose/minimal.yml exec cli archon resolve-id alice
+./archon list-ids
+./archon resolve-id alice
 ```
 
-Export `COMPOSE_FILE=docker/compose/minimal.yml` in your shell to drop the `-f`
-from each of those. `archon --help` lists the rest. The CLI reads
-`ARCHON_ADMIN_API_KEY` from the environment the compose file gives it, so it
-authenticates without further setup.
+`./archon -h` lists the rest, and `./admin` and `./ipfs` reach the admin and
+IPFS CLIs the same way. The CLI reads `ARCHON_ADMIN_API_KEY` from the
+environment the compose file gives it, so it authenticates without further
+setup.
 
 The same operations are available over HTTP if you would rather not use the
 container. Gatekeeper answers on port 4224 and Keymaster on 4226:

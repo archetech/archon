@@ -36,14 +36,6 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/scripts ./scripts
 
-# The CLI is the reason to exec into this image, so give it a name on PATH.
-# scripts/archon-cli.js has no shebang and node_modules/.bin is not on PATH,
-# so without this every invocation has to spell out the interpreter and path.
-# It resolves its own package.json from __dirname, so any working directory
-# works.
-RUN printf '#!/bin/sh\nexec node /app/scripts/archon-cli.js "$@"\n' > /usr/local/bin/archon \
-    && chmod +x /usr/local/bin/archon
-
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
 
