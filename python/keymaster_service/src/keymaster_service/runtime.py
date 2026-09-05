@@ -6,7 +6,6 @@ from typing import Any
 
 from keymaster import Keymaster, KeymasterError, WalletNotFoundError
 
-from .admin import check_wallet_store
 from .config import Settings
 from .metrics import wallets_created_total
 from keymaster.gatekeeper_client import GatekeeperClient
@@ -44,28 +43,20 @@ class KeymasterService:
                 f"Unsupported ARCHON_KEYMASTER_DB for Python service: {self.settings.keymaster_db}"
             )
 
-        # Before the blocking gatekeeper connect below: a node told to fail
-        # closed on a missing wallet must say so immediately, not wait on an
-        # upstream that may never arrive.
-        check = check_wallet_store(
-            self.wallet_store.load_wallet() is None,
-            self.settings.require_wallet,
-            self.settings.keymaster_db,
-        )
-        if check.fatal:
-            raise KeymasterServiceError(check.fatal)
-
         await self.gatekeeper.connect(wait_until_ready=True, interval_seconds=5)
 
         # The one place this service provisions, so a fresh mnemonic is a
         # startup event with a log line and a counter rather than a side effect
-        # of whichever request happened to read the wallet first (#1037). The
-        # store is read again rather than trusting the snapshot above: a wallet
-        # that arrived during the gatekeeper wait is loaded, not replaced.
+        # of whichever request happened to read the wallet first (#1037). Any
+        # other failure to load propagates and ends startup.
         try:
             await self.keymaster.load_wallet()
         except WalletNotFoundError:
-            LOGGER.warning(check.warning)
+            LOGGER.warning(
+                "No wallet found in %s — creating one. If this node has run before, its "
+                "store is missing and its identity has been replaced.",
+                self.settings.keymaster_db,
+            )
             await self.keymaster.new_wallet()
             wallets_created_total.inc()
         # Resolve the node ID in the background so the ASGI app can start

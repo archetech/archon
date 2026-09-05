@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContextProviders } from '../contexts/ContextProviders';
@@ -44,6 +44,11 @@ async function completeSetup() {
 }
 
 const PASSPHRASE = 'render-smoke-test-passphrase';
+
+// The session passphrase is a module-level variable, not sessionStorage, so the
+// shared afterEach that clears storage does not reset it. Each test starts from
+// no session, or its first mount depends on what the previous test left.
+beforeEach(() => clearSessionPassphrase());
 
 // WalletWeb's default localStorage key.
 const WALLET_KEY = 'archon-keymaster';

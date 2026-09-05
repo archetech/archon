@@ -65,13 +65,18 @@ function argumentShape(args: string): string {
         .join(' ');
 }
 
-function optionsFor(source: string, command: string): string[] {
+// The source of one commander command: from its .command( to the next.
+function commandBlock(source: string, command: string): string {
     const start = source.indexOf(`.command('${command}`);
     if (start === -1) {
-        return [];
+        return '';
     }
     const next = source.indexOf('.command(', start + 1);
-    const block = source.slice(start, next === -1 ? undefined : next);
+    return source.slice(start, next === -1 ? undefined : next);
+}
+
+function optionsFor(source: string, command: string): string[] {
+    const block = commandBlock(source, command);
     return [...block.matchAll(/\.option\('([^']+)'/g)]
         .map(match => match[1].split(',').map(part => part.trim()).pop() as string)
         .sort();
@@ -180,25 +185,30 @@ describe('wallet-optional command policy', () => {
         expect(pyAllowlist).toEqual(jsAllowlist);
     });
 
-    // What each allowlisted handler does about the wallet, by name. Anything
-    // not listed here is a command that reads a wallet it has no way to obtain.
-    const HANDLES_ITS_OWN_WALLET: Record<string, RegExp> = {
-        'create-wallet': /loadOrCreateWallet\(\)/,
-        'new-wallet': /newWallet\("", true\)/,
-        'create-id': /loadOrCreateWallet\(\)/,
-        'import-wallet': /newWallet\(recoveryPhrase\)/,
-        'restore-wallet-file': /saveWallet\(wallet, true\)/,
-        'list-registries': /listRegistries\(\)/,
+    // What each allowlisted handler does about the wallet, by name. A command
+    // that creates, replaces or provisions has a positive pattern; a command
+    // that needs no wallet is marked null and is checked for the absence of a
+    // read instead -- the defect this guard exists to catch is a wallet read
+    // creeping into a handler that runs before one exists.
+    const HANDLES_ITS_OWN_WALLET: Record<string, RegExp | null> = {
+        'create-wallet': /loadOrCreateWallet\(/,
+        'new-wallet': /newWallet\(/,
+        'create-id': /loadOrCreateWallet\(/,
+        'import-wallet': /newWallet\(/,
+        'restore-wallet-file': /saveWallet\(/,
+        'list-registries': null,
     };
+    const READS_THE_WALLET = /\.(loadWallet|mutateWallet|decryptMnemonic)\(/;
 
     it.each(jsAllowlist)('%s handles the wallet itself in the package CLI', (command) => {
+        expect(HANDLES_ITS_OWN_WALLET).toHaveProperty(command);
         const pattern = HANDLES_ITS_OWN_WALLET[command];
-        expect(pattern).toBeDefined();
+        const handler = commandBlock(packageCli, command);
 
-        const start = packageCli.indexOf(`.command('${command}`);
-        const next = packageCli.indexOf('.command(', start + 1);
-        const handler = packageCli.slice(start, next === -1 ? undefined : next);
-
-        expect(handler).toMatch(pattern!);
+        if (pattern === null) {
+            expect(handler).not.toMatch(READS_THE_WALLET);
+        } else {
+            expect(handler).toMatch(pattern);
+        }
     });
 });

@@ -938,6 +938,11 @@ class Keymaster:
                     continue
 
                 return await self.create_response(data["challenge"], {"retries": 5, "delay": 1000})
+            except WalletNotFoundError:
+                # No wallet is not a property of this endpoint; trying the next
+                # one cannot help, and reporting it as a challenge failure hides
+                # the remedy.
+                raise
             except Exception:
                 last_error = "Failed to fetch address challenge"
 

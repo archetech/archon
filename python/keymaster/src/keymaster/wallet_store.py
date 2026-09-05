@@ -7,9 +7,6 @@ import threading
 from typing import Any
 
 import redis as redis_lib
-from redis.backoff import ExponentialBackoff
-from redis.exceptions import ConnectionError as RedisConnectionError
-from redis.retry import Retry
 
 
 class JsonWalletStore:
@@ -40,17 +37,7 @@ class RedisWalletStore:
 
     def __init__(self, redis_url: str = "redis://localhost:6379", wallet_key: str = "wallet"):
         self._wallet_key = wallet_key
-        # The first read happens at startup, before anything else has waited
-        # for the stack to come up. Retry a Redis that is not yet accepting
-        # connections rather than failing the process on the first attempt --
-        # matching ioredis, which queues offline commands for the TypeScript
-        # service.
-        self._client = redis_lib.from_url(
-            redis_url,
-            decode_responses=True,
-            retry=Retry(ExponentialBackoff(cap=2, base=0.05), 20),
-            retry_on_error=[RedisConnectionError],
-        )
+        self._client = redis_lib.from_url(redis_url, decode_responses=True)
 
     def save_wallet(self, wallet: dict[str, Any], overwrite: bool = False) -> bool:
         exists = self._client.exists(self._wallet_key)

@@ -24,9 +24,6 @@ export const SERVICE_NAME = process.env.ARCHON_HERALD_NAME || 'name-service';
 export const PUBLIC_URL = `${DRAWBRIDGE_PUBLIC_HOST.replace(/\/$/, '')}/names`;
 export const SERVICE_DOMAIN = process.env.ARCHON_HERALD_DOMAIN || '';
 export const SESSION_SECRET = process.env.ARCHON_HERALD_SESSION_SECRET;
-// Refuse to start when the standalone wallet store reads empty, rather than mint
-// a new issuer identity. Every credential Herald has issued names the old one.
-export const REQUIRE_WALLET = process.env.ARCHON_HERALD_REQUIRE_WALLET ? process.env.ARCHON_HERALD_REQUIRE_WALLET === 'true' : false;
 export const IPNS_KEY_NAME = process.env.ARCHON_HERALD_IPNS_KEY_NAME || SERVICE_NAME;
 export const DEFAULT_MEMBERSHIP_SCHEMA_DID = 'did:cid:bagaaieravnv5onsflewvrz6urhwfjixfnwq7bgc3ejhlrj2nekx75ddhdupq';
 export const MEMBERSHIP_SCHEMA_DID = process.env.ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID || DEFAULT_MEMBERSHIP_SCHEMA_DID;

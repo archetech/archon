@@ -6,6 +6,7 @@ import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
 import { CID } from 'multiformats/cid';
 import {
+    ArchonError,
     InvalidDIDError,
     InvalidParameterError,
     KeymasterError,
@@ -1846,7 +1847,7 @@ export default class Keymaster implements KeymasterInterface {
 
             return data.name;
         } catch (error: any) {
-            if (error.type === 'Keymaster') {
+            if (error instanceof ArchonError) {
                 throw error;
             } else {
                 throw new InvalidDIDError();
@@ -2060,7 +2061,13 @@ export default class Keymaster implements KeymasterInterface {
                     delay: ADDRESS_CHALLENGE_RESPONSE_DELAY_MS,
                 });
             }
-            catch {
+            catch (error) {
+                // No wallet is not a property of this endpoint; trying the next
+                // one cannot help, and reporting it as a challenge failure hides
+                // the remedy.
+                if (error instanceof WalletNotFoundError) {
+                    throw error;
+                }
                 lastError = 'Failed to fetch address challenge';
             }
         }

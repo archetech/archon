@@ -137,18 +137,20 @@ MUST be observable: log a warning naming the store, and increment
 non-zero counter on a node that has been running is the signal that its store
 went missing.
 
-`ARCHON_KEYMASTER_REQUIRE_WALLET=true` makes an empty store fatal at startup
-rather than provisioning. An operator whose node already holds an identity sets
-it, and is then protected from the cases above replacing that identity silently.
-
 Loading MUST NOT create. Provisioning is a separate call — `loadOrCreateWallet`
-in the TypeScript library, `load_or_create_wallet` in the Python one — so it is
-visible at the call site
+in the TypeScript library, `load_or_create_wallet` in the Python one, or
+`newWallet` after a `WalletNotFoundError` — so it is visible at the call site
 rather than governed by configuration read somewhere else. The surfaces that
-make it are the CLIs (for the commands on their own allowlist of things that may
-run before a wallet exists), the browser wallet's setup flow, and the services'
-startup path. Every other caller reaching an empty store has lost one, and gets
-a `WalletNotFoundError`.
+provision are: the CLIs, in the `create-wallet` and `create-id` handlers (the
+only two on their allowlist of commands that may run before a wallet exists
+whose handlers assume one); the MCP server, in `archon_create_wallet` and
+`archon_create_id`; the browser wallets, in their first-run setup flow only;
+and the services, once at startup, where a `WalletNotFoundError` from
+`loadWallet` is answered with a warning, `newWallet`, and the counter. Every
+other caller reaching an empty store has lost one, and gets a
+`WalletNotFoundError`.
+
+There is currently no way to make an empty store fatal instead; that is #1051.
 
 ### 2.2 Authentication
 
@@ -1083,7 +1085,6 @@ labels.
 | `ARCHON_NODE_ID` | empty | Required. Name of the canonical agent ID this server provisions on startup. |
 | `ARCHON_KEYMASTER_DB` | `json` | Storage backend (`json`, `sqlite`, `redis`, `mongodb`). |
 | `ARCHON_ENCRYPTED_PASSPHRASE` | empty | Wallet passphrase, and the credential `/login` checks. **Required** — the service refuses to start without it. |
-| `ARCHON_KEYMASTER_REQUIRE_WALLET` | `false` | Refuse to start when the wallet store reads empty, instead of provisioning a new one. Set it on any node that already holds an identity. |
 | `ARCHON_WALLET_CACHE` | `false` | Enables the in-memory write-through cache. |
 | `ARCHON_DEFAULT_REGISTRY` | unset (uses `hyperswarm` in code) | Default registry for created DIDs. |
 | `ARCHON_KEYMASTER_UPLOAD_LIMIT` | `10mb` | Body cap for `/files`, `/images`, dmail attachments. |
@@ -1095,19 +1096,14 @@ labels.
 
 1. Validate `ARCHON_ADMIN_API_KEY` and `ARCHON_ENCRYPTED_PASSPHRASE`; exit
    non-zero if either is unset (§2.2).
-2. Open the wallet backend and read it once. A store that cannot be read —
-   a truncated `wallet.json`, say — is fatal here: the node MUST NOT bind a
-   port with half an identity behind it, and the operator restores the wallet
-   or moves it aside. An empty store with `ARCHON_KEYMASTER_REQUIRE_WALLET`
-   set is fatal too (§2.1.1).
-3. Bind HTTP listener.
-4. Connect to Gatekeeper (`waitUntilReady=true`, polling every 5s).
-5. Construct the in-process Keymaster with the wallet, Gatekeeper client,
-   and cipher implementation, and load the wallet. If the store is still
-   empty, provision one: log the warning and increment
-   `keymaster_wallets_created_total`. The store is read again here rather
-   than trusting step 2, so a wallet that arrived during the Gatekeeper wait
-   is loaded rather than replaced.
+2. Bind HTTP listener.
+3. Connect to Gatekeeper (`waitUntilReady=true`, polling every 5s).
+4. Initialize the wallet backend and construct the in-process Keymaster with
+   it, the Gatekeeper client, and the cipher implementation.
+5. Load the wallet. If the store is empty, provision one: log the warning and
+   increment `keymaster_wallets_created_total` (§2.1.1). Any other failure to
+   load — an unreadable store, a wrong passphrase — ends the process with a
+   non-zero exit rather than leaving a listener with no Keymaster behind it.
 6. Run `waitForNodeId()`:
    - `ARCHON_NODE_ID` MUST be set.
    - If the wallet doesn't have an ID with that name, create one

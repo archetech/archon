@@ -169,7 +169,6 @@ Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keyma
 |----------|---------|-------------|
 | `ARCHON_ADMIN_API_KEY` | *(empty)* | **Required.** Protects admin API routes, and on Keymaster the whole v1 API. Gatekeeper and Keymaster both refuse to start without it; mediators and the CLI use the same value to authenticate against it |
 | `ARCHON_ENCRYPTED_PASSPHRASE` | *(empty)* | **Required.** Passphrase for encrypting the wallet. Keymaster won't start without it |
-| `ARCHON_KEYMASTER_REQUIRE_WALLET` | `false` | Refuse to start if the wallet store is empty rather than minting a new identity. Set to `true` once the node has a wallet worth keeping |
 | `ARCHON_NODE_ID` | `mynodeID` | Alias for the node's agent DID (created on first run) |
 | `ARCHON_NODE_NAME` | `mynodeName` | Human-readable node name for peer discovery |
 | `COMPOSE_PROFILES` | sample default | Optional Docker Compose service profiles |

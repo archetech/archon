@@ -65,31 +65,6 @@ export function checkPassphrase(passphrase: string): StartupCheck {
     return {};
 }
 
-/**
- * Decide what an empty wallet store means for this node.
- *
- * Empty cannot be told apart from lost by looking at the store, so the operator
- * says which it is: with ARCHON_KEYMASTER_REQUIRE_WALLET set, a node that
- * already holds an identity refuses rather than mint a new one over it.
- * Otherwise provisioning goes ahead, with a warning that names the store so a
- * node that has run before is not silently replaced.
- */
-export function checkWalletStore(missing: boolean, requireWallet: boolean, db: string): StartupCheck {
-    if (!missing) {
-        return {};
-    }
-
-    if (requireWallet) {
-        return {
-            fatal: `No wallet in ${db} and ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new identity. Check that the data volume is mounted and ARCHON_KEYMASTER_DB matches the store this node was using.`,
-        };
-    }
-
-    return {
-        warning: `No wallet found in ${db} — creating one. If this node has run before, its store is missing and its identity has been replaced. Set ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal.`,
-    };
-}
-
 // Admin API key middleware — every route mounted after it requires a matching
 // X-Archon-Admin-Key header. This provides defense-in-depth even when running
 // behind a reverse proxy.

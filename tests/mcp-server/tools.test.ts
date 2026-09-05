@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import { ARCHON_MCP_TOOL_DEFINITIONS, registerArchonTools, McpServerConfig } from '@didcid/mcp-server';
 
 type ToolHandler = (args?: unknown) => Promise<any>;
@@ -1120,5 +1121,21 @@ describe('archon_create_id provisions like its CLI counterpart', () => {
         await server.tools.get('archon_create_id')!.handler({ name: 'alice' });
 
         expect(calls).toEqual(['loadOrCreateWallet', 'createId']);
+    });
+});
+
+// Reading never creates, so on a fresh machine every wallet-backed tool refuses.
+// The refusal has to name the tools that provision, or an agent is left to guess.
+describe('a missing wallet names its remedy', () => {
+    it('appends the provisioning tools to WalletNotFoundError', async () => {
+        const runtime = mockRuntime({ listIds: jest.fn<any>().mockRejectedValue(new WalletNotFoundError()) });
+        const server = new FakeServer();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response = await server.tools.get('archon_list_ids')!.handler({});
+
+        expect(response.isError).toBe(true);
+        expect(response.content[0].text).toContain('Wallet not found');
+        expect(response.content[0].text).toContain('archon_create_wallet');
     });
 });

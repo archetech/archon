@@ -4,6 +4,7 @@ import { McpServerConfig } from './config.js';
 import { ArchonRuntime, requireKeymaster } from './runtime.js';
 import { assetDataUnavailable, vaultItemUri } from './resources.js';
 import { errorMessage } from './redact.js';
+import { WalletNotFoundError } from '@didcid/common/errors';
 
 type RegisterableServer = {
     registerTool?: (name: string, config: any, handler: (args: unknown) => Promise<unknown>) => void;
@@ -285,11 +286,17 @@ function ok(result: unknown): CallToolResult {
 }
 
 function fail(error: unknown): CallToolResult {
+    // A fresh machine has no wallet, and reading never creates one; say which
+    // tools do, so an agent does not have to guess.
+    const text = error instanceof WalletNotFoundError
+        ? `${errorMessage(error)}. Create one with archon_create_wallet or archon_create_id.`
+        : errorMessage(error);
+
     return {
         content: [
             {
                 type: 'text',
-                text: errorMessage(error),
+                text,
             },
         ],
         isError: true,

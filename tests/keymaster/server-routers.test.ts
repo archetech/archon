@@ -24,7 +24,7 @@ import { createResponseRouter } from '../../services/keymaster/server/src/keymas
 import { createSchemaRouter } from '../../services/keymaster/server/src/keymaster-schema-router.ts';
 import { createSchemaTemplateRouter } from '../../services/keymaster/server/src/keymaster-schema-template-router.ts';
 import { createVaultRouter } from '../../services/keymaster/server/src/keymaster-vault-router.ts';
-import { checkAdminApiKey, checkPassphrase, checkWalletStore, createRequireAdminKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/keymaster/server/src/keymaster-admin.ts';
+import { checkAdminApiKey, checkPassphrase, createRequireAdminKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/keymaster/server/src/keymaster-admin.ts';
 import defaultConfig from '../../services/keymaster/server/src/config.js';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -577,27 +577,3 @@ describe('keymaster admin key startup check', () => {
     });
 });
 
-// Empty cannot be told apart from lost by looking at the store, so the operator
-// says which it is. Pure, like the other startup checks, so the decision and its
-// wording are pinned without spawning a process.
-describe('keymaster wallet store startup check', () => {
-    it('needs no decision when a wallet is present', () => {
-        expect(checkWalletStore(false, true, 'redis')).toEqual({});
-    });
-
-    it('is fatal when the wallet is missing and required', () => {
-        const result = checkWalletStore(true, true, 'redis');
-
-        expect(result.fatal).toContain('ARCHON_KEYMASTER_REQUIRE_WALLET');
-        expect(result.fatal).toContain('redis');
-        expect(result.warning).toBeUndefined();
-    });
-
-    it('warns when the wallet is missing and provisioning is allowed', () => {
-        const result = checkWalletStore(true, false, 'json');
-
-        expect(result.fatal).toBeUndefined();
-        expect(result.warning).toContain('creating one');
-        expect(result.warning).toContain('ARCHON_KEYMASTER_REQUIRE_WALLET=true');
-    });
-});

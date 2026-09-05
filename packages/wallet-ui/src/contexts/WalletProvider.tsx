@@ -107,8 +107,6 @@ export function WalletProvider(
     }, []);
 
     async function initialiseWallet() {
-        const walletData = await walletStore.loadWallet();
-
         const pass = await session.get();
         if (!pendingMnemonic && pass) {
             const res = await rebuildKeymaster(pass);
@@ -118,6 +116,11 @@ export function WalletProvider(
             setPassphraseErrorText("");
             await session.clear();
         }
+
+        // Read after the rebuild, not before: the store can change while the
+        // session round-trips, and a rebuild that found it empty has already
+        // routed to setup -- a stale snapshot here would put decrypt back.
+        const walletData = await walletStore.loadWallet();
 
         if (!walletData || pendingMnemonic) {
             // eslint-disable-next-line sonarjs/no-duplicate-string

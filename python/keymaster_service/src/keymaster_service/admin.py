@@ -62,32 +62,3 @@ def check_passphrase(passphrase: str) -> StartupCheck:
 
     return StartupCheck()
 
-
-def check_wallet_store(missing: bool, require_wallet: bool, db: str) -> StartupCheck:
-    """Decide what an empty wallet store means for this node.
-
-    Empty cannot be told apart from lost by looking at the store, so the
-    operator says which it is: with ARCHON_KEYMASTER_REQUIRE_WALLET set, a node
-    that already holds an identity refuses rather than mint a new one over it.
-    Otherwise provisioning goes ahead, with a warning that names the store.
-    Mirrors the TypeScript ``checkWalletStore``.
-    """
-    if not missing:
-        return StartupCheck()
-
-    if require_wallet:
-        return StartupCheck(
-            fatal=(
-                f"No wallet in {db} and ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing "
-                "to mint a new identity. Check that the data volume is mounted and "
-                "ARCHON_KEYMASTER_DB matches the store this node was using."
-            )
-        )
-
-    return StartupCheck(
-        warning=(
-            f"No wallet found in {db} — creating one. If this node has run before, its "
-            "store is missing and its identity has been replaced. Set "
-            "ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal."
-        )
-    )

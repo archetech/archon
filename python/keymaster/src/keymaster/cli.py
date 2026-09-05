@@ -1470,7 +1470,7 @@ async def _run(args: argparse.Namespace) -> int:
 
     # Only read the store when its absence would be fatal. Reading parses it, so
     # a corrupt wallet would otherwise block the very commands that replace one.
-    if args.command not in WALLET_OPTIONAL_COMMANDS and wallet_store.load_wallet() is None:
+    if args.command not in WALLET_OPTIONAL_COMMANDS and not wallet_store.load_wallet():
         print(f"Error: Wallet not found at {wallet_path}", file=sys.stderr)
         print(
             "Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.",

@@ -830,10 +830,6 @@ describe('fixWallet', () => {
 });
 
 describe('updateWallet', () => {
-    beforeEach(async () => {
-        await keymaster.loadOrCreateWallet();
-    });
-
     it('should throw when no wallet has been created', async () => {
         const test = new WalletJsonMemory();
         try {
@@ -882,6 +878,13 @@ describe('wallet provisioning', () => {
         await expect(build().loadWallet()).rejects.toThrow();
 
         expect(await wallet.loadWallet()).toBeNull();
+    });
+
+    // recoverId's catch converts unexpected errors to InvalidDIDError. A missing
+    // wallet is not an invalid DID, and callers turn WalletNotFoundError into a
+    // remedy; it has to survive the catch.
+    it('recoverId surfaces WalletNotFoundError rather than InvalidDIDError', async () => {
+        await expect(build().recoverId('did:cid:bagaaieranotreal')).rejects.toBeInstanceOf(WalletNotFoundError);
     });
 
     // A warm instance keeps the wallet it loaded even if the store is emptied
