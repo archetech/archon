@@ -18,7 +18,7 @@ import { createAddressRouter } from './keymaster-address-router.js';
 import { createAgentRouter } from './keymaster-agent-router.js';
 import { createAssetRouter } from './keymaster-asset-router.js';
 import { createChallengeRouter } from './keymaster-challenge-router.js';
-import { createRequireAdminKey } from './keymaster-admin.js';
+import { checkAdminApiKey, checkPassphrase, createRequireAdminKey } from './keymaster-admin.js';
 import { createCoreRouter } from './keymaster-core-router.js';
 import { createCredentialRouter } from './keymaster-credential-router.js';
 import { createDidCommRouter } from './keymaster-didcomm-router.js';
@@ -266,35 +266,56 @@ async function initWallet() {
     return wallet;
 }
 
+// Before the port is bound, and with an explicit exit: this process installs
+// uncaughtException and unhandledRejection handlers that log and continue, so a
+// throw raised from inside the listen callback would leave the server accepting
+// requests anyway.
+for (const check of [checkAdminApiKey(config.adminApiKey), checkPassphrase(config.keymasterPassphrase)]) {
+    if (check.fatal) {
+        console.error(check.fatal);
+        process.exit(1);
+    }
+
+    if (check.warning) {
+        console.warn(check.warning);
+    }
+}
+
 const port = config.keymasterPort;
 
+// The port is bound before any of this runs, and the process-level handlers
+// below log rejections rather than ending the process -- so a failure here
+// would otherwise leave a server answering requests with no keymaster behind
+// it. Startup is all-or-nothing: anything that fails exits.
 const server = app.listen(port, config.bindAddress, async () => {
-    gatekeeper = new DrawbridgeClient();
+    try {
+        gatekeeper = new DrawbridgeClient();
 
-    await gatekeeper.connect({
-        url: config.gatekeeperURL,
-        waitUntilReady: true,
-        intervalSeconds: 5,
-        chatty: true,
-    });
+        await gatekeeper.connect({
+            url: config.gatekeeperURL,
+            waitUntilReady: true,
+            intervalSeconds: 5,
+            chatty: true,
+        });
 
-    const wallet = await initWallet();
-    const cipher = new CipherNode();
-    const defaultRegistry = config.defaultRegistry;
-    keymaster = new Keymaster({
-        gatekeeper,
-        wallet,
-        cipher,
-        defaultRegistry,
-        passphrase: config.keymasterPassphrase,
-    });
+        const wallet = await initWallet();
+        const cipher = new CipherNode();
+        const defaultRegistry = config.defaultRegistry;
+        keymaster = new Keymaster({
+            gatekeeper,
+            wallet,
+            cipher,
+            defaultRegistry,
+            passphrase: config.keymasterPassphrase,
+        });
+    }
+    catch (error) {
+        console.error('Keymaster failed to start:', error);
+        process.exit(1);
+    }
+
     console.log(`Keymaster server v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
-    if (config.adminApiKey) {
-        console.log('Admin API key protection is ENABLED');
-    } else {
-        console.warn('Warning: ARCHON_ADMIN_API_KEY is not set — admin routes are unprotected');
-    }
 
     try {
         await waitForNodeId();

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import hmac
 import json
 import logging
 import time
@@ -58,10 +59,6 @@ def parse_resolve_options(request: Request) -> dict[str, Any]:
 async def lifespan(_: FastAPI):
     LOGGER.info("Keymaster server v%s (%s) running on %s:%s", settings.service_version, settings.git_commit, settings.bind_address, settings.keymaster_port)
     LOGGER.info("Keymaster server persisting to %s", settings.keymaster_db)
-    if settings.admin_api_key:
-        LOGGER.info("Admin API key protection is ENABLED")
-    else:
-        LOGGER.warning("ARCHON_ADMIN_API_KEY is not set — admin routes are unprotected")
     set_service_version_info(settings.service_version, settings.git_commit)
     await service.startup()
     try:
@@ -122,13 +119,25 @@ async def generic_error_handler(_: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
+# compare_digest rejects str with non-ASCII characters, and a request body can
+# carry anything, so both sides are encoded before comparison.
+def _secret_matches(supplied: Any, expected: str) -> bool:
+    if not isinstance(supplied, str):
+        return False
+    return hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+
+
 async def require_admin_key(request: Request) -> None:
+    # Fail closed. The entry point refuses to start without ARCHON_ADMIN_API_KEY,
+    # so reaching this branch means the app was imported directly without one.
     if not settings.admin_api_key:
-        return
+        raise HTTPException(status_code=403, detail="Admin API key not configured")
     header_key = request.headers.get("x-archon-admin-key")
     auth_header = request.headers.get("authorization", "")
     bearer_key = auth_header[7:] if auth_header.lower().startswith("bearer ") else None
-    if header_key != settings.admin_api_key and bearer_key != settings.admin_api_key:
+    # Constant-time, as the TypeScript service uses timingSafeEqual: a plain
+    # comparison leaks how much of the key was guessed through its timing.
+    if not any(_secret_matches(candidate, settings.admin_api_key) for candidate in (header_key, bearer_key)):
         raise HTTPException(status_code=401, detail="Unauthorized — valid admin API key required")
 
 
@@ -148,9 +157,12 @@ async def version() -> dict[str, str]:
 @public_api.post("/login")
 async def login(body: dict[str, Any]) -> dict[str, str]:
     passphrase = body.get("passphrase", "")
+    # Fail closed. The entry point refuses to start without
+    # ARCHON_ENCRYPTED_PASSPHRASE, so reaching this branch means the app was
+    # imported directly without one.
     if not settings.passphrase:
-        return {"adminApiKey": settings.admin_api_key or ""}
-    if passphrase != settings.passphrase:
+        raise HTTPException(status_code=403, detail="Passphrase not configured")
+    if not _secret_matches(passphrase, settings.passphrase):
         raise HTTPException(status_code=401, detail="Incorrect passphrase")
     return {"adminApiKey": settings.admin_api_key or ""}
 

@@ -66,9 +66,9 @@ export function createPublicRouter(options: CreateKeymasterRouterOptions): expre
      * /login:
      *   post:
      *     summary: Authenticate to retrieve the admin API key.
-     *     description: Returns the configured admin API key when the supplied passphrase matches the Keymaster passphrase. In development mode without a passphrase, returns the admin API key directly.
+     *     description: Returns the configured admin API key when the supplied passphrase matches ARCHON_ENCRYPTED_PASSPHRASE. The server refuses to start when that is unset, so there is no unauthenticated path to the key.
      *     requestBody:
-     *       required: false
+     *       required: true
      *       content:
      *         application/json:
      *           schema:
@@ -96,13 +96,25 @@ export function createPublicRouter(options: CreateKeymasterRouterOptions): expre
      *               properties:
      *                 error:
      *                   type: string
+     *       403:
+     *         description: No passphrase configured. Unreachable through the normal entry point, which refuses to start without one.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 error:
+     *                   type: string
      */
     router.post('/login', async (req, res) => {
         const { passphrase } = req.body;
 
+        // Fail closed. The entry point refuses to start without
+        // ARCHON_ENCRYPTED_PASSPHRASE, so reaching this branch means the app was
+        // constructed programmatically without one -- never a reason to hand the
+        // admin key to an unauthenticated caller.
         if (!config.keymasterPassphrase) {
-            // No passphrase configured — return key directly (dev mode)
-            res.json({ adminApiKey: config.adminApiKey || '' });
+            res.status(403).json({ error: 'Passphrase not configured' });
             return;
         }
 
