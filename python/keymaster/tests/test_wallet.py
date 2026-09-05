@@ -3,9 +3,10 @@ from __future__ import annotations
 import pytest
 
 from keymaster import Keymaster, KeymasterError
+from keymaster.core import WalletNotFoundError
 from keymaster.crypto import encrypt_with_passphrase
 
-from .helpers import make_testbed, run
+from .helpers import FakeGatekeeper, FakeWalletStore, make_testbed, run
 
 
 def test_load_wallet_creates_new_wallet(testbed):
@@ -89,6 +90,7 @@ def test_save_wallet_restore_into_warm_instance_does_not_corrupt(testbed):
         gatekeeper=testbed.gatekeeper,
         wallet_store=testbed.wallet_store,
         passphrase="passphrase",
+        create_wallet_if_missing=True,
     )
     restored = run(fresh.load_wallet())
     assert "Bob" in restored["ids"]
@@ -170,6 +172,7 @@ def test_change_passphrase_allows_reload_with_new_passphrase(testbed):
         gatekeeper=testbed.gatekeeper,
         wallet_store=testbed.wallet_store,
         passphrase="new-passphrase",
+        create_wallet_if_missing=True,
     )
     loaded = run(km2.load_wallet())
     assert "Bob" in loaded["ids"]
@@ -183,6 +186,7 @@ def test_change_passphrase_rejects_old_passphrase_after_rotation(testbed):
         gatekeeper=testbed.gatekeeper,
         wallet_store=testbed.wallet_store,
         passphrase="passphrase",
+        create_wallet_if_missing=True,
     )
     with pytest.raises(KeymasterError, match="Incorrect passphrase"):
         run(km2.load_wallet())
@@ -235,3 +239,47 @@ def test_check_and_fix_wallet_count_owned_and_held_entries(testbed):
 
     assert check == {"checked": 3, "invalid": 2, "deleted": 0}
     assert fixed == {"idsRemoved": 0, "ownedRemoved": 1, "heldRemoved": 1, "aliasesRemoved": 0}
+
+
+# #1037: load_wallet used to mint a fresh mnemonic whenever the store read
+# empty, so an unmounted volume or a switched ARCHON_KEYMASTER_DB replaced the
+# node's identity with nothing logged. Mirrors the TypeScript
+# "wallet provisioning" suite.
+@pytest.mark.asyncio
+async def test_load_wallet_refuses_an_empty_store_by_default():
+    km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=FakeWalletStore(), passphrase="pass")
+
+    with pytest.raises(WalletNotFoundError):
+        await km.load_wallet()
+
+
+@pytest.mark.asyncio
+async def test_load_wallet_creates_when_the_surface_provisions():
+    km = Keymaster(
+        gatekeeper=FakeGatekeeper(),
+        wallet_store=FakeWalletStore(),
+        passphrase="pass",
+        create_wallet_if_missing=True,
+    )
+
+    assert (await km.load_wallet())["seed"] is not None
+
+
+@pytest.mark.asyncio
+async def test_load_or_create_wallet_provisions_without_the_flag():
+    km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=FakeWalletStore(), passphrase="pass")
+
+    assert (await km.load_or_create_wallet())["seed"] is not None
+
+
+@pytest.mark.asyncio
+async def test_load_or_create_wallet_keeps_the_stored_wallet():
+    store = FakeWalletStore()
+    first = await Keymaster(
+        gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass"
+    ).load_or_create_wallet()
+    again = await Keymaster(
+        gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass"
+    ).load_or_create_wallet()
+
+    assert again["seed"] == first["seed"]

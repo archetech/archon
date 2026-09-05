@@ -35,9 +35,9 @@ beforeEach(() => {
     ownerWallet = new WalletJsonMemory();
     voterWallet = new WalletJsonMemory();
     outsiderWallet = new WalletJsonMemory();
-    owner = new Keymaster({ gatekeeper, wallet: ownerWallet, cipher, passphrase: 'owner' });
-    voter = new Keymaster({ gatekeeper, wallet: voterWallet, cipher, passphrase: 'voter' });
-    outsider = new Keymaster({ gatekeeper, wallet: outsiderWallet, cipher, passphrase: 'outsider' });
+    owner = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet: ownerWallet, cipher, passphrase: 'owner' });
+    voter = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet: voterWallet, cipher, passphrase: 'voter' });
+    outsider = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet: outsiderWallet, cipher, passphrase: 'outsider' });
 });
 
 describe('pollTemplate', () => {

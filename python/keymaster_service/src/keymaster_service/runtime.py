@@ -7,6 +7,7 @@ from typing import Any
 from keymaster import Keymaster, KeymasterError
 
 from .config import Settings
+from .metrics import wallets_created_total
 from keymaster.gatekeeper_client import GatekeeperClient
 from keymaster.wallet_store import JsonWalletStore, RedisWalletStore
 
@@ -43,7 +44,29 @@ class KeymasterService:
             )
 
         await self.gatekeeper.connect(wait_until_ready=True, interval_seconds=5)
-        await self.keymaster.load_wallet()
+
+        # Provisioning happens here and nowhere else, so a fresh mnemonic is a
+        # startup event with a log line and a counter rather than a side effect
+        # of whichever request happened to read the wallet first (#1037).
+        if self.wallet_store.load_wallet() is None:
+            if self.settings.require_wallet:
+                raise KeymasterServiceError(
+                    f"No wallet in {self.settings.keymaster_db} and "
+                    "ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new "
+                    "identity. Check that the data volume is mounted and "
+                    "ARCHON_KEYMASTER_DB matches the store this node was using."
+                )
+
+            LOGGER.warning(
+                "No wallet found in %s — creating one. If this node has run before, its "
+                "store is missing and its identity has been replaced. Set "
+                "ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal.",
+                self.settings.keymaster_db,
+            )
+            wallets_created_total.inc()
+            await self.keymaster.new_wallet()
+        else:
+            await self.keymaster.load_wallet()
         # Resolve the node ID in the background so the ASGI app can start
         # serving /version, /metrics, and /ready immediately. /ready will
         # report ready=False until this task completes.

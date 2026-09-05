@@ -76,7 +76,7 @@ beforeEach(async () => {
 
     // The keymaster sends through the DIDComm service (here, the same relay).
     (gatekeeper as any).url = nodeURL;
-    keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass' });
+    keymaster = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass' });
     (keymaster as any)._nodeCapabilities = { didcomm: true };
 });
 

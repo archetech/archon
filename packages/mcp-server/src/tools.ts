@@ -348,7 +348,7 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_get_version', description: 'Get Archon node version information.', schema: EmptySchema, handler: runtime => runtime.node.getVersion() }),
     tool({ name: 'archon_get_status', description: 'Get Archon node status.', schema: EmptySchema, handler: runtime => runtime.node.getStatus() }),
 
-    tool({ name: 'archon_create_wallet', cliCommand: 'create-wallet', description: 'Create or load the local wallet.', schema: EmptySchema, mutates: true, handler: runtime => requireKeymaster(runtime).loadWallet() }),
+    tool({ name: 'archon_create_wallet', cliCommand: 'create-wallet', description: 'Create or load the local wallet.', schema: EmptySchema, mutates: true, handler: runtime => requireKeymaster(runtime).loadOrCreateWallet() }),
     tool({ name: 'archon_new_wallet', cliCommand: 'new-wallet', description: 'Create a new local wallet, replacing the existing wallet.', schema: ConfirmSchema, mutates: true, handler: runtime => requireKeymaster(runtime).newWallet('', true) }),
     tool({ name: 'archon_change_passphrase', cliCommand: 'change-passphrase', description: 'Re-encrypt the local wallet with a new passphrase.', schema: z.object({ newPassphrase: z.string() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { newPassphrase }) => requireKeymaster(runtime).changePassphrase(newPassphrase) }),
     tool({ name: 'archon_check_wallet', cliCommand: 'check-wallet', description: 'Validate DIDs in the local wallet.', schema: EmptySchema, outputSchema: CheckWalletOutputSchema, handler: runtime => requireKeymaster(runtime).checkWallet() }),

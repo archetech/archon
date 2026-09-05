@@ -2294,7 +2294,9 @@ async function run() {
         }
 
         // Initialize keymaster
-        keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase });
+        // The allowlist above already decides which commands may run without a
+        // wallet, so this surface provisions on demand for exactly those.
+        keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase, createWalletIfMissing: true });
 
         program.parse(process.argv);
     }

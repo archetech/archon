@@ -40,6 +40,13 @@ http_request_duration_seconds = Histogram(
     buckets=HTTP_DURATION_BUCKETS,
 )
 
+# A node should mint a wallet once, ever. A non-zero count on a node that has
+# been running is the signal that its store went missing.
+wallets_created_total = Counter(
+    "keymaster_wallets_created_total",
+    "Wallets provisioned at startup because the store was empty",
+)
+
 wallet_operations_total = Counter(
     "wallet_operations_total",
     "Total number of wallet operations",

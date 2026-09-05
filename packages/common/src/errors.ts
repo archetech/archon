@@ -66,6 +66,14 @@ export class LightningUnavailableError extends ArchonError {
     }
 }
 
+export class WalletNotFoundError extends ArchonError {
+    static type = 'Wallet not found';
+
+    constructor(detail?: string) {
+        super(WalletNotFoundError.type, detail);
+    }
+}
+
 // For unit tests
 export class ExpectedExceptionError extends ArchonError {
     static type = 'Expected to throw an exception';

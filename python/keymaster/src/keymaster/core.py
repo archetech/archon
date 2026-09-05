@@ -81,6 +81,10 @@ class KeymasterError(Exception):
     pass
 
 
+class WalletNotFoundError(KeymasterError):
+    """The wallet store is empty and this surface does not provision wallets."""
+
+
 class UnknownIDError(KeymasterError):
     pass
 
@@ -124,6 +128,7 @@ class Keymaster:
         default_registry: str = "hyperswarm",
         ephemeral_registry: str = "hyperswarm",
         max_alias_length: int = 32,
+        create_wallet_if_missing: bool = False,
     ):
         self.gatekeeper = gatekeeper
         self.wallet_store = wallet_store
@@ -133,6 +138,7 @@ class Keymaster:
         # controlling agent is local.
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
+        self.create_wallet_if_missing = create_wallet_if_missing
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache = None
@@ -180,11 +186,30 @@ class Keymaster:
 
         stored = self.wallet_store.load_wallet()
         if stored is None:
+            # Creating here would mint a fresh mnemonic on any read that finds
+            # the store empty -- an unmounted volume, a wiped database, a
+            # backend switch -- replacing the node's identity with nothing
+            # logged. Surfaces that provision a wallet say so; see #1037.
+            if not self.create_wallet_if_missing:
+                raise WalletNotFoundError("wallet store is empty")
+
             stored = await self.new_wallet()
 
         decrypted = await self.decrypt_wallet(stored)
         self._wallet_cache = self._upgrade_wallet(decrypted)
         return self._wallet_cache
+
+    async def load_or_create_wallet(self) -> dict[str, Any]:
+        """Load the wallet, creating one when the store is empty.
+
+        The explicit form of what ``load_wallet`` used to do implicitly, so
+        creation is a decision at one call site rather than a side effect of any
+        read. Mirrors the TypeScript ``loadOrCreateWallet``.
+        """
+        if self.wallet_store.load_wallet() is None:
+            return await self.new_wallet()
+
+        return await self.load_wallet()
 
     async def save_wallet(self, wallet: dict[str, Any], overwrite: bool = True) -> bool:
         decrypted = await self.decrypt_wallet(wallet)

@@ -21,9 +21,9 @@ class PollClients:
 def make_poll_clients() -> PollClients:
     gatekeeper = FakeGatekeeper()
     return PollClients(
-        owner=Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase="owner-passphrase"),
-        voter=Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase="voter-passphrase"),
-        outsider=Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase="outsider-passphrase"),
+        owner=Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase="owner-passphrase", create_wallet_if_missing=True),
+        voter=Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase="voter-passphrase", create_wallet_if_missing=True),
+        outsider=Keymaster(gatekeeper=gatekeeper, wallet_store=FakeWalletStore(), passphrase="outsider-passphrase", create_wallet_if_missing=True),
     )
 
 

@@ -88,7 +88,7 @@ beforeEach(() => {
         ]);
     };
 
-    keymaster = new Keymaster({
+    keymaster = new Keymaster({ createWalletIfMissing: true,
         gatekeeper, wallet, cipher, passphrase: 'passphrase',
     });
     // The stubbed gatekeeper.url is a black-hole host; preset the memoized node
@@ -754,7 +754,7 @@ describe('Lightning without Drawbridge', () => {
     it('should throw when gatekeeper has no Lightning methods', async () => {
         const db = new DbJsonMemory('test');
         const plainGatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
-        const plainKeymaster = new Keymaster({
+        const plainKeymaster = new Keymaster({ createWalletIfMissing: true,
             gatekeeper: plainGatekeeper, wallet, cipher, passphrase: 'passphrase',
         });
 

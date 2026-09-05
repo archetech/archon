@@ -245,5 +245,11 @@ class TestBed:
 def make_testbed(passphrase: str = "passphrase") -> TestBed:
     gatekeeper = FakeGatekeeper()
     wallet_store = FakeWalletStore()
-    keymaster = Keymaster(gatekeeper=gatekeeper, wallet_store=wallet_store, passphrase=passphrase)
+    # In-memory stores start empty every run, so the test surface provisions.
+    keymaster = Keymaster(
+        gatekeeper=gatekeeper,
+        wallet_store=wallet_store,
+        passphrase=passphrase,
+        create_wallet_if_missing=True,
+    )
     return TestBed(keymaster=keymaster, gatekeeper=gatekeeper, wallet_store=wallet_store)

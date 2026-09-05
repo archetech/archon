@@ -33,7 +33,7 @@ afterAll(async () => {
 beforeEach(() => {
     const db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm'] });
-    keymaster = new Keymaster({
+    keymaster = new Keymaster({ createWalletIfMissing: true,
         gatekeeper,
         wallet: new WalletJsonMemory(),
         cipher: new CipherNode(),

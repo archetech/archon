@@ -138,7 +138,9 @@ export function WalletProvider(
     }
 
     const buildKeymaster = async (wallet: WalletBase, passphrase: string) => {
-        const instance = new Keymaster({ gatekeeper, wallet, cipher, passphrase });
+        // This surface owns first-run setup, so an empty store here is a new
+        // browser profile rather than a lost wallet.
+        const instance = new Keymaster({ gatekeeper, wallet, cipher, passphrase, createWalletIfMissing: true });
 
         if (pendingMnemonic) {
             await instance.newWallet(pendingMnemonic, true);

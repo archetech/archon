@@ -159,7 +159,7 @@ def test_send_didcomm_requires_a_node_gateway():
     import pytest
     from keymaster.core import Keymaster, KeymasterError
 
-    km = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
     with pytest.raises(KeymasterError):
         asyncio.run(km.send_didcomm({"type": "t", "body": {}}, "did:cid:bob"))
 
@@ -207,7 +207,7 @@ def _mailbox_keymaster(monkeypatch, calls, responses):
     import keymaster.core as core
 
     monkeypatch.setattr(core.httpx, "AsyncClient", lambda **kw: _FakeClient(responses, calls))
-    km = core.Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass")
+    km = core.Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
     monkeypatch.setattr(km, "fetch_id_info", _async_return({"did": "did:cid:alice"}))
     monkeypatch.setattr(km, "fetch_key_pair", _async_return({"privateJwk": {}, "publicJwk": {}}))
     monkeypatch.setattr(km, "_didcomm_gateway_base", lambda endpoint=None: "https://gateway.example/didcomm")
@@ -403,7 +403,7 @@ def test_ack_didcomm_rejects_non_list_ids():
     import pytest
     from keymaster.core import Keymaster, KeymasterError
 
-    km = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
     with pytest.raises(KeymasterError):
         asyncio.run(km.ack_didcomm("msg-1"))
 
@@ -414,7 +414,7 @@ def test_ack_didcomm_empty_list_is_a_noop():
     import asyncio
     from keymaster.core import Keymaster
 
-    km = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
     assert asyncio.run(km.ack_didcomm([])) == 0
 
 
@@ -431,7 +431,7 @@ def test_capability_gating_blocks_unavailable_services():
         async def create_lightning_wallet(self, name):  # lets require_drawbridge pass
             return {}
 
-    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
     km._node_capabilities = {"didcomm": False, "lightning": False}  # preset cache, no fetch
 
     with pytest.raises(KeymasterError, match="does not offer DIDComm"):
@@ -450,7 +450,7 @@ def test_capability_gating_permissive_when_manifest_absent():
     class _Gw:
         url = "http://node.test"
 
-    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
     km._node_capabilities = None  # node exposes no manifest
 
     # Gets past the gate, then fails at crypto/resolve against the bare fake gateway —
@@ -494,7 +494,7 @@ def test_get_node_capabilities_is_public_and_memoized(monkeypatch):
             return _Response()
 
     monkeypatch.setattr(httpx, "AsyncClient", _Client)
-    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
 
     async def run():
         first = await km.get_node_capabilities()
@@ -514,7 +514,7 @@ def test_get_node_capabilities_none_without_node_url():
     class _Gw:
         url = None
 
-    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
     assert asyncio.run(km.get_node_capabilities()) is None
 
 
@@ -540,7 +540,7 @@ def test_accept_credential_didcomm_requires_a_resolvable_did():
     class _Gw:
         url = "http://node.test"
 
-    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
 
     foreign = {
         "type": "https://didcomm.org/issue-credential/3.0/issue-credential",
@@ -564,7 +564,7 @@ def test_send_credential_didcomm_carries_the_credential_not_a_reference(monkeypa
     class _Gw:
         url = "http://node.test"
 
-    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
 
     vc = {
         "@context": ["https://www.w3.org/ns/credentials/v2"],
@@ -612,7 +612,7 @@ def test_accept_credential_didcomm_refuses_a_credential_it_did_not_show(monkeypa
     class _Gw:
         url = "http://node.test"
 
-    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass", create_wallet_if_missing=True)
 
     resolved = {"type": ["VerifiableCredential"], "issuer": "did:cid:alice"}
     shown = {"type": ["VerifiableCredential"], "issuer": "did:cid:mallory"}

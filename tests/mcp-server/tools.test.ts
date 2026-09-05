@@ -151,6 +151,7 @@ function argsForTool(name: string) {
 function mockRuntime(overrides: Record<string, unknown> = {}) {
     const defaults: Record<string, any> = {
         loadWallet: jest.fn<any>().mockResolvedValue({ version: 2, ids: {} }),
+        loadOrCreateWallet: jest.fn<any>().mockResolvedValue({ version: 2, ids: {} }),
         newWallet: jest.fn<any>().mockResolvedValue({ version: 2, ids: {} }),
         changePassphrase: jest.fn<any>().mockResolvedValue(true),
         checkWallet: jest.fn<any>().mockResolvedValue({ checked: 0, invalid: 0, deleted: 0 }),

@@ -613,7 +613,7 @@ describe('verifyChallengeSignature', () => {
         const db = new DbJsonMemory('test');
         gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm'] });
         cipher = new CipherNode();
-        keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass' });
+        keymaster = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass' });
     });
 
     async function sign(name: string, challenge: string): Promise<string> {

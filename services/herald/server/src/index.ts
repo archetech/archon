@@ -191,11 +191,20 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
         });
         const wallet = new WalletJson('wallet.json', DATA_DIR);
         const cipher = new CipherNode();
+
+        // Herald issues name credentials from this identity, so replacing it
+        // invalidates every credential it has issued. Provisioning is fine on a
+        // first run; it must not pass unremarked on any other.
+        if (!await wallet.loadWallet()) {
+            console.warn(`Herald: no wallet at ${DATA_DIR}/wallet.json — creating one. If this node has run before, its data directory is missing and the identity it issued credentials from has been replaced.`);
+        }
+
         ctx.keymaster = new Keymaster({
             gatekeeper,
             wallet,
             cipher,
             passphrase,
+            createWalletIfMissing: true,
         });
 
         // Load existing wallet (decrypt and restore IDs/aliases)

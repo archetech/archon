@@ -1489,6 +1489,9 @@ async def _run(args: argparse.Namespace) -> int:
             wallet_store=wallet_store,
             passphrase=passphrase,
             default_registry=default_registry or "hyperswarm",
+            # The check above already decides which commands may run without a
+            # wallet, so this surface provisions on demand for exactly those.
+            create_wallet_if_missing=True,
         )
 
         try:

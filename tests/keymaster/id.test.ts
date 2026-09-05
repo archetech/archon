@@ -28,7 +28,7 @@ beforeEach(() => {
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
-    keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+    keymaster = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher, passphrase: 'passphrase' });
 });
 
 describe('createId', () => {
@@ -60,7 +60,7 @@ describe('createId', () => {
 
     it('should create a new ID on customized default registry', async () => {
         const defaultRegistry = 'BTC:signet';
-        const keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase: 'passphrase' });
+        const keymaster = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher, defaultRegistry, passphrase: 'passphrase' });
 
         const name = 'Bob';
         const did = await keymaster.createId(name);
@@ -291,7 +291,7 @@ describe('createIdOperation', () => {
 
     it('should use customized default registry when none specified', async () => {
         const defaultRegistry = 'local';
-        const customKeymaster = new Keymaster({
+        const customKeymaster = new Keymaster({ createWalletIfMissing: true,
             gatekeeper,
             wallet,
             cipher,

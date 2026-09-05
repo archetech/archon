@@ -145,6 +145,7 @@ def _keymaster(**kwargs):
         wallet_store=FakeWalletStore(),
         passphrase="passphrase",
         **kwargs,
+        create_wallet_if_missing=True,
     )
 
 

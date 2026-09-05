@@ -27,7 +27,7 @@ describe('generate mocks', () => {
         const gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local'] });
         const wallet = new WalletJsonMemory();
         const cipher = new CipherNode();
-        const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+        const keymaster = new Keymaster({ createWalletIfMissing: true, gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
 
         // Create a new wallet
         await keymaster.loadWallet();

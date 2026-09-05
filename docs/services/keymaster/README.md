@@ -122,6 +122,30 @@ parses (search the file for `response.data.<key>` to enumerate). The full
 key inventory, including routes that return unwrapped objects, is the
 contract.
 
+### 2.1.1 Wallet provisioning
+
+An empty wallet store and a lost one are the same read: every backend returns
+null for "no wallet here", and none can distinguish a store that never held one
+from a store that used to. So a node cannot tell a genuine first run from a
+volume that failed to mount, a wiped database, or a changed
+`ARCHON_KEYMASTER_DB`.
+
+Implementations MUST NOT create a wallet as a side effect of loading one.
+Provisioning MUST be a distinct operation, performed once at startup, and it
+MUST be observable: log a warning naming the store, and increment
+`keymaster_wallets_created_total`. A node mints a wallet once in its life, so a
+non-zero counter on a node that has been running is the signal that its store
+went missing.
+
+`ARCHON_KEYMASTER_REQUIRE_WALLET=true` makes an empty store fatal at startup
+rather than provisioning. An operator whose node already holds an identity sets
+it, and is then protected from the cases above replacing that identity silently.
+
+Surfaces that legitimately provision say so — the CLIs (which already gate on
+their own allowlist of commands that may run without a wallet), the browser
+wallet's setup flow, and the services' startup path. Every other caller reaching
+an empty store has lost one, and gets an error.
+
 ### 2.2 Authentication
 
 - `POST /api/v1/login` accepts `{ "passphrase": string }` and returns
@@ -1054,6 +1078,7 @@ labels.
 | `ARCHON_NODE_ID` | empty | Required. Name of the canonical agent ID this server provisions on startup. |
 | `ARCHON_KEYMASTER_DB` | `json` | Storage backend (`json`, `sqlite`, `redis`, `mongodb`). |
 | `ARCHON_ENCRYPTED_PASSPHRASE` | empty | Wallet passphrase, and the credential `/login` checks. **Required** — the service refuses to start without it. |
+| `ARCHON_KEYMASTER_REQUIRE_WALLET` | `false` | Refuse to start when the wallet store reads empty, instead of provisioning a new one. Set it on any node that already holds an identity. |
 | `ARCHON_WALLET_CACHE` | `false` | Enables the in-memory write-through cache. |
 | `ARCHON_DEFAULT_REGISTRY` | unset (uses `hyperswarm` in code) | Default registry for created DIDs. |
 | `ARCHON_KEYMASTER_UPLOAD_LIMIT` | `10mb` | Body cap for `/files`, `/images`, dmail attachments. |

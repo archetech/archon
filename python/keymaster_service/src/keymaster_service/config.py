@@ -19,6 +19,10 @@ class Settings:
     gatekeeper_url: str = os.environ.get("ARCHON_GATEKEEPER_URL", "http://localhost:4224")
     keymaster_db: str = os.environ.get("ARCHON_KEYMASTER_DB", "json") or "json"
     passphrase: str = os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE", "")
+    # Refuse to mint a wallet when the store reads empty. An operator whose node
+    # already holds an identity sets this, and is then protected from an
+    # unmounted volume or a changed ARCHON_KEYMASTER_DB silently replacing it.
+    require_wallet: bool = os.environ.get("ARCHON_KEYMASTER_REQUIRE_WALLET", "false") == "true"
     wallet_cache: bool = os.environ.get("ARCHON_WALLET_CACHE", "false").lower() == "true"
     default_registry: str = os.environ.get("ARCHON_DEFAULT_REGISTRY", "hyperswarm") or "hyperswarm"
     upload_limit: str = os.environ.get("ARCHON_KEYMASTER_UPLOAD_LIMIT", "10mb")

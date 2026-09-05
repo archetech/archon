@@ -66,6 +66,13 @@ const walletOperationsTotal = new promClient.Counter({
     labelNames: ['operation', 'status'],
 });
 
+// A node should mint a wallet once, ever. A non-zero count on a node that has
+// been running is the signal that its store went missing.
+const walletsCreatedTotal = new promClient.Counter({
+    name: 'keymaster_wallets_created_total',
+    help: 'Wallets provisioned at startup because the store was empty',
+});
+
 const serviceVersionInfo = new promClient.Gauge({
     name: 'service_version_info',
     help: 'Service version information',
@@ -301,12 +308,29 @@ const server = app.listen(port, config.bindAddress, async () => {
         const wallet = await initWallet();
         const cipher = new CipherNode();
         const defaultRegistry = config.defaultRegistry;
+
+        // Provisioning happens here and nowhere else, so a fresh mnemonic is a
+        // startup event with a log line and a counter rather than a side effect
+        // of whichever request happened to read the wallet first (#1037).
+        const provisioned = !await wallet.loadWallet();
+
+        if (provisioned) {
+            if (config.requireWallet) {
+                console.error(`No wallet in ${config.db} and ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new identity. Check that the data volume is mounted and ARCHON_KEYMASTER_DB matches the store this node was using.`);
+                process.exit(1);
+            }
+
+            console.warn(`No wallet found in ${config.db} — creating one. If this node has run before, its store is missing and its identity has been replaced. Set ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal.`);
+            walletsCreatedTotal.inc();
+        }
+
         keymaster = new Keymaster({
             gatekeeper,
             wallet,
             cipher,
             defaultRegistry,
             passphrase: config.keymasterPassphrase,
+            createWalletIfMissing: provisioned,
         });
     }
     catch (error) {
