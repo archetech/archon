@@ -1009,6 +1009,7 @@ Exposed at `GET /metrics`.
 | `http_requests_total` | counter | `method`, `route`, `status` |
 | `http_request_duration_seconds` | histogram (buckets: 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5) | `method`, `route`, `status` |
 | `wallet_operations_total` | counter | `operation`, `status` |
+| `keymaster_wallets_created_total` | counter | — |
 | `service_version_info` | gauge | `version`, `commit` |
 
 Plus Prometheus default process metrics (`process_resident_memory_bytes`,
@@ -1092,17 +1093,27 @@ labels.
 
 ### 15.3 Startup sequence
 
-1. Bind HTTP listener.
-2. Connect to Gatekeeper (`waitUntilReady=true`, polling every 5s).
-3. Initialize the wallet backend.
-4. Construct the in-process Keymaster with the wallet, Gatekeeper client,
-   and cipher implementation.
-5. Run `waitForNodeId()`:
+1. Validate `ARCHON_ADMIN_API_KEY` and `ARCHON_ENCRYPTED_PASSPHRASE`; exit
+   non-zero if either is unset (§2.2).
+2. Open the wallet backend and read it once. A store that cannot be read —
+   a truncated `wallet.json`, say — is fatal here: the node MUST NOT bind a
+   port with half an identity behind it, and the operator restores the wallet
+   or moves it aside. An empty store with `ARCHON_KEYMASTER_REQUIRE_WALLET`
+   set is fatal too (§2.1.1).
+3. Bind HTTP listener.
+4. Connect to Gatekeeper (`waitUntilReady=true`, polling every 5s).
+5. Construct the in-process Keymaster with the wallet, Gatekeeper client,
+   and cipher implementation, and load the wallet. If the store is still
+   empty, provision one: log the warning and increment
+   `keymaster_wallets_created_total`. The store is read again here rather
+   than trusting step 2, so a wallet that arrived during the Gatekeeper wait
+   is loaded rather than replaced.
+6. Run `waitForNodeId()`:
    - `ARCHON_NODE_ID` MUST be set.
    - If the wallet doesn't have an ID with that name, create one
      (`keymaster.createId(ARCHON_NODE_ID)`).
    - Loop until the new ID resolves on the Gatekeeper (10s between polls).
-6. Mark `serverReady = true`.
+7. Mark `serverReady = true`.
 
 `/api/v1/ready` returns `{ "ready": serverReady }` and MUST return
 `{ "ready": false }` until the node ID resolves.

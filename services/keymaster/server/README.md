@@ -13,4 +13,5 @@ This service is also useful when clients share a wallet, such as the `archon` CL
 | `ARCHON_KEYMASTER_DB`     | json | Wallet database adapter, must be `redis`, `json`, `mongodb`, or `sqlite` |
 | `ARCHON_ENCRYPTED_PASSPHRASE` |  (no default) | If specified, the wallet will be encrypted and decrypted with this passphrase  |
 | `ARCHON_WALLET_CACHE`     |  false | Use wallet cache to increase performance (but understand security implications)  |
+| `ARCHON_KEYMASTER_REQUIRE_WALLET` | false | Refuse to start when the wallet store reads empty, instead of provisioning a new identity. Set it on a node that already holds a wallet. |
 | `ARCHON_DEFAULT_REGISTRY` |  hyperswarm | Default registry to use when creating DIDs               |

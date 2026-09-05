@@ -8,19 +8,11 @@ on an upstream that may never arrive.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 
 import pytest
 
+from keymaster_service.config import Settings
 from keymaster_service.runtime import KeymasterService, KeymasterServiceError
-
-
-@dataclass
-class StubSettings:
-    keymaster_db: str = "json"
-    passphrase: str = "passphrase"
-    default_registry: str = "hyperswarm"
-    require_wallet: bool = True
 
 
 class NeverConnects:
@@ -44,7 +36,8 @@ class EmptyStore:
 
 def test_require_wallet_refuses_before_waiting_for_gatekeeper():
     gatekeeper = NeverConnects()
-    service = KeymasterService(StubSettings(), gatekeeper, EmptyStore())
+    settings = Settings(keymaster_db="json", passphrase="passphrase", require_wallet=True)
+    service = KeymasterService(settings, gatekeeper, EmptyStore())
 
     with pytest.raises(KeymasterServiceError, match="ARCHON_KEYMASTER_REQUIRE_WALLET"):
         asyncio.run(asyncio.wait_for(service.startup(), timeout=5))

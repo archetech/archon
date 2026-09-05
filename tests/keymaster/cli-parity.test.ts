@@ -153,3 +153,52 @@ describe('CLI parity across entry points', () => {
         expect(pythonCli).toMatch(/load_dotenv\(Path\.cwd\(\) \/ "\.env", override=False\)/);
     });
 });
+
+// Which commands may run before a wallet exists is policy, held as an allowlist
+// in each CLI. The two lists have to agree, and each entry has to be honest:
+// a command on the list either creates or replaces a wallet in its own handler,
+// provisions explicitly, or never touches one. An entry that does none of those
+// reaches loadWallet on an empty store and fails with 'Wallet not found' -- the
+// regression #1050's review caught on the MCP surface.
+describe('wallet-optional command policy', () => {
+    const jsAllowlist = [...packageCli.matchAll(/walletOptionalCommands = \[([^\]]+)\]/g)]
+        .flatMap(m => m[1].split(',').map(part => part.trim().replace(/^'|'$/g, '')))
+        .filter(Boolean)
+        .sort();
+    const pyAllowlist = (() => {
+        const start = pythonCli.indexOf('WALLET_OPTIONAL_COMMANDS = {');
+        const end = pythonCli.indexOf('}', start);
+        return [...pythonCli.slice(start, end).matchAll(/"([a-z-]+)"/g)].map(m => m[1]).sort();
+    })();
+
+    it('is declared in both CLIs', () => {
+        expect(jsAllowlist.length).toBeGreaterThan(0);
+        expect(pyAllowlist.length).toBeGreaterThan(0);
+    });
+
+    it('is the same list in both CLIs', () => {
+        expect(pyAllowlist).toEqual(jsAllowlist);
+    });
+
+    // What each allowlisted handler does about the wallet, by name. Anything
+    // not listed here is a command that reads a wallet it has no way to obtain.
+    const HANDLES_ITS_OWN_WALLET: Record<string, RegExp> = {
+        'create-wallet': /loadOrCreateWallet\(\)/,
+        'new-wallet': /newWallet\("", true\)/,
+        'create-id': /loadOrCreateWallet\(\)/,
+        'import-wallet': /newWallet\(recoveryPhrase\)/,
+        'restore-wallet-file': /saveWallet\(wallet, true\)/,
+        'list-registries': /listRegistries\(\)/,
+    };
+
+    it.each(jsAllowlist)('%s handles the wallet itself in the package CLI', (command) => {
+        const pattern = HANDLES_ITS_OWN_WALLET[command];
+        expect(pattern).toBeDefined();
+
+        const start = packageCli.indexOf(`.command('${command}`);
+        const next = packageCli.indexOf('.command(', start + 1);
+        const handler = packageCli.slice(start, next === -1 ? undefined : next);
+
+        expect(handler).toMatch(pattern!);
+    });
+});

@@ -8,6 +8,7 @@ from keymaster_service.admin import (
     MIN_ADMIN_API_KEY_LENGTH,
     check_admin_api_key,
     check_passphrase,
+    check_wallet_store,
 )
 
 
@@ -54,3 +55,26 @@ def test_secret_matches_handles_non_ascii_and_non_str():
     assert not _secret_matches("pässwörd", "other")
     assert not _secret_matches(None, "secret")
     assert not _secret_matches(1234, "secret")
+
+
+def test_present_wallet_needs_no_decision():
+    check = check_wallet_store(missing=False, require_wallet=True, db="redis")
+
+    assert check.fatal is None
+    assert check.warning is None
+
+
+def test_missing_wallet_is_fatal_when_required():
+    check = check_wallet_store(missing=True, require_wallet=True, db="redis")
+
+    assert "ARCHON_KEYMASTER_REQUIRE_WALLET" in check.fatal
+    assert "redis" in check.fatal
+    assert check.warning is None
+
+
+def test_missing_wallet_warns_when_provisioning_is_allowed():
+    check = check_wallet_store(missing=True, require_wallet=False, db="json")
+
+    assert check.fatal is None
+    assert "creating one" in check.warning
+    assert "ARCHON_KEYMASTER_REQUIRE_WALLET=true" in check.warning

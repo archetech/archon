@@ -5,6 +5,7 @@ import DrawbridgeClient from '@didcid/clients/drawbridge';
 import CipherWeb from '@didcid/cipher/web';
 import Keymaster from '@didcid/keymaster';
 import WalletWeb from '@didcid/keymaster/wallet/web';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
@@ -76,6 +77,13 @@ function App() {
             // check pass & convert to v1 if needed
             await (provision ? instance.loadOrCreateWallet() : instance.loadWallet());
         } catch (error) {
+            if (error instanceof WalletNotFoundError) {
+                // Nothing to decrypt: the store emptied under an open prompt.
+                // Not a passphrase problem, and not a reason to mint.
+                setPendingWallet(null);
+                setModalAction('set-passphrase');
+                return;
+            }
             setPassphraseErrorText(error?.error || error?.message || 'Failed to load wallet');
             return;
         }

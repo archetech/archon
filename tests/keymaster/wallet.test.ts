@@ -845,10 +845,8 @@ describe('updateWallet', () => {
     });
 });
 
-// #1037: loadWallet used to mint a fresh mnemonic whenever the store read
-// empty, so an unmounted volume or a switched ARCHON_KEYMASTER_DB replaced the
-// node's identity with nothing logged. Reading never creates now; callers that
-// mean to provision say so.
+// Reading never creates: an empty store is refused, and provisioning is the
+// separate loadOrCreateWallet call (#1037).
 describe('wallet provisioning', () => {
     function build() {
         return new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
@@ -884,5 +882,16 @@ describe('wallet provisioning', () => {
         await expect(build().loadWallet()).rejects.toThrow();
 
         expect(await wallet.loadWallet()).toBeNull();
+    });
+
+    // A warm instance keeps the wallet it loaded even if the store is emptied
+    // underneath it: that is the lost-store case, and provisioning there would
+    // replace the identity the process is already using.
+    it('loadOrCreateWallet honours the cache over an emptied store', async () => {
+        const km = build();
+        const loaded = await km.loadOrCreateWallet();
+        wallet.walletCache = null;
+
+        expect(await km.loadOrCreateWallet()).toBe(loaded);
     });
 });

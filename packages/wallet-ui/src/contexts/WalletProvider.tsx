@@ -10,6 +10,7 @@ import {
 } from "react";
 import DrawbridgeClient from "@didcid/clients/drawbridge";
 import Keymaster from "@didcid/keymaster";
+import { WalletNotFoundError } from "@didcid/common/errors";
 import { WalletBase, StoredWallet } from '@didcid/keymaster/types';
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
 import CipherWeb from "@didcid/cipher";
@@ -155,9 +156,15 @@ export function WalletProvider(
                 const message = error?.message || String(error);
                 if (message.includes('Incorrect passphrase')) {
                     setPassphraseErrorText(INCORRECT_PASSPHRASE);
-                } else if (message.includes('Wallet not found')) {
-                    // Nothing to decrypt. The caller falls through to setup
-                    // rather than showing this as a passphrase problem.
+                } else if (error instanceof WalletNotFoundError) {
+                    // Nothing to decrypt: the store emptied under an open prompt
+                    // or a live session. Not a passphrase problem, and not a
+                    // reason to mint -- send the user to setup, from here, since
+                    // most callers discard this function's result.
+                    setPendingWallet(null);
+                    setPendingMnemonic("");
+                    setUploadAction(null);
+                    setModalAction('set-passphrase');
                     return false;
                 } else {
                     setPassphraseErrorText(message);

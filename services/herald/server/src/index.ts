@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
 import Keymaster from '@didcid/keymaster';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import KeymasterClient from '@didcid/clients/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { DatabaseInterface } from './db/interfaces.js';
@@ -32,6 +33,7 @@ import {
     SERVICE_NAME,
     SESSION_SECRET,
     WALLET_URL,
+    REQUIRE_WALLET,
 } from './config.js';
 
 // Shared mutable state, populated by the bootstrap below and read lazily by the
@@ -182,6 +184,18 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             process.exit(1);
         }
 
+        const wallet = new WalletJson('wallet.json', DATA_DIR);
+
+        // Herald issues name credentials from this identity, so replacing it
+        // invalidates every credential it has issued. Before the gatekeeper
+        // wait, so a node told to fail closed says so at once.
+        const walletMissing = !await wallet.loadWallet();
+
+        if (walletMissing && REQUIRE_WALLET) {
+            console.error(`Herald: no wallet at ${DATA_DIR}/wallet.json and ARCHON_HERALD_REQUIRE_WALLET is set — refusing to mint a new issuer identity. Check that the data directory is mounted.`);
+            process.exit(1);
+        }
+
         const gatekeeper = new GatekeeperClient();
         await gatekeeper.connect({
             url: GATEKEEPER_URL,
@@ -189,7 +203,6 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             intervalSeconds: 5,
             chatty: true,
         });
-        const wallet = new WalletJson('wallet.json', DATA_DIR);
         const cipher = new CipherNode();
 
         ctx.keymaster = new Keymaster({
@@ -199,16 +212,20 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             passphrase,
         });
 
-        // Herald issues name credentials from this identity, so replacing it
-        // invalidates every credential it has issued. Provisioning is fine on a
-        // first run; it must not pass unremarked on any other.
-        if (!await wallet.loadWallet()) {
-            console.warn(`Herald: no wallet at ${DATA_DIR}/wallet.json — creating one. If this node has run before, its data directory is missing and the identity it issued credentials from has been replaced.`);
-            await ctx.keymaster.loadOrCreateWallet();
+        // Provisioning is fine on a first run; it must not pass unremarked on
+        // any other. The store is read again rather than trusting the snapshot
+        // above, so a wallet that arrived during the wait is loaded, not replaced.
+        try {
+            await ctx.keymaster.loadWallet();
         }
+        catch (error) {
+            if (!(error instanceof WalletNotFoundError)) {
+                throw error;
+            }
 
-        // Load existing wallet (decrypt and restore IDs/aliases)
-        await ctx.keymaster.loadWallet();
+            console.warn(`Herald: no wallet at ${DATA_DIR}/wallet.json — creating one. If this node has run before, its data directory is missing and the identity it issued credentials from has been replaced. Set ARCHON_HERALD_REQUIRE_WALLET=true to make this fatal.`);
+            await ctx.keymaster.newWallet();
+        }
         console.log(`${SERVICE_NAME} using gatekeeper at ${GATEKEEPER_URL}`);
     }
 

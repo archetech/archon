@@ -4,8 +4,9 @@ import asyncio
 import logging
 from typing import Any
 
-from keymaster import Keymaster, KeymasterError
+from keymaster import Keymaster, KeymasterError, WalletNotFoundError
 
+from .admin import check_wallet_store
 from .config import Settings
 from .metrics import wallets_created_total
 from keymaster.gatekeeper_client import GatekeeperClient
@@ -46,33 +47,27 @@ class KeymasterService:
         # Before the blocking gatekeeper connect below: a node told to fail
         # closed on a missing wallet must say so immediately, not wait on an
         # upstream that may never arrive.
-        wallet_missing = self.wallet_store.load_wallet() is None
-
-        if wallet_missing and self.settings.require_wallet:
-            raise KeymasterServiceError(
-                f"No wallet in {self.settings.keymaster_db} and "
-                "ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new "
-                "identity. Check that the data volume is mounted and "
-                "ARCHON_KEYMASTER_DB matches the store this node was using."
-            )
+        check = check_wallet_store(
+            self.wallet_store.load_wallet() is None,
+            self.settings.require_wallet,
+            self.settings.keymaster_db,
+        )
+        if check.fatal:
+            raise KeymasterServiceError(check.fatal)
 
         await self.gatekeeper.connect(wait_until_ready=True, interval_seconds=5)
 
-        # Provisioning happens here and nowhere else, so a fresh mnemonic is a
+        # The one place this service provisions, so a fresh mnemonic is a
         # startup event with a log line and a counter rather than a side effect
-        # of whichever request happened to read the wallet first (#1037).
-        # Refusing already happened above, before the connect.
-        if wallet_missing:
-            LOGGER.warning(
-                "No wallet found in %s — creating one. If this node has run before, its "
-                "store is missing and its identity has been replaced. Set "
-                "ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal.",
-                self.settings.keymaster_db,
-            )
-            await self.keymaster.load_or_create_wallet()
-            wallets_created_total.inc()
-        else:
+        # of whichever request happened to read the wallet first (#1037). The
+        # store is read again rather than trusting the snapshot above: a wallet
+        # that arrived during the gatekeeper wait is loaded, not replaced.
+        try:
             await self.keymaster.load_wallet()
+        except WalletNotFoundError:
+            LOGGER.warning(check.warning)
+            await self.keymaster.new_wallet()
+            wallets_created_total.inc()
         # Resolve the node ID in the background so the ASGI app can start
         # serving /version, /metrics, and /ready immediately. /ready will
         # report ready=False until this task completes.

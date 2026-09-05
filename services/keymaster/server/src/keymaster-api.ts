@@ -14,11 +14,12 @@ import WalletCache from '@didcid/keymaster/wallet/cache';
 import CipherNode from '@didcid/cipher/node';
 import { InvalidParameterError } from '@didcid/common/errors';
 import config from './config.js';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import { createAddressRouter } from './keymaster-address-router.js';
 import { createAgentRouter } from './keymaster-agent-router.js';
 import { createAssetRouter } from './keymaster-asset-router.js';
 import { createChallengeRouter } from './keymaster-challenge-router.js';
-import { checkAdminApiKey, checkPassphrase, createRequireAdminKey } from './keymaster-admin.js';
+import { checkAdminApiKey, checkPassphrase, checkWalletStore, createRequireAdminKey } from './keymaster-admin.js';
 import { createCoreRouter } from './keymaster-core-router.js';
 import { createCredentialRouter } from './keymaster-credential-router.js';
 import { createDidCommRouter } from './keymaster-didcomm-router.js';
@@ -293,24 +294,28 @@ const port = config.keymasterPort;
 // Before the port is bound and before the blocking gatekeeper connect below:
 // a node told to fail closed on a missing wallet must say so immediately, not
 // sit with an open port waiting for an upstream that may never arrive.
+//
 // Wrapped, because a rejection from a module-scope await reaches the
 // uncaughtException handler above, which logs and lets the process exit 0 --
-// looking like a clean shutdown while never having bound the port.
+// looking like a clean shutdown while never having bound the port. A store
+// that cannot be read is fatal in its own right: it is neither empty nor
+// usable, and the node must not run with half an identity behind it.
 async function openWalletStore() {
     try {
         const store = await initWallet();
         return { store, missing: !await store.loadWallet() };
     }
     catch (error) {
-        console.error('Keymaster failed to open its wallet store:', error);
+        console.error(`Keymaster cannot read its wallet store (${config.db}): ${error}. Restore the wallet from a backup, or move it aside to provision a new identity.`);
         process.exit(1);
     }
 }
 
 const { store: walletStore, missing: walletMissing } = await openWalletStore();
+const walletCheck = checkWalletStore(walletMissing, config.requireWallet, config.db);
 
-if (walletMissing && config.requireWallet) {
-    console.error(`No wallet in ${config.db} and ARCHON_KEYMASTER_REQUIRE_WALLET is set — refusing to mint a new identity. Check that the data volume is mounted and ARCHON_KEYMASTER_DB matches the store this node was using.`);
+if (walletCheck.fatal) {
+    console.error(walletCheck.fatal);
     process.exit(1);
 }
 
@@ -344,10 +349,19 @@ const server = app.listen(port, config.bindAddress, async () => {
         // The one place this service provisions, so a fresh mnemonic is a
         // startup event with a log line and a counter rather than a side effect
         // of whichever request happened to read the wallet first (#1037).
-        // Refusing already happened above, before the port was bound.
-        if (walletMissing) {
-            console.warn(`No wallet found in ${config.db} — creating one. If this node has run before, its store is missing and its identity has been replaced. Set ARCHON_KEYMASTER_REQUIRE_WALLET=true to make this fatal.`);
-            await keymaster.loadOrCreateWallet();
+        // Refusing already happened above, before the port was bound. The store
+        // is read again here rather than trusting that snapshot: a wallet that
+        // arrived during the gatekeeper wait is loaded, not replaced and counted.
+        try {
+            await keymaster.loadWallet();
+        }
+        catch (error) {
+            if (!(error instanceof WalletNotFoundError)) {
+                throw error;
+            }
+
+            console.warn(walletCheck.warning);
+            await keymaster.newWallet();
             walletsCreatedTotal.inc();
         }
     }

@@ -12,7 +12,7 @@ const config = {
     // Refuse to mint a wallet when the store reads empty. An operator whose
     // node already holds an identity sets this, and is then protected from an
     // unmounted volume or a changed ARCHON_KEYMASTER_DB silently replacing it.
-    requireWallet: process.env.ARCHON_KEYMASTER_REQUIRE_WALLET === 'true',
+    requireWallet: process.env.ARCHON_KEYMASTER_REQUIRE_WALLET ? process.env.ARCHON_KEYMASTER_REQUIRE_WALLET === 'true' : false,
     walletCache: process.env.ARCHON_WALLET_CACHE ? process.env.ARCHON_WALLET_CACHE === 'true' : false,
     defaultRegistry: process.env.ARCHON_DEFAULT_REGISTRY,
     uploadLimit: process.env.ARCHON_KEYMASTER_UPLOAD_LIMIT || '10mb',

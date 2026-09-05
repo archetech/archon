@@ -1103,3 +1103,22 @@ describe('tool registration fallbacks', () => {
         expect(expectOk(response)).toStrictEqual(['hyperswarm']);
     });
 });
+
+// Both CLIs provision inside create-id, because it may run before a wallet
+// exists. The MCP tool of the same name has to make the same call, or a fresh
+// machine gets 'Wallet not found' from the first example in the README.
+describe('archon_create_id provisions like its CLI counterpart', () => {
+    it('loads or creates the wallet before creating the id', async () => {
+        const calls: string[] = [];
+        const runtime = mockRuntime({
+            loadOrCreateWallet: jest.fn<any>().mockImplementation(async () => { calls.push('loadOrCreateWallet'); return { version: 2, ids: {} }; }),
+            createId: jest.fn<any>().mockImplementation(async () => { calls.push('createId'); return 'did:cid:new'; }),
+        });
+        const server = new FakeServer();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        await server.tools.get('archon_create_id')!.handler({ name: 'alice' });
+
+        expect(calls).toEqual(['loadOrCreateWallet', 'createId']);
+    });
+});

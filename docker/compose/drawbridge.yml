@@ -19,6 +19,7 @@ services:
       # explorer links, rather than being replaced by the fallback.
       - ARCHON_HERALD_EXPLORER_URL=${ARCHON_HERALD_EXPLORER_URL-https://explorer.archon.technology}
       - ARCHON_HERALD_WALLET_PASSPHRASE=${ARCHON_HERALD_WALLET_PASSPHRASE:-}
+      - ARCHON_HERALD_REQUIRE_WALLET=${ARCHON_HERALD_REQUIRE_WALLET:-false}
       - ARCHON_HERALD_DB=${ARCHON_HERALD_DB:-json}
       - ARCHON_REDIS_URL=redis://redis:6379
       - ARCHON_HERALD_DATA_DIR=/app/server/data

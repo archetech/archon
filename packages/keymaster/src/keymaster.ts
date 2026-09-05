@@ -248,7 +248,7 @@ export default class Keymaster implements KeymasterInterface {
     private async mutateWallet(
         mutator: (wallet: WalletFile) => void | Promise<void>
     ): Promise<void> {
-        // Create wallet if none and make sure _walletCache is set
+        // Make sure _walletCache is set; refuses if there is no wallet to load
         if (!this._walletCache) {
             await this.loadWallet();
         }
@@ -279,11 +279,10 @@ export default class Keymaster implements KeymasterInterface {
         const stored = await this.db.loadWallet() as WalletFile | null;
 
         if (!stored) {
-            // Reading never creates. Minting here would replace the node's
-            // identity on any read that finds the store empty -- an unmounted
-            // volume, a wiped database, a backend switch -- with nothing at the
-            // call site saying so. Callers that mean to provision call
-            // loadOrCreateWallet. See #1037.
+            // Reading never creates. An empty store here is an unmounted
+            // volume, a wiped database or a switched backend as often as it is
+            // a first run, and the two cannot be told apart from the store.
+            // Callers that provision say so through loadOrCreateWallet (#1037).
             throw new WalletNotFoundError();
         }
 
@@ -293,21 +292,27 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     /**
-     * Load the wallet, creating one when the store is empty.
+     * Load the wallet, creating one only when the store holds none.
      *
-     * The explicit form of what `loadWallet` used to do implicitly. Callers
-     * that legitimately provision -- first-run startup, `create-wallet` --
-     * name it, so creation is a decision at one call site rather than a side
-     * effect of any read.
+     * The one call that provisions. Callers that mean to -- first-run startup,
+     * `create-wallet` -- name it, so creation is a decision at a call site
+     * rather than a side effect of a read.
+     *
+     * Goes through `loadWallet` so the cache is honoured: an instance that has
+     * already loaded a wallet keeps it even if the store underneath has since
+     * been emptied, which is the same lost-store case `loadWallet` refuses.
      */
     async loadOrCreateWallet(): Promise<WalletFile> {
-        const stored = await this.db.loadWallet() as WalletFile | null;
-
-        if (!stored) {
-            return this.newWallet();
+        try {
+            return await this.loadWallet();
+        }
+        catch (error) {
+            if (!(error instanceof WalletNotFoundError)) {
+                throw error;
+            }
         }
 
-        return this.loadWallet();
+        return this.newWallet();
     }
 
     async saveWallet(

@@ -361,7 +361,13 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_backup_wallet_did', cliCommand: 'backup-wallet-did', description: 'Backup wallet to an encrypted DID and seed bank.', schema: ConfirmSchema, mutates: true, handler: runtime => requireKeymaster(runtime).backupWallet() }),
     tool({ name: 'archon_recover_wallet_did', cliCommand: 'recover-wallet-did', description: 'Recover wallet from seed bank or encrypted DID.', schema: z.object({ did: z.string().optional() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { did }) => requireKeymaster(runtime).recoverWallet(did) }),
 
-    tool({ name: 'archon_create_id', cliCommand: 'create-id', description: 'Create a new local Keymaster wallet ID.', schema: z.object({ name: z.string(), registry: z.string().optional() }), mutates: true, handler: (runtime, { name, registry }) => requireKeymaster(runtime).createId(name, compactOptions({ registry })) }),
+    tool({ name: 'archon_create_id', cliCommand: 'create-id', description: 'Create a new local Keymaster wallet ID.', schema: z.object({ name: z.string(), registry: z.string().optional() }), mutates: true, handler: async (runtime, { name, registry }) => {
+        // As create-id does in both CLIs: allowed before a wallet exists, so it
+        // is one of the two commands that provision.
+        const keymaster = requireKeymaster(runtime);
+        await keymaster.loadOrCreateWallet();
+        return keymaster.createId(name, compactOptions({ registry }));
+    } }),
     tool({ name: 'archon_resolve_id', cliCommand: 'resolve-id', description: 'Resolve a local ID name, alias, DID, or the current ID when id is omitted.', schema: z.object({ id: z.string().optional() }).merge(ResolveOptionsSchema), handler: async (runtime, { id, ...options }) => {
         const keymaster = requireKeymaster(runtime);
         const resolvedId = id ?? await keymaster.getCurrentId();

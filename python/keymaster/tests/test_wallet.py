@@ -9,7 +9,7 @@ from keymaster.crypto import encrypt_with_passphrase
 from .helpers import FakeGatekeeper, FakeWalletStore, make_testbed, run
 
 
-def test_load_wallet_creates_new_wallet(testbed):
+def test_provisioned_wallet_has_the_v2_shape(testbed):
     wallet = run(testbed.keymaster.load_wallet())
 
     assert wallet["version"] == 2
@@ -252,36 +252,48 @@ def test_check_and_fix_wallet_count_owned_and_held_entries(testbed):
     assert fixed == {"idsRemoved": 0, "ownedRemoved": 1, "heldRemoved": 1, "aliasesRemoved": 0}
 
 
-# #1037: load_wallet used to mint a fresh mnemonic whenever the store read
-# empty, so an unmounted volume or a switched ARCHON_KEYMASTER_DB replaced the
-# node's identity with nothing logged. Mirrors the TypeScript
+# Reading never creates: an empty store is refused, and provisioning is the
+# separate load_or_create_wallet call. Mirrors the TypeScript
 # "wallet provisioning" suite.
-@pytest.mark.asyncio
-async def test_load_wallet_refuses_an_empty_store_by_default():
+def test_load_wallet_refuses_an_empty_store_by_default():
     km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=FakeWalletStore(), passphrase="pass")
 
     with pytest.raises(WalletNotFoundError):
-        await km.load_wallet()
+        run(km.load_wallet())
 
 
-@pytest.mark.asyncio
-async def test_load_or_create_wallet_provisions_without_the_flag():
+def test_load_or_create_wallet_provisions_without_the_flag():
     km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=FakeWalletStore(), passphrase="pass")
 
-    assert (await km.load_or_create_wallet())["seed"] is not None
+    assert run(km.load_or_create_wallet())["seed"] is not None
 
 
-@pytest.mark.asyncio
-async def test_load_or_create_wallet_keeps_the_stored_wallet():
+def test_load_or_create_wallet_keeps_the_stored_wallet():
     store = FakeWalletStore()
-    first = await Keymaster(
-        gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass"
-    ).load_or_create_wallet()
-    again = await Keymaster(
-        gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass"
-    ).load_or_create_wallet()
+    first = run(Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass").load_or_create_wallet())
+    again = run(Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass").load_or_create_wallet())
 
     assert again["seed"] == first["seed"]
+
+
+# A warm instance keeps the wallet it loaded even if the store is emptied
+# underneath it: that is the lost-store case, and provisioning there would
+# replace the identity the process is already using.
+def test_load_or_create_wallet_honours_the_cache_over_an_emptied_store():
+    store = FakeWalletStore()
+    km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass")
+    loaded = run(km.load_or_create_wallet())
+    store.wallet = None
+
+    assert run(km.load_or_create_wallet()) is loaded
+
+
+def test_new_wallet_returns_the_object_load_wallet_will_serve():
+    km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=FakeWalletStore(), passphrase="pass")
+
+    created = run(km.new_wallet())
+
+    assert run(km.load_wallet()) is created
 
 
 def test_wallet_not_found_error_is_on_the_package_surface():
