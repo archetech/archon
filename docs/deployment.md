@@ -96,20 +96,18 @@ The CLI container is how you work with a node that has no UI. It idles until
 you exec into it:
 
 ```bash
-cd /path/to/archon
-alias archon='docker compose -f docker/compose/minimal.yml exec -T cli node scripts/archon-cli.js'
-
 # Create an identity, published to the hyperswarm registry
-archon create-id alice
+docker compose -f docker/compose/minimal.yml exec cli archon create-id alice
 
 # List what the wallet holds, and resolve the DID back
-archon list-ids
-archon resolve-id alice
+docker compose -f docker/compose/minimal.yml exec cli archon list-ids
+docker compose -f docker/compose/minimal.yml exec cli archon resolve-id alice
 ```
 
-`archon --help` lists the rest. The CLI reads `ARCHON_ADMIN_API_KEY` from the
-environment the compose file gives it, so it authenticates without further
-setup.
+Export `COMPOSE_FILE=docker/compose/minimal.yml` in your shell to drop the `-f`
+from each of those. `archon --help` lists the rest. The CLI reads
+`ARCHON_ADMIN_API_KEY` from the environment the compose file gives it, so it
+authenticates without further setup.
 
 The same operations are available over HTTP if you would rather not use the
 container. Gatekeeper answers on port 4224 and Keymaster on 4226:
