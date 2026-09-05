@@ -80,15 +80,52 @@ cp minimal-sample.env .env
 docker compose --env-file .env -f docker/compose/minimal.yml up
 ```
 
-That starts five services — IPFS, Redis, Gatekeeper, Keymaster, and the
-hyperswarm mediator — and nothing else. `minimal-sample.env` carries only the
-variables that stack reads, with placeholders where a value is mandatory, so
-the node runs as copied. Replace both `CHANGE_ME` placeholders before the node
+That starts six services — IPFS, Redis, Gatekeeper, Keymaster, the hyperswarm
+mediator, and the CLI container — and nothing else. `minimal-sample.env`
+carries only the variables that stack reads, with placeholders where a value is
+mandatory, so the node runs as copied. Replace both `CHANGE_ME` placeholders before the node
 holds anything you care about. `ARCHON_ADMIN_API_KEY` gates the API — generate
 one with `openssl rand -hex 32`. `ARCHON_ENCRYPTED_PASSPHRASE` encrypts the
 wallet mnemonic, and editing it later re-encrypts nothing: it leaves the
-existing wallet undecryptable, so change it with `keymaster change-passphrase
-<new>` first and then update the variable.
+existing wallet undecryptable, so rotate it with the CLI's `change-passphrase`
+first (see below) and then update the variable.
+
+### Driving the Node
+
+The CLI container is how you work with a node that has no UI. It idles until
+you exec into it:
+
+```bash
+cd /path/to/archon
+alias archon='docker compose -f docker/compose/minimal.yml exec -T cli node scripts/archon-cli.js'
+
+# Create an identity, published to the hyperswarm registry
+archon create-id alice
+
+# List what the wallet holds, and resolve the DID back
+archon list-ids
+archon resolve-id alice
+```
+
+`archon --help` lists the rest. The CLI reads `ARCHON_ADMIN_API_KEY` from the
+environment the compose file gives it, so it authenticates without further
+setup.
+
+The same operations are available over HTTP if you would rather not use the
+container. Gatekeeper answers on port 4224 and Keymaster on 4226:
+
+```bash
+# Gatekeeper is up
+curl -s localhost:4224/api/v1/version
+
+# Resolution is public — no admin key
+curl -s localhost:4224/1.0/identifiers/<did>
+```
+
+Keymaster's API requires `X-Archon-Admin-Key` on every route, so reach it with
+the value you set in `.env`.
+
+### How This Differs From the Full Stack
 
 This is a different stack from the profile-gated one below, in two ways worth
 knowing:
