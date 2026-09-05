@@ -44,6 +44,9 @@ async function completeSetup() {
 
 const PASSPHRASE = 'render-smoke-test-passphrase';
 
+// WalletWeb's default localStorage key.
+const WALLET_KEY = 'archon-keymaster';
+
 describe('react-wallet provider tree', () => {
     it('mounts without throwing', () => {
         expect(() =>
@@ -90,4 +93,43 @@ describe('react-wallet provider tree', () => {
             { timeout: 20000 }
         );
     }, 30000);
+});
+
+// #1037: a browser store cleared underneath a live session used to mint a
+// replacement wallet and report ready, silently replacing the identity. The
+// wallet's own setup flow is the only place that may provision; a rebuild --
+// restoring a session, reloading the page -- has to fail closed.
+//
+// This is the one review finding on that change with no other coverage: the
+// apps' tests mount, and a regression here would be as quiet as the original.
+describe('a cleared wallet store under a live session', () => {
+    it('returns to setup instead of minting a replacement', async () => {
+        const { unmount } = render(
+            <ContextProviders>
+                <div data-testid="child">child</div>
+            </ContextProviders>
+        );
+
+        await completeSetup();
+        await waitFor(
+            () => expect(screen.getByTestId('child')).toBeInTheDocument(),
+            { timeout: 20000 }
+        );
+
+        // The session passphrase survives; the store does not. A volume that
+        // failed to mount, cleared site data, a different browser profile.
+        expect(window.localStorage.getItem(WALLET_KEY)).not.toBeNull();
+        window.localStorage.removeItem(WALLET_KEY);
+        unmount();
+
+        render(
+            <ContextProviders>
+                <div data-testid="child">child</div>
+            </ContextProviders>
+        );
+
+        // Setup, not a wallet conjured out of the session.
+        expect(await screen.findByText('Set a Passphrase')).toBeInTheDocument();
+        expect(window.localStorage.getItem(WALLET_KEY)).toBeNull();
+    }, 40000);
 });
