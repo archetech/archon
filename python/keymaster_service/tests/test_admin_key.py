@@ -43,3 +43,14 @@ def test_unset_passphrase_is_fatal():
 
 def test_any_non_empty_passphrase_is_accepted():
     assert check_passphrase("correct horse battery staple").fatal is None
+
+
+def test_secret_matches_handles_non_ascii_and_non_str():
+    """compare_digest raises TypeError on non-ASCII str, and a request body can
+    carry any JSON type — either would turn a 401 into a 500."""
+    from keymaster_service.app import _secret_matches
+
+    assert _secret_matches("pässwörd", "pässwörd")
+    assert not _secret_matches("pässwörd", "other")
+    assert not _secret_matches(None, "secret")
+    assert not _secret_matches(1234, "secret")
