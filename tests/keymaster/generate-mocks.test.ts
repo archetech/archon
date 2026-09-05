@@ -28,6 +28,7 @@ describe('generate mocks', () => {
         const wallet = new WalletJsonMemory();
         const cipher = new CipherNode();
         const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+        await keymaster.loadOrCreateWallet();
 
         // Create a new wallet
         await keymaster.loadWallet();

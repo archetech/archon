@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
 import Keymaster from '@didcid/keymaster';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import KeymasterClient from '@didcid/clients/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { DatabaseInterface } from './db/interfaces.js';
@@ -182,24 +183,46 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             process.exit(1);
         }
 
-        const gatekeeper = new GatekeeperClient();
-        await gatekeeper.connect({
-            url: GATEKEEPER_URL,
-            waitUntilReady: true,
-            intervalSeconds: 5,
-            chatty: true,
-        });
-        const wallet = new WalletJson('wallet.json', DATA_DIR);
-        const cipher = new CipherNode();
-        ctx.keymaster = new Keymaster({
-            gatekeeper,
-            wallet,
-            cipher,
-            passphrase,
-        });
+        // Wrapped and exited explicitly: routes.ts installs a log-only
+        // unhandledRejection handler at module scope, so a throw here would
+        // otherwise leave Herald listening with no keymaster behind it.
+        try {
+            const gatekeeper = new GatekeeperClient();
+            await gatekeeper.connect({
+                url: GATEKEEPER_URL,
+                waitUntilReady: true,
+                intervalSeconds: 5,
+                chatty: true,
+            });
+            const wallet = new WalletJson('wallet.json', DATA_DIR);
+            const cipher = new CipherNode();
 
-        // Load existing wallet (decrypt and restore IDs/aliases)
-        await ctx.keymaster.loadWallet();
+            ctx.keymaster = new Keymaster({
+                gatekeeper,
+                wallet,
+                cipher,
+                passphrase,
+            });
+
+            // Herald issues name credentials from this identity, so replacing it
+            // invalidates every credential it has issued. Provisioning is fine on
+            // a first run; it must not pass unremarked on any other.
+            try {
+                await ctx.keymaster.loadWallet();
+            }
+            catch (error) {
+                if (!(error instanceof WalletNotFoundError)) {
+                    throw error;
+                }
+
+                console.warn(`Herald: no wallet at ${DATA_DIR}/wallet.json — creating one. If this node has run before, its data directory is missing and the identity it issued credentials from has been replaced.`);
+                await ctx.keymaster.newWallet();
+            }
+        }
+        catch (error) {
+            console.error('Herald failed to start:', error);
+            process.exit(1);
+        }
         console.log(`${SERVICE_NAME} using gatekeeper at ${GATEKEEPER_URL}`);
     }
 

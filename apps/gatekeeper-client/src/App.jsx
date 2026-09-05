@@ -5,6 +5,7 @@ import DrawbridgeClient from '@didcid/clients/drawbridge';
 import CipherWeb from '@didcid/cipher/web';
 import Keymaster from '@didcid/keymaster';
 import WalletWeb from '@didcid/keymaster/wallet/web';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import WalletJsonMemory from "@didcid/keymaster/wallet/json-memory";
 import { isWalletEncFile } from '@didcid/keymaster/wallet/typeGuards';
@@ -66,13 +67,23 @@ function App() {
         init();
     }, []);
 
-    const buildKeymaster = async (wallet, passphrase) => {
+    // `provision` is set only by the first-run flow. A rebuild must fail closed:
+    // a browser store cleared underneath this app is a lost wallet, and minting
+    // a replacement there would replace the identity silently (#1037).
+    const buildKeymaster = async (wallet, passphrase, provision = false) => {
         const instance = new Keymaster({ gatekeeper, wallet, cipher, passphrase });
 
         try {
             // check pass & convert to v1 if needed
-            await instance.loadWallet();
+            await (provision ? instance.loadOrCreateWallet() : instance.loadWallet());
         } catch (error) {
+            if (error instanceof WalletNotFoundError) {
+                // Nothing to decrypt: the store emptied under an open prompt.
+                // Not a passphrase problem, and not a reason to mint.
+                setPendingWallet(null);
+                setModalAction('set-passphrase');
+                return;
+            }
             setPassphraseErrorText(error?.error || error?.message || 'Failed to load wallet');
             return;
         }
@@ -94,10 +105,10 @@ function App() {
         setIsReady(true);
     };
 
-    async function rebuildKeymaster(passphrase) {
+    async function rebuildKeymaster(passphrase, provision = false) {
         const walletWeb = new WalletWeb();
         const walletCached = new WalletCache(walletWeb);
-        await buildKeymaster(walletCached, passphrase);
+        await buildKeymaster(walletCached, passphrase, provision);
     }
 
     async function handlePassphraseSubmit(passphrase) {
@@ -120,7 +131,13 @@ function App() {
             }
         }
 
-        await rebuildKeymaster(passphrase);
+        // The first-run flow, and only it: the modal has to be the one that
+        // asks for a new passphrase, and the store still empty. A store that
+        // vanishes while the decrypt prompt is open is a lost wallet, not a
+        // first run, and must not be answered with a fresh identity.
+        const provision = modalAction === 'set-passphrase' && !await walletWeb.loadWallet();
+
+        await rebuildKeymaster(passphrase, provision);
     }
 
     function handleStartReset() {

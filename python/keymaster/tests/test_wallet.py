@@ -3,18 +3,33 @@ from __future__ import annotations
 import pytest
 
 from keymaster import Keymaster, KeymasterError
+from keymaster.core import WalletNotFoundError
 from keymaster.crypto import encrypt_with_passphrase
 
-from .helpers import make_testbed, run
+from .helpers import FakeGatekeeper, FakeWalletStore, make_testbed, run
 
 
-def test_load_wallet_creates_new_wallet(testbed):
+def test_provisioned_wallet_has_the_v2_shape(testbed):
     wallet = run(testbed.keymaster.load_wallet())
 
     assert wallet["version"] == 2
     assert wallet["counter"] == 0
     assert wallet["ids"] == {}
     assert "mnemonicEnc" in wallet["seed"]
+
+
+def _cold(testbed, passphrase: str = "passphrase") -> Keymaster:
+    """An instance over the same store with no warmed cache.
+
+    The test bed provisions, so its keymaster already holds a decrypted wallet;
+    tests that write a payload into the store directly need a reader that will
+    actually go and fetch it.
+    """
+    return Keymaster(
+        gatekeeper=testbed.gatekeeper,
+        wallet_store=testbed.wallet_store,
+        passphrase=passphrase,
+    )
 
 
 def test_load_wallet_returns_cached_wallet(testbed):
@@ -34,7 +49,7 @@ def test_load_wallet_upgrades_legacy_names_and_v1_version(testbed):
     }
 
     assert testbed.wallet_store.save_wallet(legacy_wallet, overwrite=True) is True
-    loaded = run(testbed.keymaster.load_wallet())
+    loaded = run(_cold(testbed).load_wallet())
 
     assert loaded["version"] == 2
     assert "names" not in loaded
@@ -46,7 +61,7 @@ def test_load_wallet_rejects_unsupported_legacy_payload(testbed):
 
     assert testbed.wallet_store.save_wallet(corrupt_wallet, overwrite=True) is True
     with pytest.raises(KeymasterError, match="Unsupported wallet version"):
-        run(testbed.keymaster.load_wallet())
+        run(_cold(testbed).load_wallet())
 
 
 def test_save_wallet_respects_overwrite_flag(testbed):
@@ -235,3 +250,56 @@ def test_check_and_fix_wallet_count_owned_and_held_entries(testbed):
 
     assert check == {"checked": 3, "invalid": 2, "deleted": 0}
     assert fixed == {"idsRemoved": 0, "ownedRemoved": 1, "heldRemoved": 1, "aliasesRemoved": 0}
+
+
+# Reading never creates: an empty store is refused, and provisioning is the
+# separate load_or_create_wallet call. Mirrors the TypeScript
+# "wallet provisioning" suite.
+def test_load_wallet_refuses_an_empty_store_by_default():
+    km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=FakeWalletStore(), passphrase="pass")
+
+    with pytest.raises(WalletNotFoundError):
+        run(km.load_wallet())
+
+
+def test_load_or_create_wallet_provisions_without_the_flag():
+    km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=FakeWalletStore(), passphrase="pass")
+
+    assert run(km.load_or_create_wallet())["seed"] is not None
+
+
+def test_load_or_create_wallet_keeps_the_stored_wallet():
+    store = FakeWalletStore()
+    first = run(Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass").load_or_create_wallet())
+    again = run(Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass").load_or_create_wallet())
+
+    assert again["seed"] == first["seed"]
+
+
+# A warm instance keeps the wallet it loaded even if the store is emptied
+# underneath it: that is the lost-store case, and provisioning there would
+# replace the identity the process is already using.
+def test_load_or_create_wallet_honours_the_cache_over_an_emptied_store():
+    store = FakeWalletStore()
+    km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=store, passphrase="pass")
+    loaded = run(km.load_or_create_wallet())
+    store.wallet = None
+
+    assert run(km.load_or_create_wallet()) is loaded
+
+
+def test_new_wallet_returns_the_object_load_wallet_will_serve():
+    km = Keymaster(gatekeeper=FakeGatekeeper(), wallet_store=FakeWalletStore(), passphrase="pass")
+
+    created = run(km.new_wallet())
+
+    assert run(km.load_wallet()) is created
+
+
+def test_wallet_not_found_error_is_on_the_package_surface():
+    """Callers turn this into a startup refusal, so it has to be importable
+    without reaching into keymaster.core."""
+    import keymaster
+
+    assert keymaster.WalletNotFoundError is WalletNotFoundError
+    assert "WalletNotFoundError" in keymaster.__all__

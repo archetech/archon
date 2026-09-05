@@ -29,7 +29,7 @@ afterAll(async () => {
     }
 });
 
-beforeEach(() => {
+beforeEach(async () => {
     const db = new DbJsonMemory('test');
     const baseGatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     wallet = new WalletJsonMemory();
@@ -91,6 +91,7 @@ beforeEach(() => {
     keymaster = new Keymaster({
         gatekeeper, wallet, cipher, passphrase: 'passphrase',
     });
+    await keymaster.loadOrCreateWallet();
     // The stubbed gatekeeper.url is a black-hole host; preset the memoized node
     // capability manifest so the gating fetch doesn't hit the network (a real node
     // offering Lightning would return this).
@@ -757,6 +758,7 @@ describe('Lightning without Drawbridge', () => {
         const plainKeymaster = new Keymaster({
             gatekeeper: plainGatekeeper, wallet, cipher, passphrase: 'passphrase',
         });
+        await plainKeymaster.loadOrCreateWallet();
 
         await plainKeymaster.createId('Bob');
 

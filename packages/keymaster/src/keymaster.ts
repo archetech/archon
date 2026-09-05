@@ -6,12 +6,14 @@ import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
 import { CID } from 'multiformats/cid';
 import {
+    ArchonError,
     InvalidDIDError,
     InvalidParameterError,
     KeymasterError,
     UnknownIDError,
     LightningNotConfiguredError,
     LightningUnavailableError,
+    WalletNotFoundError,
 } from '@didcid/common/errors';
 import {
     DrawbridgeInterface,
@@ -247,7 +249,7 @@ export default class Keymaster implements KeymasterInterface {
     private async mutateWallet(
         mutator: (wallet: WalletFile) => void | Promise<void>
     ): Promise<void> {
-        // Create wallet if none and make sure _walletCache is set
+        // Make sure _walletCache is set; refuses if there is no wallet to load
         if (!this._walletCache) {
             await this.loadWallet();
         }
@@ -275,15 +277,43 @@ export default class Keymaster implements KeymasterInterface {
             return this._walletCache;
         }
 
-        let stored = await this.db.loadWallet() as WalletFile | null;
+        const stored = await this.db.loadWallet() as WalletFile | null;
 
         if (!stored) {
-            stored = await this.newWallet();
+            // Reading never creates. An empty store here is an unmounted
+            // volume, a wiped database or a switched backend as often as it is
+            // a first run, and the two cannot be told apart from the store.
+            // Callers that provision say so through loadOrCreateWallet (#1037).
+            throw new WalletNotFoundError();
         }
 
         const decrypted = await this.decryptWallet(stored);
         this._walletCache = await this.upgradeWallet(decrypted);
         return this._walletCache;
+    }
+
+    /**
+     * Load the wallet, creating one only when the store holds none.
+     *
+     * The one call that provisions. Callers that mean to -- first-run startup,
+     * `create-wallet` -- name it, so creation is a decision at a call site
+     * rather than a side effect of a read.
+     *
+     * Goes through `loadWallet` so the cache is honoured: an instance that has
+     * already loaded a wallet keeps it even if the store underneath has since
+     * been emptied, which is the same lost-store case `loadWallet` refuses.
+     */
+    async loadOrCreateWallet(): Promise<WalletFile> {
+        try {
+            return await this.loadWallet();
+        }
+        catch (error) {
+            if (!(error instanceof WalletNotFoundError)) {
+                throw error;
+            }
+        }
+
+        return this.newWallet();
     }
 
     async saveWallet(
@@ -1817,7 +1847,7 @@ export default class Keymaster implements KeymasterInterface {
 
             return data.name;
         } catch (error: any) {
-            if (error.type === 'Keymaster') {
+            if (error instanceof ArchonError) {
                 throw error;
             } else {
                 throw new InvalidDIDError();
@@ -2031,7 +2061,13 @@ export default class Keymaster implements KeymasterInterface {
                     delay: ADDRESS_CHALLENGE_RESPONSE_DELAY_MS,
                 });
             }
-            catch {
+            catch (error) {
+                // No wallet is not a property of this endpoint; trying the next
+                // one cannot help, and reporting it as a challenge failure hides
+                // the remedy.
+                if (error instanceof WalletNotFoundError) {
+                    throw error;
+                }
                 lastError = 'Failed to fetch address challenge';
             }
         }

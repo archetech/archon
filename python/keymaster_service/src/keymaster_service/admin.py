@@ -61,3 +61,4 @@ def check_passphrase(passphrase: str) -> StartupCheck:
         )
 
     return StartupCheck()
+

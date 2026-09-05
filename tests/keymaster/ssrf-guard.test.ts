@@ -73,6 +73,7 @@ describe('the public lookup methods reject private targets', () => {
             cipher: new CipherNode(),
             passphrase: 'passphrase',
         });
+        await keymaster.loadOrCreateWallet();
         await keymaster.createId('Alice', { registry: 'local' });
     });
 

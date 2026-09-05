@@ -220,6 +220,7 @@ def test_lightning_validation_and_unavailable_gateway(testbed):
 
     plain_gatekeeper = PlainGatekeeper(make_testbed().gatekeeper)
     plain_keymaster = Keymaster(gatekeeper=plain_gatekeeper, wallet_store=FakeWalletStore(), passphrase="passphrase")
+    run(plain_keymaster.load_or_create_wallet())
     run(plain_keymaster.create_id("Bob"))
 
     with pytest.raises(KeymasterError, match="Gateway does not support Lightning"):

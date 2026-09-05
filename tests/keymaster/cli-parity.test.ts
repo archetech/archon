@@ -65,13 +65,18 @@ function argumentShape(args: string): string {
         .join(' ');
 }
 
-function optionsFor(source: string, command: string): string[] {
+// The source of one commander command: from its .command( to the next.
+function commandBlock(source: string, command: string): string {
     const start = source.indexOf(`.command('${command}`);
     if (start === -1) {
-        return [];
+        return '';
     }
     const next = source.indexOf('.command(', start + 1);
-    const block = source.slice(start, next === -1 ? undefined : next);
+    return source.slice(start, next === -1 ? undefined : next);
+}
+
+function optionsFor(source: string, command: string): string[] {
+    const block = commandBlock(source, command);
     return [...block.matchAll(/\.option\('([^']+)'/g)]
         .map(match => match[1].split(',').map(part => part.trim()).pop() as string)
         .sort();
@@ -151,5 +156,94 @@ describe('CLI parity across entry points', () => {
         // location rather than the caller's, so it would not find the user's
         // .env at all. The other two read the working directory only.
         expect(pythonCli).toMatch(/load_dotenv\(Path\.cwd\(\) \/ "\.env", override=False\)/);
+    });
+});
+
+// Which commands may run before a wallet exists is policy, held as an allowlist
+// in each CLI. The two lists have to agree, and each entry has to be honest:
+// a command on the list either creates or replaces a wallet in its own handler,
+// provisions explicitly, or never touches one. An entry that does none of those
+// reaches loadWallet on an empty store and fails with 'Wallet not found' -- the
+// regression #1050's review caught on the MCP surface.
+describe('wallet-optional command policy', () => {
+    const jsAllowlist = [...packageCli.matchAll(/walletOptionalCommands = \[([^\]]+)\]/g)]
+        .flatMap(m => m[1].split(',').map(part => part.trim().replace(/^'|'$/g, '')))
+        .filter(Boolean)
+        .sort();
+    const pyAllowlist = (() => {
+        const start = pythonCli.indexOf('WALLET_OPTIONAL_COMMANDS = {');
+        const end = pythonCli.indexOf('}', start);
+        return [...pythonCli.slice(start, end).matchAll(/"([a-z-]+)"/g)].map(m => m[1]).sort();
+    })();
+
+    it('is declared in both CLIs', () => {
+        expect(jsAllowlist.length).toBeGreaterThan(0);
+        expect(pyAllowlist.length).toBeGreaterThan(0);
+    });
+
+    it('is the same list in both CLIs', () => {
+        expect(pyAllowlist).toEqual(jsAllowlist);
+    });
+
+    // What each allowlisted handler does about the wallet, by name. A command
+    // that creates, replaces or provisions has a positive pattern; a command
+    // that needs no wallet is marked null and is checked for the absence of a
+    // read instead -- the defect this guard exists to catch is a wallet read
+    // creeping into a handler that runs before one exists.
+    const HANDLES_ITS_OWN_WALLET: Record<string, RegExp | null> = {
+        'create-wallet': /loadOrCreateWallet\(/,
+        'new-wallet': /newWallet\(/,
+        'create-id': /loadOrCreateWallet\(/,
+        'import-wallet': /newWallet\(/,
+        'restore-wallet-file': /saveWallet\(/,
+        'list-registries': null,
+    };
+    const READS_THE_WALLET = /\.(loadWallet|mutateWallet|decryptMnemonic)\(/;
+
+    // argparse: handlers are `async def cmd_<name>` with hyphens as underscores;
+    // the block runs to the next top-level def.
+    function pythonCommandBlock(source: string, command: string): string {
+        const name = `cmd_${command.replace(/-/g, '_')}`;
+        const start = source.indexOf(`async def ${name}(`);
+        if (start === -1) {
+            return '';
+        }
+        const next = source.slice(start + 1).search(/\n(?:async )?def /);
+        return next === -1 ? source.slice(start) : source.slice(start, start + 1 + next);
+    }
+
+    const PY_HANDLES_ITS_OWN_WALLET: Record<string, RegExp | null> = {
+        'create-wallet': /load_or_create_wallet\(/,
+        'new-wallet': /new_wallet\(/,
+        'create-id': /load_or_create_wallet\(/,
+        'import-wallet': /new_wallet\(/,
+        'restore-wallet-file': /save_wallet\(/,
+        'list-registries': null,
+    };
+    const PY_READS_THE_WALLET = /\.(load_wallet|decrypt_mnemonic)\(/;
+
+    it.each(pyAllowlist)('%s handles the wallet itself in the Python CLI', (command) => {
+        expect(PY_HANDLES_ITS_OWN_WALLET).toHaveProperty(command);
+        const pattern = PY_HANDLES_ITS_OWN_WALLET[command];
+        const handler = pythonCommandBlock(pythonCli, command);
+        expect(handler).not.toBe('');
+
+        if (pattern === null) {
+            expect(handler).not.toMatch(PY_READS_THE_WALLET);
+        } else {
+            expect(handler).toMatch(pattern);
+        }
+    });
+
+    it.each(jsAllowlist)('%s handles the wallet itself in the package CLI', (command) => {
+        expect(HANDLES_ITS_OWN_WALLET).toHaveProperty(command);
+        const pattern = HANDLES_ITS_OWN_WALLET[command];
+        const handler = commandBlock(packageCli, command);
+
+        if (pattern === null) {
+            expect(handler).not.toMatch(READS_THE_WALLET);
+        } else {
+            expect(handler).toMatch(pattern);
+        }
     });
 });

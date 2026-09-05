@@ -14,6 +14,7 @@ import WalletCache from '@didcid/keymaster/wallet/cache';
 import CipherNode from '@didcid/cipher/node';
 import { InvalidParameterError } from '@didcid/common/errors';
 import config from './config.js';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import { createAddressRouter } from './keymaster-address-router.js';
 import { createAgentRouter } from './keymaster-agent-router.js';
 import { createAssetRouter } from './keymaster-asset-router.js';
@@ -64,6 +65,13 @@ const walletOperationsTotal = new promClient.Counter({
     name: 'wallet_operations_total',
     help: 'Total number of wallet operations',
     labelNames: ['operation', 'status'],
+});
+
+// A node should mint a wallet once, ever. A non-zero count on a node that has
+// been running is the signal that its store went missing.
+const walletsCreatedTotal = new promClient.Counter({
+    name: 'keymaster_wallets_created_total',
+    help: 'Wallets provisioned at startup because the store was empty',
 });
 
 const serviceVersionInfo = new promClient.Gauge({
@@ -301,6 +309,7 @@ const server = app.listen(port, config.bindAddress, async () => {
         const wallet = await initWallet();
         const cipher = new CipherNode();
         const defaultRegistry = config.defaultRegistry;
+
         keymaster = new Keymaster({
             gatekeeper,
             wallet,
@@ -308,6 +317,24 @@ const server = app.listen(port, config.bindAddress, async () => {
             defaultRegistry,
             passphrase: config.keymasterPassphrase,
         });
+
+        // The one place this service provisions, so a fresh mnemonic is a
+        // startup event with a log line and a counter rather than a side effect
+        // of whichever request happened to read the wallet first (#1037). Any
+        // other failure to load -- an unreadable store, a wrong passphrase --
+        // reaches the catch below and ends the process.
+        try {
+            await keymaster.loadWallet();
+        }
+        catch (error) {
+            if (!(error instanceof WalletNotFoundError)) {
+                throw error;
+            }
+
+            console.warn(`No wallet found in ${config.db} — creating one. If this node has run before, its store is missing and its identity has been replaced.`);
+            await keymaster.newWallet();
+            walletsCreatedTotal.inc();
+        }
     }
     catch (error) {
         console.error('Keymaster failed to start:', error);

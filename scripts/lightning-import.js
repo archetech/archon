@@ -14,6 +14,7 @@
 
 import path from 'path';
 import fs from 'fs';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import WalletJson from '@didcid/keymaster/wallet/json';
@@ -69,7 +70,21 @@ try {
     const cipher = new CipherNode();
     const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase });
 
-    const walletData = await keymaster.loadWallet();
+    // Reading never provisions, so an empty store is reported rather than
+    // replaced by a new identity this script would then act on.
+    let walletData;
+    try {
+        walletData = await keymaster.loadWallet();
+    }
+    catch (error) {
+        if (!(error instanceof WalletNotFoundError)) {
+            throw error;
+        }
+
+        console.error(`Error: no wallet at ${walletPath}`);
+        console.error('Set ARCHON_WALLET_PATH, or create one with: keymaster create-wallet');
+        process.exit(1);
+    }
 
     const currentName = walletData.current;
     if (!currentName) {

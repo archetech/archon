@@ -4,6 +4,7 @@ import { McpServerConfig } from './config.js';
 import { ArchonRuntime, requireKeymaster } from './runtime.js';
 import { assetDataUnavailable, vaultItemUri } from './resources.js';
 import { errorMessage } from './redact.js';
+import { WalletNotFoundError } from '@didcid/common/errors';
 
 type RegisterableServer = {
     registerTool?: (name: string, config: any, handler: (args: unknown) => Promise<unknown>) => void;
@@ -285,11 +286,17 @@ function ok(result: unknown): CallToolResult {
 }
 
 function fail(error: unknown): CallToolResult {
+    // A fresh machine has no wallet, and reading never creates one; say which
+    // tools do, so an agent does not have to guess.
+    const text = error instanceof WalletNotFoundError
+        ? `${errorMessage(error)}. Create one with archon_create_wallet or archon_create_id.`
+        : errorMessage(error);
+
     return {
         content: [
             {
                 type: 'text',
-                text: errorMessage(error),
+                text,
             },
         ],
         isError: true,
@@ -348,7 +355,7 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_get_version', description: 'Get Archon node version information.', schema: EmptySchema, handler: runtime => runtime.node.getVersion() }),
     tool({ name: 'archon_get_status', description: 'Get Archon node status.', schema: EmptySchema, handler: runtime => runtime.node.getStatus() }),
 
-    tool({ name: 'archon_create_wallet', cliCommand: 'create-wallet', description: 'Create or load the local wallet.', schema: EmptySchema, mutates: true, handler: runtime => requireKeymaster(runtime).loadWallet() }),
+    tool({ name: 'archon_create_wallet', cliCommand: 'create-wallet', description: 'Create or load the local wallet.', schema: EmptySchema, mutates: true, handler: runtime => requireKeymaster(runtime).loadOrCreateWallet() }),
     tool({ name: 'archon_new_wallet', cliCommand: 'new-wallet', description: 'Create a new local wallet, replacing the existing wallet.', schema: ConfirmSchema, mutates: true, handler: runtime => requireKeymaster(runtime).newWallet('', true) }),
     tool({ name: 'archon_change_passphrase', cliCommand: 'change-passphrase', description: 'Re-encrypt the local wallet with a new passphrase.', schema: z.object({ newPassphrase: z.string() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { newPassphrase }) => requireKeymaster(runtime).changePassphrase(newPassphrase) }),
     tool({ name: 'archon_check_wallet', cliCommand: 'check-wallet', description: 'Validate DIDs in the local wallet.', schema: EmptySchema, outputSchema: CheckWalletOutputSchema, handler: runtime => requireKeymaster(runtime).checkWallet() }),
@@ -361,7 +368,13 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_backup_wallet_did', cliCommand: 'backup-wallet-did', description: 'Backup wallet to an encrypted DID and seed bank.', schema: ConfirmSchema, mutates: true, handler: runtime => requireKeymaster(runtime).backupWallet() }),
     tool({ name: 'archon_recover_wallet_did', cliCommand: 'recover-wallet-did', description: 'Recover wallet from seed bank or encrypted DID.', schema: z.object({ did: z.string().optional() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { did }) => requireKeymaster(runtime).recoverWallet(did) }),
 
-    tool({ name: 'archon_create_id', cliCommand: 'create-id', description: 'Create a new local Keymaster wallet ID.', schema: z.object({ name: z.string(), registry: z.string().optional() }), mutates: true, handler: (runtime, { name, registry }) => requireKeymaster(runtime).createId(name, compactOptions({ registry })) }),
+    tool({ name: 'archon_create_id', cliCommand: 'create-id', description: 'Create a new local Keymaster wallet ID.', schema: z.object({ name: z.string(), registry: z.string().optional() }), mutates: true, handler: async (runtime, { name, registry }) => {
+        // As create-id does in both CLIs: allowed before a wallet exists, so it
+        // is one of the two commands that provision.
+        const keymaster = requireKeymaster(runtime);
+        await keymaster.loadOrCreateWallet();
+        return keymaster.createId(name, compactOptions({ registry }));
+    } }),
     tool({ name: 'archon_resolve_id', cliCommand: 'resolve-id', description: 'Resolve a local ID name, alias, DID, or the current ID when id is omitted.', schema: z.object({ id: z.string().optional() }).merge(ResolveOptionsSchema), handler: async (runtime, { id, ...options }) => {
         const keymaster = requireKeymaster(runtime);
         const resolvedId = id ?? await keymaster.getCurrentId();

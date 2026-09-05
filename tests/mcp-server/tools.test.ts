@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { WalletNotFoundError } from '@didcid/common/errors';
 import { ARCHON_MCP_TOOL_DEFINITIONS, registerArchonTools, McpServerConfig } from '@didcid/mcp-server';
 
 type ToolHandler = (args?: unknown) => Promise<any>;
@@ -151,6 +152,7 @@ function argsForTool(name: string) {
 function mockRuntime(overrides: Record<string, unknown> = {}) {
     const defaults: Record<string, any> = {
         loadWallet: jest.fn<any>().mockResolvedValue({ version: 2, ids: {} }),
+        loadOrCreateWallet: jest.fn<any>().mockResolvedValue({ version: 2, ids: {} }),
         newWallet: jest.fn<any>().mockResolvedValue({ version: 2, ids: {} }),
         changePassphrase: jest.fn<any>().mockResolvedValue(true),
         checkWallet: jest.fn<any>().mockResolvedValue({ checked: 0, invalid: 0, deleted: 0 }),
@@ -1100,5 +1102,40 @@ describe('tool registration fallbacks', () => {
         const response = await server.tools.get('archon_list_registries')!.handler();
 
         expect(expectOk(response)).toStrictEqual(['hyperswarm']);
+    });
+});
+
+// Both CLIs provision inside create-id, because it may run before a wallet
+// exists. The MCP tool of the same name has to make the same call, or a fresh
+// machine gets 'Wallet not found' from the first example in the README.
+describe('archon_create_id provisions like its CLI counterpart', () => {
+    it('loads or creates the wallet before creating the id', async () => {
+        const calls: string[] = [];
+        const runtime = mockRuntime({
+            loadOrCreateWallet: jest.fn<any>().mockImplementation(async () => { calls.push('loadOrCreateWallet'); return { version: 2, ids: {} }; }),
+            createId: jest.fn<any>().mockImplementation(async () => { calls.push('createId'); return 'did:cid:new'; }),
+        });
+        const server = new FakeServer();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        await server.tools.get('archon_create_id')!.handler({ name: 'alice' });
+
+        expect(calls).toEqual(['loadOrCreateWallet', 'createId']);
+    });
+});
+
+// Reading never creates, so on a fresh machine every wallet-backed tool refuses.
+// The refusal has to name the tools that provision, or an agent is left to guess.
+describe('a missing wallet names its remedy', () => {
+    it('appends the provisioning tools to WalletNotFoundError', async () => {
+        const runtime = mockRuntime({ listIds: jest.fn<any>().mockRejectedValue(new WalletNotFoundError()) });
+        const server = new FakeServer();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const response = await server.tools.get('archon_list_ids')!.handler({});
+
+        expect(response.isError).toBe(true);
+        expect(response.content[0].text).toContain('Wallet not found');
+        expect(response.content[0].text).toContain('archon_create_wallet');
     });
 });

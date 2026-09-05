@@ -4,7 +4,7 @@ import { WalletEncFile, WalletFile } from '@didcid/keymaster/types';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import { ExpectedExceptionError } from '@didcid/common/errors';
+import { ExpectedExceptionError, WalletNotFoundError } from '@didcid/common/errors';
 import HeliaClient from '@didcid/ipfs/helia';
 import { DidCidDocument } from "@didcid/gatekeeper/types";
 import { TestHelper } from './helper.ts';
@@ -56,7 +56,7 @@ afterAll(async () => {
     }
 });
 
-beforeEach(() => {
+beforeEach(async () => {
     const db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     wallet = new WalletJsonMemory();
@@ -66,8 +66,8 @@ beforeEach(() => {
 });
 
 describe('loadWallet', () => {
-    it('should create a wallet on first load', async () => {
-        const wallet = await keymaster.loadWallet();
+    it('should create a wallet on first provision', async () => {
+        const wallet = await keymaster.loadOrCreateWallet();
 
         expect(wallet).toEqual(
             expect.objectContaining({
@@ -86,7 +86,7 @@ describe('loadWallet', () => {
     });
 
     it('should return the same wallet on second load', async () => {
-        const wallet1 = await keymaster.loadWallet();
+        const wallet1 = await keymaster.loadOrCreateWallet();
         const wallet2 = await keymaster.loadWallet();
 
         expect(wallet2).toStrictEqual(wallet1);
@@ -250,6 +250,7 @@ describe('saveWallet', () => {
 
     it('wallet should return unencrypted wallet', async () => {
         const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+        await keymaster.loadOrCreateWallet();
         const testWallet = await keymaster.loadWallet();
         const expectedWallet = await keymaster.loadWallet();
 
@@ -257,6 +258,7 @@ describe('saveWallet', () => {
     });
 
     it('should save augmented wallet', async () => {
+        await keymaster.loadOrCreateWallet();
         await keymaster.createId('Bob');
         const wallet = await keymaster.loadWallet();
 
@@ -297,12 +299,14 @@ describe('saveWallet', () => {
     // saveWallet still returned true.
     it('should not corrupt when restoring a different wallet into a warm instance', async () => {
         // Warm instance A's HD-key cache with wallet A.
+        await keymaster.loadOrCreateWallet();
         await keymaster.createId('Alice');
         await keymaster.loadWallet();
 
         // Build an independent wallet B and take its decrypted WalletFile form.
         const walletBStore = new WalletJsonMemory();
         const keymasterB = new Keymaster({ gatekeeper, wallet: walletBStore, cipher, passphrase: PASSPHRASE });
+        await keymasterB.loadOrCreateWallet();
         await keymasterB.createId('Bob');
         const walletB = await keymasterB.loadWallet();
         expect('enc' in walletB).toBe(false);
@@ -314,6 +318,7 @@ describe('saveWallet', () => {
         // A fresh instance over the same storage must read B back intact,
         // not throw or surface wallet A's contents.
         const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+        await fresh.loadOrCreateWallet();
         const restored = await fresh.loadWallet();
         expect(restored.ids['Bob']).toBeDefined();
         expect(restored.ids['Alice']).toBeUndefined();
@@ -323,6 +328,7 @@ describe('saveWallet', () => {
     it('should throw on incorrect passphrase', async () => {
         const wallet = new WalletJsonMemory();
         const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'incorrect' });
+        await keymaster.loadOrCreateWallet();
 
         try {
             await keymaster.saveWallet(MOCK_WALLET_V1_ENCRYPTED, true);
@@ -343,6 +349,7 @@ describe('saveWallet', () => {
 
         const wallet = new WalletJsonMemory();
         const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+        await keymaster.loadOrCreateWallet();
 
         try {
             await keymaster.saveWallet(corruptWallet, true);
@@ -354,6 +361,10 @@ describe('saveWallet', () => {
 });
 
 describe('decryptMnemonic', () => {
+    beforeEach(async () => {
+        await keymaster.loadOrCreateWallet();
+    });
+
     it('should return 12 words', async () => {
         await keymaster.loadWallet();
         const mnemonic = await keymaster.decryptMnemonic();
@@ -365,6 +376,10 @@ describe('decryptMnemonic', () => {
 });
 
 describe('changePassphrase', () => {
+    beforeEach(async () => {
+        await keymaster.loadOrCreateWallet();
+    });
+
     it('should re-encrypt wallet with new passphrase', async () => {
         const did = await keymaster.createId('Bob');
         const mnemonicBefore = await keymaster.decryptMnemonic();
@@ -387,6 +402,7 @@ describe('changePassphrase', () => {
 
         // Create a fresh keymaster with the new passphrase against the same wallet store
         const km2 = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'new-passphrase' });
+        await km2.loadOrCreateWallet();
         const loaded = await km2.loadWallet();
         expect(loaded.ids).toHaveProperty('Bob');
     });
@@ -416,6 +432,10 @@ describe('changePassphrase', () => {
 });
 
 describe('exportEncryptedWallet', () => {
+    beforeEach(async () => {
+        await keymaster.loadOrCreateWallet();
+    });
+
     it('should export the wallet in encrypted form', async () => {
         const res = await keymaster.exportEncryptedWallet();
         expect(res).toEqual(
@@ -431,6 +451,10 @@ describe('exportEncryptedWallet', () => {
 });
 
 describe('updateSeedBank', () => {
+    beforeEach(async () => {
+        await keymaster.loadOrCreateWallet();
+    });
+
     it('should throw error on missing DID', async () => {
         const doc: DidCidDocument = {};
 
@@ -446,7 +470,7 @@ describe('updateSeedBank', () => {
 
 describe('newWallet', () => {
     it('should overwrite an existing wallet when allowed', async () => {
-        const wallet1 = await keymaster.loadWallet();
+        const wallet1 = await keymaster.loadOrCreateWallet();
         await keymaster.newWallet(undefined, true);
         const wallet2 = await keymaster.loadWallet();
 
@@ -454,7 +478,7 @@ describe('newWallet', () => {
     });
 
     it('should not overwrite an existing wallet by default', async () => {
-        await keymaster.loadWallet();
+        await keymaster.loadOrCreateWallet();
 
         try {
             await keymaster.newWallet();
@@ -486,6 +510,10 @@ describe('newWallet', () => {
 });
 
 describe('resolveSeedBank', () => {
+    beforeEach(async () => {
+        await keymaster.loadOrCreateWallet();
+    });
+
     it('should create a deterministic seed bank ID', async () => {
         const bank1 = await keymaster.resolveSeedBank();
         const bank2 = await keymaster.resolveSeedBank();
@@ -498,6 +526,10 @@ describe('resolveSeedBank', () => {
 });
 
 describe('backupWallet', () => {
+    beforeEach(async () => {
+        await keymaster.loadOrCreateWallet();
+    });
+
     it('should return a valid DID', async () => {
         await keymaster.createId('Bob');
         const did = await keymaster.backupWallet();
@@ -516,6 +548,10 @@ describe('backupWallet', () => {
 });
 
 describe('recoverWallet', () => {
+    beforeEach(async () => {
+        await keymaster.loadOrCreateWallet();
+    });
+
     it('should recover wallet from seed bank', async () => {
         await keymaster.createId('Bob');
         const wallet = await keymaster.loadWallet();
@@ -641,6 +677,10 @@ describe('recoverWallet', () => {
 });
 
 describe('checkWallet', () => {
+    beforeEach(async () => {
+        await keymaster.loadOrCreateWallet();
+    });
+
     it('should report no problems with empty wallet', async () => {
         const { checked, invalid, deleted } = await keymaster.checkWallet();
 
@@ -711,6 +751,10 @@ describe('checkWallet', () => {
 });
 
 describe('fixWallet', () => {
+    beforeEach(async () => {
+        await keymaster.loadOrCreateWallet();
+    });
+
     it('should report no problems with empty wallet', async () => {
         const { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } = await keymaster.fixWallet();
 
@@ -794,5 +838,63 @@ describe('updateWallet', () => {
         } catch (error: any) {
             expect(error.message).toBe('updateWallet: no wallet found to update');
         }
+    });
+});
+
+// Reading never creates: an empty store is refused, and provisioning is the
+// separate loadOrCreateWallet call (#1037).
+describe('wallet provisioning', () => {
+    function build() {
+        return new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+    }
+
+    it('refuses to load from an empty store', async () => {
+        await expect(build().loadWallet()).rejects.toThrow('Wallet not found');
+    });
+
+    // The failure has to be distinguishable, because callers turn it into a
+    // startup refusal rather than a generic error.
+    it('throws WalletNotFoundError, not a bare Error', async () => {
+        await expect(build().loadWallet()).rejects.toBeInstanceOf(WalletNotFoundError);
+    });
+
+    it('loadOrCreateWallet provisions an empty store', async () => {
+        const created = await build().loadOrCreateWallet();
+
+        expect(created.seed).toBeDefined();
+        expect(await wallet.loadWallet()).not.toBeNull();
+    });
+
+    it('loadOrCreateWallet returns the stored wallet rather than replacing it', async () => {
+        const first = await build().loadOrCreateWallet();
+        const again = await build().loadOrCreateWallet();
+
+        expect(again.seed).toEqual(first.seed);
+    });
+
+    // Provisioning is the only way in, so a caller that forgets it gets an
+    // error rather than a silently different identity.
+    it('leaves the store untouched when loadWallet refuses', async () => {
+        await expect(build().loadWallet()).rejects.toThrow();
+
+        expect(await wallet.loadWallet()).toBeNull();
+    });
+
+    // recoverId's catch converts unexpected errors to InvalidDIDError. A missing
+    // wallet is not an invalid DID, and callers turn WalletNotFoundError into a
+    // remedy; it has to survive the catch.
+    it('recoverId surfaces WalletNotFoundError rather than InvalidDIDError', async () => {
+        await expect(build().recoverId('did:cid:bagaaieranotreal')).rejects.toBeInstanceOf(WalletNotFoundError);
+    });
+
+    // A warm instance keeps the wallet it loaded even if the store is emptied
+    // underneath it: that is the lost-store case, and provisioning there would
+    // replace the identity the process is already using.
+    it('loadOrCreateWallet honours the cache over an emptied store', async () => {
+        const km = build();
+        const loaded = await km.loadOrCreateWallet();
+        wallet.walletCache = null;
+
+        expect(await km.loadOrCreateWallet()).toBe(loaded);
     });
 });

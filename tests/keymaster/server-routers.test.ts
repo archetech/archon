@@ -576,3 +576,4 @@ describe('keymaster admin key startup check', () => {
         expect(checkPassphrase('correct horse battery staple').fatal).toBeUndefined();
     });
 });
+

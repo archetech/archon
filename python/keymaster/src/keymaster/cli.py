@@ -68,7 +68,7 @@ WALLET_OPTIONAL_COMMANDS = {
 # ---------------------------------------------------------------------------
 
 async def cmd_create_wallet(km: Keymaster, args: argparse.Namespace) -> None:
-    wallet = await km.load_wallet()
+    wallet = await km.load_or_create_wallet()
     _print_json(wallet)
 
 
@@ -142,6 +142,9 @@ async def cmd_recover_wallet_did(km: Keymaster, args: argparse.Namespace) -> Non
 
 async def cmd_create_id(km: Keymaster, args: argparse.Namespace) -> None:
     opts = {"registry": args.registry} if args.registry else {}
+    # create-id is allowed to run before a wallet exists, so it is one of the
+    # two commands that provision.
+    await km.load_or_create_wallet()
     print(await km.create_id(args.name, opts or None))
     # A wallet is created on demand, so any create-id may be the run that made
     # one. On stderr, so it cannot land in a piped DID.
@@ -1465,16 +1468,16 @@ async def _run(args: argparse.Namespace) -> int:
         data_folder=str(wallet_path_obj.parent) if wallet_path_obj.parent.as_posix() else ".",
     )
 
-    if args.command not in WALLET_OPTIONAL_COMMANDS:
-        existing = wallet_store.load_wallet()
-        if not existing:
-            print(f"Error: Wallet not found at {wallet_path}", file=sys.stderr)
-            print(
-                "Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.",
-                file=sys.stderr,
-            )
-            print("To create a new wallet, run: keymaster create-wallet", file=sys.stderr)
-            return 1
+    # Only read the store when its absence would be fatal. Reading parses it, so
+    # a corrupt wallet would otherwise block the very commands that replace one.
+    if args.command not in WALLET_OPTIONAL_COMMANDS and not wallet_store.load_wallet():
+        print(f"Error: Wallet not found at {wallet_path}", file=sys.stderr)
+        print(
+            "Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.",
+            file=sys.stderr,
+        )
+        print("To create a new wallet, run: keymaster create-wallet", file=sys.stderr)
+        return 1
 
     gatekeeper = GatekeeperClient(gatekeeper_url)
     try:

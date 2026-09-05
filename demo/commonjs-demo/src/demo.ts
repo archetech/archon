@@ -44,6 +44,9 @@ async function main() {
             cipher,
             passphrase: process.env.ARCHON_ENCRYPTED_PASSPHRASE || "passphrase",
         });
+
+        // WalletJsonMemory starts empty every run, so this demo always provisions.
+        await keymaster.loadOrCreateWallet();
     }
 
     try {

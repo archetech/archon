@@ -81,6 +81,10 @@ class KeymasterError(Exception):
     pass
 
 
+class WalletNotFoundError(KeymasterError):
+    """The wallet store is empty and this surface does not provision wallets."""
+
+
 class UnknownIDError(KeymasterError):
     pass
 
@@ -180,11 +184,29 @@ class Keymaster:
 
         stored = self.wallet_store.load_wallet()
         if stored is None:
-            stored = await self.new_wallet()
+            # Reading never creates. An empty store here is an unmounted volume,
+            # a wiped database or a switched backend as often as it is a first
+            # run, and the two cannot be told apart from the store. Callers that
+            # provision say so through load_or_create_wallet (#1037).
+            raise WalletNotFoundError("wallet store is empty")
 
         decrypted = await self.decrypt_wallet(stored)
         self._wallet_cache = self._upgrade_wallet(decrypted)
         return self._wallet_cache
+
+    async def load_or_create_wallet(self) -> dict[str, Any]:
+        """Load the wallet, creating one only when the store holds none.
+
+        The one call that provisions, so creation is a decision at a call site
+        rather than a side effect of a read. Goes through ``load_wallet`` so the
+        cache is honoured: an instance that has already loaded a wallet keeps it
+        even if the store underneath has since been emptied. Mirrors the
+        TypeScript ``loadOrCreateWallet``.
+        """
+        try:
+            return await self.load_wallet()
+        except WalletNotFoundError:
+            return await self.new_wallet()
 
     async def save_wallet(self, wallet: dict[str, Any], overwrite: bool = True) -> bool:
         decrypted = await self.decrypt_wallet(wallet)
@@ -213,7 +235,9 @@ class Keymaster:
         ok = await self.save_wallet(wallet, overwrite=overwrite)
         if not ok:
             raise KeymasterError("save wallet failed")
-        return wallet
+        # save_wallet installed an upgraded copy as the cache; hand back that
+        # object, so a caller's edits are the ones load_wallet then sees.
+        return self._wallet_cache if self._wallet_cache is not None else wallet
 
     async def decrypt_wallet(self, stored: dict[str, Any]) -> dict[str, Any]:
         if "enc" not in stored:
@@ -914,6 +938,11 @@ class Keymaster:
                     continue
 
                 return await self.create_response(data["challenge"], {"retries": 5, "delay": 1000})
+            except WalletNotFoundError:
+                # No wallet is not a property of this endpoint; trying the next
+                # one cannot help, and reporting it as a challenge failure hides
+                # the remedy.
+                raise
             except Exception:
                 last_error = "Failed to fetch address challenge"
 

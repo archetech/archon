@@ -30,7 +30,7 @@ afterAll(async () => {
     }
 });
 
-beforeEach(() => {
+beforeEach(async () => {
     const db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm'] });
     keymaster = new Keymaster({
@@ -39,6 +39,7 @@ beforeEach(() => {
         cipher: new CipherNode(),
         passphrase: 'passphrase',
     });
+    await keymaster.loadOrCreateWallet();
 });
 
 describe('revocation and immutability', () => {

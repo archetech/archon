@@ -54,3 +54,4 @@ def test_secret_matches_handles_non_ascii_and_non_str():
     assert not _secret_matches("pässwörd", "other")
     assert not _secret_matches(None, "secret")
     assert not _secret_matches(1234, "secret")
+

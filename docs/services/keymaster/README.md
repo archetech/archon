@@ -122,6 +122,36 @@ parses (search the file for `response.data.<key>` to enumerate). The full
 key inventory, including routes that return unwrapped objects, is the
 contract.
 
+### 2.1.1 Wallet provisioning
+
+An empty wallet store and a lost one are the same read: every backend returns
+null for "no wallet here", and none can distinguish a store that never held one
+from a store that used to. So a node cannot tell a genuine first run from a
+volume that failed to mount, a wiped database, or a changed
+`ARCHON_KEYMASTER_DB`.
+
+Implementations MUST NOT create a wallet as a side effect of loading one.
+Provisioning MUST be a distinct operation, performed once at startup, and it
+MUST be observable: log a warning naming the store, and increment
+`keymaster_wallets_created_total`. A node mints a wallet once in its life, so a
+non-zero counter on a node that has been running is the signal that its store
+went missing.
+
+Loading MUST NOT create. Provisioning is a separate call — `loadOrCreateWallet`
+in the TypeScript library, `load_or_create_wallet` in the Python one, or
+`newWallet` after a `WalletNotFoundError` — so it is visible at the call site
+rather than governed by configuration read somewhere else. The surfaces that
+provision are: the CLIs, in the `create-wallet` and `create-id` handlers (the
+only two on their allowlist of commands that may run before a wallet exists
+whose handlers assume one); the MCP server, in `archon_create_wallet` and
+`archon_create_id`; the browser wallets, in their first-run setup flow only;
+and the services, once at startup, where a `WalletNotFoundError` from
+`loadWallet` is answered with a warning, `newWallet`, and the counter. Every
+other caller reaching an empty store has lost one, and gets a
+`WalletNotFoundError`.
+
+There is currently no way to make an empty store fatal instead; that is #1051.
+
 ### 2.2 Authentication
 
 - `POST /api/v1/login` accepts `{ "passphrase": string }` and returns
@@ -981,6 +1011,7 @@ Exposed at `GET /metrics`.
 | `http_requests_total` | counter | `method`, `route`, `status` |
 | `http_request_duration_seconds` | histogram (buckets: 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5) | `method`, `route`, `status` |
 | `wallet_operations_total` | counter | `operation`, `status` |
+| `keymaster_wallets_created_total` | counter | — |
 | `service_version_info` | gauge | `version`, `commit` |
 
 Plus Prometheus default process metrics (`process_resident_memory_bytes`,
@@ -1063,17 +1094,22 @@ labels.
 
 ### 15.3 Startup sequence
 
-1. Bind HTTP listener.
-2. Connect to Gatekeeper (`waitUntilReady=true`, polling every 5s).
-3. Initialize the wallet backend.
-4. Construct the in-process Keymaster with the wallet, Gatekeeper client,
-   and cipher implementation.
-5. Run `waitForNodeId()`:
+1. Validate `ARCHON_ADMIN_API_KEY` and `ARCHON_ENCRYPTED_PASSPHRASE`; exit
+   non-zero if either is unset (§2.2).
+2. Bind HTTP listener.
+3. Connect to Gatekeeper (`waitUntilReady=true`, polling every 5s).
+4. Initialize the wallet backend and construct the in-process Keymaster with
+   it, the Gatekeeper client, and the cipher implementation.
+5. Load the wallet. If the store is empty, provision one: log the warning and
+   increment `keymaster_wallets_created_total` (§2.1.1). Any other failure to
+   load — an unreadable store, a wrong passphrase — ends the process with a
+   non-zero exit rather than leaving a listener with no Keymaster behind it.
+6. Run `waitForNodeId()`:
    - `ARCHON_NODE_ID` MUST be set.
    - If the wallet doesn't have an ID with that name, create one
      (`keymaster.createId(ARCHON_NODE_ID)`).
    - Loop until the new ID resolves on the Gatekeeper (10s between polls).
-6. Mark `serverReady = true`.
+7. Mark `serverReady = true`.
 
 `/api/v1/ready` returns `{ "ready": serverReady }` and MUST return
 `{ "ready": false }` until the node ID resolves.

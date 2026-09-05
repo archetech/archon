@@ -40,7 +40,7 @@ program
     .description('Create a new wallet (or show existing wallet)')
     .action(async () => {
         try {
-            const wallet = await keymaster.loadWallet();
+            const wallet = await keymaster.loadOrCreateWallet();
             console.log(JSON.stringify(wallet, null, 4));
         }
         catch (error: any) {
@@ -210,6 +210,9 @@ program
     .action(async (name, options) => {
         try {
             const { registry } = options;
+            // create-id is allowed to run before a wallet exists, so it is one
+            // of the two commands that provision.
+            await keymaster.loadOrCreateWallet();
             const did = await keymaster.createId(name, { registry });
             console.log(did);
             // A wallet is created on demand, so any create-id may be the run
@@ -2283,17 +2286,22 @@ async function run() {
         // Commands in this allowlist can run before a local wallet exists.
         const walletOptionalCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file', 'list-registries'];
         const commandName = process.argv[2];
-        if (commandName && !walletOptionalCommands.includes(commandName)) {
-            const existing = await wallet.loadWallet();
-            if (!existing) {
-                console.error(`Error: Wallet not found at ${walletPath}`);
-                console.error('Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.');
-                console.error('To create a new wallet, run: keymaster create-wallet');
-                process.exit(1);
-            }
+        const walletOptional = !commandName || walletOptionalCommands.includes(commandName);
+
+        // Only read the store when its absence would be fatal. Reading parses
+        // it, so a corrupt wallet would otherwise block the very commands that
+        // exist to replace one.
+        if (!walletOptional && !await wallet.loadWallet()) {
+            console.error(`Error: Wallet not found at ${walletPath}`);
+            console.error('Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.');
+            console.error('To create a new wallet, run: keymaster create-wallet');
+            process.exit(1);
         }
 
         // Initialize keymaster
+        // No provisioning here: of the allowlisted commands, most create or
+        // replace a wallet themselves and one needs none at all. The two whose
+        // handlers assume a wallet exists provision in the handler.
         keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase });
 
         program.parse(process.argv);

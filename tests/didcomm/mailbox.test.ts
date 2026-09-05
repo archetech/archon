@@ -609,11 +609,12 @@ describe('verifyChallengeSignature', () => {
         }
     });
 
-    beforeEach(() => {
+    beforeEach(async () => {
         const db = new DbJsonMemory('test');
         gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm'] });
         cipher = new CipherNode();
         keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'pass' });
+        await keymaster.loadOrCreateWallet();
     });
 
     async function sign(name: string, challenge: string): Promise<string> {
