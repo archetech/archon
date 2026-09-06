@@ -13,6 +13,7 @@ import KeymasterClient from '@didcid/clients/keymaster';
 import KuboClient from '@didcid/ipfs/kubo';
 import { Operation } from '@didcid/gatekeeper/types';
 import CipherNode from '@didcid/cipher/node';
+import { installProcessGuards } from '@didcid/common/process-guards';
 import config from './config.js';
 import { exit } from 'process';
 
@@ -740,13 +741,10 @@ async function connectionLoop(): Promise<void> {
     setTimeout(connectionLoop, 60 * 1000);
 }
 
-process.on('uncaughtException', (error) => {
-    console.error('Unhandled exception caught', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled rejection at:', promise, 'reason:', reason);
-});
+// Fatal until main resolves, then log-and-continue: the mediator binds its
+// metrics port partway through startup, so a failure after that would
+// otherwise leave a process serving metrics and mediating nothing.
+const startupComplete = installProcessGuards('Hyperswarm mediator');
 
 process.stdin.on('data', d => {
     if (d.toString().startsWith('q')) {
@@ -828,4 +826,4 @@ async function main(): Promise<void> {
     await connectionLoop();
 }
 
-main();
+main().then(startupComplete);

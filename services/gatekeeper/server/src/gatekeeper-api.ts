@@ -7,6 +7,7 @@ import { resolve as resolvePath } from 'path';
 import { fileURLToPath } from 'url';
 import type Gatekeeper from '@didcid/gatekeeper';
 import { CheckDIDsResult } from '@didcid/gatekeeper/types';
+import { installProcessGuards } from '@didcid/common/process-guards';
 import { createIdentifiersRouter } from './identifiers-router.js';
 import { createV1Router } from './v1-router.js';
 import { checkAdminApiKey } from './v1-admin.js';
@@ -400,7 +401,7 @@ async function createDb(config: GatekeeperApiConfig) {
     }
 }
 
-async function main() {
+async function main(startupComplete: () => void) {
     const config = defaultConfig;
 
     const adminKeyCheck = checkAdminApiKey(config.adminApiKey);
@@ -471,6 +472,9 @@ async function main() {
         console.log(`Server is running on ${config.bindAddress}:${config.port}`);
         console.log('Admin API key protection is ENABLED');
         api.setReady(true);
+        // Startup is over when the port is bound, not when main returns:
+        // main returns first, and a bind that fails arrives later still.
+        startupComplete();
     });
 
     const shutdown = async () => {
@@ -495,13 +499,8 @@ const isMain = process.argv[1]
     : false;
 
 if (isMain) {
-    main();
-
-    process.on('uncaughtException', (error) => {
-        console.error('Unhandled exception caught', error);
-    });
-
-    process.on('unhandledRejection', (reason, promise) => {
-        console.error('Unhandled rejection caught', reason, promise);
-    });
+    // Installed before main runs, and fatal until the port is bound: a bad
+    // request must not take a running service down, but a failed startup must
+    // not leave a process alive with no gatekeeper behind it.
+    main(installProcessGuards('Gatekeeper'));
 }

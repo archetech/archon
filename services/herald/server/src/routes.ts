@@ -1378,14 +1378,6 @@ export function createHeraldRoutes(ctx: HeraldContext): {
         }
     });
 
-    process.on('uncaughtException', (error) => {
-        console.error('Unhandled exception caught', error);
-    });
-
-    process.on('unhandledRejection', (reason, promise) => {
-        console.error('Unhandled rejection at:', promise, 'reason:', reason);
-    });
-
     const DMAIL_POLL_INTERVAL_MS = 60_000; // 1 minute
 
     async function pollDmailForEmail(): Promise<void> {

@@ -8,6 +8,7 @@ import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import { WalletNotFoundError } from '@didcid/common/errors';
+import { installProcessGuards } from '@didcid/common/process-guards';
 import KeymasterClient from '@didcid/clients/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import { DatabaseInterface } from './db/interfaces.js';
@@ -45,6 +46,11 @@ const ctx: HeraldContext = {
 };
 
 dotenv.config();
+
+// Fatal until startupComplete() at the end of the bootstrap below, then
+// log-and-continue: a bad request must not take a running service down, but a
+// failed startup must not leave one listening with no keymaster behind it.
+const startupComplete = installProcessGuards(SERVICE_NAME);
 
 const SESSION_SECRET_PLACEHOLDERS = new Set(['change-me', 'change-me-to-a-random-string']);
 
@@ -183,46 +189,38 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
             process.exit(1);
         }
 
-        // Wrapped and exited explicitly: routes.ts installs a log-only
-        // unhandledRejection handler at module scope, so a throw here would
-        // otherwise leave Herald listening with no keymaster behind it.
+        const gatekeeper = new GatekeeperClient();
+        await gatekeeper.connect({
+            url: GATEKEEPER_URL,
+            waitUntilReady: true,
+            intervalSeconds: 5,
+            chatty: true,
+        });
+        const wallet = new WalletJson('wallet.json', DATA_DIR);
+        const cipher = new CipherNode();
+
+        ctx.keymaster = new Keymaster({
+            gatekeeper,
+            wallet,
+            cipher,
+            passphrase,
+        });
+
+        // Herald issues name credentials from this identity, so replacing it
+        // invalidates every credential it has issued. Provisioning is fine on
+        // a first run; it must not pass unremarked on any other.
         try {
-            const gatekeeper = new GatekeeperClient();
-            await gatekeeper.connect({
-                url: GATEKEEPER_URL,
-                waitUntilReady: true,
-                intervalSeconds: 5,
-                chatty: true,
-            });
-            const wallet = new WalletJson('wallet.json', DATA_DIR);
-            const cipher = new CipherNode();
-
-            ctx.keymaster = new Keymaster({
-                gatekeeper,
-                wallet,
-                cipher,
-                passphrase,
-            });
-
-            // Herald issues name credentials from this identity, so replacing it
-            // invalidates every credential it has issued. Provisioning is fine on
-            // a first run; it must not pass unremarked on any other.
-            try {
-                await ctx.keymaster.loadWallet();
-            }
-            catch (error) {
-                if (!(error instanceof WalletNotFoundError)) {
-                    throw error;
-                }
-
-                console.warn(`Herald: no wallet at ${DATA_DIR}/wallet.json — creating one. If this node has run before, its data directory is missing and the identity it issued credentials from has been replaced.`);
-                await ctx.keymaster.newWallet();
-            }
+            await ctx.keymaster.loadWallet();
         }
         catch (error) {
-            console.error('Herald failed to start:', error);
-            process.exit(1);
+            if (!(error instanceof WalletNotFoundError)) {
+                throw error;
+            }
+
+            console.warn(`Herald: no wallet at ${DATA_DIR}/wallet.json — creating one. If this node has run before, its data directory is missing and the identity it issued credentials from has been replaced.`);
+            await ctx.keymaster.newWallet();
         }
+
         console.log(`${SERVICE_NAME} using gatekeeper at ${GATEKEEPER_URL}`);
     }
 
@@ -246,4 +244,5 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
 
     console.log(`${SERVICE_NAME} using wallet at ${WALLET_URL}`);
     console.log(`${SERVICE_NAME} listening on port ${HOST_PORT}`);
+    startupComplete();
 });
