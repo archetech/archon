@@ -258,7 +258,7 @@ don't need the full Keymaster service surface.
 ### 4.3 Service identity
 
 On startup Herald ensures a Keymaster ID exists with the name
-`ARCHON_HERALD_NAME` (default `name-service`). If the wallet doesn't
+`ARCHON_HERALD_NAME` (default `herald`). If the wallet doesn't
 have it, Herald creates it (`keymaster.createId(name)`). The
 resulting DID is the Herald's "service identity" — it owns every
 issued credential.
@@ -410,7 +410,7 @@ gateway at `ipns://<key-id>/`.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `ARCHON_HERALD_PORT` | `4230` | HTTP listen port. |
-| `ARCHON_HERALD_NAME` | `name-service` | Service identity name (Keymaster ID). Owns issued credentials. |
+| `ARCHON_HERALD_NAME` | `herald` | Service identity name (Keymaster ID). Owns issued credentials. |
 | `ARCHON_HERALD_DOMAIN` | empty | Domain for credential subjects (`<name>@<domain>`) and WebFinger validation. |
 | `ARCHON_HERALD_DB` | `json` | `json` / `sqlite` / `redis`. |
 | `ARCHON_HERALD_DATA_DIR` | `/app/server/data` | Filesystem root for JSON / SQLite / OAuth signing key. |
@@ -420,7 +420,7 @@ gateway at `ipns://<key-id>/`.
 | `ARCHON_HERALD_WALLET_PASSPHRASE` | empty | Required for standalone mode; ignored in shared mode. |
 | `ARCHON_HERALD_WALLET_URL` | `https://wallet.archon.technology` | URL embedded in `challengeURL` so wallets know where to load. |
 | `ARCHON_HERALD_IPFS_API_URL` | `http://localhost:5001/api/v0` | Kubo HTTP API for IPNS publication. |
-| `ARCHON_HERALD_IPNS_KEY_NAME` | `name-service` (the value of `ARCHON_HERALD_NAME`) | IPNS key name. |
+| `ARCHON_HERALD_IPNS_KEY_NAME` | `herald` (the value of `ARCHON_HERALD_NAME`) | IPNS key name. |
 | `ARCHON_HERALD_MEMBERSHIP_SCHEMA_DID` | `did:cid:bagaaieravnv5o...` | Schema DID for issued membership credentials. |
 | `ARCHON_HERALD_TOR_PROXY` | empty | SOCKS5 proxy `host:port` for `.onion` Lightning lookups. |
 | `ARCHON_HERALD_JWT_KEY_PATH` | `${DATA_DIR}/oauth-signing-key.json` | Persisted ES256 OAuth signing key. |

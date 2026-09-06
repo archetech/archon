@@ -14,7 +14,11 @@ services:
       - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       - ARCHON_HERALD_KEYMASTER_URL=${ARCHON_HERALD_KEYMASTER_URL-http://keymaster:4226}
-      - ARCHON_HERALD_WALLET_URL=${ARCHON_HERALD_WALLET_URL:-http://localhost:4228}
+      # The login challenge is handed to the visitor's browser, so this has to
+      # resolve for them rather than on the node. Operators running their own
+      # wallet point it there; a localhost default would only ever work for a
+      # visitor sitting on the node itself.
+      - ARCHON_HERALD_WALLET_URL=${ARCHON_HERALD_WALLET_URL:-https://wallet.archon.technology}
       # Single-dash default so an explicitly empty value survives and hides the
       # explorer links, rather than being replaced by the fallback.
       - ARCHON_HERALD_EXPLORER_URL=${ARCHON_HERALD_EXPLORER_URL-https://explorer.archon.technology}

@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { SignJWT, exportJWK, generateKeyPair, importJWK } from 'jose';
+import { WALLET_URL } from '../config.js';
 
 const DATA_DIR = process.env.ARCHON_HERALD_DATA_DIR || '/app/server/data';
 const JWT_KEY_PATH = process.env.ARCHON_HERALD_JWT_KEY_PATH || path.join(DATA_DIR, 'oauth-signing-key.json');
@@ -250,8 +251,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             });
 
             // Return challenge for client to display
-            const walletUrl = process.env.ARCHON_HERALD_WALLET_URL || 'https://wallet.archon.technology';
-            const challengeURL = `${walletUrl}?challenge=${challenge}`;
+            const challengeURL = `${WALLET_URL}?challenge=${challenge}`;
 
             // If explicitly requesting JSON (API call), return JSON
             const wantsJson = req.headers.accept?.includes('application/json') && 

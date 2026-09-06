@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { globSync } from 'fs';
+import ts from 'typescript';
 
 // A compose fragment writing ${VAR:-x} and the service reading VAR with its own
 // default are two copies of the same number. They disagreed for the gatekeeper
@@ -13,15 +14,16 @@ const COMPOSE = globSync('docker/compose/*.yml')
     .concat(globSync('docker-compose*.yml'))
     .filter(path => !path.endsWith('gatekeeper-parity.yml'));
 
-// Every runtime flavor, so a default cannot drift between the ports that are
-// meant to be interchangeable.
-const CONFIGS = [
-    'services/gatekeeper/server/src/config.js',
-    'services/keymaster/server/src/config.js',
-    'services/mediators/hyperswarm/src/config.js',
-    'rust/services/gatekeeper/src/config.rs',
-    'python/keymaster_service/src/keymaster_service/config.py',
-];
+// Every service that reads its own environment, and every runtime flavor of the
+// ones with more than one, so a default cannot drift between ports meant to be
+// interchangeable. Globbed rather than listed: a config file nothing here
+// matches is a file whose defaults nothing compares against.
+const CONFIGS = globSync('services/*/server/src/config.*')
+    .concat(globSync('services/mediators/*/src/config.*'))
+    .concat([
+        'rust/services/gatekeeper/src/config.rs',
+        'python/keymaster_service/src/keymaster_service/config.py',
+    ]);
 
 type Declaration = { path: string, value: string };
 
@@ -50,37 +52,134 @@ function composeDefaults(): Map<string, Declaration[]> {
     return defaults;
 }
 
+// A default that is not a literal -- a call, another variable, a nested
+// ternary -- is not a second copy of anything a compose file writes, so it goes
+// unrecorded rather than recorded wrong.
+function literalValue(node: ts.Node): string | null {
+    if (ts.isStringLiteral(node)) {
+        return node.text;
+    }
+
+    if (ts.isNumericLiteral(node)) {
+        // 10_000 in code is 10000 in compose.
+        return node.getText().replace(/_/g, '');
+    }
+
+    if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) {
+        return node.getText();
+    }
+
+    return null;
+}
+
+// process.env.NAME, and nothing else that looks like it.
+function envVarName(node: ts.Node): string | null {
+    return ts.isPropertyAccessExpression(node)
+        && ts.isPropertyAccessExpression(node.expression)
+        && ts.isIdentifier(node.expression.expression)
+        && node.expression.expression.text === 'process'
+        && node.expression.name.text === 'env'
+        ? node.name.text
+        : null;
+}
+
+// The four shapes the services read an environment variable in:
+//
+//   process.env.VAR || 'value'
+//   process.env.VAR ? parseInt(process.env.VAR) : 60
+//   process.env.VAR === 'true'     — absent means false
+//   process.env.VAR !== 'false'    — absent means true
+//
+// Parsed rather than matched by pattern, because the last two appear inside the
+// first two: a regex recognising the bare comparison also fires on the one
+// nested in a ternary, and records false for a variable whose default is true.
+function jsDefaults(path: string, into: Map<string, Declaration[]>): void {
+    const source = ts.createSourceFile(path, readFileSync(path, 'utf-8'), ts.ScriptTarget.Latest, true);
+
+    function unwrap(node: ts.Expression): ts.Expression {
+        return ts.isParenthesizedExpression(node) ? unwrap(node.expression) : node;
+    }
+
+    function visit(node: ts.Node): void {
+        const declared = ts.isPropertyAssignment(node) || ts.isVariableDeclaration(node);
+        const initializer = declared && node.initializer ? unwrap(node.initializer) : undefined;
+
+        if (initializer && ts.isConditionalExpression(initializer)) {
+            const name = envVarName(unwrap(initializer.condition));
+            const value = literalValue(unwrap(initializer.whenFalse));
+
+            if (name && value !== null) {
+                record(into, name, value, path);
+            }
+        }
+
+        if (initializer && ts.isBinaryExpression(initializer)) {
+            const name = envVarName(unwrap(initializer.left));
+            const right = unwrap(initializer.right);
+            const operator = initializer.operatorToken.kind;
+
+            if (name && operator === ts.SyntaxKind.BarBarToken) {
+                const value = literalValue(right);
+
+                if (value !== null) {
+                    record(into, name, value, path);
+                }
+            }
+
+            if (name && operator === ts.SyntaxKind.EqualsEqualsEqualsToken && literalValue(right) === 'true') {
+                record(into, name, 'false', path);
+            }
+
+            if (name && operator === ts.SyntaxKind.ExclamationEqualsEqualsToken && literalValue(right) === 'false') {
+                record(into, name, 'true', path);
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(source);
+}
+
 function codeDefaults(): Map<string, Declaration[]> {
     const defaults = collect();
 
     for (const path of CONFIGS) {
+        if (path.endsWith('.ts') || path.endsWith('.js')) {
+            jsDefaults(path, defaults);
+            continue;
+        }
+
         const text = readFileSync(path, 'utf-8');
 
-        // process.env.VAR || 'value'      env_var_or_default("VAR", "value")
-        // os.environ.get("VAR", "value")
-        for (const [, a, b, c, value] of text.matchAll(
-            /(?:process\.env\.([A-Z][A-Z0-9_]*)\s*\|\||env_var_or_default\(\s*"([A-Z][A-Z0-9_]*)"\s*,|os\.environ\.get\(\s*"([A-Z][A-Z0-9_]*)"\s*,)\s*['"]([^'"]*)['"]/g)) {
-            record(defaults, (a ?? b ?? c)!, value, path);
+        // env_var_or_default("VAR", "value")   os.environ.get("VAR", "value")
+        for (const [, a, b, value] of text.matchAll(
+            /(?:env_var_or_default\(\s*"([A-Z][A-Z0-9_]*)"\s*,|os\.environ\.get\(\s*"([A-Z][A-Z0-9_]*)"\s*,)\s*['"]([^'"]*)['"]/g)) {
+            record(defaults, (a ?? b)!, value, path);
         }
 
-        // VAR ? parseInt(VAR) : 60        env_parse("VAR", 60)
-        for (const [, name, value] of text.matchAll(
-            /parseInt\(process\.env\.([A-Z][A-Z0-9_]*)\)\s*:\s*(\d+)/g)) {
-            record(defaults, name, value, path);
-        }
+        // env_parse("VAR", 60)
         for (const [, name, value] of text.matchAll(/env_parse\(\s*"([A-Z][A-Z0-9_]*)"\s*,\s*(\d+)\s*\)/g)) {
             record(defaults, name, value, path);
         }
 
-        // VAR ? VAR === 'true' : false    — booleans, whose default is the else branch
-        for (const [, name, value] of text.matchAll(
-            /process\.env\.([A-Z][A-Z0-9_]*)\s*\?[^:;,\n]*:\s*(true|false)/g)) {
-            record(defaults, name, value, path);
-        }
         // os.environ.get("VAR", "false").lower() == "true"
         for (const [, name, value] of text.matchAll(
             /os\.environ\.get\(\s*"([A-Z][A-Z0-9_]*)"\s*,\s*"(true|false)"\s*\)\s*\.lower\(\)/g)) {
             record(defaults, name, value, path);
+        }
+    }
+
+    // An empty code default is the absence of one, the same way an empty
+    // compose default means "leave it unset" rather than "set it to nothing".
+    for (const [name, declarations] of defaults) {
+        const values = declarations.filter(declaration => declaration.value !== '');
+
+        if (values.length) {
+            defaults.set(name, values);
+        }
+        else {
+            defaults.delete(name);
         }
     }
 
