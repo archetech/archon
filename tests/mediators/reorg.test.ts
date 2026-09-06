@@ -1,5 +1,5 @@
-import { isBlockNotFound as satoshi, rewindTarget as satoshiRewind, reorgDepth as satoshiConfigured, DEFAULT_REORG_DEPTH as satoshiDepth } from '../../services/mediators/satoshi/src/reorg.ts';
-import { isBlockNotFound as zcash, rewindTarget as zcashRewind, reorgDepth as zcashConfigured, DEFAULT_REORG_DEPTH as zcashDepth } from '../../services/mediators/zcash/src/reorg.ts';
+import { isBlockNotFound as satoshi, rewindTarget as satoshiRewind, planRewind as satoshiPlan, reorgDepth as satoshiConfigured, DEFAULT_REORG_DEPTH as satoshiDepth } from '../../services/mediators/satoshi/src/reorg.ts';
+import { isBlockNotFound as zcash, rewindTarget as zcashRewind, planRewind as zcashPlan, reorgDepth as zcashConfigured, DEFAULT_REORG_DEPTH as zcashDepth } from '../../services/mediators/zcash/src/reorg.ts';
 
 // A reorg near the tip must not restart the scan from the configured start
 // block. A rewind that follows the orphaned chain gives up on the first block
@@ -7,11 +7,11 @@ import { isBlockNotFound as zcash, rewindTarget as zcashRewind, reorgDepth as zc
 // of progress under the same log line a two-block rewind prints (#1063).
 
 const IMPLEMENTATIONS = [
-    ['satoshi', satoshi, satoshiRewind, satoshiConfigured, satoshiDepth],
-    ['zcash', zcash, zcashRewind, zcashConfigured, zcashDepth],
+    ['satoshi', satoshi, satoshiRewind, satoshiPlan, satoshiConfigured, satoshiDepth],
+    ['zcash', zcash, zcashRewind, zcashPlan, zcashConfigured, zcashDepth],
 ] as const;
 
-describe.each(IMPLEMENTATIONS)('%s reorg handling', (_name, isBlockNotFound, rewindTarget, reorgDepth, depth) => {
+describe.each(IMPLEMENTATIONS)('%s reorg handling', (_name, isBlockNotFound, rewindTarget, planRewind, reorgDepth, depth) => {
     describe('rewindTarget', () => {
         it('rewinds by the configured depth', () => {
             expect(rewindTarget(3_474_237, 3_339_200, depth)).toBe(3_474_237 - depth);
@@ -32,6 +32,35 @@ describe.each(IMPLEMENTATIONS)('%s reorg handling', (_name, isBlockNotFound, rew
             expect(rewindTarget(1_000, 0, 0)).toBeLessThan(1_000);
             expect(rewindTarget(1_000, 0, -5)).toBeLessThan(1_000);
             expect(rewindTarget(1_000, 0, NaN)).toBeLessThan(1_000);
+        });
+    });
+
+    describe('planRewind', () => {
+        const START = 3_339_200;
+
+        it('resumes above the checkpoint when there is room below', () => {
+            expect(planRewind(START + 1_000, START, depth)).toStrictEqual({
+                rescanWindow: false,
+                checkpoint: START + 1_000 - depth,
+                from: START + 1_000 - depth + 1,
+            });
+        });
+
+        // At the window start there is no block below to resume above, so
+        // resuming above the checkpoint would skip the block that replaced
+        // ours with nothing left to catch it.
+        it('re-reads the window from its first block at the boundary', () => {
+            expect(planRewind(START + depth, START, depth)).toStrictEqual({ rescanWindow: true, from: START });
+            expect(planRewind(START + 1, START, depth)).toStrictEqual({ rescanWindow: true, from: START });
+            expect(planRewind(START, START, depth)).toStrictEqual({ rescanWindow: true, from: START });
+        });
+
+        it('is one block clear of the boundary just above it', () => {
+            expect(planRewind(START + depth + 1, START, depth)).toStrictEqual({
+                rescanWindow: false,
+                checkpoint: START + 1,
+                from: START + 2,
+            });
         });
     });
 

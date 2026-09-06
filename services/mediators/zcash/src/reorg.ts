@@ -36,6 +36,25 @@ export function rewindTarget(height: number, startBlock: number, depth: number):
     return Math.max(startBlock, height - blocksToRewind(depth));
 }
 
+// What a reorg at `height` means for the stored position.
+//
+// Away from the window start there is a block below to fall back on: it
+// becomes the checkpoint and reading resumes above it. At the start there is
+// not, so the window is re-read from its first block instead of from the one
+// after it -- the boundary is where resuming above the target would skip the
+// block that replaced ours with nothing left to catch it.
+export type Rewind =
+    | { rescanWindow: true, from: number }
+    | { rescanWindow: false, checkpoint: number, from: number };
+
+export function planRewind(height: number, startBlock: number, depth: number): Rewind {
+    const target = rewindTarget(height, startBlock, depth);
+
+    return target === startBlock
+        ? { rescanWindow: true, from: startBlock }
+        : { rescanWindow: false, checkpoint: target, from: target + 1 };
+}
+
 // Whether an error says the node does not have that block, as opposed to
 // saying nothing because it could not be asked.
 //

@@ -17,7 +17,7 @@ import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 import axios from 'axios';
 import { createHash } from 'crypto';
-import { isBlockNotFound, rewindTarget } from './reorg.js';
+import { isBlockNotFound, planRewind } from './reorg.js';
 
 const REGISTRY = config.chain;
 
@@ -550,23 +550,42 @@ async function resolveScanStart(blockCount: number): Promise<number | null> {
         return db.height + 1;
     }
 
-    satoshiReorgs.inc();
+    const plan = planRewind(db.height, config.startBlock, config.reorgDepth);
 
-    const rewindHeight = rewindTarget(db.height, config.startBlock, config.reorgDepth);
+    // The stored height sits just below the window, which is what a scan that
+    // has read none of it looks like.
+    if (plan.rescanWindow) {
+        satoshiReorgs.inc();
+        console.log(`Reorg detected at height ${db.height}; rescanning the window from ${config.startBlock}`);
+
+        await jsonPersister.updateDb((data) => {
+            data.height = config.startBlock - 1;
+            data.hash = '';
+            data.time = '';
+            data.blocksScanned = 0;
+            data.txnsScanned = 0;
+            data.blockCount = blockCount;
+            data.blocksPending = blockCount - config.startBlock;
+        });
+
+        return plan.from;
+    }
+
     let rewindHash: string;
     let rewindHeader: BlockHeader;
 
     try {
-        rewindHash = await getChainBlockHash(rewindHeight);
+        rewindHash = await getChainBlockHash(plan.checkpoint);
         rewindHeader = await getChainBlockHeader(rewindHash);
     } catch (error) {
         // Committing a rewind to a block that cannot be read would store a
         // position no later pass can verify.
-        console.warn(`Reorg at height ${db.height}, but the chain at ${rewindHeight} could not be read, skipping this pass: ${error}`);
+        console.warn(`Reorg at height ${db.height}, but the chain at ${plan.checkpoint} could not be read, skipping this pass: ${error}`);
         return null;
     }
 
-    console.log(`Reorg detected at height ${db.height}; rewinding ${db.height - rewindHeight} block(s) to ${rewindHeight}`);
+    satoshiReorgs.inc();
+    console.log(`Reorg detected at height ${db.height}; rewinding ${db.height - plan.checkpoint} block(s) to ${plan.checkpoint}`);
 
     let txnsToSubtract = 0;
     let counted = true;
@@ -574,7 +593,7 @@ async function resolveScanStart(blockCount: number): Promise<number | null> {
     try {
         // The blocks about to be read again were counted when they were read
         // the first time.
-        for (let height = rewindHeight + 1; height <= Math.min(db.height, blockCount); height++) {
+        for (let height = plan.from; height <= Math.min(db.height, blockCount); height++) {
             txnsToSubtract += await getBlockTxCount(await getChainBlockHash(height));
         }
     } catch (error) {
@@ -586,16 +605,16 @@ async function resolveScanStart(blockCount: number): Promise<number | null> {
     }
 
     await jsonPersister.updateDb((data) => {
-        data.height = rewindHeight;
+        data.height = plan.checkpoint;
         data.hash = rewindHash;
         data.time = rewindHeader.time ? new Date(rewindHeader.time * 1000).toISOString() : '';
-        data.blocksScanned = Math.max(0, rewindHeight - config.startBlock + 1);
+        data.blocksScanned = Math.max(0, plan.checkpoint - config.startBlock + 1);
         data.txnsScanned = counted ? Math.max(0, data.txnsScanned - txnsToSubtract) : data.txnsScanned;
         data.blockCount = blockCount;
-        data.blocksPending = blockCount - rewindHeight;
+        data.blocksPending = blockCount - plan.checkpoint;
     });
 
-    return rewindHeight + 1;
+    return plan.from;
 }
 
 function discoveredKey(item: Pick<DiscoveredItem, 'height' | 'index' | 'txid' | 'did'>): string {

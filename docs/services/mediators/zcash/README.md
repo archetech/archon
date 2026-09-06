@@ -31,8 +31,8 @@ Walks the configured chain from `startBlock` forward via Zebra JSON-RPC,
 decoding every `OP_RETURN` output of every transparent transaction.
 When an `OP_RETURN` payload decodes as a valid `did:cid:...`, that
 transaction is recorded as a **discovered item** (height, index, time,
-txid, did). Handles reorgs by walking back through `previousblockhash`
-to the nearest confirmed ancestor and resuming from there.
+txid, did). Handles reorgs by re-reading a bounded number of blocks
+(§2.4).
 
 Shielded inputs and outputs are ignored; the scanner only inspects
 transparent `vout[].scriptPubKey.asm` strings.
@@ -153,14 +153,23 @@ The `registration` metadata is what later powers
 
 ### 2.4 Reorg handling
 
-Every scan cycle, the mediator checks whether the last scanned block
-hash still has `confirmations > 0` via `getblockheader`. If not, it
-walks `previousblockhash` backwards until it finds a block that does,
-subtracting that block's transaction count from `txnsScanned`, then
-resumes scanning from `height + 1`. Reorgs are counted via the
-`zcash_reorgs_total` metric.
+Every scan cycle, the mediator checks whether the last scanned block hash
+still has `confirmations > 0` via `getblockheader`. If the node reports the
+block as unknown, the chain has moved: the mediator rewinds
+`ARCHON_ZEC_REORG_DEPTH` blocks (default 6), re-reads them, and subtracts
+their transaction count from `txnsScanned`. Within that depth of the
+configured start block it re-reads the window from its first block instead,
+since there is no earlier block to resume above.
 
-Imports are idempotent at the Gatekeeper level
+Any other RPC failure is not a reorg. The mediator leaves its position alone
+and skips the pass, so the stored hash is checked again next cycle rather than
+overwritten by a scan that never verified it.
+
+Reorgs are counted via the `zcash_reorgs_total` metric, once per rewind that is
+committed.
+
+A reorg deeper than the configured depth is not detected. Imports are
+idempotent at the Gatekeeper level
 (`importBatchByCids` with the same CIDs produces the same `processed`
 result), so any discovered items beyond the rewind point will be
 re-discovered and re-imported as the canonical chain is rescanned.
@@ -179,7 +188,7 @@ delegated to the zcash-wallet service.
 | `getblockchaininfo` | Startup readiness probe. |
 | `getblockcount` | Scan-loop ceiling. |
 | `getblockhash(height)` | Deref height → hash. |
-| `getblockheader(hash)` | Confirmation check during reorg walk; also fetches `time` and `nTx` for sync mode. |
+| `getblockheader(hash)` | Confirmation check for the stored block and the rewind target; also fetches `time` and `nTx` for sync mode. |
 | `getblock(hash, 2)` | Fetch block with full tx+vout for OP_RETURN scanning. |
 | `getnetworkinfo` | `relayfee` for the local half of the hybrid fee estimator. |
 
@@ -465,8 +474,9 @@ A conformant third implementation MUST:
 - Parse OP_RETURN payloads on transparent Zcash outputs and detect
   valid `did:cid:...` strings.
 - Ignore shielded inputs/outputs entirely.
-- Handle reorgs by walking `previousblockhash` until
-  `confirmations > 0`, adjusting `txnsScanned` accordingly.
+- Handle reorgs by rewinding a bounded number of blocks and re-reading
+  them, adjusting `txnsScanned` accordingly, and treat a node that cannot
+  answer as a reason to retry rather than as a reorg.
 - Persist the `MediatorDb` shape in §4, including the atomic
   `updateDb` contract.
 - Call `gatekeeper.importBatchByCids` with the exact `metadata` shape

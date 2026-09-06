@@ -27,7 +27,7 @@ Walks the configured chain from `startBlock` forward, decoding every
 `OP_RETURN` in every transaction. When an `OP_RETURN` payload decodes as
 a valid `did:cid:...`, that transaction is recorded as a
 **discovered item** (height, index, time, txid, did). Handles reorgs by
-walking back to the nearest confirmed ancestor and resuming from there.
+re-reading a bounded number of blocks (§2.4).
 
 ### 1.2 Import loop (read mode)
 
@@ -139,14 +139,22 @@ The `registration` metadata is what later powers
 
 ### 2.4 Reorg handling
 
-Every scan cycle, the mediator checks whether the last scanned block
-hash still has `confirmations > 0` via `getblockheader`. If not, it
-walks `previousblockhash` backwards until it finds a block that does,
-then resumes scanning from `height + 1`. Reorgs are counted via the
-`satoshi_reorgs_total` metric.
+Every scan cycle, the mediator checks whether the last scanned block hash
+still has `confirmations > 0` via `getblockheader`. If the node reports the
+block as unknown, the chain has moved: the mediator rewinds
+`ARCHON_SAT_REORG_DEPTH` blocks (default 6), re-reads them, and subtracts
+their transaction count from `txnsScanned`. Within that depth of the
+configured start block it re-reads the window from its first block instead,
+since there is no earlier block to resume above.
 
-This simple rewind is correct for the anchoring use case: any
-discovered items beyond the rewind point will be re-discovered when the
+Any other RPC failure is not a reorg. The mediator leaves its position alone
+and skips the pass, so the stored hash is checked again next cycle rather than
+overwritten by a scan that never verified it.
+
+Reorgs are counted via the `satoshi_reorgs_total` metric, once per rewind that is
+committed.
+
+A reorg deeper than the configured depth is not detected. Any discovered items beyond the rewind point are re-discovered when the
 canonical chain is rescanned. Imports are idempotent at the Gatekeeper
 level (`importBatchByCids` with the same CIDs produces the same
 `processed` result).
@@ -445,8 +453,9 @@ expected block.
 A conformant third implementation MUST:
 
 - Parse OP_RETURN payloads and detect valid `did:cid:...` strings.
-- Handle reorgs by walking `previousblockhash` until
-  `confirmations > 0`.
+- Handle reorgs by rewinding a bounded number of blocks and re-reading
+  them, and treat a node that cannot answer as a reason to retry rather
+  than as a reorg.
 - Persist the `MediatorDb` shape in §4, including the atomic
   `updateDb` contract.
 - Call `gatekeeper.importBatchByCids` with the exact `metadata` shape
