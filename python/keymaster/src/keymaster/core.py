@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import struct
-from typing import Any, Protocol, cast
+from typing import Any, NamedTuple, Protocol, cast
 from urllib.parse import urlparse
 
 import httpx
@@ -119,6 +119,15 @@ class WalletStoreProtocol(Protocol):
     def load_wallet(self) -> dict[str, Any] | None: ...
 
 
+class _RootCache(NamedTuple):
+    # An HD root together with the identity of the wallet whose seed it came
+    # from. One value, so a root can never be observed under another wallet's
+    # identity: encrypting a *different* wallet finds the identity does not
+    # match and re-derives, rather than reusing a stale root.
+    root: Any
+    id: str | None
+
+
 class Keymaster:
     def __init__(
         self,
@@ -139,10 +148,7 @@ class Keymaster:
         self.max_alias_length = max_alias_length
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
-        self._root_cache = None
-        # Identity of the wallet whose seed `_root_cache` was derived from, so a
-        # save of a *different* wallet re-derives instead of reusing a stale key.
-        self._root_cache_key: str | None = None
+        self._root_cache: _RootCache | None = None
         self._lock = asyncio.Lock()
         # Node capability manifest (<nodeURL>/api/v1/capabilities), fetched once and
         # memoized. _UNFETCHED until first read; None = node has no manifest (older
@@ -218,7 +224,7 @@ class Keymaster:
             mnemonic = generate_mnemonic()
 
         try:
-            self._root_cache = hd_root_from_mnemonic(mnemonic)
+            root = hd_root_from_mnemonic(mnemonic)
         except Exception as exc:
             raise KeymasterError("Invalid parameter: mnemonic") from exc
 
@@ -229,9 +235,8 @@ class Keymaster:
             "ids": {},
             "aliases": {},
         }
-        # _root_cache was just set from this mnemonic; record its identity so
-        # the save below reuses it instead of re-deriving.
-        self._root_cache_key = self._root_cache_identity(wallet["seed"])
+        # Warm for the save below, which would otherwise re-derive this root.
+        self._root_cache = _RootCache(root, self._root_cache_identity(wallet["seed"]))
         ok = await self.save_wallet(wallet, overwrite=overwrite)
         if not ok:
             raise KeymasterError("save wallet failed")
@@ -248,8 +253,7 @@ class Keymaster:
             mnemonic = decrypt_with_passphrase(seed["mnemonicEnc"], self.passphrase)
         except InvalidTag as exc:
             raise KeymasterError("Incorrect passphrase.") from exc
-        self._root_cache = hd_root_from_mnemonic(mnemonic)
-        self._root_cache_key = self._root_cache_identity(seed)
+        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), self._root_cache_identity(seed))
         root_pair = await self.hd_key_pair()
         try:
             plaintext = decrypt_message(root_pair["privateJwk"], stored["enc"])
@@ -277,8 +281,7 @@ class Keymaster:
         wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, new_passphrase)
 
         self.passphrase = new_passphrase
-        self._root_cache = hd_root_from_mnemonic(mnemonic)
-        self._root_cache_key = self._root_cache_identity(wallet["seed"])
+        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
         self._wallet_cache = wallet
 
         encrypted = await self.encrypt_wallet_for_storage(wallet)
@@ -308,21 +311,21 @@ class Keymaster:
         # early-return on a warm cache: callers inside decrypt_wallet reach here
         # while load_wallet is mid-flight, so we must not re-enter load_wallet.
         if wallet is not None:
-            cache_key = self._root_cache_identity(wallet.get("seed", {}))
-            if self._root_cache is not None and cache_key is not None and self._root_cache_key == cache_key:
-                return self._root_cache
+            cache_id = self._root_cache_identity(wallet.get("seed", {}))
+            if self._root_cache is not None and cache_id is not None and self._root_cache.id == cache_id:
+                return self._root_cache.root
             mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
-            self._root_cache = hd_root_from_mnemonic(mnemonic)
-            self._root_cache_key = cache_key
-            return self._root_cache
+            root = hd_root_from_mnemonic(mnemonic)
+            self._root_cache = _RootCache(root, cache_id)
+            return root
 
         if self._root_cache is not None:
-            return self._root_cache
+            return self._root_cache.root
         wallet = await self.load_wallet()
         mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
-        self._root_cache = hd_root_from_mnemonic(mnemonic)
-        self._root_cache_key = self._root_cache_identity(wallet.get("seed", {}))
-        return self._root_cache
+        root = hd_root_from_mnemonic(mnemonic)
+        self._root_cache = _RootCache(root, self._root_cache_identity(wallet.get("seed", {})))
+        return root
 
     async def hd_key_pair(self, wallet: dict[str, Any] | None = None) -> dict[str, dict[str, str]]:
         root = await self._root_node(wallet)

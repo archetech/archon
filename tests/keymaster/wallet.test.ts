@@ -396,6 +396,28 @@ describe('changePassphrase', () => {
         expect(mnemonicAfter).toBe(mnemonicBefore);
     });
 
+    // Regression for #1052: rotation stamped the re-encrypted seed's identity
+    // onto whichever HD key the cache already held. When that key belonged to
+    // another wallet the pair passed the staleness check, and the rotated
+    // wallet was written under a key its own seed does not derive.
+    it('should not rotate onto the key left by a refused save', async () => {
+        await keymaster.createId('Alice');
+
+        // A refused save still derives the key of the wallet it was asked to
+        // store, leaving the instance warm for a wallet it never kept.
+        const otherStore = new WalletJsonMemory();
+        const other = new Keymaster({ gatekeeper, wallet: otherStore, cipher, passphrase: PASSPHRASE });
+        const otherWallet = await other.loadOrCreateWallet();
+
+        expect(await keymaster.saveWallet(otherWallet, false)).toBe(false);
+        expect(await keymaster.changePassphrase('rotated')).toBe(true);
+
+        const reader = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'rotated' });
+        const reread = await reader.loadWallet();
+
+        expect(reread.ids!['Alice']).toBeDefined();
+    });
+
     it('should load with new passphrase after change', async () => {
         await keymaster.createId('Bob');
         await keymaster.changePassphrase('new-passphrase');
@@ -506,6 +528,35 @@ describe('newWallet', () => {
         catch (error: any) {
             expect(error.message).toBe('Invalid parameter: mnemonic');
         }
+    });
+
+    // Regression for #1052: newWallet set the HD-key cache before the
+    // passphrase encryption it awaits and the cache's identity after, so any
+    // encryption running in between paired one wallet's identity with another
+    // wallet's key. That pair passes the staleness check, so the wallet was
+    // encrypted under a key its own seed does not derive and no later read
+    // could open it.
+    it('should not encrypt another wallet under a wallet being created', async () => {
+        await keymaster.loadOrCreateWallet();
+        await keymaster.createId('Alice');
+        const original = await keymaster.loadWallet();
+
+        // Deliberately not awaited: the export below runs while the second
+        // wallet's passphrase encryption is still in flight.
+        const pending = keymaster.newWallet(undefined, true);
+        const exported = await keymaster.exportEncryptedWallet();
+        await pending;
+
+        expect(exported.seed.mnemonicEnc).toStrictEqual(original.seed!.mnemonicEnc);
+
+        // The export carries Alice's seed, so it must open under the key that
+        // seed derives, not the key of the wallet created alongside it.
+        const store = new WalletJsonMemory();
+        await store.saveWallet(exported, true);
+        const reader = new Keymaster({ gatekeeper, wallet: store, cipher, passphrase: PASSPHRASE });
+        const reread = await reader.loadWallet();
+
+        expect(reread.ids!['Alice']).toBeDefined();
     });
 });
 
