@@ -7,7 +7,7 @@ set -e
 # Configuration
 DRAWBRIDGE_PUBLIC_HOST="${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-http://localhost:${ARCHON_DRAWBRIDGE_PORT:-4222}}"
 API_URL="${DRAWBRIDGE_PUBLIC_HOST%/}/names"
-IPNS_KEY="${ARCHON_HERALD_IPNS_KEY_NAME:-${ARCHON_HERALD_NAME:-name-service}}"
+IPNS_KEY="${ARCHON_HERALD_IPNS_KEY_NAME:-${ARCHON_HERALD_NAME:-herald}}"
 OUTPUT_FILE="/tmp/registry.json"
 
 echo "[$(date)] Starting registry publish..."

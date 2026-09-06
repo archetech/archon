@@ -65,6 +65,15 @@ function literalValue(node: ts.Node): string | null {
         return node.getText().replace(/_/g, '');
     }
 
+    // A byte or millisecond budget is written as its factors -- 16 * 1024 *
+    // 1024 -- and compose writes what that comes to.
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AsteriskToken) {
+        const left = literalValue(node.left);
+        const right = literalValue(node.right);
+
+        return left !== null && right !== null ? String(Number(left) * Number(right)) : null;
+    }
+
     if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) {
         return node.getText();
     }
@@ -109,6 +118,22 @@ function jsDefaults(path: string, into: Map<string, Declaration[]>): void {
             const value = literalValue(unwrap(initializer.whenFalse));
 
             if (name && value !== null) {
+                record(into, name, value, path);
+            }
+        }
+
+        // positiveInt('VAR', process.env.VAR, 100) and anything else that
+        // names the variable it reads and takes its default last. Matched on
+        // the call passing both the name and process.env.<that name>, so a
+        // helper whose trailing argument means something else cannot be
+        // mistaken for one of these.
+        if (initializer && ts.isCallExpression(initializer) && initializer.arguments.length > 1) {
+            const named = initializer.arguments[0];
+            const name = ts.isStringLiteral(named) && /^[A-Z][A-Z0-9_]*$/.test(named.text) ? named.text : null;
+            const readsIt = initializer.arguments.some(argument => envVarName(unwrap(argument)) === name);
+            const value = literalValue(unwrap(initializer.arguments[initializer.arguments.length - 1]));
+
+            if (name && readsIt && value !== null) {
                 record(into, name, value, path);
             }
         }
@@ -201,6 +226,20 @@ describe('compose defaults', () => {
                     .map(actual => `${name}: ${declared.path}=${declared.value} ${actual.path}=${actual.value}`)));
 
         expect([...new Set(divergent)].sort()).toEqual([]);
+    });
+
+    // One variable per shape the extractor understands, with the value it
+    // should read. A matcher that stops recognising a shape takes every
+    // variable written that way out of the comparison and reports nothing.
+    it.each([
+        ['|| string', 'ARCHON_GATEKEEPER_DB', 'redis'],
+        ['ternary number', 'ARCHON_GATEKEEPER_GC_INTERVAL', '60'],
+        ['ternary boolean', 'ARCHON_ZEC_REIMPORT', 'true'],
+        ['bare === true', 'ARCHON_DRAWBRIDGE_L402_ENABLED', 'false'],
+        ['helper call', 'ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX', '100'],
+        ['helper call, folded', 'ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_PER_SOURCE_BYTES', '16777216'],
+    ])('read a %s default from the code', (_shape, name, value) => {
+        expect((code.get(name) ?? []).map(declaration => declaration.value)).toContain(value);
     });
 
     it('cover the variables the minimal sample stopped carrying', () => {
