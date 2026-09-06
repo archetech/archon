@@ -16,8 +16,8 @@ const COMPOSE = globSync('docker/compose/*.yml')
 
 // Every service that reads its own environment, and every runtime flavor of the
 // ones with more than one, so a default cannot drift between ports meant to be
-// interchangeable. Globbed rather than listed: a config file nothing here
-// matches is a file whose defaults nothing compares against.
+// interchangeable. Matched by glob, so a new config joins the comparison by
+// existing; one that nothing here matches has its defaults compared to nothing.
 const CONFIGS = globSync('services/*/server/src/config.*')
     .concat(globSync('services/mediators/*/src/config.*'))
     .concat([
@@ -92,16 +92,17 @@ function envVarName(node: ts.Node): string | null {
         : null;
 }
 
-// The four shapes the services read an environment variable in:
+// The shapes the services read an environment variable in:
 //
 //   process.env.VAR || 'value'
 //   process.env.VAR ? parseInt(process.env.VAR) : 60
-//   process.env.VAR === 'true'     — absent means false
-//   process.env.VAR !== 'false'    — absent means true
+//   process.env.VAR === 'true'                    — absent means false
+//   process.env.VAR !== 'false'                   — absent means true
+//   positiveInt('VAR', process.env.VAR, 100)      — default last
 //
-// Parsed rather than matched by pattern, because the last two appear inside the
-// first two: a regex recognising the bare comparison also fires on the one
-// nested in a ternary, and records false for a variable whose default is true.
+// They are read from the syntax tree because they nest: the bare comparison is
+// also the middle of the ternary, so a pattern that recognises it fires on the
+// nested one too and records false for a variable whose default is true.
 function jsDefaults(path: string, into: Map<string, Declaration[]>): void {
     const source = ts.createSourceFile(path, readFileSync(path, 'utf-8'), ts.ScriptTarget.Latest, true);
 
