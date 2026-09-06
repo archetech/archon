@@ -352,6 +352,7 @@ No `/ready`, no CORS, no admin auth. No public client-facing routes.
 | `ARCHON_SAT_FEE_ORACLE_URL` | empty | Optional remote fee oracle (e.g. mempool.space). |
 | `ARCHON_SAT_RBF_ENABLED` | `false` | Enable the replace-by-fee bump loop. |
 | `ARCHON_SAT_START_BLOCK` | `0` | Scan from this height. Set per-chain to skip pre-launch history. |
+| `ARCHON_SAT_REORG_DEPTH` | `6` | Blocks to re-read after a reorg. Deep enough for a natural fork; a deeper one is not detected. |
 | `ARCHON_SAT_REIMPORT` | `true` | Clear per-item import state on startup. |
 | `ARCHON_SAT_DB` | `json` | Storage backend. |
 | `ARCHON_SAT_DB_NAME` | `<chain>` (`:` → `-`) | Database key / filename base. |

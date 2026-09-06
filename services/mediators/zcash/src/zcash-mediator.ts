@@ -15,6 +15,7 @@ import express from 'express';
 import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 import axios from 'axios';
+import { isBlockNotFound, rewindTarget } from './reorg.js';
 
 const REGISTRY = config.chain;
 
@@ -298,82 +299,65 @@ async function resolveScanStart(blockCount: number): Promise<number> {
     }
 
     let header: BlockHeader | undefined;
+
     try {
         header = await zecClient.getBlockHeader(db.hash) as BlockHeader;
-    } catch { }
+    } catch (error) {
+        if (!isBlockNotFound(error)) {
+            // The node said nothing about the chain, so neither does this. The
+            // position stands and the next pass asks again.
+            console.warn(`Could not read block ${db.hash} at height ${db.height}: ${error}`);
+            return db.height + 1;
+        }
+    }
 
     if ((header?.confirmations ?? 0) > 0) {
         return db.height + 1;
     }
 
     zcashReorgs.inc();
-    console.log(`Reorg detected at height ${db.height}, rewinding to a confirmed block...`);
 
-    let height = db.height;
-    let hash = db.hash;
-    let txnsToSubtract = 0;
-
-    while (hash && height >= config.startBlock) {
-        let currentHeader: BlockHeader;
-        try {
-            currentHeader = await zecClient.getBlockHeader(hash) as BlockHeader;
-        } catch {
-            break;
-        }
-
-        if ((currentHeader.confirmations ?? 0) > 0) {
-            const resolvedHeight = currentHeader.height ?? height;
-            const resolvedTime = currentHeader.time ? new Date(currentHeader.time * 1000).toISOString() : '';
-            const resolvedHash = hash;
-            const resolvedBlocksPending = blockCount - resolvedHeight;
-            const resolvedTxnsToSubtract = txnsToSubtract;
-            await jsonPersister.updateDb((data) => {
-                data.height = resolvedHeight;
-                data.hash = resolvedHash;
-                data.time = resolvedTime;
-                data.blocksScanned = Math.max(0, resolvedHeight - config.startBlock + 1);
-                data.txnsScanned = Math.max(0, data.txnsScanned - resolvedTxnsToSubtract);
-                data.blockCount = blockCount;
-                data.blocksPending = resolvedBlocksPending;
-            });
-            return resolvedHeight + 1;
-        }
-
-        txnsToSubtract += await getBlockTxCount(hash, currentHeader);
-
-        if (!currentHeader.previousblockhash) {
-            break;
-        }
-
-        hash = currentHeader.previousblockhash;
-        height = (currentHeader.height ?? height) - 1;
-    }
-
-    const fallbackHeight = config.startBlock;
-    let fallbackHash = '';
-    let fallbackTime = '';
+    const rewindHeight = rewindTarget(db.height, config.startBlock, config.reorgDepth);
+    let rewindHash: string;
+    let rewindHeader: BlockHeader;
 
     try {
-        fallbackHash = await zecClient.getBlockHash(fallbackHeight);
-        const fallbackHeader = await zecClient.getBlockHeader(fallbackHash) as BlockHeader;
-        fallbackTime = fallbackHeader.time ? new Date(fallbackHeader.time * 1000).toISOString() : '';
-    } catch {
-        fallbackHash = '';
+        rewindHash = await zecClient.getBlockHash(rewindHeight);
+        rewindHeader = await zecClient.getBlockHeader(rewindHash) as BlockHeader;
+    } catch (error) {
+        // Committing a rewind to a block that cannot be read would store a
+        // position no later pass can verify.
+        console.warn(`Reorg at height ${db.height}, but the chain at ${rewindHeight} could not be read: ${error}`);
+        return db.height + 1;
+    }
+
+    console.log(`Reorg detected at height ${db.height}; rewinding ${db.height - rewindHeight} block(s) to ${rewindHeight}`);
+
+    let txnsToSubtract = 0;
+
+    try {
+        // The blocks about to be read again were counted when they were read
+        // the first time.
+        for (let height = rewindHeight + 1; height <= Math.min(db.height, blockCount); height++) {
+            txnsToSubtract += await getBlockTxCount(await zecClient.getBlockHash(height));
+        }
+    } catch (error) {
+        // A metric, not the position: a rewind that cannot adjust the count
+        // still has to happen.
+        console.warn(`Could not total the transactions being rescanned: ${error}`);
     }
 
     await jsonPersister.updateDb((data) => {
-        data.height = fallbackHeight;
-        if (fallbackHash) {
-            data.hash = fallbackHash;
-        }
-        data.time = fallbackTime;
-        data.blocksScanned = 0;
-        data.txnsScanned = 0;
+        data.height = rewindHeight;
+        data.hash = rewindHash;
+        data.time = rewindHeader.time ? new Date(rewindHeader.time * 1000).toISOString() : '';
+        data.blocksScanned = Math.max(0, rewindHeight - config.startBlock + 1);
+        data.txnsScanned = Math.max(0, data.txnsScanned - txnsToSubtract);
         data.blockCount = blockCount;
-        data.blocksPending = blockCount - fallbackHeight;
+        data.blocksPending = blockCount - rewindHeight;
     });
 
-    return fallbackHeight + 1;
+    return rewindHeight + 1;
 }
 
 function discoveredKey(item: Pick<DiscoveredItem, 'height' | 'index' | 'txid' | 'did'>): string {

@@ -368,6 +368,7 @@ No `/ready`, no CORS, no admin auth. No public client-facing routes.
 | `ARCHON_ZEC_FEE_ORACLE_URL` | empty | Optional remote fee oracle with mempool.space-compatible `{ fastestFee, halfHourFee, hourFee }` JSON. |
 | `ARCHON_ZEC_RBF_ENABLED` | `false` | Accepted for config parity. v1 logs a notice and never bumps. |
 | `ARCHON_ZEC_START_BLOCK` | `0` | Scan from this height. Set per-chain to skip pre-launch history. |
+| `ARCHON_ZEC_REORG_DEPTH` | `6` | Blocks to re-read after a reorg. Deep enough for a natural fork; a deeper one is not detected. |
 | `ARCHON_ZEC_REIMPORT` | `true` | Clear per-item import state on startup. |
 | `ARCHON_ZEC_DB` | `json` | Storage backend. |
 | `ARCHON_ZEC_DB_NAME` | `<chain>` (`:` → `-`) | Database key / filename base. |

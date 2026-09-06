@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { DEFAULT_REORG_DEPTH } from './reorg.js';
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ export interface AppConfig {
     feeOracleUrl: string;
     rbfEnabled: boolean;
     startBlock: number;
+    reorgDepth: number;
     reimport: boolean;
     db: SatoshiDB;
     dbName: string;
@@ -101,6 +103,7 @@ const config: AppConfig = {
     feeOracleUrl: process.env.ARCHON_SAT_FEE_ORACLE_URL || '',
     rbfEnabled: process.env.ARCHON_SAT_RBF_ENABLED === 'true',
     startBlock: process.env.ARCHON_SAT_START_BLOCK ? parseInt(process.env.ARCHON_SAT_START_BLOCK) : 0,
+    reorgDepth: process.env.ARCHON_SAT_REORG_DEPTH ? parseInt(process.env.ARCHON_SAT_REORG_DEPTH) : DEFAULT_REORG_DEPTH,
     reimport: process.env.ARCHON_SAT_REIMPORT ? (process.env.ARCHON_SAT_REIMPORT === 'true') : true,
     db: toDB(process.env.ARCHON_SAT_DB),
     dbName: process.env.ARCHON_SAT_DB_NAME || toChain(process.env.ARCHON_SAT_CHAIN).replace(/:/g, '-'),
