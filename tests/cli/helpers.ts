@@ -15,6 +15,21 @@ export async function archon(...args: string[]): Promise<string> {
 }
 
 /**
+ * Run an archon CLI command that is expected to fail.
+ * Returns its exit status and trimmed stderr.
+ */
+export async function archonFails(...args: string[]): Promise<{ status: number, stderr: string }> {
+    try {
+        await exec('docker', ['compose', 'exec', '-T', 'cli', 'node', 'scripts/archon-cli.js', ...args]);
+    }
+    catch (error: any) {
+        return { status: error.code, stderr: String(error.stderr ?? '').trim() };
+    }
+
+    throw new Error(`expected \`archon ${args.join(' ')}\` to fail`);
+}
+
+/**
  * Run an admin CLI command via docker compose (no TTY).
  * Returns trimmed stdout.
  */

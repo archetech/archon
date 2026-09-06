@@ -46,6 +46,15 @@ def _json_default(obj: Any) -> Any:
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
+class CommandError(Exception):
+    """A command that could not do what it was asked.
+
+    Raised rather than reported in place, so the dispatcher gives it a failing
+    status: a handler that prints its complaint and returns is indistinguishable
+    from one that succeeded.
+    """
+
+
 def _error(message: Any) -> None:
     if isinstance(message, dict) and "error" in message:
         print(message["error"], file=sys.stderr)
@@ -154,8 +163,7 @@ async def cmd_create_id(km: Keymaster, args: argparse.Namespace) -> None:
 async def cmd_resolve_id(km: Keymaster, args: argparse.Namespace) -> None:
     current = await km.get_current_id()
     if not current:
-        _error("No current ID set")
-        return
+        raise CommandError("No current ID set")
     id_info = await km.fetch_id_info(current)
     _print_json(await km.resolve_did(id_info["did"]))
 
@@ -210,7 +218,7 @@ async def cmd_resolve_did(km: Keymaster, args: argparse.Namespace) -> None:
         doc = await km.resolve_did(args.did, {"confirm": bool(args.confirm)} if args.confirm else None)
         _print_json(doc)
     except Exception:
-        _error(f"cannot resolve {args.did}")
+        raise CommandError(f"cannot resolve {args.did}")
 
 
 async def cmd_resolve_did_version(km: Keymaster, args: argparse.Namespace) -> None:
@@ -218,7 +226,7 @@ async def cmd_resolve_did_version(km: Keymaster, args: argparse.Namespace) -> No
         doc = await km.resolve_did(args.did, {"versionSequence": int(args.version)})
         _print_json(doc)
     except Exception:
-        _error(f"cannot resolve {args.did}")
+        raise CommandError(f"cannot resolve {args.did}")
 
 
 async def cmd_revoke_did(km: Keymaster, args: argparse.Namespace) -> None:
@@ -226,7 +234,7 @@ async def cmd_revoke_did(km: Keymaster, args: argparse.Namespace) -> None:
         ok = await km.revoke_did(args.did)
         print(UPDATE_OK if ok else UPDATE_FAILED)
     except Exception:
-        _error(f"cannot revoke {args.did}")
+        raise CommandError(f"cannot revoke {args.did}")
 
 
 async def cmd_change_registry(km: Keymaster, args: argparse.Namespace) -> None:
@@ -249,14 +257,14 @@ async def cmd_decrypt_did(km: Keymaster, args: argparse.Namespace) -> None:
     try:
         print(await km.decrypt_message(args.did))
     except Exception:
-        _error(f"cannot decrypt {args.did}")
+        raise CommandError(f"cannot decrypt {args.did}")
 
 
 async def cmd_decrypt_json(km: Keymaster, args: argparse.Namespace) -> None:
     try:
         _print_json(await km.decrypt_json(args.did))
     except Exception:
-        _error(f"cannot decrypt {args.did}")
+        raise CommandError(f"cannot decrypt {args.did}")
 
 
 # Signing ---------------------------------------------------------------------
@@ -349,8 +357,7 @@ async def cmd_get_credential(km: Keymaster, args: argparse.Namespace) -> None:
 async def cmd_view_credential(km: Keymaster, args: argparse.Namespace) -> None:
     credential = await km.get_credential(args.did)
     if not credential:
-        _error("Credential not found")
-        return
+        raise CommandError("Credential not found")
     types = credential.get("type") or []
     print(f"Credential: {args.did}")
     print(f"Type:       {', '.join(types) if isinstance(types, list) else types}")
@@ -683,8 +690,7 @@ async def cmd_get_asset_image(km: Keymaster, args: argparse.Namespace) -> None:
     file_obj = image_asset.get("file") if image_asset else None
     data = file_obj.get("data") if file_obj else None
     if not data:
-        _error("Image not found")
-        return
+        raise CommandError("Image not found")
     output_file = args.file or file_obj.get("filename")
     if isinstance(data, str):
         # Python core may return base64 or raw; handle both
@@ -701,8 +707,7 @@ async def cmd_get_asset_image(km: Keymaster, args: argparse.Namespace) -> None:
 async def cmd_get_asset_file(km: Keymaster, args: argparse.Namespace) -> None:
     file_asset = await km.get_file(args.id)
     if not file_asset or not file_asset.get("data"):
-        _error("File not found")
-        return
+        raise CommandError("File not found")
     output_file = args.file or file_asset.get("filename")
     data = file_asset["data"]
     if isinstance(data, str):
@@ -877,7 +882,7 @@ async def cmd_get_vault_item(km: Keymaster, args: argparse.Namespace) -> None:
         Path(args.file).write_bytes(bytes(data))
         print(f"Data written to {args.file}")
     else:
-        _error(f"Item {args.item} not found in vault")
+        raise CommandError(f"Item {args.item} not found in vault")
 
 
 # Dmail -----------------------------------------------------------------------
@@ -898,7 +903,7 @@ async def cmd_send_dmail(km: Keymaster, args: argparse.Namespace) -> None:
     if notice:
         print(notice)
     else:
-        _error("Send failed")
+        raise CommandError("Send failed")
 
 
 async def cmd_get_dmail(km: Keymaster, args: argparse.Namespace) -> None:
@@ -906,7 +911,7 @@ async def cmd_get_dmail(km: Keymaster, args: argparse.Namespace) -> None:
     if message:
         _print_json(message)
     else:
-        _error("Dmail not found")
+        raise CommandError("Dmail not found")
 
 
 async def cmd_list_dmail(km: Keymaster, args: argparse.Namespace) -> None:
@@ -951,7 +956,7 @@ async def cmd_get_dmail_attachment(km: Keymaster, args: argparse.Namespace) -> N
         Path(args.file).write_bytes(bytes(data))
         print(f"Data written to {args.file}")
     else:
-        _error(f"Attachment {args.name} not found")
+        raise CommandError(f"Attachment {args.name} not found")
 
 
 async def cmd_list_dmail_attachments(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1497,7 +1502,12 @@ async def _run(args: argparse.Namespace) -> int:
         try:
             await args.handler(km, args)
         except Exception as exc:
+            # Reported and non-zero: `keymaster create-id alice && next` must
+            # not run next after alice failed, and no script or CI step can
+            # tell from the message alone.
             _error(getattr(exc, "error", None) or str(exc))
+            return 1
+
         return 0
     finally:
         await gatekeeper.close()
