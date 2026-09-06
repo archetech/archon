@@ -472,8 +472,8 @@ async function main(startupComplete: () => void) {
         console.log(`Server is running on ${config.bindAddress}:${config.port}`);
         console.log('Admin API key protection is ENABLED');
         api.setReady(true);
-        // Only once the port is actually bound: a listen that fails reports it
-        // here, after main has already returned.
+        // Startup is over when the port is bound, not when main returns:
+        // main returns first, and a bind that fails arrives later still.
         startupComplete();
     });
 

@@ -2,15 +2,12 @@ import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import ts from 'typescript';
 
-// Every long-running service used to install its own uncaughtException and
-// unhandledRejection handlers that logged and returned. Because they all do
-// their real startup after binding a port, a startup failure left a process
-// that answered /version, failed every real route, and never exited -- and
-// each PR that touched startup re-discovered this and added its own
-// try/process.exit wrapper (#1048, #1050, #1053).
-//
-// The shared guard is fatal until a service says it is up. A raw handler
-// installed alongside it puts the swallowing behaviour back.
+// Every one of these services binds a port before it reaches its
+// dependencies, so a tolerated startup failure leaves it listening with
+// nothing behind it (#1048, #1050, #1053). The shared guard is fatal until a
+// service says it is up. A hand-written handler is how that gets lost: a
+// listener of any kind suppresses the fatal default Node would otherwise
+// apply, so one that only logs keeps the process alive on its own.
 
 const ENTRY_POINTS = [
     'services/keymaster/server/src/keymaster-api.ts',
@@ -37,9 +34,9 @@ function sources(dir: string): string[] {
     });
 }
 
-// Parsed rather than grepped: every one of these entry points names
-// startupComplete in its comments too, so counting occurrences in the text
-// stays green after the call itself is deleted.
+// Read from the syntax tree, not the text: every entry point names
+// startupComplete in its comments as well, so a textual count cannot tell a
+// live call from a mention of one.
 function guardUse(file: string): { installs: boolean, completions: number } {
     const parsed = ts.createSourceFile(file, readFileSync(file, 'utf-8'), ts.ScriptTarget.Latest, true);
 

@@ -4,9 +4,8 @@ import { join } from 'path';
 // A published package reaches consumers as `dist` alone, so TypeScript's
 // legacy `node` resolution finds a subpath's declarations only through
 // typesVersions -- the `types` condition inside `exports` is invisible to it.
-// A subpath with no entry compiles for everyone here and fails with TS2307
-// for anyone on that setting, which is how @didcid/common/process-guards
-// shipped in #1053 and how ./didcomm and ./didcomm-protocols shipped before it.
+// A subpath with no entry compiles for everyone in this repo, which resolves
+// through source, and fails with TS2307 for a consumer on that setting.
 
 interface Manifest {
     name?: string;

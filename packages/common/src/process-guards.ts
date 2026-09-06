@@ -1,14 +1,12 @@
 // Process-level handlers for a long-running service.
 //
-// Logging an uncaught exception and carrying on is right for a service that is
-// already up: one bad request should not take it down. The same handler
-// applied during startup gives something worse than a crash. These services
-// bind their port first and reach their dependencies from inside the listen
-// callback, so a throw there is a rejection the handler swallows, leaving a
-// process that answers /version and /metrics, fails every real route with a
-// TypeError, and never exits (#1053).
+// Tolerating an uncaught exception suits a service that is already up: one bad
+// request should not take it down. Before then it is the wrong trade. A
+// service that binds its port and reaches its dependencies afterwards has, on
+// a tolerated startup failure, a listening process with nothing behind it --
+// one that passes a health check and fails every real request (#1053).
 //
-// So the handlers are fatal until the service says it is up.
+// So the handlers are fatal until the caller says startup finished.
 
 export interface ProcessGuardOptions {
     // Seams for tests. Nothing in production passes these.
