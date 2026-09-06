@@ -62,6 +62,9 @@
       "web": [
         "./dist/types/cipher-web.d.ts"
       ],
+      "didcomm": [
+        "./dist/types/didcomm.d.ts"
+      ],
       "passphrase": [
         "./dist/types/passphrase.d.ts"
       ],
