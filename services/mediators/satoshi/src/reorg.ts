@@ -5,8 +5,8 @@
 // response. Re-reading a fixed number of blocks is idempotent -- discovered
 // items are keyed by height, index, txid and DID -- and costs that many
 // blocks. Following the orphaned chain to find the fork point instead costs
-// whatever the node still holds of it, and yields nothing once it holds none,
-// which is when the scan restarts from the beginning of its window (#1063).
+// whatever the node still holds of it, and yields nothing once it holds none
+// (#1063).
 //
 // The exact fork point is recoverable: every scanned block is sent to the
 // gatekeeper with its height, so its registry can be compared against the
@@ -39,10 +39,8 @@ export function rewindTarget(height: number, startBlock: number, depth: number):
 // Whether an error says the node does not have that block, as opposed to
 // saying nothing because it could not be asked.
 //
-// Only the first is evidence of a reorg. A timeout or a refused connection
-// read as one rewinds a chain that never forked, and read as an unboundedly
-// deep one -- which walking an orphaned chain the node no longer holds
-// amounts to -- discards the entire scan.
+// Only the first is evidence of a reorg. Reading a timeout or a refused
+// connection as one rewinds a chain that never forked.
 export function isBlockNotFound(error: unknown): boolean {
     // bitcoind and zcashd answer an unknown block with RPC code -5. Whether
     // that code survives the client is not guaranteed, so the message counts

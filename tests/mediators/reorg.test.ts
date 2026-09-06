@@ -54,7 +54,7 @@ describe.each(IMPLEMENTATIONS)('%s reorg handling', (_name, isBlockNotFound, rew
         });
 
         it('recognises the message when the code did not survive the client', () => {
-            // The zcash client rethrows data.error.message and drops the code.
+            // A client that rethrows only the message loses the code with it.
             expect(isBlockNotFound(new Error('Block not found'))).toBe(true);
         });
 
