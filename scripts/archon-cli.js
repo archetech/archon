@@ -23,6 +23,16 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// A handler that reports a failure has to fail the process too: without this
+// `archon create-id alice && next` runs `next` after alice failed, and no
+// script or CI step can tell. exitCode rather than exit(1), so stdout a
+// partially-completed command already wrote still flushes.
+function fail(detail) {
+    console.error(detail);
+    process.exitCode = 1;
+}
+
+
 program
     .version(pkg.version)
     .description('Archon CLI tool')
@@ -37,7 +47,7 @@ program
             console.log(JSON.stringify(wallet, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -51,7 +61,7 @@ program
             console.log(JSON.stringify(wallet, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -70,7 +80,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -84,7 +94,7 @@ program
             console.log(`${idsRemoved} IDs and ${ownedRemoved} owned DIDs and ${heldRemoved} held DIDs and ${aliasesRemoved} aliases were removed`);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -97,7 +107,7 @@ program
             console.log(JSON.stringify(wallet, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -110,7 +120,7 @@ program
             console.log(JSON.stringify(wallet, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -124,7 +134,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -139,7 +149,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -152,7 +162,7 @@ program
             console.log(mnenomic);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -165,7 +175,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -178,7 +188,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -191,7 +201,7 @@ program
             console.log(JSON.stringify(wallet, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -207,7 +217,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -221,7 +231,7 @@ program
             console.log(JSON.stringify(doc, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -234,7 +244,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -247,7 +257,7 @@ program
             console.log(response);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -260,7 +270,7 @@ program
             console.log(`ID ${name} removed`);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -273,7 +283,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -295,7 +305,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -311,7 +321,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -324,7 +334,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -337,7 +347,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -350,7 +360,7 @@ program
             console.log(JSON.stringify(doc, null, 4));
         }
         catch (error) {
-            console.error(`cannot resolve ${did}`);
+            fail(`cannot resolve ${did}`);
         }
     });
 
@@ -363,7 +373,7 @@ program
             console.log(JSON.stringify(doc, null, 4));
         }
         catch (error) {
-            console.error(`cannot resolve ${did}`);
+            fail(`cannot resolve ${did}`);
         }
     });
 
@@ -376,7 +386,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -389,7 +399,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(`cannot revoke ${did}`);
+            fail(`cannot revoke ${did}`);
         }
     });
 
@@ -402,7 +412,7 @@ program
             console.log(cipherDid);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -416,7 +426,7 @@ program
             console.log(cipherDid);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -429,7 +439,7 @@ program
             console.log(plaintext);
         }
         catch (error) {
-            console.error(`cannot decrypt ${did}`);
+            fail(`cannot decrypt ${did}`);
         }
     });
 
@@ -442,7 +452,7 @@ program
             console.log(JSON.stringify(json, null, 4));
         }
         catch (error) {
-            console.error(`cannot decrypt ${did}`);
+            fail(`cannot decrypt ${did}`);
         }
     });
 
@@ -456,7 +466,7 @@ program
             console.log(JSON.stringify(json, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -470,7 +480,7 @@ program
             console.log(`proof in ${file}`, isValid ? 'is valid' : 'is NOT valid');
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -487,7 +497,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -503,7 +513,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -516,7 +526,7 @@ program
             console.log(JSON.stringify(vc, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -533,7 +543,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -546,7 +556,7 @@ program
             console.log(JSON.stringify(response, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -559,7 +569,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -584,7 +594,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -597,7 +607,7 @@ program
             console.log(JSON.stringify(held, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -610,7 +620,7 @@ program
             console.log(JSON.stringify(credential, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -622,7 +632,7 @@ program
             const credential = await keymaster.getCredential(did);
 
             if (!credential) {
-                console.error('Credential not found');
+                fail('Credential not found');
                 return;
             }
 
@@ -649,7 +659,7 @@ program
             console.log(`Proof:      ${isValid ? 'valid' : 'INVALID'}`);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -662,7 +672,7 @@ program
             console.log(JSON.stringify(response, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -675,7 +685,7 @@ program
             console.log(JSON.stringify(response, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -688,7 +698,7 @@ program
             console.log(response);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -701,7 +711,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -714,7 +724,7 @@ program
             console.log(JSON.stringify(vp, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -727,7 +737,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -740,7 +750,7 @@ program
             console.log(did || `${alias} not found`);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -753,7 +763,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -766,7 +776,7 @@ program
             console.log(JSON.stringify(nostr, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -779,7 +789,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -798,7 +808,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -814,7 +824,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -827,7 +837,7 @@ program
             console.log(JSON.stringify(groups, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -840,7 +850,7 @@ program
             console.log(JSON.stringify(group, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -853,7 +863,7 @@ program
             console.log(response);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -866,7 +876,7 @@ program
             console.log(response);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -879,7 +889,7 @@ program
             console.log(response);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -896,7 +906,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -909,7 +919,7 @@ program
             console.log(JSON.stringify(schemas, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -923,7 +933,7 @@ program
             console.log(JSON.stringify(schema, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -936,7 +946,7 @@ program
             console.log(JSON.stringify(template, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -952,7 +962,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -969,7 +979,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -987,7 +997,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1005,7 +1015,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1018,7 +1028,7 @@ program
             console.log(JSON.stringify(asset, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1032,7 +1042,7 @@ program
             console.log(`Data written to ${file}`);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1043,7 +1053,7 @@ program
         try {
             const imageAsset = await keymaster.getImage(id);
             if (!imageAsset || !imageAsset.file.data) {
-                console.error('Image not found');
+                fail('Image not found');
                 return;
             }
             const outputFile = file || imageAsset.file.filename;
@@ -1051,7 +1061,7 @@ program
             console.log(`Data written to ${outputFile}`);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1062,7 +1072,7 @@ program
         try {
             const fileAsset = await keymaster.getFile(id);
             if (!fileAsset || !fileAsset.data) {
-                console.error('File not found');
+                fail('File not found');
                 return;
             }
             const outputFile = file || fileAsset.filename;
@@ -1070,7 +1080,7 @@ program
             console.log(`Data written to ${outputFile}`);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1084,7 +1094,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1099,7 +1109,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1114,7 +1124,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1126,7 +1136,7 @@ program
             const ok = await keymaster.transferAsset(id, controller);
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         } catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1141,7 +1151,7 @@ program
             const did = await keymaster.cloneAsset(id, { alias, registry });
             console.log(did);
         } catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1159,7 +1169,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1183,7 +1193,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1196,7 +1206,7 @@ program
             console.log(JSON.stringify(assets, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1209,7 +1219,7 @@ program
             console.log(JSON.stringify(template, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1226,7 +1236,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1239,7 +1249,7 @@ program
             console.log(JSON.stringify(response, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1252,7 +1262,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1265,7 +1275,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1278,7 +1288,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1291,7 +1301,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1304,7 +1314,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1342,7 +1352,7 @@ program
             console.timeEnd('total');
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1358,7 +1368,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1371,7 +1381,7 @@ program
             console.log(JSON.stringify(items, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1384,7 +1394,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1397,7 +1407,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1410,7 +1420,7 @@ program
             console.log(JSON.stringify(members, null, 4));
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1425,7 +1435,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1438,7 +1448,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1452,7 +1462,7 @@ program
             console.log(`Data written to ${file}`);
         }
         catch (error) {
-            console.error(error.error || error);
+            fail(error.error || error);
         }
     });
 
@@ -1469,7 +1479,7 @@ program
             console.log(ok ? 'published' : 'failed');
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1483,7 +1493,7 @@ program
             console.log(ok ? 'unpublished' : 'failed');
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1507,7 +1517,7 @@ program
             console.log(packed);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1522,7 +1532,7 @@ program
             console.log(JSON.stringify(result, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1546,7 +1556,7 @@ program
             console.log(JSON.stringify(ids, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1567,7 +1577,7 @@ program
             console.log(JSON.stringify(ids, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1581,7 +1591,7 @@ program
             console.log(JSON.stringify({ ok }, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1597,7 +1607,7 @@ program
             console.log(JSON.stringify(results, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1612,7 +1622,7 @@ program
             console.log(JSON.stringify({ acknowledged }, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1627,7 +1637,7 @@ program
             console.log(JSON.stringify(result, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1642,7 +1652,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1662,7 +1672,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1682,7 +1692,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1702,7 +1712,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1728,7 +1738,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1742,7 +1752,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1756,7 +1766,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1770,7 +1780,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1784,7 +1794,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1800,7 +1810,7 @@ program
             console.log(JSON.stringify(nostr, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1821,7 +1831,7 @@ program
             console.log('Show them with: show-wallet');
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1835,7 +1845,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1849,7 +1859,7 @@ program
             console.log(`${balance.balance} sats`);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1863,7 +1873,7 @@ program
             console.log(JSON.stringify(info, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1877,7 +1887,7 @@ program
             console.log(JSON.stringify(invoice, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1891,7 +1901,7 @@ program
             console.log(JSON.stringify(payment, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1905,7 +1915,7 @@ program
             console.log(JSON.stringify(status, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1919,7 +1929,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1933,7 +1943,7 @@ program
             console.log(UPDATE_OK);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1959,7 +1969,7 @@ program
             }, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -1984,7 +1994,7 @@ program
             }
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2000,7 +2010,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2014,7 +2024,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2028,7 +2038,7 @@ program
             console.log(JSON.stringify(members, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2042,7 +2052,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2056,7 +2066,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2070,7 +2080,7 @@ program
             console.log(JSON.stringify(result, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2088,7 +2098,7 @@ program
             console.log(did);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2103,7 +2113,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2117,11 +2127,11 @@ program
             if (notice) {
                 console.log(notice);
             } else {
-                console.error('Send failed');
+                fail('Send failed');
             }
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2135,11 +2145,11 @@ program
             if (message) {
                 console.log(JSON.stringify(message, null, 4));
             } else {
-                console.error('Dmail not found');
+                fail('Dmail not found');
             }
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2153,7 +2163,7 @@ program
             console.log(JSON.stringify(dmails, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2168,7 +2178,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2182,7 +2192,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2196,7 +2206,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2210,7 +2220,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2226,7 +2236,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2240,7 +2250,7 @@ program
             console.log(ok ? UPDATE_OK : UPDATE_FAILED);
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2255,11 +2265,11 @@ program
                 fs.writeFileSync(file, data);
                 console.log(`Data written to ${file}`);
             } else {
-                console.error(`Attachment ${name} not found`);
+                fail(`Attachment ${name} not found`);
             }
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
@@ -2273,7 +2283,7 @@ program
             console.log(JSON.stringify(attachments, null, 4));
         }
         catch (error) {
-            console.error(error.error || error.message || error);
+            fail(error.error || error.message || error);
         }
     });
 
