@@ -50,6 +50,9 @@
       ],
       "net": [
         "./dist/types/net.d.ts"
+      ],
+      "process-guards": [
+        "./dist/types/process-guards.d.ts"
       ]
     }
   },
