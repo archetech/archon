@@ -183,9 +183,9 @@ describe('encrypted wallet export', () => {
         expect(exported.seed?.mnemonicEnc).toBeDefined();
     });
 
-    // hdkeyCacheKey's `enc ? ... : undefined` false branch is not reachable through
+    // hdkeyCacheId's `enc ? ... : undefined` false branch is not reachable through
     // the public API: a wallet whose seed lacks mnemonicEnc fails isWalletFile on
-    // load, so decryptWallet rejects it before any cache key is derived. Left
+    // load, so decryptWallet rejects it before any cache id is derived. Left
     // uncovered rather than reached by writing an invalid wallet straight to disk.
 });
 
