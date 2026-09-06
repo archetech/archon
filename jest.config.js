@@ -24,6 +24,7 @@ const config = {
         '^@didcid/cipher/types': '<rootDir>/packages/cipher/src/types.ts',
         '^@didcid/common/errors$': '<rootDir>/packages/common/src/errors.ts',
         '^@didcid/common/utils$': '<rootDir>/packages/common/src/utils.ts',
+        '^@didcid/common/process-guards$': '<rootDir>/packages/common/src/process-guards.ts',
         '^@didcid/gatekeeper$': '<rootDir>/packages/gatekeeper/src/gatekeeper.ts',
         '^@didcid/gatekeeper/types$': '<rootDir>/packages/gatekeeper/src/types.ts',
         '^@didcid/gatekeeper/client$': '<rootDir>/packages/gatekeeper/src/gatekeeper-client.ts',

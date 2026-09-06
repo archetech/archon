@@ -13,7 +13,8 @@ const config = {
         'index': 'dist/esm/index.js',
         utils: 'dist/esm/utils.js',
         errors: 'dist/esm/errors.js',
-        net: 'dist/esm/net.js'
+        net: 'dist/esm/net.js',
+        'process-guards': 'dist/esm/process-guards.js'
     },
     output: {
         dir: 'dist/cjs',

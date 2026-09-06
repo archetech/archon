@@ -13,6 +13,7 @@ import WalletSQLite from '@didcid/keymaster/wallet/sqlite';
 import WalletCache from '@didcid/keymaster/wallet/cache';
 import CipherNode from '@didcid/cipher/node';
 import { InvalidParameterError } from '@didcid/common/errors';
+import { installProcessGuards } from '@didcid/common/process-guards';
 import config from './config.js';
 import { WalletNotFoundError } from '@didcid/common/errors';
 import { createAddressRouter } from './keymaster-address-router.js';
@@ -211,15 +212,10 @@ app.use('/api', (req, res) => {
     res.status(404).json({ message: 'Endpoint not found' });
 });
 
-process.on('uncaughtException', (error) => {
-    //console.error('Unhandled exception caught');
-    console.error('Unhandled exception caught', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled rejection at:', promise, 'reason:', reason);
-    //console.error('Unhandled rejection caught');
-});
+// Fatal until startupComplete() below, then log-and-continue: a bad request
+// must not take a running service down, but a failed startup must not leave
+// one listening either.
+const startupComplete = installProcessGuards('Keymaster');
 
 async function waitForNodeId() {
     let isReady = false;
@@ -274,10 +270,8 @@ async function initWallet() {
     return wallet;
 }
 
-// Before the port is bound, and with an explicit exit: this process installs
-// uncaughtException and unhandledRejection handlers that log and continue, so a
-// throw raised from inside the listen callback would leave the server accepting
-// requests anyway.
+// Before the port is bound, so a misconfigured node never accepts a request at
+// all and the operator gets the reason rather than a stack trace.
 for (const check of [checkAdminApiKey(config.adminApiKey), checkPassphrase(config.keymasterPassphrase)]) {
     if (check.fatal) {
         console.error(check.fatal);
@@ -291,58 +285,52 @@ for (const check of [checkAdminApiKey(config.adminApiKey), checkPassphrase(confi
 
 const port = config.keymasterPort;
 
-// The port is bound before any of this runs, and the process-level handlers
-// below log rejections rather than ending the process -- so a failure here
-// would otherwise leave a server answering requests with no keymaster behind
-// it. Startup is all-or-nothing: anything that fails exits.
+// The port is bound before any of this runs, so a failure here would leave a
+// server answering requests with no keymaster behind it. The process guards
+// end the process instead, until startupComplete() says the service is up.
 const server = app.listen(port, config.bindAddress, async () => {
+    gatekeeper = new DrawbridgeClient();
+
+    await gatekeeper.connect({
+        url: config.gatekeeperURL,
+        waitUntilReady: true,
+        intervalSeconds: 5,
+        chatty: true,
+    });
+
+    const wallet = await initWallet();
+    const cipher = new CipherNode();
+    const defaultRegistry = config.defaultRegistry;
+
+    keymaster = new Keymaster({
+        gatekeeper,
+        wallet,
+        cipher,
+        defaultRegistry,
+        passphrase: config.keymasterPassphrase,
+    });
+
+    // The one place this service provisions, so a fresh mnemonic is a
+    // startup event with a log line and a counter rather than a side effect
+    // of whichever request happened to read the wallet first (#1037). Any
+    // other failure to load -- an unreadable store, a wrong passphrase --
+    // propagates, and the guards above end the process.
     try {
-        gatekeeper = new DrawbridgeClient();
-
-        await gatekeeper.connect({
-            url: config.gatekeeperURL,
-            waitUntilReady: true,
-            intervalSeconds: 5,
-            chatty: true,
-        });
-
-        const wallet = await initWallet();
-        const cipher = new CipherNode();
-        const defaultRegistry = config.defaultRegistry;
-
-        keymaster = new Keymaster({
-            gatekeeper,
-            wallet,
-            cipher,
-            defaultRegistry,
-            passphrase: config.keymasterPassphrase,
-        });
-
-        // The one place this service provisions, so a fresh mnemonic is a
-        // startup event with a log line and a counter rather than a side effect
-        // of whichever request happened to read the wallet first (#1037). Any
-        // other failure to load -- an unreadable store, a wrong passphrase --
-        // reaches the catch below and ends the process.
-        try {
-            await keymaster.loadWallet();
-        }
-        catch (error) {
-            if (!(error instanceof WalletNotFoundError)) {
-                throw error;
-            }
-
-            console.warn(`No wallet found in ${config.db} — creating one. If this node has run before, its store is missing and its identity has been replaced.`);
-            await keymaster.newWallet();
-            walletsCreatedTotal.inc();
-        }
+        await keymaster.loadWallet();
     }
     catch (error) {
-        console.error('Keymaster failed to start:', error);
-        process.exit(1);
+        if (!(error instanceof WalletNotFoundError)) {
+            throw error;
+        }
+
+        console.warn(`No wallet found in ${config.db} — creating one. If this node has run before, its store is missing and its identity has been replaced.`);
+        await keymaster.newWallet();
+        walletsCreatedTotal.inc();
     }
 
     console.log(`Keymaster server v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
+    startupComplete();
 
     try {
         await waitForNodeId();
