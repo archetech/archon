@@ -210,10 +210,11 @@ export default class Keymaster implements KeymasterInterface {
     // `undefined` = not yet fetched; `null` = the node advertises none.
     private _nodeDidCommEndpoint?: string | null;
     private _walletCache?: WalletFile;
-    private _hdkeyCache?: any;
-    // Identity of the wallet whose seed `_hdkeyCache` was derived from, so a
-    // save of a *different* wallet re-derives instead of reusing a stale key.
-    private _hdkeyCacheKey?: string;
+    // An HD key together with the identity of the wallet whose seed it came
+    // from. One value, so a key can never be observed under another wallet's
+    // identity: encrypting a *different* wallet finds the identity does not
+    // match and re-derives, rather than reusing a stale key.
+    private _hdkeyCache?: { hdkey: any, id: string | undefined };
 
     constructor(options: KeymasterOptions) {
         if (!options || !options.gatekeeper || !options.gatekeeper.createDID) {
@@ -336,12 +337,14 @@ export default class Keymaster implements KeymasterInterface {
         mnemonic?: string,
         overwrite = false
     ): Promise<WalletFile> {
+        let hdkey: any;
+
         try {
             if (!mnemonic) {
                 mnemonic = this.cipher.generateMnemonic();
             }
 
-            this._hdkeyCache = this.cipher.generateHDKey(mnemonic);
+            hdkey = this.cipher.generateHDKey(mnemonic);
         } catch (error) {
             throw new InvalidParameterError('mnemonic');
         }
@@ -353,9 +356,8 @@ export default class Keymaster implements KeymasterInterface {
             counter: 0,
             ids: {}
         };
-        // _hdkeyCache was just set from this mnemonic; record its identity so
-        // the save below reuses it instead of re-deriving.
-        this._hdkeyCacheKey = this.hdkeyCacheKey(wallet.seed);
+        // Warm for the save below, which would otherwise re-derive this key.
+        this._hdkeyCache = { hdkey, id: this.hdkeyCacheId(wallet.seed) };
 
         const ok = await this.saveWallet(wallet, overwrite)
         if (!ok) {
@@ -386,10 +388,12 @@ export default class Keymaster implements KeymasterInterface {
         wallet.seed.mnemonicEnc = mnemonicEnc;
         this.passphrase = newPassphrase;
         this._walletCache = wallet;
-        // Rotation re-encrypts the same mnemonic, so the cached HD key is still
-        // valid; repoint its identity to the new mnemonicEnc so the re-encrypt
-        // below reuses the cache instead of re-deriving.
-        this._hdkeyCacheKey = this.hdkeyCacheKey(wallet.seed);
+        // Rotation re-encrypts the same mnemonic, so the HD key is unchanged.
+        // Derive it rather than adopt whatever the cache holds, so the new
+        // identity cannot be attached to another wallet's key; the re-encrypt
+        // below then reuses this entry instead of re-deriving.
+        const hdkey = this.cipher.generateHDKey(mnemonic);
+        this._hdkeyCache = { hdkey, id: this.hdkeyCacheId(wallet.seed) };
 
         const encrypted = await this.encryptWalletForStorage(wallet);
         const ok = await this.db.saveWallet(encrypted, true);
@@ -5826,21 +5830,21 @@ export default class Keymaster implements KeymasterInterface {
     // for the wallet currently being encrypted (e.g. restoring one wallet into
     // an instance warmed by another) so we re-derive rather than encrypt under
     // the wrong key and brick the stored wallet.
-    private hdkeyCacheKey(seed: Seed): string | undefined {
+    private hdkeyCacheId(seed: Seed): string | undefined {
         const enc = seed.mnemonicEnc;
         return enc ? `${enc.salt}.${enc.iv}.${enc.data}` : undefined;
     }
 
     private async getHDKeyFromCacheOrMnemonic(wallet: WalletFile) {
-        const cacheKey = this.hdkeyCacheKey(wallet.seed);
-        if (this._hdkeyCache && cacheKey !== undefined && this._hdkeyCacheKey === cacheKey) {
-            return this._hdkeyCache;
+        const id = this.hdkeyCacheId(wallet.seed);
+        if (this._hdkeyCache && id !== undefined && this._hdkeyCache.id === id) {
+            return this._hdkeyCache.hdkey;
         }
 
         const mnemonic = await this.getMnemonicForDerivation(wallet);
-        this._hdkeyCache = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCacheKey = cacheKey;
-        return this._hdkeyCache;
+        const hdkey = this.cipher.generateHDKey(mnemonic);
+        this._hdkeyCache = { hdkey, id };
+        return hdkey;
     }
 
     private async encryptWalletForStorage(decrypted: WalletFile): Promise<WalletEncFile> {
@@ -5870,9 +5874,9 @@ export default class Keymaster implements KeymasterInterface {
             throw error;
         }
 
-        this._hdkeyCache = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCacheKey = this.hdkeyCacheKey(stored.seed);
-        const { publicJwk, privateJwk } = this.cipher.generateJwk(this._hdkeyCache.privateKey!);
+        const hdkey = this.cipher.generateHDKey(mnemonic);
+        this._hdkeyCache = { hdkey, id: this.hdkeyCacheId(stored.seed) };
+        const { publicJwk, privateJwk } = this.cipher.generateJwk(hdkey.privateKey!);
 
         const plaintext = this.cipher.decryptMessage(privateJwk, stored.enc, publicJwk);
         const data = JSON.parse(plaintext);
