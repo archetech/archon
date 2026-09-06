@@ -1,18 +1,17 @@
-import { isBlockNotFound as satoshi, rewindTarget as satoshiRewind, DEFAULT_REORG_DEPTH as satoshiDepth } from '../../services/mediators/satoshi/src/reorg.ts';
-import { isBlockNotFound as zcash, rewindTarget as zcashRewind, DEFAULT_REORG_DEPTH as zcashDepth } from '../../services/mediators/zcash/src/reorg.ts';
+import { isBlockNotFound as satoshi, rewindTarget as satoshiRewind, reorgDepth as satoshiConfigured, DEFAULT_REORG_DEPTH as satoshiDepth } from '../../services/mediators/satoshi/src/reorg.ts';
+import { isBlockNotFound as zcash, rewindTarget as zcashRewind, reorgDepth as zcashConfigured, DEFAULT_REORG_DEPTH as zcashDepth } from '../../services/mediators/zcash/src/reorg.ts';
 
-// A reorg near the tip used to restart the scan from the configured start
-// block, because the rewind followed the orphaned chain and gave up on the
-// first block the node no longer held. On a mainnet node that discarded
-// 135,000 blocks of progress and reported only "rewinding to a confirmed
-// block" (#1063).
+// A reorg near the tip must not restart the scan from the configured start
+// block. A rewind that follows the orphaned chain gives up on the first block
+// the node no longer holds, which on a mainnet node discarded 135,000 blocks
+// of progress under the same log line a two-block rewind prints (#1063).
 
 const IMPLEMENTATIONS = [
-    ['satoshi', satoshi, satoshiRewind, satoshiDepth],
-    ['zcash', zcash, zcashRewind, zcashDepth],
+    ['satoshi', satoshi, satoshiRewind, satoshiConfigured, satoshiDepth],
+    ['zcash', zcash, zcashRewind, zcashConfigured, zcashDepth],
 ] as const;
 
-describe.each(IMPLEMENTATIONS)('%s reorg handling', (_name, isBlockNotFound, rewindTarget, depth) => {
+describe.each(IMPLEMENTATIONS)('%s reorg handling', (_name, isBlockNotFound, rewindTarget, reorgDepth, depth) => {
     describe('rewindTarget', () => {
         it('rewinds by the configured depth', () => {
             expect(rewindTarget(3_474_237, 3_339_200, depth)).toBe(3_474_237 - depth);
@@ -26,8 +25,26 @@ describe.each(IMPLEMENTATIONS)('%s reorg handling', (_name, isBlockNotFound, rew
             expect(rewindTarget(3_339_200, 3_339_200, depth)).toBe(3_339_200);
         });
 
-        it('does not move forward on a nonsense depth', () => {
-            expect(rewindTarget(1_000, 0, -5)).toBe(1_000);
+        // A depth of zero would rewind to the reorged height, store the
+        // canonical hash there and resume above it, so the block that replaced
+        // ours would never be read.
+        it('always rewinds at least one block', () => {
+            expect(rewindTarget(1_000, 0, 0)).toBeLessThan(1_000);
+            expect(rewindTarget(1_000, 0, -5)).toBeLessThan(1_000);
+            expect(rewindTarget(1_000, 0, NaN)).toBeLessThan(1_000);
+        });
+    });
+
+    describe('reorgDepth', () => {
+        it('takes a whole number of blocks', () => {
+            expect(reorgDepth('12')).toBe(12);
+            expect(reorgDepth('1')).toBe(1);
+        });
+
+        it('falls back to the default when the setting cannot be a depth', () => {
+            for (const setting of [undefined, '', '   ', 'six', '0', '-1', '6.5', 'Infinity']) {
+                expect(reorgDepth(setting)).toBe(depth);
+            }
         });
     });
 

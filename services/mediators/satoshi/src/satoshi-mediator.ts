@@ -525,7 +525,7 @@ async function getBlockTxCount(hash: string, header?: BlockHeader): Promise<numb
     return Array.isArray(block.tx) ? block.tx.length : 0;
 }
 
-async function resolveScanStart(blockCount: number): Promise<number> {
+async function resolveScanStart(blockCount: number): Promise<number | null> {
     const db = await loadDb();
 
     if (!db.hash) {
@@ -538,10 +538,11 @@ async function resolveScanStart(blockCount: number): Promise<number> {
         header = await getChainBlockHeader(db.hash);
     } catch (error) {
         if (!isBlockNotFound(error)) {
-            // The node said nothing about the chain, so neither does this. The
-            // position stands and the next pass asks again.
-            console.warn(`Could not read block ${db.hash} at height ${db.height}: ${error}`);
-            return db.height + 1;
+            // The node said nothing about the chain, so neither does this.
+            // Scanning now would overwrite the stored hash with the next block
+            // read, and nothing would ever re-check it.
+            console.warn(`Could not read block ${db.hash} at height ${db.height}, skipping this pass: ${error}`);
+            return null;
         }
     }
 
@@ -561,13 +562,14 @@ async function resolveScanStart(blockCount: number): Promise<number> {
     } catch (error) {
         // Committing a rewind to a block that cannot be read would store a
         // position no later pass can verify.
-        console.warn(`Reorg at height ${db.height}, but the chain at ${rewindHeight} could not be read: ${error}`);
-        return db.height + 1;
+        console.warn(`Reorg at height ${db.height}, but the chain at ${rewindHeight} could not be read, skipping this pass: ${error}`);
+        return null;
     }
 
     console.log(`Reorg detected at height ${db.height}; rewinding ${db.height - rewindHeight} block(s) to ${rewindHeight}`);
 
     let txnsToSubtract = 0;
+    let counted = true;
 
     try {
         // The blocks about to be read again were counted when they were read
@@ -576,9 +578,11 @@ async function resolveScanStart(blockCount: number): Promise<number> {
             txnsToSubtract += await getBlockTxCount(await getChainBlockHash(height));
         }
     } catch (error) {
-        // A metric, not the position: a rewind that cannot adjust the count
-        // still has to happen.
-        console.warn(`Could not total the transactions being rescanned: ${error}`);
+        // A metric, not the position: the rewind still has to happen. A partial
+        // total would subtract less than the rescan adds back, so none of it is
+        // applied and the gauge runs high by this range until the next reset.
+        counted = false;
+        console.warn(`Could not total the transactions being rescanned, leaving the count as it is: ${error}`);
     }
 
     await jsonPersister.updateDb((data) => {
@@ -586,7 +590,7 @@ async function resolveScanStart(blockCount: number): Promise<number> {
         data.hash = rewindHash;
         data.time = rewindHeader.time ? new Date(rewindHeader.time * 1000).toISOString() : '';
         data.blocksScanned = Math.max(0, rewindHeight - config.startBlock + 1);
-        data.txnsScanned = Math.max(0, data.txnsScanned - txnsToSubtract);
+        data.txnsScanned = counted ? Math.max(0, data.txnsScanned - txnsToSubtract) : data.txnsScanned;
         data.blockCount = blockCount;
         data.blocksPending = blockCount - rewindHeight;
     });
@@ -715,7 +719,11 @@ async function scanBlocks(): Promise<void> {
 
     console.log(`current block height: ${blockCount}`);
 
-    let start = await resolveScanStart(blockCount);
+    const start = await resolveScanStart(blockCount);
+
+    if (start === null) {
+        return;
+    }
 
     for (let height = start; height <= blockCount; height++) {
         console.log(`${height}/${blockCount} blocks (${formatSyncProgress(height, blockCount)}%)`);

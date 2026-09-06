@@ -17,9 +17,23 @@
 // blocks, with room to spare.
 export const DEFAULT_REORG_DEPTH = 6;
 
+// A depth below one would rewind to the reorged height itself: the handler
+// stores the canonical hash there and resumes above it, so the block that
+// replaced ours is never read. Anything that is not a whole number of blocks
+// says nothing about how far to go.
+function blocksToRewind(depth: number): number {
+    return Number.isInteger(depth) && depth >= 1 ? depth : DEFAULT_REORG_DEPTH;
+}
+
+// The configured depth, or the default when the setting is missing or is not a
+// count of blocks.
+export function reorgDepth(setting: string | undefined): number {
+    return blocksToRewind(Number(setting));
+}
+
 // Where to resume after a reorg at `height`, never before the window starts.
 export function rewindTarget(height: number, startBlock: number, depth: number): number {
-    return Math.max(startBlock, height - Math.max(0, depth));
+    return Math.max(startBlock, height - blocksToRewind(depth));
 }
 
 // Whether an error says the node does not have that block, as opposed to

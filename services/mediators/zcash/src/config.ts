@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { DEFAULT_REORG_DEPTH } from './reorg.js';
+import { reorgDepth } from './reorg.js';
 
 dotenv.config();
 
@@ -96,7 +96,7 @@ const config: AppConfig = {
     feeOracleUrl: process.env.ARCHON_ZEC_FEE_ORACLE_URL || '',
     rbfEnabled: process.env.ARCHON_ZEC_RBF_ENABLED === 'true',
     startBlock: process.env.ARCHON_ZEC_START_BLOCK ? parseInt(process.env.ARCHON_ZEC_START_BLOCK) : 0,
-    reorgDepth: process.env.ARCHON_ZEC_REORG_DEPTH ? parseInt(process.env.ARCHON_ZEC_REORG_DEPTH) : DEFAULT_REORG_DEPTH,
+    reorgDepth: reorgDepth(process.env.ARCHON_ZEC_REORG_DEPTH),
     reimport: process.env.ARCHON_ZEC_REIMPORT ? (process.env.ARCHON_ZEC_REIMPORT === 'true') : true,
     db: toDB(process.env.ARCHON_ZEC_DB),
     dbName: process.env.ARCHON_ZEC_DB_NAME || toChain(process.env.ARCHON_ZEC_CHAIN).replace(/:/g, '-'),
