@@ -45,7 +45,7 @@ export function checkAdminApiKey(adminApiKey: string): StartupCheck {
 }
 
 /**
- * Validate ARCHON_ENCRYPTED_PASSPHRASE at startup.
+ * Validate ARCHON_PASSPHRASE at startup.
  *
  * Fail closed: the passphrase is both the wallet's encryption secret and the
  * credential POST /login checks before handing back the admin API key. An empty

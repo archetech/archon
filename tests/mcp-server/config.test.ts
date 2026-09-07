@@ -5,6 +5,18 @@ import os from 'os';
 import path from 'path';
 
 describe('mcp server config', () => {
+    // A node configures the wallet passphrase under the older name, and the
+    // MCP server is one of the surfaces someone runs against that same node
+    // (#1020). Both names reach it, and the current one wins.
+    it('reads the passphrase from either name, preferring the current one', () => {
+        expect(loadConfig({ ARCHON_PASSPHRASE: 'current' }).passphrase).toBe('current');
+        expect(loadConfig({ ARCHON_ENCRYPTED_PASSPHRASE: 'older' }).passphrase).toBe('older');
+        expect(loadConfig({
+            ARCHON_PASSPHRASE: 'current',
+            ARCHON_ENCRYPTED_PASSPHRASE: 'older',
+        }).passphrase).toBe('current');
+    });
+
     it('uses Keymaster CLI compatible defaults', () => {
         const config = loadConfig({});
 
