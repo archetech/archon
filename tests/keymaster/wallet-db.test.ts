@@ -73,9 +73,9 @@ describe('WalletJson', () => {
 });
 
 describe('WalletSQLite', () => {
-    // ARCHON_WALLET_PATH is commonly absolute, and the default became one in
-    // #980. Joining it under dataFolder opened `data//home/you/...`, which is
-    // not a wallet anyone asked for.
+    // ARCHON_WALLET_PATH is commonly absolute, and so is the default. Joining
+    // one under dataFolder gives `data//home/you/...`, which is not a wallet
+    // anyone asked for (#980).
     it('treats an absolute path as the location, not a name under dataFolder', async () => {
         await withTempDir(async dir => {
             const file = join(dir, 'absolute', 'wallet.db');
@@ -90,7 +90,8 @@ describe('WalletSQLite', () => {
         });
     });
 
-    // The JSON backend creates its folder; this one reported SQLITE_CANTOPEN.
+    // The JSON backend creates its folder; without this the SQLite one fails
+    // with SQLITE_CANTOPEN.
     it('creates the directory it was pointed at', async () => {
         await withTempDir(async dir => {
             const wallet = await WalletSQLite.create('wallet.db', join(dir, 'missing', 'deeper'));

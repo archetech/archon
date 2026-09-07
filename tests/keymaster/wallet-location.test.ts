@@ -69,8 +69,8 @@ describe('defaultWalletFile', () => {
 });
 
 describe('directoryWallets', () => {
-    // A SQLite wallet made before the extension was corrected is still called
-    // wallet.json, and it holds the identity -- so it is looked for first.
+    // Some SQLite wallets are named wallet.json and those hold an identity, so
+    // that name is looked for first.
     it('looks for the older SQLite name before the corrected one', () => {
         expect(directoryWallets('sqlite')).toStrictEqual(['./wallet.json', './wallet.db']);
     });

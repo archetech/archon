@@ -13,8 +13,9 @@ import path from 'path';
 
 export const ARCHON_HOME_DIRECTORY = '.archon';
 
-// SQLite's own default is wallet.db. The CLI never reached it, because it
-// always passes a path, so a SQLite database was written under a .json name.
+// SQLite's own default is wallet.db, which the CLI never reaches because it
+// always passes a path. Without a name per backend, a SQLite database is
+// written under a .json one.
 export function defaultWalletFile(walletType: string): string {
     return walletType === 'sqlite' ? 'wallet.db' : 'wallet.json';
 }
@@ -23,9 +24,9 @@ export function homeWalletPath(homeDirectory: string, walletType: string): strin
     return path.join(homeDirectory, ARCHON_HOME_DIRECTORY, defaultWalletFile(walletType));
 }
 
-// What to look for in the working directory, in the order it should win. A
-// SQLite wallet made before the extension was corrected is still called
-// wallet.json, and it is the one holding the identity.
+// What to look for in the working directory, in the order it should win.
+// Some SQLite wallets are named wallet.json, those are the ones holding an
+// identity, and nothing about the name says which backend wrote it.
 export function directoryWallets(walletType: string): string[] {
     return walletType === 'sqlite' ? ['./wallet.json', './wallet.db'] : ['./wallet.json'];
 }
@@ -65,8 +66,8 @@ export function resolveWalletPath(location: WalletLocation): string {
 }
 
 // Said when a wallet is not where it was looked for. `create-wallet` is only
-// the right answer if there is not one already, and the commonest case is one
-// made in another directory before this default existed.
+// the right answer if there is not one already, and the commonest case is a
+// wallet sitting in another directory.
 export function walletNotFoundMessage(walletPath: string, homeWallet: string): string[] {
     const lines = [`Error: no wallet at ${walletPath}`];
 

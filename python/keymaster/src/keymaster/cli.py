@@ -72,10 +72,10 @@ def saved_passphrase_file() -> str:
 
 
 def default_wallet_file(wallet_type: str) -> str:
-    """SQLite's own default is wallet.db.
+    """SQLite's own default is wallet.db, which the CLI never reaches.
 
-    The CLI never reached it, because it always passes a path, so a SQLite
-    database was written under a .json name.
+    It always passes a path, so without a name per backend a SQLite database is
+    written under a .json one.
     """
     return "wallet.db" if wallet_type == "sqlite" else "wallet.json"
 
@@ -87,8 +87,8 @@ def home_wallet_path(home_directory: str, wallet_type: str) -> str:
 def directory_wallets(wallet_type: str) -> list[str]:
     """What to look for in the working directory, in the order it should win.
 
-    A SQLite wallet made before the extension was corrected is still called
-    wallet.json, and it is the one holding the identity.
+    Some SQLite wallets are named wallet.json, those are the ones holding an
+    identity, and nothing about the name says which backend wrote it.
     """
     return ["./wallet.json", "./wallet.db"] if wallet_type == "sqlite" else ["./wallet.json"]
 
@@ -148,8 +148,7 @@ def wallet_not_found_message(wallet_path: str, home_wallet: str) -> list[str]:
     """Said when a wallet is not where it was looked for.
 
     ``create-wallet`` is only the right answer if there is not one already, and
-    the commonest case is one made in another directory before this default
-    existed.
+    the commonest case is a wallet sitting in another directory.
     """
     lines = [f"Error: no wallet at {wallet_path}"]
 

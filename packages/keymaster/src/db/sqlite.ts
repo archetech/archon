@@ -17,7 +17,7 @@ export default class WalletSQLite extends AbstractBase {
     constructor(walletFileName: string = 'wallet.db', dataFolder: string = 'data') {
         super();
         // An absolute path is a location, not a name to hang under dataFolder.
-        // ARCHON_WALLET_PATH is commonly one, and joining it produced
+        // ARCHON_WALLET_PATH is commonly one, and joining it would give
         // `data//home/you/...`, which opens nothing anyone asked for.
         this.walletName = path.isAbsolute(walletFileName)
             ? walletFileName
