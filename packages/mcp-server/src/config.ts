@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { directoryWallets, homeWalletPath, resolveWalletPath, storedAt, type WalletLocation } from '@didcid/keymaster/wallet-location';
+import { directoryWallets, homeWalletPath, resolveWalletPath, type WalletLocation } from '@didcid/keymaster/wallet-location';
 
 export type WalletType = 'json' | 'sqlite';
 
@@ -74,7 +74,10 @@ export function loadConfig(
             env,
             directoryWallets: directoryWallets(walletType),
             homeWallet: homeWalletPath(os.homedir(), walletType),
-            exists: (candidate: string) => fs.existsSync(storedAt(walletType, candidate)),
+            // Plain existence, unlike the CLI: createArchonRuntime splits this
+            // path and hands the parts to the backend, so a relative one opens
+            // where it says rather than under the backend's own folder.
+            exists: (candidate: string) => fs.existsSync(candidate),
             ...location,
         }),
         // A node sets this under its older name; read that too (#1020).

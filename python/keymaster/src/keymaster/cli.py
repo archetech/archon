@@ -71,43 +71,19 @@ def saved_passphrase_file() -> str:
     return str(Path.home() / ARCHON_HOME_DIRECTORY / "passphrase")
 
 
-def default_wallet_file(wallet_type: str) -> str:
-    """SQLite's own default is wallet.db, which the CLI never reaches.
+def home_wallet_path(home_directory: str) -> str:
+    return str(Path(home_directory) / ARCHON_HOME_DIRECTORY / "wallet.json")
 
-    It always passes a path, so without a name per backend a SQLite database is
-    written under a .json one.
+
+def directory_wallets() -> list[str]:
+    """What to look for in the working directory.
+
+    One name, not the TypeScript CLI's list: this CLI builds a JsonWalletStore
+    for every command and the package ships no SQLite store, so a wallet under
+    another backend's name is one it could not open. Reading ARCHON_WALLET_TYPE
+    here would find a file it then opens as JSON.
     """
-    return "wallet.db" if wallet_type == "sqlite" else "wallet.json"
-
-
-def home_wallet_path(home_directory: str, wallet_type: str) -> str:
-    return str(Path(home_directory) / ARCHON_HOME_DIRECTORY / default_wallet_file(wallet_type))
-
-
-def directory_wallets(wallet_type: str) -> list[str]:
-    """What to look for in the working directory, in the order it should win.
-
-    Some SQLite wallets are named wallet.json, those are the ones holding an
-    identity, and nothing about the name says which backend wrote it.
-    """
-    return ["./wallet.json", "./wallet.db"] if wallet_type == "sqlite" else ["./wallet.json"]
-
-
-def stored_at(wallet_type: str, wallet_path: str) -> str:
-    """Where a backend keeps the wallet it is handed.
-
-    The JSON one uses the path as given; the SQLite one treats a relative one
-    as a name under its own data folder, so ``./wallet.json`` is stored at
-    ``data/wallet.json``.
-
-    Asking whether a wallet is already in the working directory means asking
-    where that backend would have put it. Looking at the name instead reports
-    no wallet to a SQLite user who has one, and sends them to the home default.
-    """
-    if wallet_type == "sqlite" and not Path(wallet_path).is_absolute():
-        return str(Path("data") / wallet_path)
-
-    return wallet_path
+    return ["./wallet.json"]
 
 
 def resolve_wallet_path(
@@ -1703,13 +1679,12 @@ async def _run(args: argparse.Namespace) -> int:
         or os.environ.get("ARCHON_GATEKEEPER_URL")
         or "http://localhost:4224"
     )
-    wallet_type = os.environ.get("ARCHON_WALLET_TYPE", "json")
-    home_wallet = home_wallet_path(str(Path.home()), wallet_type)
+    home_wallet = home_wallet_path(str(Path.home()))
     wallet_path = resolve_wallet_path(
         os.environ,
-        directory_wallets=directory_wallets(wallet_type),
+        directory_wallets=directory_wallets(),
         home_wallet=home_wallet,
-        exists=lambda candidate: Path(stored_at(wallet_type, candidate)).exists(),
+        exists=lambda candidate: Path(candidate).exists(),
     )
     default_registry = os.environ.get("ARCHON_DEFAULT_REGISTRY")
     # stdin decides whether there is anyone to answer. stdout may be a pipe
