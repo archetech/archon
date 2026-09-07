@@ -8,6 +8,8 @@ function sources(env: Record<string, string | undefined>, overrides: Partial<Par
     return {
         env,
         readFile: () => { throw new Error('no file expected'); },
+        fileExists: () => false,
+        savedFile: '/home/someone/.archon/passphrase',
         interactive: false,
         prompt: async () => { throw new Error('no prompt expected'); },
         ...overrides,
@@ -16,11 +18,13 @@ function sources(env: Record<string, string | undefined>, overrides: Partial<Par
 
 describe('resolvePassphrase', () => {
     it('takes the environment first, so automation is unaffected', async () => {
-        expect(await resolvePassphrase(sources({ ARCHON_PASSPHRASE: 'from-env' }))).toBe('from-env');
+        expect(await resolvePassphrase(sources({ ARCHON_PASSPHRASE: 'from-env' })))
+            .toStrictEqual({ passphrase: 'from-env', from: 'environment' });
     });
 
     it('still reads the older name', async () => {
-        expect(await resolvePassphrase(sources({ ARCHON_ENCRYPTED_PASSPHRASE: 'older' }))).toBe('older');
+        expect(await resolvePassphrase(sources({ ARCHON_ENCRYPTED_PASSPHRASE: 'older' })))
+            .toStrictEqual({ passphrase: 'older', from: 'environment' });
     });
 
     it('reads a file when the environment holds nothing', async () => {
@@ -31,7 +35,7 @@ describe('resolvePassphrase', () => {
             },
         }));
 
-        expect(read).toBe('from-file');
+        expect(read).toStrictEqual({ passphrase: 'from-file', from: 'file' });
     });
 
     // Only the newline an editor leaves. Spaces could be the passphrase.
@@ -40,7 +44,7 @@ describe('resolvePassphrase', () => {
             readFile: () => '  two words  \r\n',
         }));
 
-        expect(read).toBe('  two words  ');
+        expect(read?.passphrase).toBe('  two words  ');
     });
 
     // A path that is wrong is an error, not an invitation to type something
@@ -55,6 +59,33 @@ describe('resolvePassphrase', () => {
         await expect(attempt).rejects.toThrow('ENOENT');
     });
 
+    // Accepting the CLI's offer to save has to end the asking, or every
+    // command in a session prompts again -- which is what the exported
+    // variable was buying.
+    it('reads the saved file before asking', async () => {
+        let asked = false;
+        const read = await resolvePassphrase(sources({}, {
+            fileExists: (path) => path === '/home/someone/.archon/passphrase',
+            readFile: () => 'saved-one\n',
+            interactive: true,
+            prompt: async () => { asked = true; return 'typed'; },
+        }));
+
+        expect(read).toStrictEqual({ passphrase: 'saved-one', from: 'saved' });
+        expect(asked).toBe(false);
+    });
+
+    it('fails on a saved file it cannot read, as with a configured one', async () => {
+        const attempt = resolvePassphrase(sources({}, {
+            fileExists: () => true,
+            readFile: () => { throw new Error('EACCES'); },
+            interactive: true,
+            prompt: async () => 'typed',
+        }));
+
+        await expect(attempt).rejects.toThrow('EACCES');
+    });
+
     it('asks when there is someone to ask', async () => {
         const asked: string[] = [];
         const read = await resolvePassphrase(sources({}, {
@@ -62,7 +93,7 @@ describe('resolvePassphrase', () => {
             prompt: async (query) => { asked.push(query); return 'typed'; },
         }));
 
-        expect(read).toBe('typed');
+        expect(read).toStrictEqual({ passphrase: 'typed', from: 'prompt' });
         expect(asked).toHaveLength(1);
     });
 

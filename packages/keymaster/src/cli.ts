@@ -11,8 +11,9 @@ import CipherNode from '@didcid/cipher/node';
 import type { DidCommEnc } from '@didcid/cipher/didcomm';
 import WalletJson from './db/json.js';
 import WalletSQLite from './db/sqlite.js';
+import os from 'os';
 import { createInterface } from 'readline';
-import { missingPassphraseMessage, resolvePassphrase } from './passphrase.js';
+import { missingPassphraseMessage, resolvePassphrase, type ResolvedPassphrase } from './passphrase.js';
 
 dotenv.config();
 
@@ -52,6 +53,39 @@ function askHidden(query: string): Promise<string> {
             resolve(answer);
         });
     });
+}
+
+function ask(query: string): Promise<string> {
+    return new Promise((resolve) => {
+        const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+
+        rl.question(query, (answer) => {
+            rl.close();
+            resolve(answer);
+        });
+    });
+}
+
+// Typing a passphrase for every command is what the exported variable was
+// buying, so a prompted one is offered a home the CLI reads back (#977).
+// Owner-only, and on stderr so nothing here reaches a piped stdout.
+async function offerToSave(file: string, passphrase: string): Promise<void> {
+    const answer = await ask(`Save it to ${file} so you are not asked again? [y/N] `);
+
+    if (!/^y(es)?$/i.test(answer.trim())) {
+        return;
+    }
+
+    try {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, `${passphrase}\n`);
+        fs.chmodSync(file, 0o600);
+        console.error(`Saved to ${file}, readable only by you.`);
+    }
+    catch (error: any) {
+        // Not fatal: the command can still run on what was typed.
+        console.error(`Could not save to ${file}: ${error.message || error}`);
+    }
 }
 
 // A handler that reports a failure has to fail the process too: without this
@@ -2293,27 +2327,36 @@ async function run() {
     const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
     const defaultRegistry = process.env.ARCHON_DEFAULT_REGISTRY;
     const interactive = process.stdin.isTTY === true && process.stdout.isTTY === true;
-    let passphrase: string | undefined;
+    const savedFile = path.join(os.homedir(), '.archon', 'passphrase');
+    let resolved: ResolvedPassphrase | undefined;
 
     try {
-        passphrase = await resolvePassphrase({
+        resolved = await resolvePassphrase({
             env: process.env,
-            readFile: (path) => fs.readFileSync(path, 'utf-8'),
+            readFile: (file) => fs.readFileSync(file, 'utf-8'),
+            fileExists: (file) => fs.existsSync(file),
+            savedFile,
             interactive,
             prompt: askHidden,
         });
     }
     catch (error: any) {
-        console.error(`Error: could not read ARCHON_PASSPHRASE_FILE: ${error.message || error}`);
+        console.error(`Error: could not read the passphrase file: ${error.message || error}`);
         process.exit(1);
     }
 
-    if (!passphrase) {
+    if (!resolved) {
         for (const line of missingPassphraseMessage(interactive)) {
             console.error(line);
         }
 
         process.exit(1);
+    }
+
+    const passphrase = resolved.passphrase;
+
+    if (resolved.from === 'prompt') {
+        await offerToSave(savedFile, passphrase);
     }
 
     try {

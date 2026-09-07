@@ -8,36 +8,59 @@
 
 export interface PassphraseSources {
     env: Record<string, string | undefined>;
-    // Throws if the configured file cannot be read, which must not fall
-    // through to a prompt: an explicit path that is wrong is an error, not an
+    // Throws if a configured file cannot be read, which must not fall through
+    // to a prompt: an explicit path that is wrong is an error, not an
     // invitation to type something else.
     readFile: (path: string) => string;
+    fileExists: (path: string) => boolean;
+    // Where a prompted passphrase is offered a home. Read before prompting, so
+    // accepting that offer once ends the asking -- otherwise every command in a
+    // session asks again, which is what the environment variable was buying.
+    savedFile: string;
     // A prompt is only possible when someone is there to answer it. Asking a
     // pipe hangs the script that opened it.
     interactive: boolean;
     prompt: (query: string) => Promise<string>;
 }
 
+// Which of them supplied it. Only a prompted one is worth offering to save.
+export type PassphraseSource = 'environment' | 'file' | 'saved' | 'prompt';
+
+export interface ResolvedPassphrase {
+    passphrase: string;
+    from: PassphraseSource;
+}
+
 export const PASSPHRASE_PROMPT = 'Wallet passphrase: ';
 
-export async function resolvePassphrase(sources: PassphraseSources): Promise<string | undefined> {
+// One trailing newline, which is what an editor or `echo >` leaves and what
+// the Docker secrets convention expects to be ignored. Nothing else: the rest
+// could be the passphrase.
+function fromFile(text: string): string {
+    return text.replace(/\r?\n$/, '');
+}
+
+export async function resolvePassphrase(sources: PassphraseSources): Promise<ResolvedPassphrase | undefined> {
     const configured = sources.env.ARCHON_PASSPHRASE || sources.env.ARCHON_ENCRYPTED_PASSPHRASE;
 
     if (configured) {
-        return configured;
+        return { passphrase: configured, from: 'environment' };
     }
 
     const file = sources.env.ARCHON_PASSPHRASE_FILE;
 
     if (file) {
-        // One trailing newline, which is what an editor or `echo >` leaves and
-        // what the Docker secrets convention expects to be ignored. Nothing
-        // else is trimmed: the rest could be the passphrase.
-        return sources.readFile(file).replace(/\r?\n$/, '');
+        return { passphrase: fromFile(sources.readFile(file)), from: 'file' };
+    }
+
+    if (sources.fileExists(sources.savedFile)) {
+        return { passphrase: fromFile(sources.readFile(sources.savedFile)), from: 'saved' };
     }
 
     if (sources.interactive) {
-        return await sources.prompt(PASSPHRASE_PROMPT) || undefined;
+        const answer = await sources.prompt(PASSPHRASE_PROMPT);
+
+        return answer ? { passphrase: answer, from: 'prompt' } : undefined;
     }
 
     return undefined;

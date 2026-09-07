@@ -866,10 +866,12 @@ export ARCHON_NODE_URL=${nodeUrl}
 keymaster create-id myagent`}
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mb: 2 }}>
-                            The passphrase encrypts your wallet. The CLI asks for it and keeps it
-                            off your command line; for scripts and agents, point{' '}
-                            <code>ARCHON_PASSPHRASE_FILE</code> at a file holding it, or set{' '}
-                            <code>ARCHON_PASSPHRASE</code> if the environment is somewhere you
+                            The passphrase encrypts your wallet. The CLI asks for it rather than
+                            taking it from your command line, and offers to save it to{' '}
+                            <code>~/.archon/passphrase</code> so later commands do not ask again.
+                            To keep it elsewhere, point <code>ARCHON_PASSPHRASE_FILE</code> at
+                            that file. Scripts and agents can still set{' '}
+                            <code>ARCHON_PASSPHRASE</code> where the environment is somewhere you
                             trust with a secret.
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mb: 2, mt: 3 }}>

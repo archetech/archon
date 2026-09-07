@@ -20,20 +20,28 @@ def no_prompt(query: str) -> str:
     raise AssertionError("no prompt expected")
 
 
-def test_environment_comes_first_so_automation_is_unaffected() -> None:
-    resolved = resolve_passphrase(
-        {"ARCHON_PASSPHRASE": "from-env"}, read_file=no_file, interactive=False, prompt=no_prompt
-    )
+def resolve(env, **overrides):
+    kwargs = {
+        "read_file": no_file,
+        "file_exists": lambda _: False,
+        "saved_file": "/home/someone/.archon/passphrase",
+        "interactive": False,
+        "prompt": no_prompt,
+    }
+    kwargs.update(overrides)
+    return resolve_passphrase(env, **kwargs)
 
-    assert resolved == "from-env"
+
+def test_environment_comes_first_so_automation_is_unaffected() -> None:
+    resolved = resolve({"ARCHON_PASSPHRASE": "from-env"})
+
+    assert resolved == ("from-env", "environment")
 
 
 def test_older_name_is_still_read() -> None:
-    resolved = resolve_passphrase(
-        {"ARCHON_ENCRYPTED_PASSPHRASE": "older"}, read_file=no_file, interactive=False, prompt=no_prompt
-    )
+    resolved = resolve({"ARCHON_ENCRYPTED_PASSPHRASE": "older"})
 
-    assert resolved == "older"
+    assert resolved == ("older", "environment")
 
 
 def test_file_is_read_when_the_environment_holds_nothing() -> None:
@@ -43,24 +51,17 @@ def test_file_is_read_when_the_environment_holds_nothing() -> None:
         seen.append(path)
         return "from-file\n"
 
-    resolved = resolve_passphrase(
-        {"ARCHON_PASSPHRASE_FILE": "/run/secrets/pass"}, read_file=read, interactive=False, prompt=no_prompt
-    )
+    resolved = resolve({"ARCHON_PASSPHRASE_FILE": "/run/secrets/pass"}, read_file=read)
 
-    assert resolved == "from-file"
+    assert resolved == ("from-file", "file")
     assert seen == ["/run/secrets/pass"]
 
 
 def test_only_one_trailing_newline_is_removed() -> None:
     # Spaces could be the passphrase.
-    resolved = resolve_passphrase(
-        {"ARCHON_PASSPHRASE_FILE": "/f"},
-        read_file=lambda _: "  two words  \r\n",
-        interactive=False,
-        prompt=no_prompt,
-    )
+    resolved = resolve({"ARCHON_PASSPHRASE_FILE": "/f"}, read_file=lambda _: "  two words  \r\n")
 
-    assert resolved == "  two words  "
+    assert resolved[0] == "  two words  "
 
 
 def test_unreadable_file_raises_rather_than_prompting() -> None:
@@ -70,12 +71,33 @@ def test_unreadable_file_raises_rather_than_prompting() -> None:
         raise FileNotFoundError(path)
 
     with pytest.raises(FileNotFoundError):
-        resolve_passphrase(
-            {"ARCHON_PASSPHRASE_FILE": "/missing"},
-            read_file=read,
-            interactive=True,
-            prompt=lambda _: "typed",
-        )
+        resolve({"ARCHON_PASSPHRASE_FILE": "/missing"}, read_file=read, interactive=True, prompt=lambda _: "typed")
+
+
+def test_saved_file_is_read_before_asking() -> None:
+    # Accepting the CLI's offer to save has to end the asking, or every command
+    # in a session prompts again -- which is what the exported variable was
+    # buying.
+    asked: list[str] = []
+
+    resolved = resolve(
+        {},
+        file_exists=lambda path: path == "/home/someone/.archon/passphrase",
+        read_file=lambda _: "saved-one\n",
+        interactive=True,
+        prompt=lambda query: asked.append(query) or "typed",
+    )
+
+    assert resolved == ("saved-one", "saved")
+    assert asked == []
+
+
+def test_unreadable_saved_file_raises_as_a_configured_one_does() -> None:
+    def read(path: str) -> str:
+        raise PermissionError(path)
+
+    with pytest.raises(PermissionError):
+        resolve({}, file_exists=lambda _: True, read_file=read, interactive=True, prompt=lambda _: "typed")
 
 
 def test_asks_when_there_is_someone_to_ask() -> None:
@@ -85,21 +107,21 @@ def test_asks_when_there_is_someone_to_ask() -> None:
         asked.append(query)
         return "typed"
 
-    resolved = resolve_passphrase({}, read_file=no_file, interactive=True, prompt=prompt)
+    resolved = resolve({}, interactive=True, prompt=prompt)
 
-    assert resolved == "typed"
+    assert resolved == ("typed", "prompt")
     assert len(asked) == 1
 
 
 def test_does_not_ask_when_nothing_is_attached() -> None:
     # Asking a pipe hangs the script that opened it.
-    resolved = resolve_passphrase({}, read_file=no_file, interactive=False, prompt=no_prompt)
+    resolved = resolve({})
 
     assert resolved is None
 
 
 def test_empty_answer_is_no_passphrase() -> None:
-    resolved = resolve_passphrase({}, read_file=no_file, interactive=True, prompt=lambda _: "")
+    resolved = resolve({}, interactive=True, prompt=lambda _: "")
 
     assert resolved is None
 

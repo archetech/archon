@@ -60,14 +60,26 @@ class CommandError(Exception):
 
 PASSPHRASE_PROMPT = "Wallet passphrase: "
 
+# Which source supplied it. Only a prompted one is worth offering to save.
+PassphraseSource = str
+
+
+def _from_file(text: str) -> str:
+    # One trailing newline, which is what an editor or `echo >` leaves and what
+    # the Docker secrets convention expects to be ignored. Nothing else: the
+    # rest could be the passphrase.
+    return re.sub(r"\r?\n$", "", text)
+
 
 def resolve_passphrase(
     env: Mapping[str, str],
     *,
     read_file: Callable[[str], str],
+    file_exists: Callable[[str], bool],
+    saved_file: str,
     interactive: bool,
     prompt: Callable[[str], str],
-) -> str | None:
+) -> tuple[str, PassphraseSource] | None:
     """Where the CLI gets the wallet passphrase.
 
     The environment is the worst of the available places for it: it persists in
@@ -76,29 +88,60 @@ def resolve_passphrase(
     needs it, so it stays supported -- but it is not the only way and not the
     one a first-time reader is taught (#977).
 
+    ``saved_file`` is read before prompting so that accepting the CLI's offer
+    to write it ends the asking; otherwise every command in a session asks
+    again, which is what the exported variable was buying.
+
+    A configured file that cannot be read raises rather than falling through to
+    a prompt: an explicit path that is wrong is an error, not an invitation to
+    type something else.
+
     Mirrors the TypeScript resolvePassphrase, including its order.
     """
     configured = env.get("ARCHON_PASSPHRASE") or env.get("ARCHON_ENCRYPTED_PASSPHRASE")
 
     if configured:
-        return configured
+        return configured, "environment"
 
     path = env.get("ARCHON_PASSPHRASE_FILE")
 
     if path:
-        # A configured file that cannot be read raises rather than falling
-        # through to a prompt: an explicit path that is wrong is an error, not
-        # an invitation to type something else. One trailing newline goes,
-        # which is what an editor or `echo >` leaves; nothing else, because the
-        # rest could be the passphrase.
-        return re.sub(r"\r?\n$", "", read_file(path))
+        return _from_file(read_file(path)), "file"
+
+    if file_exists(saved_file):
+        return _from_file(read_file(saved_file)), "saved"
 
     if interactive:
         # A prompt is only possible when someone is there to answer it. Asking
         # a pipe hangs the script that opened it.
-        return prompt(PASSPHRASE_PROMPT) or None
+        answer = prompt(PASSPHRASE_PROMPT)
+
+        return (answer, "prompt") if answer else None
 
     return None
+
+
+def offer_to_save(file: str, passphrase: str) -> None:
+    """Offer a prompted passphrase a home the CLI reads back.
+
+    Typing one for every command is what the exported variable was buying.
+    Owner-only, and everything here goes to stderr so nothing reaches a piped
+    stdout.
+    """
+    answer = input(f"Save it to {file} so you are not asked again? [y/N] ")
+
+    if answer.strip().lower() not in ("y", "yes"):
+        return
+
+    try:
+        path = Path(file)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"{passphrase}\n", encoding="utf-8")
+        path.chmod(0o600)
+        print(f"Saved to {file}, readable only by you.", file=sys.stderr)
+    except OSError as exc:
+        # Not fatal: the command can still run on what was typed.
+        print(f"Could not save to {file}: {exc}", file=sys.stderr)
 
 
 def missing_passphrase_message(interactive: bool) -> list[str]:
@@ -1524,21 +1567,30 @@ async def _run(args: argparse.Namespace) -> int:
     default_registry = os.environ.get("ARCHON_DEFAULT_REGISTRY")
     interactive = sys.stdin.isatty() and sys.stdout.isatty()
 
+    saved_file = str(Path.home() / ".archon" / "passphrase")
+
     try:
-        passphrase = resolve_passphrase(
+        resolved = resolve_passphrase(
             os.environ,
             read_file=lambda path: Path(path).read_text(encoding="utf-8"),
+            file_exists=lambda path: Path(path).exists(),
+            saved_file=saved_file,
             interactive=interactive,
             prompt=getpass.getpass,
         )
     except OSError as exc:
-        print(f"Error: could not read ARCHON_PASSPHRASE_FILE: {exc}", file=sys.stderr)
+        print(f"Error: could not read the passphrase file: {exc}", file=sys.stderr)
         return 1
 
-    if not passphrase:
+    if resolved is None:
         for line in missing_passphrase_message(interactive):
             print(line, file=sys.stderr)
         return 1
+
+    passphrase, passphrase_source = resolved
+
+    if passphrase_source == "prompt":
+        offer_to_save(saved_file, passphrase)
 
     wallet_path_obj = Path(wallet_path)
     wallet_store = JsonWalletStore(
