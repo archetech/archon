@@ -109,8 +109,8 @@ export function createPublicRouter(options: CreateKeymasterRouterOptions): expre
     router.post('/login', async (req, res) => {
         const { passphrase } = req.body;
 
-        // Fail closed. The entry point refuses to start without
-        // ARCHON_PASSPHRASE, so reaching this branch means the app was
+        // Fail closed. The entry point refuses to start without a passphrase,
+        // so reaching this branch means the app was
         // constructed programmatically without one -- never a reason to hand the
         // admin key to an unauthenticated caller.
         if (!config.keymasterPassphrase) {
