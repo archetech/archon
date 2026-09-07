@@ -8,7 +8,12 @@ const config = {
     bindAddress: process.env.ARCHON_BIND_ADDRESS || '0.0.0.0',
     nodeID: process.env.ARCHON_NODE_ID || '',
     db: process.env.ARCHON_KEYMASTER_DB || 'json',
-    keymasterPassphrase: process.env.ARCHON_ENCRYPTED_PASSPHRASE || '',
+    // One secret under one name: the CLIs, the lightning scripts and the MCP
+    // server read the same ARCHON_PASSPHRASE. ARCHON_ENCRYPTED_PASSPHRASE is
+    // its older name, read second so a deployment carrying only that one
+    // starts unchanged (#1020).
+    keymasterPassphrase: process.env.ARCHON_PASSPHRASE || process.env.ARCHON_ENCRYPTED_PASSPHRASE || '',
+    passphraseFromOldName: !process.env.ARCHON_PASSPHRASE && !!process.env.ARCHON_ENCRYPTED_PASSPHRASE,
     walletCache: process.env.ARCHON_WALLET_CACHE ? process.env.ARCHON_WALLET_CACHE === 'true' : false,
     defaultRegistry: process.env.ARCHON_DEFAULT_REGISTRY,
     uploadLimit: process.env.ARCHON_KEYMASTER_UPLOAD_LIMIT || '10mb',

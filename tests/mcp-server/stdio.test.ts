@@ -29,6 +29,12 @@ describe('mcp server stdio smoke', () => {
             env: {
                 ARCHON_NODE_URL: 'http://127.0.0.1:1',
                 ARCHON_WALLET_PATH: './wallet.json',
+                // The server calls dotenv.config() from the repo root, and
+                // dotenv leaves a variable that is already set alone. Empty
+                // strings pin the passphrase absent whether or not the
+                // developer running this has a .env holding one.
+                ARCHON_PASSPHRASE: '',
+                ARCHON_ENCRYPTED_PASSPHRASE: '',
             },
         });
 

@@ -66,7 +66,7 @@ export function createPublicRouter(options: CreateKeymasterRouterOptions): expre
      * /login:
      *   post:
      *     summary: Authenticate to retrieve the admin API key.
-     *     description: Returns the configured admin API key when the supplied passphrase matches ARCHON_ENCRYPTED_PASSPHRASE. The server refuses to start when that is unset, so there is no unauthenticated path to the key.
+     *     description: Returns the configured admin API key when the supplied passphrase matches ARCHON_PASSPHRASE (or ARCHON_ENCRYPTED_PASSPHRASE, its older name). The server refuses to start when neither is set, so there is no unauthenticated path to the key.
      *     requestBody:
      *       required: true
      *       content:
@@ -109,8 +109,8 @@ export function createPublicRouter(options: CreateKeymasterRouterOptions): expre
     router.post('/login', async (req, res) => {
         const { passphrase } = req.body;
 
-        // Fail closed. The entry point refuses to start without
-        // ARCHON_ENCRYPTED_PASSPHRASE, so reaching this branch means the app was
+        // Fail closed. The entry point refuses to start without a passphrase,
+        // so reaching this branch means the app was
         // constructed programmatically without one -- never a reason to hand the
         // admin key to an unauthenticated caller.
         if (!config.keymasterPassphrase) {

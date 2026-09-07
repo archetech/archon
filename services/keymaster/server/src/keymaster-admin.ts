@@ -45,7 +45,7 @@ export function checkAdminApiKey(adminApiKey: string): StartupCheck {
 }
 
 /**
- * Validate ARCHON_ENCRYPTED_PASSPHRASE at startup.
+ * Validate ARCHON_PASSPHRASE at startup.
  *
  * Fail closed: the passphrase is both the wallet's encryption secret and the
  * credential POST /login checks before handing back the admin API key. An empty
@@ -55,10 +55,16 @@ export function checkAdminApiKey(adminApiKey: string): StartupCheck {
  * The Keymaster constructor already rejects an empty passphrase, but it runs
  * inside the listen callback where the throw does not stop the server.
  */
-export function checkPassphrase(passphrase: string): StartupCheck {
+export function checkPassphrase(passphrase: string, fromOldName = false): StartupCheck {
     if (!passphrase) {
         return {
-            fatal: 'ARCHON_ENCRYPTED_PASSPHRASE must be set — POST /login would otherwise return the admin API key without checking it.',
+            fatal: 'ARCHON_PASSPHRASE must be set — POST /login would otherwise return the admin API key without checking it. The older name ARCHON_ENCRYPTED_PASSPHRASE is read too.',
+        };
+    }
+
+    if (fromOldName) {
+        return {
+            warning: 'Warning: ARCHON_ENCRYPTED_PASSPHRASE holds the wallet passphrase under its older name. ARCHON_PASSPHRASE is the name the CLIs, the lightning scripts and the MCP server read, so one value under that name serves everything. The old name still works.',
         };
     }
 

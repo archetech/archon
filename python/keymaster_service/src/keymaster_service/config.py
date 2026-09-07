@@ -18,7 +18,14 @@ class Settings:
     keymaster_port: int = int(os.environ.get("ARCHON_KEYMASTER_PORT", "4226"))
     gatekeeper_url: str = os.environ.get("ARCHON_GATEKEEPER_URL", "http://localhost:4224")
     keymaster_db: str = os.environ.get("ARCHON_KEYMASTER_DB", "json") or "json"
-    passphrase: str = os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE", "")
+    # One secret under one name: the CLIs, the lightning scripts and the MCP
+    # server read the same ARCHON_PASSPHRASE. ARCHON_ENCRYPTED_PASSPHRASE is
+    # its older name, read second so a deployment carrying only that one
+    # starts unchanged (#1020).
+    passphrase: str = os.environ.get("ARCHON_PASSPHRASE") or os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE", "")
+    passphrase_from_old_name: bool = (
+        not os.environ.get("ARCHON_PASSPHRASE") and bool(os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE"))
+    )
     wallet_cache: bool = os.environ.get("ARCHON_WALLET_CACHE", "false").lower() == "true"
     default_registry: str = os.environ.get("ARCHON_DEFAULT_REGISTRY", "hyperswarm") or "hyperswarm"
     upload_limit: str = os.environ.get("ARCHON_KEYMASTER_UPLOAD_LIMIT", "10mb")

@@ -569,11 +569,29 @@ describe('keymaster admin key startup check', () => {
     // A blank passphrase made POST /login return the admin key to any caller,
     // and /login is public by design because it is how a client obtains the key.
     it('is fatal when the passphrase is unset', () => {
-        expect(checkPassphrase('').fatal).toContain('ARCHON_ENCRYPTED_PASSPHRASE must be set');
+        const { fatal } = checkPassphrase('');
+
+        expect(fatal).toContain('ARCHON_PASSPHRASE must be set');
+        // Someone reading this may have the value under the older name.
+        expect(fatal).toContain('ARCHON_ENCRYPTED_PASSPHRASE');
     });
 
     it('accepts any non-empty passphrase', () => {
         expect(checkPassphrase('correct horse battery staple').fatal).toBeUndefined();
+    });
+
+    // The old name still works, so the only thing to say is which name to
+    // move to -- and it has to start, not stop the service (#1020).
+    it('says which name supersedes the old one, without refusing to start', () => {
+        const { fatal, warning } = checkPassphrase('correct horse battery staple', true);
+
+        expect(fatal).toBeUndefined();
+        expect(warning).toContain('ARCHON_ENCRYPTED_PASSPHRASE');
+        expect(warning).toContain('ARCHON_PASSPHRASE');
+    });
+
+    it('says nothing when the passphrase came from the current name', () => {
+        expect(checkPassphrase('correct horse battery staple', false).warning).toBeUndefined();
     });
 });
 

@@ -272,7 +272,7 @@ async function initWallet() {
 
 // Before the port is bound, so a misconfigured node never accepts a request at
 // all and the operator gets the reason rather than a stack trace.
-for (const check of [checkAdminApiKey(config.adminApiKey), checkPassphrase(config.keymasterPassphrase)]) {
+for (const check of [checkAdminApiKey(config.adminApiKey), checkPassphrase(config.keymasterPassphrase, config.passphraseFromOldName)]) {
     if (check.fatal) {
         console.error(check.fatal);
         process.exit(1);

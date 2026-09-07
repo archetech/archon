@@ -1459,7 +1459,9 @@ async def _run(args: argparse.Namespace) -> int:
         or "http://localhost:4224"
     )
     wallet_path = os.environ.get("ARCHON_WALLET_PATH", "./wallet.json")
-    passphrase = os.environ.get("ARCHON_PASSPHRASE")
+    # A node sets this under its older name; read that too rather than
+    # asking for a value the operator already has (#1020).
+    passphrase = os.environ.get("ARCHON_PASSPHRASE") or os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE")
     default_registry = os.environ.get("ARCHON_DEFAULT_REGISTRY")
 
     if not passphrase:

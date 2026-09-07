@@ -44,19 +44,33 @@ def check_admin_api_key(admin_api_key: str) -> StartupCheck:
     return StartupCheck()
 
 
-def check_passphrase(passphrase: str) -> StartupCheck:
-    """Validate ARCHON_ENCRYPTED_PASSPHRASE at startup.
+def check_passphrase(passphrase: str, from_old_name: bool = False) -> StartupCheck:
+    """Validate ARCHON_PASSPHRASE at startup.
 
     Fail closed: the passphrase is both the wallet's encryption secret and the
     credential POST /login checks before handing back the admin API key. An
     empty one made /login return that key to any caller, and /login sits ahead
     of the admin guard because it is how a client obtains the key.
+
+    ARCHON_ENCRYPTED_PASSPHRASE is the older name for the same secret and is
+    still read; a node using it is told which name supersedes it (#1020).
     """
     if not passphrase:
         return StartupCheck(
             fatal=(
-                "ARCHON_ENCRYPTED_PASSPHRASE must be set — POST /login would "
-                "otherwise return the admin API key without checking it."
+                "ARCHON_PASSPHRASE must be set — POST /login would otherwise "
+                "return the admin API key without checking it. The older name "
+                "ARCHON_ENCRYPTED_PASSPHRASE is read too."
+            )
+        )
+
+    if from_old_name:
+        return StartupCheck(
+            warning=(
+                "Warning: ARCHON_ENCRYPTED_PASSPHRASE holds the wallet passphrase under "
+                "its older name. ARCHON_PASSPHRASE is the name the CLIs, the lightning "
+                "scripts and the MCP server read, so one value under that name serves "
+                "everything. The old name still works."
             )
         )
 

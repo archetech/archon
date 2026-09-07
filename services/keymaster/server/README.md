@@ -11,6 +11,7 @@ This service is also useful when clients share a wallet, such as the `archon` CL
 | `ARCHON_GATEKEEPER_URL`   | http://localhost:4224  | Archon gatekeeper service URL   |
 | `ARCHON_KEYMASTER_PORT`   | 4226 | Service port                                    |
 | `ARCHON_KEYMASTER_DB`     | json | Wallet database adapter, must be `redis`, `json`, `mongodb`, or `sqlite` |
-| `ARCHON_ENCRYPTED_PASSPHRASE` |  (no default) | If specified, the wallet will be encrypted and decrypted with this passphrase  |
+| `ARCHON_PASSPHRASE` |  (no default) | The wallet is encrypted and decrypted with this passphrase  |
+| `ARCHON_ENCRYPTED_PASSPHRASE` |  (no default) | Older name for `ARCHON_PASSPHRASE`, still read  |
 | `ARCHON_WALLET_CACHE`     |  false | Use wallet cache to increase performance (but understand security implications)  |
 | `ARCHON_DEFAULT_REGISTRY` |  hyperswarm | Default registry to use when creating DIDs               |
