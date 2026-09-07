@@ -11,6 +11,10 @@ import CipherNode from '@didcid/cipher/node';
 import type { DidCommEnc } from '@didcid/cipher/didcomm';
 import WalletJson from './db/json.js';
 import WalletSQLite from './db/sqlite.js';
+import os from 'os';
+import { createInterface } from 'readline';
+import { WalletNotFoundError } from '@didcid/common/errors';
+import { missingPassphraseMessage, resolvePassphrase, type ResolvedPassphrase } from './passphrase.js';
 
 dotenv.config();
 
@@ -25,8 +29,97 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', '..', 'package.json'), 'utf-8'));
 
+// Where a prompted passphrase is offered a home, and read back from.
+const SAVED_PASSPHRASE_FILE = path.join(os.homedir(), '.archon', 'passphrase');
+
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// readline redraws the whole line on every keystroke, so the query is written
+// once by hand and every later redraw is swallowed -- otherwise the secret is
+// echoed back character by character.
+function askHidden(query: string): Promise<string> {
+    return new Promise((resolve) => {
+        const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
+        let asked = false;
+
+        (rl as unknown as { _writeToOutput: (chunk: string) => void })._writeToOutput = () => {
+            if (!asked) {
+                process.stderr.write(query);
+                asked = true;
+            }
+        };
+
+        rl.question(query, (answer) => {
+            process.stderr.write('\n');
+            rl.close();
+            resolve(answer);
+        });
+    });
+}
+
+function ask(query: string): Promise<string> {
+    return new Promise((resolve) => {
+        const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
+
+        rl.question(query, (answer) => {
+            rl.close();
+            resolve(answer);
+        });
+    });
+}
+
+// Created owner-only in one exclusive step and renamed into place, because a
+// secret written at the umask default is world-readable until a chmod lands,
+// stays that way if the chmod fails, and follows a symlink planted at the
+// path.
+function writeSecret(file: string, passphrase: string): void {
+    const directory = path.dirname(file);
+    const temporary = path.join(directory, `.passphrase.${process.pid}`);
+
+    fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+
+    try {
+        fs.writeFileSync(temporary, `${passphrase}\n`, { mode: 0o600, flag: 'wx' });
+        fs.renameSync(temporary, file);
+    }
+    catch (error) {
+        fs.rmSync(temporary, { force: true });
+        throw error;
+    }
+}
+
+// An empty store proves nothing either way, and is the first-run case: the
+// passphrase is about to become the wallet's.
+async function passphraseOpensWallet(): Promise<boolean> {
+    try {
+        await keymaster.loadWallet();
+        return true;
+    }
+    catch (error) {
+        return error instanceof WalletNotFoundError;
+    }
+}
+
+// Typing a passphrase for every command is the price of not exporting it, so
+// a prompted one is offered a home the CLI reads back (#977).
+// Owner-only, and on stderr so nothing here reaches a piped stdout.
+async function offerToSave(file: string, passphrase: string): Promise<void> {
+    const answer = await ask(`Save it to ${file} so you are not asked again? [y/N] `);
+
+    if (!/^y(es)?$/i.test(answer.trim())) {
+        return;
+    }
+
+    try {
+        writeSecret(file, passphrase);
+        console.error(`Saved to ${file}, readable only by you.`);
+    }
+    catch (error: any) {
+        // Not fatal: the command can still run on what was typed.
+        console.error(`Could not save to ${file}: ${error.message || error}`);
+    }
 }
 
 // A handler that reports a failure has to fail the process too: without this
@@ -86,6 +179,13 @@ program
         try {
             const ok = await keymaster.changePassphrase(newPassphrase);
             console.log(ok ? 'OK' : 'Failed');
+
+            // The saved file holds what this command just replaced, and is
+            // read before any prompt -- left alone it locks the wallet out.
+            if (ok && fs.existsSync(SAVED_PASSPHRASE_FILE)) {
+                writeSecret(SAVED_PASSPHRASE_FILE, newPassphrase);
+                notice(`Updated ${SAVED_PASSPHRASE_FILE}.`);
+            }
         }
         catch (error: any) {
             fail(error.error || error.message || error);
@@ -2266,16 +2366,36 @@ async function run() {
         'http://localhost:4224';
     const walletPath = process.env.ARCHON_WALLET_PATH || './wallet.json';
     const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
-    // A node sets this under its older name; read that too rather than
-    // asking for a value the operator already has (#1020).
-    const passphrase = process.env.ARCHON_PASSPHRASE || process.env.ARCHON_ENCRYPTED_PASSPHRASE;
     const defaultRegistry = process.env.ARCHON_DEFAULT_REGISTRY;
+    // stdin decides whether there is anyone to answer. stdout may be a pipe
+    // -- prompts go to stderr, so `keymaster list-ids | jq` still works.
+    const interactive = process.stdin.isTTY === true;
+    let resolved: ResolvedPassphrase | undefined;
 
-    if (!passphrase) {
-        console.error('Error: ARCHON_PASSPHRASE environment variable is required');
-        console.error('Set it with: export ARCHON_PASSPHRASE=your-passphrase');
+    try {
+        resolved = await resolvePassphrase({
+            env: process.env,
+            readFile: (file) => fs.readFileSync(file, 'utf-8'),
+            fileExists: (file) => fs.existsSync(file),
+            savedFile: SAVED_PASSPHRASE_FILE,
+            interactive,
+            prompt: askHidden,
+        });
+    }
+    catch (error: any) {
+        console.error(`Error: ${error.message || error}`);
         process.exit(1);
     }
+
+    if (!resolved) {
+        for (const line of missingPassphraseMessage(interactive)) {
+            console.error(line);
+        }
+
+        process.exit(1);
+    }
+
+    const passphrase = resolved.passphrase;
 
     try {
         // Initialize gatekeeper client
@@ -2322,6 +2442,13 @@ async function run() {
         // replace a wallet themselves and one needs none at all. The two whose
         // handlers assume a wallet exists provision in the handler.
         keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase });
+
+        // Only once it is known to open this wallet. Saving a mistyped one
+        // would suppress every future prompt and leave no way back in but
+        // deleting a file nobody was told about.
+        if (resolved.from === 'prompt' && await passphraseOpensWallet()) {
+            await offerToSave(SAVED_PASSPHRASE_FILE, passphrase);
+        }
 
         program.parse(process.argv);
     }

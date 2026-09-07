@@ -118,7 +118,8 @@ curl -fsSL https://archon.technology/install | bash
 |----------|----------|---------|-------------|
 | `ARCHON_NODE_URL` | No | `http://localhost:4224` | Node URL for the Gatekeeper/Drawbridge entry point |
 | `ARCHON_GATEKEEPER_URL` | No | - | Legacy fallback for `ARCHON_NODE_URL` |
-| `ARCHON_PASSPHRASE` | Yes | - | Passphrase for wallet encryption |
+| `ARCHON_PASSPHRASE` | No | - | Passphrase for wallet encryption. For automation; the environment is a poor place for a secret |
+| `ARCHON_PASSPHRASE_FILE` | No | `~/.archon/passphrase` | File holding the passphrase. Read if it exists, so answering the CLI's offer to save ends the asking |
 | `ARCHON_WALLET_PATH` | No | `./wallet.json` | Path to wallet file |
 | `ARCHON_WALLET_TYPE` | No | `json` | Wallet type (`json` or `sqlite`) |
 | `ARCHON_DEFAULT_REGISTRY` | No | `hyperswarm` | Default DID registry |
@@ -129,11 +130,11 @@ curl -fsSL https://archon.technology/install | bash
 # Guided install and onboarding
 curl -fsSL https://archon.technology/install | bash
 
-# Set required environment variables
+# Point it at a node
 export ARCHON_NODE_URL=http://localhost:4224
-export ARCHON_PASSPHRASE=your-secure-passphrase
 
-# Create a new wallet
+# Create a new wallet — you are asked for a passphrase once, and offered
+# somewhere to keep it so later commands do not ask again
 keymaster create-wallet
 
 # Create an identity
