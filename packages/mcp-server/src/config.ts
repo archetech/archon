@@ -61,7 +61,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpServerConfi
         nodeUrl: env.ARCHON_NODE_URL || env.ARCHON_GATEKEEPER_URL || 'https://archon.technology',
         walletType: parseWalletType(env.ARCHON_WALLET_TYPE),
         walletPath: env.ARCHON_WALLET_PATH || './wallet.json',
-        passphrase: env.ARCHON_PASSPHRASE,
+        // A node sets this under its older name; read that too (#1020).
+        passphrase: env.ARCHON_PASSPHRASE || env.ARCHON_ENCRYPTED_PASSPHRASE,
         defaultRegistry: env.ARCHON_DEFAULT_REGISTRY,
         readOnly: parseBool(env.ARCHON_MCP_READ_ONLY),
         inlineLimit: parseInlineLimit(env.ARCHON_MCP_INLINE_LIMIT),

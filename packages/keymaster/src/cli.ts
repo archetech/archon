@@ -2266,7 +2266,9 @@ async function run() {
         'http://localhost:4224';
     const walletPath = process.env.ARCHON_WALLET_PATH || './wallet.json';
     const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
-    const passphrase = process.env.ARCHON_PASSPHRASE;
+    // A node sets this under its older name; read that too rather than
+    // asking for a value the operator already has (#1020).
+    const passphrase = process.env.ARCHON_PASSPHRASE || process.env.ARCHON_ENCRYPTED_PASSPHRASE;
     const defaultRegistry = process.env.ARCHON_DEFAULT_REGISTRY;
 
     if (!passphrase) {

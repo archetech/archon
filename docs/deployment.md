@@ -85,7 +85,7 @@ mediator, and the CLI container — and nothing else. `minimal-sample.env`
 carries only the variables that stack reads, with placeholders where a value is
 mandatory, so the node runs as copied. Replace both `CHANGE_ME` placeholders before the node
 holds anything you care about. `ARCHON_ADMIN_API_KEY` gates the API — generate
-one with `openssl rand -hex 32`. `ARCHON_ENCRYPTED_PASSPHRASE` encrypts the
+one with `openssl rand -hex 32`. `ARCHON_PASSPHRASE` encrypts the
 wallet mnemonic, and editing it later re-encrypts nothing: it leaves the
 existing wallet undecryptable, so rotate it with the CLI's `change-passphrase`
 first (see below) and then update the variable.
@@ -168,7 +168,8 @@ Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keyma
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ARCHON_ADMIN_API_KEY` | *(empty)* | **Required.** Protects admin API routes, and on Keymaster the whole v1 API. Gatekeeper and Keymaster both refuse to start without it; mediators and the CLI use the same value to authenticate against it |
-| `ARCHON_ENCRYPTED_PASSPHRASE` | *(empty)* | **Required.** Passphrase for encrypting the wallet. Keymaster won't start without it |
+| `ARCHON_PASSPHRASE` | *(empty)* | **Required.** Passphrase for encrypting the wallet, and the value the CLIs and MCP server read. Keymaster won't start without it |
+| `ARCHON_ENCRYPTED_PASSPHRASE` | *(empty)* | Older name for `ARCHON_PASSPHRASE`, still read so existing deployments keep working |
 | `ARCHON_NODE_ID` | `mynodeID` | Alias for the node's agent DID (created on first run) |
 | `ARCHON_NODE_NAME` | `mynodeName` | Human-readable node name for peer discovery |
 | `COMPOSE_PROFILES` | sample default | Optional Docker Compose service profiles |

@@ -42,7 +42,7 @@ async function main() {
             gatekeeper: gatekeeperClient,
             wallet,
             cipher,
-            passphrase: process.env.ARCHON_ENCRYPTED_PASSPHRASE || "passphrase",
+            passphrase: process.env.ARCHON_PASSPHRASE || process.env.ARCHON_ENCRYPTED_PASSPHRASE || "passphrase",
         });
 
         // WalletJsonMemory starts empty every run, so this demo always provisions.

@@ -38,11 +38,27 @@ def test_unset_passphrase_is_fatal():
     result = check_passphrase("")
 
     assert result.fatal is not None
-    assert "ARCHON_ENCRYPTED_PASSPHRASE must be set" in result.fatal
+    assert "ARCHON_PASSPHRASE must be set" in result.fatal
+    # Someone reading this may have the value under the older name.
+    assert "ARCHON_ENCRYPTED_PASSPHRASE" in result.fatal
 
 
 def test_any_non_empty_passphrase_is_accepted():
     assert check_passphrase("correct horse battery staple").fatal is None
+
+
+def test_old_name_is_reported_without_refusing_to_start():
+    # The old name still works, so the only thing to say is which name to move
+    # to -- and it has to start, not stop the service (#1020).
+    result = check_passphrase("correct horse battery staple", from_old_name=True)
+
+    assert result.fatal is None
+    assert "ARCHON_ENCRYPTED_PASSPHRASE" in (result.warning or "")
+    assert "ARCHON_PASSPHRASE" in (result.warning or "")
+
+
+def test_current_name_reports_nothing():
+    assert check_passphrase("correct horse battery staple", from_old_name=False).warning is None
 
 
 def test_secret_matches_handles_non_ascii_and_non_str():

@@ -17,7 +17,10 @@ def main() -> None:
 
     # Before uvicorn binds the port, so a refused configuration never reaches a
     # state where requests can be served.
-    for check in (check_admin_api_key(settings.admin_api_key), check_passphrase(settings.passphrase)):
+    for check in (
+        check_admin_api_key(settings.admin_api_key),
+        check_passphrase(settings.passphrase, settings.passphrase_from_old_name),
+    ):
         if check.fatal:
             print(check.fatal, file=sys.stderr)
             raise SystemExit(1)
