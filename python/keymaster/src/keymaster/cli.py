@@ -74,6 +74,23 @@ def home_wallet_path(home_directory: str) -> str:
     return str(Path(home_directory) / ARCHON_HOME_DIRECTORY / "wallet.json")
 
 
+def stored_at(wallet_type: str, wallet_path: str) -> str:
+    """Where a backend keeps the wallet it is handed.
+
+    The JSON one uses the path as given; the SQLite one treats a relative one
+    as a name under its own data folder, so ``./wallet.json`` is stored at
+    ``data/wallet.json``.
+
+    Asking whether a wallet is already in the working directory means asking
+    where that backend would have put it. Looking at the name instead reports
+    no wallet to a SQLite user who has one, and sends them to the home default.
+    """
+    if wallet_type == "sqlite" and not Path(wallet_path).is_absolute():
+        return str(Path("data") / wallet_path)
+
+    return wallet_path
+
+
 def resolve_wallet_path(
     env: Mapping[str, str],
     *,
@@ -1672,7 +1689,9 @@ async def _run(args: argparse.Namespace) -> int:
         os.environ,
         directory_wallet="./wallet.json",
         home_wallet=home_wallet,
-        exists=lambda candidate: Path(candidate).exists(),
+        exists=lambda candidate: Path(
+            stored_at(os.environ.get("ARCHON_WALLET_TYPE", "json"), candidate)
+        ).exists(),
     )
     default_registry = os.environ.get("ARCHON_DEFAULT_REGISTRY")
     # stdin decides whether there is anyone to answer. stdout may be a pipe

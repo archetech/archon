@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { homeWalletPath, resolveWalletPath, type WalletLocation } from '@didcid/keymaster/wallet-location';
+import { homeWalletPath, resolveWalletPath, storedAt, type WalletLocation } from '@didcid/keymaster/wallet-location';
 
 export type WalletType = 'json' | 'sqlite';
 
@@ -65,14 +65,16 @@ export function loadConfig(
     env: NodeJS.ProcessEnv = process.env,
     location: Partial<WalletLocation> = {},
 ): McpServerConfig {
+    const walletType = parseWalletType(env.ARCHON_WALLET_TYPE);
+
     return {
         nodeUrl: env.ARCHON_NODE_URL || env.ARCHON_GATEKEEPER_URL || 'https://archon.technology',
-        walletType: parseWalletType(env.ARCHON_WALLET_TYPE),
+        walletType,
         walletPath: resolveWalletPath({
             env,
             directoryWallet: './wallet.json',
             homeWallet: homeWalletPath(os.homedir()),
-            exists: (candidate: string) => fs.existsSync(candidate),
+            exists: (candidate: string) => fs.existsSync(storedAt(walletType, candidate)),
             ...location,
         }),
         // A node sets this under its older name; read that too (#1020).

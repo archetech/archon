@@ -1,4 +1,4 @@
-import { homeWalletPath, resolveWalletPath, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
+import { homeWalletPath, resolveWalletPath, storedAt, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
 
 // A globally installed CLI resolving ./wallet.json ties the identity to
 // whichever directory it was created in, and the passphrase that unlocks it is
@@ -31,6 +31,22 @@ describe('resolveWalletPath', () => {
     // naming what was asked for, not silently fall back somewhere else.
     it('obeys an explicit path that does not exist', () => {
         expect(resolveWalletPath(location({ ARCHON_WALLET_PATH: '/gone.json' }))).toBe('/gone.json');
+    });
+});
+
+describe('storedAt', () => {
+    it('is the path itself for the JSON backend', () => {
+        expect(storedAt('json', './wallet.json')).toBe('./wallet.json');
+    });
+
+    // Asking the name instead reports no wallet to a SQLite user who has one,
+    // and sends them to the home default.
+    it('is under the data folder for a relative SQLite path', () => {
+        expect(storedAt('sqlite', './wallet.json')).toBe('data/wallet.json');
+    });
+
+    it('leaves an absolute SQLite path alone', () => {
+        expect(storedAt('sqlite', '/home/someone/.archon/wallet.json')).toBe('/home/someone/.archon/wallet.json');
     });
 });
 

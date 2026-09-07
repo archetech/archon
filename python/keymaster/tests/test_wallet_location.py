@@ -7,7 +7,12 @@ the home directory — so the wallet belongs there too.
 
 from __future__ import annotations
 
-from keymaster.cli import home_wallet_path, resolve_wallet_path, wallet_not_found_message
+from keymaster.cli import (
+    stored_at,
+    home_wallet_path,
+    resolve_wallet_path,
+    wallet_not_found_message,
+)
 
 HOME_WALLET = home_wallet_path("/home/someone")
 
@@ -57,3 +62,16 @@ def test_message_does_not_point_at_the_home_location_when_that_is_where_it_looke
 
     assert HOME_WALLET in " ".join(lines)
     assert not [line for line in lines if "unless ARCHON_WALLET_PATH" in line]
+
+
+def test_stored_at_is_the_path_itself_for_json() -> None:
+    assert stored_at("json", "./wallet.json") == "./wallet.json"
+
+
+def test_stored_at_is_under_the_data_folder_for_a_relative_sqlite_path() -> None:
+    # Asking the name instead reports no wallet to a SQLite user who has one.
+    assert stored_at("sqlite", "./wallet.json") == "data/wallet.json"
+
+
+def test_stored_at_leaves_an_absolute_sqlite_path_alone() -> None:
+    assert stored_at("sqlite", "/home/someone/.archon/wallet.json") == "/home/someone/.archon/wallet.json"

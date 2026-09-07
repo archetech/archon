@@ -14,7 +14,7 @@ import WalletSQLite from './db/sqlite.js';
 import os from 'os';
 import { createInterface } from 'readline';
 import { WalletNotFoundError } from '@didcid/common/errors';
-import { ARCHON_HOME_DIRECTORY, homeWalletPath, resolveWalletPath, walletNotFoundMessage } from './wallet-location.js';
+import { ARCHON_HOME_DIRECTORY, homeWalletPath, resolveWalletPath, storedAt, walletNotFoundMessage } from './wallet-location.js';
 import { missingPassphraseMessage, resolvePassphrase, type ResolvedPassphrase } from './passphrase.js';
 
 dotenv.config();
@@ -2365,14 +2365,14 @@ async function run() {
         process.env.ARCHON_NODE_URL ||
         process.env.ARCHON_GATEKEEPER_URL ||
         'http://localhost:4224';
+    const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
     const homeWallet = homeWalletPath(os.homedir());
     const walletPath = resolveWalletPath({
         env: process.env,
         directoryWallet: './wallet.json',
         homeWallet,
-        exists: (candidate) => fs.existsSync(candidate),
+        exists: (candidate) => fs.existsSync(storedAt(walletType, candidate)),
     });
-    const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
     const defaultRegistry = process.env.ARCHON_DEFAULT_REGISTRY;
     // stdin decides whether there is anyone to answer. stdout may be a pipe
     // -- prompts go to stderr, so `keymaster list-ids | jq` still works.

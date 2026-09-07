@@ -17,6 +17,19 @@ export function homeWalletPath(homeDirectory: string): string {
     return path.join(homeDirectory, ARCHON_HOME_DIRECTORY, 'wallet.json');
 }
 
+// Where a backend keeps the wallet it is handed. The JSON one uses the path as
+// given; the SQLite one treats a relative one as a name under its own data
+// folder, so `./wallet.json` is stored at `data/wallet.json`.
+//
+// Asking whether a wallet is already in the working directory means asking
+// where that backend would have put it. Looking at the name instead reports no
+// wallet to a SQLite user who has one, and sends them to the home default.
+export function storedAt(walletType: string, walletPath: string): string {
+    return walletType === 'sqlite' && !path.isAbsolute(walletPath)
+        ? path.join('data', walletPath)
+        : walletPath;
+}
+
 export interface WalletLocation {
     env: Record<string, string | undefined>;
     directoryWallet: string;
