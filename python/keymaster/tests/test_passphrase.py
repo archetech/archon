@@ -100,6 +100,23 @@ def test_unreadable_saved_file_raises_as_a_configured_one_does() -> None:
         resolve({}, file_exists=lambda _: True, read_file=read, interactive=True, prompt=lambda _: "typed")
 
 
+def test_refuses_a_file_holding_nothing_but_a_newline() -> None:
+    # "" would encrypt a wallet with no secret at all, which Keymaster and
+    # encrypt_with_passphrase both accept.
+    with pytest.raises(ValueError, match="is empty"):
+        resolve(
+            {"ARCHON_PASSPHRASE_FILE": "/blank"},
+            read_file=lambda _: "\n",
+            interactive=True,
+            prompt=lambda _: "typed",
+        )
+
+
+def test_refuses_an_empty_saved_file_too() -> None:
+    with pytest.raises(ValueError, match="is empty"):
+        resolve({}, file_exists=lambda _: True, read_file=lambda _: "", interactive=True, prompt=lambda _: "typed")
+
+
 def test_asks_when_there_is_someone_to_ask() -> None:
     asked: list[str] = []
 

@@ -36,8 +36,18 @@ export const PASSPHRASE_PROMPT = 'Wallet passphrase: ';
 // One trailing newline, which is what an editor or `echo >` leaves and what
 // the Docker secrets convention expects to be ignored. Nothing else: the rest
 // could be the passphrase.
-function fromFile(text: string): string {
-    return text.replace(/\r?\n$/, '');
+//
+// A file holding nothing else is a mistake rather than an empty passphrase.
+// Passing it on encrypts a wallet with no secret at all, which the Python
+// Keymaster accepts, so it is refused here for both flavors.
+function fromFile(path: string, text: string): string {
+    const passphrase = text.replace(/\r?\n$/, '');
+
+    if (!passphrase) {
+        throw new Error(`the passphrase file ${path} is empty`);
+    }
+
+    return passphrase;
 }
 
 export async function resolvePassphrase(sources: PassphraseSources): Promise<ResolvedPassphrase | undefined> {
@@ -50,11 +60,11 @@ export async function resolvePassphrase(sources: PassphraseSources): Promise<Res
     const file = sources.env.ARCHON_PASSPHRASE_FILE;
 
     if (file) {
-        return { passphrase: fromFile(sources.readFile(file)), from: 'file' };
+        return { passphrase: fromFile(file, sources.readFile(file)), from: 'file' };
     }
 
     if (sources.fileExists(sources.savedFile)) {
-        return { passphrase: fromFile(sources.readFile(sources.savedFile)), from: 'saved' };
+        return { passphrase: fromFile(sources.savedFile, sources.readFile(sources.savedFile)), from: 'saved' };
     }
 
     if (sources.interactive) {

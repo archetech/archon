@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 from collections.abc import Mapping
 from typing import Any, Callable
 
-from keymaster.core import Keymaster
+from keymaster.core import Keymaster, KeymasterError, WalletNotFoundError
 from keymaster.gatekeeper_client import GatekeeperClient
 from keymaster.wallet_store import JsonWalletStore
 
@@ -60,15 +60,29 @@ class CommandError(Exception):
 
 PASSPHRASE_PROMPT = "Wallet passphrase: "
 
+
+def saved_passphrase_file() -> str:
+    """Where a prompted passphrase is offered a home, and read back from."""
+    return str(Path.home() / ".archon" / "passphrase")
+
 # Which source supplied it. Only a prompted one is worth offering to save.
 PassphraseSource = str
 
 
-def _from_file(text: str) -> str:
+def _from_file(path: str, text: str) -> str:
     # One trailing newline, which is what an editor or `echo >` leaves and what
     # the Docker secrets convention expects to be ignored. Nothing else: the
     # rest could be the passphrase.
-    return re.sub(r"\r?\n$", "", text)
+    #
+    # A file holding nothing else is a mistake rather than an empty passphrase.
+    # Keymaster and encrypt_with_passphrase accept "", so passing it on would
+    # encrypt a wallet with no secret at all.
+    passphrase = re.sub(r"\r?\n$", "", text)
+
+    if not passphrase:
+        raise ValueError(f"the passphrase file {path} is empty")
+
+    return passphrase
 
 
 def resolve_passphrase(
@@ -106,10 +120,10 @@ def resolve_passphrase(
     path = env.get("ARCHON_PASSPHRASE_FILE")
 
     if path:
-        return _from_file(read_file(path)), "file"
+        return _from_file(path, read_file(path)), "file"
 
     if file_exists(saved_file):
-        return _from_file(read_file(saved_file)), "saved"
+        return _from_file(saved_file, read_file(saved_file)), "saved"
 
     if interactive:
         # A prompt is only possible when someone is there to answer it. Asking
@@ -121,6 +135,29 @@ def resolve_passphrase(
     return None
 
 
+def write_secret(file: str, passphrase: str) -> None:
+    """Create the file owner-only, in one step, and move it into place.
+
+    Written at the process umask and narrowed afterwards, a secret is
+    world-readable until the chmod lands, stays that way if the chmod fails,
+    and follows a symlink planted at the path.
+    """
+    path = Path(file)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    temporary = path.parent / f".passphrase.{os.getpid()}"
+
+    try:
+        handle = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(f"{passphrase}\n")
+
+        os.replace(temporary, path)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
 def offer_to_save(file: str, passphrase: str) -> None:
     """Offer a prompted passphrase a home the CLI reads back.
 
@@ -128,16 +165,14 @@ def offer_to_save(file: str, passphrase: str) -> None:
     Owner-only, and everything here goes to stderr so nothing reaches a piped
     stdout.
     """
-    answer = input(f"Save it to {file} so you are not asked again? [y/N] ")
+    print(f"Save it to {file} so you are not asked again? [y/N] ", end="", file=sys.stderr)
+    answer = sys.stdin.readline()
 
     if answer.strip().lower() not in ("y", "yes"):
         return
 
     try:
-        path = Path(file)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"{passphrase}\n", encoding="utf-8")
-        path.chmod(0o600)
+        write_secret(file, passphrase)
         print(f"Saved to {file}, readable only by you.", file=sys.stderr)
     except OSError as exc:
         # Not fatal: the command can still run on what was typed.
@@ -193,6 +228,14 @@ async def cmd_new_wallet(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_change_passphrase(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.change_passphrase(args.new_passphrase)
+
+    # The saved file holds what this command just replaced, and is read before
+    # any prompt -- left alone it locks the wallet out.
+    saved = Path(saved_passphrase_file())
+
+    if ok and saved.exists():
+        write_secret(str(saved), args.new_passphrase)
+        print(f"Updated {saved}.", file=sys.stderr)
     print(UPDATE_OK if ok else "Failed")
 
 
@@ -1565,9 +1608,11 @@ async def _run(args: argparse.Namespace) -> int:
     )
     wallet_path = os.environ.get("ARCHON_WALLET_PATH", "./wallet.json")
     default_registry = os.environ.get("ARCHON_DEFAULT_REGISTRY")
-    interactive = sys.stdin.isatty() and sys.stdout.isatty()
+    # stdin decides whether there is anyone to answer. stdout may be a pipe
+    # -- prompts go to stderr, so `keymaster list-ids | jq` still works.
+    interactive = sys.stdin.isatty()
 
-    saved_file = str(Path.home() / ".archon" / "passphrase")
+    saved_file = saved_passphrase_file()
 
     try:
         resolved = resolve_passphrase(
@@ -1576,10 +1621,10 @@ async def _run(args: argparse.Namespace) -> int:
             file_exists=lambda path: Path(path).exists(),
             saved_file=saved_file,
             interactive=interactive,
-            prompt=getpass.getpass,
+            prompt=lambda query: getpass.getpass(query, stream=sys.stderr),
         )
-    except OSError as exc:
-        print(f"Error: could not read the passphrase file: {exc}", file=sys.stderr)
+    except (OSError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         return 1
 
     if resolved is None:
@@ -1588,9 +1633,6 @@ async def _run(args: argparse.Namespace) -> int:
         return 1
 
     passphrase, passphrase_source = resolved
-
-    if passphrase_source == "prompt":
-        offer_to_save(saved_file, passphrase)
 
     wallet_path_obj = Path(wallet_path)
     wallet_store = JsonWalletStore(
@@ -1623,6 +1665,23 @@ async def _run(args: argparse.Namespace) -> int:
             passphrase=passphrase,
             default_registry=default_registry or "hyperswarm",
         )
+
+        # Only once it is known to open this wallet. Saving a mistyped one would
+        # suppress every future prompt and leave no way back in but deleting a
+        # file nobody was told about. An empty store proves nothing either way,
+        # and is the first-run case: the passphrase is about to become the
+        # wallet's.
+        if passphrase_source == "prompt":
+            try:
+                await km.load_wallet()
+                opens = True
+            except WalletNotFoundError:
+                opens = True
+            except KeymasterError:
+                opens = False
+
+            if opens:
+                offer_to_save(saved_file, passphrase)
 
         try:
             await args.handler(km, args)

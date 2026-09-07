@@ -86,6 +86,29 @@ describe('resolvePassphrase', () => {
         await expect(attempt).rejects.toThrow('EACCES');
     });
 
+    // "" would encrypt a wallet with no secret at all, which the Python
+    // Keymaster accepts outright.
+    it('refuses a file holding nothing but a newline', async () => {
+        const attempt = resolvePassphrase(sources({ ARCHON_PASSPHRASE_FILE: '/blank' }, {
+            readFile: () => '\n',
+            interactive: true,
+            prompt: async () => 'typed',
+        }));
+
+        await expect(attempt).rejects.toThrow('/blank is empty');
+    });
+
+    it('refuses an empty saved file too', async () => {
+        const attempt = resolvePassphrase(sources({}, {
+            fileExists: () => true,
+            readFile: () => '',
+            interactive: true,
+            prompt: async () => 'typed',
+        }));
+
+        await expect(attempt).rejects.toThrow('is empty');
+    });
+
     it('asks when there is someone to ask', async () => {
         const asked: string[] = [];
         const read = await resolvePassphrase(sources({}, {
