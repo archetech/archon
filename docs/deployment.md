@@ -853,6 +853,9 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 
 ## 12. Troubleshooting
 
+For multi-step recovery after losing state — resyncing a reset gatekeeper
+database, a dead hidden service — see [Recovery Procedures](recovery.md).
+
 ### CLN Not Syncing
 
 Check Bitcoin RPC connectivity:
