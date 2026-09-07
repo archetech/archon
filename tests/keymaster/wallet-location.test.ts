@@ -56,8 +56,8 @@ describe('resolveWalletPath', () => {
 });
 
 describe('defaultWalletFile', () => {
-    // The CLI passed one path for both backends, so a SQLite database was
-    // written under a .json name and WalletSQLite's own default never ran.
+    // The CLI passes one path for both backends, so without a name per
+    // backend a SQLite database is written under a .json one.
     it('names a SQLite wallet for what it is', () => {
         expect(defaultWalletFile('sqlite')).toBe('wallet.db');
         expect(homeWalletPath('/home/someone', 'sqlite')).toBe('/home/someone/.archon/wallet.db');

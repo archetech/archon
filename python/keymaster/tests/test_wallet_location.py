@@ -48,8 +48,8 @@ def test_a_new_sqlite_wallet_gets_a_db_name() -> None:
 
 
 def test_sqlite_names_the_wallet_for_what_it_is() -> None:
-    # The CLI passed one path for both backends, so a SQLite database was
-    # written under a .json name and WalletSQLite's own default never ran.
+    # The CLI passes one path for both backends, so without a name per
+    # backend a SQLite database is written under a .json one.
     assert default_wallet_file("sqlite") == "wallet.db"
     assert default_wallet_file("json") == "wallet.json"
     assert directory_wallets("sqlite") == ["./wallet.json", "./wallet.db"]
