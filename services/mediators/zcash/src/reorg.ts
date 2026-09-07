@@ -72,3 +72,142 @@ export function isBlockNotFound(error: unknown): boolean {
 
     return typeof message === 'string' && /block not found/i.test(message);
 }
+
+// Everything the decision needs from the chain. The mediators differ in how
+// they reach their node -- one over axios, one over a client library with a
+// fallback RPC -- so the plan takes the three reads it makes and nothing else.
+export interface ChainReader {
+    // Throws when the node has no such block, and also when it cannot be
+    // asked; isBlockNotFound tells those apart.
+    header(hash: string): Promise<{ confirmations?: number, time?: number } | undefined>;
+    hashAt(height: number): Promise<string>;
+    txCount(hash: string): Promise<number>;
+}
+
+export interface StoredPosition {
+    height: number;
+    // Absent before anything in the window has been read.
+    hash?: string;
+    txnsScanned: number;
+}
+
+export interface ScanWindow {
+    startBlock: number;
+    reorgDepth: number;
+}
+
+// The fields a rewind writes, as absolute values: the plan is handed the
+// counters it adjusts, so nothing downstream has to work out what to add.
+export interface RewindCommit {
+    height: number;
+    hash: string;
+    time: string;
+    blocksScanned: number;
+    txnsScanned: number;
+    blockCount: number;
+    blocksPending: number;
+}
+
+// `scan: false` holds the position: the stored hash could not be checked, and
+// reading anything now would overwrite it before the next pass could look.
+export type ScanDecision =
+    | { scan: false, warn: string }
+    | { scan: true, from: number }
+    | { scan: true, from: number, commit: RewindCommit, log: string };
+
+export async function planScanStart(
+    stored: StoredPosition,
+    window: ScanWindow,
+    chain: ChainReader,
+    blockCount: number,
+): Promise<ScanDecision> {
+    if (!stored.hash) {
+        return { scan: true, from: stored.height ? stored.height + 1 : window.startBlock };
+    }
+
+    let header: { confirmations?: number, time?: number } | undefined;
+
+    try {
+        header = await chain.header(stored.hash);
+    } catch (error) {
+        if (!isBlockNotFound(error)) {
+            return {
+                scan: false,
+                warn: `Could not read block ${stored.hash} at height ${stored.height}, skipping this pass: ${error}`,
+            };
+        }
+    }
+
+    if ((header?.confirmations ?? 0) > 0) {
+        return { scan: true, from: stored.height + 1 };
+    }
+
+    const plan = planRewind(stored.height, window.startBlock, window.reorgDepth);
+
+    if (plan.rescanWindow) {
+        return {
+            scan: true,
+            from: plan.from,
+            log: `Reorg detected at height ${stored.height}; rescanning the window from ${window.startBlock}`,
+            commit: {
+                // Just below the window, which is what a scan that has read
+                // none of it looks like -- including to the next pass, which
+                // reads this back rather than resuming above it.
+                height: window.startBlock - 1,
+                hash: '',
+                time: '',
+                blocksScanned: 0,
+                txnsScanned: 0,
+                blockCount,
+                blocksPending: blockCount - window.startBlock,
+            },
+        };
+    }
+
+    let checkpointHash: string;
+    let checkpointHeader: { confirmations?: number, time?: number } | undefined;
+
+    try {
+        checkpointHash = await chain.hashAt(plan.checkpoint);
+        checkpointHeader = await chain.header(checkpointHash);
+    } catch (error) {
+        // Committing a rewind to a block that cannot be read would store a
+        // position no later pass can verify.
+        return {
+            scan: false,
+            warn: `Reorg at height ${stored.height}, but the chain at ${plan.checkpoint} could not be read, skipping this pass: ${error}`,
+        };
+    }
+
+    let subtract = 0;
+    let counted = true;
+
+    try {
+        // The blocks about to be read again were counted when they were read
+        // the first time.
+        for (let height = plan.from; height <= Math.min(stored.height, blockCount); height++) {
+            subtract += await chain.txCount(await chain.hashAt(height));
+        }
+    } catch {
+        // A metric, not the position: the rewind still happens. A partial
+        // total would subtract less than the rescan adds back, so none of it
+        // is applied and the gauge runs high by this range.
+        counted = false;
+    }
+
+    return {
+        scan: true,
+        from: plan.from,
+        log: `Reorg detected at height ${stored.height}; rewinding ${stored.height - plan.checkpoint} block(s) to ${plan.checkpoint}`
+            + (counted ? '' : ', leaving the transaction count as it is'),
+        commit: {
+            height: plan.checkpoint,
+            hash: checkpointHash,
+            time: checkpointHeader?.time ? new Date(checkpointHeader.time * 1000).toISOString() : '',
+            blocksScanned: Math.max(0, plan.checkpoint - window.startBlock + 1),
+            txnsScanned: counted ? Math.max(0, stored.txnsScanned - subtract) : stored.txnsScanned,
+            blockCount,
+            blocksPending: blockCount - plan.checkpoint,
+        },
+    };
+}
