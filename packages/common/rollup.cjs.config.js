@@ -14,7 +14,8 @@ const config = {
         utils: 'dist/esm/utils.js',
         errors: 'dist/esm/errors.js',
         net: 'dist/esm/net.js',
-        'process-guards': 'dist/esm/process-guards.js'
+        'process-guards': 'dist/esm/process-guards.js',
+        'wallet-startup': 'dist/esm/wallet-startup.js'
     },
     output: {
         dir: 'dist/cjs',

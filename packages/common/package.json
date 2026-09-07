@@ -38,6 +38,11 @@
       "import": "./dist/esm/process-guards.js",
       "require": "./dist/cjs/process-guards.cjs",
       "types": "./dist/types/process-guards.d.ts"
+    },
+    "./wallet-startup": {
+      "import": "./dist/esm/wallet-startup.js",
+      "require": "./dist/cjs/wallet-startup.cjs",
+      "types": "./dist/types/wallet-startup.d.ts"
     }
   },
   "typesVersions": {
@@ -53,6 +58,9 @@
       ],
       "process-guards": [
         "./dist/types/process-guards.d.ts"
+      ],
+      "wallet-startup": [
+        "./dist/types/wallet-startup.d.ts"
       ]
     }
   },

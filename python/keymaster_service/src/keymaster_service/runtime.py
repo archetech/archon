@@ -4,8 +4,9 @@ import asyncio
 import logging
 from typing import Any
 
-from keymaster import Keymaster, KeymasterError, WalletNotFoundError
+from keymaster import Keymaster, KeymasterError
 
+from .admin import decide_wallet_startup
 from .config import Settings
 from .metrics import wallets_created_total
 from keymaster.gatekeeper_client import GatekeeperClient
@@ -43,22 +44,29 @@ class KeymasterService:
                 f"Unsupported ARCHON_KEYMASTER_DB for Python service: {self.settings.keymaster_db}"
             )
 
-        await self.gatekeeper.connect(wait_until_ready=True, interval_seconds=5)
+        # Settled before the gatekeeper wait below, which polls without bound:
+        # whether this node has an identity is a question about its own store,
+        # and a node told that an empty one is a fault must not wait on an
+        # unrelated upstream to find out (#1051).
+        decision = await decide_wallet_startup(
+            self.keymaster.load_wallet,
+            store=self.settings.keymaster_db,
+            require_existing=self.settings.require_wallet,
+            require_setting="ARCHON_KEYMASTER_REQUIRE_WALLET",
+        )
+
+        if decision.action == "refuse":
+            raise KeymasterServiceError(decision.fatal or "wallet unavailable")
 
         # The one place this service provisions, so a fresh mnemonic is a
         # startup event with a log line and a counter rather than a side effect
-        # of whichever request happened to read the wallet first (#1037). Any
-        # other failure to load propagates and ends startup.
-        try:
-            await self.keymaster.load_wallet()
-        except WalletNotFoundError:
-            LOGGER.warning(
-                "No wallet found in %s — creating one. If this node has run before, its "
-                "store is missing and its identity has been replaced.",
-                self.settings.keymaster_db,
-            )
+        # of whichever request happened to read the wallet first (#1037).
+        if decision.action == "provision":
+            LOGGER.warning("%s", decision.warning)
             await self.keymaster.new_wallet()
             wallets_created_total.inc()
+
+        await self.gatekeeper.connect(wait_until_ready=True, interval_seconds=5)
         # Resolve the node ID in the background so the ASGI app can start
         # serving /version, /metrics, and /ready immediately. /ready will
         # report ready=False until this task completes.

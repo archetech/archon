@@ -413,6 +413,7 @@ gateway at `ipns://<key-id>/`.
 | `ARCHON_HERALD_NAME` | `herald` | Service identity name (Keymaster ID). Owns issued credentials. |
 | `ARCHON_HERALD_DOMAIN` | empty | Domain for credential subjects (`<name>@<domain>`) and WebFinger validation. |
 | `ARCHON_HERALD_DB` | `json` | `json` / `sqlite` / `redis`. |
+| `ARCHON_HERALD_REQUIRE_WALLET` | unset | Set to `true` once this Herald has issued credentials: an empty data directory then stops startup instead of replacing the identity that signed them. |
 | `ARCHON_HERALD_DATA_DIR` | `/app/server/data` | Filesystem root for JSON / SQLite / OAuth signing key. |
 | `ARCHON_HERALD_SESSION_SECRET` | unset (**required**) | Secret for Express sessions. MUST NOT be a placeholder string. |
 | `ARCHON_HERALD_OWNER_DID` | empty | Single owner DID with admin scope. |

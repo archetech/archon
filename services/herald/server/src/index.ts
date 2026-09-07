@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
 import Keymaster from '@didcid/keymaster';
-import { WalletNotFoundError } from '@didcid/common/errors';
+import { decideWalletStartup } from '@didcid/common/wallet-startup';
 import { installProcessGuards } from '@didcid/common/process-guards';
 import KeymasterClient from '@didcid/clients/keymaster';
 import WalletJson from '@didcid/keymaster/wallet/json';
@@ -24,6 +24,7 @@ import {
     GATEKEEPER_URL,
     HERALD_DATABASE_TYPE,
     HOST_PORT,
+    REQUIRE_WALLET,
     IPFS_API_URL,
     IPNS_KEY_NAME,
     SENDGRID_API_KEY,
@@ -190,12 +191,6 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
         }
 
         const gatekeeper = new GatekeeperClient();
-        await gatekeeper.connect({
-            url: GATEKEEPER_URL,
-            waitUntilReady: true,
-            intervalSeconds: 5,
-            chatty: true,
-        });
         const wallet = new WalletJson('wallet.json', DATA_DIR);
         const cipher = new CipherNode();
 
@@ -207,19 +202,32 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
         });
 
         // Herald issues name credentials from this identity, so replacing it
-        // invalidates every credential it has issued. Provisioning is fine on
-        // a first run; it must not pass unremarked on any other.
-        try {
-            await ctx.keymaster.loadWallet();
-        }
-        catch (error) {
-            if (!(error instanceof WalletNotFoundError)) {
-                throw error;
-            }
+        // invalidates every one it has ever issued -- and with a Redis or
+        // SQLite database the names outlive the wallet, leaving each of them
+        // un-renamable. Settled before the gatekeeper wait below, which polls
+        // without bound (#1051).
+        const decision = await decideWalletStartup(() => ctx.keymaster.loadWallet(), {
+            store: `${DATA_DIR}/wallet.json`,
+            requireExisting: REQUIRE_WALLET,
+            requireSetting: 'ARCHON_HERALD_REQUIRE_WALLET',
+        });
 
-            console.warn(`Herald: no wallet at ${DATA_DIR}/wallet.json — creating one. If this node has run before, its data directory is missing and the identity it issued credentials from has been replaced.`);
+        if (decision.action === 'refuse') {
+            console.error(decision.fatal);
+            process.exit(1);
+        }
+
+        if (decision.action === 'provision') {
+            console.warn(`Herald: ${decision.warning} Every name credential it has issued was signed by the identity that is gone.`);
             await ctx.keymaster.newWallet();
         }
+
+        await gatekeeper.connect({
+            url: GATEKEEPER_URL,
+            waitUntilReady: true,
+            intervalSeconds: 5,
+            chatty: true,
+        });
 
         console.log(`${SERVICE_NAME} using gatekeeper at ${GATEKEEPER_URL}`);
     }

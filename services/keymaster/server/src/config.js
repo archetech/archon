@@ -10,6 +10,9 @@ const config = {
     db: process.env.ARCHON_KEYMASTER_DB || 'json',
     keymasterPassphrase: process.env.ARCHON_ENCRYPTED_PASSPHRASE || '',
     walletCache: process.env.ARCHON_WALLET_CACHE ? process.env.ARCHON_WALLET_CACHE === 'true' : false,
+    // An empty store is a fault, not a first run: this node already has an
+    // identity, so a store that reads back empty is missing or misconfigured.
+    requireWallet: process.env.ARCHON_KEYMASTER_REQUIRE_WALLET === 'true',
     defaultRegistry: process.env.ARCHON_DEFAULT_REGISTRY,
     uploadLimit: process.env.ARCHON_KEYMASTER_UPLOAD_LIMIT || '10mb',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',

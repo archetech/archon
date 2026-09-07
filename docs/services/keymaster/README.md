@@ -1084,6 +1084,7 @@ labels.
 | `ARCHON_KEYMASTER_GATEKEEPER_URL` | unset | Compose-only override for Keymaster's internal `ARCHON_GATEKEEPER_URL`; set to `http://drawbridge:4222` when server-side DIDComm should use Drawbridge's `/didcomm` gateway. |
 | `ARCHON_NODE_ID` | empty | Required. Name of the canonical agent ID this server provisions on startup. |
 | `ARCHON_KEYMASTER_DB` | `json` | Storage backend (`json`, `sqlite`, `redis`, `mongodb`). |
+| `ARCHON_KEYMASTER_REQUIRE_WALLET` | unset | Set to `true` on a node that already has an identity: an empty store then stops startup instead of minting a new one. |
 | `ARCHON_ENCRYPTED_PASSPHRASE` | empty | Wallet passphrase, and the credential `/login` checks. **Required** — the service refuses to start without it. |
 | `ARCHON_WALLET_CACHE` | `false` | Enables the in-memory write-through cache. |
 | `ARCHON_DEFAULT_REGISTRY` | unset (uses `hyperswarm` in code) | Default registry for created DIDs. |

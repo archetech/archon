@@ -19,6 +19,9 @@ class Settings:
     gatekeeper_url: str = os.environ.get("ARCHON_GATEKEEPER_URL", "http://localhost:4224")
     keymaster_db: str = os.environ.get("ARCHON_KEYMASTER_DB", "json") or "json"
     passphrase: str = os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE", "")
+    # An empty store is a fault, not a first run: this node already has an
+    # identity, so a store that reads back empty is missing or misconfigured.
+    require_wallet: bool = os.environ.get("ARCHON_KEYMASTER_REQUIRE_WALLET") == "true"
     wallet_cache: bool = os.environ.get("ARCHON_WALLET_CACHE", "false").lower() == "true"
     default_registry: str = os.environ.get("ARCHON_DEFAULT_REGISTRY", "hyperswarm") or "hyperswarm"
     upload_limit: str = os.environ.get("ARCHON_KEYMASTER_UPLOAD_LIMIT", "10mb")

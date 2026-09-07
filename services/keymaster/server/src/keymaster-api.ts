@@ -14,8 +14,8 @@ import WalletCache from '@didcid/keymaster/wallet/cache';
 import CipherNode from '@didcid/cipher/node';
 import { InvalidParameterError } from '@didcid/common/errors';
 import { installProcessGuards } from '@didcid/common/process-guards';
+import { decideWalletStartup } from '@didcid/common/wallet-startup';
 import config from './config.js';
-import { WalletNotFoundError } from '@didcid/common/errors';
 import { createAddressRouter } from './keymaster-address-router.js';
 import { createAgentRouter } from './keymaster-agent-router.js';
 import { createAssetRouter } from './keymaster-asset-router.js';
@@ -291,42 +291,55 @@ const port = config.keymasterPort;
 const server = app.listen(port, config.bindAddress, async () => {
     gatekeeper = new DrawbridgeClient();
 
+    const cipher = new CipherNode();
+    let instance: Keymaster | undefined;
+
+    // Settled before the gatekeeper wait below, which polls without bound:
+    // whether this node has an identity is a question about its own store, and
+    // a node told that an empty one is a fault must not wait on an unrelated
+    // upstream to reach that decision (#1051). Opening the store is inside the
+    // retry, so one that is still starting is waited for rather than read as a
+    // fault.
+    const decision = await decideWalletStartup(async () => {
+        if (!instance) {
+            instance = new Keymaster({
+                gatekeeper,
+                wallet: await initWallet(),
+                cipher,
+                defaultRegistry: config.defaultRegistry,
+                passphrase: config.keymasterPassphrase,
+            });
+        }
+
+        return instance.loadWallet();
+    }, {
+        store: config.db,
+        requireExisting: config.requireWallet,
+        requireSetting: 'ARCHON_KEYMASTER_REQUIRE_WALLET',
+    });
+
+    if (decision.action === 'refuse') {
+        console.error(decision.fatal);
+        process.exit(1);
+    }
+
+    keymaster = instance!;
+
+    // The one place this service provisions, so a fresh mnemonic is a startup
+    // event with a log line and a counter rather than a side effect of
+    // whichever request happened to read the wallet first (#1037).
+    if (decision.action === 'provision') {
+        console.warn(decision.warning);
+        await keymaster.newWallet();
+        walletsCreatedTotal.inc();
+    }
+
     await gatekeeper.connect({
         url: config.gatekeeperURL,
         waitUntilReady: true,
         intervalSeconds: 5,
         chatty: true,
     });
-
-    const wallet = await initWallet();
-    const cipher = new CipherNode();
-    const defaultRegistry = config.defaultRegistry;
-
-    keymaster = new Keymaster({
-        gatekeeper,
-        wallet,
-        cipher,
-        defaultRegistry,
-        passphrase: config.keymasterPassphrase,
-    });
-
-    // The one place this service provisions, so a fresh mnemonic is a
-    // startup event with a log line and a counter rather than a side effect
-    // of whichever request happened to read the wallet first (#1037). Any
-    // other failure to load -- an unreadable store, a wrong passphrase --
-    // propagates, and the guards above end the process.
-    try {
-        await keymaster.loadWallet();
-    }
-    catch (error) {
-        if (!(error instanceof WalletNotFoundError)) {
-            throw error;
-        }
-
-        console.warn(`No wallet found in ${config.db} — creating one. If this node has run before, its store is missing and its identity has been replaced.`);
-        await keymaster.newWallet();
-        walletsCreatedTotal.inc();
-    }
 
     console.log(`Keymaster server v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${port}`);
     console.log(`Keymaster server persisting to ${config.db}`);
