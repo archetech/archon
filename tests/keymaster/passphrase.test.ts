@@ -1,8 +1,9 @@
 import { missingPassphraseMessage, resolvePassphrase } from '../../packages/keymaster/src/passphrase.ts';
 
-// The quickstart taught `export ARCHON_PASSPHRASE=...` as the only way in, for
-// a secret that encrypts a wallet holding Lightning funds — into shell history,
-// /proc/<pid>/environ, and every child the shell spawns after it (#977).
+// Exporting the passphrase puts a secret that encrypts a wallet holding
+// Lightning funds into shell history, /proc/<pid>/environ, and every child the
+// shell spawns afterwards. It stays available for automation, but it is not
+// the only way in and not what a first-time reader is shown (#977).
 
 function sources(env: Record<string, string | undefined>, overrides: Partial<Parameters<typeof resolvePassphrase>[0]> = {}) {
     return {
@@ -60,8 +61,8 @@ describe('resolvePassphrase', () => {
     });
 
     // Accepting the CLI's offer to save has to end the asking, or every
-    // command in a session prompts again -- which is what the exported
-    // variable was buying.
+    // command in a session prompts again -- the convenience exporting it
+    // buys.
     it('reads the saved file before asking', async () => {
         let asked = false;
         const read = await resolvePassphrase(sources({}, {
@@ -144,8 +145,7 @@ describe('missingPassphraseMessage', () => {
         expect(lines).toContain('ARCHON_PASSPHRASE_FILE');
     });
 
-    // The old message said "export ARCHON_PASSPHRASE=...", which is the habit
-    // this change exists to stop teaching.
+    // Telling someone to export it teaches the habit this exists to avoid.
     it('does not instruct anyone to export the secret', () => {
         for (const interactive of [true, false]) {
             expect(missingPassphraseMessage(interactive).join(' ')).not.toContain('export ');

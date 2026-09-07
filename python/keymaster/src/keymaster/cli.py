@@ -104,7 +104,7 @@ def resolve_passphrase(
 
     ``saved_file`` is read before prompting so that accepting the CLI's offer
     to write it ends the asking; otherwise every command in a session asks
-    again, which is what the exported variable was buying.
+    again, which is the convenience exporting it buys.
 
     A configured file that cannot be read raises rather than falling through to
     a prompt: an explicit path that is wrong is an error, not an invitation to
@@ -138,9 +138,9 @@ def resolve_passphrase(
 def write_secret(file: str, passphrase: str) -> None:
     """Create the file owner-only, in one step, and move it into place.
 
-    Written at the process umask and narrowed afterwards, a secret is
-    world-readable until the chmod lands, stays that way if the chmod fails,
-    and follows a symlink planted at the path.
+    A secret written at the process umask is world-readable until a chmod
+    lands, stays that way if the chmod fails, and follows a symlink planted at
+    the path.
     """
     path = Path(file)
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -161,9 +161,8 @@ def write_secret(file: str, passphrase: str) -> None:
 def offer_to_save(file: str, passphrase: str) -> None:
     """Offer a prompted passphrase a home the CLI reads back.
 
-    Typing one for every command is what the exported variable was buying.
-    Owner-only, and everything here goes to stderr so nothing reaches a piped
-    stdout.
+    Typing one for every command is the price of not exporting it. Owner-only,
+    and everything here goes to stderr so nothing reaches a piped stdout.
     """
     print(f"Save it to {file} so you are not asked again? [y/N] ", end="", file=sys.stderr)
     answer = sys.stdin.readline()

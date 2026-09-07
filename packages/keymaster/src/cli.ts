@@ -70,10 +70,10 @@ function ask(query: string): Promise<string> {
     });
 }
 
-// A secret written at the umask default is world-readable until the chmod
-// lands, stays that way if the chmod fails, and follows a symlink planted at
-// the path. Created owner-only in one exclusive step and renamed into place
-// instead.
+// Created owner-only in one exclusive step and renamed into place, because a
+// secret written at the umask default is world-readable until a chmod lands,
+// stays that way if the chmod fails, and follows a symlink planted at the
+// path.
 function writeSecret(file: string, passphrase: string): void {
     const directory = path.dirname(file);
     const temporary = path.join(directory, `.passphrase.${process.pid}`);
@@ -102,8 +102,8 @@ async function passphraseOpensWallet(): Promise<boolean> {
     }
 }
 
-// Typing a passphrase for every command is what the exported variable was
-// buying, so a prompted one is offered a home the CLI reads back (#977).
+// Typing a passphrase for every command is the price of not exporting it, so
+// a prompted one is offered a home the CLI reads back (#977).
 // Owner-only, and on stderr so nothing here reaches a piped stdout.
 async function offerToSave(file: string, passphrase: string): Promise<void> {
     const answer = await ask(`Save it to ${file} so you are not asked again? [y/N] `);

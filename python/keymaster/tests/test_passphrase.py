@@ -1,8 +1,9 @@
 """Where the CLI gets the wallet passphrase (#977).
 
-The quickstart taught ``export ARCHON_PASSPHRASE=...`` as the only way in, for
-a secret that encrypts a wallet holding Lightning funds — into shell history,
-/proc/<pid>/environ, and every child the shell spawns after it.
+Exporting it puts a secret that encrypts a wallet holding Lightning funds into
+shell history, /proc/<pid>/environ, and every child the shell spawns
+afterwards. It stays available for automation, but it is not the only way in
+and not what a first-time reader is shown.
 """
 
 from __future__ import annotations
@@ -76,8 +77,7 @@ def test_unreadable_file_raises_rather_than_prompting() -> None:
 
 def test_saved_file_is_read_before_asking() -> None:
     # Accepting the CLI's offer to save has to end the asking, or every command
-    # in a session prompts again -- which is what the exported variable was
-    # buying.
+    # in a session prompts again -- the convenience exporting it buys.
     asked: list[str] = []
 
     resolved = resolve(
@@ -151,7 +151,6 @@ def test_message_never_tells_a_non_interactive_caller_to_answer_a_prompt() -> No
 
 
 def test_message_does_not_instruct_anyone_to_export_the_secret() -> None:
-    # The old message said "export ARCHON_PASSPHRASE=...", which is the habit
-    # this change exists to stop teaching.
+    # Telling someone to export it teaches the habit this exists to avoid.
     for interactive in (True, False):
         assert "export " not in " ".join(missing_passphrase_message(interactive))

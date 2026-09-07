@@ -15,7 +15,7 @@ export interface PassphraseSources {
     fileExists: (path: string) => boolean;
     // Where a prompted passphrase is offered a home. Read before prompting, so
     // accepting that offer once ends the asking -- otherwise every command in a
-    // session asks again, which is what the environment variable was buying.
+    // session asks again, which is the convenience exporting it buys.
     savedFile: string;
     // A prompt is only possible when someone is there to answer it. Asking a
     // pipe hangs the script that opened it.
