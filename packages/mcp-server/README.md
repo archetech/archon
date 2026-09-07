@@ -35,7 +35,7 @@ Example MCP client config:
 | `ARCHON_NODE_URL` | `https://archon.technology` | Archon Gatekeeper/Drawbridge node URL |
 | `ARCHON_GATEKEEPER_URL` | unset | Legacy fallback when `ARCHON_NODE_URL` is unset |
 | `ARCHON_WALLET_TYPE` | `json` | Local wallet backend: `json` or `sqlite` |
-| `ARCHON_WALLET_PATH` | `~/.archon/wallet.json`, or `./wallet.json` if one is already there | Wallet file path. The default is the same one the CLI uses, so both see one identity |
+| `ARCHON_WALLET_PATH` | `~/.archon/wallet.json` (`wallet.db` for sqlite), or `./wallet.json` if one is already there | Wallet file path. The default is the same one the CLI uses, so both see one identity |
 | `ARCHON_PASSPHRASE` | unset | Required for wallet-backed tools; node health tools work without it |
 | `ARCHON_DEFAULT_REGISTRY` | Keymaster default | Default registry for new DIDs |
 | `ARCHON_MCP_READ_ONLY` | `false` | Set to `true` to omit mutating tools from `tools/list` |

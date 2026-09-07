@@ -13,8 +13,21 @@ import path from 'path';
 
 export const ARCHON_HOME_DIRECTORY = '.archon';
 
-export function homeWalletPath(homeDirectory: string): string {
-    return path.join(homeDirectory, ARCHON_HOME_DIRECTORY, 'wallet.json');
+// SQLite's own default is wallet.db. The CLI never reached it, because it
+// always passes a path, so a SQLite database was written under a .json name.
+export function defaultWalletFile(walletType: string): string {
+    return walletType === 'sqlite' ? 'wallet.db' : 'wallet.json';
+}
+
+export function homeWalletPath(homeDirectory: string, walletType: string): string {
+    return path.join(homeDirectory, ARCHON_HOME_DIRECTORY, defaultWalletFile(walletType));
+}
+
+// What to look for in the working directory, in the order it should win. A
+// SQLite wallet made before the extension was corrected is still called
+// wallet.json, and it is the one holding the identity.
+export function directoryWallets(walletType: string): string[] {
+    return walletType === 'sqlite' ? ['./wallet.json', './wallet.db'] : ['./wallet.json'];
 }
 
 // Where a backend keeps the wallet it is handed. The JSON one uses the path as
@@ -32,7 +45,7 @@ export function storedAt(walletType: string, walletPath: string): string {
 
 export interface WalletLocation {
     env: Record<string, string | undefined>;
-    directoryWallet: string;
+    directoryWallets: string[];
     homeWallet: string;
     exists: (candidate: string) => boolean;
 }
@@ -46,11 +59,9 @@ export function resolveWalletPath(location: WalletLocation): string {
         return configured;
     }
 
-    if (location.exists(location.directoryWallet)) {
-        return location.directoryWallet;
-    }
+    const found = location.directoryWallets.find(candidate => location.exists(candidate));
 
-    return location.homeWallet;
+    return found ?? location.homeWallet;
 }
 
 // Said when a wallet is not where it was looked for. `create-wallet` is only

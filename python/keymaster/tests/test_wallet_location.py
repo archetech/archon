@@ -8,18 +8,23 @@ the home directory — so the wallet belongs there too.
 from __future__ import annotations
 
 from keymaster.cli import (
-    stored_at,
+    default_wallet_file,
+    directory_wallets,
     home_wallet_path,
     resolve_wallet_path,
+    stored_at,
     wallet_not_found_message,
 )
 
-HOME_WALLET = home_wallet_path("/home/someone")
+HOME_WALLET = home_wallet_path("/home/someone", "json")
 
 
-def resolve(env, exists=lambda _: False):
+def resolve(env, exists=lambda _: False, wallet_type="json"):
     return resolve_wallet_path(
-        env, directory_wallet="./wallet.json", home_wallet=HOME_WALLET, exists=exists
+        env,
+        directory_wallets=directory_wallets(wallet_type),
+        home_wallet=home_wallet_path("/home/someone", wallet_type),
+        exists=exists,
     )
 
 
@@ -30,6 +35,24 @@ def test_a_new_wallet_goes_under_the_home_directory() -> None:
 def test_a_wallet_already_in_the_working_directory_keeps_being_used() -> None:
     # A setup built that way goes on working without being touched.
     assert resolve({}, exists=lambda candidate: candidate == "./wallet.json") == "./wallet.json"
+
+
+def test_a_sqlite_wallet_still_under_the_older_name_is_found() -> None:
+    # Reporting no wallet here is what sends an existing SQLite user to a new
+    # identity in the home directory.
+    assert resolve({}, exists=lambda c: c == "./wallet.json", wallet_type="sqlite") == "./wallet.json"
+
+
+def test_a_new_sqlite_wallet_gets_a_db_name() -> None:
+    assert resolve({}, wallet_type="sqlite") == "/home/someone/.archon/wallet.db"
+
+
+def test_sqlite_names_the_wallet_for_what_it_is() -> None:
+    # The CLI passed one path for both backends, so a SQLite database was
+    # written under a .json name and WalletSQLite's own default never ran.
+    assert default_wallet_file("sqlite") == "wallet.db"
+    assert default_wallet_file("json") == "wallet.json"
+    assert directory_wallets("sqlite") == ["./wallet.json", "./wallet.db"]
 
 
 def test_an_explicit_path_wins_over_both() -> None:

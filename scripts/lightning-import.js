@@ -9,13 +9,13 @@
 //
 // Environment:
 //   ARCHON_PASSPHRASE   — Required. Wallet encryption passphrase.
-//   ARCHON_WALLET_PATH  — Wallet file path (default: ~/.archon/wallet.json, or
-//                        ./wallet.json if one is already there)
+//   ARCHON_WALLET_PATH  — Wallet file path (default: ~/.archon/wallet.json, wallet.db
+//                        for sqlite, or ./wallet.json if one is already there)
 //   ARCHON_WALLET_TYPE  — "json" (default) or "sqlite"
 
 import os from 'os';
 import path from 'path';
-import { homeWalletPath, resolveWalletPath, storedAt } from '@didcid/keymaster/wallet-location';
+import { directoryWallets, homeWalletPath, resolveWalletPath, storedAt } from '@didcid/keymaster/wallet-location';
 import fs from 'fs';
 import { WalletNotFoundError } from '@didcid/common/errors';
 import Keymaster from '@didcid/keymaster';
@@ -25,8 +25,8 @@ import WalletSQLite from '@didcid/keymaster/wallet/sqlite';
 
 const walletPath = process.argv[2] || resolveWalletPath({
     env: process.env,
-    directoryWallet: './wallet.json',
-    homeWallet: homeWalletPath(os.homedir()),
+    directoryWallets: directoryWallets(process.env.ARCHON_WALLET_TYPE || 'json'),
+    homeWallet: homeWalletPath(os.homedir(), process.env.ARCHON_WALLET_TYPE || 'json'),
     exists: (candidate) => fs.existsSync(storedAt(process.env.ARCHON_WALLET_TYPE || 'json', candidate)),
 });
 const walletType = process.env.ARCHON_WALLET_TYPE || 'json';

@@ -14,7 +14,7 @@ import WalletSQLite from './db/sqlite.js';
 import os from 'os';
 import { createInterface } from 'readline';
 import { WalletNotFoundError } from '@didcid/common/errors';
-import { ARCHON_HOME_DIRECTORY, homeWalletPath, resolveWalletPath, storedAt, walletNotFoundMessage } from './wallet-location.js';
+import { ARCHON_HOME_DIRECTORY, directoryWallets, homeWalletPath, resolveWalletPath, storedAt, walletNotFoundMessage } from './wallet-location.js';
 import { missingPassphraseMessage, resolvePassphrase, type ResolvedPassphrase } from './passphrase.js';
 
 dotenv.config();
@@ -2366,10 +2366,10 @@ async function run() {
         process.env.ARCHON_GATEKEEPER_URL ||
         'http://localhost:4224';
     const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
-    const homeWallet = homeWalletPath(os.homedir());
+    const homeWallet = homeWalletPath(os.homedir(), walletType);
     const walletPath = resolveWalletPath({
         env: process.env,
-        directoryWallet: './wallet.json',
+        directoryWallets: directoryWallets(walletType),
         homeWallet,
         exists: (candidate) => fs.existsSync(storedAt(walletType, candidate)),
     });

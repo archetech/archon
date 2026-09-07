@@ -1,13 +1,22 @@
-import { homeWalletPath, resolveWalletPath, storedAt, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
+import { defaultWalletFile, directoryWallets, homeWalletPath, resolveWalletPath, storedAt, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
 
 // A globally installed CLI resolving ./wallet.json ties the identity to
 // whichever directory it was created in, and the passphrase that unlocks it is
 // kept under the home directory — so the wallet belongs there too (#980).
 
-const HOME_WALLET = homeWalletPath('/home/someone');
+const HOME_WALLET = homeWalletPath('/home/someone', 'json');
 
-function location(env: Record<string, string | undefined>, exists: (candidate: string) => boolean = () => false) {
-    return { env, directoryWallet: './wallet.json', homeWallet: HOME_WALLET, exists };
+function location(
+    env: Record<string, string | undefined>,
+    exists: (candidate: string) => boolean = () => false,
+    walletType = 'json',
+) {
+    return {
+        env,
+        directoryWallets: directoryWallets(walletType),
+        homeWallet: homeWalletPath('/home/someone', walletType),
+        exists,
+    };
 }
 
 describe('resolveWalletPath', () => {
@@ -21,6 +30,18 @@ describe('resolveWalletPath', () => {
         expect(resolveWalletPath(location({}, (candidate) => candidate === './wallet.json'))).toBe('./wallet.json');
     });
 
+    // Reporting no wallet here is what sends an existing SQLite user to a new
+    // identity in the home directory.
+    it('finds a SQLite wallet still under the older name', () => {
+        const chosen = resolveWalletPath(location({}, (candidate) => candidate === './wallet.json', 'sqlite'));
+
+        expect(chosen).toBe('./wallet.json');
+    });
+
+    it('puts a new SQLite wallet under a .db name', () => {
+        expect(resolveWalletPath(location({}, () => false, 'sqlite'))).toBe('/home/someone/.archon/wallet.db');
+    });
+
     it('obeys an explicit path over both', () => {
         const chosen = resolveWalletPath(location({ ARCHON_WALLET_PATH: '/srv/keys/wallet.json' }, () => true));
 
@@ -31,6 +52,31 @@ describe('resolveWalletPath', () => {
     // naming what was asked for, not silently fall back somewhere else.
     it('obeys an explicit path that does not exist', () => {
         expect(resolveWalletPath(location({ ARCHON_WALLET_PATH: '/gone.json' }))).toBe('/gone.json');
+    });
+});
+
+describe('defaultWalletFile', () => {
+    // The CLI passed one path for both backends, so a SQLite database was
+    // written under a .json name and WalletSQLite's own default never ran.
+    it('names a SQLite wallet for what it is', () => {
+        expect(defaultWalletFile('sqlite')).toBe('wallet.db');
+        expect(homeWalletPath('/home/someone', 'sqlite')).toBe('/home/someone/.archon/wallet.db');
+    });
+
+    it('leaves the JSON wallet alone', () => {
+        expect(defaultWalletFile('json')).toBe('wallet.json');
+    });
+});
+
+describe('directoryWallets', () => {
+    // A SQLite wallet made before the extension was corrected is still called
+    // wallet.json, and it holds the identity -- so it is looked for first.
+    it('looks for the older SQLite name before the corrected one', () => {
+        expect(directoryWallets('sqlite')).toStrictEqual(['./wallet.json', './wallet.db']);
+    });
+
+    it('has one name for the JSON backend', () => {
+        expect(directoryWallets('json')).toStrictEqual(['./wallet.json']);
     });
 });
 

@@ -8,7 +8,8 @@ match the TypeScript CLI so tooling can swap implementations.
 Environment:
     ARCHON_NODE_URL / ARCHON_GATEKEEPER_URL  Gatekeeper HTTP URL (default http://localhost:4224)
     ARCHON_WALLET_PATH                        Wallet file path (default ~/.archon/wallet.json,
-                                              or ./wallet.json if one is already there)
+                                              wallet.db for sqlite, or ./wallet.json if
+                                              one is already there)
     ARCHON_PASSPHRASE                         Required — wallet passphrase
     ARCHON_DEFAULT_REGISTRY                   Default registry (optional)
 """
@@ -70,8 +71,26 @@ def saved_passphrase_file() -> str:
     return str(Path.home() / ARCHON_HOME_DIRECTORY / "passphrase")
 
 
-def home_wallet_path(home_directory: str) -> str:
-    return str(Path(home_directory) / ARCHON_HOME_DIRECTORY / "wallet.json")
+def default_wallet_file(wallet_type: str) -> str:
+    """SQLite's own default is wallet.db.
+
+    The CLI never reached it, because it always passes a path, so a SQLite
+    database was written under a .json name.
+    """
+    return "wallet.db" if wallet_type == "sqlite" else "wallet.json"
+
+
+def home_wallet_path(home_directory: str, wallet_type: str) -> str:
+    return str(Path(home_directory) / ARCHON_HOME_DIRECTORY / default_wallet_file(wallet_type))
+
+
+def directory_wallets(wallet_type: str) -> list[str]:
+    """What to look for in the working directory, in the order it should win.
+
+    A SQLite wallet made before the extension was corrected is still called
+    wallet.json, and it is the one holding the identity.
+    """
+    return ["./wallet.json", "./wallet.db"] if wallet_type == "sqlite" else ["./wallet.json"]
 
 
 def stored_at(wallet_type: str, wallet_path: str) -> str:
@@ -94,7 +113,7 @@ def stored_at(wallet_type: str, wallet_path: str) -> str:
 def resolve_wallet_path(
     env: Mapping[str, str],
     *,
-    directory_wallet: str,
+    directory_wallets: list[str],
     home_wallet: str,
     exists: Callable[[str], bool],
 ) -> str:
@@ -118,8 +137,9 @@ def resolve_wallet_path(
     if configured:
         return configured
 
-    if exists(directory_wallet):
-        return directory_wallet
+    for candidate in directory_wallets:
+        if exists(candidate):
+            return candidate
 
     return home_wallet
 
@@ -1684,14 +1704,13 @@ async def _run(args: argparse.Namespace) -> int:
         or os.environ.get("ARCHON_GATEKEEPER_URL")
         or "http://localhost:4224"
     )
-    home_wallet = home_wallet_path(str(Path.home()))
+    wallet_type = os.environ.get("ARCHON_WALLET_TYPE", "json")
+    home_wallet = home_wallet_path(str(Path.home()), wallet_type)
     wallet_path = resolve_wallet_path(
         os.environ,
-        directory_wallet="./wallet.json",
+        directory_wallets=directory_wallets(wallet_type),
         home_wallet=home_wallet,
-        exists=lambda candidate: Path(
-            stored_at(os.environ.get("ARCHON_WALLET_TYPE", "json"), candidate)
-        ).exists(),
+        exists=lambda candidate: Path(stored_at(wallet_type, candidate)).exists(),
     )
     default_registry = os.environ.get("ARCHON_DEFAULT_REGISTRY")
     # stdin decides whether there is anyone to answer. stdout may be a pipe

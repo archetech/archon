@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { homeWalletPath, resolveWalletPath, storedAt, type WalletLocation } from '@didcid/keymaster/wallet-location';
+import { directoryWallets, homeWalletPath, resolveWalletPath, storedAt, type WalletLocation } from '@didcid/keymaster/wallet-location';
 
 export type WalletType = 'json' | 'sqlite';
 
@@ -72,8 +72,8 @@ export function loadConfig(
         walletType,
         walletPath: resolveWalletPath({
             env,
-            directoryWallet: './wallet.json',
-            homeWallet: homeWalletPath(os.homedir()),
+            directoryWallets: directoryWallets(walletType),
+            homeWallet: homeWalletPath(os.homedir(), walletType),
             exists: (candidate: string) => fs.existsSync(storedAt(walletType, candidate)),
             ...location,
         }),
