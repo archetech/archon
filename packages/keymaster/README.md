@@ -120,7 +120,7 @@ curl -fsSL https://archon.technology/install | bash
 | `ARCHON_GATEKEEPER_URL` | No | - | Legacy fallback for `ARCHON_NODE_URL` |
 | `ARCHON_PASSPHRASE` | No | - | Passphrase for wallet encryption. For automation; the environment is a poor place for a secret |
 | `ARCHON_PASSPHRASE_FILE` | No | `~/.archon/passphrase` | File holding the passphrase. Read if it exists, so answering the CLI's offer to save ends the asking |
-| `ARCHON_WALLET_PATH` | No | `./wallet.json` | Path to wallet file |
+| `ARCHON_WALLET_PATH` | No | `~/.archon/wallet.json` (`wallet.db` for sqlite), or `./wallet.json` if one is already there | Path to wallet file. The default follows you between directories; an explicit path is obeyed even if nothing is there |
 | `ARCHON_WALLET_TYPE` | No | `json` | Wallet type (`json` or `sqlite`) |
 | `ARCHON_DEFAULT_REGISTRY` | No | `hyperswarm` | Default DID registry |
 

@@ -73,6 +73,37 @@ describe('WalletJson', () => {
 });
 
 describe('WalletSQLite', () => {
+    // ARCHON_WALLET_PATH is commonly absolute, and so is the default. Joining
+    // one under dataFolder gives `data//home/you/...`, which is not a wallet
+    // anyone asked for (#980).
+    it('treats an absolute path as the location, not a name under dataFolder', async () => {
+        await withTempDir(async dir => {
+            const file = join(dir, 'absolute', 'wallet.db');
+            const wallet = await WalletSQLite.create(file);
+
+            try {
+                await wallet.saveWallet(walletOne as StoredWallet);
+                expect(existsSync(file)).toBe(true);
+            } finally {
+                await wallet.disconnect();
+            }
+        });
+    });
+
+    // The JSON backend creates its folder; without this the SQLite one fails
+    // with SQLITE_CANTOPEN.
+    it('creates the directory it was pointed at', async () => {
+        await withTempDir(async dir => {
+            const wallet = await WalletSQLite.create('wallet.db', join(dir, 'missing', 'deeper'));
+
+            try {
+                await expect(wallet.loadWallet()).resolves.toBeNull();
+            } finally {
+                await wallet.disconnect();
+            }
+        });
+    });
+
     it('loads null when the wallet table is empty', async () => {
         await withTempDir(async dir => {
             const wallet = await WalletSQLite.create('wallet.db', dir);
@@ -128,23 +159,6 @@ describe('WalletSQLite defaults and guards', () => {
         if (process.cwd() !== originalCwd) {
             process.chdir(originalCwd);
         }
-    });
-
-    // NOTE: unlike WalletJson.saveWallet, which does mkdirSync(dataFolder,
-    // {recursive:true}), WalletSQLite.connect never creates its folder — it opens
-    // `${dataFolder}/${file}` directly and sqlite cannot open the file if the
-    // directory is absent. These tests therefore create `data/` first.
-    it('does not create its data folder, unlike WalletJson', async () => {
-        await withTempDir(async dir => {
-            const folder = join(dir, 'missing');
-            const wallet = new WalletSQLite('wallet.db', folder);
-
-            // The guarantee is that the folder is not created, so that is what
-            // is asserted; matching the driver's wording would break on a Node
-            // rephrasing even while the behaviour held.
-            await expect(wallet.saveWallet(walletOne)).rejects.toThrow();
-            expect(existsSync(folder)).toBe(false);
-        });
     });
 
     it('defaults to data/wallet.db when constructed with no arguments', async () => {

@@ -40,6 +40,11 @@
       "require": "./dist/cjs/keymaster-client.cjs",
       "types": "./dist/types/keymaster-client.d.ts"
     },
+    "./wallet-location": {
+      "import": "./dist/esm/wallet-location.js",
+      "require": "./dist/cjs/wallet-location.cjs",
+      "types": "./dist/types/wallet-location.d.ts"
+    },
     "./didcomm-protocols": {
       "import": "./dist/esm/didcomm-protocols.js",
       "require": "./dist/cjs/didcomm-protocols.cjs",
@@ -103,6 +108,9 @@
     "*": {
       "client": [
         "./dist/types/keymaster-client.d.ts"
+      ],
+      "wallet-location": [
+        "./dist/types/wallet-location.d.ts"
       ],
       "didcomm-protocols": [
         "./dist/types/didcomm-protocols.d.ts"

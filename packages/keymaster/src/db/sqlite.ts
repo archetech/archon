@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { StoredWallet } from '../types.js';
 import { AbstractBase } from './abstract-base.js';
 import { DatabaseSync } from 'node:sqlite';
@@ -14,7 +16,12 @@ export default class WalletSQLite extends AbstractBase {
 
     constructor(walletFileName: string = 'wallet.db', dataFolder: string = 'data') {
         super();
-        this.walletName = `${dataFolder}/${walletFileName}`;
+        // An absolute path is a location, not a name to hang under dataFolder.
+        // ARCHON_WALLET_PATH is commonly one, and joining it would give
+        // `data//home/you/...`, which opens nothing anyone asked for.
+        this.walletName = path.isAbsolute(walletFileName)
+            ? walletFileName
+            : path.join(dataFolder, walletFileName);
         this.db = null
     }
 
@@ -23,6 +30,9 @@ export default class WalletSQLite extends AbstractBase {
             return;
         }
 
+        // The JSON backend creates its folder; DatabaseSync reports
+        // SQLITE_CANTOPEN rather than creating one.
+        fs.mkdirSync(path.dirname(this.walletName), { recursive: true });
         this.db = new DatabaseSync(this.walletName);
 
         this.db.exec(`
