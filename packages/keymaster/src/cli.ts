@@ -14,6 +14,7 @@ import WalletSQLite from './db/sqlite.js';
 import os from 'os';
 import { createInterface } from 'readline';
 import { WalletNotFoundError } from '@didcid/common/errors';
+import { ARCHON_HOME_DIRECTORY, homeWalletPath, resolveWalletPath, walletNotFoundMessage } from './wallet-location.js';
 import { missingPassphraseMessage, resolvePassphrase, type ResolvedPassphrase } from './passphrase.js';
 
 dotenv.config();
@@ -30,7 +31,7 @@ const __dirname = path.dirname(__filename);
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', '..', 'package.json'), 'utf-8'));
 
 // Where a prompted passphrase is offered a home, and read back from.
-const SAVED_PASSPHRASE_FILE = path.join(os.homedir(), '.archon', 'passphrase');
+const SAVED_PASSPHRASE_FILE = path.join(os.homedir(), ARCHON_HOME_DIRECTORY, 'passphrase');
 
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -2364,7 +2365,13 @@ async function run() {
         process.env.ARCHON_NODE_URL ||
         process.env.ARCHON_GATEKEEPER_URL ||
         'http://localhost:4224';
-    const walletPath = process.env.ARCHON_WALLET_PATH || './wallet.json';
+    const homeWallet = homeWalletPath(os.homedir());
+    const walletPath = resolveWalletPath({
+        env: process.env,
+        directoryWallet: './wallet.json',
+        homeWallet,
+        exists: (candidate) => fs.existsSync(candidate),
+    });
     const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
     const defaultRegistry = process.env.ARCHON_DEFAULT_REGISTRY;
     // stdin decides whether there is anyone to answer. stdout may be a pipe
@@ -2431,9 +2438,9 @@ async function run() {
         // it, so a corrupt wallet would otherwise block the very commands that
         // exist to replace one.
         if (!walletOptional && !await wallet.loadWallet()) {
-            console.error(`Error: Wallet not found at ${walletPath}`);
-            console.error('Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.');
-            console.error('To create a new wallet, run: keymaster create-wallet');
+            for (const line of walletNotFoundMessage(walletPath, homeWallet)) {
+                console.error(line);
+            }
             process.exit(1);
         }
 

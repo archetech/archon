@@ -35,6 +35,7 @@ const config = {
         '^@didcid/keymaster/search$': '<rootDir>/packages/keymaster/src/search-client.ts',
         '^@didcid/keymaster$': '<rootDir>/packages/keymaster/src/keymaster.ts',
         '^@didcid/keymaster/client$': '<rootDir>/packages/keymaster/src/keymaster-client.ts',
+        '^@didcid/keymaster/wallet-location$': '<rootDir>/packages/keymaster/src/wallet-location.ts',
         '^@didcid/keymaster/wallet/(.*)$': '<rootDir>/packages/keymaster/src/db/$1',
         '^@didcid/mcp-server$': '<rootDir>/packages/mcp-server/src/index.ts',
         '^@didcid/cipher/passphrase': '<rootDir>/packages/cipher/src/passphrase.ts',

@@ -7,7 +7,8 @@ match the TypeScript CLI so tooling can swap implementations.
 
 Environment:
     ARCHON_NODE_URL / ARCHON_GATEKEEPER_URL  Gatekeeper HTTP URL (default http://localhost:4224)
-    ARCHON_WALLET_PATH                        Wallet file path (default ./wallet.json)
+    ARCHON_WALLET_PATH                        Wallet file path (default ~/.archon/wallet.json,
+                                              or ./wallet.json if one is already there)
     ARCHON_PASSPHRASE                         Required — wallet passphrase
     ARCHON_DEFAULT_REGISTRY                   Default registry (optional)
 """
@@ -61,9 +62,70 @@ class CommandError(Exception):
 PASSPHRASE_PROMPT = "Wallet passphrase: "
 
 
+ARCHON_HOME_DIRECTORY = ".archon"
+
+
 def saved_passphrase_file() -> str:
     """Where a prompted passphrase is offered a home, and read back from."""
-    return str(Path.home() / ".archon" / "passphrase")
+    return str(Path.home() / ARCHON_HOME_DIRECTORY / "passphrase")
+
+
+def home_wallet_path(home_directory: str) -> str:
+    return str(Path(home_directory) / ARCHON_HOME_DIRECTORY / "wallet.json")
+
+
+def resolve_wallet_path(
+    env: Mapping[str, str],
+    *,
+    directory_wallet: str,
+    home_wallet: str,
+    exists: Callable[[str], bool],
+) -> str:
+    """Where a wallet lives when nothing says otherwise.
+
+    A globally installed CLI resolving ./wallet.json ties the identity to
+    whichever directory it was created in: ``cd ..`` and it is gone, and the
+    "not found" message reads as an invitation to create a second one, leaving
+    the first on disk somewhere the user is not looking (#980).
+
+    The passphrase that unlocks a wallet is kept under the home directory, so
+    the wallet belongs there too. A wallet already sitting in the working
+    directory still wins, so a setup built that way goes on working untouched.
+
+    Mirrors the TypeScript resolveWalletPath, including its order.
+    """
+    # An explicit path is an instruction, not a preference: it wins even when
+    # it points at nothing, so the error names what was asked for.
+    configured = env.get("ARCHON_WALLET_PATH")
+
+    if configured:
+        return configured
+
+    if exists(directory_wallet):
+        return directory_wallet
+
+    return home_wallet
+
+
+def wallet_not_found_message(wallet_path: str, home_wallet: str) -> list[str]:
+    """Said when a wallet is not where it was looked for.
+
+    ``create-wallet`` is only the right answer if there is not one already, and
+    the commonest case is one made in another directory before this default
+    existed.
+    """
+    lines = [f"Error: no wallet at {wallet_path}"]
+
+    if wallet_path != home_wallet:
+        lines.append(
+            f"This node's own wallet lives at {home_wallet} unless ARCHON_WALLET_PATH says otherwise."
+        )
+
+    return [
+        *lines,
+        "A wallet made in another directory is still there — point ARCHON_WALLET_PATH at it.",
+        "To start a new identity instead, run: keymaster create-wallet",
+    ]
 
 # Which source supplied it. Only a prompted one is worth offering to save.
 PassphraseSource = str
@@ -1605,7 +1667,13 @@ async def _run(args: argparse.Namespace) -> int:
         or os.environ.get("ARCHON_GATEKEEPER_URL")
         or "http://localhost:4224"
     )
-    wallet_path = os.environ.get("ARCHON_WALLET_PATH", "./wallet.json")
+    home_wallet = home_wallet_path(str(Path.home()))
+    wallet_path = resolve_wallet_path(
+        os.environ,
+        directory_wallet="./wallet.json",
+        home_wallet=home_wallet,
+        exists=lambda candidate: Path(candidate).exists(),
+    )
     default_registry = os.environ.get("ARCHON_DEFAULT_REGISTRY")
     # stdin decides whether there is anyone to answer. stdout may be a pipe
     # -- prompts go to stderr, so `keymaster list-ids | jq` still works.
@@ -1642,12 +1710,8 @@ async def _run(args: argparse.Namespace) -> int:
     # Only read the store when its absence would be fatal. Reading parses it, so
     # a corrupt wallet would otherwise block the very commands that replace one.
     if args.command not in WALLET_OPTIONAL_COMMANDS and not wallet_store.load_wallet():
-        print(f"Error: Wallet not found at {wallet_path}", file=sys.stderr)
-        print(
-            "Set ARCHON_WALLET_PATH or ensure wallet.json exists in the current directory.",
-            file=sys.stderr,
-        )
-        print("To create a new wallet, run: keymaster create-wallet", file=sys.stderr)
+        for line in wallet_not_found_message(wallet_path, home_wallet):
+            print(line, file=sys.stderr)
         return 1
 
     gatekeeper = GatekeeperClient(gatekeeper_url)

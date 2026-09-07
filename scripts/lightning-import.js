@@ -9,10 +9,13 @@
 //
 // Environment:
 //   ARCHON_PASSPHRASE   — Required. Wallet encryption passphrase.
-//   ARCHON_WALLET_PATH  — Wallet file path (default: ./wallet.json)
+//   ARCHON_WALLET_PATH  — Wallet file path (default: ~/.archon/wallet.json, or
+//                        ./wallet.json if one is already there)
 //   ARCHON_WALLET_TYPE  — "json" (default) or "sqlite"
 
+import os from 'os';
 import path from 'path';
+import { homeWalletPath, resolveWalletPath } from '@didcid/keymaster/wallet-location';
 import fs from 'fs';
 import { WalletNotFoundError } from '@didcid/common/errors';
 import Keymaster from '@didcid/keymaster';
@@ -20,7 +23,12 @@ import CipherNode from '@didcid/cipher/node';
 import WalletJson from '@didcid/keymaster/wallet/json';
 import WalletSQLite from '@didcid/keymaster/wallet/sqlite';
 
-const walletPath = process.argv[2] || process.env.ARCHON_WALLET_PATH || './wallet.json';
+const walletPath = process.argv[2] || resolveWalletPath({
+    env: process.env,
+    directoryWallet: './wallet.json',
+    homeWallet: homeWalletPath(os.homedir()),
+    exists: (candidate) => fs.existsSync(candidate),
+});
 const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
 // A node sets this under its older name; read that too (#1020).
 const passphrase = process.env.ARCHON_PASSPHRASE || process.env.ARCHON_ENCRYPTED_PASSPHRASE;

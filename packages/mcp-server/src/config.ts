@@ -1,4 +1,7 @@
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
+import { homeWalletPath, resolveWalletPath, type WalletLocation } from '@didcid/keymaster/wallet-location';
 
 export type WalletType = 'json' | 'sqlite';
 
@@ -56,11 +59,22 @@ function parseInlineLimit(value: string | undefined): number {
     return Number(trimmed);
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpServerConfig {
+// `location` is a seam: without it the default wallet path is read off the
+// machine running the tests, home directory and working directory included.
+export function loadConfig(
+    env: NodeJS.ProcessEnv = process.env,
+    location: Partial<WalletLocation> = {},
+): McpServerConfig {
     return {
         nodeUrl: env.ARCHON_NODE_URL || env.ARCHON_GATEKEEPER_URL || 'https://archon.technology',
         walletType: parseWalletType(env.ARCHON_WALLET_TYPE),
-        walletPath: env.ARCHON_WALLET_PATH || './wallet.json',
+        walletPath: resolveWalletPath({
+            env,
+            directoryWallet: './wallet.json',
+            homeWallet: homeWalletPath(os.homedir()),
+            exists: (candidate: string) => fs.existsSync(candidate),
+            ...location,
+        }),
         // A node sets this under its older name; read that too (#1020).
         passphrase: env.ARCHON_PASSPHRASE || env.ARCHON_ENCRYPTED_PASSPHRASE,
         defaultRegistry: env.ARCHON_DEFAULT_REGISTRY,

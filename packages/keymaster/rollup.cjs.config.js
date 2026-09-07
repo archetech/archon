@@ -16,6 +16,7 @@ const config = {
         'node': 'dist/esm/node.js',
         'keymaster': 'dist/esm/keymaster.js',
         'keymaster-client': 'dist/esm/keymaster-client.js',
+        'wallet-location': 'dist/esm/wallet-location.js',
         'didcomm-protocols': 'dist/esm/didcomm-protocols.js',
         'db/abstract-base': 'dist/esm/db/abstract-base.js',
         'db/json': 'dist/esm/db/json.js',

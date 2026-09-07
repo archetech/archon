@@ -8,6 +8,15 @@ describe('mcp server config', () => {
     // A node configures the wallet passphrase under the older name, and the
     // MCP server is one of the surfaces someone runs against that same node
     // (#1020). Both names reach it, and the current one wins.
+    it('keeps using a wallet already in the working directory', () => {
+        const config = loadConfig({}, {
+            homeWallet: '/home/someone/.archon/wallet.json',
+            exists: (candidate) => candidate === './wallet.json',
+        });
+
+        expect(config.walletPath).toBe('./wallet.json');
+    });
+
     it('reads the passphrase from either name, preferring the current one', () => {
         expect(loadConfig({ ARCHON_PASSPHRASE: 'current' }).passphrase).toBe('current');
         expect(loadConfig({ ARCHON_ENCRYPTED_PASSPHRASE: 'older' }).passphrase).toBe('older');
@@ -18,12 +27,14 @@ describe('mcp server config', () => {
     });
 
     it('uses Keymaster CLI compatible defaults', () => {
-        const config = loadConfig({});
+        const config = loadConfig({}, { homeWallet: '/home/someone/.archon/wallet.json', exists: () => false });
 
         expect(config).toStrictEqual({
             nodeUrl: 'https://archon.technology',
             walletType: 'json',
-            walletPath: './wallet.json',
+            // The same place the CLI puts one, so an agent and its operator
+            // see a single identity rather than one each (#980).
+            walletPath: '/home/someone/.archon/wallet.json',
             passphrase: undefined,
             defaultRegistry: undefined,
             readOnly: false,
