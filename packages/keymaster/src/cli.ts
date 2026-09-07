@@ -11,6 +11,8 @@ import CipherNode from '@didcid/cipher/node';
 import type { DidCommEnc } from '@didcid/cipher/didcomm';
 import WalletJson from './db/json.js';
 import WalletSQLite from './db/sqlite.js';
+import { createInterface } from 'readline';
+import { missingPassphraseMessage, resolvePassphrase } from './passphrase.js';
 
 dotenv.config();
 
@@ -27,6 +29,29 @@ const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', '..', 'pack
 
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// readline redraws the whole line on every keystroke, so the query is written
+// once by hand and every later redraw is swallowed -- otherwise the secret is
+// echoed back character by character.
+function askHidden(query: string): Promise<string> {
+    return new Promise((resolve) => {
+        const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+        let asked = false;
+
+        (rl as unknown as { _writeToOutput: (chunk: string) => void })._writeToOutput = () => {
+            if (!asked) {
+                process.stdout.write(query);
+                asked = true;
+            }
+        };
+
+        rl.question(query, (answer) => {
+            process.stdout.write('\n');
+            rl.close();
+            resolve(answer);
+        });
+    });
 }
 
 // A handler that reports a failure has to fail the process too: without this
@@ -2266,14 +2291,28 @@ async function run() {
         'http://localhost:4224';
     const walletPath = process.env.ARCHON_WALLET_PATH || './wallet.json';
     const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
-    // A node sets this under its older name; read that too rather than
-    // asking for a value the operator already has (#1020).
-    const passphrase = process.env.ARCHON_PASSPHRASE || process.env.ARCHON_ENCRYPTED_PASSPHRASE;
     const defaultRegistry = process.env.ARCHON_DEFAULT_REGISTRY;
+    const interactive = process.stdin.isTTY === true && process.stdout.isTTY === true;
+    let passphrase: string | undefined;
+
+    try {
+        passphrase = await resolvePassphrase({
+            env: process.env,
+            readFile: (path) => fs.readFileSync(path, 'utf-8'),
+            interactive,
+            prompt: askHidden,
+        });
+    }
+    catch (error: any) {
+        console.error(`Error: could not read ARCHON_PASSPHRASE_FILE: ${error.message || error}`);
+        process.exit(1);
+    }
 
     if (!passphrase) {
-        console.error('Error: ARCHON_PASSPHRASE environment variable is required');
-        console.error('Set it with: export ARCHON_PASSPHRASE=your-passphrase');
+        for (const line of missingPassphraseMessage(interactive)) {
+            console.error(line);
+        }
+
         process.exit(1);
     }
 

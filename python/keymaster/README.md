@@ -44,5 +44,6 @@ keymaster list-ids
 |---|---|---|
 | `ARCHON_NODE_URL` / `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Gatekeeper HTTP endpoint |
 | `ARCHON_WALLET_PATH` | `./wallet.json` | Path to wallet file |
-| `ARCHON_PASSPHRASE` | *(required)* | Wallet passphrase |
+| `ARCHON_PASSPHRASE` | *(asked for)* | Wallet passphrase. Unset on a terminal, the CLI asks for it |
+| `ARCHON_PASSPHRASE_FILE` | - | Path to a file holding the passphrase, for scripts that keep it out of the environment |
 | `ARCHON_DEFAULT_REGISTRY` | `hyperswarm` | Default registry for new DIDs |

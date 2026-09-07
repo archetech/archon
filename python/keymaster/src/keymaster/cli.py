@@ -17,12 +17,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import getpass
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+from collections.abc import Mapping
 from typing import Any, Callable
 
 from keymaster.core import Keymaster
@@ -53,6 +56,65 @@ class CommandError(Exception):
     status: a handler that prints its complaint and returns is indistinguishable
     from one that succeeded.
     """
+
+
+PASSPHRASE_PROMPT = "Wallet passphrase: "
+
+
+def resolve_passphrase(
+    env: Mapping[str, str],
+    *,
+    read_file: Callable[[str], str],
+    interactive: bool,
+    prompt: Callable[[str], str],
+) -> str | None:
+    """Where the CLI gets the wallet passphrase.
+
+    The environment is the worst of the available places for it: it persists in
+    shell history, is readable from /proc/<pid>/environ, is inherited by every
+    child the shell spawns afterwards, and lands in CI logs. Automation still
+    needs it, so it stays supported -- but it is not the only way and not the
+    one a first-time reader is taught (#977).
+
+    Mirrors the TypeScript resolvePassphrase, including its order.
+    """
+    configured = env.get("ARCHON_PASSPHRASE") or env.get("ARCHON_ENCRYPTED_PASSPHRASE")
+
+    if configured:
+        return configured
+
+    path = env.get("ARCHON_PASSPHRASE_FILE")
+
+    if path:
+        # A configured file that cannot be read raises rather than falling
+        # through to a prompt: an explicit path that is wrong is an error, not
+        # an invitation to type something else. One trailing newline goes,
+        # which is what an editor or `echo >` leaves; nothing else, because the
+        # rest could be the passphrase.
+        return re.sub(r"\r?\n$", "", read_file(path))
+
+    if interactive:
+        # A prompt is only possible when someone is there to answer it. Asking
+        # a pipe hangs the script that opened it.
+        return prompt(PASSPHRASE_PROMPT) or None
+
+    return None
+
+
+def missing_passphrase_message(interactive: bool) -> list[str]:
+    """What to tell someone who has not supplied one.
+
+    A prompt they could have answered is only worth mentioning if they could
+    have seen it.
+    """
+    options = [
+        "Set ARCHON_PASSPHRASE_FILE to a file holding it, or ARCHON_PASSPHRASE for automation."
+    ]
+
+    if interactive:
+        return ["Error: no wallet passphrase given.", *options]
+
+    return ["Error: no wallet passphrase, and no terminal to ask on.", *options]
 
 
 def _error(message: Any) -> None:
@@ -1459,14 +1521,23 @@ async def _run(args: argparse.Namespace) -> int:
         or "http://localhost:4224"
     )
     wallet_path = os.environ.get("ARCHON_WALLET_PATH", "./wallet.json")
-    # A node sets this under its older name; read that too rather than
-    # asking for a value the operator already has (#1020).
-    passphrase = os.environ.get("ARCHON_PASSPHRASE") or os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE")
     default_registry = os.environ.get("ARCHON_DEFAULT_REGISTRY")
+    interactive = sys.stdin.isatty() and sys.stdout.isatty()
+
+    try:
+        passphrase = resolve_passphrase(
+            os.environ,
+            read_file=lambda path: Path(path).read_text(encoding="utf-8"),
+            interactive=interactive,
+            prompt=getpass.getpass,
+        )
+    except OSError as exc:
+        print(f"Error: could not read ARCHON_PASSPHRASE_FILE: {exc}", file=sys.stderr)
+        return 1
 
     if not passphrase:
-        print("Error: ARCHON_PASSPHRASE environment variable is required", file=sys.stderr)
-        print("Set it with: export ARCHON_PASSPHRASE=your-passphrase", file=sys.stderr)
+        for line in missing_passphrase_message(interactive):
+            print(line, file=sys.stderr)
         return 1
 
     wallet_path_obj = Path(wallet_path)

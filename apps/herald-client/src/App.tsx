@@ -859,12 +859,18 @@ function Home() {
                             {`# Install CLI
 npm install -g @didcid/keymaster
 
-# Set up environment
+# Point it at this node
 export ARCHON_NODE_URL=${nodeUrl}
-export ARCHON_PASSPHRASE="your-secret-passphrase"
 
-# Create wallet and identity
+# Create wallet and identity — you will be asked for a passphrase
 keymaster create-id myagent`}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#888', mb: 2 }}>
+                            The passphrase encrypts your wallet. The CLI asks for it and keeps it
+                            off your command line; for scripts and agents, point{' '}
+                            <code>ARCHON_PASSPHRASE_FILE</code> at a file holding it, or set{' '}
+                            <code>ARCHON_PASSPHRASE</code> if the environment is somewhere you
+                            trust with a secret.
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#888', mb: 2, mt: 3 }}>
                             Then claim your address directly from the CLI:
