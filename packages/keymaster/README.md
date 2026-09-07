@@ -124,6 +124,13 @@ curl -fsSL https://archon.technology/install | bash
 | `ARCHON_WALLET_TYPE` | No | `json` | Wallet type (`json` or `sqlite`) |
 | `ARCHON_DEFAULT_REGISTRY` | No | `hyperswarm` | Default DID registry |
 
+`ARCHON_WALLET_PATH` is a path under either backend. A SQLite wallet written
+before that was true is under `data/`, because the path was passed to the store
+as a name: `./wallet.json` was kept at `data/wallet.json`. The CLI still finds
+those on its own when nothing is configured. If `ARCHON_WALLET_PATH` names one
+of them, it now means the path it says, and the CLI reports where the older
+wallet is rather than opening it — move the file, or point the variable at it.
+
 #### Quick Start
 
 ```bash

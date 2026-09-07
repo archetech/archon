@@ -1,11 +1,12 @@
 import { mkdtemp, rm } from 'fs/promises';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 import WalletJson from '../../packages/keymaster/src/db/json.ts';
 import WalletSQLite from '../../packages/keymaster/src/db/sqlite.ts';
-import type { StoredWallet } from '../../packages/keymaster/src/types.ts';
+import { openWalletStore } from '../../packages/keymaster/src/db/open.ts';
+import type { StoredWallet, WalletBase } from '../../packages/keymaster/src/types.ts';
 
 const walletOne = {
     version: 2,
@@ -219,6 +220,71 @@ describe('WalletSQLite defaults and guards', () => {
 
             await expect(wallet.saveWallet(walletOne)).rejects.toThrow('DB failed to connect.');
             await expect(wallet.loadWallet()).rejects.toThrow('DB failed to connect.');
+        });
+    });
+});
+
+describe('openWalletStore', () => {
+    // These chdir, because the defect is about what a *relative* path means.
+    // cwd is process-global and the unit suite runs --runInBand, so a test that
+    // fails to restore it corrupts every later suite in the process.
+    const originalCwd = process.cwd();
+
+    afterEach(() => {
+        if (process.cwd() !== originalCwd) {
+            process.chdir(originalCwd);
+        }
+    });
+
+    // A path passed whole to the SQLite store was read as a name and hung under
+    // the store's own data folder, so one ARCHON_WALLET_PATH meant two
+    // different files depending on the backend (#1073).
+    it.each(['json', 'sqlite'])('writes a %s wallet to the relative path it was given', async walletType => {
+        await withTempDir(async dir => {
+            const cwd = process.cwd();
+            process.chdir(dir);
+            try {
+                const wallet = await openWalletStore(walletType, './wallet.db') as WalletBase & { disconnect?: () => Promise<void> };
+
+                try {
+                    await expect(wallet.saveWallet(walletOne)).resolves.toBe(true);
+                } finally {
+                    await wallet.disconnect?.();
+                }
+
+                expect(existsSync(join(dir, 'wallet.db'))).toBe(true);
+                expect(existsSync(join(dir, 'data', 'wallet.db'))).toBe(false);
+            } finally {
+                process.chdir(cwd);
+            }
+        });
+    });
+
+    it.each(['json', 'sqlite'])('writes a %s wallet to the absolute path it was given', async walletType => {
+        await withTempDir(async dir => {
+            const file = join(dir, 'nested', 'wallet.db');
+            const wallet = await openWalletStore(walletType, file) as WalletBase & { disconnect?: () => Promise<void> };
+
+            try {
+                await expect(wallet.saveWallet(walletOne)).resolves.toBe(true);
+            } finally {
+                await wallet.disconnect?.();
+            }
+
+            expect(existsSync(file)).toBe(true);
+        });
+    });
+
+    // Anything that is not the SQLite backend is the JSON one, which is what
+    // every caller's `ARCHON_WALLET_TYPE || 'json'` already assumed.
+    it('reads an unset wallet type as JSON', async () => {
+        await withTempDir(async dir => {
+            const file = join(dir, 'wallet.json');
+            const wallet = await openWalletStore('', file);
+
+            await wallet.saveWallet(walletOne);
+
+            expect(JSON.parse(readFileSync(file, 'utf-8'))).toStrictEqual(walletOne);
         });
     });
 });
