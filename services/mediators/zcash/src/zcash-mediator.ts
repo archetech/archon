@@ -15,6 +15,7 @@ import express from 'express';
 import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 import axios from 'axios';
+import { planScanStart, type ChainReader } from './reorg.js';
 
 const REGISTRY = config.chain;
 
@@ -290,90 +291,30 @@ async function getBlockTxCount(hash: string, header?: BlockHeader): Promise<numb
     return Array.isArray(block.tx) ? block.tx.length : 0;
 }
 
-async function resolveScanStart(blockCount: number): Promise<number> {
+const chain: ChainReader = {
+    header: (hash) => zecClient.getBlockHeader(hash),
+    hashAt: (height) => zecClient.getBlockHash(height),
+    txCount: (hash) => getBlockTxCount(hash),
+};
+
+async function resolveScanStart(blockCount: number): Promise<number | null> {
     const db = await loadDb();
+    const decision = await planScanStart(db, config, chain, blockCount);
 
-    if (!db.hash) {
-        return db.height ? db.height + 1 : config.startBlock;
+    if (!decision.scan) {
+        console.warn(decision.warn);
+        return null;
     }
 
-    let header: BlockHeader | undefined;
-    try {
-        header = await zecClient.getBlockHeader(db.hash) as BlockHeader;
-    } catch { }
-
-    if ((header?.confirmations ?? 0) > 0) {
-        return db.height + 1;
+    if ('commit' in decision) {
+        zcashReorgs.inc();
+        console.log(decision.log);
+        await jsonPersister.updateDb((data) => {
+            Object.assign(data, decision.commit);
+        });
     }
 
-    zcashReorgs.inc();
-    console.log(`Reorg detected at height ${db.height}, rewinding to a confirmed block...`);
-
-    let height = db.height;
-    let hash = db.hash;
-    let txnsToSubtract = 0;
-
-    while (hash && height >= config.startBlock) {
-        let currentHeader: BlockHeader;
-        try {
-            currentHeader = await zecClient.getBlockHeader(hash) as BlockHeader;
-        } catch {
-            break;
-        }
-
-        if ((currentHeader.confirmations ?? 0) > 0) {
-            const resolvedHeight = currentHeader.height ?? height;
-            const resolvedTime = currentHeader.time ? new Date(currentHeader.time * 1000).toISOString() : '';
-            const resolvedHash = hash;
-            const resolvedBlocksPending = blockCount - resolvedHeight;
-            const resolvedTxnsToSubtract = txnsToSubtract;
-            await jsonPersister.updateDb((data) => {
-                data.height = resolvedHeight;
-                data.hash = resolvedHash;
-                data.time = resolvedTime;
-                data.blocksScanned = Math.max(0, resolvedHeight - config.startBlock + 1);
-                data.txnsScanned = Math.max(0, data.txnsScanned - resolvedTxnsToSubtract);
-                data.blockCount = blockCount;
-                data.blocksPending = resolvedBlocksPending;
-            });
-            return resolvedHeight + 1;
-        }
-
-        txnsToSubtract += await getBlockTxCount(hash, currentHeader);
-
-        if (!currentHeader.previousblockhash) {
-            break;
-        }
-
-        hash = currentHeader.previousblockhash;
-        height = (currentHeader.height ?? height) - 1;
-    }
-
-    const fallbackHeight = config.startBlock;
-    let fallbackHash = '';
-    let fallbackTime = '';
-
-    try {
-        fallbackHash = await zecClient.getBlockHash(fallbackHeight);
-        const fallbackHeader = await zecClient.getBlockHeader(fallbackHash) as BlockHeader;
-        fallbackTime = fallbackHeader.time ? new Date(fallbackHeader.time * 1000).toISOString() : '';
-    } catch {
-        fallbackHash = '';
-    }
-
-    await jsonPersister.updateDb((data) => {
-        data.height = fallbackHeight;
-        if (fallbackHash) {
-            data.hash = fallbackHash;
-        }
-        data.time = fallbackTime;
-        data.blocksScanned = 0;
-        data.txnsScanned = 0;
-        data.blockCount = blockCount;
-        data.blocksPending = blockCount - fallbackHeight;
-    });
-
-    return fallbackHeight + 1;
+    return decision.from;
 }
 
 function discoveredKey(item: Pick<DiscoveredItem, 'height' | 'index' | 'txid' | 'did'>): string {
@@ -504,7 +445,11 @@ async function scanBlocks(): Promise<void> {
 
     console.log(`current block height: ${blockCount}`);
 
-    let start = await resolveScanStart(blockCount);
+    const start = await resolveScanStart(blockCount);
+
+    if (start === null) {
+        return;
+    }
 
     for (let height = start; height <= blockCount; height++) {
         console.log(`${height}/${blockCount} blocks (${formatSyncProgress(height, blockCount)}%)`);
