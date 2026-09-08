@@ -1,8 +1,8 @@
 import fs from 'fs';
 import os from 'os';
-import { directoryWallets, homeWalletPath, resolveWalletPath, splitWalletPath, type WalletLocation } from '@didcid/keymaster/wallet-location';
+import { directoryWallets, homeWalletPath, resolveWalletPath, splitWalletPath, walletBackend, type WalletBackend, type WalletLocation } from '@didcid/keymaster/wallet-location';
 
-export type WalletType = 'json' | 'sqlite';
+export type WalletType = WalletBackend;
 
 export interface McpServerConfig {
     nodeUrl: string;
@@ -22,19 +22,6 @@ export interface McpServerConfig {
 // low because base64 is not something a model can read -- inlining only ever helps the
 // client render or save it, so paying much context for it buys nothing.
 export const DEFAULT_INLINE_LIMIT = 16 * 1024;
-
-function parseWalletType(value: string | undefined): WalletType {
-    switch (value) {
-    case undefined:
-    case '':
-    case 'json':
-        return 'json';
-    case 'sqlite':
-        return 'sqlite';
-    default:
-        throw new Error(`Unsupported ARCHON_WALLET_TYPE "${value}"`);
-    }
-}
 
 function parseBool(value: string | undefined): boolean {
     return value === 'true' || value === '1' || value === 'yes';
@@ -64,7 +51,7 @@ export function loadConfig(
     env: NodeJS.ProcessEnv = process.env,
     location: Partial<WalletLocation> = {},
 ): McpServerConfig {
-    const walletType = parseWalletType(env.ARCHON_WALLET_TYPE);
+    const walletType = walletBackend(env.ARCHON_WALLET_TYPE);
 
     return {
         nodeUrl: env.ARCHON_NODE_URL || env.ARCHON_GATEKEEPER_URL || 'https://archon.technology',

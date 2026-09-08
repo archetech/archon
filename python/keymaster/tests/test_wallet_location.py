@@ -9,6 +9,8 @@ backend is that both CLIs open one wallet on one machine.
 
 from __future__ import annotations
 
+import pytest
+
 from keymaster.cli import (
     default_wallet_file,
     directory_wallets,
@@ -17,6 +19,7 @@ from keymaster.cli import (
     resolve_wallet_path,
     stranded_wallet,
     stranded_wallet_message,
+    wallet_backend,
     wallet_not_found_message,
 )
 
@@ -150,3 +153,20 @@ def test_message_does_not_point_at_the_home_location_when_that_is_where_it_looke
 
     assert HOME_WALLET in " ".join(lines)
     assert not [line for line in lines if "unless ARCHON_WALLET_PATH" in line]
+
+
+def test_wallet_backend_reads_an_unset_or_empty_value_as_json() -> None:
+    assert wallet_backend(None) == "json"
+    assert wallet_backend("") == "json"
+
+
+def test_wallet_backend_takes_the_two_backends_it_documents() -> None:
+    assert wallet_backend("json") == "json"
+    assert wallet_backend("sqlite") == "sqlite"
+
+
+def test_wallet_backend_refuses_a_value_it_does_not_know() -> None:
+    # Falling through to JSON hands a SQLite user an empty JSON wallet and an
+    # offer to create a second identity.
+    with pytest.raises(ValueError, match='Unsupported ARCHON_WALLET_TYPE "sqltie"'):
+        wallet_backend("sqltie")

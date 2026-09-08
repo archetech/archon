@@ -1,4 +1,4 @@
-import { defaultWalletFile, directoryWallets, homeWalletPath, legacyWalletPath, resolveWalletPath, splitWalletPath, strandedWallet, strandedWalletMessage, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
+import { defaultWalletFile, walletBackend, directoryWallets, homeWalletPath, legacyWalletPath, resolveWalletPath, splitWalletPath, strandedWallet, strandedWalletMessage, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
 
 // A globally installed CLI resolving ./wallet.json ties the identity to
 // whichever directory it was created in, and the passphrase that unlocks it is
@@ -184,5 +184,25 @@ describe('strandedWallet', () => {
         expect(message).toContain('./wallet.json');
         expect(message).toContain('data/wallet.json');
         expect(message).toContain('ARCHON_WALLET_PATH');
+    });
+});
+
+describe('walletBackend', () => {
+    it('reads an unset or empty value as JSON', () => {
+        expect(walletBackend(undefined)).toBe('json');
+        expect(walletBackend('')).toBe('json');
+    });
+
+    it('takes the two backends it documents', () => {
+        expect(walletBackend('json')).toBe('json');
+        expect(walletBackend('sqlite')).toBe('sqlite');
+    });
+
+    // Falling through to JSON hands a SQLite user an empty JSON wallet and an
+    // offer to create a second identity, which is the failure the location
+    // rules exist to prevent.
+    it('refuses a value it does not know rather than choosing for the caller', () => {
+        expect(() => walletBackend('sqltie')).toThrow('Unsupported ARCHON_WALLET_TYPE "sqltie"');
+        expect(() => walletBackend('mongo')).toThrow('Unsupported ARCHON_WALLET_TYPE');
     });
 });

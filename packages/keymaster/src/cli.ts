@@ -13,7 +13,7 @@ import { openWalletStore } from './db/open.js';
 import os from 'os';
 import { createInterface } from 'readline';
 import { WalletNotFoundError } from '@didcid/common/errors';
-import { ARCHON_HOME_DIRECTORY, directoryWallets, homeWalletPath, resolveWalletPath, walletNotFoundMessage } from './wallet-location.js';
+import { ARCHON_HOME_DIRECTORY, directoryWallets, homeWalletPath, resolveWalletPath, walletBackend, walletNotFoundMessage, type WalletBackend } from './wallet-location.js';
 import { missingPassphraseMessage, resolvePassphrase, type ResolvedPassphrase } from './passphrase.js';
 
 dotenv.config();
@@ -2364,7 +2364,16 @@ async function run() {
         process.env.ARCHON_NODE_URL ||
         process.env.ARCHON_GATEKEEPER_URL ||
         'http://localhost:4224';
-    const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
+    let walletType: WalletBackend;
+
+    try {
+        walletType = walletBackend(process.env.ARCHON_WALLET_TYPE);
+    }
+    catch (error: any) {
+        console.error(`Error: ${error.message || error}`);
+        process.exit(1);
+    }
+
     const homeWallet = homeWalletPath(os.homedir(), walletType);
     const walletPath = resolveWalletPath({
         env: process.env,

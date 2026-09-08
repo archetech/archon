@@ -84,6 +84,23 @@ def saved_passphrase_file() -> str:
     return str(Path.home() / ARCHON_HOME_DIRECTORY / "passphrase")
 
 
+def wallet_backend(value: str | None) -> str:
+    """Which store ARCHON_WALLET_TYPE asks for.
+
+    Anything that is not ``sqlite`` selected JSON, so a typo opened a JSON
+    wallet for someone who has a SQLite one and offered them a new identity --
+    the silent second wallet the location rules exist to prevent. Mirrors the
+    TypeScript walletBackend, message included.
+    """
+    if value in (None, "", "json"):
+        return "json"
+
+    if value == "sqlite":
+        return "sqlite"
+
+    raise ValueError(f'Unsupported ARCHON_WALLET_TYPE "{value}"')
+
+
 def default_wallet_file(wallet_type: str) -> str:
     """SQLite's own default is wallet.db, which the CLI never reaches.
 
@@ -1773,7 +1790,12 @@ async def _run(args: argparse.Namespace) -> int:
         or os.environ.get("ARCHON_GATEKEEPER_URL")
         or "http://localhost:4224"
     )
-    wallet_type = os.environ.get("ARCHON_WALLET_TYPE", "json")
+    try:
+        wallet_type = wallet_backend(os.environ.get("ARCHON_WALLET_TYPE"))
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
     home_wallet = home_wallet_path(str(Path.home()), wallet_type)
     wallet_path = resolve_wallet_path(
         os.environ,
