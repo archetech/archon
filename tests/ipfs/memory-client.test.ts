@@ -1,4 +1,4 @@
-import MemoryClient from '@didcid/ipfs/memory';
+import MemoryClient, { BlockNotFoundError } from '@didcid/ipfs/memory';
 import { generateCID } from '@didcid/ipfs/utils';
 
 describe('MemoryClient', () => {
@@ -35,6 +35,22 @@ describe('MemoryClient', () => {
         const ipfs = new MemoryClient();
 
         await expect(ipfs.getJSON(await generateCID({ never: 'stored' }))).resolves.toBeNull();
+    });
+
+    // The other readers return `string` and `Buffer`, which cannot say "no such
+    // block". Empty would read as content, and the routes over them answer 200
+    // with an empty body instead of reporting the miss.
+    it('raises for content it does not hold, rather than reading as empty', async () => {
+        const ipfs = new MemoryClient();
+        const missing = await generateCID('never stored');
+
+        await expect(ipfs.getText(missing)).rejects.toThrow(BlockNotFoundError);
+        await expect(ipfs.getData(missing)).rejects.toThrow(BlockNotFoundError);
+        await expect((async () => {
+            for await (const chunk of ipfs.getDataStream(missing)) {
+                void chunk;
+            }
+        })()).rejects.toThrow(BlockNotFoundError);
     });
 
     it('rebuilds a stream into one block, and streams it back', async () => {
@@ -90,6 +106,6 @@ describe('MemoryClient', () => {
         const cid = await ipfs.addText('gone after stop');
         await ipfs.stop();
 
-        expect(await ipfs.getText(cid)).toBe('');
+        await expect(ipfs.getText(cid)).rejects.toThrow(BlockNotFoundError);
     });
 });

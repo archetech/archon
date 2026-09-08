@@ -1,6 +1,15 @@
 import * as jsonCodec from 'multiformats/codecs/json';
+import { ArchonError } from '@didcid/common/errors';
 import { IPFSClient } from './types.js';
 import { generateCID } from './utils.js';
+
+export class BlockNotFoundError extends ArchonError {
+    static type = 'Block not found';
+
+    constructor(cid: string) {
+        super(`${BlockNotFoundError.type}: ${cid}`);
+    }
+}
 
 // An IPFSClient backed by a Map, for tests and for anything that wants content
 // addressing without a node. The Gatekeeper requires an IPFSClient, so a suite
@@ -26,6 +35,20 @@ export default class MemoryClient implements IPFSClient {
     // Copied in, because a CID promises its bytes do not change. addData is
     // handed the caller's Buffer, and keeping the reference would let them
     // rewrite the content behind an address already computed from it.
+    // Absent content raises rather than reading as empty: `Promise<string>`
+    // cannot say "no such block", and a node would fail this lookup too. The
+    // routes over these methods report the throw, and would answer 200 with an
+    // empty body otherwise.
+    private require(cid: string): Uint8Array {
+        const bytes = this.blocks.get(cid);
+
+        if (bytes === undefined) {
+            throw new BlockNotFoundError(cid);
+        }
+
+        return bytes;
+    }
+
     private async put(bytes: Uint8Array, key: any): Promise<string> {
         const cid = await generateCID(key);
         this.blocks.set(cid, Uint8Array.from(bytes));
@@ -38,9 +61,7 @@ export default class MemoryClient implements IPFSClient {
     }
 
     async getText(cid: string): Promise<string> {
-        const bytes = this.blocks.get(cid);
-
-        return bytes === undefined ? '' : new TextDecoder().decode(bytes);
+        return new TextDecoder().decode(this.require(cid));
     }
 
     async addData(data: Buffer): Promise<string> {
@@ -48,9 +69,7 @@ export default class MemoryClient implements IPFSClient {
     }
 
     async getData(cid: string): Promise<Buffer> {
-        const bytes = this.blocks.get(cid);
-
-        return bytes === undefined ? Buffer.alloc(0) : Buffer.from(bytes);
+        return Buffer.from(this.require(cid));
     }
 
     async addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string> {
@@ -66,11 +85,7 @@ export default class MemoryClient implements IPFSClient {
     // Copied out for the same reason getData copies: a consumer that writes
     // through the chunk it was yielded would edit the stored block.
     async *getDataStream(cid: string): AsyncIterable<Uint8Array> {
-        const bytes = this.blocks.get(cid);
-
-        if (bytes !== undefined) {
-            yield Uint8Array.from(bytes);
-        }
+        yield Uint8Array.from(this.require(cid));
     }
 
     async addJSON(json: any): Promise<string> {
