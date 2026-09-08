@@ -247,3 +247,125 @@ describe('wallet-optional command policy', () => {
         }
     });
 });
+
+// Both CLIs are meant to open one wallet on one machine, which holds only while
+// they agree on where a wallet lives and what it is called. Each suite pins
+// those rules as its own literals -- the SQLite candidate list is asserted
+// separately in wallet-location.test.ts and test_wallet_location.py -- so a
+// change made on one side and updated in its own test leaves the other silently
+// resolving somewhere else, with both suites green (#1075).
+describe('wallet location rules', () => {
+    const walletLocation = readSource('packages/keymaster/src/wallet-location.ts');
+
+    // A scanner, not a pattern: both files name the same paths in prose, and
+    // `./wallet.json` inside a comment is not a rule. Telling the two apart
+    // means tracking comments, docstrings and string state, which is what a
+    // pattern over the raw text cannot do.
+    function stringLiterals(source: string): string[] {
+        const found: string[] = [];
+        let index = 0;
+
+        while (index < source.length) {
+            const rest = source.slice(index);
+
+            if (rest.startsWith('//') || rest.startsWith('#')) {
+                const end = source.indexOf('\n', index);
+                index = end === -1 ? source.length : end;
+                continue;
+            }
+
+            if (rest.startsWith('/*')) {
+                const end = source.indexOf('*/', index + 2);
+                index = end === -1 ? source.length : end + 2;
+                continue;
+            }
+
+            // Docstrings carry the same prose as comments, and are not rules.
+            const triple = ['"""', "'''"].find(quote => rest.startsWith(quote));
+            if (triple) {
+                const end = source.indexOf(triple, index + 3);
+                index = end === -1 ? source.length : end + 3;
+                continue;
+            }
+
+            const quote = ['"', "'", '`'].find(mark => rest.startsWith(mark));
+            if (quote) {
+                let cursor = index + 1;
+                let value = '';
+
+                while (cursor < source.length && source[cursor] !== quote) {
+                    if (source[cursor] === '\\') {
+                        value += source[cursor + 1] ?? '';
+                        cursor += 2;
+                        continue;
+                    }
+                    value += source[cursor];
+                    cursor += 1;
+                }
+
+                found.push(value);
+                index = cursor + 1;
+                continue;
+            }
+
+            index += 1;
+        }
+
+        return found;
+    }
+
+    // `${walletPath}` and `{wallet_path}` say the same thing about the same
+    // value; the name each language gives it is not the rule.
+    function rules(body: string): string[] {
+        return stringLiterals(body)
+            .map(literal => literal.replace(/\$\{[^}]*\}/g, '{}').replace(/\{[^}]*\}/g, '{}'))
+            .sort();
+    }
+
+    function typescriptBody(name: string): string {
+        const start = walletLocation.indexOf(`export function ${name}(`);
+        const end = walletLocation.indexOf('\n}', start);
+
+        return start === -1 ? '' : walletLocation.slice(start, end);
+    }
+
+    function pythonBody(name: string): string {
+        const start = pythonCli.indexOf(`def ${name}(`);
+        const end = pythonCli.indexOf('\ndef ', start + 1);
+
+        return start === -1 ? '' : pythonCli.slice(start, end === -1 ? undefined : end);
+    }
+
+    // Where a wallet is, what it is called, and what the CLI says when it is
+    // not there. Functions whose rule is not written as a literal on both sides
+    // are left out: resolveWalletPath reads ARCHON_WALLET_PATH as a property in
+    // TypeScript and as a string in Python, so comparing them compares syntax.
+    const PAIRS = [
+        ['defaultWalletFile', 'default_wallet_file'],
+        ['directoryWallets', 'directory_wallets'],
+        ['legacyWalletPath', 'legacy_wallet_path'],
+        ['walletBackend', 'wallet_backend'],
+        ['walletNotFoundMessage', 'wallet_not_found_message'],
+        ['strandedWalletMessage', 'stranded_wallet_message'],
+    ] as const;
+
+    it('finds the rules it means to compare', () => {
+        for (const [typescript, python] of PAIRS) {
+            expect(typescriptBody(typescript)).not.toBe('');
+            expect(pythonBody(python)).not.toBe('');
+        }
+
+        expect(rules(typescriptBody('directoryWallets'))).toContain('./wallet.db');
+        expect(rules(typescriptBody('walletNotFoundMessage')).length).toBeGreaterThanOrEqual(4);
+    });
+
+    it.each(PAIRS)('%s and %s state the same rule', (typescript, python) => {
+        expect(rules(pythonBody(python))).toStrictEqual(rules(typescriptBody(typescript)));
+    });
+
+    it('keeps the wallet in the same home directory', () => {
+        const home = /ARCHON_HOME_DIRECTORY\s*=\s*["'](.+?)["']/;
+
+        expect(pythonCli.match(home)?.[1]).toBe(walletLocation.match(home)?.[1]);
+    });
+});

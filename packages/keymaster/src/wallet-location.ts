@@ -13,6 +13,25 @@ import path from 'path';
 
 export const ARCHON_HOME_DIRECTORY = '.archon';
 
+export type WalletBackend = 'json' | 'sqlite';
+
+// The two backends, and nothing else. Reading an unknown value as JSON would
+// open an empty JSON wallet for someone whose wallet is SQLite, and offer them
+// a new identity -- the silent second wallet these rules exist to prevent, off
+// a typo in ARCHON_WALLET_TYPE.
+export function walletBackend(value: string | undefined): WalletBackend {
+    switch (value) {
+    case undefined:
+    case '':
+    case 'json':
+        return 'json';
+    case 'sqlite':
+        return 'sqlite';
+    default:
+        throw new Error(`Unsupported ARCHON_WALLET_TYPE "${value}"`);
+    }
+}
+
 // SQLite's own default is wallet.db, which the CLI never reaches because it
 // always passes a path. Without a name per backend, a SQLite database is
 // written under a .json one.
