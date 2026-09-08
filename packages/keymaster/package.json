@@ -55,6 +55,11 @@
       "require": "./dist/cjs/db/json.cjs",
       "types": "./dist/types/db/json.d.ts"
     },
+    "./wallet/open": {
+      "import": "./dist/esm/db/open.js",
+      "require": "./dist/cjs/db/open.cjs",
+      "types": "./dist/types/db/open.d.ts"
+    },
     "./wallet/json-memory": {
       "import": "./dist/esm/db/json-memory.js",
       "require": "./dist/cjs/db/json-memory.cjs",
@@ -117,6 +122,9 @@
       ],
       "wallet/json": [
         "./dist/types/db/json.d.ts"
+      ],
+      "wallet/open": [
+        "./dist/types/db/open.d.ts"
       ],
       "wallet/json-memory": [
         "./dist/types/db/json-memory.d.ts"

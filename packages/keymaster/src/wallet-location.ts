@@ -26,22 +26,64 @@ export function homeWalletPath(homeDirectory: string, walletType: string): strin
 
 // What to look for in the working directory, in the order it should win.
 // Some SQLite wallets are named wallet.json, those are the ones holding an
-// identity, and nothing about the name says which backend wrote it.
+// identity, and nothing about the name says which backend wrote it. The
+// data/ entries follow, because a SQLite wallet may still be sitting where an
+// earlier release put it and its owner has nothing in the directory itself.
 export function directoryWallets(walletType: string): string[] {
-    return walletType === 'sqlite' ? ['./wallet.json', './wallet.db'] : ['./wallet.json'];
+    const here = walletType === 'sqlite' ? ['./wallet.json', './wallet.db'] : ['./wallet.json'];
+    const legacy = here
+        .map(candidate => legacyWalletPath(walletType, candidate))
+        .filter((candidate): candidate is string => candidate !== undefined);
+
+    return [...here, ...legacy];
 }
 
-// Where a backend keeps the wallet it is handed. The JSON one uses the path as
-// given; the SQLite one treats a relative one as a name under its own data
-// folder, so `./wallet.json` is stored at `data/wallet.json`.
+// Where a wallet ended up when a relative path was handed to the SQLite store
+// as a *name*, which hung it under the store's own data folder: `./wallet.json`
+// was written to `data/wallet.json` (#1073).
 //
-// Asking whether a wallet is already in the working directory means asking
-// where that backend would have put it. Looking at the name instead reports no
-// wallet to a SQLite user who has one, and sends them to the home default.
-export function storedAt(walletType: string, walletPath: string): string {
+// Nothing resolves through this. It finds wallets written before a path meant a
+// path, so they keep opening and so the "no wallet" message can name one it can
+// see. Delete it, and its two callers, once those wallets have moved.
+export function legacyWalletPath(walletType: string, walletPath: string): string | undefined {
     return walletType === 'sqlite' && !path.isAbsolute(walletPath)
         ? path.join('data', walletPath)
-        : walletPath;
+        : undefined;
+}
+
+// A store takes the folder and the name separately; every caller resolving
+// ARCHON_WALLET_PATH has one path. Splitting it here keeps each caller from
+// deciding for itself what a path handed to a store means.
+export function splitWalletPath(walletPath: string): { directory: string, file: string } {
+    return {
+        directory: path.dirname(walletPath),
+        file: path.basename(walletPath),
+    };
+}
+
+// A wallet is stranded when the path in hand holds nothing and one is readable
+// where an earlier release put it. Answered before a store is opened, because
+// opening creates the file and provisioning then mints a second identity on top
+// of a wallet the owner still has.
+export function strandedWallet(
+    walletType: string,
+    walletPath: string,
+    exists: (candidate: string) => boolean,
+): string | undefined {
+    if (exists(walletPath)) {
+        return undefined;
+    }
+
+    const legacy = legacyWalletPath(walletType, walletPath);
+
+    return legacy && exists(legacy) ? legacy : undefined;
+}
+
+export function strandedWalletMessage(walletPath: string, foundAt: string): string {
+    return [
+        `no wallet at ${walletPath}, and a wallet is still at ${foundAt}, where earlier releases put it.`,
+        `Move it to ${walletPath}, or point ARCHON_WALLET_PATH there.`,
+    ].join('\n');
 }
 
 export interface WalletLocation {

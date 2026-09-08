@@ -9,12 +9,11 @@ import Keymaster from './keymaster.js';
 import DrawbridgeClient from '@didcid/clients/drawbridge';
 import CipherNode from '@didcid/cipher/node';
 import type { DidCommEnc } from '@didcid/cipher/didcomm';
-import WalletJson from './db/json.js';
-import WalletSQLite from './db/sqlite.js';
+import { openWalletStore } from './db/open.js';
 import os from 'os';
 import { createInterface } from 'readline';
 import { WalletNotFoundError } from '@didcid/common/errors';
-import { ARCHON_HOME_DIRECTORY, directoryWallets, homeWalletPath, resolveWalletPath, storedAt, walletNotFoundMessage } from './wallet-location.js';
+import { ARCHON_HOME_DIRECTORY, directoryWallets, homeWalletPath, resolveWalletPath, walletNotFoundMessage } from './wallet-location.js';
 import { missingPassphraseMessage, resolvePassphrase, type ResolvedPassphrase } from './passphrase.js';
 
 dotenv.config();
@@ -2371,7 +2370,7 @@ async function run() {
         env: process.env,
         directoryWallets: directoryWallets(walletType),
         homeWallet,
-        exists: (candidate) => fs.existsSync(storedAt(walletType, candidate)),
+        exists: (candidate) => fs.existsSync(candidate),
     });
     const defaultRegistry = process.env.ARCHON_DEFAULT_REGISTRY;
     // stdin decides whether there is anyone to answer. stdout may be a pipe
@@ -2416,15 +2415,7 @@ async function run() {
         });
 
         // Initialize wallet
-        let wallet;
-        if (walletType === 'sqlite') {
-            wallet = await WalletSQLite.create(walletPath);
-        } else {
-            // WalletJson expects (filename, folder) - parse the path
-            const walletDir = path.dirname(walletPath);
-            const walletFile = path.basename(walletPath);
-            wallet = new WalletJson(walletFile, walletDir);
-        }
+        const wallet = await openWalletStore(walletType, walletPath);
 
         // Initialize cipher
         const cipher = new CipherNode();

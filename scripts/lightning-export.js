@@ -13,19 +13,17 @@
 
 import fs from 'fs';
 import os from 'os';
-import path from 'path';
-import { directoryWallets, homeWalletPath, resolveWalletPath, storedAt } from '@didcid/keymaster/wallet-location';
+import { directoryWallets, homeWalletPath, resolveWalletPath } from '@didcid/keymaster/wallet-location';
 import { WalletNotFoundError } from '@didcid/common/errors';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
-import WalletJson from '@didcid/keymaster/wallet/json';
-import WalletSQLite from '@didcid/keymaster/wallet/sqlite';
+import { openWalletStore } from '@didcid/keymaster/wallet/open';
 
 const walletPath = process.argv[2] || resolveWalletPath({
     env: process.env,
     directoryWallets: directoryWallets(process.env.ARCHON_WALLET_TYPE || 'json'),
     homeWallet: homeWalletPath(os.homedir(), process.env.ARCHON_WALLET_TYPE || 'json'),
-    exists: (candidate) => fs.existsSync(storedAt(process.env.ARCHON_WALLET_TYPE || 'json', candidate)),
+    exists: (candidate) => fs.existsSync(candidate),
 });
 const walletType = process.env.ARCHON_WALLET_TYPE || 'json';
 // A node sets this under its older name; read that too (#1020).
@@ -42,14 +40,7 @@ const gatekeeper = new Proxy({}, {
 });
 
 try {
-    let wallet;
-    if (walletType === 'sqlite') {
-        wallet = await WalletSQLite.create(walletPath);
-    } else {
-        const walletDir = path.dirname(walletPath);
-        const walletFile = path.basename(walletPath);
-        wallet = new WalletJson(walletFile, walletDir);
-    }
+    const wallet = await openWalletStore(walletType, walletPath);
 
     const cipher = new CipherNode();
     const keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase });

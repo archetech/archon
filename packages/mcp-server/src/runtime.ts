@@ -2,9 +2,8 @@ import path from 'path';
 import CipherNode from '@didcid/cipher/node';
 import DrawbridgeClient from '@didcid/clients/drawbridge';
 import Keymaster from '@didcid/keymaster';
-import WalletJson from '@didcid/keymaster/wallet/json';
-import WalletSQLite from '@didcid/keymaster/wallet/sqlite';
-import { McpServerConfig, walletLocation } from './config.js';
+import { openWalletStore } from '@didcid/keymaster/wallet/open';
+import { McpServerConfig } from './config.js';
 
 export interface ArchonRuntime {
     node: DrawbridgeClient;
@@ -22,13 +21,7 @@ export function requireKeymaster(runtime: ArchonRuntime): Keymaster {
 }
 
 export async function createWallet(config: McpServerConfig) {
-    const { directory, file } = walletLocation(config.walletPath);
-
-    if (config.walletType === 'sqlite') {
-        return WalletSQLite.create(file, directory);
-    }
-
-    return new WalletJson(file, directory);
+    return openWalletStore(config.walletType, config.walletPath);
 }
 
 export async function createArchonRuntime(config: McpServerConfig): Promise<ArchonRuntime> {

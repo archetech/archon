@@ -1,7 +1,6 @@
 import fs from 'fs';
 import os from 'os';
-import path from 'path';
-import { directoryWallets, homeWalletPath, resolveWalletPath, type WalletLocation } from '@didcid/keymaster/wallet-location';
+import { directoryWallets, homeWalletPath, resolveWalletPath, splitWalletPath, type WalletLocation } from '@didcid/keymaster/wallet-location';
 
 export type WalletType = 'json' | 'sqlite';
 
@@ -74,9 +73,6 @@ export function loadConfig(
             env,
             directoryWallets: directoryWallets(walletType),
             homeWallet: homeWalletPath(os.homedir(), walletType),
-            // Plain existence, unlike the CLI: createArchonRuntime splits this
-            // path and hands the parts to the backend, so a relative one opens
-            // where it says rather than under the backend's own folder.
             exists: (candidate: string) => fs.existsSync(candidate),
             ...location,
         }),
@@ -89,8 +85,5 @@ export function loadConfig(
 }
 
 export function walletLocation(walletPath: string): { directory: string; file: string } {
-    return {
-        directory: path.dirname(walletPath),
-        file: path.basename(walletPath),
-    };
+    return splitWalletPath(walletPath);
 }

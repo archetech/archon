@@ -1,4 +1,4 @@
-import { defaultWalletFile, directoryWallets, homeWalletPath, resolveWalletPath, storedAt, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
+import { defaultWalletFile, directoryWallets, homeWalletPath, legacyWalletPath, resolveWalletPath, splitWalletPath, strandedWallet, strandedWalletMessage, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
 
 // A globally installed CLI resolving ./wallet.json ties the identity to
 // whichever directory it was created in, and the passphrase that unlocks it is
@@ -42,6 +42,21 @@ describe('resolveWalletPath', () => {
         expect(resolveWalletPath(location({}, () => false, 'sqlite'))).toBe('/home/someone/.archon/wallet.db');
     });
 
+    // A SQLite wallet made before a path meant a path is under data/, and the
+    // working directory holds nothing. Missing it hands its owner a new
+    // identity in the home directory and leaves the funded one behind.
+    it('finds a SQLite wallet left under the data folder', () => {
+        const chosen = resolveWalletPath(location({}, (candidate) => candidate === 'data/wallet.json', 'sqlite'));
+
+        expect(chosen).toBe('data/wallet.json');
+    });
+
+    // The candidate is opened by splitting it, so what resolution found has to
+    // be the file the store then reads.
+    it('resolves a legacy candidate to the file it was found at', () => {
+        expect(splitWalletPath('data/wallet.json')).toStrictEqual({ directory: 'data', file: 'wallet.json' });
+    });
+
     it('obeys an explicit path over both', () => {
         const chosen = resolveWalletPath(location({ ARCHON_WALLET_PATH: '/srv/keys/wallet.json' }, () => true));
 
@@ -71,8 +86,13 @@ describe('defaultWalletFile', () => {
 describe('directoryWallets', () => {
     // Some SQLite wallets are named wallet.json and those hold an identity, so
     // that name is looked for first.
-    it('looks for the older SQLite name before the corrected one', () => {
-        expect(directoryWallets('sqlite')).toStrictEqual(['./wallet.json', './wallet.db']);
+    it('looks for the older SQLite name before the corrected one, and both under data/', () => {
+        expect(directoryWallets('sqlite')).toStrictEqual([
+            './wallet.json',
+            './wallet.db',
+            'data/wallet.json',
+            'data/wallet.db',
+        ]);
     });
 
     it('has one name for the JSON backend', () => {
@@ -80,19 +100,33 @@ describe('directoryWallets', () => {
     });
 });
 
-describe('storedAt', () => {
-    it('is the path itself for the JSON backend', () => {
-        expect(storedAt('json', './wallet.json')).toBe('./wallet.json');
+describe('legacyWalletPath', () => {
+    // A relative path was passed to the SQLite store as a name, so the store
+    // hung it under its own data folder.
+    it('names where a relative SQLite path used to be written', () => {
+        expect(legacyWalletPath('sqlite', './wallet.json')).toBe('data/wallet.json');
     });
 
-    // Asking the name instead reports no wallet to a SQLite user who has one,
-    // and sends them to the home default.
-    it('is under the data folder for a relative SQLite path', () => {
-        expect(storedAt('sqlite', './wallet.json')).toBe('data/wallet.json');
+    // Nothing moved for these, so pointing at a second location would send
+    // their owners looking for a wallet that was never there.
+    it('has nowhere older to offer for JSON or for an absolute path', () => {
+        expect(legacyWalletPath('json', './wallet.json')).toBeUndefined();
+        expect(legacyWalletPath('sqlite', '/home/someone/.archon/wallet.db')).toBeUndefined();
+    });
+});
+
+describe('splitWalletPath', () => {
+    // Passing a path whole is what made it mean one thing under JSON and
+    // another under SQLite.
+    it('separates the folder from the name a store is constructed with', () => {
+        expect(splitWalletPath('/home/someone/.archon/wallet.db')).toStrictEqual({
+            directory: '/home/someone/.archon',
+            file: 'wallet.db',
+        });
     });
 
-    it('leaves an absolute SQLite path alone', () => {
-        expect(storedAt('sqlite', '/home/someone/.archon/wallet.json')).toBe('/home/someone/.archon/wallet.json');
+    it('keeps a bare name in the working directory', () => {
+        expect(splitWalletPath('./wallet.json')).toStrictEqual({ directory: '.', file: 'wallet.json' });
     });
 });
 
@@ -117,5 +151,38 @@ describe('walletNotFoundMessage', () => {
 
         expect(lines.join(' ')).toContain(HOME_WALLET);
         expect(lines.filter(line => line.includes('unless ARCHON_WALLET_PATH'))).toHaveLength(0);
+    });
+});
+
+describe('strandedWallet', () => {
+    const at = (...found: string[]) => (candidate: string) => found.includes(candidate);
+
+    // Provisioning commands never reach the "no wallet" message, so nothing
+    // downstream of opening the store can stop create-wallet or create-id
+    // minting a second identity while the funded one sits under data/.
+    it('reports a wallet left where an earlier release put it', () => {
+        expect(strandedWallet('sqlite', './wallet.json', at('data/wallet.json'))).toBe('data/wallet.json');
+    });
+
+    it('says nothing when the path in hand holds a wallet', () => {
+        expect(strandedWallet('sqlite', './wallet.json', at('./wallet.json', 'data/wallet.json'))).toBeUndefined();
+    });
+
+    // A first wallet has to be creatable, so an empty path with nothing older
+    // behind it is not stranded.
+    it('says nothing when there is no older wallet either', () => {
+        expect(strandedWallet('sqlite', './wallet.json', at())).toBeUndefined();
+    });
+
+    it('says nothing for a backend that never moved a wallet', () => {
+        expect(strandedWallet('json', './wallet.json', at('data/wallet.json'))).toBeUndefined();
+    });
+
+    it('names both paths and how to reconcile them', () => {
+        const message = strandedWalletMessage('./wallet.json', 'data/wallet.json');
+
+        expect(message).toContain('./wallet.json');
+        expect(message).toContain('data/wallet.json');
+        expect(message).toContain('ARCHON_WALLET_PATH');
     });
 });
