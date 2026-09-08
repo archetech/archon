@@ -3,7 +3,7 @@ import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 
 // §6.5 of the whitepaper tells controllers that revoking a DID does not erase
 // what was published under it, and that anything written to didDocumentData
@@ -15,12 +15,12 @@ import HeliaClient from '@didcid/ipfs/helia';
 // lifecycle management", one bullet below a promise that full version history
 // is preserved -- an invitation to read revocation as deletion (#772).
 
-let ipfs: HeliaClient;
+let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
 let keymaster: Keymaster;
 
 beforeAll(async () => {
-    ipfs = new HeliaClient();
+    ipfs = new MemoryClient();
     await ipfs.start();
 });
 

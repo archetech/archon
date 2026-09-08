@@ -2,7 +2,7 @@ import { BlockInfo } from '@didcid/gatekeeper/types';
 import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import { ExpectedExceptionError } from '@didcid/common/errors';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import { generateCID } from '@didcid/ipfs/utils';
 
 const mockConsole = {
@@ -13,7 +13,7 @@ const mockConsole = {
 } as unknown as typeof console;
 
 const db = new DbJsonMemory('test');
-const ipfs = new HeliaClient();
+const ipfs = new MemoryClient();
 const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet'] });
 
 beforeAll(async () => {

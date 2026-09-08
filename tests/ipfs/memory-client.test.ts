@@ -1,0 +1,105 @@
+import MemoryClient, { BlockNotFoundError } from '@didcid/ipfs/memory';
+import { generateCID } from '@didcid/ipfs/utils';
+
+describe('MemoryClient', () => {
+    // The Gatekeeper mints a DID from the CID addJSON returns, and KuboClient
+    // computes that CID the same way -- json codec, sha256, CIDv1. A store that
+    // addressed JSON differently would hand the tests DIDs a node would never
+    // produce.
+    it('addresses JSON the way a node does', async () => {
+        const operation = { type: 'create', created: '2026-01-01T00:00:00Z' };
+        const ipfs = new MemoryClient();
+
+        expect(await ipfs.addJSON(operation)).toBe(await generateCID(operation));
+    });
+
+    it('reads back what it stored', async () => {
+        const ipfs = new MemoryClient();
+        const json = { hello: 'world', nested: { list: [1, 2, 3] } };
+
+        expect(await ipfs.getJSON(await ipfs.addJSON(json))).toStrictEqual(json);
+        expect(await ipfs.getText(await ipfs.addText('some text'))).toBe('some text');
+        expect(await ipfs.getData(await ipfs.addData(Buffer.from([1, 2, 3])))).toStrictEqual(Buffer.from([1, 2, 3]));
+    });
+
+    it('gives equal content one address', async () => {
+        const ipfs = new MemoryClient();
+
+        expect(await ipfs.addJSON({ a: 1 })).toBe(await ipfs.addJSON({ a: 1 }));
+        expect(await ipfs.addText('x')).not.toBe(await ipfs.addText('y'));
+    });
+
+    // What a node does: KuboClient's reads carry a 10s timeout and throw
+    // TimeoutError when nobody has the block -- verified against kubo v0.43.0 --
+    // and Helia's blocked on a local-only node. Answering null or empty here
+    // would let a test pass where production raises.
+    it('raises for content it does not hold, rather than reading as empty', async () => {
+        const ipfs = new MemoryClient();
+        const missing = await generateCID('never stored');
+
+        await expect(ipfs.getJSON(await generateCID({ never: 'stored' }))).rejects.toThrow(BlockNotFoundError);
+        await expect(ipfs.getText(missing)).rejects.toThrow(BlockNotFoundError);
+        await expect(ipfs.getData(missing)).rejects.toThrow(BlockNotFoundError);
+        await expect((async () => {
+            for await (const chunk of ipfs.getDataStream(missing)) {
+                void chunk;
+            }
+        })()).rejects.toThrow(BlockNotFoundError);
+    });
+
+    it('rebuilds a stream into one block, and streams it back', async () => {
+        const ipfs = new MemoryClient();
+        const chunks = [Buffer.from('one '), Buffer.from('two '), Buffer.from('three')];
+
+        async function* source() {
+            for (const chunk of chunks) {
+                yield chunk;
+            }
+        }
+
+        const cid = await ipfs.addDataStream(source());
+        expect(cid).toBe(await ipfs.addData(Buffer.concat(chunks)));
+
+        const read = [];
+        for await (const chunk of ipfs.getDataStream(cid)) {
+            read.push(chunk);
+        }
+
+        expect(Buffer.concat(read).toString()).toBe('one two three');
+    });
+
+    // A CID promises its bytes. addData is handed the caller's Buffer and
+    // getDataStream hands a chunk back, so a store that kept either reference
+    // would let content change under an address already computed from it.
+    it('does not let a caller rewrite what it stored', async () => {
+        const ipfs = new MemoryClient();
+        const data = Buffer.from('original');
+
+        const cid = await ipfs.addData(data);
+        data.write('rewritten');
+
+        expect((await ipfs.getData(cid)).toString()).toBe('original');
+    });
+
+    it('does not let a reader rewrite what it streamed', async () => {
+        const ipfs = new MemoryClient();
+        const cid = await ipfs.addData(Buffer.from('original'));
+
+        for await (const chunk of ipfs.getDataStream(cid)) {
+            Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength).write('rewritten');
+        }
+
+        expect((await ipfs.getData(cid)).toString()).toBe('original');
+    });
+
+    // Suites bracket their work with these, and a store that survived stop()
+    // would carry one test's content into the next.
+    it('starts, stops, and forgets what it held', async () => {
+        const ipfs = new MemoryClient();
+        await ipfs.start();
+        const cid = await ipfs.addText('gone after stop');
+        await ipfs.stop();
+
+        await expect(ipfs.getText(cid)).rejects.toThrow(BlockNotFoundError);
+    });
+});

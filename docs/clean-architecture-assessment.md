@@ -47,7 +47,7 @@ structure mirrors the logical layering, which is itself a good sign.
 
 ```
                     Frameworks & Drivers
-        Express · MongoDB · Redis · SQLite · IPFS (Kubo/Helia)
+        Express · MongoDB · Redis · SQLite · IPFS (Kubo)
         Commander CLI · React · Electron · Browser extension
    ┌──────────────────────────────────────────────────────────┐
    │              Interface Adapters                            │
@@ -55,7 +55,7 @@ structure mirrors the logical layering, which is itself a good sign.
    │  packages/clients/src/keymaster-client.ts   (REST gateway) │
    │  packages/clients/src/gatekeeper-client.ts                 │
    │  packages/*/src/db/*.ts           (storage gateways)       │
-   │  packages/ipfs/src/{kubo,helia}-client.ts                  │
+   │  packages/ipfs/src/{kubo,memory}-client.ts                  │
    │   ┌────────────────────────────────────────────────────┐  │
    │   │           Use Cases / Entities                      │  │
    │   │  packages/keymaster/src/keymaster.ts  (Keymaster)   │  │
@@ -70,7 +70,7 @@ structure mirrors the logical layering, which is itself a good sign.
 | **Entities** (enterprise rules) | Domain types & invariants in [packages/keymaster/src/types.ts](../packages/keymaster/src/types.ts) and [packages/gatekeeper/src/types.ts](../packages/gatekeeper/src/types.ts): `WalletFile`, `IDInfo`, `VerifiableCredential`, `Operation`, `GatekeeperEvent`. Domain errors in [packages/common/src/errors.ts](../packages/common/src/errors.ts). DID-document validity and operation ordering rules live in the core. |
 | **Use Cases** (application rules) | The `Keymaster` class ([packages/keymaster/src/keymaster.ts](../packages/keymaster/src/keymaster.ts)) and `Gatekeeper` class ([packages/gatekeeper/src/gatekeeper.ts](../packages/gatekeeper/src/gatekeeper.ts)) — wallet derivation, credential issuance/verification, DID create/update/resolve, event ordering. |
 | **Interface Adapters** | Express routers ([services/keymaster/server/src/keymaster-api.ts](../services/keymaster/server/src/keymaster-api.ts), [services/gatekeeper/server/src/gatekeeper-api.ts](../services/gatekeeper/server/src/gatekeeper-api.ts)); REST gateways (`KeymasterClient`, `GatekeeperClient`); storage gateways in `packages/*/src/db/`; IPFS gateways. |
-| **Frameworks & Drivers** | Express, MongoDB, Redis, SQLite, Kubo/Helia, Commander CLI ([packages/keymaster/src/cli.ts](../packages/keymaster/src/cli.ts)), React/Electron apps under [apps/](../apps/). |
+| **Frameworks & Drivers** | Express, MongoDB, Redis, SQLite, Kubo, Commander CLI ([packages/keymaster/src/cli.ts](../packages/keymaster/src/cli.ts)), React/Electron apps under [apps/](../apps/). |
 
 The monorepo's package boundary reinforces this: `packages/*` is published as
 versioned libraries (the stable core and its adapters), while `services/*` and
@@ -92,7 +92,7 @@ imports only sibling domain packages (`@didcid/gatekeeper/types`,
 `@didcid/cipher/types`, `@didcid/common/errors`, `@didcid/ipfs/utils`) plus a
 handful of *pure, framework-free* utility libraries (`image-size`,
 `file-type`, `light-bolt11-decoder`, `multiformats`). A grep for
-`express`, `mongodb`, `ioredis`, `redis`, `kubo-rpc-client`, or `helia` against
+`express`, `mongodb`, `ioredis`, `redis`, or `kubo-rpc-client` against
 both core classes returns **nothing**. The web, the database, and the IPFS node
 are invisible to the business logic.
 
@@ -120,7 +120,7 @@ Every boundary the core crosses is expressed as an explicit interface (a
 | --- | --- | --- |
 | `WalletBase` | [keymaster/src/types.ts:272](../packages/keymaster/src/types.ts) | `json`, `json-memory`, `mongo`, `redis`, `sqlite`, `cache`, `chrome`, `web` in [packages/keymaster/src/db/](../packages/keymaster/src/db/) |
 | `GatekeeperDb` | [gatekeeper/src/types.ts:84](../packages/gatekeeper/src/types.ts) | `json`, `json-cache`, `json-memory`, `mongo`, `redis`, `sqlite` in [packages/gatekeeper/src/db/](../packages/gatekeeper/src/db/) |
-| `IPFSClient` | [ipfs/src/types.ts:1](../packages/ipfs/src/types.ts) | [kubo-client.ts](../packages/ipfs/src/kubo-client.ts), [helia-client.ts](../packages/ipfs/src/helia-client.ts) |
+| `IPFSClient` | [ipfs/src/types.ts:1](../packages/ipfs/src/types.ts) | [kubo-client.ts](../packages/ipfs/src/kubo-client.ts), [memory-client.ts](../packages/ipfs/src/memory-client.ts) |
 | `Cipher` | [cipher/src/types.ts:49](../packages/cipher/src/types.ts) | `cipher-node`, `cipher-web` |
 | `KeymasterInterface` | [keymaster/src/types.ts:362](../packages/keymaster/src/types.ts) | in-process `Keymaster`; REST `KeymasterClient` |
 | `GatekeeperInterface` | [gatekeeper/src/types.ts:141](../packages/gatekeeper/src/types.ts) | in-process `Gatekeeper`; REST `GatekeeperClient` |
@@ -232,7 +232,7 @@ Archon's package layout is a good fit for Martin's component principles.
   clients. Tests depend on the core through its public API and do not pin
   implementation details, avoiding the "fragile tests" problem.
 - **Deferred decisions.** The acid test of the architecture: the choice of
-  SQLite vs MongoDB vs Redis, Kubo vs Helia, and local vs remote execution are
+  SQLite vs MongoDB vs Redis, a node vs an in-memory store, and local vs remote execution are
   all runtime configuration, not compile-time facts. These decisions were
   successfully *deferred to the edge*.
 

@@ -30,7 +30,7 @@ const config = {
         '^@didcid/gatekeeper/client$': '<rootDir>/packages/gatekeeper/src/gatekeeper-client.ts',
         '^@didcid/gatekeeper/drawbridge$': '<rootDir>/packages/gatekeeper/src/drawbridge-client.ts',
         '^@didcid/gatekeeper/db/(.*)$': '<rootDir>/packages/gatekeeper/src/db/$1',
-        '^@didcid/ipfs/helia$': '<rootDir>/packages/ipfs/src/helia-client.ts',
+        '^@didcid/ipfs/memory$': '<rootDir>/packages/ipfs/src/memory-client.ts',
         '^@didcid/ipfs/utils$': '<rootDir>/packages/ipfs/src/utils.ts',
         '^@didcid/keymaster/search$': '<rootDir>/packages/keymaster/src/search-client.ts',
         '^@didcid/keymaster$': '<rootDir>/packages/keymaster/src/keymaster.ts',

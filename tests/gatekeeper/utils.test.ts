@@ -4,7 +4,7 @@ import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import { compareOrdinals } from '@didcid/common/utils';
 import { ExpectedExceptionError } from '@didcid/common/errors';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import { isValidDID } from '@didcid/ipfs/utils';
 import TestHelper from './helper.ts';
 
@@ -17,7 +17,7 @@ const mockConsole = {
 
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
-const ipfs = new HeliaClient();
+const ipfs = new MemoryClient();
 const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet'] });
 const helper = new TestHelper(gatekeeper, cipher);
 

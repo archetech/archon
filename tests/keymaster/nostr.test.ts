@@ -4,7 +4,7 @@ import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { UnknownIDError } from '@didcid/common/errors';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import { bech32 } from 'bech32';
 // Deliberately a DIFFERENT copy of @noble/curves than the one that signed:
 // packages/cipher pins 1.9.7, and this resolves the root's 2.x. Nostr
@@ -22,14 +22,14 @@ import { bech32 } from 'bech32';
 // 1.x still resolved the extensionless specifier.
 import { schnorr } from '@noble/curves/secp256k1.js';
 
-let ipfs: HeliaClient;
+let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
 let wallet: WalletJsonMemory;
 let cipher: CipherNode;
 let keymaster: Keymaster;
 
 beforeAll(async () => {
-    ipfs = new HeliaClient();
+    ipfs = new MemoryClient();
     await ipfs.start();
 });
 

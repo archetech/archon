@@ -1,8 +1,8 @@
 
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import * as uuid from 'uuid';
 
-const ipfs = new HeliaClient();
+const ipfs = new MemoryClient();
 
 console.time('start');
 await ipfs.start();
