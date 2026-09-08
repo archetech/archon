@@ -116,10 +116,6 @@ describe('native prebuild seeding', () => {
         // tells prebuild-install to look there. Each module is checked by name,
         // so wiring up only one of two modules cannot pass.
         //
-        // TARGETS is empty today, so the per-module half of this is dormant.
-        // The half that pairs the COPY with a pointer is not: it still catches
-        // an image wired up on one side only, which is the state the images are
-        // in while they point at a module nothing installs any more.
         const expected = expectedPrebuildVars();
         const problems: string[] = [];
 
@@ -177,8 +173,10 @@ describe('prefetch covers every installed version', () => {
     });
 
     // A target no lockfile installs seeds a file nothing will ever ask for, and
-    // the build still succeeds -- so nothing else would say. Vacuous while
-    // TARGETS is empty, which it is: the one entry came in with Helia.
+    // the build still succeeds -- so nothing else would say. This caught the
+    // list still naming @ipshipyard/node-datachannel after Helia left with it
+    // (#1080); the package that needs seeding now is upstream node-datachannel,
+    // which filecoin-pin brings to the Filecoin wallet.
     it('seeds only packages something actually installs', () => {
         expect(TARGETS.filter(name => versionsOf(name).size === 0)).toStrictEqual([]);
     });
