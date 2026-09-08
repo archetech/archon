@@ -23,9 +23,12 @@ export default class MemoryClient implements IPFSClient {
         this.blocks.clear();
     }
 
+    // Copied in, because a CID promises its bytes do not change. addData is
+    // handed the caller's Buffer, and keeping the reference would let them
+    // rewrite the content behind an address already computed from it.
     private async put(bytes: Uint8Array, key: any): Promise<string> {
         const cid = await generateCID(key);
-        this.blocks.set(cid, bytes);
+        this.blocks.set(cid, Uint8Array.from(bytes));
 
         return cid;
     }
@@ -60,11 +63,13 @@ export default class MemoryClient implements IPFSClient {
         return this.addData(Buffer.concat(chunks));
     }
 
+    // Copied out for the same reason getData copies: a consumer that writes
+    // through the chunk it was yielded would edit the stored block.
     async *getDataStream(cid: string): AsyncIterable<Uint8Array> {
         const bytes = this.blocks.get(cid);
 
         if (bytes !== undefined) {
-            yield bytes;
+            yield Uint8Array.from(bytes);
         }
     }
 

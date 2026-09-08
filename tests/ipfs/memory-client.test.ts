@@ -58,6 +58,30 @@ describe('MemoryClient', () => {
         expect(Buffer.concat(read).toString()).toBe('one two three');
     });
 
+    // A CID promises its bytes. addData is handed the caller's Buffer and
+    // getDataStream hands a chunk back, so a store that kept either reference
+    // would let content change under an address already computed from it.
+    it('does not let a caller rewrite what it stored', async () => {
+        const ipfs = new MemoryClient();
+        const data = Buffer.from('original');
+
+        const cid = await ipfs.addData(data);
+        data.write('rewritten');
+
+        expect((await ipfs.getData(cid)).toString()).toBe('original');
+    });
+
+    it('does not let a reader rewrite what it streamed', async () => {
+        const ipfs = new MemoryClient();
+        const cid = await ipfs.addData(Buffer.from('original'));
+
+        for await (const chunk of ipfs.getDataStream(cid)) {
+            Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength).write('rewritten');
+        }
+
+        expect((await ipfs.getData(cid)).toString()).toBe('original');
+    });
+
     // Suites bracket their work with these, and a store that survived stop()
     // would carry one test's content into the next.
     it('starts, stops, and forgets what it held', async () => {
