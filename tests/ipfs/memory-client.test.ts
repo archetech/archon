@@ -29,21 +29,15 @@ describe('MemoryClient', () => {
         expect(await ipfs.addText('x')).not.toBe(await ipfs.addText('y'));
     });
 
-    // The Gatekeeper asks for operations it may not hold and types the answer
-    // `Operation | null`, so an unknown CID is an absence, not a failure.
-    it('reports an unknown CID as absent rather than throwing', async () => {
-        const ipfs = new MemoryClient();
-
-        await expect(ipfs.getJSON(await generateCID({ never: 'stored' }))).resolves.toBeNull();
-    });
-
-    // The other readers return `string` and `Buffer`, which cannot say "no such
-    // block". Empty would read as content, and the routes over them answer 200
-    // with an empty body instead of reporting the miss.
+    // What a node does: KuboClient's reads carry a 10s timeout and throw
+    // TimeoutError when nobody has the block -- verified against kubo v0.43.0 --
+    // and Helia's blocked on a local-only node. Answering null or empty here
+    // would let a test pass where production raises.
     it('raises for content it does not hold, rather than reading as empty', async () => {
         const ipfs = new MemoryClient();
         const missing = await generateCID('never stored');
 
+        await expect(ipfs.getJSON(await generateCID({ never: 'stored' }))).rejects.toThrow(BlockNotFoundError);
         await expect(ipfs.getText(missing)).rejects.toThrow(BlockNotFoundError);
         await expect(ipfs.getData(missing)).rejects.toThrow(BlockNotFoundError);
         await expect((async () => {

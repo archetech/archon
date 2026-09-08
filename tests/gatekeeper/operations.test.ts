@@ -336,12 +336,12 @@ describe('importBatchByCids', () => {
         expect(result.rejected).toBe(0);
     });
 
-    it('skips a CID neither the db nor the store holds', async () => {
-        // Untested for years because a store that reaches for the network can
-        // block forever on a CID nobody has. An in-memory one answers at once.
-        const keypair = cipher.generateRandomJwk();
-        const agentOp = await helper.createAgentOp(keypair, { registry: 'hyperswarm' });
-        const known = await ipfs.addJSON(agentOp);
+    it('raises on a CID neither the db nor the store holds', async () => {
+        // Untested for years because a store that reaches for the network
+        // blocks on a CID nobody has -- kubo throws TimeoutError, but only
+        // after ten seconds. An in-memory one reaches the same answer at once,
+        // so the batch failing rather than silently importing less is now
+        // pinned.
         const missing = await gatekeeper.generateCID({ never: 'stored' });
 
         const metadata = {
@@ -350,9 +350,7 @@ describe('importBatchByCids', () => {
             ordinal: [100, 1],
         };
 
-        const result = await gatekeeper.importBatchByCids([known, missing], metadata);
-
-        expect(result.queued).toBe(1);
+        await expect(gatekeeper.importBatchByCids([missing], metadata)).rejects.toThrow();
     });
 
 

@@ -35,10 +35,12 @@ export default class MemoryClient implements IPFSClient {
     // Copied in, because a CID promises its bytes do not change. addData is
     // handed the caller's Buffer, and keeping the reference would let them
     // rewrite the content behind an address already computed from it.
-    // Absent content raises rather than reading as empty: `Promise<string>`
-    // cannot say "no such block", and a node would fail this lookup too. The
-    // routes over these methods report the throw, and would answer 200 with an
-    // empty body otherwise.
+    // Absent content raises, because that is what a node does: KuboClient's
+    // reads carry a 10s timeout and throw TimeoutError when nobody has the
+    // block, and Helia's blocked on a local-only node. Answering null or empty
+    // instead would let a test pass where production raises -- and the routes
+    // over these methods rely on the throw to report the miss rather than
+    // returning 200 with an empty body.
     private require(cid: string): Uint8Array {
         const bytes = this.blocks.get(cid);
 
@@ -92,11 +94,7 @@ export default class MemoryClient implements IPFSClient {
         return this.put(jsonCodec.encode(json), json);
     }
 
-    // Null rather than a throw: the Gatekeeper reads an operation it may not
-    // hold and types the result `Operation | null`.
     async getJSON(cid: string): Promise<any> {
-        const bytes = this.blocks.get(cid);
-
-        return bytes === undefined ? null : jsonCodec.decode(bytes);
+        return jsonCodec.decode(this.require(cid));
     }
 }
