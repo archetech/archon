@@ -43,9 +43,10 @@ class SqliteWalletStore:
     """
 
     def __init__(self, wallet_file_name: str = "wallet.db", data_folder: str = "data"):
-        # An absolute path is a location, not a name to hang under data_folder:
-        # joining it would give `data//home/you/...`, which opens nothing anyone
-        # asked for.
+        # An absolute path is a location, not a name to hang under data_folder.
+        # Said outright rather than left to pathlib, which drops the left side
+        # of a join when the right is absolute: the rule is the same one
+        # WalletSQLite states, where joining really would give `data//home/...`.
         name = Path(wallet_file_name)
         self._wallet_path = name if name.is_absolute() else Path(data_folder) / name
         self._lock = threading.RLock()

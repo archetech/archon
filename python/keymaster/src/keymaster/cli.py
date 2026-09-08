@@ -87,10 +87,11 @@ def saved_passphrase_file() -> str:
 def wallet_backend(value: str | None) -> str:
     """Which store ARCHON_WALLET_TYPE asks for.
 
-    Anything that is not ``sqlite`` selected JSON, so a typo opened a JSON
-    wallet for someone who has a SQLite one and offered them a new identity --
-    the silent second wallet the location rules exist to prevent. Mirrors the
-    TypeScript walletBackend, message included.
+    The two backends, and nothing else. Reading an unknown value as JSON would
+    open an empty JSON wallet for someone whose wallet is SQLite, and offer
+    them a new identity -- the silent second wallet these rules exist to
+    prevent, off a typo. Mirrors the TypeScript walletBackend, message
+    included.
     """
     if value in (None, "", "json"):
         return "json"
@@ -176,9 +177,8 @@ def open_wallet_store(wallet_type: str, wallet_path: str) -> JsonWalletStore | S
     """Opens the local wallet store a path names, whichever backend is configured.
 
     Both stores are constructed from a folder and a name, and the path in hand
-    is one string. Splitting it here keeps the caller from deciding what a path
-    handed to a store means -- passing it whole is how the TypeScript CLI came
-    to store ./wallet.json at data/wallet.json under SQLite (#1073).
+    is one string. Splitting it here is what keeps a path meaning the same
+    thing under either backend, rather than each caller deciding (#1073).
     """
     # Before anything is created: opening writes the file, and create-wallet or
     # create-id would then hold a new identity while the owner's wallet sits

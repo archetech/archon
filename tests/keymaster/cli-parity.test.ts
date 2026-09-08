@@ -257,9 +257,10 @@ describe('wallet-optional command policy', () => {
 describe('wallet location rules', () => {
     const walletLocation = readSource('packages/keymaster/src/wallet-location.ts');
 
-    // A scanner, not a pattern: both files put example paths in prose, and
-    // `./wallet.json` inside a comment is not a rule. Stripping comments by
-    // regex has read real code as a comment in this repo before.
+    // A scanner, not a pattern: both files name the same paths in prose, and
+    // `./wallet.json` inside a comment is not a rule. Telling the two apart
+    // means tracking comments, docstrings and string state, which is what a
+    // pattern over the raw text cannot do.
     function stringLiterals(source: string): string[] {
         const found: string[] = [];
         let index = 0;

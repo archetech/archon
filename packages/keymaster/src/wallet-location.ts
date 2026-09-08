@@ -15,9 +15,10 @@ export const ARCHON_HOME_DIRECTORY = '.archon';
 
 export type WalletBackend = 'json' | 'sqlite';
 
-// Anything that is not `sqlite` selected JSON, so a typo in ARCHON_WALLET_TYPE
-// opened a JSON wallet for someone who has a SQLite one and offered them a new
-// identity -- the silent second wallet the location rules exist to prevent.
+// The two backends, and nothing else. Reading an unknown value as JSON would
+// open an empty JSON wallet for someone whose wallet is SQLite, and offer them
+// a new identity -- the silent second wallet these rules exist to prevent, off
+// a typo in ARCHON_WALLET_TYPE.
 export function walletBackend(value: string | undefined): WalletBackend {
     switch (value) {
     case undefined:
