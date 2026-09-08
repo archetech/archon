@@ -8,9 +8,11 @@ match the TypeScript CLI so tooling can swap implementations.
 Environment:
     ARCHON_NODE_URL / ARCHON_GATEKEEPER_URL  Gatekeeper HTTP URL (default http://localhost:4224)
     ARCHON_WALLET_PATH                        Wallet file path (default ~/.archon/wallet.json,
-                                              wallet.db for sqlite, or ./wallet.json if
-                                              one is already there)
-    ARCHON_PASSPHRASE                         Required — wallet passphrase
+                                              or ./wallet.json if one is already there)
+    ARCHON_PASSPHRASE                         Wallet passphrase, for automation. Asked for
+                                              when unset and a terminal is attached
+    ARCHON_PASSPHRASE_FILE                    File holding the passphrase (default
+                                              ~/.archon/passphrase)
     ARCHON_DEFAULT_REGISTRY                   Default registry (optional)
 """
 
