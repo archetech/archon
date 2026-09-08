@@ -111,6 +111,10 @@ const locks = await Promise.all(lockPaths.map(async p => JSON.parse(await readFi
 await mkdir(OUT_DIR, { recursive: true });
 
 let failed = 0;
+// TARGETS is empty on purpose (see above). The loop is what a new entry needs
+// in order to work, and the rule cannot tell a list awaiting its next entry
+// from one nothing ever fills.
+// eslint-disable-next-line sonarjs/no-empty-collection
 for (const target of TARGETS) {
     const versions = await resolveVersions(locks, target.name);
     if (versions.length === 0) {
