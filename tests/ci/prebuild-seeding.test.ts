@@ -93,6 +93,18 @@ function copiedPaths(source: string): string[] {
     return [...source.matchAll(/^COPY\s+((?:services|apps)\/[\w./-]+)/gm)].map(match => match[1].replace(/\/$/, ''));
 }
 
+// Which lockfiles an image installs. Most copy the root manifests and run a
+// root `npm ci` before the service's own, so a seeded package added to the root
+// lockfile lands in every one of them -- not only in the service that named it.
+export function installedLocks(source: string, locks: string[]): string[] {
+    const copiesRoot = /^COPY\s+package\*?\.json/m.test(source);
+    const paths = copiedPaths(source);
+
+    return locks.filter(lock => lock === 'package-lock.json'
+        ? copiesRoot
+        : paths.some(dir => lock.startsWith(`${dir}/`)));
+}
+
 describe('native prebuild seeding', () => {
     it('finds workflows to check', () => {
         // Guard the guard: an empty listing would make the check below vacuous.
@@ -152,7 +164,7 @@ describe('native prebuild seeding', () => {
             const source = readFileSync(file, 'utf-8');
             const copies = /COPY\s+prebuilds\//.test(source);
             const points = /npm_config_\w+_local_prebuilds=\/prebuilds/.test(source);
-            const needs = seededLocks.some(lock => copiedPaths(source).some(dir => lock.startsWith(`${dir}/`)));
+            const needs = installedLocks(source, seededLocks).length > 0;
 
             if (copies !== needs) {
                 problems.push(`${file} ${copies ? 'seeds prebuilds but installs no seeded package' : 'installs a seeded package but does not seed prebuilds'}`);
@@ -174,6 +186,43 @@ describe('native prebuild seeding', () => {
 
     it('finds an image that needs seeding, so the pairing above is not vacuous', () => {
         expect(dockerfiles().filter(f => /COPY\s+prebuilds\//.test(readFileSync(f, 'utf-8')))).not.toStrictEqual([]);
+    });
+});
+
+// Checked against written-out Dockerfiles rather than the repo's, because the
+// cases that matter are ones the repo does not currently contain.
+describe('which lockfiles an image installs', () => {
+    const ROOT = 'package-lock.json';
+    const WALLET = 'services/mediators/filecoin-wallet/package-lock.json';
+    const image = (...lines: string[]) => lines.join('\n');
+
+    // The failure this exists to prevent: every image runs a root `npm ci`, so
+    // a seeded package in the root lockfile is installed by all of them. A
+    // mapping that reads only the service directory would clear every image.
+    it('counts the root lockfile for an image that copies the root manifests', () => {
+        const source = image('COPY package*.json ./', 'RUN npm ci');
+
+        expect(installedLocks(source, [ROOT, WALLET])).toStrictEqual([ROOT]);
+    });
+
+    it('does not count it for an image that never copies them', () => {
+        const source = image('COPY services/mediators/filecoin-wallet ./wallet/');
+
+        expect(installedLocks(source, [ROOT])).toStrictEqual([]);
+    });
+
+    it('counts a service lockfile the image copies', () => {
+        const source = image('COPY services/mediators/filecoin-wallet ./wallet/');
+
+        expect(installedLocks(source, [WALLET])).toStrictEqual([WALLET]);
+    });
+
+    // `services/mediators/filecoin` is a string prefix of the wallet's path and
+    // installs none of its dependencies.
+    it('does not count a sibling whose path it merely prefixes', () => {
+        const source = image('COPY services/mediators/filecoin ./filecoin/');
+
+        expect(installedLocks(source, [WALLET])).toStrictEqual([]);
     });
 });
 
