@@ -3,7 +3,7 @@ import request from 'supertest';
 import CipherNode from '@didcid/cipher/node';
 import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import TestHelper from './helper.ts';
 import { InvalidOperationError } from '@didcid/common/errors';
 import { createIdentifiersRouter } from '../../services/gatekeeper/server/src/identifiers-router.ts';
@@ -19,7 +19,7 @@ const mockLogger = { error: (): void => { } };
 
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
-const ipfs = new HeliaClient();
+const ipfs = new MemoryClient();
 const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local'] });
 const helper = new TestHelper(gatekeeper, cipher);
 

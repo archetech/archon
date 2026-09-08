@@ -61,8 +61,8 @@
       "@didcid/gatekeeper/db/*": [
         "packages/gatekeeper/src/db/*"
       ],
-      "@didcid/ipfs/helia": [
-        "packages/ipfs/src/helia-client.ts"
+      "@didcid/ipfs/memory": [
+        "packages/ipfs/src/memory-client.ts"
       ],
       "@didcid/ipfs/utils": [
         "packages/ipfs/src/utils.ts"

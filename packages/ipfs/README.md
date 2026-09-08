@@ -14,12 +14,12 @@ npm install @didcid/ipfs
 
 ```js
 // Import using subpaths
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 
 // Non-subpath import
-import { HeliaClient } from '@didcid/ipfs';
+import { MemoryClient } from '@didcid/ipfs';
 
-const ipfs = new HeliaClient();
+const ipfs = new MemoryClient();
 
 await ipfs.start();
 
@@ -30,27 +30,16 @@ const retrieve = await ipfs.getJSON(cid); // retrieve == data
 await ipfs.stop();
 ```
 
-### create factory
+`MemoryClient` keeps blocks in a `Map`, for tests and for anything that wants
+content addressing without a node. It addresses JSON exactly as `KuboClient`
+does, so a DID minted against it is the DID a node would mint for the same
+operation. Text and binary are stored whole, where a node chunks them through
+unixfs and arrives at a different CID. `stop()` discards everything.
 
-The static factory method `create` can be used to create and start an IPFS instance:
-
-```js
-const ipfs = await HeliaClient.create();
-```
-
-### FS blockstore mode
-
-Passing `datadir` in options to `start` or `create` will persist the data to the specified folder.
+For a real node, use `KuboClient` against a kubo daemon:
 
 ```js
-const ipfs = await HeliaClient.create({ datadir: 'data/ipfs' });
-```
+import KuboClient from '@didcid/ipfs/kubo';
 
-### minimal mode
-
-Starting IPFS in `minimal` mode avoids starting a Helia IPFS server.
-Only `add` works to generate CIDs. Nothing is persisted so `get` always throws a `NotConnectedError`.
-
-```js
-const ipfs = await HeliaClient.create({ minimal: true });
+const ipfs = await KuboClient.create({ url: 'http://localhost:5001' });
 ```

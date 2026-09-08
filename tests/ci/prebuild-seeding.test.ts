@@ -65,8 +65,6 @@ function expectedPrebuildVars(): string[] {
     const script = readFileSync(join('scripts', 'prefetch-prebuilds.mjs'), 'utf-8');
     const targets = [...script.matchAll(/\bname:\s*'([^']+)'/g)].map(m => m[1]);
 
-    expect(targets.length).toBeGreaterThan(0);
-
     return targets.map(name => `npm_config_${name.replace(/^@/, '').replace(/[^a-zA-Z0-9]/g, '_')}_local_prebuilds`);
 }
 
@@ -117,20 +115,26 @@ describe('native prebuild seeding', () => {
         // Seeding is useless unless the Dockerfile copies ./prebuilds in and
         // tells prebuild-install to look there. Each module is checked by name,
         // so wiring up only one of two modules cannot pass.
+        //
+        // TARGETS is empty today, so the per-module half of this is dormant.
+        // The half that pairs the COPY with a pointer is not: it still catches
+        // an image wired up on one side only, which is the state the images are
+        // in while they point at a module nothing installs any more.
         const expected = expectedPrebuildVars();
         const problems: string[] = [];
 
         for (const name of readdirSync('docker').filter(f => f.startsWith('Dockerfile.'))) {
             const source = readFileSync(join('docker', name), 'utf-8');
             const copies = /COPY\s+prebuilds\//.test(source);
+            const points = /npm_config_\w+_local_prebuilds=\/prebuilds/.test(source);
             const missing = expected.filter(variable => !source.includes(`${variable}=/prebuilds`));
 
             if (copies && missing.length) {
                 problems.push(`${name} copies prebuilds/ but does not set ${missing.join(', ')}`);
             }
 
-            if (!copies && missing.length < expected.length) {
-                problems.push(`${name} points at /prebuilds but never copies it in`);
+            if (copies !== points) {
+                problems.push(`${name} ${copies ? 'copies prebuilds/ but points at nothing' : 'points at /prebuilds but never copies it in'}`);
             }
         }
 
@@ -143,7 +147,10 @@ describe('native prebuild seeding', () => {
 // npm-ci time -- silently, because the build still succeeds. Services carry
 // their own lockfiles, and only the root was being read.
 describe('prefetch covers every installed version', () => {
-    const TARGETS = ['@ipshipyard/node-datachannel'];
+    // Read out of the script rather than repeated here: a list kept in both
+    // places drifts, and the copy in the test is the one nobody updates.
+    const TARGETS = [...readFileSync('scripts/prefetch-prebuilds.mjs', 'utf-8')
+        .matchAll(/\{\s*name:\s*'([^']+)'/g)].map(match => match[1]);
 
     function versionsOf(name: string): Set<string> {
         const locks = execSync("git ls-files '*package-lock.json'", { encoding: 'utf-8' })
@@ -169,8 +176,10 @@ describe('prefetch covers every installed version', () => {
         expect(script).toMatch(/git['"],\s*\['ls-files', '\*package-lock\.json'\]/);
     });
 
-    it.each(TARGETS)('finds a version of %s to seed', (name) => {
-        // Guard the guard: a rename would make the check below vacuous.
-        expect(versionsOf(name).size).toBeGreaterThan(0);
+    // A target no lockfile installs seeds a file nothing will ever ask for, and
+    // the build still succeeds -- so nothing else would say. Vacuous while
+    // TARGETS is empty, which it is: the one entry came in with Helia.
+    it('seeds only packages something actually installs', () => {
+        expect(TARGETS.filter(name => versionsOf(name).size === 0)).toStrictEqual([]);
     });
 });

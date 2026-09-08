@@ -1,2 +1,2 @@
 export * from './index.js';
-export { default as HeliaClient } from './helia-client.js';
+export { default as MemoryClient } from './memory-client.js';

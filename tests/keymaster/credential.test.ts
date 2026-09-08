@@ -6,10 +6,10 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { copyJSON } from '@didcid/common/utils';
 import { InvalidDIDError, ExpectedExceptionError, UnknownIDError } from '@didcid/common/errors';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import { TestHelper, mockJson, mockSchema } from './helper.ts';
 
-let ipfs: HeliaClient;
+let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
 let wallet: WalletJsonMemory;
 let cipher: CipherNode;
@@ -17,7 +17,7 @@ let keymaster: Keymaster;
 let helper: TestHelper;
 
 beforeAll(async () => {
-    ipfs = new HeliaClient();
+    ipfs = new MemoryClient();
     await ipfs.start();
 });
 

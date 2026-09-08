@@ -148,7 +148,7 @@ Additionally, on both ports: passphrase comparison is non-constant-time (`!==` /
 
 Runtime-relevant (selection):
 - **`tar` (CRITICAL)** — arbitrary file creation/overwrite; reached via `sqlite3` → `node-gyp` → `cacache`/`make-fetch-happen` (WalletSQLite build chain)
-- **`@libp2p/kad-dht` (HIGH)** — unvalidated PUT_VALUE records allow unbounded storage; reached via `helia` (packages/ipfs — Gatekeeper's IPFS layer)
+- ~~**`@libp2p/kad-dht` (HIGH)** — unvalidated PUT_VALUE records allow unbounded storage; reached via `helia` (packages/ipfs — Gatekeeper's IPFS layer)~~ ✅ Resolved (#1078): the Helia backend was only ever used by tests and is gone, taking `helia`, `libp2p` and `@libp2p/kad-dht` out of the tree.
 - **`ip` (HIGH)** — SSRF improper categorization in `isPublic`; no fix available
 - **`@hono/node-server` (MODERATE)** — path traversal in `serve-static`; reached via `@modelcontextprotocol/sdk` (packages/mcp-server)
 - **`nanoid`, `image-size`, `brace-expansion`, `js-yaml` (HIGH)** — DoS classes; mostly dev/build chains (metro/react-native/lerna)
@@ -292,7 +292,7 @@ other tracking surface.
 2. **H-02** — Stop returning the admin key from `/login` without passphrase verification. Python first (live); TS is a startup-window edge case, best closed by validating the passphrase before `app.listen`.
 3. **H-01** — ⚠️ Half done: both Gatekeeper ports fixed in #868 (merged). Remaining: TS Keymaster (`keymaster-admin.ts`) and Python (`hmac.compare_digest`), which need a decision about the router-wide mount first. Do **not** "fix" this by host-binding Gatekeeper's compose port — that port is public by design for DID resolution (`docs/deployment.md:648`); the admin key is the control.
 4. **H-03** — CORS allowlist.
-5. **H-04** — `tar` override; `@hono/node-server` pin; assess `helia`/`@libp2p/kad-dht` exposure.
+5. **H-04** — `tar` override; `@hono/node-server` pin. `helia`/`@libp2p/kad-dht` no longer ship (#1078).
 6. **M-01/M-02** — Stop trusting `X-DID`; atomic check-and-increment for macaroon uses.
 7. **M-03** — Generic client-facing error messages; log internals server-side only.
 

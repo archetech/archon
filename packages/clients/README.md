@@ -2,7 +2,7 @@
 
 Lightweight HTTP clients for Archon Gatekeeper, Drawbridge, and Keymaster services.
 This package depends only on Axios and the browser-compatible Buffer package; it
-does not install the Gatekeeper, Keymaster, IPFS, Helia, or libp2p runtimes.
+does not install the Gatekeeper, Keymaster, or IPFS runtimes.
 
 ```bash
 npm install @didcid/clients

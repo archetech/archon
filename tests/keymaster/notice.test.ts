@@ -3,19 +3,19 @@ import Keymaster, { DmailTags, NoticeTags } from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import { NoticeMessage } from '@didcid/keymaster/types';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import { jest } from '@jest/globals';
 
-let ipfs: HeliaClient;
+let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
 let wallet: WalletJsonMemory;
 let cipher: CipherNode;
 let keymaster: Keymaster;
 
 beforeAll(async () => {
-    ipfs = new HeliaClient();
+    ipfs = new MemoryClient();
     await ipfs.start();
 });
 

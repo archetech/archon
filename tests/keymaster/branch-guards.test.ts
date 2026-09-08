@@ -3,21 +3,21 @@ import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import { jest } from '@jest/globals';
 
 // The main suites drive these methods along their happy paths, which leaves the
 // validation guards and "already in the desired state" branches untaken. These
 // cover that side — the rejections and short-circuits.
 
-let ipfs: HeliaClient;
+let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
 let wallet: WalletJsonMemory;
 let cipher: CipherNode;
 let keymaster: Keymaster;
 
 beforeAll(async () => {
-    ipfs = new HeliaClient();
+    ipfs = new MemoryClient();
     await ipfs.start();
 });
 

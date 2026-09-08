@@ -4,9 +4,9 @@ import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { UnknownIDError, InvalidParameterError, LightningNotConfiguredError, LightningUnavailableError } from '@didcid/common/errors';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 
-let ipfs: HeliaClient;
+let ipfs: MemoryClient;
 let gatekeeper: any;
 let wallet: WalletJsonMemory;
 let cipher: CipherNode;
@@ -19,7 +19,7 @@ function trackCall(method: string, ...args: any[]) {
 }
 
 beforeAll(async () => {
-    ipfs = new HeliaClient();
+    ipfs = new MemoryClient();
     await ipfs.start();
 });
 

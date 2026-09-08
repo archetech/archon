@@ -25,9 +25,11 @@ import path from 'node:path';
 // build version prebuild-install resolves for Node 22 (the highest entry in the
 // package's own `binary.napi_versions`); if a future bump changes it, the
 // download 404s and we fall back to fetching at npm-ci time.
-const TARGETS = [
-    { name: '@ipshipyard/node-datachannel', repo: 'ipshipyard/js-node-datachannel', napi: 8 },
-];
+// Empty since Helia left the tree: @ipshipyard/node-datachannel arrived through
+// @libp2p/webrtc and was the only entry. The seeding steps stay wired into the
+// image builds, so the next native dependency is one line rather than a
+// workflow change.
+const TARGETS = [];
 
 const PLATFORM = process.env.PREBUILD_PLATFORM || 'linux';
 // Both arches, because the publish workflows build linux/amd64,linux/arm64.

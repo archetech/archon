@@ -2,7 +2,7 @@ import CipherNode from '@didcid/cipher/node';
 import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import { ExpectedExceptionError } from '@didcid/common/errors';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import TestHelper from './helper.ts';
 
 const mockConsole = {
@@ -14,7 +14,7 @@ const mockConsole = {
 
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
-const ipfs = new HeliaClient();
+const ipfs = new MemoryClient();
 const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet'] });
 const helper = new TestHelper(gatekeeper, cipher);
 
@@ -336,8 +336,25 @@ describe('importBatchByCids', () => {
         expect(result.rejected).toBe(0);
     });
 
-    // Note: Testing invalid CID handling is skipped because IPFS lookup
-    // for non-existent CIDs can hang indefinitely in a local-only Helia setup.
+    it('skips a CID neither the db nor the store holds', async () => {
+        // Untested for years because a store that reaches for the network can
+        // block forever on a CID nobody has. An in-memory one answers at once.
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await helper.createAgentOp(keypair, { registry: 'hyperswarm' });
+        const known = await ipfs.addJSON(agentOp);
+        const missing = await gatekeeper.generateCID({ never: 'stored' });
+
+        const metadata = {
+            registry: 'hyperswarm',
+            time: new Date().toISOString(),
+            ordinal: [100, 1],
+        };
+
+        const result = await gatekeeper.importBatchByCids([known, missing], metadata);
+
+        expect(result.queued).toBe(1);
+    });
+
 
     it('should build correct ordinals for multiple operations', async () => {
         const keypair = cipher.generateRandomJwk();

@@ -5,7 +5,7 @@ import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import { createApp } from '../../services/didcomm/server/src/didcomm-api.ts';
 import { MemoryMailboxStore } from '../../services/didcomm/server/src/store.ts';
 import {
@@ -35,7 +35,7 @@ import { mockSchema } from '../keymaster/helper.ts';
 // End-to-end: two Archon identities exchange a DIDComm message through the live
 // mailbox relay (real express routes + signed-challenge auth + keymaster
 // send/receive client), over HTTP.
-let ipfs: HeliaClient;
+let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
 let cipher: CipherNode;
 let keymaster: Keymaster;
@@ -43,7 +43,7 @@ let server: Server;
 let endpoint: string;
 
 beforeAll(async () => {
-    ipfs = new HeliaClient();
+    ipfs = new MemoryClient();
     await ipfs.start();
 });
 

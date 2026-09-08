@@ -3,7 +3,7 @@ import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import { readFileSync } from 'fs';
 import { jest } from '@jest/globals';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
@@ -50,11 +50,11 @@ describe('isPrivateHostname', () => {
 // it used to be defined once and called once, on a private method, while the
 // three public entry points that fetch a caller-supplied host went unchecked.
 describe('the public lookup methods reject private targets', () => {
-    let ipfs: HeliaClient;
+    let ipfs: MemoryClient;
     let keymaster: Keymaster;
 
     beforeAll(async () => {
-        ipfs = new HeliaClient();
+        ipfs = new MemoryClient();
         await ipfs.start();
     });
 

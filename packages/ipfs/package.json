@@ -29,15 +29,15 @@
         "types": "./dist/types/node.d.ts"
       }
     },
-    "./helia": {
-      "import": "./dist/esm/helia-client.js",
-      "require": "./dist/cjs/helia-client.cjs",
-      "types": "./dist/types/helia-client.d.ts"
-    },
     "./kubo": {
       "import": "./dist/esm/kubo-client.js",
       "require": "./dist/cjs/kubo-client.cjs",
       "types": "./dist/types/kubo-client.d.ts"
+    },
+    "./memory": {
+      "import": "./dist/esm/memory-client.js",
+      "require": "./dist/cjs/memory-client.cjs",
+      "types": "./dist/types/memory-client.d.ts"
     },
     "./utils": {
       "import": "./dist/esm/utils.js",
@@ -50,11 +50,11 @@
   },
   "typesVersions": {
     "*": {
-      "helia": [
-        "./dist/types/helia-client.d.ts"
-      ],
       "kubo": [
         "./dist/types/kubo-client.d.ts"
+      ],
+      "memory": [
+        "./dist/types/memory-client.d.ts"
       ],
       "utils": [
         "./dist/types/utils.d.ts"
@@ -75,11 +75,7 @@
   "license": "MIT",
   "dependencies": {
     "@didcid/common": "^0.3.3",
-    "@helia/json": "^4.0.3",
-    "@helia/unixfs": "^5.0.0",
     "axios": "^1.19.0",
-    "blockstore-fs": "^2.0.2",
-    "helia": "^5.3.0",
     "ip": "^2.0.1",
     "kubo-rpc-client": "^5.1.0",
     "multiformats": "^13.3.3"

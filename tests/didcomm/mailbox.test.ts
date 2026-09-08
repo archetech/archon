@@ -4,7 +4,7 @@ import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import HeliaClient from '@didcid/ipfs/helia';
+import MemoryClient from '@didcid/ipfs/memory';
 import { packEncrypted } from '@didcid/cipher/didcomm';
 import { MailboxFullError, MemoryMailboxStore, RedisMailboxStore } from '../../services/didcomm/server/src/store.ts';
 import { recipientDidsFromEnvelope, verifyChallengeSignature } from '../../services/didcomm/server/src/mailbox.ts';
@@ -593,13 +593,13 @@ describe('recipientDidsFromEnvelope', () => {
 });
 
 describe('verifyChallengeSignature', () => {
-    let ipfs: HeliaClient;
+    let ipfs: MemoryClient;
     let gatekeeper: Gatekeeper;
     let cipher: CipherNode;
     let keymaster: Keymaster;
 
     beforeAll(async () => {
-        ipfs = new HeliaClient();
+        ipfs = new MemoryClient();
         await ipfs.start();
     });
 
