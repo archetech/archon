@@ -43,7 +43,8 @@ keymaster list-ids
 | Variable | Default | Description |
 |---|---|---|
 | `ARCHON_NODE_URL` / `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Gatekeeper HTTP endpoint |
-| `ARCHON_WALLET_PATH` | `~/.archon/wallet.json`, or `./wallet.json` if one is already there | Path to wallet file. The default follows you between directories |
+| `ARCHON_WALLET_PATH` | `~/.archon/wallet.json` (`wallet.db` for sqlite), or `./wallet.json` if one is already there | Path to wallet file. The default follows you between directories |
+| `ARCHON_WALLET_TYPE` | `json` | Wallet backend: `json` or `sqlite`. The same file the TypeScript CLI opens |
 | `ARCHON_PASSPHRASE` | *(asked for)* | Wallet passphrase. For automation; the environment is a poor place for a secret |
 | `ARCHON_PASSPHRASE_FILE` | `~/.archon/passphrase` | File holding the passphrase. Read if it exists, so answering the CLI's offer to save ends the asking |
 | `ARCHON_DEFAULT_REGISTRY` | `hyperswarm` | Default registry for new DIDs |

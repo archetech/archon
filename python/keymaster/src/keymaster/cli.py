@@ -2,13 +2,16 @@
 
 Mirrors the TypeScript CLI command surface by instantiating the Python
 Keymaster library directly against a remote gatekeeper HTTP endpoint and a
-local JSON wallet file. Command names, argument shapes, and output formats
-match the TypeScript CLI so tooling can swap implementations.
+local wallet file, JSON or SQLite. Command names, argument shapes, and output
+formats match the TypeScript CLI so tooling can swap implementations, and both
+CLIs resolve and open the same wallet on one machine.
 
 Environment:
     ARCHON_NODE_URL / ARCHON_GATEKEEPER_URL  Gatekeeper HTTP URL (default http://localhost:4224)
     ARCHON_WALLET_PATH                        Wallet file path (default ~/.archon/wallet.json,
-                                              or ./wallet.json if one is already there)
+                                              wallet.db for sqlite, or ./wallet.json if
+                                              one is already there)
+    ARCHON_WALLET_TYPE                        Wallet backend: json (default) or sqlite
     ARCHON_PASSPHRASE                         Wallet passphrase, for automation. Asked for
                                               when unset and a terminal is attached
     ARCHON_PASSPHRASE_FILE                    File holding the passphrase (default
@@ -34,7 +37,7 @@ from typing import Any, Callable
 
 from keymaster.core import Keymaster, KeymasterError, WalletNotFoundError
 from keymaster.gatekeeper_client import GatekeeperClient
-from keymaster.wallet_store import JsonWalletStore
+from keymaster.wallet_store import JsonWalletStore, SqliteWalletStore
 
 
 UPDATE_OK = "OK"
@@ -62,6 +65,14 @@ class CommandError(Exception):
     """
 
 
+class WalletLocationError(Exception):
+    """The configured path cannot be opened as it stands.
+
+    Raised before a store is constructed, so nothing is created on the way to
+    reporting it.
+    """
+
+
 PASSPHRASE_PROMPT = "Wallet passphrase: "
 
 
@@ -73,19 +84,100 @@ def saved_passphrase_file() -> str:
     return str(Path.home() / ARCHON_HOME_DIRECTORY / "passphrase")
 
 
-def home_wallet_path(home_directory: str) -> str:
-    return str(Path(home_directory) / ARCHON_HOME_DIRECTORY / "wallet.json")
+def default_wallet_file(wallet_type: str) -> str:
+    """SQLite's own default is wallet.db, which the CLI never reaches.
 
-
-def directory_wallets() -> list[str]:
-    """What to look for in the working directory.
-
-    One name, not the TypeScript CLI's list: this CLI builds a JsonWalletStore
-    for every command and the package ships no SQLite store, so a wallet under
-    another backend's name is one it could not open. Reading ARCHON_WALLET_TYPE
-    here would find a file it then opens as JSON.
+    It always passes a path, so without a name per backend a SQLite database is
+    written under a .json one.
     """
-    return ["./wallet.json"]
+    return "wallet.db" if wallet_type == "sqlite" else "wallet.json"
+
+
+def home_wallet_path(home_directory: str, wallet_type: str) -> str:
+    return str(Path(home_directory) / ARCHON_HOME_DIRECTORY / default_wallet_file(wallet_type))
+
+
+def directory_wallets(wallet_type: str) -> list[str]:
+    """What to look for in the working directory, in the order it should win.
+
+    Some SQLite wallets are named wallet.json, those are the ones holding an
+    identity, and nothing about the name says which backend wrote it. The data/
+    entries follow, because a SQLite wallet may still be sitting where an
+    earlier release put it and its owner has nothing in the directory itself.
+    """
+    here = ["./wallet.json", "./wallet.db"] if wallet_type == "sqlite" else ["./wallet.json"]
+    legacy = [legacy_wallet_path(wallet_type, candidate) for candidate in here]
+
+    return here + [candidate for candidate in legacy if candidate is not None]
+
+
+def legacy_wallet_path(wallet_type: str, wallet_path: str) -> str | None:
+    """Where a wallet ended up when a relative path was handed to the SQLite store as a *name*.
+
+    That hung it under the store's own data folder, so ``./wallet.json`` was
+    written to ``data/wallet.json`` (#1073).
+
+    Nothing resolves through this. It finds wallets written before a path meant
+    a path, so they keep opening. Delete it, and its two callers, once those
+    wallets have moved.
+    """
+    if wallet_type == "sqlite" and not Path(wallet_path).is_absolute():
+        return str(Path("data") / wallet_path)
+
+    return None
+
+
+def stranded_wallet(
+    wallet_type: str,
+    wallet_path: str,
+    exists: Callable[[str], bool],
+) -> str | None:
+    """A wallet is stranded when the path in hand holds nothing and one is readable where an earlier release put it.
+
+    Answered before a store is opened, because opening creates the file and
+    provisioning then mints a second identity on top of a wallet the owner
+    still has.
+    """
+    if exists(wallet_path):
+        return None
+
+    legacy = legacy_wallet_path(wallet_type, wallet_path)
+
+    return legacy if legacy and exists(legacy) else None
+
+
+def stranded_wallet_message(wallet_path: str, found_at: str) -> str:
+    return "\n".join(
+        [
+            f"no wallet at {wallet_path}, and a wallet is still at {found_at}, where earlier releases put it.",
+            f"Move it to {wallet_path}, or point ARCHON_WALLET_PATH there.",
+        ]
+    )
+
+
+def open_wallet_store(wallet_type: str, wallet_path: str) -> JsonWalletStore | SqliteWalletStore:
+    """Opens the local wallet store a path names, whichever backend is configured.
+
+    Both stores are constructed from a folder and a name, and the path in hand
+    is one string. Splitting it here keeps the caller from deciding what a path
+    handed to a store means -- passing it whole is how the TypeScript CLI came
+    to store ./wallet.json at data/wallet.json under SQLite (#1073).
+    """
+    # Before anything is created: opening writes the file, and create-wallet or
+    # create-id would then hold a new identity while the owner's wallet sits
+    # where an earlier release left it.
+    stranded = stranded_wallet(wallet_type, wallet_path, lambda candidate: Path(candidate).exists())
+
+    if stranded:
+        raise WalletLocationError(stranded_wallet_message(wallet_path, stranded))
+
+    path = Path(wallet_path)
+    directory = str(path.parent) if path.parent.as_posix() else "."
+
+    if wallet_type == "sqlite":
+        return SqliteWalletStore(wallet_file_name=path.name, data_folder=directory)
+
+    return JsonWalletStore(wallet_file_name=path.name, data_folder=directory)
 
 
 def resolve_wallet_path(
@@ -1681,10 +1773,11 @@ async def _run(args: argparse.Namespace) -> int:
         or os.environ.get("ARCHON_GATEKEEPER_URL")
         or "http://localhost:4224"
     )
-    home_wallet = home_wallet_path(str(Path.home()))
+    wallet_type = os.environ.get("ARCHON_WALLET_TYPE", "json")
+    home_wallet = home_wallet_path(str(Path.home()), wallet_type)
     wallet_path = resolve_wallet_path(
         os.environ,
-        directory_wallets=directory_wallets(),
+        directory_wallets=directory_wallets(wallet_type),
         home_wallet=home_wallet,
         exists=lambda candidate: Path(candidate).exists(),
     )
@@ -1715,11 +1808,11 @@ async def _run(args: argparse.Namespace) -> int:
 
     passphrase, passphrase_source = resolved
 
-    wallet_path_obj = Path(wallet_path)
-    wallet_store = JsonWalletStore(
-        wallet_file_name=wallet_path_obj.name,
-        data_folder=str(wallet_path_obj.parent) if wallet_path_obj.parent.as_posix() else ".",
-    )
+    try:
+        wallet_store = open_wallet_store(wallet_type, wallet_path)
+    except WalletLocationError as exc:
+        print(f"Failed to initialize: {exc}", file=sys.stderr)
+        return 1
 
     # Only read the store when its absence would be fatal. Reading parses it, so
     # a corrupt wallet would otherwise block the very commands that replace one.
