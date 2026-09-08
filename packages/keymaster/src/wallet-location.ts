@@ -61,6 +61,31 @@ export function splitWalletPath(walletPath: string): { directory: string, file: 
     };
 }
 
+// A wallet is stranded when the path in hand holds nothing and one is readable
+// where an earlier release put it. Answered before a store is opened, because
+// opening creates the file and provisioning then mints a second identity on top
+// of a wallet the owner still has.
+export function strandedWallet(
+    walletType: string,
+    walletPath: string,
+    exists: (candidate: string) => boolean,
+): string | undefined {
+    if (exists(walletPath)) {
+        return undefined;
+    }
+
+    const legacy = legacyWalletPath(walletType, walletPath);
+
+    return legacy && exists(legacy) ? legacy : undefined;
+}
+
+export function strandedWalletMessage(walletPath: string, foundAt: string): string {
+    return [
+        `no wallet at ${walletPath}, and a wallet is still at ${foundAt}, where earlier releases put it.`,
+        `Move it to ${walletPath}, or point ARCHON_WALLET_PATH there.`,
+    ].join('\n');
+}
+
 export interface WalletLocation {
     env: Record<string, string | undefined>;
     directoryWallets: string[];
@@ -85,17 +110,7 @@ export function resolveWalletPath(location: WalletLocation): string {
 // Said when a wallet is not where it was looked for. `create-wallet` is only
 // the right answer if there is not one already, and the commonest case is a
 // wallet sitting in another directory.
-export function walletNotFoundMessage(walletPath: string, homeWallet: string, foundAt?: string): string[] {
-    // A wallet that can still be read is the whole answer, and offering to make
-    // a second identity underneath it would only bury the first.
-    if (foundAt) {
-        return [
-            `Error: no wallet at ${walletPath}`,
-            `A wallet is still at ${foundAt}, where earlier releases put it.`,
-            `Move it to ${walletPath}, or point ARCHON_WALLET_PATH there.`,
-        ];
-    }
-
+export function walletNotFoundMessage(walletPath: string, homeWallet: string): string[] {
     const lines = [`Error: no wallet at ${walletPath}`];
 
     if (walletPath !== homeWallet) {

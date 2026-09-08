@@ -13,7 +13,7 @@ import { openWalletStore } from './db/open.js';
 import os from 'os';
 import { createInterface } from 'readline';
 import { WalletNotFoundError } from '@didcid/common/errors';
-import { ARCHON_HOME_DIRECTORY, directoryWallets, homeWalletPath, legacyWalletPath, resolveWalletPath, walletNotFoundMessage } from './wallet-location.js';
+import { ARCHON_HOME_DIRECTORY, directoryWallets, homeWalletPath, resolveWalletPath, walletNotFoundMessage } from './wallet-location.js';
 import { missingPassphraseMessage, resolvePassphrase, type ResolvedPassphrase } from './passphrase.js';
 
 dotenv.config();
@@ -2429,9 +2429,7 @@ async function run() {
         // it, so a corrupt wallet would otherwise block the very commands that
         // exist to replace one.
         if (!walletOptional && !await wallet.loadWallet()) {
-            const legacy = legacyWalletPath(walletType, walletPath);
-
-            for (const line of walletNotFoundMessage(walletPath, homeWallet, legacy && fs.existsSync(legacy) ? legacy : undefined)) {
+            for (const line of walletNotFoundMessage(walletPath, homeWallet)) {
                 console.error(line);
             }
             process.exit(1);

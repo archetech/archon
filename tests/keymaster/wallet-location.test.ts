@@ -1,4 +1,4 @@
-import { defaultWalletFile, directoryWallets, homeWalletPath, legacyWalletPath, resolveWalletPath, splitWalletPath, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
+import { defaultWalletFile, directoryWallets, homeWalletPath, legacyWalletPath, resolveWalletPath, splitWalletPath, strandedWallet, strandedWalletMessage, walletNotFoundMessage } from '../../packages/keymaster/src/wallet-location.ts';
 
 // A globally installed CLI resolving ./wallet.json ties the identity to
 // whichever directory it was created in, and the passphrase that unlocks it is
@@ -152,14 +152,37 @@ describe('walletNotFoundMessage', () => {
         expect(lines.join(' ')).toContain(HOME_WALLET);
         expect(lines.filter(line => line.includes('unless ARCHON_WALLET_PATH'))).toHaveLength(0);
     });
+});
 
-    // Someone whose wallet is readable at the older location needs that path,
-    // not the general advice -- and never an offer to create a second identity
-    // on top of the one still holding their funds.
-    it('names a wallet found where earlier releases put it, and offers nothing else', () => {
-        const lines = walletNotFoundMessage('./wallet.json', HOME_WALLET, 'data/wallet.json');
+describe('strandedWallet', () => {
+    const at = (...found: string[]) => (candidate: string) => found.includes(candidate);
 
-        expect(lines.join(' ')).toContain('data/wallet.json');
-        expect(lines.join(' ')).not.toContain('create-wallet');
+    // Provisioning commands never reach the "no wallet" message, so nothing
+    // downstream of opening the store can stop create-wallet or create-id
+    // minting a second identity while the funded one sits under data/.
+    it('reports a wallet left where an earlier release put it', () => {
+        expect(strandedWallet('sqlite', './wallet.json', at('data/wallet.json'))).toBe('data/wallet.json');
+    });
+
+    it('says nothing when the path in hand holds a wallet', () => {
+        expect(strandedWallet('sqlite', './wallet.json', at('./wallet.json', 'data/wallet.json'))).toBeUndefined();
+    });
+
+    // A first wallet has to be creatable, so an empty path with nothing older
+    // behind it is not stranded.
+    it('says nothing when there is no older wallet either', () => {
+        expect(strandedWallet('sqlite', './wallet.json', at())).toBeUndefined();
+    });
+
+    it('says nothing for a backend that never moved a wallet', () => {
+        expect(strandedWallet('json', './wallet.json', at('data/wallet.json'))).toBeUndefined();
+    });
+
+    it('names both paths and how to reconcile them', () => {
+        const message = strandedWalletMessage('./wallet.json', 'data/wallet.json');
+
+        expect(message).toContain('./wallet.json');
+        expect(message).toContain('data/wallet.json');
+        expect(message).toContain('ARCHON_WALLET_PATH');
     });
 });

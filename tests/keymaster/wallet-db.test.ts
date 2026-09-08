@@ -275,6 +275,27 @@ describe('openWalletStore', () => {
         });
     });
 
+    // create-wallet, create-id and the MCP tools behind loadOrCreateWallet all
+    // provision without consulting the "no wallet" message, so the only place
+    // that can stop them minting a second identity is before the store opens.
+    it('refuses to open an empty path while a wallet is stranded under data/', async () => {
+        await withTempDir(async dir => {
+            const cwd = process.cwd();
+            process.chdir(dir);
+            try {
+                mkdirSync(join(dir, 'data'), { recursive: true });
+                const legacy = await WalletSQLite.create('wallet.json', 'data');
+                await legacy.saveWallet(walletOne);
+                await legacy.disconnect();
+
+                await expect(openWalletStore('sqlite', './wallet.json')).rejects.toThrow('data/wallet.json');
+                expect(existsSync(join(dir, 'wallet.json'))).toBe(false);
+            } finally {
+                process.chdir(cwd);
+            }
+        });
+    });
+
     // Anything that is not the SQLite backend is the JSON one, which is what
     // every caller's `ARCHON_WALLET_TYPE || 'json'` already assumed.
     it('reads an unset wallet type as JSON', async () => {
