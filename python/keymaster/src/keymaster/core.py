@@ -1819,6 +1819,27 @@ class Keymaster:
             },
         }
 
+    def _authorized_for_purpose(self, doc: dict[str, Any], proof: dict[str, Any]) -> bool:
+        """Whether the document lists this key under the purpose the proof claims.
+
+        Without it a key published for authentication alone can produce a proof
+        claiming assertionMethod, and the signature checks out because the key
+        genuinely belongs to the subject.
+        """
+        did = doc.get("didDocument", {}).get("id")
+        if not did:
+            return False
+
+        relationship = (
+            "authentication" if proof.get("proofPurpose") == "authentication" else "assertionMethod"
+        )
+        target = _absolute_key_id(proof.get("verificationMethod", ""), did)
+
+        return any(
+            _absolute_key_id(ref, did) == target
+            for ref in doc.get("didDocument", {}).get(relationship) or []
+        )
+
     def _resolve_proof_key(self, doc: dict[str, Any], proof: dict[str, Any]) -> tuple[str, Any] | None:
         """The key a proof names, for verification only.
 
@@ -1826,6 +1847,9 @@ class Keymaster:
         key for encryption -- making that one proof-aware would hand them the
         wrong key.
         """
+        if not self._authorized_for_purpose(doc, proof):
+            return None
+
         vm = self._find_verification_method(doc, proof.get("verificationMethod", ""))
 
         if vm is None:
@@ -3860,13 +3884,13 @@ class Keymaster:
         return dc.generate_x25519_jwk(dc.ed25519_seed_to_x25519(derived))
 
     async def fetch_assertion_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]]:
-        """Ed25519 assertion key, derived on its own branch (change=2).
+        """Ed25519 assertion key, on its own SLIP-0010 branch.
 
-        `change` selects the key type and the final index is that type's
-        rotation counter: 0 signing/authentication, 1 DIDComm key agreement,
-        2 Ed25519 assertion. The BIP32 node is secp256k1 either way -- an
-        Ed25519 secret is any 32 bytes -- so this needs no second HD scheme,
-        exactly as fetch_didcomm_key_pair does for X25519.
+        Derived from the BIP39 seed rather than the BIP32 secp256k1 node, on a
+        hardened path as SLIP-0010 requires for Ed25519. The account is the
+        identity and the level below it separates key types: 1' key agreement,
+        2' assertion. Signing keys stay on the BIP32 tree at change=0, where
+        their index is the rotation counter.
         """
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
@@ -3931,14 +3955,17 @@ class Keymaster:
         else:
             did_document.pop("assertionMethod", None)
 
-        context = [entry for entry in did_document.get("@context") or [] if entry != MULTIKEY_CONTEXT]
+        # Only once nothing needs it: another Multikey may remain, and dropping
+        # the context would leave its terms undefined.
+        if not any(vm.get("type") == "Multikey" for vm in verification_method):
+            context = [entry for entry in did_document.get("@context") or [] if entry != MULTIKEY_CONTEXT]
 
-        if context:
-            did_document["@context"] = context
-        else:
-            # Assigning only when something survives leaves the original list in
-            # place, multikey entry and all.
-            did_document.pop("@context", None)
+            if context:
+                did_document["@context"] = context
+            else:
+                # Assigning only when something survives leaves the original
+                # list in place, multikey entry and all.
+                did_document.pop("@context", None)
 
         return await self.update_did(did, {"didDocument": did_document})
 

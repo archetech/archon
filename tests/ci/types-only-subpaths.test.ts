@@ -18,10 +18,33 @@ interface Manifest {
     exports?: Record<string, { types?: string, import?: string, require?: string }>;
 }
 
-// `export function`, `export const`, `export class`, `export enum` — anything
-// that survives to runtime. `export type`, `export interface` and re-exported
-// types do not.
-const VALUE_EXPORT = /^export\s+(?:default\s+)?(?:async\s+)?(?:function|const|let|var|class|enum)\s+(\w+)/gm;
+// Anything that survives to runtime. `export type`, `export interface` and
+// `export type { ... } from` do not.
+const VALUE_DECLARATION = /^export\s+(?:default\s+)?(?:async\s+)?(?:function|const|let|var|class|enum)\s+(\w+)/gm;
+
+// A re-export emits an import of the module it names unless it is type-only,
+// so `export { x } from './m.js'` and `export * from './m.js'` both put a
+// runtime dependency in a module that is supposed to have none. Only
+// `export type { ... } from` and `export type * from` are erased.
+const RE_EXPORT = /^export\s+(?!type\s)(\{[^}]*\}|\*(?:\s+as\s+\w+)?)\s+from\s+['"][^'"]+['"]/gm;
+
+function valueExports(source: string): string[] {
+    const declared = [...source.matchAll(VALUE_DECLARATION)].map(match => match[1]);
+    const reExported = [...source.matchAll(RE_EXPORT)].flatMap(match => {
+        // `export { type A, B } from` is partly erased; B is the problem.
+        if (match[1].startsWith('*')) {
+            return [match[0].trim()];
+        }
+
+        return match[1]
+            .replace(/^\{|\}$/g, '')
+            .split(',')
+            .map(part => part.trim())
+            .filter(part => part && !part.startsWith('type '));
+    });
+
+    return [...declared, ...reExported];
+}
 
 function typesOnlyModules(): { specifier: string, source: string }[] {
     const modules: { specifier: string, source: string }[] = [];
@@ -63,8 +86,6 @@ describe('types-only subpaths', () => {
     });
 
     it.each(modules.map(module => [module.specifier, module.source]))('%s exports no runtime value', (_specifier, source) => {
-        const exported = [...readFileSync(source, 'utf-8').matchAll(VALUE_EXPORT)].map(match => match[1]);
-
-        expect(exported).toStrictEqual([]);
+        expect(valueExports(readFileSync(source, 'utf-8'))).toStrictEqual([]);
     });
 });

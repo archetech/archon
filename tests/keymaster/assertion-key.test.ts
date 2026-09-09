@@ -115,6 +115,30 @@ describe('publishAssertionKey', () => {
 });
 
 describe('unpublishAssertionKey', () => {
+    // The Multikey context defines the terms of every Multikey in the document,
+    // so removing it while one remains leaves that method's terms undefined.
+    it('keeps the Multikey context while another Multikey remains', async () => {
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        await keymaster.publishAssertionKey();
+
+        const doc: any = await keymaster.resolveDID(did);
+        const didDocument = { ...doc.didDocument };
+        didDocument.verificationMethod = [...didDocument.verificationMethod, {
+            id: `${did}#key-other-1`,
+            controller: did,
+            type: 'Multikey',
+            publicKeyMultibase: 'z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp',
+        }];
+        await keymaster.updateDID(did, { didDocument });
+
+        await keymaster.unpublishAssertionKey();
+
+        const after: any = await keymaster.resolveDID(did);
+
+        expect(after.didDocument.verificationMethod.map((vm: any) => vm.id)).toContain(`${did}#key-other-1`);
+        expect(after.didDocument['@context']).toContain('https://w3id.org/security/multikey/v1');
+    });
+
     it('removes the key and its reference, keeping the identity key', async () => {
         const did = await keymaster.createId('Alice', { registry: 'local' });
         await keymaster.publishAssertionKey();

@@ -131,6 +131,59 @@ describe('proof sets', () => {
     });
 });
 
+describe('proofPurpose authorization', () => {
+    // The signature checks out either way -- the key really is the subject's --
+    // so without this a key published only for key agreement, or only for
+    // authentication, can sign a credential claiming assertionMethod.
+    it('rejects a proof naming a key the document does not authorize for that purpose', async () => {
+        const { did, document } = await credential();
+
+        // The key moves out of assertionMethod and under keyAgreement, and the
+        // proof is signed afterwards. Order matters: verifyProof resolves at
+        // the proof's own created time, so a document changed after a proof was
+        // made cannot retroactively invalidate it -- which is what makes key
+        // rotation survivable, and is asserted separately below.
+        const doc: any = await keymaster.resolveDID(did);
+        const didDocument = { ...doc.didDocument };
+        didDocument.assertionMethod = didDocument.assertionMethod.filter((r: string) => !r.endsWith('#key-assertion-1'));
+        didDocument.keyAgreement = [`${did}#key-assertion-1`];
+        await keymaster.updateDID(did, { didDocument });
+
+        const proof: any = await signEddsaJcs2022(document, did);
+
+        expect(await keymaster.verifyProof({ ...document, proof })).toBe(false);
+    });
+
+    // The other half of the same rule: a proof made while the key was
+    // authorized keeps verifying after the document moves on.
+    it('accepts a proof made while the key was still authorized', async () => {
+        const { did, document } = await credential();
+        const proof: any = await signEddsaJcs2022(document, did);
+
+        const doc: any = await keymaster.resolveDID(did);
+        const didDocument = { ...doc.didDocument };
+        didDocument.assertionMethod = didDocument.assertionMethod.filter((r: string) => !r.endsWith('#key-assertion-1'));
+        await keymaster.updateDID(did, { didDocument });
+
+        expect(await keymaster.verifyProof({ ...document, proof })).toBe(true);
+    });
+
+    it('rejects an authentication proof from a key listed only for assertion', async () => {
+        const { did, document } = await credential();
+        const proof: any = await signEddsaJcs2022(document, did);
+
+        expect(await keymaster.verifyProof({ ...document, proof: { ...proof, proofPurpose: 'authentication' } })).toBe(false);
+    });
+
+    // #key-1 is in both relationships, so the ordinary case keeps working.
+    it('accepts the identity key, which the document lists under both', async () => {
+        await keymaster.createId('Bob', { registry: 'local' });
+        const signed = await keymaster.addProof({ hello: 'world' });
+
+        expect(await keymaster.verifyProof(signed)).toBe(true);
+    });
+});
+
 describe('the legacy label', () => {
     // Every credential issued so far carries it, and they are immutable, so it
     // is accepted for good rather than deprecated.

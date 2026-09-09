@@ -1310,8 +1310,32 @@ export default class Keymaster implements KeymasterInterface {
     // The key a proof names, for verification only. Deliberately not
     // getPublicKeyJwk, which five callers use to reach the identity key for
     // encryption -- making that one proof-aware would hand them the wrong key.
+    // A verification method may sign for a purpose only if the document lists
+    // it under that relationship. Without this a key published for
+    // authentication alone can produce a proof claiming assertionMethod, and
+    // the signature checks out because the key is genuinely the subject's.
+    private authorizedForPurpose(doc: DidCidDocument, proof: CredentialProof): boolean {
+        const did = doc.didDocument?.id;
+
+        if (!did) {
+            return false;
+        }
+
+        const refs = proof.proofPurpose === 'authentication'
+            ? doc.didDocument?.authentication
+            : doc.didDocument?.assertionMethod;
+
+        const target = this.absoluteKeyId(proof.verificationMethod, did);
+
+        return (refs || []).some(ref => this.absoluteKeyId(ref, did) === target);
+    }
+
     private resolveProofKey(doc: DidCidDocument, proof: CredentialProof):
         { curve: 'secp256k1', jwk: EcdsaJwkPublic } | { curve: 'Ed25519', key: Uint8Array } | null {
+        if (!this.authorizedForPurpose(doc, proof)) {
+            return null;
+        }
+
         const vm = this.findVerificationMethod(doc, proof.verificationMethod);
 
         if (!vm) {
@@ -2578,15 +2602,19 @@ export default class Keymaster implements KeymasterInterface {
             delete didDocument.assertionMethod;
         }
 
-        const context = (didDocument['@context'] || []).filter(entry => entry !== MULTIKEY_CONTEXT);
+        // Only once nothing needs it: another Multikey may remain, and dropping
+        // the context would leave its terms undefined.
+        if (!verificationMethod.some(vm => vm.type === 'Multikey')) {
+            const context = (didDocument['@context'] || []).filter(entry => entry !== MULTIKEY_CONTEXT);
 
-        if (context.length > 0) {
-            didDocument['@context'] = context;
-        }
-        else {
-            // Assigning only when something survives leaves the original array
-            // in place, multikey entry and all.
-            delete didDocument['@context'];
+            if (context.length > 0) {
+                didDocument['@context'] = context;
+            }
+            else {
+                // Assigning only when something survives leaves the original
+                // array in place, multikey entry and all.
+                delete didDocument['@context'];
+            }
         }
 
         return this.updateDID(did, { didDocument });

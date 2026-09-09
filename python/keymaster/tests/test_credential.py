@@ -274,3 +274,47 @@ def test_verify_proof_reads_a_set_and_ignores_suites_it_does_not_implement(testb
     assert run(km.verify_proof({**document, "proof": [foreign, good]})) is True
     assert run(km.verify_proof({**document, "proof": [foreign]})) is False
     assert run(km.verify_proof({**document, "proof": []})) is False
+
+
+def test_verify_proof_requires_the_key_to_be_authorized_for_the_purpose(testbed):
+    """A key published only for key agreement can otherwise sign a credential
+    claiming assertionMethod: the signature checks out because the key really is
+    the subject's. Mirrors tests/keymaster/verify-proof.test.ts."""
+    km = testbed.keymaster
+    did, document = _published_credential(km)
+
+    # The key moves out of assertionMethod first: verify_proof resolves at the
+    # proof's own created time, so a document changed afterwards cannot
+    # retroactively invalidate a proof.
+    doc = run(km.resolve_did(did))["didDocument"]
+    doc["assertionMethod"] = [r for r in doc["assertionMethod"] if not str(r).endswith("#key-assertion-1")]
+    doc["keyAgreement"] = [f"{did}#key-assertion-1"]
+    run(km.update_did(did, {"didDocument": doc}))
+
+    proof = _sign_eddsa_jcs_2022(km, document, did)
+
+    assert run(km.verify_proof({**document, "proof": proof})) is False
+
+
+def test_unpublish_assertion_key_keeps_the_context_while_a_multikey_remains(testbed):
+    km = testbed.keymaster
+    did, _ = _published_credential(km)
+
+    doc = run(km.resolve_did(did))["didDocument"]
+    doc["verificationMethod"] = [
+        *doc["verificationMethod"],
+        {
+            "id": f"{did}#key-other-1",
+            "controller": did,
+            "type": "Multikey",
+            "publicKeyMultibase": "z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp",
+        },
+    ]
+    run(km.update_did(did, {"didDocument": doc}))
+
+    run(km.unpublish_assertion_key())
+
+    after = run(km.resolve_did(did))["didDocument"]
+
+    assert f"{did}#key-other-1" in [vm["id"] for vm in after["verificationMethod"]]
+    assert "https://w3id.org/security/multikey/v1" in after.get("@context", [])
