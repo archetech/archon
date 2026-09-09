@@ -2702,11 +2702,21 @@ export default class Keymaster implements KeymasterInterface {
         });
         didDocument.verificationMethod = verificationMethod;
 
-        // Added to assertionMethod, not substituted for it: #key-1 is already
-        // there and still signs everything Archon verifies itself.
-        const assertionMethod = (didDocument.assertionMethod || []).filter(ref => !isAssertionKey(ref));
-        assertionMethod.push(vmId);
-        didDocument.assertionMethod = assertionMethod;
+        // Both relationships: assertionMethod for the credentials this identity
+        // issues, authentication for the presentations it holds. A presentation
+        // signed under authentication by a key listed only for assertionMethod
+        // is one a conforming verifier rejects, so publishing for one and not
+        // the other would leave presentations Archon-only.
+        //
+        // Added to each, not substituted for it: #key-1 is already there and
+        // still signs everything Archon verifies itself. Nothing widens as a
+        // result -- both gatekeeper ports authorize an operation against
+        // verificationMethod[0] and never read these arrays.
+        for (const relationship of ['assertionMethod', 'authentication'] as const) {
+            const refs = (didDocument[relationship] || []).filter(ref => !isAssertionKey(ref));
+            refs.push(vmId);
+            didDocument[relationship] = refs;
+        }
 
         const context = didDocument['@context'] || [];
         if (!context.includes(MULTIKEY_CONTEXT)) {
@@ -2735,15 +2745,17 @@ export default class Keymaster implements KeymasterInterface {
             delete didDocument.verificationMethod;
         }
 
-        // Only this fragment leaves: unlike keyAgreement, assertionMethod holds
-        // the identity key too and deleting it wholesale would unpublish that.
-        const assertionMethod = (didDocument.assertionMethod || []).filter(ref => !isAssertionKey(ref));
+        // Only this fragment leaves: unlike keyAgreement, both of these hold the
+        // identity key too and deleting either wholesale would unpublish that.
+        for (const relationship of ['assertionMethod', 'authentication'] as const) {
+            const refs = (didDocument[relationship] || []).filter(ref => !isAssertionKey(ref));
 
-        if (assertionMethod.length > 0) {
-            didDocument.assertionMethod = assertionMethod;
-        }
-        else {
-            delete didDocument.assertionMethod;
+            if (refs.length > 0) {
+                didDocument[relationship] = refs;
+            }
+            else {
+                delete didDocument[relationship];
+            }
         }
 
         // Only once nothing needs it: another Multikey may remain, and dropping

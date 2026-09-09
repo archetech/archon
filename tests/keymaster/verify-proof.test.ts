@@ -344,33 +344,37 @@ describe('issuing', () => {
         expect(signed.proof.type).toBe('EcdsaSecp256k1Signature2019');
     });
 
-    // publishAssertionKey lists the key under assertionMethod alone, and the
-    // presentation path signs with 'authentication', so this is reachable
-    // rather than theoretical.
-    it('attaches nothing for a purpose the assertion key is not authorized for', async () => {
+    // A presentation is signed under authentication, so this is the path a
+    // holder takes rather than a theoretical one.
+    it('attaches both for a presentation signed under authentication', async () => {
         const { document } = await credential();
+        const signed: any = await keymaster.addProof(document, 'Alice', 'authentication');
+
+        expect(signed.proof).toHaveLength(2);
+        expect(signed.proof[1].proofPurpose).toBe('authentication');
+        expect(await keymaster.verifyProof({ ...document, proof: [signed.proof[1]] })).toBe(true);
+    });
+
+    // The signing side runs the check the verifier runs, so a document that
+    // does not authorize the key for the purpose gets no proof it would then
+    // reject. Reachable through a document edited after publishing, and the
+    // reason the relationship is read rather than assumed from the publish.
+    it('attaches nothing for a purpose the document does not authorize', async () => {
+        const { did, document } = await credential();
+        const doc: any = await keymaster.resolveDID(did);
+        const didDocument = {
+            ...doc.didDocument,
+            authentication: doc.didDocument.authentication.filter(
+                (ref: string) => !ref.endsWith('#key-assertion-1')),
+        };
+        await keymaster.updateDID(did, { didDocument });
+
         const signed: any = await keymaster.addProof(document, 'Alice', 'authentication');
 
         expect(Array.isArray(signed.proof)).toBe(false);
         expect(signed.proof.type).toBe('EcdsaSecp256k1Signature2019');
         expect(signed.proof.proofPurpose).toBe('authentication');
         expect(await keymaster.verifyProof(signed)).toBe(true);
-    });
-
-    it('attaches both once the key is authorized for authentication too', async () => {
-        const { did, document } = await credential();
-        const doc: any = await keymaster.resolveDID(did);
-        const didDocument = {
-            ...doc.didDocument,
-            authentication: [...doc.didDocument.authentication, `${did}#key-assertion-1`],
-        };
-        await keymaster.updateDID(did, { didDocument });
-
-        const signed: any = await keymaster.addProof(document, 'Alice', 'authentication');
-
-        expect(signed.proof).toHaveLength(2);
-        expect(signed.proof[1].proofPurpose).toBe('authentication');
-        expect(await keymaster.verifyProof({ ...document, proof: [signed.proof[1]] })).toBe(true);
     });
 
     // Both gatekeeper ports require an operation proof to be a single object

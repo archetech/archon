@@ -189,6 +189,7 @@ def test_publish_assertion_key_adds_a_multikey_without_displacing_the_identity_k
         keypair["publicJwk"]["x"]
     )
     assert document["assertionMethod"] == ["#key-1", f"{did}#key-assertion-1"]
+    assert document["authentication"] == ["#key-1", f"{did}#key-assertion-1"]
     assert "https://w3id.org/security/multikey/v1" in document["@context"]
 
 
@@ -203,6 +204,7 @@ def test_unpublish_assertion_key_leaves_the_identity_key_in_place(testbed):
 
     assert [vm["id"] for vm in document["verificationMethod"]] == ["#key-1"]
     assert document["assertionMethod"] == ["#key-1"]
+    assert document["authentication"] == ["#key-1"]
     assert "https://w3id.org/security/multikey/v1" not in document.get("@context", [])
 
 
@@ -358,9 +360,10 @@ def test_publish_assertion_key_replaces_a_relative_reference(testbed):
         {**vm, "id": "#key-assertion-1"} if vm.get("id") == f"{did}#key-assertion-1" else vm
         for vm in doc["verificationMethod"]
     ]
-    doc["assertionMethod"] = [
-        "#key-assertion-1" if ref == f"{did}#key-assertion-1" else ref for ref in doc["assertionMethod"]
-    ]
+    for relationship in ("assertionMethod", "authentication"):
+        doc[relationship] = [
+            "#key-assertion-1" if ref == f"{did}#key-assertion-1" else ref for ref in doc[relationship]
+        ]
     run(km.update_did(did, {"didDocument": doc}))
 
     run(km.publish_assertion_key())
@@ -370,6 +373,7 @@ def test_publish_assertion_key_replaces_a_relative_reference(testbed):
 
     assert len(multikeys) == 1
     assert len([r for r in after["assertionMethod"] if str(r).endswith("#key-assertion-1")]) == 1
+    assert len([r for r in after["authentication"] if str(r).endswith("#key-assertion-1")]) == 1
 
 
 def test_verify_proof_rejects_a_context_the_document_does_not_declare(testbed):
@@ -439,12 +443,28 @@ def test_add_proof_attaches_nothing_when_the_published_key_is_not_the_derived_on
     assert isinstance(signed["proof"], dict)
 
 
-def test_add_proof_attaches_nothing_for_an_unauthorized_purpose(testbed):
-    """publish_assertion_key lists the key under assertionMethod alone, and the
-    presentation path signs with 'authentication'. Mirrors
+def test_add_proof_attaches_both_for_a_presentation(testbed):
+    """A presentation is signed under authentication. Mirrors
     tests/keymaster/verify-proof.test.ts."""
     km = testbed.keymaster
     _, document = _published_credential(km)
+
+    signed = run(km.add_proof(document, "Alice", "authentication"))
+
+    assert len(signed["proof"]) == 2
+    assert signed["proof"][1]["proofPurpose"] == "authentication"
+    assert run(km.verify_proof({**document, "proof": [signed["proof"][1]]})) is True
+
+
+def test_add_proof_attaches_nothing_for_a_purpose_the_document_does_not_authorize(testbed):
+    """The signing side runs the check the verifier runs, so a document that
+    does not authorize the key for the purpose gets no proof it would reject."""
+    km = testbed.keymaster
+    did, document = _published_credential(km)
+
+    doc = run(km.resolve_did(did))["didDocument"]
+    doc["authentication"] = [r for r in doc["authentication"] if not str(r).endswith("#key-assertion-1")]
+    run(km.update_did(did, {"didDocument": doc}))
 
     signed = run(km.add_proof(document, "Alice", "authentication"))
 
@@ -452,21 +472,6 @@ def test_add_proof_attaches_nothing_for_an_unauthorized_purpose(testbed):
     assert signed["proof"]["type"] == "EcdsaSecp256k1Signature2019"
     assert signed["proof"]["proofPurpose"] == "authentication"
     assert run(km.verify_proof(signed)) is True
-
-
-def test_add_proof_attaches_both_once_authorized_for_authentication(testbed):
-    km = testbed.keymaster
-    did, document = _published_credential(km)
-
-    doc = run(km.resolve_did(did))["didDocument"]
-    doc["authentication"] = [*doc["authentication"], f"{did}#key-assertion-1"]
-    run(km.update_did(did, {"didDocument": doc}))
-
-    signed = run(km.add_proof(document, "Alice", "authentication"))
-
-    assert len(signed["proof"]) == 2
-    assert signed["proof"][1]["proofPurpose"] == "authentication"
-    assert run(km.verify_proof({**document, "proof": [signed["proof"][1]]})) is True
 
 
 def test_operations_carry_one_legacy_proof_after_an_assertion_key_is_published(testbed):

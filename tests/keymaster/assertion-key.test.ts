@@ -68,15 +68,16 @@ describe('publishAssertionKey', () => {
             .toBe(keypair.publicJwk.x);
     });
 
-    // assertionMethod already names #key-1, and dropping it would unpublish the
-    // key everything Archon verifies today is signed with.
-    it('adds to assertionMethod rather than replacing it', async () => {
+    // Both already name #key-1, and dropping it would unpublish the key
+    // everything Archon verifies today is signed with.
+    it('adds to assertionMethod and authentication rather than replacing them', async () => {
         const did = await keymaster.createId('Alice', { registry: 'local' });
         await keymaster.publishAssertionKey();
 
         const doc: any = await keymaster.resolveDID(did);
 
         expect(doc.didDocument.assertionMethod).toStrictEqual(['#key-1', `${did}#key-assertion-1`]);
+        expect(doc.didDocument.authentication).toStrictEqual(['#key-1', `${did}#key-assertion-1`]);
     });
 
     it('declares the Multikey context', async () => {
@@ -101,6 +102,8 @@ describe('publishAssertionKey', () => {
             (vm: any) => vm.id === `${did}#key-assertion-1` ? { ...vm, id: '#key-assertion-1' } : vm);
         didDocument.assertionMethod = didDocument.assertionMethod.map(
             (ref: string) => ref === `${did}#key-assertion-1` ? '#key-assertion-1' : ref);
+        didDocument.authentication = didDocument.authentication.map(
+            (ref: string) => ref === `${did}#key-assertion-1` ? '#key-assertion-1' : ref);
         await keymaster.updateDID(did, { didDocument });
 
         await keymaster.publishAssertionKey();
@@ -109,6 +112,7 @@ describe('publishAssertionKey', () => {
 
         expect(assertionMethods(after)).toHaveLength(1);
         expect(after.didDocument.assertionMethod.filter((r: string) => r.endsWith('#key-assertion-1'))).toHaveLength(1);
+        expect(after.didDocument.authentication.filter((r: string) => r.endsWith('#key-assertion-1'))).toHaveLength(1);
     });
 
     it('is idempotent', async () => {
@@ -120,6 +124,7 @@ describe('publishAssertionKey', () => {
 
         expect(assertionMethods(doc)).toHaveLength(1);
         expect(doc.didDocument.assertionMethod.filter((r: string) => r.endsWith('#key-assertion-1'))).toHaveLength(1);
+        expect(doc.didDocument.authentication.filter((r: string) => r.endsWith('#key-assertion-1'))).toHaveLength(1);
     });
 
     // The key is not stored, so a rotation that dropped it would leave every
@@ -134,6 +139,7 @@ describe('publishAssertionKey', () => {
 
         expect(assertionMethods(doc)).toHaveLength(1);
         expect(doc.didDocument.assertionMethod).toContain(`${did}#key-assertion-1`);
+        expect(doc.didDocument.authentication).toContain(`${did}#key-assertion-1`);
     });
 });
 
@@ -172,6 +178,7 @@ describe('unpublishAssertionKey', () => {
 
         expect(assertionMethods(doc)).toHaveLength(0);
         expect(doc.didDocument.assertionMethod).toStrictEqual(['#key-1']);
+        expect(doc.didDocument.authentication).toStrictEqual(['#key-1']);
         expect(doc.didDocument.verificationMethod.map((vm: any) => vm.id)).toStrictEqual(['#key-1']);
         expect(doc.didDocument['@context']).not.toContain('https://w3id.org/security/multikey/v1');
     });

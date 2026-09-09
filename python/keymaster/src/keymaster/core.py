@@ -4039,13 +4039,20 @@ class Keymaster:
         })
         did_document["verificationMethod"] = verification_method
 
-        # Added to assertionMethod, not substituted for it: #key-1 is already
-        # there and still signs everything Archon verifies itself.
-        assertion_method = [
-            ref for ref in did_document.get("assertionMethod") or [] if not is_assertion_key(ref)
-        ]
-        assertion_method.append(vm_id)
-        did_document["assertionMethod"] = assertion_method
+        # Both relationships: assertionMethod for the credentials this identity
+        # issues, authentication for the presentations it holds. A presentation
+        # signed under authentication by a key listed only for assertionMethod
+        # is one a conforming verifier rejects, so publishing for one and not
+        # the other would leave presentations Archon-only.
+        #
+        # Added to each, not substituted for it: #key-1 is already there and
+        # still signs everything Archon verifies itself. Nothing widens as a
+        # result -- both gatekeeper ports authorize an operation against
+        # verificationMethod[0] and never read these arrays.
+        for relationship in ("assertionMethod", "authentication"):
+            refs = [ref for ref in did_document.get(relationship) or [] if not is_assertion_key(ref)]
+            refs.append(vm_id)
+            did_document[relationship] = refs
 
         context = list(did_document.get("@context") or [])
         if MULTIKEY_CONTEXT not in context:
@@ -4073,16 +4080,15 @@ class Keymaster:
         else:
             did_document.pop("verificationMethod", None)
 
-        # Only this fragment leaves: unlike keyAgreement, assertionMethod holds
-        # the identity key too and deleting it wholesale would unpublish that.
-        assertion_method = [
-            ref for ref in did_document.get("assertionMethod") or [] if not is_assertion_key(ref)
-        ]
+        # Only this fragment leaves: unlike keyAgreement, both of these hold the
+        # identity key too and deleting either wholesale would unpublish that.
+        for relationship in ("assertionMethod", "authentication"):
+            refs = [ref for ref in did_document.get(relationship) or [] if not is_assertion_key(ref)]
 
-        if assertion_method:
-            did_document["assertionMethod"] = assertion_method
-        else:
-            did_document.pop("assertionMethod", None)
+            if refs:
+                did_document[relationship] = refs
+            else:
+                did_document.pop(relationship, None)
 
         # Only once nothing needs it: another Multikey may remain, and dropping
         # the context would leave its terms undefined.
