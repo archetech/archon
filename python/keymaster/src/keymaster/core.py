@@ -1856,6 +1856,14 @@ class Keymaster:
         if not vm or not vm.get("publicKeyMultibase"):
             return None
 
+        # publish_assertion_key lists the key under assertionMethod alone, so for
+        # any other purpose this key is unauthorized and the proof it produced
+        # would be one no verifier accepts -- including this class's own.
+        if not self._authorized_for_purpose(
+            doc, {"verificationMethod": vm_id, "proofPurpose": proof_purpose}
+        ):
+            return None
+
         keypair = await self.fetch_assertion_key_pair(controller)
 
         # The published key is what a verifier will resolve, so a derivation

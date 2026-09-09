@@ -1352,6 +1352,13 @@ export default class Keymaster implements KeymasterInterface {
             return null;
         }
 
+        // publishAssertionKey lists the key under assertionMethod alone, so for
+        // any other purpose this key is unauthorized and the proof it produced
+        // would be one no verifier accepts -- including this class's own.
+        if (!this.authorizedForPurpose(doc, { verificationMethod: vmId, proofPurpose })) {
+            return null;
+        }
+
         const keypair = await this.fetchAssertionKeyPair(controller);
 
         // The published key is what a verifier will resolve, so a derivation
@@ -1396,7 +1403,10 @@ export default class Keymaster implements KeymasterInterface {
     // it under that relationship. Without this a key published for
     // authentication alone can produce a proof claiming assertionMethod, and
     // the signature checks out because the key is genuinely the subject's.
-    private authorizedForPurpose(doc: DidCidDocument, proof: CredentialProof): boolean {
+    private authorizedForPurpose(
+        doc: DidCidDocument,
+        proof: Pick<CredentialProof, 'verificationMethod' | 'proofPurpose'>,
+    ): boolean {
         const did = doc.didDocument?.id;
 
         if (!did) {

@@ -439,6 +439,36 @@ def test_add_proof_attaches_nothing_when_the_published_key_is_not_the_derived_on
     assert isinstance(signed["proof"], dict)
 
 
+def test_add_proof_attaches_nothing_for_an_unauthorized_purpose(testbed):
+    """publish_assertion_key lists the key under assertionMethod alone, and the
+    presentation path signs with 'authentication'. Mirrors
+    tests/keymaster/verify-proof.test.ts."""
+    km = testbed.keymaster
+    _, document = _published_credential(km)
+
+    signed = run(km.add_proof(document, "Alice", "authentication"))
+
+    assert isinstance(signed["proof"], dict)
+    assert signed["proof"]["type"] == "EcdsaSecp256k1Signature2019"
+    assert signed["proof"]["proofPurpose"] == "authentication"
+    assert run(km.verify_proof(signed)) is True
+
+
+def test_add_proof_attaches_both_once_authorized_for_authentication(testbed):
+    km = testbed.keymaster
+    did, document = _published_credential(km)
+
+    doc = run(km.resolve_did(did))["didDocument"]
+    doc["authentication"] = [*doc["authentication"], f"{did}#key-assertion-1"]
+    run(km.update_did(did, {"didDocument": doc}))
+
+    signed = run(km.add_proof(document, "Alice", "authentication"))
+
+    assert len(signed["proof"]) == 2
+    assert signed["proof"][1]["proofPurpose"] == "authentication"
+    assert run(km.verify_proof({**document, "proof": [signed["proof"][1]]})) is True
+
+
 def test_operations_carry_one_legacy_proof_after_an_assertion_key_is_published(testbed):
     """Both gatekeeper ports require an operation proof to be a single object
     whose type is the literal EcdsaSecp256k1Signature2019. The testbed's
