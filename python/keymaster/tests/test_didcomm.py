@@ -638,3 +638,41 @@ def test_accept_credential_didcomm_refuses_a_credential_it_did_not_show(monkeypa
     message["attachments"][0]["data"]["json"] = resolved
     assert asyncio.run(km.accept_credential_didcomm(message)) is True
     assert accepted == ["did:cid:credential"]
+
+# The same zero seed and the values the TypeScript cipher produces for it. Both
+# suites pin these constants, so an encoding change on either side fails here
+# rather than surfacing as a credential the other cannot verify.
+ED25519_ZERO_SEED_X = "O2onvM62pC1io6jQKm8Nc2UyFXcd4kOmOsBIoYtZ2ik"
+ED25519_ZERO_SEED_MULTIKEY = "z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp"
+ED25519_ZERO_SEED_SIGNATURE = (
+    "4lyHI9A5_o9F1snWqJF_qRvHVJE81Zb9NYpJOiGjy1kKZTe6vH3wQAq2GgVYnJw2tloUOHjLA0HU6eSEGcQ3DQ"
+)
+
+
+def test_ed25519_matches_the_typescript_cipher_byte_for_byte():
+    pair = dc.generate_ed25519_jwk(bytes(32))
+    signature = dc.sign_ed25519(b"hello", pair["privateJwk"])
+
+    assert pair["publicJwk"]["x"] == ED25519_ZERO_SEED_X
+    assert dc.ed25519_public_key_to_multikey(dc.ub64url(pair["publicJwk"]["x"])) == ED25519_ZERO_SEED_MULTIKEY
+    assert dc.b64url(signature) == ED25519_ZERO_SEED_SIGNATURE
+
+
+def test_ed25519_verification_rejects_what_it_should():
+    pair = dc.generate_ed25519_jwk(bytes(32))
+    other = dc.generate_ed25519_jwk(bytes([1] * 32))
+    signature = dc.sign_ed25519(b"hello", pair["privateJwk"])
+
+    assert dc.verify_ed25519(b"hello", signature, pair["publicJwk"]) is True
+    assert dc.verify_ed25519(b"goodbye", signature, pair["publicJwk"]) is False
+    assert dc.verify_ed25519(b"hello", signature, other["publicJwk"]) is False
+    assert dc.verify_ed25519(b"hello", b"short", pair["publicJwk"]) is False
+
+
+def test_multikey_rejects_another_curve():
+    import pytest
+
+    x25519 = dc.bytes_to_multibase(bytes([dc.MULTICODEC_X25519_PUB, 0x01]) + bytes(32))
+
+    with pytest.raises(ValueError, match="Ed25519"):
+        dc.multikey_to_ed25519_public_key(x25519)

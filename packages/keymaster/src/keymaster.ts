@@ -4,6 +4,8 @@ import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
+import { ed25519PublicKeyToMultikey } from '@didcid/cipher/multikey';
+import type { Ed25519JwkPair } from '@didcid/cipher/types';
 import { CID } from 'multiformats/cid';
 import {
     ArchonError,
@@ -192,6 +194,10 @@ export enum PollItems {
     POLL = 'poll',
     RESULTS = 'results',
 }
+
+// Data Integrity verification methods are Multikeys, whose term this context
+// defines.
+const MULTIKEY_CONTEXT = 'https://w3id.org/security/multikey/v1';
 
 export default class Keymaster implements KeymasterInterface {
     private passphrase: string;
@@ -2417,6 +2423,96 @@ export default class Keymaster implements KeymasterInterface {
         const path = `m/44'/0'/${id.account}'/1/0`;
         const didkey = hdkey.derive(path);
         return this.cipher.generateX25519Jwk(didkey.privateKey!);
+    }
+
+    // Ed25519 assertion keys are derived on their own branch (change=2), the
+    // rule being that `change` selects the key type and the final index is that
+    // type's rotation counter: 0 signing/authentication, 1 DIDComm key
+    // agreement, 2 Ed25519 assertion. The BIP32 node is secp256k1 either way --
+    // an Ed25519 secret is any 32 bytes -- so this needs no second HD scheme,
+    // exactly as fetchDidCommKeyPair does for X25519.
+    async fetchAssertionKeyPair(name?: string): Promise<Ed25519JwkPair> {
+        const wallet = await this.loadWallet();
+        const id = await this.fetchIdInfo(name, wallet);
+        const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
+        const path = `m/44'/0'/${id.account}'/2/0`;
+        const didkey = hdkey.derive(path);
+        return this.cipher.generateEd25519Jwk(didkey.privateKey!);
+    }
+
+    // Published as a Multikey rather than a JsonWebKey2020: eddsa-jcs-2022
+    // requires the verification method to carry publicKeyMultibase, and a
+    // strict verifier refuses the JWK form the DIDComm key uses.
+    async publishAssertionKey(name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+        const keypair = await this.fetchAssertionKeyPair(name);
+        const doc = await this.resolveDID(did);
+        const didDocument = { ...doc.didDocument! };
+
+        const vmId = `${did}#key-assertion-1`;
+        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => vm.id !== vmId);
+        verificationMethod.push({
+            id: vmId,
+            controller: did,
+            type: 'Multikey',
+            publicKeyMultibase: ed25519PublicKeyToMultikey(base64url.baseDecode(keypair.publicJwk.x)),
+        });
+        didDocument.verificationMethod = verificationMethod;
+
+        // Added to assertionMethod, not substituted for it: #key-1 is already
+        // there and still signs everything Archon verifies itself.
+        const assertionMethod = (didDocument.assertionMethod || []).filter(ref => ref !== vmId);
+        assertionMethod.push(vmId);
+        didDocument.assertionMethod = assertionMethod;
+
+        const context = didDocument['@context'] || [];
+        if (!context.includes(MULTIKEY_CONTEXT)) {
+            didDocument['@context'] = [...context, MULTIKEY_CONTEXT];
+        }
+
+        return this.updateDID(did, { didDocument });
+    }
+
+    async unpublishAssertionKey(name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+        const doc = await this.resolveDID(did);
+        const didDocument = { ...doc.didDocument! };
+
+        const vmId = `${did}#key-assertion-1`;
+        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => vm.id !== vmId);
+
+        if (verificationMethod.length > 0) {
+            didDocument.verificationMethod = verificationMethod;
+        }
+        else {
+            delete didDocument.verificationMethod;
+        }
+
+        // Only this fragment leaves: unlike keyAgreement, assertionMethod holds
+        // the identity key too and deleting it wholesale would unpublish that.
+        const assertionMethod = (didDocument.assertionMethod || []).filter(ref => ref !== vmId);
+
+        if (assertionMethod.length > 0) {
+            didDocument.assertionMethod = assertionMethod;
+        }
+        else {
+            delete didDocument.assertionMethod;
+        }
+
+        const context = (didDocument['@context'] || []).filter(entry => entry !== MULTIKEY_CONTEXT);
+
+        if (context.length > 0) {
+            didDocument['@context'] = context;
+        }
+        else {
+            // Assigning only when something survives leaves the original array
+            // in place, multikey entry and all.
+            delete didDocument['@context'];
+        }
+
+        return this.updateDID(did, { didDocument });
     }
 
     async publishDidComm(endpoint?: string, name?: string, routingKeys?: string[]): Promise<boolean> {

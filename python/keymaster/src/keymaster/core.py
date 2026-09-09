@@ -77,6 +77,11 @@ class PollItems:
 _UNFETCHED = object()
 
 
+# Data Integrity verification methods are Multikeys, whose term this context
+# defines.
+MULTIKEY_CONTEXT = "https://w3id.org/security/multikey/v1"
+
+
 def _key_fragment(ref: Any) -> str | None:
     """The fragment of a verification method reference.
 
@@ -3725,6 +3730,90 @@ class Keymaster:
         root = await self._root_node(wallet)
         seed = derive_private_key_bytes(root, f"m/44'/0'/{id_info['account']}'/1/0")
         return dc.generate_x25519_jwk(seed)
+
+    async def fetch_assertion_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]]:
+        """Ed25519 assertion key, derived on its own branch (change=2).
+
+        `change` selects the key type and the final index is that type's
+        rotation counter: 0 signing/authentication, 1 DIDComm key agreement,
+        2 Ed25519 assertion. The BIP32 node is secp256k1 either way -- an
+        Ed25519 secret is any 32 bytes -- so this needs no second HD scheme,
+        exactly as fetch_didcomm_key_pair does for X25519.
+        """
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(name, wallet)
+        root = await self._root_node(wallet)
+        seed = derive_private_key_bytes(root, f"m/44'/0'/{id_info['account']}'/2/0")
+        return dc.generate_ed25519_jwk(seed)
+
+    async def publish_assertion_key(self, name: str | None = None) -> bool:
+        """Publish the Ed25519 key as a Multikey.
+
+        eddsa-jcs-2022 requires the verification method to carry
+        publicKeyMultibase; a strict verifier refuses the JsonWebKey2020 form
+        the DIDComm key uses.
+        """
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        keypair = await self.fetch_assertion_key_pair(name)
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+
+        vm_id = f"{did}#key-assertion-1"
+        verification_method = [vm for vm in did_document.get("verificationMethod") or [] if vm.get("id") != vm_id]
+        verification_method.append({
+            "id": vm_id,
+            "controller": did,
+            "type": "Multikey",
+            "publicKeyMultibase": dc.ed25519_public_key_to_multikey(dc.ub64url(keypair["publicJwk"]["x"])),
+        })
+        did_document["verificationMethod"] = verification_method
+
+        # Added to assertionMethod, not substituted for it: #key-1 is already
+        # there and still signs everything Archon verifies itself.
+        assertion_method = [ref for ref in did_document.get("assertionMethod") or [] if ref != vm_id]
+        assertion_method.append(vm_id)
+        did_document["assertionMethod"] = assertion_method
+
+        context = list(did_document.get("@context") or [])
+        if MULTIKEY_CONTEXT not in context:
+            did_document["@context"] = [*context, MULTIKEY_CONTEXT]
+
+        return await self.update_did(did, {"didDocument": did_document})
+
+    async def unpublish_assertion_key(self, name: str | None = None) -> bool:
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+
+        vm_id = f"{did}#key-assertion-1"
+        verification_method = [vm for vm in did_document.get("verificationMethod") or [] if vm.get("id") != vm_id]
+
+        if verification_method:
+            did_document["verificationMethod"] = verification_method
+        else:
+            did_document.pop("verificationMethod", None)
+
+        # Only this fragment leaves: unlike keyAgreement, assertionMethod holds
+        # the identity key too and deleting it wholesale would unpublish that.
+        assertion_method = [ref for ref in did_document.get("assertionMethod") or [] if ref != vm_id]
+
+        if assertion_method:
+            did_document["assertionMethod"] = assertion_method
+        else:
+            did_document.pop("assertionMethod", None)
+
+        context = [entry for entry in did_document.get("@context") or [] if entry != MULTIKEY_CONTEXT]
+
+        if context:
+            did_document["@context"] = context
+        else:
+            # Assigning only when something survives leaves the original list in
+            # place, multikey entry and all.
+            did_document.pop("@context", None)
+
+        return await self.update_did(did, {"didDocument": did_document})
 
     async def publish_didcomm(self, endpoint: str | None = None, name: str | None = None, routing_keys: list[str] | None = None) -> bool:
         # When no endpoint is given, auto-discover the node's public DIDComm

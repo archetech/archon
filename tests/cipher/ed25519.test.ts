@@ -107,3 +107,21 @@ describe('cross-check against the existing did:key encoding', () => {
         expect(multikeyToEd25519PublicKey(didKey.slice('did:key:'.length)).length).toBe(32);
     });
 });
+
+// A zero seed, with the values the Python port produces for it. Both suites
+// pin the same constants, so a change to either implementation's encoding
+// fails here rather than surfacing as a credential one side cannot verify.
+describe('cross-language vector', () => {
+    const SEED = new Uint8Array(32);
+    const PUBLIC_X = 'O2onvM62pC1io6jQKm8Nc2UyFXcd4kOmOsBIoYtZ2ik';
+    const MULTIKEY = 'z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp';
+    const SIGNATURE = '4lyHI9A5_o9F1snWqJF_qRvHVJE81Zb9NYpJOiGjy1kKZTe6vH3wQAq2GgVYnJw2tloUOHjLA0HU6eSEGcQ3DQ';
+
+    it('matches the Python keymaster byte for byte', () => {
+        const { publicJwk, privateJwk } = cipher.generateEd25519Jwk(SEED);
+
+        expect(publicJwk.x).toBe(PUBLIC_X);
+        expect(ed25519PublicKeyToMultikey(Buffer.from(publicJwk.x, 'base64url'))).toBe(MULTIKEY);
+        expect(Buffer.from(cipher.signEd25519(bytes('hello'), privateJwk)).toString('base64url')).toBe(SIGNATURE);
+    });
+});

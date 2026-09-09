@@ -24,6 +24,10 @@ import struct
 from typing import Any
 
 from bip_utils import Base58Decoder, Base58Encoder
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PrivateKey,
     X25519PublicKey,
@@ -134,6 +138,64 @@ def generate_x25519_jwk(seed: bytes) -> dict[str, dict[str, str]]:
     public_jwk = {"kty": "OKP", "crv": "X25519", "x": b64url(public_bytes)}
     private_jwk = {**public_jwk, "d": b64url(seed)}
     return {"publicJwk": public_jwk, "privateJwk": private_jwk}
+
+
+# ---------------------------------------------------------------------------
+# Ed25519 signing + Multikey encoding (mirrors packages/cipher/src/multikey.ts)
+# ---------------------------------------------------------------------------
+
+# Multicodec varint prefixes for key material, each followed by 0x01.
+MULTICODEC_X25519_PUB = 0xEC
+MULTICODEC_ED25519_PUB = 0xED
+
+
+def generate_ed25519_jwk(seed: bytes) -> dict[str, dict[str, str]]:
+    """Deterministic Ed25519 JWK pair from a 32-byte seed (matches generateEd25519Jwk)."""
+    if len(seed) != 32:
+        raise ValueError("Ed25519 seed must be 32 bytes")
+    public_bytes = Ed25519PrivateKey.from_private_bytes(seed).public_key().public_bytes_raw()
+    public_jwk = {"kty": "OKP", "crv": "Ed25519", "x": b64url(public_bytes)}
+    private_jwk = {**public_jwk, "d": b64url(seed)}
+    return {"publicJwk": public_jwk, "privateJwk": private_jwk}
+
+
+def sign_ed25519(message: bytes, private_jwk: dict[str, str]) -> bytes:
+    """Over the message bytes, not a hash of them: EdDSA hashes internally."""
+    return Ed25519PrivateKey.from_private_bytes(ub64url(private_jwk["d"])).sign(message)
+
+
+def verify_ed25519(message: bytes, signature: bytes, public_jwk: dict[str, str]) -> bool:
+    try:
+        Ed25519PublicKey.from_public_bytes(ub64url(public_jwk["x"])).verify(signature, message)
+        return True
+    except Exception:
+        # A malformed signature or key is a failed verification, not a crash.
+        return False
+
+
+def bytes_to_multibase(data: bytes) -> str:
+    """Base58-btc multibase, the form a Data Integrity proofValue takes."""
+    return "z" + Base58Encoder.Encode(data)
+
+
+def multibase_to_bytes(multibase: str) -> bytes:
+    if not multibase.startswith("z"):
+        raise ValueError("Expected a base58-btc multibase value")
+    return Base58Decoder.Decode(multibase[1:])
+
+
+def ed25519_public_key_to_multikey(key: bytes) -> str:
+    """The multicodec-prefixed form a Multikey verification method carries."""
+    return bytes_to_multibase(bytes([MULTICODEC_ED25519_PUB, 0x01]) + key)
+
+
+def multikey_to_ed25519_public_key(multibase: str) -> bytes:
+    decoded = multibase_to_bytes(multibase)
+    if len(decoded) < 3 or decoded[1] != 0x01:
+        raise ValueError("Unsupported multibase key material")
+    if decoded[0] != MULTICODEC_ED25519_PUB:
+        raise ValueError(f"Expected an Ed25519 key, got multicodec 0x{decoded[0]:x}")
+    return decoded[2:]
 
 
 # ---------------------------------------------------------------------------

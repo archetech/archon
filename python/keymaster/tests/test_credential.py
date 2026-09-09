@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from keymaster import KeymasterError
+from keymaster import didcomm_crypto as dc
 
 from .helpers import MOCK_SCHEMA, run
 
@@ -156,3 +157,50 @@ def test_rotate_keys_keeps_a_published_key_agreement_key(testbed):
     assert "#key-1" not in ids
     assert document["authentication"] == ["#key-2"]
     assert document["assertionMethod"] == ["#key-2"]
+
+
+def test_assertion_key_derivation_is_deterministic_and_its_own_branch(testbed):
+    km = testbed.keymaster
+    run(km.create_id("Alice", {"registry": "local"}))
+
+    first = run(km.fetch_assertion_key_pair())
+    again = run(km.fetch_assertion_key_pair())
+    agreement = run(km.fetch_didcomm_key_pair())
+
+    assert first == again
+    assert first["publicJwk"]["crv"] == "Ed25519"
+    assert first["publicJwk"]["x"] != agreement["publicJwk"]["x"]
+
+
+def test_publish_assertion_key_adds_a_multikey_without_displacing_the_identity_key(testbed):
+    km = testbed.keymaster
+    did = run(km.create_id("Alice", {"registry": "local"}))
+
+    assert run(km.publish_assertion_key()) is True
+
+    document = run(km.resolve_did(did))["didDocument"]
+    multikeys = [vm for vm in document["verificationMethod"] if vm.get("type") == "Multikey"]
+    keypair = run(km.fetch_assertion_key_pair())
+
+    assert len(multikeys) == 1
+    assert multikeys[0]["id"] == f"{did}#key-assertion-1"
+    assert multikeys[0]["publicKeyMultibase"].startswith("z")
+    assert dc.multikey_to_ed25519_public_key(multikeys[0]["publicKeyMultibase"]) == dc.ub64url(
+        keypair["publicJwk"]["x"]
+    )
+    assert document["assertionMethod"] == ["#key-1", f"{did}#key-assertion-1"]
+    assert "https://w3id.org/security/multikey/v1" in document["@context"]
+
+
+def test_unpublish_assertion_key_leaves_the_identity_key_in_place(testbed):
+    km = testbed.keymaster
+    did = run(km.create_id("Alice", {"registry": "local"}))
+    run(km.publish_assertion_key())
+
+    assert run(km.unpublish_assertion_key()) is True
+
+    document = run(km.resolve_did(did))["didDocument"]
+
+    assert [vm["id"] for vm in document["verificationMethod"]] == ["#key-1"]
+    assert document["assertionMethod"] == ["#key-1"]
+    assert "https://w3id.org/security/multikey/v1" not in document.get("@context", [])

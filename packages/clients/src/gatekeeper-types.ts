@@ -249,6 +249,9 @@ export interface DidCidDocument {
             controller?: string,
             type?: string,
             publicKeyJwk?: EcdsaJwkPublic | OkpJwkPublic,
+            // A Multikey carries its key here instead, which is the form the
+            // Data Integrity cryptosuites require.
+            publicKeyMultibase?: string,
         }>,
         authentication?: string[],
         assertionMethod?: string[],
