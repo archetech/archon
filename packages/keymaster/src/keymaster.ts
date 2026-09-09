@@ -4,7 +4,7 @@ import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
-import { ed25519PublicKeyToMultikey } from '@didcid/cipher/multikey';
+import { ed25519PublicKeyToMultikey, multikeyToEd25519PublicKey, multibaseToBytes } from '@didcid/cipher/multikey';
 import type { Ed25519JwkPair } from '@didcid/cipher/types';
 import { CID } from 'multiformats/cid';
 import {
@@ -69,6 +69,8 @@ import {
     PollConfig,
     PollResults,
     PossiblyProofed,
+    CredentialProof,
+    DataIntegrityProof,
     ViewBallotResult,
     StoredWallet,
     VerifiableCredential,
@@ -79,6 +81,7 @@ import {
     Seed,
     StoredAddressInfo,
 } from '@didcid/keymaster/types';
+import { proofsOf } from '@didcid/clients/keymaster-types';
 import {
     isWalletEncFile,
     isWalletFile
@@ -198,6 +201,12 @@ export enum PollItems {
 // Data Integrity verification methods are Multikeys, whose term this context
 // defines.
 const MULTIKEY_CONTEXT = 'https://w3id.org/security/multikey/v1';
+
+// No registered Data Integrity cryptosuite covers secp256k1 -- vc-di-ecdsa
+// defines P-256 and P-384 only -- so the secp256k1 credential proof names a
+// suite Archon defines rather than claiming one it does not implement. The
+// bytes are unchanged: JCS canonicalization, sha256, base64url signature.
+const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-jcs-2019';
 
 export default class Keymaster implements KeymasterInterface {
     private passphrase: string;
@@ -1298,38 +1307,111 @@ export default class Keymaster implements KeymasterInterface {
         }
     }
 
-    async verifyProof<T extends PossiblyProofed>(obj: T): Promise<boolean> {
-        if (!obj?.proof) {
-            return false;
+    // The key a proof names, for verification only. Deliberately not
+    // getPublicKeyJwk, which five callers use to reach the identity key for
+    // encryption -- making that one proof-aware would hand them the wrong key.
+    private resolveProofKey(doc: DidCidDocument, proof: CredentialProof):
+        { curve: 'secp256k1', jwk: EcdsaJwkPublic } | { curve: 'Ed25519', key: Uint8Array } | null {
+        const vm = this.findVerificationMethod(doc, proof.verificationMethod);
+
+        if (!vm) {
+            // Credentials issued before any of this named `#key-1` while the
+            // document listed one method, and resolution is at the proof's own
+            // versionTime, so this should not fire -- but a legacy proof keeps
+            // the behaviour it was written under rather than failing.
+            if (proof.type === 'EcdsaSecp256k1Signature2019') {
+                const jwk = doc.didDocument?.verificationMethod?.[0]?.publicKeyJwk;
+                return jwk && jwk.kty === 'EC' ? { curve: 'secp256k1', jwk: jwk as EcdsaJwkPublic } : null;
+            }
+            return null;
         }
 
-        const { proof } = obj;
-
-        if (proof.type !== "EcdsaSecp256k1Signature2019") {
-            return false;
+        if (vm.publicKeyMultibase) {
+            try {
+                return { curve: 'Ed25519', key: multikeyToEd25519PublicKey(vm.publicKeyMultibase) };
+            }
+            catch {
+                return null;
+            }
         }
 
-        if (!proof.verificationMethod) {
+        return vm.publicKeyJwk?.kty === 'EC'
+            ? { curve: 'secp256k1', jwk: vm.publicKeyJwk as EcdsaJwkPublic }
+            : null;
+    }
+
+    // eddsa-jcs-2022: sha256 of the canonical proof config, then sha256 of the
+    // canonical document, concatenated. The config is the proof without its
+    // proofValue, and it carries the document's @context, so the context is
+    // signed too.
+    private eddsaJcs2022Payload(unsecured: unknown, proof: DataIntegrityProof): Uint8Array {
+        const { proofValue, ...config } = proof;
+        void proofValue;
+        const digests = this.cipher.hashJSON(config) + this.cipher.hashJSON(unsecured);
+
+        return Uint8Array.from(Buffer.from(digests, 'hex'));
+    }
+
+    private verifyOneProof(unsecured: unknown, proof: CredentialProof, doc: DidCidDocument): boolean {
+        const resolved = this.resolveProofKey(doc, proof);
+
+        if (!resolved) {
             return false;
         }
-
-        // Extract DID from verificationMethod
-        const [signerDid] = proof.verificationMethod.split('#');
-
-        const jsonCopy = JSON.parse(JSON.stringify(obj));
-        delete jsonCopy.proof;
-        const msgHash = this.cipher.hashJSON(jsonCopy);
-
-        const doc = await this.resolveDID(signerDid, { versionTime: proof.created });
-        const publicJwk = this.getPublicKeyJwk(doc);
 
         try {
-            const signatureHex = base64urlToHex(proof.proofValue);
-            return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
+            if (proof.type === 'DataIntegrityProof' && proof.cryptosuite === 'eddsa-jcs-2022') {
+                return resolved.curve === 'Ed25519' && this.cipher.verifyEd25519(
+                    this.eddsaJcs2022Payload(unsecured, proof),
+                    multibaseToBytes(proof.proofValue),
+                    { kty: 'OKP', crv: 'Ed25519', x: base64url.baseEncode(resolved.key) },
+                );
+            }
+
+            // The legacy label and its corrected name sign identical bytes:
+            // sha256 over the JCS-canonical document, secp256k1, base64url.
+            if (proof.type === 'EcdsaSecp256k1Signature2019'
+                || (proof.type === 'DataIntegrityProof' && proof.cryptosuite === ARCHON_SECP256K1_CRYPTOSUITE)) {
+                return resolved.curve === 'secp256k1' && this.cipher.verifySig(
+                    this.cipher.hashJSON(unsecured), base64urlToHex(proof.proofValue), resolved.jwk);
+            }
         }
-        catch (error) {
+        catch {
             return false;
         }
+
+        // An unrecognised cryptosuite is somebody else's, not a failure of ours.
+        return false;
+    }
+
+    async verifyProof<T extends PossiblyProofed>(obj: T): Promise<boolean> {
+        const proofs = proofsOf(obj);
+
+        if (proofs.length === 0) {
+            return false;
+        }
+
+        const unsecured = JSON.parse(JSON.stringify(obj));
+        delete unsecured.proof;
+
+        // One verifying proof is enough. A document may carry a suite this
+        // build does not implement alongside one it does, and refusing it for
+        // the former would make Archon unable to read a credential that is
+        // perfectly valid.
+        for (const proof of proofs) {
+            if (!proof?.verificationMethod) {
+                continue;
+            }
+
+            const [signerDid] = proof.verificationMethod.split('#');
+            const doc = await this.resolveDID(signerDid, { versionTime: proof.created });
+
+            if (this.verifyOneProof(unsecured, proof, doc)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     async updateDID(id: string, doc: DidCidDocument): Promise<boolean> {

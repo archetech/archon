@@ -1,0 +1,144 @@
+import Gatekeeper from '@didcid/gatekeeper';
+import Keymaster from '@didcid/keymaster';
+import CipherNode from '@didcid/cipher/node';
+import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
+import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
+import MemoryClient from '@didcid/ipfs/memory';
+import { bytesToMultibase } from '@didcid/cipher/multikey';
+import canonicalizeModule from 'canonicalize';
+import { sha256 } from '@noble/hashes/sha256';
+
+const canonicalize = canonicalizeModule as unknown as (input: unknown) => string;
+
+let ipfs: MemoryClient;
+let keymaster: Keymaster;
+let cipher: CipherNode;
+
+beforeAll(async () => {
+    ipfs = new MemoryClient();
+    await ipfs.start();
+});
+
+afterAll(async () => {
+    if (ipfs) {
+        await ipfs.stop();
+    }
+});
+
+beforeEach(async () => {
+    const gatekeeper = new Gatekeeper({ db: new DbJsonMemory('test'), ipfs, registries: ['local'] });
+    cipher = new CipherNode();
+    keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'passphrase' });
+    await keymaster.loadOrCreateWallet();
+});
+
+// Built here rather than through the implementation, so a wrong payload fails
+// instead of agreeing with itself. Per vc-di-eddsa: the proof config is the
+// proof without proofValue, carrying the document's @context; the signed
+// payload is sha256(canonical config) || sha256(canonical document).
+async function signEddsaJcs2022(document: any, did: string, name?: string) {
+    const keypair = await keymaster.fetchAssertionKeyPair(name);
+    const { proof, ...unsecured } = document;
+    void proof;
+
+    const config: any = {
+        '@context': unsecured['@context'],
+        type: 'DataIntegrityProof',
+        cryptosuite: 'eddsa-jcs-2022',
+        created: new Date().toISOString(),
+        verificationMethod: `${did}#key-assertion-1`,
+        proofPurpose: 'assertionMethod',
+    };
+
+    const payload = new Uint8Array([
+        ...sha256(canonicalize(config)),
+        ...sha256(canonicalize(unsecured)),
+    ]);
+
+    return { ...config, proofValue: bytesToMultibase(cipher.signEd25519(payload, keypair.privateJwk)) };
+}
+
+async function credential(name = 'Alice') {
+    const did = await keymaster.createId(name, { registry: 'local' });
+    await keymaster.publishAssertionKey(name);
+    return { did, document: { '@context': ['https://www.w3.org/ns/credentials/v2'], type: ['VerifiableCredential'], issuer: did, credentialSubject: { id: did } } };
+}
+
+describe('eddsa-jcs-2022', () => {
+    it('verifies a proof built to the spec by hand', async () => {
+        const { did, document } = await credential();
+        const secured = { ...document, proof: await signEddsaJcs2022(document, did) };
+
+        expect(await keymaster.verifyProof(secured)).toBe(true);
+    });
+
+    it('rejects it once the document changes', async () => {
+        const { did, document } = await credential();
+        const proof = await signEddsaJcs2022(document, did);
+
+        expect(await keymaster.verifyProof({ ...document, credentialSubject: { id: 'did:cid:someone-else' }, proof })).toBe(false);
+    });
+
+    it('rejects a tampered proofValue', async () => {
+        const { did, document } = await credential();
+        const proof: any = await signEddsaJcs2022(document, did);
+        const bytes = Uint8Array.from(Buffer.from('deadbeef'.repeat(16), 'hex'));
+
+        expect(await keymaster.verifyProof({ ...document, proof: { ...proof, proofValue: bytesToMultibase(bytes) } })).toBe(false);
+    });
+
+    // The @context is inside the signed config, so swapping it after signing
+    // has to invalidate the proof.
+    it('rejects a proof whose context was changed after signing', async () => {
+        const { did, document } = await credential();
+        const proof: any = await signEddsaJcs2022(document, did);
+
+        expect(await keymaster.verifyProof({ ...document, proof: { ...proof, '@context': ['https://example.test/v1'] } })).toBe(false);
+    });
+
+    // The key is not verificationMethod[0], so this only passes if selection is
+    // by the fragment the proof names.
+    it('selects the key the proof names rather than the first one', async () => {
+        const { did, document } = await credential();
+        const doc: any = await keymaster.resolveDID(did);
+
+        expect(doc.didDocument.verificationMethod[0].id).toBe('#key-1');
+        expect(doc.didDocument.verificationMethod[1].id).toBe(`${did}#key-assertion-1`);
+        expect(await keymaster.verifyProof({ ...document, proof: await signEddsaJcs2022(document, did) })).toBe(true);
+    });
+});
+
+describe('proof sets', () => {
+    it('accepts a set where one proof verifies and another is a suite we do not implement', async () => {
+        const { did, document } = await credential();
+        const foreign = { type: 'DataIntegrityProof', cryptosuite: 'ecdsa-rdfc-2019', created: new Date().toISOString(), verificationMethod: `${did}#key-1`, proofPurpose: 'assertionMethod', proofValue: 'zNotOurs' };
+
+        expect(await keymaster.verifyProof({ ...document, proof: [foreign, await signEddsaJcs2022(document, did)] } as any)).toBe(true);
+    });
+
+    it('rejects a set holding only a suite we do not implement', async () => {
+        const { did, document } = await credential();
+        const foreign = { type: 'DataIntegrityProof', cryptosuite: 'ecdsa-rdfc-2019', created: new Date().toISOString(), verificationMethod: `${did}#key-1`, proofPurpose: 'assertionMethod', proofValue: 'zNotOurs' };
+
+        expect(await keymaster.verifyProof({ ...document, proof: [foreign] } as any)).toBe(false);
+    });
+
+    it('rejects an empty set and a missing proof', async () => {
+        const { document } = await credential();
+
+        expect(await keymaster.verifyProof({ ...document, proof: [] } as any)).toBe(false);
+        expect(await keymaster.verifyProof(document as any)).toBe(false);
+    });
+});
+
+describe('the legacy label', () => {
+    // Every credential issued so far carries it, and they are immutable, so it
+    // is accepted for good rather than deprecated.
+    it('still verifies a single EcdsaSecp256k1Signature2019 proof', async () => {
+        await keymaster.createId('Alice', { registry: 'local' });
+        const signed = await keymaster.addProof({ hello: 'world' });
+
+        expect((signed.proof as any).type).toBe('EcdsaSecp256k1Signature2019');
+        expect(await keymaster.verifyProof(signed)).toBe(true);
+    });
+});

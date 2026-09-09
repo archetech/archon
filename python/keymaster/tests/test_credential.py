@@ -204,3 +204,73 @@ def test_unpublish_assertion_key_leaves_the_identity_key_in_place(testbed):
     assert [vm["id"] for vm in document["verificationMethod"]] == ["#key-1"]
     assert document["assertionMethod"] == ["#key-1"]
     assert "https://w3id.org/security/multikey/v1" not in document.get("@context", [])
+
+
+def _sign_eddsa_jcs_2022(km, document, did, name=None):
+    """Built here rather than through the implementation, so a wrong payload
+    fails instead of agreeing with itself. Mirrors tests/keymaster/verify-proof.test.ts."""
+    from keymaster.crypto import hash_json
+
+    keypair = run(km.fetch_assertion_key_pair(name))
+    unsecured = {k: v for k, v in document.items() if k != "proof"}
+    config = {
+        "@context": unsecured["@context"],
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-01-01T00:00:00.000Z",
+        "verificationMethod": f"{did}#key-assertion-1",
+        "proofPurpose": "assertionMethod",
+    }
+    payload = bytes.fromhex(hash_json(config) + hash_json(unsecured))
+    return {**config, "proofValue": dc.bytes_to_multibase(dc.sign_ed25519(payload, keypair["privateJwk"]))}
+
+
+def _published_credential(km, name="Alice"):
+    did = run(km.create_id(name, {"registry": "local"}))
+    run(km.publish_assertion_key(name))
+    document = {
+        "@context": ["https://www.w3.org/ns/credentials/v2"],
+        "type": ["VerifiableCredential"],
+        "issuer": did,
+        "credentialSubject": {"id": did},
+    }
+    return did, document
+
+
+def test_verify_proof_accepts_an_eddsa_jcs_2022_proof(testbed):
+    km = testbed.keymaster
+    did, document = _published_credential(km)
+
+    secured = {**document, "proof": _sign_eddsa_jcs_2022(km, document, did)}
+
+    assert run(km.verify_proof(secured)) is True
+
+
+def test_verify_proof_rejects_a_changed_document_or_proof(testbed):
+    km = testbed.keymaster
+    did, document = _published_credential(km)
+    proof = _sign_eddsa_jcs_2022(km, document, did)
+
+    changed = {**document, "credentialSubject": {"id": "did:cid:someone-else"}, "proof": proof}
+    recontexted = {**document, "proof": {**proof, "@context": ["https://example.test/v1"]}}
+
+    assert run(km.verify_proof(changed)) is False
+    assert run(km.verify_proof(recontexted)) is False
+
+
+def test_verify_proof_reads_a_set_and_ignores_suites_it_does_not_implement(testbed):
+    km = testbed.keymaster
+    did, document = _published_credential(km)
+    foreign = {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "ecdsa-rdfc-2019",
+        "created": "2026-01-01T00:00:00.000Z",
+        "verificationMethod": f"{did}#key-1",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zNotOurs",
+    }
+    good = _sign_eddsa_jcs_2022(km, document, did)
+
+    assert run(km.verify_proof({**document, "proof": [foreign, good]})) is True
+    assert run(km.verify_proof({**document, "proof": [foreign]})) is False
+    assert run(km.verify_proof({**document, "proof": []})) is False

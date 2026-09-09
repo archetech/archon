@@ -2,7 +2,7 @@ import {
     DidCidDocument,
     EcdsaJwkPublic,
     ResolveDIDOptions,
-    Proof,
+    CredentialProof,
     LightningConfig,
     LightningBalance,
     LightningInvoice,
@@ -11,6 +11,8 @@ import {
     LightningPaymentStatus,
 } from './gatekeeper-types.js';
 import type { Buffer } from 'buffer';
+
+export type { CredentialProof, DataIntegrityProof } from './gatekeeper-types.js';
 
 export interface NostrKeys {
     npub: string;
@@ -158,7 +160,9 @@ export interface VerifiableCredential {
         id: string;
         [key: string]: unknown;
     };
-    proof?: Proof;
+    // One proof, or a proof set. A credential carries a set once its issuer has
+    // published a key whose cryptosuite an outside verifier recognises.
+    proof?: CredentialProof | CredentialProof[];
 }
 
 export interface IssueCredentialsOptions extends EncryptOptions {
@@ -322,7 +326,17 @@ export interface EncryptedMessage {
 }
 
 export interface PossiblyProofed {
-    proof?: Proof;
+    proof?: CredentialProof | CredentialProof[];
+}
+
+// The proofs on a document, however it carries them. Everything that reads a
+// proof goes through this rather than assuming a shape.
+export function proofsOf(obj: PossiblyProofed): CredentialProof[] {
+    if (!obj?.proof) {
+        return [];
+    }
+
+    return Array.isArray(obj.proof) ? obj.proof : [obj.proof];
 }
 
 export interface RestClientOptions {

@@ -83,6 +83,20 @@ _UNFETCHED = object()
 # defines.
 MULTIKEY_CONTEXT = "https://w3id.org/security/multikey/v1"
 
+# No registered Data Integrity cryptosuite covers secp256k1 -- vc-di-ecdsa
+# defines P-256 and P-384 only -- so the secp256k1 credential proof names a
+# suite Archon defines rather than claiming one it does not implement. The bytes
+# are unchanged: JCS canonicalization, sha256, base64url signature.
+ARCHON_SECP256K1_CRYPTOSUITE = "archon-ecdsa-jcs-2019"
+
+
+def _proofs_of(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """The proofs on a document, however it carries them."""
+    proof = payload.get("proof") if isinstance(payload, dict) else None
+    if not proof:
+        return []
+    return [p for p in (proof if isinstance(proof, list) else [proof]) if isinstance(p, dict)]
+
 
 def _key_fragment(ref: Any) -> str | None:
     """The fragment of a verification method reference."""
@@ -1805,22 +1819,96 @@ class Keymaster:
             },
         }
 
-    async def verify_proof(self, payload: dict[str, Any]) -> bool:
-        proof = payload.get("proof")
-        if not proof:
+    def _resolve_proof_key(self, doc: dict[str, Any], proof: dict[str, Any]) -> tuple[str, Any] | None:
+        """The key a proof names, for verification only.
+
+        Deliberately not get_public_key_jwk, whose callers reach the identity
+        key for encryption -- making that one proof-aware would hand them the
+        wrong key.
+        """
+        vm = self._find_verification_method(doc, proof.get("verificationMethod", ""))
+
+        if vm is None:
+            # Credentials issued before any of this named `#key-1` while the
+            # document listed one method, and resolution is at the proof's own
+            # versionTime, so this should not fire -- but a legacy proof keeps
+            # the behaviour it was written under rather than failing.
+            if proof.get("type") == "EcdsaSecp256k1Signature2019":
+                methods = doc.get("didDocument", {}).get("verificationMethod") or []
+                jwk = methods[0].get("publicKeyJwk") if methods else None
+                return ("secp256k1", jwk) if jwk else None
+            return None
+
+        if vm.get("publicKeyMultibase"):
+            try:
+                return ("Ed25519", dc.multikey_to_ed25519_public_key(vm["publicKeyMultibase"]))
+            except ValueError:
+                return None
+
+        jwk = vm.get("publicKeyJwk")
+        return ("secp256k1", jwk) if jwk else None
+
+    def _eddsa_jcs_2022_payload(self, unsecured: dict[str, Any], proof: dict[str, Any]) -> bytes:
+        """sha256 of the canonical proof config, then of the canonical document.
+
+        The config is the proof without its proofValue and it carries the
+        document's @context, so the context is signed too.
+        """
+        config = {key: value for key, value in proof.items() if key != "proofValue"}
+        return bytes.fromhex(hash_json(config) + hash_json(unsecured))
+
+    def _verify_one_proof(self, unsecured: dict[str, Any], proof: dict[str, Any], doc: dict[str, Any]) -> bool:
+        resolved = self._resolve_proof_key(doc, proof)
+        if resolved is None:
             return False
+        curve, key = resolved
+
+        try:
+            if proof.get("type") == "DataIntegrityProof" and proof.get("cryptosuite") == "eddsa-jcs-2022":
+                if curve != "Ed25519":
+                    return False
+                return dc.verify_ed25519(
+                    self._eddsa_jcs_2022_payload(unsecured, proof),
+                    dc.multibase_to_bytes(proof["proofValue"]),
+                    {"kty": "OKP", "crv": "Ed25519", "x": dc.b64url(key)},
+                )
+
+            # The legacy label and its corrected name sign identical bytes:
+            # sha256 over the JCS-canonical document, secp256k1, base64url.
+            if proof.get("type") == "EcdsaSecp256k1Signature2019" or (
+                proof.get("type") == "DataIntegrityProof"
+                and proof.get("cryptosuite") == ARCHON_SECP256K1_CRYPTOSUITE
+            ):
+                if curve != "secp256k1":
+                    return False
+                return verify_sig(hash_json(unsecured), ub64url(proof["proofValue"]).hex(), key)
+        except Exception:
+            return False
+
+        # An unrecognised cryptosuite is somebody else's, not a failure of ours.
+        return False
+
+    async def verify_proof(self, payload: dict[str, Any]) -> bool:
+        proofs = _proofs_of(payload)
+        if not proofs:
+            return False
+
         unsigned = deepcopy(payload)
         unsigned.pop("proof", None)
-        verification_method = proof.get("verificationMethod", "")
-        signer_did = verification_method.split("#")[0]
-        if not signer_did:
-            return False
-        doc = await self.resolve_did(signer_did, {"confirm": "true", "versionTime": proof.get("created")})
-        verification_methods = doc.get("didDocument", {}).get("verificationMethod") or []
-        public_jwk = verification_methods[0].get("publicKeyJwk") if verification_methods else None
-        if not public_jwk:
-            return False
-        return verify_sig(hash_json(unsigned), ub64url(proof["proofValue"]).hex(), public_jwk)
+
+        # One verifying proof is enough. A document may carry a suite this build
+        # does not implement alongside one it does, and refusing it for the
+        # former would make Archon unable to read a perfectly valid credential.
+        for proof in proofs:
+            verification_method = proof.get("verificationMethod", "") if isinstance(proof, dict) else ""
+            signer_did = verification_method.split("#")[0]
+            if not signer_did:
+                continue
+            doc = await self.resolve_did(signer_did, {"confirm": "true", "versionTime": proof.get("created")})
+            if self._verify_one_proof(unsigned, proof, doc):
+                return True
+
+        return False
 
     async def update_did(self, identifier: str, doc: dict[str, Any]) -> bool:
         did = await self.lookup_did(identifier)
