@@ -21,6 +21,7 @@ const config = {
         '^@didcid/clients/keymaster-types$': '<rootDir>/packages/clients/src/keymaster-types.ts',
         '^@didcid/cipher/node$': '<rootDir>/packages/cipher/src/cipher-node.ts',
         '^@didcid/cipher/didcomm$': '<rootDir>/packages/cipher/src/didcomm.ts',
+        '^@didcid/cipher/multikey$': '<rootDir>/packages/cipher/src/multikey.ts',
         '^@didcid/cipher/types': '<rootDir>/packages/cipher/src/types.ts',
         '^@didcid/common/errors$': '<rootDir>/packages/common/src/errors.ts',
         '^@didcid/common/utils$': '<rootDir>/packages/common/src/utils.ts',

@@ -2,14 +2,14 @@ import * as bip39 from 'bip39';
 import { HDKey } from '@scure/bip32';
 import * as secp from '@noble/secp256k1';
 import { schnorr } from '@noble/curves/secp256k1';
-import { x25519 } from '@noble/curves/ed25519';
+import { ed25519, x25519 } from '@noble/curves/ed25519';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha256';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
 import { managedNonce } from '@noble/ciphers/webcrypto/utils'
 import { bytesToUtf8, utf8ToBytes } from '@noble/ciphers/utils';
 import { base64url } from 'multiformats/bases/base64';
-import { Cipher, HDKeyJSON, EcdsaJwkPublic, EcdsaJwkPrivate, EcdsaJwkPair, OkpJwkPublic, OkpJwkPrivate, OkpJwkPair, NostrKeys } from './types.js';
+import { Cipher, HDKeyJSON, EcdsaJwkPublic, EcdsaJwkPrivate, EcdsaJwkPair, OkpJwkPublic, OkpJwkPrivate, OkpJwkPair, Ed25519JwkPublic, Ed25519JwkPrivate, Ed25519JwkPair, NostrKeys } from './types.js';
 import { buildJweCompact, parseJweCompact, isJweCompact } from './jwe.js';
 import { bech32 } from 'bech32';
 import canonicalizeModule from 'canonicalize';
@@ -83,6 +83,42 @@ export default abstract class CipherBase implements Cipher {
         const privateJwk: OkpJwkPrivate = { ...publicJwk, d };
 
         return { publicJwk, privateJwk };
+    }
+
+    // Derives an Ed25519 signing keypair from 32 bytes of seed material, the
+    // same way generateX25519Jwk derives a key-agreement one: the seed is the
+    // Ed25519 private key, so an HD-derived branch always yields the same pair.
+    generateEd25519Jwk(seedBytes: Uint8Array): Ed25519JwkPair {
+        if (seedBytes.length !== 32) {
+            throw new Error('Ed25519 seed must be 32 bytes');
+        }
+
+        const publicJwk: Ed25519JwkPublic = {
+            kty: 'OKP',
+            crv: 'Ed25519',
+            x: base64url.baseEncode(ed25519.getPublicKey(seedBytes)),
+        };
+
+        const privateJwk: Ed25519JwkPrivate = { ...publicJwk, d: base64url.baseEncode(seedBytes) };
+
+        return { publicJwk, privateJwk };
+    }
+
+    // Over the message bytes, not a hash of them: EdDSA hashes internally, and
+    // eddsa-jcs-2022 signs the canonical document's digest as the message. This
+    // is why the shape differs from signHash, which takes a hex digest.
+    signEd25519(message: Uint8Array, privateJwk: Ed25519JwkPrivate): Uint8Array {
+        return ed25519.sign(message, base64url.baseDecode(privateJwk.d));
+    }
+
+    verifyEd25519(message: Uint8Array, signature: Uint8Array, publicJwk: Ed25519JwkPublic): boolean {
+        try {
+            return ed25519.verify(signature, message, base64url.baseDecode(publicJwk.x));
+        }
+        catch {
+            // A malformed signature or key is a failed verification, not a crash.
+            return false;
+        }
     }
 
     convertJwkToCompressedBytes(jwk: EcdsaJwkPublic): Uint8Array {

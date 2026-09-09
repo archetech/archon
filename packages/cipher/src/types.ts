@@ -40,6 +40,24 @@ export interface OkpJwkPair {
     privateJwk: OkpJwkPrivate,
 }
 
+// Ed25519 signing keys. Kept apart from the Okp* triple above, which is pinned
+// to X25519 for key agreement -- the two curves are never interchangeable and
+// widening `crv` there would loosen every DIDComm consumer of it.
+export interface Ed25519JwkPublic {
+    kty: 'OKP',
+    crv: 'Ed25519',
+    x: string,
+}
+
+export interface Ed25519JwkPrivate extends Ed25519JwkPublic {
+    d: string,
+}
+
+export interface Ed25519JwkPair {
+    publicJwk: Ed25519JwkPublic,
+    privateJwk: Ed25519JwkPrivate,
+}
+
 export interface NostrKeys {
     npub: string,
     pubkey: string,
@@ -69,11 +87,18 @@ export interface Cipher {
     generateJwk(privateKeyBytes: Uint8Array): EcdsaJwkPair,
     generateRandomJwk(): EcdsaJwkPair,
     generateX25519Jwk(seedBytes: Uint8Array): OkpJwkPair,
+    generateEd25519Jwk(seedBytes: Uint8Array): Ed25519JwkPair,
+    signEd25519(message: Uint8Array, privateJwk: Ed25519JwkPrivate): Uint8Array,
+    verifyEd25519(message: Uint8Array, signature: Uint8Array, publicJwk: Ed25519JwkPublic): boolean,
     convertJwkToCompressedBytes(jwk: EcdsaJwkPublic): Uint8Array,
     jwkToNostr(publicJwk: EcdsaJwkPublic): NostrKeys,
     nsecToJwk(nsec: string): EcdsaJwkPair,
 
     hashMessage(msg: string | Uint8Array): string,
+    // eddsa-jcs-2022 canonicalizes the proof config and the document
+    // separately, so callers holding this interface need the step on its own
+    // rather than only through hashJSON.
+    canonicalizeJSON(json: unknown): string,
     hashJSON(obj: unknown): string,
 
     signHash(msgHash: string, privateJwk: EcdsaJwkPrivate): string,
