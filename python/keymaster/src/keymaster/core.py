@@ -28,6 +28,7 @@ from .crypto import (
     encrypt_with_passphrase,
     generate_jwk_pair,
     generate_mnemonic,
+    canonicalize_json,
     hash_json,
     hash_message,
     hd_root_from_mnemonic,
@@ -1893,6 +1894,21 @@ class Keymaster:
         config = {key: value for key, value in proof.items() if key != "proofValue"}
         return bytes.fromhex(hash_json(config) + hash_json(unsecured))
 
+    def _context_agrees(self, unsecured: dict[str, Any], proof: dict[str, Any]) -> bool:
+        """Whether the proof's @context is the one the document declares.
+
+        Create Proof sets the proof's @context from the document it secures, so
+        the two agreeing is part of the suite rather than a coincidence. The
+        proof config is canonicalized as given, which means a proof deliberately
+        signed over a different context would verify here while a verifier that
+        rebuilds the config from the document rejects it. Refused outright, and
+        for a reason a caller can act on rather than an opaque bad signature.
+        """
+        if "@context" not in proof:
+            return True
+
+        return canonicalize_json(proof["@context"]) == canonicalize_json(unsecured.get("@context"))
+
     def _verify_one_proof(self, unsecured: dict[str, Any], proof: dict[str, Any], doc: dict[str, Any]) -> bool:
         resolved = self._resolve_proof_key(doc, proof)
         if resolved is None:
@@ -1901,7 +1917,7 @@ class Keymaster:
 
         try:
             if proof.get("type") == "DataIntegrityProof" and proof.get("cryptosuite") == "eddsa-jcs-2022":
-                if curve != "Ed25519":
+                if curve != "Ed25519" or not self._context_agrees(unsecured, proof):
                     return False
                 return dc.verify_ed25519(
                     self._eddsa_jcs_2022_payload(unsecured, proof),

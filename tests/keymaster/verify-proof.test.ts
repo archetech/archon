@@ -87,6 +87,32 @@ describe('eddsa-jcs-2022', () => {
         expect(await keymaster.verifyProof({ ...document, proof: { ...proof, proofValue: bytesToMultibase(bytes) } })).toBe(false);
     });
 
+    // Signed over a context the document does not declare, so the signature is
+    // genuinely valid and only the agreement check can reject it. Create Proof
+    // sets the proof's @context from the document, so a mismatch is a proof
+    // built outside the suite -- and one a verifier that rebuilds the config
+    // from the document would reject while this one, canonicalizing the config
+    // as given, would not.
+    it('rejects a proof signed over a context the document does not declare', async () => {
+        const { did, document } = await credential();
+        const keypair = await keymaster.fetchAssertionKeyPair();
+        const config: any = {
+            '@context': ['https://example.test/other/v1'],
+            type: 'DataIntegrityProof',
+            cryptosuite: 'eddsa-jcs-2022',
+            created: new Date().toISOString(),
+            verificationMethod: `${did}#key-assertion-1`,
+            proofPurpose: 'assertionMethod',
+        };
+        const payload = new Uint8Array([
+            ...sha256(canonicalize(config)),
+            ...sha256(canonicalize(document)),
+        ]);
+        const proof = { ...config, proofValue: bytesToMultibase(cipher.signEd25519(payload, keypair.privateJwk)) };
+
+        expect(await keymaster.verifyProof({ ...document, proof } as any)).toBe(false);
+    });
+
     // The @context is inside the signed config, so swapping it after signing
     // has to invalidate the proof.
     it('rejects a proof whose context was changed after signing', async () => {

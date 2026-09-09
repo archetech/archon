@@ -370,3 +370,25 @@ def test_publish_assertion_key_replaces_a_relative_reference(testbed):
 
     assert len(multikeys) == 1
     assert len([r for r in after["assertionMethod"] if str(r).endswith("#key-assertion-1")]) == 1
+
+
+def test_verify_proof_rejects_a_context_the_document_does_not_declare(testbed):
+    """Signed over a different context, so the signature is genuinely valid and
+    only the agreement check can reject it. Mirrors the TypeScript test."""
+    from keymaster.crypto import hash_json
+
+    km = testbed.keymaster
+    did, document = _published_credential(km)
+    keypair = run(km.fetch_assertion_key_pair())
+    config = {
+        "@context": ["https://example.test/other/v1"],
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-01-01T00:00:00.000Z",
+        "verificationMethod": f"{did}#key-assertion-1",
+        "proofPurpose": "assertionMethod",
+    }
+    payload = bytes.fromhex(hash_json(config) + hash_json(document))
+    proof = {**config, "proofValue": dc.bytes_to_multibase(dc.sign_ed25519(payload, keypair["privateJwk"]))}
+
+    assert run(km.verify_proof({**document, "proof": proof})) is False

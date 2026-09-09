@@ -1383,6 +1383,20 @@ export default class Keymaster implements KeymasterInterface {
         return Uint8Array.from(Buffer.from(digests, 'hex'));
     }
 
+    // Create Proof sets the proof's @context from the document it secures, so
+    // the two agreeing is part of the suite rather than a coincidence. The
+    // proof config is canonicalized as given, which means a proof deliberately
+    // signed over a different context would verify here while a verifier that
+    // rebuilds the config from the document rejects it. Refused outright, and
+    // for a reason a caller can act on rather than an opaque bad signature.
+    private contextAgrees(unsecured: any, proof: DataIntegrityProof): boolean {
+        if (proof['@context'] === undefined) {
+            return true;
+        }
+
+        return this.cipher.canonicalizeJSON(proof['@context']) === this.cipher.canonicalizeJSON(unsecured?.['@context']);
+    }
+
     private supportedProof(proof: CredentialProof): boolean {
         if (proof.type === 'EcdsaSecp256k1Signature2019') {
             return true;
@@ -1401,7 +1415,7 @@ export default class Keymaster implements KeymasterInterface {
 
         try {
             if (proof.type === 'DataIntegrityProof' && proof.cryptosuite === 'eddsa-jcs-2022') {
-                return resolved.curve === 'Ed25519' && this.cipher.verifyEd25519(
+                return this.contextAgrees(unsecured, proof) && resolved.curve === 'Ed25519' && this.cipher.verifyEd25519(
                     this.eddsaJcs2022Payload(unsecured, proof),
                     multibaseToBytes(proof.proofValue),
                     { kty: 'OKP', crv: 'Ed25519', x: base64url.baseEncode(resolved.key) },
