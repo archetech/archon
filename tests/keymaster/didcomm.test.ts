@@ -197,6 +197,27 @@ describe('rotateKeys with a published key agreement key', () => {
         expect(doc.assertionMethod).toStrictEqual(['#key-2']);
     });
 
+    // A document may carry a method controlled by another DID. Matching on the
+    // bare fragment treats did:other:123#key-1 as the local #key-1, so rotation
+    // would rewrite somebody else's key and the relationship naming it.
+    it('leaves a verification method controlled by another DID alone', async () => {
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        const doc = await keymaster.resolveDID(did);
+        const didDocument: any = { ...doc.didDocument! };
+        const foreign = { id: 'did:other:123#key-1', controller: 'did:other:123', type: 'Multikey', publicKeyMultibase: 'z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp' };
+        didDocument.verificationMethod = [...didDocument.verificationMethod, foreign];
+        didDocument.assertionMethod = [...didDocument.assertionMethod, 'did:other:123#key-1'];
+        await keymaster.updateDID(did, { didDocument });
+
+        await keymaster.rotateKeys();
+
+        const after: any = await keymaster.resolveDID(did);
+
+        expect(after.didDocument.verificationMethod).toContainEqual(foreign);
+        expect(after.didDocument.assertionMethod).toContain('did:other:123#key-1');
+        expect(after.didDocument.assertionMethod).toContain('#key-2');
+    });
+
     // The whole point of keeping the key is that DIDComm still works after a
     // rotation, which the document shape alone does not prove.
     it('can still receive an encrypted message afterwards', async () => {

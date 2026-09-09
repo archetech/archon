@@ -204,13 +204,22 @@ def ed25519_public_key_to_multikey(key: bytes) -> str:
     return bytes_to_multibase(bytes([MULTICODEC_ED25519_PUB, 0x01]) + key)
 
 
+ED25519_PUBLIC_KEY_BYTES = 32
+
+
 def multikey_to_ed25519_public_key(multibase: str) -> bytes:
     decoded = multibase_to_bytes(multibase)
     if len(decoded) < 3 or decoded[1] != 0x01:
         raise ValueError("Unsupported multibase key material")
     if decoded[0] != MULTICODEC_ED25519_PUB:
         raise ValueError(f"Expected an Ed25519 key, got multicodec 0x{decoded[0]:x}")
-    return decoded[2:]
+    key = decoded[2:]
+    # Rejected here rather than deeper in: a wrong-length key reaches the curve
+    # code as something that merely fails to verify, which reads as a bad
+    # signature rather than a malformed document.
+    if len(key) != ED25519_PUBLIC_KEY_BYTES:
+        raise ValueError(f"An Ed25519 key is {ED25519_PUBLIC_KEY_BYTES} bytes, got {len(key)}")
+    return key
 
 
 # ---------------------------------------------------------------------------

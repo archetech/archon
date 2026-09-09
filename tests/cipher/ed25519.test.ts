@@ -75,6 +75,16 @@ describe('multikey encoding', () => {
         expect(Buffer.from(multikeyToEd25519PublicKey(multikey))).toStrictEqual(key);
     });
 
+    // A wrong-length key reaches the curve code as something that merely fails
+    // to verify, which reads as a bad signature rather than a bad document.
+    it('refuses a payload that is not a 32-byte key', () => {
+        const short = bytesToMultibase(new Uint8Array([0xed, 0x01, ...new Uint8Array(31)]));
+        const long = bytesToMultibase(new Uint8Array([0xed, 0x01, ...new Uint8Array(33)]));
+
+        expect(() => multikeyToEd25519PublicKey(short)).toThrow('32 bytes');
+        expect(() => multikeyToEd25519PublicKey(long)).toThrow('32 bytes');
+    });
+
     it('refuses key material under another multicodec', () => {
         // 0xec is X25519 -- a key agreement key, which cannot verify anything.
         const x25519 = bytesToMultibase(new Uint8Array([0xec, 0x01, ...new Uint8Array(32)]));

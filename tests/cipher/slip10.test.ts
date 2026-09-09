@@ -40,6 +40,12 @@ describe('hardened-only', () => {
         expect(() => slip10DerivePath(SEED, "m/44'/0'/0'/2/0")).toThrow('hardened only');
     });
 
+    // setUint32 truncates a fraction and wraps past 2^32, so an unchecked index
+    // would silently derive some other node instead of failing.
+    it.each([NaN, 2147483648.5, 0x100000000, Infinity])('refuses the out-of-range index %p', (index) => {
+        expect(() => slip10DeriveChild(slip10MasterKey(SEED), index)).toThrow('hardened only');
+    });
+
     it('refuses a path that does not start at the master node', () => {
         expect(() => slip10DerivePath(SEED, "44'/0'")).toThrow('master node');
     });

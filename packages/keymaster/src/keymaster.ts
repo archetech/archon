@@ -1887,7 +1887,7 @@ export default class Keymaster implements KeymasterInterface {
             }
 
             const rotated = doc.didDocument.verificationMethod[0];
-            const rotatedFragment = rotated.id && this.keyFragment(rotated.id);
+            const rotatedTarget = rotated.id && this.absoluteKeyId(rotated.id, id.did);
             const rotatedId = `#key-${nextIndex + 1}`;
             const vmethod = { ...rotated, id: rotatedId, publicKeyJwk: keypair.publicJwk };
 
@@ -1897,7 +1897,7 @@ export default class Keymaster implements KeymasterInterface {
             // `#key-agreement-1` among them -- while `keyAgreement`, which was
             // never rebuilt, kept pointing at the method just deleted.
             const isRotated = (ref: string | undefined) =>
-                !!ref && !!rotatedFragment && this.keyFragment(ref) === rotatedFragment;
+                !!ref && !!rotatedTarget && this.absoluteKeyId(ref, id.did) === rotatedTarget;
 
             const retitle = (refs: string[] | undefined) =>
                 (refs || []).map(ref => isRotated(ref) ? rotatedId : ref);
@@ -2601,15 +2601,27 @@ export default class Keymaster implements KeymasterInterface {
 
     // A verification method is referenced sometimes relatively (`#key-1`, which
     // the gatekeeper writes) and sometimes absolutely (`did:cid:...#key-1`,
-    // which publishDidComm writes), so anything comparing references has to
-    // compare fragments.
+    // which publishDidComm writes). Both forms resolve against the document's
+    // own DID, so comparing whole DID URLs keeps a method controlled by another
+    // DID -- `did:other:123#key-1` -- from matching the local `#key-1`.
     private keyFragment(id: string): string {
         return id.includes('#') ? id.split('#').pop()! : id;
     }
 
+    private absoluteKeyId(ref: string, did: string): string {
+        return ref.includes(':') ? ref : `${did}#${this.keyFragment(ref)}`;
+    }
+
     private findVerificationMethod(doc: DidCidDocument, kid: string) {
-        const frag = this.keyFragment(kid);
-        return (doc.didDocument?.verificationMethod || []).find(vm => vm.id && this.keyFragment(vm.id) === frag);
+        const did = doc.didDocument?.id;
+
+        if (!did) {
+            return undefined;
+        }
+
+        const target = this.absoluteKeyId(kid, did);
+        return (doc.didDocument?.verificationMethod || []).find(
+            vm => vm.id && this.absoluteKeyId(vm.id, did) === target);
     }
 
     private resolveKeyAgreement(doc: DidCidDocument): { kid: string; publicJwk: OkpJwkPublic } {
@@ -5943,25 +5955,35 @@ export default class Keymaster implements KeymasterInterface {
         return enc ? `${enc.salt}.${enc.iv}.${enc.data}` : undefined;
     }
 
-    private async getHDKeyFromCacheOrMnemonic(wallet: WalletFile) {
+    // Returns the entry it resolved rather than the field it stored it in. A
+    // caller reading `this._hdkeyCache` after its own await can be handed
+    // another wallet's material, because anything that changes wallets between
+    // the two continuations replaces it (#1052).
+    private async getKeysFromCacheOrMnemonic(wallet: WalletFile): Promise<{ hdkey: any, seed: Uint8Array }> {
         const id = this.hdkeyCacheId(wallet.seed);
         if (this._hdkeyCache && id !== undefined && this._hdkeyCache.id === id) {
-            return this._hdkeyCache.hdkey;
+            return this._hdkeyCache;
         }
 
         const mnemonic = await this.getMnemonicForDerivation(wallet);
-        const hdkey = this.cipher.generateHDKey(mnemonic);
-        const seed = this.cipher.mnemonicToSeed(mnemonic);
-        this._hdkeyCache = { hdkey, seed, id };
-        return hdkey;
+        const entry = {
+            hdkey: this.cipher.generateHDKey(mnemonic),
+            seed: this.cipher.mnemonicToSeed(mnemonic),
+            id,
+        };
+        this._hdkeyCache = entry;
+        return entry;
     }
 
-    // The same cache entry, for the curves that derive off the BIP39 seed
-    // rather than the BIP32 node. Decrypting the mnemonic is the expensive part
-    // and these keys are fetched on every packed message.
+    private async getHDKeyFromCacheOrMnemonic(wallet: WalletFile) {
+        return (await this.getKeysFromCacheOrMnemonic(wallet)).hdkey;
+    }
+
+    // For the curves deriving off the BIP39 seed rather than the BIP32 node.
+    // Decrypting the mnemonic is the expensive part and these keys are fetched
+    // on every packed message, so they share the one cache entry.
     private async getSeedFromCacheOrMnemonic(wallet: WalletFile): Promise<Uint8Array> {
-        await this.getHDKeyFromCacheOrMnemonic(wallet);
-        return this._hdkeyCache!.seed;
+        return (await this.getKeysFromCacheOrMnemonic(wallet)).seed;
     }
 
     private async encryptWalletForStorage(decrypted: WalletFile): Promise<WalletEncFile> {

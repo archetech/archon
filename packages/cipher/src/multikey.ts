@@ -41,11 +41,20 @@ export function ed25519PublicKeyToMultikey(key: Uint8Array): string {
     return keyToMultikey(MULTICODEC_ED25519_PUB, key);
 }
 
+export const ED25519_PUBLIC_KEY_BYTES = 32;
+
 export function multikeyToEd25519PublicKey(multibase: string): Uint8Array {
     const { codec, key } = multikeyToKey(multibase);
 
     if (codec !== MULTICODEC_ED25519_PUB) {
         throw new Error(`Expected an Ed25519 key, got multicodec 0x${codec.toString(16)}`);
+    }
+
+    // Rejected here rather than deeper in: a wrong-length key reaches the curve
+    // code as something that merely fails to verify, which reads as a bad
+    // signature rather than a malformed document.
+    if (key.length !== ED25519_PUBLIC_KEY_BYTES) {
+        throw new Error(`An Ed25519 key is ${ED25519_PUBLIC_KEY_BYTES} bytes, got ${key.length}`);
     }
 
     return key;

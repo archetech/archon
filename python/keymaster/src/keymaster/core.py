@@ -85,17 +85,26 @@ MULTIKEY_CONTEXT = "https://w3id.org/security/multikey/v1"
 
 
 def _key_fragment(ref: Any) -> str | None:
-    """The fragment of a verification method reference.
-
-    References are written relatively (`#key-1`, which the gatekeeper emits) and
-    absolutely (`did:cid:...#key-1`, which publish_didcomm emits), so anything
-    comparing them has to compare fragments. Mirrors keyFragment in the
-    TypeScript keymaster.
-    """
+    """The fragment of a verification method reference."""
     if not isinstance(ref, str):
         return None
 
     return ref.split("#")[-1] if "#" in ref else ref
+
+
+def _absolute_key_id(ref: Any, did: str) -> str | None:
+    """A verification method reference as a whole DID URL.
+
+    References are written relatively (`#key-1`, which the gatekeeper emits) and
+    absolutely (`did:cid:...#key-1`, which publish_didcomm emits); both resolve
+    against the document's own DID. Comparing whole URLs keeps a method
+    controlled by another DID -- `did:other:123#key-1` -- from matching the
+    local `#key-1`. Mirrors absoluteKeyId in the TypeScript keymaster.
+    """
+    if not isinstance(ref, str):
+        return None
+
+    return ref if ":" in ref else f"{did}#{_key_fragment(ref)}"
 
 
 class KeymasterError(Exception):
@@ -141,11 +150,14 @@ class WalletStoreProtocol(Protocol):
 
 
 class _RootCache(NamedTuple):
-    # An HD root together with the identity of the wallet whose seed it came
-    # from. One value, so a root can never be observed under another wallet's
-    # identity: encrypting a *different* wallet finds the identity does not
-    # match and re-derives, rather than reusing a stale root.
+    # An HD root, the BIP39 seed the SLIP-0010 curves derive from, and the
+    # identity of the wallet both came from. One value, so a root can never be
+    # observed under another wallet's identity: encrypting a *different* wallet
+    # finds the identity does not match and re-derives, rather than reusing a
+    # stale root. Callers take the entry rather than reading self._root_cache
+    # after their own await, which anything changing wallets could replace.
     root: Any
+    seed: bytes
     id: str | None
 
 
@@ -257,7 +269,7 @@ class Keymaster:
             "aliases": {},
         }
         # Warm for the save below, which would otherwise re-derive this root.
-        self._root_cache = _RootCache(root, self._root_cache_identity(wallet["seed"]))
+        self._root_cache = _RootCache(root, bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
         ok = await self.save_wallet(wallet, overwrite=overwrite)
         if not ok:
             raise KeymasterError("save wallet failed")
@@ -274,7 +286,7 @@ class Keymaster:
             mnemonic = decrypt_with_passphrase(seed["mnemonicEnc"], self.passphrase)
         except InvalidTag as exc:
             raise KeymasterError("Incorrect passphrase.") from exc
-        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), self._root_cache_identity(seed))
+        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(seed))
         root_pair = await self.hd_key_pair()
         try:
             plaintext = decrypt_message(root_pair["privateJwk"], stored["enc"])
@@ -302,7 +314,7 @@ class Keymaster:
         wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, new_passphrase)
 
         self.passphrase = new_passphrase
-        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
+        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
         self._wallet_cache = wallet
 
         encrypted = await self.encrypt_wallet_for_storage(wallet)
@@ -326,7 +338,7 @@ class Keymaster:
             return None
         return f"{enc['salt']}.{enc['iv']}.{enc['data']}"
 
-    async def _root_node(self, wallet: dict[str, Any] | None = None):
+    async def _root_entry(self, wallet: dict[str, Any] | None = None) -> _RootCache:
         # When a wallet is supplied, re-derive if the cache belongs to a
         # different wallet (the #733 fix). When it is not, keep the original
         # early-return on a warm cache: callers inside decrypt_wallet reach here
@@ -334,19 +346,26 @@ class Keymaster:
         if wallet is not None:
             cache_id = self._root_cache_identity(wallet.get("seed", {}))
             if self._root_cache is not None and cache_id is not None and self._root_cache.id == cache_id:
-                return self._root_cache.root
-            mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
-            root = hd_root_from_mnemonic(mnemonic)
-            self._root_cache = _RootCache(root, cache_id)
-            return root
+                return self._root_cache
+            entry = self._derive_root_entry(wallet, cache_id)
+            self._root_cache = entry
+            return entry
 
         if self._root_cache is not None:
-            return self._root_cache.root
+            return self._root_cache
         wallet = await self.load_wallet()
+        entry = self._derive_root_entry(wallet, self._root_cache_identity(wallet.get("seed", {})))
+        self._root_cache = entry
+        return entry
+
+    def _derive_root_entry(self, wallet: dict[str, Any], cache_id: str | None) -> _RootCache:
+        # Decrypting the mnemonic is the expensive part, so the BIP32 root and
+        # the BIP39 seed are derived together and cached together.
         mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
-        root = hd_root_from_mnemonic(mnemonic)
-        self._root_cache = _RootCache(root, self._root_cache_identity(wallet.get("seed", {})))
-        return root
+        return _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), cache_id)
+
+    async def _root_node(self, wallet: dict[str, Any] | None = None):
+        return (await self._root_entry(wallet)).root
 
     async def _bip39_seed(self, wallet: dict[str, Any] | None = None) -> bytes:
         """The BIP39 seed the SLIP-0010 curves derive from.
@@ -354,10 +373,7 @@ class Keymaster:
         BIP32 and SLIP-0010 build different master nodes out of it, so one
         mnemonic backs every key without any curve sharing material.
         """
-        if wallet is None:
-            wallet = await self.load_wallet()
-        mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
-        return bip39_seed_from_mnemonic(mnemonic)
+        return (await self._root_entry(wallet)).seed
 
     async def hd_key_pair(self, wallet: dict[str, Any] | None = None) -> dict[str, dict[str, str]]:
         root = await self._root_node(wallet)
@@ -2270,7 +2286,7 @@ class Keymaster:
             if not verification_methods:
                 raise KeymasterError("DID Document missing verificationMethod")
             rotated = verification_methods[0]
-            rotated_fragment = _key_fragment(rotated.get("id"))
+            rotated_target = _absolute_key_id(rotated.get("id"), id_info["did"])
             rotated_id = f"#key-{next_index + 1}"
             updated_method = {**rotated, "id": rotated_id, "publicKeyJwk": keypair["publicJwk"]}
 
@@ -2280,7 +2296,7 @@ class Keymaster:
             # `#key-agreement-1` among them -- while `keyAgreement`, which was
             # never rebuilt, kept naming the method just deleted.
             def is_rotated(ref: Any) -> bool:
-                return bool(rotated_fragment) and _key_fragment(ref) == rotated_fragment
+                return bool(rotated_target) and _absolute_key_id(ref, id_info["did"]) == rotated_target
 
             def retitle(refs: Any) -> list[Any]:
                 return [rotated_id if is_rotated(ref) else ref for ref in (refs or [])]
@@ -3644,9 +3660,12 @@ class Keymaster:
     # keys and call it, and speak the mailbox-relay HTTP protocol.
 
     def _find_verification_method(self, doc: dict[str, Any], kid: str) -> dict[str, Any] | None:
-        frag = _key_fragment(kid)
+        did = doc.get("didDocument", {}).get("id")
+        if not did:
+            return None
+        target = _absolute_key_id(kid, did)
         for vm in doc.get("didDocument", {}).get("verificationMethod") or []:
-            if vm.get("id") and _key_fragment(vm["id"]) == frag:
+            if vm.get("id") and _absolute_key_id(vm["id"], did) == target:
                 return vm
         return None
 

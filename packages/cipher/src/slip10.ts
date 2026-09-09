@@ -28,8 +28,13 @@ export function slip10MasterKey(seed: Uint8Array): Slip10Node {
     return split(hmac(sha512, ED25519_CURVE, seed));
 }
 
+const MAX_INDEX = 0xffffffff;
+
 export function slip10DeriveChild(parent: Slip10Node, index: number): Slip10Node {
-    if (index < HARDENED) {
+    // The whole uint32 range is checked, not just the hardened floor: setUint32
+    // truncates a fraction and wraps anything above 2^32, so an out-of-range
+    // index would silently derive some other node rather than fail.
+    if (!Number.isInteger(index) || index < HARDENED || index > MAX_INDEX) {
         throw new Error(`SLIP-0010 Ed25519 derivation is hardened only, got index ${index}`);
     }
 
