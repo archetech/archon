@@ -1830,14 +1830,26 @@ class Keymaster:
         if not did:
             return False
 
-        relationship = (
-            "authentication" if proof.get("proofPurpose") == "authentication" else "assertionMethod"
-        )
+        # Proofs are untrusted JSON, so the declared purpose is checked rather
+        # than defaulted: anything else falling through to assertionMethod lets
+        # an unsupported purpose pass on an assertion key.
+        relationship = proof.get("proofPurpose")
+        if relationship not in ("assertionMethod", "authentication"):
+            return False
         target = _absolute_key_id(proof.get("verificationMethod", ""), did)
 
         return any(
             _absolute_key_id(ref, did) == target
             for ref in doc.get("didDocument", {}).get(relationship) or []
+        )
+
+    @staticmethod
+    def _supported_proof(proof: dict[str, Any]) -> bool:
+        if proof.get("type") == "EcdsaSecp256k1Signature2019":
+            return True
+        return proof.get("type") == "DataIntegrityProof" and proof.get("cryptosuite") in (
+            "eddsa-jcs-2022",
+            ARCHON_SECP256K1_CRYPTOSUITE,
         )
 
     def _resolve_proof_key(self, doc: dict[str, Any], proof: dict[str, Any]) -> tuple[str, Any] | None:
@@ -1924,11 +1936,20 @@ class Keymaster:
         # does not implement alongside one it does, and refusing it for the
         # former would make Archon unable to read a perfectly valid credential.
         for proof in proofs:
-            verification_method = proof.get("verificationMethod", "") if isinstance(proof, dict) else ""
+            # Suite first, because resolving is I/O against a DID method this
+            # node may not implement. A foreign proof whose issuer cannot be
+            # resolved would otherwise raise and take the rest of the set with
+            # it, including a proof this build can check.
+            verification_method = proof.get("verificationMethod", "")
             signer_did = verification_method.split("#")[0]
-            if not signer_did:
+            if not signer_did or not self._supported_proof(proof):
                 continue
-            doc = await self.resolve_did(signer_did, {"confirm": "true", "versionTime": proof.get("created")})
+            try:
+                doc = await self.resolve_did(
+                    signer_did, {"confirm": "true", "versionTime": proof.get("created")}
+                )
+            except Exception:
+                continue
             if self._verify_one_proof(unsigned, proof, doc):
                 return True
 
@@ -3911,7 +3932,17 @@ class Keymaster:
         did_document = dict(doc.get("didDocument") or {})
 
         vm_id = f"{did}#key-assertion-1"
-        verification_method = [vm for vm in did_document.get("verificationMethod") or [] if vm.get("id") != vm_id]
+
+        # Compared as DID URLs, not strings: a document may already carry this
+        # method relatively, and `#key-assertion-1` names the same key as the
+        # absolute form. Filtering on the raw string would keep it and append a
+        # duplicate beside it.
+        def is_assertion_key(ref: Any) -> bool:
+            return _absolute_key_id(ref, did) == vm_id
+
+        verification_method = [
+            vm for vm in did_document.get("verificationMethod") or [] if not is_assertion_key(vm.get("id"))
+        ]
         verification_method.append({
             "id": vm_id,
             "controller": did,
@@ -3922,7 +3953,9 @@ class Keymaster:
 
         # Added to assertionMethod, not substituted for it: #key-1 is already
         # there and still signs everything Archon verifies itself.
-        assertion_method = [ref for ref in did_document.get("assertionMethod") or [] if ref != vm_id]
+        assertion_method = [
+            ref for ref in did_document.get("assertionMethod") or [] if not is_assertion_key(ref)
+        ]
         assertion_method.append(vm_id)
         did_document["assertionMethod"] = assertion_method
 
@@ -3939,7 +3972,13 @@ class Keymaster:
         did_document = dict(doc.get("didDocument") or {})
 
         vm_id = f"{did}#key-assertion-1"
-        verification_method = [vm for vm in did_document.get("verificationMethod") or [] if vm.get("id") != vm_id]
+
+        def is_assertion_key(ref: Any) -> bool:
+            return _absolute_key_id(ref, did) == vm_id
+
+        verification_method = [
+            vm for vm in did_document.get("verificationMethod") or [] if not is_assertion_key(vm.get("id"))
+        ]
 
         if verification_method:
             did_document["verificationMethod"] = verification_method
@@ -3948,7 +3987,9 @@ class Keymaster:
 
         # Only this fragment leaves: unlike keyAgreement, assertionMethod holds
         # the identity key too and deleting it wholesale would unpublish that.
-        assertion_method = [ref for ref in did_document.get("assertionMethod") or [] if ref != vm_id]
+        assertion_method = [
+            ref for ref in did_document.get("assertionMethod") or [] if not is_assertion_key(ref)
+        ]
 
         if assertion_method:
             did_document["assertionMethod"] = assertion_method

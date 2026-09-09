@@ -206,7 +206,7 @@ def test_unpublish_assertion_key_leaves_the_identity_key_in_place(testbed):
     assert "https://w3id.org/security/multikey/v1" not in document.get("@context", [])
 
 
-def _sign_eddsa_jcs_2022(km, document, did, name=None):
+def _sign_eddsa_jcs_2022(km, document, did, name=None, proof_purpose="assertionMethod"):
     """Built here rather than through the implementation, so a wrong payload
     fails instead of agreeing with itself. Mirrors tests/keymaster/verify-proof.test.ts."""
     from keymaster.crypto import hash_json
@@ -219,7 +219,7 @@ def _sign_eddsa_jcs_2022(km, document, did, name=None):
         "cryptosuite": "eddsa-jcs-2022",
         "created": "2026-01-01T00:00:00.000Z",
         "verificationMethod": f"{did}#key-assertion-1",
-        "proofPurpose": "assertionMethod",
+        "proofPurpose": proof_purpose,
     }
     payload = bytes.fromhex(hash_json(config) + hash_json(unsecured))
     return {**config, "proofValue": dc.bytes_to_multibase(dc.sign_ed25519(payload, keypair["privateJwk"]))}
@@ -318,3 +318,55 @@ def test_unpublish_assertion_key_keeps_the_context_while_a_multikey_remains(test
 
     assert f"{did}#key-other-1" in [vm["id"] for vm in after["verificationMethod"]]
     assert "https://w3id.org/security/multikey/v1" in after.get("@context", [])
+
+
+def test_verify_proof_rejects_a_purpose_that_is_not_a_relationship(testbed):
+    """Signed *with* the bad purpose, so the signature is genuinely valid and
+    only the authorization check can reject it."""
+    km = testbed.keymaster
+    did, document = _published_credential(km)
+
+    for purpose in ("capabilityInvocation", "keyAgreement", ""):
+        proof = _sign_eddsa_jcs_2022(km, document, did, proof_purpose=purpose)
+        assert run(km.verify_proof({**document, "proof": proof})) is False
+
+
+def test_verify_proof_survives_a_proof_naming_an_unresolvable_issuer(testbed):
+    km = testbed.keymaster
+    did, document = _published_credential(km)
+    unresolvable = {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-01-01T00:00:00.000Z",
+        "verificationMethod": "did:web:example.test#key-1",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zNotOurs",
+    }
+
+    good = _sign_eddsa_jcs_2022(km, document, did)
+
+    assert run(km.verify_proof({**document, "proof": [unresolvable, good]})) is True
+    assert run(km.verify_proof({**document, "proof": [unresolvable]})) is False
+
+
+def test_publish_assertion_key_replaces_a_relative_reference(testbed):
+    km = testbed.keymaster
+    did, _ = _published_credential(km)
+
+    doc = run(km.resolve_did(did))["didDocument"]
+    doc["verificationMethod"] = [
+        {**vm, "id": "#key-assertion-1"} if vm.get("id") == f"{did}#key-assertion-1" else vm
+        for vm in doc["verificationMethod"]
+    ]
+    doc["assertionMethod"] = [
+        "#key-assertion-1" if ref == f"{did}#key-assertion-1" else ref for ref in doc["assertionMethod"]
+    ]
+    run(km.update_did(did, {"didDocument": doc}))
+
+    run(km.publish_assertion_key())
+
+    after = run(km.resolve_did(did))["didDocument"]
+    multikeys = [vm for vm in after["verificationMethod"] if vm.get("type") == "Multikey"]
+
+    assert len(multikeys) == 1
+    assert len([r for r in after["assertionMethod"] if str(r).endswith("#key-assertion-1")]) == 1

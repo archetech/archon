@@ -36,7 +36,7 @@ beforeEach(async () => {
 // instead of agreeing with itself. Per vc-di-eddsa: the proof config is the
 // proof without proofValue, carrying the document's @context; the signed
 // payload is sha256(canonical config) || sha256(canonical document).
-async function signEddsaJcs2022(document: any, did: string, name?: string) {
+async function signEddsaJcs2022(document: any, did: string, name?: string, proofPurpose = 'assertionMethod') {
     const keypair = await keymaster.fetchAssertionKeyPair(name);
     const { proof, ...unsecured } = document;
     void proof;
@@ -47,7 +47,7 @@ async function signEddsaJcs2022(document: any, did: string, name?: string) {
         cryptosuite: 'eddsa-jcs-2022',
         created: new Date().toISOString(),
         verificationMethod: `${did}#key-assertion-1`,
-        proofPurpose: 'assertionMethod',
+        proofPurpose,
     };
 
     const payload = new Uint8Array([
@@ -181,6 +181,60 @@ describe('proofPurpose authorization', () => {
         const signed = await keymaster.addProof({ hello: 'world' });
 
         expect(await keymaster.verifyProof(signed)).toBe(true);
+    });
+});
+
+describe('untrusted proof fields', () => {
+    // proofPurpose arrives as JSON. Anything not one of the two relationships
+    // used to fall through to assertionMethod, so an unsupported purpose passed
+    // on an assertion key.
+    // Signed *with* the bad purpose, so the signature is genuinely valid and
+    // only the authorization check can reject it. Editing the purpose after
+    // signing invalidates the signature instead, which passes for the wrong
+    // reason and would hold even with the check removed.
+    it.each(['capabilityInvocation', 'keyAgreement', ''])('rejects the purpose %p', async (proofPurpose) => {
+        const { did, document } = await credential();
+        const proof = await signEddsaJcs2022(document, did, undefined, proofPurpose);
+
+        expect(await keymaster.verifyProof({ ...document, proof } as any)).toBe(false);
+    });
+
+    it('rejects a proof with no purpose at all', async () => {
+        const { did, document } = await credential();
+        const { proofPurpose, ...proof } = await signEddsaJcs2022(document, did) as any;
+        void proofPurpose;
+
+        expect(await keymaster.verifyProof({ ...document, proof } as any)).toBe(false);
+    });
+
+    // A proof naming a DID method this node cannot resolve used to throw out of
+    // verifyProof, so a valid Archon proof beside it was never reached.
+    it('checks a valid proof beside one whose issuer cannot be resolved', async () => {
+        const { did, document } = await credential();
+        const unresolvable = {
+            type: 'DataIntegrityProof',
+            cryptosuite: 'eddsa-jcs-2022',
+            created: new Date().toISOString(),
+            verificationMethod: 'did:web:example.test#key-1',
+            proofPurpose: 'assertionMethod',
+            proofValue: 'zNotOurs',
+        };
+
+        expect(await keymaster.verifyProof({ ...document, proof: [unresolvable, await signEddsaJcs2022(document, did)] } as any)).toBe(true);
+    });
+
+    it('does not throw when every proof names an unresolvable issuer', async () => {
+        const { document } = await credential();
+        const unresolvable = {
+            type: 'DataIntegrityProof',
+            cryptosuite: 'eddsa-jcs-2022',
+            created: new Date().toISOString(),
+            verificationMethod: 'did:web:example.test#key-1',
+            proofPurpose: 'assertionMethod',
+            proofValue: 'zNotOurs',
+        };
+
+        await expect(keymaster.verifyProof({ ...document, proof: [unresolvable] } as any)).resolves.toBe(false);
     });
 });
 

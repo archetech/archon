@@ -88,6 +88,29 @@ describe('publishAssertionKey', () => {
         expect(doc.didDocument['@context']).toContain('https://w3id.org/security/multikey/v1');
     });
 
+    // A document may name the method relatively. Filtering on the raw string
+    // keeps that entry and appends the absolute form beside it, leaving two
+    // verification methods and two references for one key.
+    it('replaces a relative reference rather than duplicating it', async () => {
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        await keymaster.publishAssertionKey();
+
+        const doc: any = await keymaster.resolveDID(did);
+        const didDocument = { ...doc.didDocument };
+        didDocument.verificationMethod = didDocument.verificationMethod.map(
+            (vm: any) => vm.id === `${did}#key-assertion-1` ? { ...vm, id: '#key-assertion-1' } : vm);
+        didDocument.assertionMethod = didDocument.assertionMethod.map(
+            (ref: string) => ref === `${did}#key-assertion-1` ? '#key-assertion-1' : ref);
+        await keymaster.updateDID(did, { didDocument });
+
+        await keymaster.publishAssertionKey();
+
+        const after: any = await keymaster.resolveDID(did);
+
+        expect(assertionMethods(after)).toHaveLength(1);
+        expect(after.didDocument.assertionMethod.filter((r: string) => r.endsWith('#key-assertion-1'))).toHaveLength(1);
+    });
+
     it('is idempotent', async () => {
         const did = await keymaster.createId('Alice', { registry: 'local' });
         await keymaster.publishAssertionKey();

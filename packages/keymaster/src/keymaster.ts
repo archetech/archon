@@ -1321,6 +1321,13 @@ export default class Keymaster implements KeymasterInterface {
             return false;
         }
 
+        // Proofs are untrusted JSON, so the declared purpose is checked rather
+        // than defaulted: anything else falling through to assertionMethod
+        // lets an unsupported purpose pass on an assertion key.
+        if (proof.proofPurpose !== 'assertionMethod' && proof.proofPurpose !== 'authentication') {
+            return false;
+        }
+
         const refs = proof.proofPurpose === 'authentication'
             ? doc.didDocument?.authentication
             : doc.didDocument?.assertionMethod;
@@ -1376,6 +1383,15 @@ export default class Keymaster implements KeymasterInterface {
         return Uint8Array.from(Buffer.from(digests, 'hex'));
     }
 
+    private supportedProof(proof: CredentialProof): boolean {
+        if (proof.type === 'EcdsaSecp256k1Signature2019') {
+            return true;
+        }
+
+        return proof.type === 'DataIntegrityProof'
+            && (proof.cryptosuite === 'eddsa-jcs-2022' || proof.cryptosuite === ARCHON_SECP256K1_CRYPTOSUITE);
+    }
+
     private verifyOneProof(unsecured: unknown, proof: CredentialProof, doc: DidCidDocument): boolean {
         const resolved = this.resolveProofKey(doc, proof);
 
@@ -1423,12 +1439,24 @@ export default class Keymaster implements KeymasterInterface {
         // the former would make Archon unable to read a credential that is
         // perfectly valid.
         for (const proof of proofs) {
-            if (!proof?.verificationMethod) {
+            // Suite first to avoid resolving for a proof that cannot be
+            // checked anyway -- resolution is I/O, and a set may carry several
+            // foreign proofs. Resolution failure is caught below rather than
+            // prevented here: a supported suite can name an issuer this node
+            // cannot reach, and that must not take the rest of the set with it.
+            if (!proof?.verificationMethod || !this.supportedProof(proof)) {
                 continue;
             }
 
             const [signerDid] = proof.verificationMethod.split('#');
-            const doc = await this.resolveDID(signerDid, { versionTime: proof.created });
+            let doc: DidCidDocument;
+
+            try {
+                doc = await this.resolveDID(signerDid, { versionTime: proof.created });
+            }
+            catch {
+                continue;
+            }
 
             if (this.verifyOneProof(unsecured, proof, doc)) {
                 return true;
@@ -2552,7 +2580,14 @@ export default class Keymaster implements KeymasterInterface {
         const didDocument = { ...doc.didDocument! };
 
         const vmId = `${did}#key-assertion-1`;
-        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => vm.id !== vmId);
+        // Compared as DID URLs, not strings: a document may already carry this
+        // method relatively, and `#key-assertion-1` names the same key as the
+        // absolute form. Filtering on the raw string would keep it and append a
+        // duplicate beside it.
+        const isAssertionKey = (ref: string | undefined) =>
+            !!ref && this.absoluteKeyId(ref, did) === vmId;
+
+        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => !isAssertionKey(vm.id));
         verificationMethod.push({
             id: vmId,
             controller: did,
@@ -2563,7 +2598,7 @@ export default class Keymaster implements KeymasterInterface {
 
         // Added to assertionMethod, not substituted for it: #key-1 is already
         // there and still signs everything Archon verifies itself.
-        const assertionMethod = (didDocument.assertionMethod || []).filter(ref => ref !== vmId);
+        const assertionMethod = (didDocument.assertionMethod || []).filter(ref => !isAssertionKey(ref));
         assertionMethod.push(vmId);
         didDocument.assertionMethod = assertionMethod;
 
@@ -2582,7 +2617,10 @@ export default class Keymaster implements KeymasterInterface {
         const didDocument = { ...doc.didDocument! };
 
         const vmId = `${did}#key-assertion-1`;
-        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => vm.id !== vmId);
+        const isAssertionKey = (ref: string | undefined) =>
+            !!ref && this.absoluteKeyId(ref, did) === vmId;
+
+        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => !isAssertionKey(vm.id));
 
         if (verificationMethod.length > 0) {
             didDocument.verificationMethod = verificationMethod;
@@ -2593,7 +2631,7 @@ export default class Keymaster implements KeymasterInterface {
 
         // Only this fragment leaves: unlike keyAgreement, assertionMethod holds
         // the identity key too and deleting it wholesale would unpublish that.
-        const assertionMethod = (didDocument.assertionMethod || []).filter(ref => ref !== vmId);
+        const assertionMethod = (didDocument.assertionMethod || []).filter(ref => !isAssertionKey(ref));
 
         if (assertionMethod.length > 0) {
             didDocument.assertionMethod = assertionMethod;
