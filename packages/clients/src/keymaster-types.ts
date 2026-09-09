@@ -329,15 +329,6 @@ export interface PossiblyProofed {
     proof?: CredentialProof | CredentialProof[];
 }
 
-// The proofs on a document, however it carries them. Everything that reads a
-// proof goes through this rather than assuming a shape.
-export function proofsOf(obj: PossiblyProofed): CredentialProof[] {
-    if (!obj?.proof) {
-        return [];
-    }
-
-    return Array.isArray(obj.proof) ? obj.proof : [obj.proof];
-}
 
 export interface RestClientOptions {
     url?: string;

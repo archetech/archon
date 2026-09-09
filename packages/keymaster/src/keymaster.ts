@@ -1,4 +1,5 @@
 import { attachedJson, issueCredentialMessage, type DidCommPlaintext } from './didcomm-protocols.js';
+import { proofsOf } from '@didcid/common/utils';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
@@ -81,7 +82,6 @@ import {
     Seed,
     StoredAddressInfo,
 } from '@didcid/keymaster/types';
-import { proofsOf } from '@didcid/clients/keymaster-types';
 import {
     isWalletEncFile,
     isWalletFile
