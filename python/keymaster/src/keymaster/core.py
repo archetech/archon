@@ -77,6 +77,20 @@ class PollItems:
 _UNFETCHED = object()
 
 
+def _key_fragment(ref: Any) -> str | None:
+    """The fragment of a verification method reference.
+
+    References are written relatively (`#key-1`, which the gatekeeper emits) and
+    absolutely (`did:cid:...#key-1`, which publish_didcomm emits), so anything
+    comparing them has to compare fragments. Mirrors keyFragment in the
+    TypeScript keymaster.
+    """
+    if not isinstance(ref, str):
+        return None
+
+    return ref.split("#")[-1] if "#" in ref else ref
+
+
 class KeymasterError(Exception):
     pass
 
@@ -2237,14 +2251,29 @@ class Keymaster:
             verification_methods = did_document.get("verificationMethod") or []
             if not verification_methods:
                 raise KeymasterError("DID Document missing verificationMethod")
-            updated_method = dict(verification_methods[0])
-            updated_method["id"] = f"#key-{next_index + 1}"
-            updated_method["publicKeyJwk"] = keypair["publicJwk"]
+            rotated = verification_methods[0]
+            rotated_fragment = _key_fragment(rotated.get("id"))
+            rotated_id = f"#key-{next_index + 1}"
+            updated_method = {**rotated, "id": rotated_id, "publicKeyJwk": keypair["publicJwk"]}
+
+            # Replace the rotated key in place and leave every other method
+            # alone. Rebuilding these as single-element lists dropped keys
+            # published beside the identity one -- publish_didcomm's
+            # `#key-agreement-1` among them -- while `keyAgreement`, which was
+            # never rebuilt, kept naming the method just deleted.
+            def is_rotated(ref: Any) -> bool:
+                return bool(rotated_fragment) and _key_fragment(ref) == rotated_fragment
+
+            def retitle(refs: Any) -> list[Any]:
+                return [rotated_id if is_rotated(ref) else ref for ref in (refs or [])]
+
             updated_doc = {
                 **did_document,
-                "verificationMethod": [updated_method],
-                "authentication": [updated_method["id"]],
-                "assertionMethod": [updated_method["id"]],
+                "verificationMethod": [
+                    updated_method if is_rotated(vm.get("id")) else vm for vm in verification_methods
+                ],
+                "authentication": retitle(did_document.get("authentication")),
+                "assertionMethod": retitle(did_document.get("assertionMethod")),
             }
             ok = await self.update_did(id_info["did"], {"didDocument": updated_doc})
             if ok:
@@ -3596,14 +3625,10 @@ class Keymaster:
     # envelope crypto lives in didcomm_crypto (dc); these methods resolve DIDs to
     # keys and call it, and speak the mailbox-relay HTTP protocol.
 
-    @staticmethod
-    def _didcomm_fragment(kid: str) -> str:
-        return kid.split("#")[-1] if "#" in kid else kid
-
     def _find_verification_method(self, doc: dict[str, Any], kid: str) -> dict[str, Any] | None:
-        frag = self._didcomm_fragment(kid)
+        frag = _key_fragment(kid)
         for vm in doc.get("didDocument", {}).get("verificationMethod") or []:
-            if vm.get("id") and self._didcomm_fragment(vm["id"]) == frag:
+            if vm.get("id") and _key_fragment(vm["id"]) == frag:
                 return vm
         return None
 

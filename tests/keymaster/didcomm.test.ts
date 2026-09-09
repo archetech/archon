@@ -165,6 +165,62 @@ describe('publishDidComm', () => {
     });
 });
 
+describe('rotateKeys with a published key agreement key', () => {
+    // rotateKeys used to rebuild verificationMethod as a single-element array,
+    // dropping every key published beside the identity one. keyAgreement was
+    // not rebuilt with it, so it went on naming a method that no longer
+    // existed and senders could no longer dereference it.
+    it('keeps the key agreement key and leaves no dangling reference', async () => {
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        await keymaster.publishDidComm('https://relay.example/didcomm');
+
+        await keymaster.rotateKeys();
+
+        const doc = (await keymaster.resolveDID(did)).didDocument!;
+        const fragments = doc.verificationMethod!.map(vm => String(vm.id).split('#').pop());
+
+        expect(fragments).toContain('key-agreement-1');
+        expect(doc.keyAgreement!.every(ref => fragments.includes(String(ref).split('#').pop()))).toBe(true);
+    });
+
+    it('moves the rotated identity key on, in the document and its relationships', async () => {
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        await keymaster.publishDidComm('https://relay.example/didcomm');
+
+        await keymaster.rotateKeys();
+
+        const doc = (await keymaster.resolveDID(did)).didDocument!;
+
+        expect(doc.verificationMethod!.map(vm => vm.id)).toContain('#key-2');
+        expect(doc.verificationMethod!.map(vm => vm.id)).not.toContain('#key-1');
+        expect(doc.authentication).toStrictEqual(['#key-2']);
+        expect(doc.assertionMethod).toStrictEqual(['#key-2']);
+    });
+
+    // The whole point of keeping the key is that DIDComm still works after a
+    // rotation, which the document shape alone does not prove.
+    it('can still receive an encrypted message afterwards', async () => {
+        // 'local' confirms immediately, and rotateKeys refuses an unconfirmed
+        // document.
+        const aliceDid = await keymaster.createId('Alice', { registry: 'local' });
+        const bobDid = await keymaster.createId('Bob', { registry: 'local' });
+        await keymaster.publishDidComm(undefined, 'Alice');
+        await keymaster.publishDidComm(undefined, 'Bob');
+
+        await keymaster.setCurrentId('Alice');
+        await keymaster.rotateKeys();
+
+        const body = { text: 'after a rotation' };
+        const packed = await keymaster.packDidComm({ type: 'https://x/1/msg', body }, aliceDid, { name: 'Bob' });
+        const { message, metadata } = await keymaster.unpackDidComm(packed, { name: 'Alice' });
+
+        expect(message.body).toEqual(body);
+        expect(message.to).toEqual([aliceDid]);
+        expect(metadata.encrypted).toBe(true);
+        expect(metadata.sender).toBe(`${bobDid}#key-agreement-1`);
+    });
+});
+
 describe('unpublishDidComm', () => {
     it('removes the key-agreement method and DIDComm service but keeps the signing key', async () => {
         const did = await keymaster.createId('Alice');

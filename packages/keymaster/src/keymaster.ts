@@ -1880,15 +1880,28 @@ export default class Keymaster implements KeymasterInterface {
                 throw new KeymasterError('DID Document missing verificationMethod');
             }
 
-            const vmethod = { ...doc.didDocument.verificationMethod[0] };
-            vmethod.id = `#key-${nextIndex + 1}`;
-            vmethod.publicKeyJwk = keypair.publicJwk;
+            const rotated = doc.didDocument.verificationMethod[0];
+            const rotatedFragment = rotated.id && this.keyFragment(rotated.id);
+            const rotatedId = `#key-${nextIndex + 1}`;
+            const vmethod = { ...rotated, id: rotatedId, publicKeyJwk: keypair.publicJwk };
+
+            // Replace the rotated key in place and leave every other method
+            // alone. Rebuilding these as single-element arrays dropped keys
+            // published beside the identity one -- publishDidComm's
+            // `#key-agreement-1` among them -- while `keyAgreement`, which was
+            // never rebuilt, kept pointing at the method just deleted.
+            const isRotated = (ref: string | undefined) =>
+                !!ref && !!rotatedFragment && this.keyFragment(ref) === rotatedFragment;
+
+            const retitle = (refs: string[] | undefined) =>
+                (refs || []).map(ref => isRotated(ref) ? rotatedId : ref);
 
             const updatedDidDocument = {
                 ...doc.didDocument,
-                verificationMethod: [vmethod],
-                authentication: [vmethod.id],
-                assertionMethod: [vmethod.id],
+                verificationMethod: doc.didDocument.verificationMethod.map(
+                    vm => isRotated(vm.id) ? vmethod : vm),
+                authentication: retitle(doc.didDocument.authentication),
+                assertionMethod: retitle(doc.didDocument.assertionMethod),
             };
 
             ok = await this.updateDID(id.did, { didDocument: updatedDidDocument });
@@ -2495,13 +2508,17 @@ export default class Keymaster implements KeymasterInterface {
         return this.updateDID(did, { didDocument });
     }
 
-    private didCommFragment(id: string): string {
+    // A verification method is referenced sometimes relatively (`#key-1`, which
+    // the gatekeeper writes) and sometimes absolutely (`did:cid:...#key-1`,
+    // which publishDidComm writes), so anything comparing references has to
+    // compare fragments.
+    private keyFragment(id: string): string {
         return id.includes('#') ? id.split('#').pop()! : id;
     }
 
     private findVerificationMethod(doc: DidCidDocument, kid: string) {
-        const frag = this.didCommFragment(kid);
-        return (doc.didDocument?.verificationMethod || []).find(vm => vm.id && this.didCommFragment(vm.id) === frag);
+        const frag = this.keyFragment(kid);
+        return (doc.didDocument?.verificationMethod || []).find(vm => vm.id && this.keyFragment(vm.id) === frag);
     }
 
     private resolveKeyAgreement(doc: DidCidDocument): { kid: string; publicJwk: OkpJwkPublic } {

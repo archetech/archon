@@ -132,3 +132,27 @@ def test_issue_credential_rejects_mismatched_issuer(testbed):
     run(testbed.keymaster.set_current_id("Bob"))
     with pytest.raises(KeymasterError, match="credential.issuer"):
         run(testbed.keymaster.issue_credential(bound))
+
+def test_rotate_keys_keeps_a_published_key_agreement_key(testbed):
+    """rotate_keys rebuilt verificationMethod as a single-element list, dropping
+    every key published beside the identity one -- publish_didcomm's
+    `#key-agreement-1` among them -- while keyAgreement, never rebuilt with it,
+    went on naming the method just deleted. Mirrors the TypeScript regression in
+    tests/keymaster/didcomm.test.ts.
+    """
+    km = testbed.keymaster
+    did = run(km.create_id("Alice", {"registry": "local"}))
+    run(km.publish_didcomm("https://relay.example/didcomm"))
+
+    run(km.rotate_keys())
+
+    document = run(km.resolve_did(did))["didDocument"]
+    ids = [vm["id"] for vm in document["verificationMethod"]]
+    fragments = [str(vm_id).split("#")[-1] for vm_id in ids]
+
+    assert "key-agreement-1" in fragments
+    assert all(str(ref).split("#")[-1] in fragments for ref in document.get("keyAgreement", []))
+    assert "#key-2" in ids
+    assert "#key-1" not in ids
+    assert document["authentication"] == ["#key-2"]
+    assert document["assertionMethod"] == ["#key-2"]
