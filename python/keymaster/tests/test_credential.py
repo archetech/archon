@@ -392,3 +392,64 @@ def test_verify_proof_rejects_a_context_the_document_does_not_declare(testbed):
     proof = {**config, "proofValue": dc.bytes_to_multibase(dc.sign_ed25519(payload, keypair["privateJwk"]))}
 
     assert run(km.verify_proof({**document, "proof": proof})) is False
+
+
+def test_add_proof_emits_one_proof_until_an_assertion_key_is_published(testbed):
+    km = testbed.keymaster
+    run(km.create_id("Alice", {"registry": "local"}))
+
+    signed = run(km.add_proof({"hello": "world"}))
+
+    assert isinstance(signed["proof"], dict)
+    assert signed["proof"]["type"] == "EcdsaSecp256k1Signature2019"
+    assert run(km.verify_proof(signed)) is True
+
+
+def test_add_proof_emits_both_proofs_once_published_and_each_verifies_alone(testbed):
+    km = testbed.keymaster
+    _, document = _published_credential(km)
+
+    signed = run(km.add_proof(document))
+    secp, eddsa = signed["proof"]
+
+    assert len(signed["proof"]) == 2
+    assert secp["type"] == "EcdsaSecp256k1Signature2019"
+    assert eddsa["cryptosuite"] == "eddsa-jcs-2022"
+    assert eddsa["proofValue"].startswith("z")
+    assert eddsa["@context"] == document["@context"]
+    assert run(km.verify_proof({**document, "proof": [secp]})) is True
+    assert run(km.verify_proof({**document, "proof": [eddsa]})) is True
+    assert run(km.verify_proof(signed)) is True
+
+
+def test_add_proof_attaches_nothing_when_the_published_key_is_not_the_derived_one(testbed):
+    km = testbed.keymaster
+    did, _ = _published_credential(km)
+
+    doc = run(km.resolve_did(did))["didDocument"]
+    doc["verificationMethod"] = [
+        {**vm, "publicKeyMultibase": "z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp"}
+        if vm.get("id") == f"{did}#key-assertion-1" else vm
+        for vm in doc["verificationMethod"]
+    ]
+    run(km.update_did(did, {"didDocument": doc}))
+
+    signed = run(km.add_proof({"hello": "world"}))
+
+    assert isinstance(signed["proof"], dict)
+
+
+def test_operations_carry_one_legacy_proof_after_an_assertion_key_is_published(testbed):
+    """Both gatekeeper ports require an operation proof to be a single object
+    whose type is the literal EcdsaSecp256k1Signature2019. The testbed's
+    gatekeeper does not enforce that, so the shape is asserted directly rather
+    than relying on an operation being rejected."""
+    km = testbed.keymaster
+    run(km.create_id("Alice", {"registry": "local"}))
+    run(km.publish_assertion_key())
+
+    signed = run(km._add_operation_proof({"type": "update"}))
+
+    assert isinstance(signed["proof"], dict)
+    assert signed["proof"]["type"] == "EcdsaSecp256k1Signature2019"
+    assert signed["proof"]["proofPurpose"] == "authentication"

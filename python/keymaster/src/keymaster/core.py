@@ -1800,7 +1800,16 @@ class Keymaster:
 
         return decrypt_bytes(decrypted["privateJwk"], encrypted_data)
 
-    async def add_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
+    async def _add_operation_proof(self, payload: dict[str, Any], controller: str | None = None) -> dict[str, Any]:
+        """DID operations, which both gatekeeper ports validate.
+
+        verify_proof_format requires a single proof whose type is the literal
+        EcdsaSecp256k1Signature2019, so an operation never carries a proof set
+        however many keys its signer has published.
+        """
+        return await self._add_legacy_proof(payload, controller, "authentication")
+
+    async def _add_legacy_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
         id_info = await self.fetch_id_info(controller)
         keypair = await self.fetch_key_pair(controller)
         if not keypair:
@@ -1819,6 +1828,61 @@ class Keymaster:
                 "proofValue": b64url(bytes.fromhex(signature_hex)),
             },
         }
+
+    async def add_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
+        secp = await self._add_legacy_proof(payload, controller, proof_purpose)
+        eddsa = await self._eddsa_jcs_2022_proof(payload, controller, proof_purpose)
+
+        # A single object while the signer has published no assertion key, so an
+        # identity that never opts in emits exactly what it emitted before.
+        if eddsa is None:
+            return secp
+
+        return {**secp, "proof": [secp["proof"], eddsa]}
+
+    async def _eddsa_jcs_2022_proof(
+        self, payload: dict[str, Any], controller: str | None, proof_purpose: str
+    ) -> dict[str, Any] | None:
+        """The proof a did:webvh or did:key verifier can check.
+
+        Returns None when the signer has not published an assertion key, which
+        is every identity until it calls publish_assertion_key.
+        """
+        id_info = await self.fetch_id_info(controller)
+        doc = await self.resolve_did(id_info["did"], {"confirm": "true"})
+        vm_id = f"{id_info['did']}#key-assertion-1"
+        vm = self._find_verification_method(doc, vm_id)
+
+        if not vm or not vm.get("publicKeyMultibase"):
+            return None
+
+        keypair = await self.fetch_assertion_key_pair(controller)
+
+        # The published key is what a verifier will resolve, so a derivation
+        # that no longer matches it would produce a proof nobody can check.
+        # Silent rather than fatal: the secp256k1 proof still stands.
+        derived = dc.ed25519_public_key_to_multikey(dc.ub64url(keypair["publicJwk"]["x"]))
+        if vm["publicKeyMultibase"] != derived:
+            return None
+
+        config: dict[str, Any] = {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "eddsa-jcs-2022",
+            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            "verificationMethod": vm_id,
+            "proofPurpose": proof_purpose,
+        }
+
+        # Create Proof step 2: the proof carries the context of the document it
+        # secures. Omitted when the document declares none, as a signed file may.
+        if "@context" in payload:
+            config["@context"] = payload["@context"]
+
+        signature = dc.sign_ed25519(
+            self._eddsa_jcs_2022_payload(payload, config), keypair["privateJwk"]
+        )
+
+        return {**config, "proofValue": dc.bytes_to_multibase(signature)}
 
     def _authorized_for_purpose(self, doc: dict[str, Any], proof: dict[str, Any]) -> bool:
         """Whether the document lists this key under the purpose the proof claims.
@@ -1987,7 +2051,7 @@ class Keymaster:
         controller = current.get("didDocument", {}).get("id")
         if current.get("didDocumentRegistration", {}).get("type") == "asset":
             controller = current.get("didDocument", {}).get("controller")
-        signed = await self.add_proof(payload, controller, "authentication")
+        signed = await self._add_operation_proof(payload, controller)
         return await self.gatekeeper.update_did(signed)
 
     async def revoke_did(self, identifier: str) -> bool:
@@ -2005,7 +2069,7 @@ class Keymaster:
         controller = current.get("didDocument", {}).get("id")
         if current.get("didDocumentRegistration", {}).get("type") == "asset":
             controller = current.get("didDocument", {}).get("controller")
-        signed = await self.add_proof(payload, controller, "authentication")
+        signed = await self._add_operation_proof(payload, controller)
         ok = await self.gatekeeper.delete_did(signed)
         if ok and current.get("didDocument", {}).get("controller"):
             await self.remove_from_owned(did, current["didDocument"]["controller"])
@@ -2119,7 +2183,7 @@ class Keymaster:
             payload["registration"]["validUntil"] = valid_until
         if block and block.get("hash"):
             payload["blockid"] = block["hash"]
-        signed = await self.add_proof(payload, controller, "authentication")
+        signed = await self._add_operation_proof(payload, controller)
         did = await self.gatekeeper.create_did(signed)
         if not valid_until:
             await self.add_to_owned(did, controller)

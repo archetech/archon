@@ -6,6 +6,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import MemoryClient from '@didcid/ipfs/memory';
+import { proofsOf } from '@didcid/common/utils';
 
 let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
@@ -186,11 +187,13 @@ describe('addProof', () => {
         const did = await keymaster.createId(name);
         const signed = await keymaster.addProof(mockJson);
 
-        expect(signed.proof.type).toBe('EcdsaSecp256k1Signature2019');
-        expect(signed.proof.verificationMethod).toContain(did);
-        expect(signed.proof.verificationMethod).toContain('#key-');
-        expect(signed.proof.proofPurpose).toBe('assertionMethod');
-        expect(signed.proof.proofValue).toBeDefined();
+        const [proof] = proofsOf(signed);
+
+        expect(proof.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(proof.verificationMethod).toContain(did);
+        expect(proof.verificationMethod).toContain('#key-');
+        expect(proof.proofPurpose).toBe('assertionMethod');
+        expect(proof.proofValue).toBeDefined();
     });
 
     it('should throw an exception if no ID selected', async () => {
@@ -238,7 +241,8 @@ describe('verifyProof', () => {
         await keymaster.createId('Bob');
 
         const signed = await keymaster.addProof(mockJson);
-        signed.proof.proofValue = signed.proof.proofValue.substring(1);
+        const [proof] = proofsOf(signed);
+        proof.proofValue = proof.proofValue.substring(1);
         const isValid = await keymaster.verifyProof(signed);
 
         expect(isValid).toBe(false);
@@ -249,7 +253,7 @@ describe('verifyProof', () => {
 
         const signed = await keymaster.addProof(mockJson);
         // @ts-expect-error Testing invalid usage
-        delete signed.proof.verificationMethod;
+        delete proofsOf(signed)[0].verificationMethod;
         const isValid = await keymaster.verifyProof(signed);
 
         expect(isValid).toBe(false);
@@ -260,7 +264,7 @@ describe('verifyProof', () => {
 
         const signed = await keymaster.addProof(mockJson);
         // @ts-expect-error Testing invalid usage
-        signed.proof.type = "InvalidType";
+        proofsOf(signed)[0].type = "InvalidType";
         const isValid = await keymaster.verifyProof(signed);
 
         expect(isValid).toBe(false);

@@ -5,7 +5,7 @@ import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
-import { ed25519PublicKeyToMultikey, multikeyToEd25519PublicKey, multibaseToBytes } from '@didcid/cipher/multikey';
+import { ed25519PublicKeyToMultikey, multikeyToEd25519PublicKey, multibaseToBytes, bytesToMultibase } from '@didcid/cipher/multikey';
 import type { Ed25519JwkPair } from '@didcid/cipher/types';
 import { CID } from 'multiformats/cid';
 import {
@@ -932,7 +932,7 @@ export default class Keymaster implements KeymasterInterface {
             data,
         };
 
-        const signed = await this.addProof(operation, controller, "authentication");
+        const signed = await this.addOperationProof(operation, controller);
         const did = await this.gatekeeper.createDID(signed);
 
         // Keep assets that will be garbage-collected out of the owned list
@@ -1265,7 +1265,18 @@ export default class Keymaster implements KeymasterInterface {
         }
     }
 
-    async addProof<T extends object>(
+    // DID operations, which both gatekeeper ports validate: verifyProofFormat
+    // requires a single proof whose type is the literal
+    // EcdsaSecp256k1Signature2019, so an operation never carries a proof set
+    // however many keys its signer has published.
+    private async addOperationProof<T extends object>(
+        obj: T,
+        controller?: string,
+    ): Promise<T & { proof: Proof }> {
+        return this.addLegacyProof(obj, controller, 'authentication');
+    }
+
+    private async addLegacyProof<T extends object>(
         obj: T,
         controller?: string,
         proofPurpose: ProofPurpose = "assertionMethod"
@@ -1305,6 +1316,77 @@ export default class Keymaster implements KeymasterInterface {
         catch (error) {
             throw new InvalidParameterError('obj');
         }
+    }
+
+    async addProof<T extends object>(
+        obj: T,
+        controller?: string,
+        proofPurpose: ProofPurpose = "assertionMethod"
+    ): Promise<T & { proof: CredentialProof | CredentialProof[] }> {
+        const secp = await this.addLegacyProof(obj, controller, proofPurpose);
+        const eddsa = await this.eddsaJcs2022Proof(obj, controller, proofPurpose);
+
+        // A single object while the signer has published no assertion key, so
+        // an identity that never opts in emits exactly what it emitted before.
+        if (!eddsa) {
+            return secp;
+        }
+
+        return { ...secp, proof: [secp.proof, eddsa] };
+    }
+
+    // The proof a did:webvh or did:key verifier can check. Returns nothing when
+    // the signer has not published an assertion key, which is every identity
+    // until it calls publishAssertionKey.
+    private async eddsaJcs2022Proof(
+        obj: object,
+        controller: string | undefined,
+        proofPurpose: ProofPurpose,
+    ): Promise<DataIntegrityProof | null> {
+        const id = await this.fetchIdInfo(controller);
+        const doc = await this.resolveDID(id.did, { confirm: true });
+        const vmId = `${id.did}#key-assertion-1`;
+        const vm = this.findVerificationMethod(doc, vmId);
+
+        if (!vm?.publicKeyMultibase) {
+            return null;
+        }
+
+        const keypair = await this.fetchAssertionKeyPair(controller);
+
+        // The published key is what a verifier will resolve, so a derivation
+        // that no longer matches it would produce a proof nobody can check.
+        // Silent rather than fatal: the secp256k1 proof still stands, and this
+        // is the shape a wallet restored under a different scheme would take.
+        if (vm.publicKeyMultibase !== ed25519PublicKeyToMultikey(base64url.baseDecode(keypair.publicJwk.x))) {
+            return null;
+        }
+
+        const config: DataIntegrityProof = {
+            type: 'DataIntegrityProof',
+            cryptosuite: 'eddsa-jcs-2022',
+            created: new Date().toISOString(),
+            verificationMethod: vmId,
+            proofPurpose,
+            proofValue: '',
+        };
+
+        // Create Proof step 2: the proof carries the context of the document it
+        // secures. Omitted when the document declares none, as a signed file may.
+        const context = (obj as { '@context'?: string[] })['@context'];
+
+        if (context !== undefined) {
+            config['@context'] = context;
+        }
+
+        const { proofValue, ...unsigned } = config;
+        void proofValue;
+        const payload = this.eddsaJcs2022Payload(obj, unsigned as DataIntegrityProof);
+
+        return {
+            ...unsigned as DataIntegrityProof,
+            proofValue: bytesToMultibase(this.cipher.signEd25519(payload, keypair.privateJwk)),
+        };
     }
 
     // The key a proof names, for verification only. Deliberately not
@@ -1509,7 +1591,7 @@ export default class Keymaster implements KeymasterInterface {
             controller = current.didDocument?.controller;
         }
 
-        const signed = await this.addProof(operation, controller, "authentication");
+        const signed = await this.addOperationProof(operation, controller);
         return this.gatekeeper.updateDID(signed);
     }
 
@@ -1536,7 +1618,7 @@ export default class Keymaster implements KeymasterInterface {
             controller = current.didDocument?.controller;
         }
 
-        const signed = await this.addProof(operation, controller, "authentication");
+        const signed = await this.addOperationProof(operation, controller);
 
         const ok = await this.gatekeeper.deleteDID(signed);
 

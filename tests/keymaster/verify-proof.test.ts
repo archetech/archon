@@ -275,3 +275,90 @@ describe('the legacy label', () => {
         expect(await keymaster.verifyProof(signed)).toBe(true);
     });
 });
+
+describe('issuing', () => {
+    // An identity that never publishes an assertion key emits exactly what it
+    // emitted before this feature, so nothing downstream changes shape until
+    // somebody opts in.
+    it('emits a single proof while no assertion key is published', async () => {
+        await keymaster.createId('Alice', { registry: 'local' });
+        const signed = await keymaster.addProof({ hello: 'world' });
+
+        expect(Array.isArray(signed.proof)).toBe(false);
+        expect((signed.proof as any).type).toBe('EcdsaSecp256k1Signature2019');
+        expect(await keymaster.verifyProof(signed)).toBe(true);
+    });
+
+    it('emits both proofs once the key is published, and each verifies alone', async () => {
+        const { document } = await credential();
+        const signed: any = await keymaster.addProof(document);
+        const [secp, eddsa] = signed.proof;
+
+        expect(signed.proof).toHaveLength(2);
+        expect(secp.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(eddsa.type).toBe('DataIntegrityProof');
+        expect(eddsa.cryptosuite).toBe('eddsa-jcs-2022');
+        expect(eddsa.proofValue.startsWith('z')).toBe(true);
+
+        expect(await keymaster.verifyProof({ ...document, proof: [secp] })).toBe(true);
+        expect(await keymaster.verifyProof({ ...document, proof: [eddsa] })).toBe(true);
+        expect(await keymaster.verifyProof(signed)).toBe(true);
+    });
+
+    // Create Proof step 2: the proof carries the context of the document it
+    // secures, which the agreement check then requires on the way back in.
+    it('gives the Data Integrity proof the document context', async () => {
+        const { document } = await credential();
+        const signed: any = await keymaster.addProof(document);
+
+        expect(signed.proof[1]['@context']).toStrictEqual(document['@context']);
+    });
+
+    it('omits the context for a document that declares none', async () => {
+        await keymaster.createId('Alice', { registry: 'local' });
+        await keymaster.publishAssertionKey();
+        const signed: any = await keymaster.addProof({ hello: 'world' });
+
+        expect(signed.proof[1]['@context']).toBeUndefined();
+        expect(await keymaster.verifyProof(signed)).toBe(true);
+    });
+
+    // The published key is what a verifier resolves, so signing with a
+    // derivation that no longer matches it would emit a proof nobody can
+    // check. Skipped rather than fatal: the secp256k1 proof still stands.
+    it('attaches nothing when the published key is not the one it derives', async () => {
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        await keymaster.publishAssertionKey();
+
+        const doc: any = await keymaster.resolveDID(did);
+        const didDocument = { ...doc.didDocument };
+        didDocument.verificationMethod = didDocument.verificationMethod.map((vm: any) =>
+            vm.id === `${did}#key-assertion-1`
+                ? { ...vm, publicKeyMultibase: 'z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp' }
+                : vm);
+        await keymaster.updateDID(did, { didDocument });
+
+        const signed: any = await keymaster.addProof({ hello: 'world' });
+
+        expect(Array.isArray(signed.proof)).toBe(false);
+        expect(signed.proof.type).toBe('EcdsaSecp256k1Signature2019');
+    });
+
+    // Both gatekeeper ports require an operation proof to be a single object
+    // whose type is the literal EcdsaSecp256k1Signature2019, so an operation
+    // must never pick up the second proof however many keys its signer has.
+    it('leaves DID operations carrying one legacy proof', async () => {
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        await keymaster.publishAssertionKey();
+
+        // updateDID and revokeDID both sign operations; a rejected one throws.
+        const doc: any = await keymaster.resolveDID(did);
+        const didDocument = { ...doc.didDocument, alsoKnownAs: ['https://example.test/alice'] };
+
+        expect(await keymaster.updateDID(did, { didDocument })).toBe(true);
+
+        const asset = await keymaster.createAsset({ note: 'after publishing' });
+
+        expect(asset).toBeDefined();
+    });
+});
