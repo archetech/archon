@@ -117,6 +117,19 @@ describe('cross-language vector', () => {
     const MULTIKEY = 'z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp';
     const SIGNATURE = '4lyHI9A5_o9F1snWqJF_qRvHVJE81Zb9NYpJOiGjy1kKZTe6vH3wQAq2GgVYnJw2tloUOHjLA0HU6eSEGcQ3DQ';
 
+    // The BIP39 test mnemonic, so a third-party SLIP-0010 wallet can check
+    // these paths against its own derivation.
+    const MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+    const ASSERTION_X = '2MESnYkKQoS3HGNxZIrvf7jYWCzu_8i202PDOUdE_Gg';
+    const AGREEMENT_X = 'NoQVOtv9-xeZWgAxgNWlddNDb_aTfPA0Hgen80qg2is';
+
+    it('derives the same keys as the Python keymaster from a shared mnemonic', () => {
+        const seed = cipher.mnemonicToSeed(MNEMONIC);
+
+        expect(cipher.deriveEd25519Jwk(seed, "m/44'/0'/0'/2'/0'").publicJwk.x).toBe(ASSERTION_X);
+        expect(cipher.deriveX25519Jwk(seed, "m/44'/0'/0'/1'/0'").publicJwk.x).toBe(AGREEMENT_X);
+    });
+
     it('matches the Python keymaster byte for byte', () => {
         const { publicJwk, privateJwk } = cipher.generateEd25519Jwk(SEED);
 

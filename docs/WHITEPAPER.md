@@ -1033,11 +1033,14 @@ Master Seed (BIP-39 Mnemonic)
                   ├── .../0/{index}    signing key (change = 0)
                   │                    rotation advances the index (§8.8)
                   │
-                  └── .../1/0          X25519 key agreement (change = 1)
-                                       for DIDComm v2 messaging
+                  ├── .../1'/0'        X25519 key agreement for DIDComm v2
+                  │                    (SLIP-0010 Ed25519, converted)
+                  │
+                  └── .../2'/0'        Ed25519 assertion key (SLIP-0010)
+                                       for Data Integrity credential proofs
 ```
 
-Each identity occupies its own hardened account. Signing keys live on the `change = 0` branch and are indexed, so key rotation advances to the next index rather than deriving from a new account. The X25519 key-agreement key used for DIDComm v2 messaging is derived on the `change = 1` branch, which keeps it from ever colliding with a signing key. Both are deterministic from the seed: a given account and index always regenerate the same keys, so the messaging key needs no backup of its own. Recovery builds on the same property. The wallet's seed bank is a DID whose creation operation is itself derived from the seed, so it resolves to the same identifier every time — a controller who has taken a wallet backup can therefore restore every identity from the mnemonic alone, with no DID, file, or other material to keep alongside it. What the mnemonic cannot do is reconstruct identities that were never backed up: key regeneration is deterministic, but the mapping from name to DID, account and key index lives in wallet metadata and comes back only from a published backup.
+Each identity occupies its own hardened account. Signing keys live on the `change = 0` branch and are indexed, so key rotation advances to the next index rather than deriving from a new account. Keys on other curves derive from the same BIP39 seed through **SLIP-0010**, which seeds each curve's master node with a different HMAC key so no curve can reproduce another's material. Those paths are hardened throughout, as SLIP-0010 requires for Ed25519, and the level below the account separates key types: `1'` for key agreement, `2'` for assertion. The X25519 key-agreement key used for DIDComm v2 messaging is derived as an Ed25519 key and converted, which is the relationship `did:key` defines between a `z6Mk` verification key and the key agreement key it resolves to. Because the derivation is standard rather than Archon-specific, any SLIP-0010 wallet given the mnemonic and the path arrives at the same keys. Both are deterministic from the seed: a given account and index always regenerate the same keys, so the messaging key needs no backup of its own. Recovery builds on the same property. The wallet's seed bank is a DID whose creation operation is itself derived from the seed, so it resolves to the same identifier every time — a controller who has taken a wallet backup can therefore restore every identity from the mnemonic alone, with no DID, file, or other material to keep alongside it. What the mnemonic cannot do is reconstruct identities that were never backed up: key regeneration is deterministic, but the mapping from name to DID, account and key index lives in wallet metadata and comes back only from a published backup.
 
 **Key Types:**
 - **ECDSA secp256k1**: Primary signing algorithm

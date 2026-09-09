@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from bip_utils import Bech32Decoder, Bech32Encoder, Bip32Secp256k1, Bip39SeedGenerator
+from bip_utils import Bip32Slip10Ed25519, Bech32Decoder, Bech32Encoder, Bip32Secp256k1, Bip39SeedGenerator
 from coincurve import PrivateKey, PublicKeyXOnly
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
@@ -61,6 +61,21 @@ def hd_root_from_mnemonic(mnemonic: str) -> Bip32Secp256k1:
 
 def derive_private_key_bytes(root: Bip32Secp256k1, path: str) -> bytes:
     return root.DerivePath(path).PrivateKey().Raw().ToBytes()
+
+
+def bip39_seed_from_mnemonic(mnemonic: str) -> bytes:
+    """The BIP39 seed both curves derive from."""
+    return Bip39SeedGenerator(mnemonic).Generate()
+
+
+def slip10_ed25519_bytes(seed: bytes, path: str) -> bytes:
+    """SLIP-0010 Ed25519 derivation, hardened only.
+
+    BIP32 covers secp256k1 alone; SLIP-0010 seeds each curve's master node with
+    a different HMAC key, so an Ed25519 key derived here can never collide with
+    a secp256k1 one from the same mnemonic.
+    """
+    return Bip32Slip10Ed25519.FromSeed(seed).DerivePath(path).PrivateKey().Raw().ToBytes()
 
 
 def private_key_to_jwk_pair(private_key_bytes: bytes) -> dict[str, dict[str, str]]:

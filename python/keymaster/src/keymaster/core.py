@@ -18,6 +18,7 @@ from cryptography.exceptions import InvalidTag
 
 from .crypto import (
     b64url,
+    bip39_seed_from_mnemonic,
     decrypt_bytes,
     decrypt_message,
     decrypt_with_passphrase,
@@ -36,6 +37,7 @@ from .crypto import (
     private_key_to_jwk_pair,
     sign_hash,
     sign_schnorr,
+    slip10_ed25519_bytes,
     ub64url,
     verify_sig,
 )
@@ -345,6 +347,17 @@ class Keymaster:
         root = hd_root_from_mnemonic(mnemonic)
         self._root_cache = _RootCache(root, self._root_cache_identity(wallet.get("seed", {})))
         return root
+
+    async def _bip39_seed(self, wallet: dict[str, Any] | None = None) -> bytes:
+        """The BIP39 seed the SLIP-0010 curves derive from.
+
+        BIP32 and SLIP-0010 build different master nodes out of it, so one
+        mnemonic backs every key without any curve sharing material.
+        """
+        if wallet is None:
+            wallet = await self.load_wallet()
+        mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
+        return bip39_seed_from_mnemonic(mnemonic)
 
     async def hd_key_pair(self, wallet: dict[str, Any] | None = None) -> dict[str, dict[str, str]]:
         root = await self._root_node(wallet)
@@ -3725,11 +3738,19 @@ class Keymaster:
         return self._resolve_key_agreement(doc)
 
     async def fetch_didcomm_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]]:
+        """DIDComm key agreement key, on SLIP-0010's Ed25519 ladder and converted.
+
+        The conversion is the relationship did:key defines between a z6Mk key
+        and the key agreement key it resolves to, so the pair stays inspectable
+        against that method. Deterministic from the wallet seed and the
+        identity's account, so it needs no backup of its own and any SLIP-0010
+        wallet given the mnemonic finds the same key.
+        """
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
-        root = await self._root_node(wallet)
-        seed = derive_private_key_bytes(root, f"m/44'/0'/{id_info['account']}'/1/0")
-        return dc.generate_x25519_jwk(seed)
+        seed = await self._bip39_seed(wallet)
+        derived = slip10_ed25519_bytes(seed, f"m/44'/0'/{id_info['account']}'/1'/0'")
+        return dc.generate_x25519_jwk(dc.ed25519_seed_to_x25519(derived))
 
     async def fetch_assertion_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]]:
         """Ed25519 assertion key, derived on its own branch (change=2).
@@ -3742,9 +3763,8 @@ class Keymaster:
         """
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
-        root = await self._root_node(wallet)
-        seed = derive_private_key_bytes(root, f"m/44'/0'/{id_info['account']}'/2/0")
-        return dc.generate_ed25519_jwk(seed)
+        seed = await self._bip39_seed(wallet)
+        return dc.generate_ed25519_jwk(slip10_ed25519_bytes(seed, f"m/44'/0'/{id_info['account']}'/2'/0'"))
 
     async def publish_assertion_key(self, name: str | None = None) -> bool:
         """Publish the Ed25519 key as a Multikey.

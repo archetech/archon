@@ -676,3 +676,39 @@ def test_multikey_rejects_another_curve():
 
     with pytest.raises(ValueError, match="Ed25519"):
         dc.multikey_to_ed25519_public_key(x25519)
+
+
+# The BIP39 test mnemonic and the keys the TypeScript keymaster derives for these
+# paths. A third-party SLIP-0010 wallet can check them against its own derivation,
+# which is the point of moving off the previous custom scheme.
+SLIP10_MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+SLIP10_ASSERTION_X = "2MESnYkKQoS3HGNxZIrvf7jYWCzu_8i202PDOUdE_Gg"
+SLIP10_AGREEMENT_X = "NoQVOtv9-xeZWgAxgNWlddNDb_aTfPA0Hgen80qg2is"
+
+
+def test_slip10_derivation_matches_the_typescript_keymaster():
+    from keymaster.crypto import bip39_seed_from_mnemonic, slip10_ed25519_bytes
+
+    seed = bip39_seed_from_mnemonic(SLIP10_MNEMONIC)
+    assertion = dc.generate_ed25519_jwk(slip10_ed25519_bytes(seed, "m/44'/0'/0'/2'/0'"))
+    agreement = dc.generate_x25519_jwk(
+        dc.ed25519_seed_to_x25519(slip10_ed25519_bytes(seed, "m/44'/0'/0'/1'/0'"))
+    )
+
+    assert assertion["publicJwk"]["x"] == SLIP10_ASSERTION_X
+    assert agreement["publicJwk"]["x"] == SLIP10_AGREEMENT_X
+
+
+def test_slip10_ed25519_matches_the_published_vector():
+    """SLIP-0010 test vector 1, so the ladder itself is pinned and not just our
+    agreement with ourselves."""
+    from keymaster.crypto import slip10_ed25519_bytes
+
+    seed = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
+
+    assert slip10_ed25519_bytes(seed, "m/0'").hex() == (
+        "68e0fe46dfb67e368c75379acec591dad19df3cde26e63b93a8e704f1dade7a3"
+    )
+    assert slip10_ed25519_bytes(seed, "m/0'/1'/2'/2'/1000000000'").hex() == (
+        "8f94d394a8e8fd6b1bc2f3f49f5c47e385281d5c17e65324b0f62483e37e8793"
+    )

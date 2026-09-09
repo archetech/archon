@@ -220,7 +220,7 @@ export default class Keymaster implements KeymasterInterface {
     // from. One value, so a key can never be observed under another wallet's
     // identity: encrypting a *different* wallet finds the identity does not
     // match and re-derives, rather than reusing a stale key.
-    private _hdkeyCache?: { hdkey: any, id: string | undefined };
+    private _hdkeyCache?: { hdkey: any, seed: Uint8Array, id: string | undefined };
 
     constructor(options: KeymasterOptions) {
         if (!options || !options.gatekeeper || !options.gatekeeper.createDID) {
@@ -363,7 +363,7 @@ export default class Keymaster implements KeymasterInterface {
             ids: {}
         };
         // Warm for the save below, which would otherwise re-derive this key.
-        this._hdkeyCache = { hdkey, id: this.hdkeyCacheId(wallet.seed) };
+        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
 
         const ok = await this.saveWallet(wallet, overwrite)
         if (!ok) {
@@ -399,7 +399,7 @@ export default class Keymaster implements KeymasterInterface {
         // identity cannot be attached to another wallet's key; the re-encrypt
         // below then reuses this entry instead of re-deriving.
         const hdkey = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCache = { hdkey, id: this.hdkeyCacheId(wallet.seed) };
+        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
 
         const encrypted = await this.encryptWalletForStorage(wallet);
         const ok = await this.db.saveWallet(encrypted, true);
@@ -2412,32 +2412,27 @@ export default class Keymaster implements KeymasterInterface {
         return this.updateDID(did, { didDocument, didDocumentData });
     }
 
-    // DIDComm key agreement keys are derived on a dedicated branch (change=1)
-    // so they never collide with the authentication/signing keys at change=0.
-    // The key is deterministic from the wallet seed and the identity's account,
-    // so it survives backup/recovery without storing extra material.
+    // DIDComm key agreement keys, on SLIP-0010's Ed25519 ladder and converted
+    // to X25519 -- the relationship did:key defines between a z6Mk key and the
+    // key agreement key it resolves to. Deterministic from the wallet seed and
+    // the identity's account, so it survives backup and recovery with nothing
+    // stored, and any SLIP-0010 wallet given the mnemonic finds the same key.
     async fetchDidCommKeyPair(name?: string): Promise<OkpJwkPair> {
         const wallet = await this.loadWallet();
         const id = await this.fetchIdInfo(name, wallet);
-        const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
-        const path = `m/44'/0'/${id.account}'/1/0`;
-        const didkey = hdkey.derive(path);
-        return this.cipher.generateX25519Jwk(didkey.privateKey!);
+        const seed = await this.getSeedFromCacheOrMnemonic(wallet);
+        return this.cipher.deriveX25519Jwk(seed, `m/44'/0'/${id.account}'/1'/0'`);
     }
 
-    // Ed25519 assertion keys are derived on their own branch (change=2), the
-    // rule being that `change` selects the key type and the final index is that
-    // type's rotation counter: 0 signing/authentication, 1 DIDComm key
-    // agreement, 2 Ed25519 assertion. The BIP32 node is secp256k1 either way --
-    // an Ed25519 secret is any 32 bytes -- so this needs no second HD scheme,
-    // exactly as fetchDidCommKeyPair does for X25519.
+    // Ed25519 assertion keys, on their own SLIP-0010 branch. The account index
+    // is the identity, and the level below it separates key types: 1' key
+    // agreement, 2' assertion. Signing keys stay on the BIP32 secp256k1 tree at
+    // change=0, where their index is the rotation counter.
     async fetchAssertionKeyPair(name?: string): Promise<Ed25519JwkPair> {
         const wallet = await this.loadWallet();
         const id = await this.fetchIdInfo(name, wallet);
-        const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
-        const path = `m/44'/0'/${id.account}'/2/0`;
-        const didkey = hdkey.derive(path);
-        return this.cipher.generateEd25519Jwk(didkey.privateKey!);
+        const seed = await this.getSeedFromCacheOrMnemonic(wallet);
+        return this.cipher.deriveEd25519Jwk(seed, `m/44'/0'/${id.account}'/2'/0'`);
     }
 
     // Published as a Multikey rather than a JsonWebKey2020: eddsa-jcs-2022
@@ -5956,8 +5951,17 @@ export default class Keymaster implements KeymasterInterface {
 
         const mnemonic = await this.getMnemonicForDerivation(wallet);
         const hdkey = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCache = { hdkey, id };
+        const seed = this.cipher.mnemonicToSeed(mnemonic);
+        this._hdkeyCache = { hdkey, seed, id };
         return hdkey;
+    }
+
+    // The same cache entry, for the curves that derive off the BIP39 seed
+    // rather than the BIP32 node. Decrypting the mnemonic is the expensive part
+    // and these keys are fetched on every packed message.
+    private async getSeedFromCacheOrMnemonic(wallet: WalletFile): Promise<Uint8Array> {
+        await this.getHDKeyFromCacheOrMnemonic(wallet);
+        return this._hdkeyCache!.seed;
     }
 
     private async encryptWalletForStorage(decrypted: WalletFile): Promise<WalletEncFile> {
@@ -5988,7 +5992,7 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const hdkey = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCache = { hdkey, id: this.hdkeyCacheId(stored.seed) };
+        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(stored.seed) };
         const { publicJwk, privateJwk } = this.cipher.generateJwk(hdkey.privateKey!);
 
         const plaintext = this.cipher.decryptMessage(privateJwk, stored.enc, publicJwk);

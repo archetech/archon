@@ -149,6 +149,21 @@ MULTICODEC_X25519_PUB = 0xEC
 MULTICODEC_ED25519_PUB = 0xED
 
 
+def ed25519_seed_to_x25519(seed: bytes) -> bytes:
+    """The X25519 private scalar for an Ed25519 seed (RFC 7748 clamping).
+
+    Matches @noble/curves' edwardsToMontgomeryPriv: Ed25519 hashes its seed and
+    uses the first half, clamped, as the scalar, and X25519 uses that same
+    scalar directly. This is the private half of the map did:key already
+    defines between a z6Mk key and the key agreement key it resolves to.
+    """
+    h = bytearray(hashlib.sha512(seed).digest()[:32])
+    h[0] &= 248
+    h[31] &= 127
+    h[31] |= 64
+    return bytes(h)
+
+
 def generate_ed25519_jwk(seed: bytes) -> dict[str, dict[str, str]]:
     """Deterministic Ed25519 JWK pair from a 32-byte seed (matches generateEd25519Jwk)."""
     if len(seed) != 32:
