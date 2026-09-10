@@ -2035,11 +2035,12 @@ class Keymaster:
         signed over a different context would verify here while a verifier that
         rebuilds the config from the document rejects it. Refused outright, and
         for a reason a caller can act on rather than an opaque bad signature.
-        """
-        if "@context" not in proof:
-            return True
 
-        return canonicalize_json(proof["@context"]) == canonicalize_json(unsecured.get("@context"))
+        Absence agrees only with absence: Create Proof copies the document's
+        context into the config whenever the document declares one, so a proof
+        that omits it over a document that has one was built outside the suite.
+        """
+        return canonicalize_json(proof.get("@context")) == canonicalize_json(unsecured.get("@context"))
 
     def _verify_one_proof(self, unsecured: dict[str, Any], proof: dict[str, Any], doc: dict[str, Any]) -> bool:
         resolved = self._resolve_proof_key(doc, proof)

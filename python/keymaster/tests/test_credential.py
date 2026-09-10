@@ -536,3 +536,27 @@ def test_archon_suite_rejects_an_altered_proof_configuration(testbed):
         assert run(km.verify_proof({**document, "proof": [one]})) is False
 
     assert run(km.verify_proof({**document, "hello": "tampered", "proof": [proof]})) is False
+
+
+def test_archon_suite_rejects_a_proof_validly_signed_over_a_config_with_no_context(testbed):
+    """Signed genuinely over the context-free config, so the signature is valid
+    and only the agreement check can reject it -- simply deleting the member
+    would fail on the signature instead and prove nothing. Mirrors
+    tests/keymaster/verify-proof.test.ts."""
+    from keymaster.crypto import hash_json, hash_message, sign_hash, b64url
+
+    km = testbed.keymaster
+    did = run(km.create_id("Alice", {"registry": "local"}))
+    document = {"@context": ["https://www.w3.org/ns/credentials/v2"], "hello": "world"}
+    keypair = run(km.fetch_key_pair())
+    config = {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-jcs-2019",
+        "created": "2026-01-01T00:00:00.000Z",
+        "verificationMethod": f"{did}#key-1",
+        "proofPurpose": "assertionMethod",
+    }
+    payload = bytes.fromhex(hash_json(config) + hash_json(document))
+    proof_value = b64url(bytes.fromhex(sign_hash(hash_message(payload), keypair["privateJwk"])))
+
+    assert run(km.verify_proof({**document, "proof": [{**config, "proofValue": proof_value}]})) is False

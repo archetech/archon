@@ -464,8 +464,9 @@ The `proof.verificationMethod` field identifies which key was used to create the
 
 ### Cryptosuites
 
-A DID operation and a credential are signed with the same key and the same bytes,
-but they are labelled differently, because they are read by different verifiers.
+A DID operation and a credential are signed with the same key, but not over the
+same bytes and not under the same name, because they are read by different
+verifiers.
 
 **Operations** carry a single proof of type `EcdsaSecp256k1Signature2019`. Both
 gatekeeper implementations require exactly that literal and reject anything else,

@@ -1543,10 +1543,11 @@ export default class Keymaster implements KeymasterInterface {
     // rebuilds the config from the document rejects it. Refused outright, and
     // for a reason a caller can act on rather than an opaque bad signature.
     private contextAgrees(unsecured: any, proof: DataIntegrityProof): boolean {
-        if (proof['@context'] === undefined) {
-            return true;
-        }
-
+        // Absence agrees only with absence. Create Proof copies the document's
+        // context into the config whenever the document declares one, so a
+        // proof that omits it over a document that has one was built outside
+        // the suite -- and a conforming verifier, rebuilding the config from
+        // the document, rejects it.
         return this.cipher.canonicalizeJSON(proof['@context']) === this.cipher.canonicalizeJSON(unsecured?.['@context']);
     }
 

@@ -134,6 +134,11 @@ export default abstract class CipherBase implements Cipher {
 
     verifyEd25519(message: Uint8Array, signature: Uint8Array, publicJwk: Ed25519JwkPublic): boolean {
         try {
+            // Left on noble's default zip215:true deliberately. Its RFC 8032
+            // mode (zip215:false) additionally rejects small-order public keys
+            // and non-canonical encodings, but Python's `cryptography` accepts
+            // both, so tightening this port alone would make the same proof
+            // verify in one language and fail in the other. See #1091.
             return ed25519.verify(signature, message, base64url.baseDecode(publicJwk.x));
         }
         catch {

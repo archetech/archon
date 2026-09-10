@@ -307,6 +307,29 @@ describe('archon-ecdsa-jcs-2019 binds its proof configuration', () => {
             { ...document, proof: [{ ...proof, '@context': ['https://example.test/other/v1'] }] } as any)).toBe(false);
     });
 
+    // Create Proof copies the document's context into the config whenever the
+    // document declares one, so a proof omitting it was built outside the
+    // suite. Signed genuinely over the context-free config, so the signature
+    // is valid and only the agreement check can reject it -- simply deleting
+    // the member would fail on the signature instead and prove nothing.
+    it('rejects a proof validly signed over a config with no context', async () => {
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        const document = { '@context': ['https://www.w3.org/ns/credentials/v2'], hello: 'world' };
+        const keypair = await keymaster.fetchKeyPair();
+        const config = {
+            type: 'DataIntegrityProof',
+            cryptosuite: 'archon-ecdsa-jcs-2019',
+            created: new Date().toISOString(),
+            verificationMethod: `${did}#key-1`,
+            proofPurpose: 'assertionMethod',
+        };
+        const payload = new Uint8Array([...sha256(canonicalize(config)), ...sha256(canonicalize(document))]);
+        const proofValue = Buffer.from(
+            cipher.signHash(cipher.hashMessage(payload), keypair!.privateJwk), 'hex').toString('base64url');
+
+        expect(await keymaster.verifyProof({ ...document, proof: [{ ...config, proofValue }] } as any)).toBe(false);
+    });
+
     it('rejects an altered document', async () => {
         const { document, proof } = await archonProof();
 
