@@ -12,11 +12,12 @@ import path from 'node:path';
 const packages = path.resolve(__dirname, '../../packages');
 
 export default defineConfig({
-    // packages/wallet-ui has no tsconfig of its own, so esbuild finds no `jsx`
-    // setting for its files and falls back to the classic transform, which needs
-    // React in scope. The webpack build avoids this through babel; saying it
-    // here keeps the test path independent of that.
-    esbuild: { jsx: 'automatic' },
+    // packages/wallet-ui has no tsconfig of its own, so without this its files
+    // fall back to the classic JSX transform, which needs React in scope. Vite 8
+    // (pulled by vitest 5) transforms with oxc rather than esbuild, so the runtime
+    // is set here instead of as `esbuild.jsx`. The webpack build avoids this
+    // through babel; saying it here keeps the test path independent of that.
+    oxc: { jsx: { runtime: 'automatic' } },
     resolve: {
         // wallet-ui is consumed as source from outside this app, so without
         // this its imports resolve to the copies npm installs at the root for
