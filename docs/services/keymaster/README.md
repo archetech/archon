@@ -1153,7 +1153,29 @@ requests, close the wallet backend, exit. The TS reference uses
 | 500 | `Incorrect passphrase.` | `decryptWalletFromStorage` couldn't decrypt with the configured passphrase. (Note: trailing period; Keymaster wraps the cipher error.) |
 | 500 | `<thrown error toString>` | Unhandled exception. |
 
-### 16.3 Logging
+### 16.3 Status classification
+
+Error status is assigned by the *kind* of failure, not per route:
+
+| Failure | Status |
+| --- | --- |
+| Bad or invalid input (a `KeymasterError`) | 400 |
+| Not found — unknown ID, empty wallet, resolution miss (`UnknownIDError`, `WalletNotFoundError`) | 404 |
+| Missing/incorrect passphrase or admin key | 401 / 403 |
+| Unexpected fault — gatekeeper or IPFS unreachable, any unhandled exception | 500 |
+
+**Current divergence.** The Python service classifies by exception type this
+way (`KeymasterError` → 400, its not-found subclasses → 404), as of #1107. The
+TypeScript service still assigns status in each route's `catch` block and does
+so inconsistently — 57 routes answer 400, 79 answer 500, 22 answer 404 for what
+is often the same class of error — so it returns 500 for many client errors.
+Aligning it to this table is #1108.
+
+Until that lands the two implementations are **not** byte-for-byte identical on
+error status. A consumer SHOULD treat any 4xx as a client error and any 5xx as
+a server fault rather than pinning to exact codes per route.
+
+### 16.4 Logging
 
 - One line per HTTP request: morgan's "dev" format
   (`METHOD path status duration-ms - content-length`).
