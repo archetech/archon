@@ -1159,27 +1159,31 @@ Error status is assigned by the *kind* of failure, not per route:
 
 | Failure | Status |
 | --- | --- |
-| Bad or invalid input (a `KeymasterError`) | 400 |
-| Not found — an unresolved non-DID name (`UnknownIDError`) or an empty wallet store (`WalletNotFoundError`) | 404 |
+| Bad or invalid input (`InvalidParameterError`, `InvalidDIDError`, `InvalidOperationError`, `KeymasterError`) | 400 |
+| Not found — an unknown ID (`UnknownIDError`) or an empty wallet store (`WalletNotFoundError`) | 404 |
 | Missing/incorrect passphrase or admin key | 401 / 403 |
+| An unavailable upstream service (`LightningUnavailableError`) | 503 |
 | Unexpected fault — gatekeeper or IPFS unreachable, any unhandled exception | 500 |
 
-**Current divergence.** The Python service classifies by exception type this
-way (`KeymasterError` → 400, its not-found subclasses → 404), as of #1107. The
-TypeScript service still assigns status in each route's `catch` block and does
-so inconsistently — 57 routes answer 400, 79 answer 500, 22 answer 404 for what
-is often the same class of error — so it returns 500 for many client errors.
-Aligning it to this table is #1108.
+Both services classify this way: the Python service as of #1107, the TypeScript
+service as of #1108. Before #1108 the TypeScript routes hardcoded a status in
+each `catch` block, inconsistently — 57 answered 400, 79 answered 500, 22
+answered 404 for the same class of error — and a shared `sendError` helper
+(`keymaster-error-status.ts`) now replaces those with the classification above.
+
+Two deliberate exceptions remain, both returning **404** regardless of the error
+class because the not-found semantics are the point of the route: the
+resolve-style GETs (`GET /did/{id}`, `/ids/{id}`, `/assets/{id}`, `/groups/{name}`,
+`/schemas/{id}`, `/dmail/{id}`, `/aliases/{alias}`) answer 404 for any resolution
+failure. A malformed request body that fails JSON parsing before reaching the
+keymaster (e.g. `POST /keys/sign`) surfaces as 500, since the parse error is not
+an Archon error.
 
 One nuance in the not-found row: resolving an explicit `did:` that the gatekeeper
-cannot find raises the base `KeymasterError` and so returns 400, not 404 — only
-an unresolved *name* raises `UnknownIDError`. Making a missing DID a 404 would
-change the shared keymaster library's `resolve_did`, so it is left to #1108
-alongside the TypeScript alignment.
-
-Until that lands the two implementations are **not** byte-for-byte identical on
-error status. A consumer SHOULD treat any 4xx as a client error and any 5xx as
-a server fault rather than pinning to exact codes per route.
+cannot find raises the base `KeymasterError` (→ 400) rather than `UnknownIDError`
+(→ 404) at the library level — only an unresolved *name* raises `UnknownIDError`.
+The resolve-style routes above paper over this by returning 404 for any
+resolution failure; making the library itself distinguish them is future work.
 
 ### 16.4 Logging
 

@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createDmailRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster, config } = options;
@@ -43,7 +44,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const dmail = await getKeymaster().listDmail();
             res.json({ dmail });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -97,7 +98,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const did = await getKeymaster().createDmail(message, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -142,7 +143,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().importDmail(did);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -237,7 +238,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().updateDmail(req.params.id, message);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -278,7 +279,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().removeDmail(req.params.id);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -320,7 +321,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const did = await getKeymaster().sendDmail(req.params.id);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -378,7 +379,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().fileDmail(req.params.id, tags);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -421,7 +422,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const attachments = await getKeymaster().listDmailAttachments(dmailId);
             res.json({ attachments });
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -483,7 +484,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().addDmailAttachment(dmailId, name, data);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -531,7 +532,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().removeDmailAttachment(dmailId, name);
             res.json({ ok });
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -577,7 +578,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             res.set('Content-Type', 'application/octet-stream');
             res.send(response);
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 

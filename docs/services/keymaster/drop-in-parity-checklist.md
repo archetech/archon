@@ -262,11 +262,9 @@ Source of truth:
       relevant contract exercised by `tests/keymaster/client.test.ts`
 - [ ] Response envelope differences between TypeScript and Python are fully
       removed
-- [ ] Error status parity: the Python service classifies by exception type
-      (client error → 400, not-found → 404, server fault → 500; see
-      `README.md` §16.3, #1107). The TypeScript service assigns status per
-      route inconsistently and is being aligned to the same classification
-      (#1108). Not byte-for-byte identical until then.
+- [x] Error status parity: both services classify by exception type
+      (client error → 400, not-found → 404, unavailable upstream → 503, server
+      fault → 500; see `README.md` §16.3). Python in #1107, TypeScript in #1108.
 - [ ] Compose-level swap test passes with the Python service in place of the
       TypeScript service
 - [ ] Cross-service consumers still work: CLI, React wallet, Drawbridge,

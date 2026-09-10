@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createCoreRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -37,7 +38,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const registries = await getKeymaster().listRegistries();
             res.json({ registries });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -85,7 +86,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const capabilities = await getKeymaster().getNodeCapabilities();
             res.json({ capabilities });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -155,7 +156,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const wallet = await getKeymaster().loadWallet();
             res.json({ wallet });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -237,7 +238,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const ok = await getKeymaster().saveWallet(wallet);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -322,7 +323,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const wallet = await getKeymaster().newWallet(mnemonic, overwrite);
             res.json({ wallet });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -357,7 +358,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const ok = await getKeymaster().backupWallet();
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -427,7 +428,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const wallet = await getKeymaster().recoverWallet();
             res.json({ wallet });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -471,7 +472,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const check = await getKeymaster().checkWallet();
             res.json({ check });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -514,7 +515,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const fix = await getKeymaster().fixWallet();
             res.json({ fix });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -549,7 +550,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const mnemonic = await getKeymaster().decryptMnemonic();
             res.json({ mnemonic });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -599,7 +600,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const ok = await getKeymaster().changePassphrase(passphrase);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -658,7 +659,7 @@ export function createCoreRouter(options: CreateKeymasterRouterOptions): express
             const wallet = await getKeymaster().exportEncryptedWallet();
             res.json({ wallet });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

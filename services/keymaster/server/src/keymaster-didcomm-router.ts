@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createDidCommRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -55,7 +56,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const ok = await getKeymaster().publishDidComm(endpoint, name, routingKeys);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -101,7 +102,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const ok = await getKeymaster().unpublishDidComm(name);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -166,7 +167,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const packed = await getKeymaster().packDidComm(message, to, options);
             res.json({ packed });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -218,7 +219,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const result = await getKeymaster().unpackDidComm(packed, options);
             res.json({ result });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -266,7 +267,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const ids = await getKeymaster().sendDidComm(message, to, options);
             res.json({ ids });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -314,7 +315,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const results = await getKeymaster().receiveDidComm(options);
             res.json({ results });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -363,7 +364,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const acknowledged = await getKeymaster().ackDidComm(ids, options);
             res.json({ acknowledged });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -406,7 +407,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const result = await getKeymaster().mediateDidComm(options);
             res.json({ result });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -468,7 +469,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const ids = await getKeymaster().sendCredentialDidComm(did, to, options);
             res.json({ ids });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -512,7 +513,7 @@ export function createDidCommRouter(options: CreateKeymasterRouterOptions): expr
             const ok = await getKeymaster().acceptCredentialDidComm(message);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

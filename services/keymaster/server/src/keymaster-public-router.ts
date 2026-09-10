@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createPublicRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { config, isReady, getServiceVersion, serviceCommit } = options;
@@ -35,7 +36,7 @@ export function createPublicRouter(options: CreateKeymasterRouterOptions): expre
         try {
             res.json({ ready: isReady() });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

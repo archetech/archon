@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createResponseRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -88,7 +89,7 @@ export function createResponseRouter(options: CreateKeymasterRouterOptions): exp
             const did = await getKeymaster().createResponse(challenge, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -188,7 +189,7 @@ export function createResponseRouter(options: CreateKeymasterRouterOptions): exp
             const verify = await getKeymaster().verifyResponse(response, options);
             res.json({ verify });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

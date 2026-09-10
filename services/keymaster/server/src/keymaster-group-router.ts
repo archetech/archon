@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createGroupRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -45,7 +46,7 @@ export function createGroupRouter(options: CreateKeymasterRouterOptions): expres
             const groups = await getKeymaster().listGroups(param);
             res.json({ groups });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -123,7 +124,7 @@ export function createGroupRouter(options: CreateKeymasterRouterOptions): expres
             const did = await getKeymaster().createGroup(name, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -236,7 +237,7 @@ export function createGroupRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().addGroupMember(req.params.name, member);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -290,7 +291,7 @@ export function createGroupRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().removeGroupMember(req.params.name, member);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -343,7 +344,7 @@ export function createGroupRouter(options: CreateKeymasterRouterOptions): expres
             const test = await getKeymaster().testGroup(req.params.name, member);
             res.json({ test });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

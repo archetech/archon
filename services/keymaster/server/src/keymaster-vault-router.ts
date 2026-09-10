@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createVaultRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster, config } = options;
@@ -56,7 +57,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             const did = await getKeymaster().createVault(options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -114,7 +115,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             const vault = await getKeymaster().getVault(req.params.id);
             res.json({ vault });
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -158,7 +159,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             const test = await getKeymaster().testVault(req.params.id);
             res.json({ test });
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -216,7 +217,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().addVaultMember(vaultId, memberId);
             res.json({ ok });
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -268,7 +269,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().removeVaultMember(vaultId, memberId);
             res.json({ ok });
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -315,7 +316,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             const members = await getKeymaster().listVaultMembers(vaultId);
             res.json({ members });
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -379,7 +380,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().addVaultItem(vaultId, name, data);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -432,7 +433,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().removeVaultItem(vaultId, name);
             res.json({ ok });
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -480,7 +481,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             const items = await getKeymaster().listVaultItems(vaultId);
             res.json({ items });
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -530,7 +531,7 @@ export function createVaultRouter(options: CreateKeymasterRouterOptions): expres
             res.set('Content-Type', 'application/octet-stream');
             res.send(response);
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 

@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createCredentialRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -70,7 +71,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const credential = await getKeymaster().bindCredential(subject, options);
             res.json({ credential });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -106,7 +107,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const held = await getKeymaster().listCredentials();
             res.json({ held });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -153,7 +154,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const ok = await getKeymaster().acceptCredential(did);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -195,7 +196,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const credential = await getKeymaster().getCredential(req.params.did);
             res.json({ credential });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -236,7 +237,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const ok = await getKeymaster().removeCredential(req.params.did);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -295,7 +296,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const ok = await getKeymaster().publishCredential(did, options);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -345,7 +346,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const ok = await getKeymaster().unpublishCredential(did);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -381,7 +382,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const issued = await getKeymaster().listIssued();
             res.json({ issued });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -460,7 +461,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const did = await getKeymaster().issueCredential(credential, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -504,7 +505,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const credential = await getKeymaster().getCredential(did);
             res.json({ credential });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -552,7 +553,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const did = await getKeymaster().sendCredential(req.params.did, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -607,7 +608,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const ok = await getKeymaster().updateCredential(did, credential);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -649,7 +650,7 @@ export function createCredentialRouter(options: CreateKeymasterRouterOptions): e
             const ok = await getKeymaster().revokeCredential(did);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

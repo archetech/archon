@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createIdentityRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster, walletOperationsTotal, didNotFound: DIDNotFound } = options;
@@ -208,7 +209,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ok = await getKeymaster().revokeDID(req.params.id);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -260,7 +261,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ok = await getKeymaster().updateDID(req.params.id, req.body.doc);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -294,7 +295,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const current = await getKeymaster().getCurrentId();
             res.json({ current });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -341,7 +342,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ok = await getKeymaster().setCurrentId(name);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -377,7 +378,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ids = await getKeymaster().listIds();
             res.json({ ids });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -432,7 +433,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             res.json({ did });
         } catch (error: any) {
             walletOperationsTotal.inc({ operation: 'createId', status: 'error' });
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -524,7 +525,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ok = await getKeymaster().removeId(req.params.id);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -578,7 +579,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ok = await getKeymaster().renameId(req.params.id, name);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -631,7 +632,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ok = await getKeymaster().changeRegistry(req.params.id, registry);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -672,7 +673,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ok = await getKeymaster().backupId(req.params.id);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -726,7 +727,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
                 res.status(404).send(DIDNotFound);
             }
             else {
-                res.status(500).send({ error: error.toString() });
+                sendError(res, error);
             }
         }
     });
@@ -764,7 +765,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const aliases = await getKeymaster().listAliases();
             res.json({ aliases });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -815,7 +816,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ok = await getKeymaster().addAlias(alias, did);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -898,7 +899,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const ok = await getKeymaster().removeAlias(req.params.alias);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

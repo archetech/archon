@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createLightningRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -34,7 +35,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const config = await getKeymaster().addLightning(id);
             res.json(config);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -65,7 +66,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const ok = await getKeymaster().removeLightning(id);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -96,7 +97,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const balance = await getKeymaster().getLightningBalance(id);
             res.json(balance);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -136,7 +137,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const invoice = await getKeymaster().createLightningInvoice(amount, memo, id);
             res.json(invoice);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -172,7 +173,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const payment = await getKeymaster().payLightningInvoice(bolt11, id);
             res.json(payment);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -208,7 +209,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const status = await getKeymaster().checkLightningPayment(paymentHash, id);
             res.json(status);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -238,7 +239,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const info = await getKeymaster().decodeLightningInvoice(bolt11);
             res.json(info);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -268,7 +269,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const ok = await getKeymaster().publishLightning(id);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -298,7 +299,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const ok = await getKeymaster().unpublishLightning(id);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -334,7 +335,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const result = await getKeymaster().zapLightning(did, amount, memo, id);
             res.json(result);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -364,7 +365,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
             const payments = await getKeymaster().getLightningPayments(id);
             res.json({ payments });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

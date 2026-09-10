@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createAddressRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -41,7 +42,7 @@ export function createAddressRouter(options: CreateKeymasterRouterOptions): expr
             const addresses = await getKeymaster().listAddresses();
             res.json({ addresses });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -103,7 +104,7 @@ export function createAddressRouter(options: CreateKeymasterRouterOptions): expr
                 : null;
             res.json({ address });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -155,7 +156,7 @@ export function createAddressRouter(options: CreateKeymasterRouterOptions): expr
             const addresses = await getKeymaster().importAddress(domain);
             res.json({ addresses });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -205,7 +206,7 @@ export function createAddressRouter(options: CreateKeymasterRouterOptions): expr
             const result = await getKeymaster().checkAddress(address);
             res.json(result);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -251,7 +252,7 @@ export function createAddressRouter(options: CreateKeymasterRouterOptions): expr
             const ok = await getKeymaster().addAddress(address);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -300,7 +301,7 @@ export function createAddressRouter(options: CreateKeymasterRouterOptions): expr
             const ok = await getKeymaster().publishAddress(address, name);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -346,7 +347,7 @@ export function createAddressRouter(options: CreateKeymasterRouterOptions): expr
             const ok = await getKeymaster().unpublishAddress(name);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -388,7 +389,7 @@ export function createAddressRouter(options: CreateKeymasterRouterOptions): expr
             const ok = await getKeymaster().removeAddress(address);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
