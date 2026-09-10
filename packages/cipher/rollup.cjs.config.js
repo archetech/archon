@@ -13,6 +13,7 @@ const config = {
         'cipher-node': 'dist/esm/cipher-node.js',
         'cipher-web': 'dist/esm/cipher-web.js',
         'didcomm': 'dist/esm/didcomm.js',
+        'multikey': 'dist/esm/multikey.js',
         'passphrase': 'dist/esm/passphrase.js'
     },
     output: {

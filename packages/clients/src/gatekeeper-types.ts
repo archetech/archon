@@ -249,6 +249,9 @@ export interface DidCidDocument {
             controller?: string,
             type?: string,
             publicKeyJwk?: EcdsaJwkPublic | OkpJwkPublic,
+            // A Multikey carries its key here instead, which is the form the
+            // Data Integrity cryptosuites require.
+            publicKeyMultibase?: string,
         }>,
         authentication?: string[],
         assertionMethod?: string[],
@@ -280,6 +283,25 @@ export interface Proof {
     proofPurpose: ProofPurpose;
     proofValue: string;
 }
+
+// A Data Integrity proof, which is what a verifier outside Archon knows how to
+// check. `cryptosuite` names the algorithm, where the legacy `Proof` above
+// encodes it in `type`.
+export interface DataIntegrityProof {
+    // Mirrors the secured document's, and is inside the signed proof config.
+    '@context'?: string[];
+    type: "DataIntegrityProof";
+    cryptosuite: string;
+    created: string;
+    verificationMethod: string;
+    proofPurpose: ProofPurpose;
+    proofValue: string;
+}
+
+// What may appear on a credential or a presentation. Never on an Operation:
+// both gatekeeper ports require an operation proof to be the literal
+// EcdsaSecp256k1Signature2019, so `Proof` stays exact.
+export type CredentialProof = Proof | DataIntegrityProof;
 
 export interface Operation {
     type: 'create' | 'update' | 'delete';

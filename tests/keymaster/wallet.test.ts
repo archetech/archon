@@ -558,6 +558,41 @@ describe('newWallet', () => {
 
         expect(reread.ids!['Alice']).toBeDefined();
     });
+
+    // The SLIP-0010 keys derive from the BIP39 seed cached beside the HD key.
+    // A caller that awaits the cache and then reads the shared field can be
+    // handed the seed of whatever wallet arrived in between, and would sign or
+    // decrypt under a key its own document never advertised (#1052 again).
+    //
+    // The window is the caller's own await, one microtask wide, so racing two
+    // operations from outside passes whether or not the bug is present. The
+    // interleaving is placed exactly where it can bite instead.
+    it('should not derive a key from a wallet that lands after the cache lookup', async () => {
+        await keymaster.loadOrCreateWallet();
+        await keymaster.createId('Alice');
+        const alice = await keymaster.fetchDidCommKeyPair('Alice');
+
+        const instance = keymaster as any;
+        const foreign = cipher.generateMnemonic();
+        const original = instance.getKeysFromCacheOrMnemonic.bind(instance);
+
+        instance.getKeysFromCacheOrMnemonic = async (wallet: any) => {
+            const entry = await original(wallet);
+            // Another wallet replaces the cache after the lookup resolved and
+            // before its caller reads a seed out of it.
+            instance._hdkeyCache = {
+                hdkey: cipher.generateHDKey(foreign),
+                seed: cipher.mnemonicToSeed(foreign),
+                id: 'someone-elses-wallet',
+            };
+            return entry;
+        };
+
+        const derived = await instance.fetchDidCommKeyPair('Alice');
+        instance.getKeysFromCacheOrMnemonic = original;
+
+        expect(derived.publicJwk.x).toBe(alice.publicJwk.x);
+    });
 });
 
 describe('resolveSeedBank', () => {

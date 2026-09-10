@@ -45,6 +45,11 @@
       "require": "./dist/cjs/didcomm.cjs",
       "types": "./dist/types/didcomm.d.ts"
     },
+    "./multikey": {
+      "import": "./dist/esm/multikey.js",
+      "require": "./dist/cjs/multikey.cjs",
+      "types": "./dist/types/multikey.d.ts"
+    },
     "./passphrase": {
       "import": "./dist/esm/passphrase.js",
       "require": "./dist/cjs/passphrase.cjs",
@@ -64,6 +69,9 @@
       ],
       "didcomm": [
         "./dist/types/didcomm.d.ts"
+      ],
+      "multikey": [
+        "./dist/types/multikey.d.ts"
       ],
       "passphrase": [
         "./dist/types/passphrase.d.ts"

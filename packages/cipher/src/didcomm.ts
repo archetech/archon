@@ -19,6 +19,7 @@ import { hmac } from '@noble/hashes/hmac';
 import { randomBytes } from '@noble/hashes/utils';
 import { base64url } from 'multiformats/bases/base64';
 import { base58btc } from 'multiformats/bases/base58';
+import { MULTICODEC_ED25519_PUB, MULTICODEC_X25519_PUB } from './multikey.js';
 import { concatKdf } from './concat-kdf.js';
 import { OkpJwkPublic, OkpJwkPrivate, EcdsaJwkPublic, EcdsaJwkPrivate } from './types.js';
 
@@ -462,9 +463,6 @@ export function parseForward(plaintext: string | Record<string, any>): { next: s
 // Cross-method key material: did:key resolution + multibase normalization
 // ---------------------------------------------------------------------------
 
-// Multicodec varint prefixes for the multibase key material.
-const MULTICODEC_X25519_PUB = 0xec;  // followed by 0x01
-const MULTICODEC_ED25519_PUB = 0xed; // followed by 0x01
 
 function x25519MultibaseToBytes(multibase: string): Uint8Array {
     const decoded = base58btc.decode(multibase); // expects the leading 'z'

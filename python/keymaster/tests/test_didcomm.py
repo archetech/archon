@@ -638,3 +638,77 @@ def test_accept_credential_didcomm_refuses_a_credential_it_did_not_show(monkeypa
     message["attachments"][0]["data"]["json"] = resolved
     assert asyncio.run(km.accept_credential_didcomm(message)) is True
     assert accepted == ["did:cid:credential"]
+
+# The same zero seed and the values the TypeScript cipher produces for it. Both
+# suites pin these constants, so an encoding change on either side fails here
+# rather than surfacing as a credential the other cannot verify.
+ED25519_ZERO_SEED_X = "O2onvM62pC1io6jQKm8Nc2UyFXcd4kOmOsBIoYtZ2ik"
+ED25519_ZERO_SEED_MULTIKEY = "z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp"
+ED25519_ZERO_SEED_SIGNATURE = (
+    "4lyHI9A5_o9F1snWqJF_qRvHVJE81Zb9NYpJOiGjy1kKZTe6vH3wQAq2GgVYnJw2tloUOHjLA0HU6eSEGcQ3DQ"
+)
+
+
+def test_ed25519_matches_the_typescript_cipher_byte_for_byte():
+    pair = dc.generate_ed25519_jwk(bytes(32))
+    signature = dc.sign_ed25519(b"hello", pair["privateJwk"])
+
+    assert pair["publicJwk"]["x"] == ED25519_ZERO_SEED_X
+    assert dc.ed25519_public_key_to_multikey(dc.ub64url(pair["publicJwk"]["x"])) == ED25519_ZERO_SEED_MULTIKEY
+    assert dc.b64url(signature) == ED25519_ZERO_SEED_SIGNATURE
+
+
+def test_ed25519_verification_rejects_what_it_should():
+    pair = dc.generate_ed25519_jwk(bytes(32))
+    other = dc.generate_ed25519_jwk(bytes([1] * 32))
+    signature = dc.sign_ed25519(b"hello", pair["privateJwk"])
+
+    assert dc.verify_ed25519(b"hello", signature, pair["publicJwk"]) is True
+    assert dc.verify_ed25519(b"goodbye", signature, pair["publicJwk"]) is False
+    assert dc.verify_ed25519(b"hello", signature, other["publicJwk"]) is False
+    assert dc.verify_ed25519(b"hello", b"short", pair["publicJwk"]) is False
+
+
+def test_multikey_rejects_another_curve():
+    import pytest
+
+    x25519 = dc.bytes_to_multibase(bytes([dc.MULTICODEC_X25519_PUB, 0x01]) + bytes(32))
+
+    with pytest.raises(ValueError, match="Ed25519"):
+        dc.multikey_to_ed25519_public_key(x25519)
+
+
+# The BIP39 test mnemonic and the keys the TypeScript keymaster derives for these
+# paths. A third-party SLIP-0010 wallet can check them against its own derivation,
+# which is the point of moving off the previous custom scheme.
+SLIP10_MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+SLIP10_ASSERTION_X = "2MESnYkKQoS3HGNxZIrvf7jYWCzu_8i202PDOUdE_Gg"
+SLIP10_AGREEMENT_X = "NoQVOtv9-xeZWgAxgNWlddNDb_aTfPA0Hgen80qg2is"
+
+
+def test_slip10_derivation_matches_the_typescript_keymaster():
+    from keymaster.crypto import bip39_seed_from_mnemonic, slip10_ed25519_bytes
+
+    seed = bip39_seed_from_mnemonic(SLIP10_MNEMONIC)
+    assertion = dc.generate_ed25519_jwk(slip10_ed25519_bytes(seed, "m/44'/0'/0'/2'/0'"))
+    agreement = dc.generate_x25519_jwk(
+        dc.ed25519_seed_to_x25519(slip10_ed25519_bytes(seed, "m/44'/0'/0'/1'/0'"))
+    )
+
+    assert assertion["publicJwk"]["x"] == SLIP10_ASSERTION_X
+    assert agreement["publicJwk"]["x"] == SLIP10_AGREEMENT_X
+
+
+def test_slip10_ed25519_matches_the_published_vector():
+    """SLIP-0010 test vector 1, so the ladder itself is pinned and not just our
+    agreement with ourselves."""
+    from keymaster.crypto import slip10_ed25519_bytes
+
+    seed = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
+
+    assert slip10_ed25519_bytes(seed, "m/0'").hex() == (
+        "68e0fe46dfb67e368c75379acec591dad19df3cde26e63b93a8e704f1dade7a3"
+    )
+    assert slip10_ed25519_bytes(seed, "m/0'/1'/2'/2'/1000000000'").hex() == (
+        "8f94d394a8e8fd6b1bc2f3f49f5c47e385281d5c17e65324b0f62483e37e8793"
+    )

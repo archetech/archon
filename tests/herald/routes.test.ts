@@ -1085,6 +1085,45 @@ describe('herald member lookup', () => {
             expect(await statusOf(mountWith(issued()).app)).toStrictEqual({ status: 'verified' });
         });
 
+        // A credential carries a set once its issuer publishes a key whose
+        // cryptosuite an outside verifier reads. Reading `proof` as one object
+        // yields undefined for the set, so every published credential in a
+        // profile would render unverified.
+        it('marks a credential carrying a proof set verified', async () => {
+            const set = issued({
+                proof: [
+                    { verificationMethod: 'did:cid:issuer#key-1' },
+                    { verificationMethod: 'did:cid:issuer#key-assertion-1' },
+                ],
+            });
+
+            expect(await statusOf(mountWith(set).app)).toStrictEqual({ status: 'verified' });
+        });
+
+        // verifyProof returns true when any single proof verifies, so checking
+        // only one signer would let an attacker attach their own valid proof
+        // beside the issuer's and have the pair accepted.
+        it('reports a set whose proofs disagree about the signer', async () => {
+            const mixed = issued({
+                proof: [
+                    { verificationMethod: 'did:cid:issuer#key-1' },
+                    { verificationMethod: 'did:cid:attacker#key-1' },
+                ],
+            });
+
+            expect(await statusOf(mountWith(mixed).app)).toStrictEqual({
+                status: 'unverified',
+                reason: 'issuer does not match the signing key',
+            });
+        });
+
+        it('reports an empty proof set as having no proof', async () => {
+            expect(await statusOf(mountWith(issued({ proof: [] })).app)).toStrictEqual({
+                status: 'unverified',
+                reason: 'no proof',
+            });
+        });
+
         // publishCredential defaults reveal to false and strips the claim
         // values after the issuer signed, so the signature cannot match. That
         // is the ordinary publication path -- calling it a bad signature would

@@ -43,6 +43,9 @@
       "@didcid/cipher/types": [
         "packages/cipher/src/types.ts"
       ],
+      "@didcid/cipher/multikey": [
+        "packages/cipher/src/multikey.ts"
+      ],
       "@didcid/common/errors": [
         "packages/common/src/errors.ts"
       ],

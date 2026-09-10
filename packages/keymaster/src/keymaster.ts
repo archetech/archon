@@ -1,9 +1,12 @@
 import { attachedJson, issueCredentialMessage, type DidCommPlaintext } from './didcomm-protocols.js';
+import { proofsOf } from '@didcid/common/utils';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { base64url } from 'multiformats/bases/base64';
+import { ed25519PublicKeyToMultikey, multikeyToEd25519PublicKey, multibaseToBytes, bytesToMultibase } from '@didcid/cipher/multikey';
+import type { Ed25519JwkPair } from '@didcid/cipher/types';
 import { CID } from 'multiformats/cid';
 import {
     ArchonError,
@@ -67,6 +70,8 @@ import {
     PollConfig,
     PollResults,
     PossiblyProofed,
+    CredentialProof,
+    DataIntegrityProof,
     ViewBallotResult,
     StoredWallet,
     VerifiableCredential,
@@ -193,6 +198,16 @@ export enum PollItems {
     RESULTS = 'results',
 }
 
+// Data Integrity verification methods are Multikeys, whose term this context
+// defines.
+const MULTIKEY_CONTEXT = 'https://w3id.org/security/multikey/v1';
+
+// No registered Data Integrity cryptosuite covers secp256k1 -- vc-di-ecdsa
+// defines P-256 and P-384 only -- so the secp256k1 credential proof names a
+// suite Archon defines rather than claiming one it does not implement. The
+// bytes are unchanged: JCS canonicalization, sha256, base64url signature.
+const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-jcs-2019';
+
 export default class Keymaster implements KeymasterInterface {
     private passphrase: string;
     private gatekeeper: GatekeeperInterface;
@@ -214,7 +229,7 @@ export default class Keymaster implements KeymasterInterface {
     // from. One value, so a key can never be observed under another wallet's
     // identity: encrypting a *different* wallet finds the identity does not
     // match and re-derives, rather than reusing a stale key.
-    private _hdkeyCache?: { hdkey: any, id: string | undefined };
+    private _hdkeyCache?: { hdkey: any, seed: Uint8Array, id: string | undefined };
 
     constructor(options: KeymasterOptions) {
         if (!options || !options.gatekeeper || !options.gatekeeper.createDID) {
@@ -357,7 +372,7 @@ export default class Keymaster implements KeymasterInterface {
             ids: {}
         };
         // Warm for the save below, which would otherwise re-derive this key.
-        this._hdkeyCache = { hdkey, id: this.hdkeyCacheId(wallet.seed) };
+        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
 
         const ok = await this.saveWallet(wallet, overwrite)
         if (!ok) {
@@ -393,7 +408,7 @@ export default class Keymaster implements KeymasterInterface {
         // identity cannot be attached to another wallet's key; the re-encrypt
         // below then reuses this entry instead of re-deriving.
         const hdkey = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCache = { hdkey, id: this.hdkeyCacheId(wallet.seed) };
+        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
 
         const encrypted = await this.encryptWalletForStorage(wallet);
         const ok = await this.db.saveWallet(encrypted, true);
@@ -917,7 +932,7 @@ export default class Keymaster implements KeymasterInterface {
             data,
         };
 
-        const signed = await this.addProof(operation, controller, "authentication");
+        const signed = await this.addOperationProof(operation, controller);
         const did = await this.gatekeeper.createDID(signed);
 
         // Keep assets that will be garbage-collected out of the owned list
@@ -1250,11 +1265,95 @@ export default class Keymaster implements KeymasterInterface {
         }
     }
 
-    async addProof<T extends object>(
+    // DID operations, which both gatekeeper ports validate: verifyProofFormat
+    // requires a single proof whose type is the literal
+    // EcdsaSecp256k1Signature2019, so an operation never carries a proof set
+    // however many keys its signer has published.
+    private async addOperationProof<T extends object>(
+        obj: T,
+        controller?: string,
+    ): Promise<T & { proof: Proof }> {
+        const signer = await this.proofSigner(obj, controller);
+
+        return {
+            ...obj,
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                created: new Date().toISOString(),
+                verificationMethod: signer.verificationMethod,
+                proofPurpose: 'authentication',
+                // The document alone, never the proof configuration. Weaker
+                // than the Data Integrity construction below, and kept only
+                // because it is what every operation ever anchored was signed
+                // over.
+                proofValue: this.signProofValue(() => this.cipher.hashJSON(obj), signer.keypair),
+            },
+        };
+    }
+
+    // The corrected name for the secp256k1 suite. EcdsaSecp256k1Signature2019
+    // is a registered type whose specification requires RDF canonicalization
+    // and a `jws` member; this signs JCS-canonical bytes and carries
+    // `proofValue`, so a verifier applying that specification fails on a proof
+    // that is in fact sound. Credentials therefore carry the Data Integrity
+    // form under a suite name Archon defines -- see docs/scheme.md.
+    // Unregistered because no registered cryptosuite covers secp256k1, so an
+    // outside verifier skips it and checks the eddsa-jcs-2022 proof beside it.
+    private async archonEcdsaJcs2019Proof<T extends object>(
         obj: T,
         controller?: string,
         proofPurpose: ProofPurpose = "assertionMethod"
-    ): Promise<T & { proof: Proof }> {
+    ): Promise<T & { proof: DataIntegrityProof }> {
+        const signer = await this.proofSigner(obj, controller);
+
+        const config: DataIntegrityProof = {
+            type: 'DataIntegrityProof',
+            cryptosuite: ARCHON_SECP256K1_CRYPTOSUITE,
+            created: new Date().toISOString(),
+            verificationMethod: signer.verificationMethod,
+            proofPurpose,
+            proofValue: '',
+        };
+
+        const context = (obj as { '@context'?: string[] })['@context'];
+
+        if (context !== undefined) {
+            config['@context'] = context;
+        }
+
+        const { proofValue, ...unsigned } = config;
+        void proofValue;
+
+        return {
+            ...obj,
+            proof: {
+                ...unsigned as DataIntegrityProof,
+                // secp256k1 signs a 32-byte digest where Ed25519 takes the
+                // message, so the two concatenated digests are hashed once
+                // more to give one.
+                proofValue: this.signProofValue(
+                    () => this.cipher.hashMessage(this.dataIntegrityPayload(obj, unsigned as DataIntegrityProof)),
+                    signer.keypair),
+            },
+        };
+    }
+
+    // A non-serializable object reaches canonicalization as a throw, which is
+    // a bad parameter rather than an internal failure.
+    private signProofValue(digest: () => string, keypair: EcdsaJwkPair): string {
+        try {
+            return hexToBase64url(this.cipher.signHash(digest(), keypair.privateJwk));
+        }
+        catch {
+            throw new InvalidParameterError('obj');
+        }
+    }
+
+    // The signing identity's key and the DID URL naming it.
+    private async proofSigner(
+        obj: object,
+        controller: string | undefined,
+    ): Promise<{ verificationMethod: string, keypair: EcdsaJwkPair }> {
         if (obj == null) {
             throw new InvalidParameterError('obj');
         }
@@ -1271,59 +1370,277 @@ export default class Keymaster implements KeymasterInterface {
         const doc = await this.resolveDID(id.did, { confirm: true });
         const keyFragment = doc.didDocument?.verificationMethod?.[0]?.id || '#key-1';
 
-        try {
-            const msgHash = this.cipher.hashJSON(obj);
-            const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
-            const proofValue = hexToBase64url(signatureHex);
+        return { verificationMethod: `${id.did}${keyFragment}`, keypair };
+    }
 
-            return {
-                ...obj,
-                proof: {
-                    type: "EcdsaSecp256k1Signature2019",
-                    created: new Date().toISOString(),
-                    verificationMethod: `${id.did}${keyFragment}`,
-                    proofPurpose,
-                    proofValue,
-                }
-            };
+    async addProof<T extends object>(
+        obj: T,
+        controller?: string,
+        proofPurpose: ProofPurpose = "assertionMethod"
+    ): Promise<T & { proof: CredentialProof | CredentialProof[] }> {
+        const secp = await this.archonEcdsaJcs2019Proof(obj, controller, proofPurpose);
+        const eddsa = await this.eddsaJcs2022Proof(obj, controller, proofPurpose);
+
+        // A single object while the signer has published no assertion key, so
+        // an identity that never opts in keeps the shape it had: one proof,
+        // not a set of one.
+        if (!eddsa) {
+            return secp;
         }
-        catch (error) {
-            throw new InvalidParameterError('obj');
+
+        return { ...secp, proof: [secp.proof, eddsa] };
+    }
+
+    // The proof a did:webvh or did:key verifier can check. Returns nothing when
+    // the signer has not published an assertion key, which is every identity
+    // until it calls publishAssertionKey.
+    private async eddsaJcs2022Proof(
+        obj: object,
+        controller: string | undefined,
+        proofPurpose: ProofPurpose,
+    ): Promise<DataIntegrityProof | null> {
+        const id = await this.fetchIdInfo(controller);
+        const doc = await this.resolveDID(id.did, { confirm: true });
+        const vmId = `${id.did}#key-assertion-1`;
+        const vm = this.findVerificationMethod(doc, vmId);
+
+        if (!vm?.publicKeyMultibase) {
+            return null;
         }
+
+        // publishAssertionKey lists the key under assertionMethod alone, so for
+        // any other purpose this key is unauthorized and the proof it produced
+        // would be one no verifier accepts -- including this class's own.
+        if (!this.authorizedForPurpose(doc, { verificationMethod: vmId, proofPurpose })) {
+            return null;
+        }
+
+        const keypair = await this.fetchAssertionKeyPair(controller);
+
+        // The published key is what a verifier will resolve, so a derivation
+        // that no longer matches it would produce a proof nobody can check.
+        // Silent rather than fatal: the secp256k1 proof still stands, and this
+        // is the shape a wallet restored under a different scheme would take.
+        if (vm.publicKeyMultibase !== ed25519PublicKeyToMultikey(base64url.baseDecode(keypair.publicJwk.x))) {
+            return null;
+        }
+
+        const config: DataIntegrityProof = {
+            type: 'DataIntegrityProof',
+            cryptosuite: 'eddsa-jcs-2022',
+            created: new Date().toISOString(),
+            verificationMethod: vmId,
+            proofPurpose,
+            proofValue: '',
+        };
+
+        // Create Proof step 2: the proof carries the context of the document it
+        // secures. Omitted when the document declares none, as a signed file may.
+        const context = (obj as { '@context'?: string[] })['@context'];
+
+        if (context !== undefined) {
+            config['@context'] = context;
+        }
+
+        const { proofValue, ...unsigned } = config;
+        void proofValue;
+        const payload = this.dataIntegrityPayload(obj, unsigned as DataIntegrityProof);
+
+        return {
+            ...unsigned as DataIntegrityProof,
+            proofValue: bytesToMultibase(this.cipher.signEd25519(payload, keypair.privateJwk)),
+        };
+    }
+
+    // The key a proof names, for verification only. Deliberately not
+    // getPublicKeyJwk, which five callers use to reach the identity key for
+    // encryption -- making that one proof-aware would hand them the wrong key.
+    // A verification method may sign for a purpose only if the document lists
+    // it under that relationship. Without this a key published for
+    // authentication alone can produce a proof claiming assertionMethod, and
+    // the signature checks out because the key is genuinely the subject's.
+    private authorizedForPurpose(
+        doc: DidCidDocument,
+        proof: Pick<CredentialProof, 'verificationMethod' | 'proofPurpose'>,
+    ): boolean {
+        const did = doc.didDocument?.id;
+
+        if (!did) {
+            return false;
+        }
+
+        // Proofs are untrusted JSON, so the declared purpose is checked rather
+        // than defaulted: anything else falling through to assertionMethod
+        // lets an unsupported purpose pass on an assertion key.
+        if (proof.proofPurpose !== 'assertionMethod' && proof.proofPurpose !== 'authentication') {
+            return false;
+        }
+
+        const refs = proof.proofPurpose === 'authentication'
+            ? doc.didDocument?.authentication
+            : doc.didDocument?.assertionMethod;
+
+        const target = this.absoluteKeyId(proof.verificationMethod, did);
+
+        return (refs || []).some(ref => this.absoluteKeyId(ref, did) === target);
+    }
+
+    private resolveProofKey(doc: DidCidDocument, proof: CredentialProof):
+        { curve: 'secp256k1', jwk: EcdsaJwkPublic } | { curve: 'Ed25519', key: Uint8Array } | null {
+        if (!this.authorizedForPurpose(doc, proof)) {
+            return null;
+        }
+
+        const vm = this.findVerificationMethod(doc, proof.verificationMethod);
+
+        if (!vm) {
+            // Credentials issued before any of this named `#key-1` while the
+            // document listed one method, and resolution is at the proof's own
+            // versionTime, so this should not fire -- but a legacy proof keeps
+            // the behaviour it was written under rather than failing.
+            if (proof.type === 'EcdsaSecp256k1Signature2019') {
+                const jwk = doc.didDocument?.verificationMethod?.[0]?.publicKeyJwk;
+                return jwk && jwk.kty === 'EC' ? { curve: 'secp256k1', jwk: jwk as EcdsaJwkPublic } : null;
+            }
+            return null;
+        }
+
+        if (vm.publicKeyMultibase) {
+            try {
+                return { curve: 'Ed25519', key: multikeyToEd25519PublicKey(vm.publicKeyMultibase) };
+            }
+            catch {
+                return null;
+            }
+        }
+
+        return vm.publicKeyJwk?.kty === 'EC'
+            ? { curve: 'secp256k1', jwk: vm.publicKeyJwk as EcdsaJwkPublic }
+            : null;
+    }
+
+    // eddsa-jcs-2022: sha256 of the canonical proof config, then sha256 of the
+    // canonical document, concatenated. The config is the proof without its
+    // proofValue, and it carries the document's @context, so the context is
+    // signed too.
+    //
+    // Shared by both cryptosuites. Binding the configuration is what makes
+    // `created` and `proofPurpose` unforgeable: the legacy
+    // EcdsaSecp256k1Signature2019 payload omits it, so on those proofs both
+    // members can be altered without breaking the signature.
+    private dataIntegrityPayload(unsecured: unknown, proof: DataIntegrityProof): Uint8Array {
+        const { proofValue, ...config } = proof;
+        void proofValue;
+        const digests = this.cipher.hashJSON(config) + this.cipher.hashJSON(unsecured);
+
+        return Uint8Array.from(Buffer.from(digests, 'hex'));
+    }
+
+    // Create Proof sets the proof's @context from the document it secures, so
+    // the two agreeing is part of the suite rather than a coincidence. The
+    // proof config is canonicalized as given, which means a proof deliberately
+    // signed over a different context would verify here while a verifier that
+    // rebuilds the config from the document rejects it. Refused outright, and
+    // for a reason a caller can act on rather than an opaque bad signature.
+    private contextAgrees(unsecured: any, proof: DataIntegrityProof): boolean {
+        // Absence agrees only with absence. Create Proof copies the document's
+        // context into the config whenever the document declares one, so a
+        // proof that omits it over a document that has one was built outside
+        // the suite -- and a conforming verifier, rebuilding the config from
+        // the document, rejects it.
+        return this.cipher.canonicalizeJSON(proof['@context']) === this.cipher.canonicalizeJSON(unsecured?.['@context']);
+    }
+
+    private supportedProof(proof: CredentialProof): boolean {
+        if (proof.type === 'EcdsaSecp256k1Signature2019') {
+            return true;
+        }
+
+        return proof.type === 'DataIntegrityProof'
+            && (proof.cryptosuite === 'eddsa-jcs-2022' || proof.cryptosuite === ARCHON_SECP256K1_CRYPTOSUITE);
+    }
+
+    private verifyOneProof(unsecured: unknown, proof: CredentialProof, doc: DidCidDocument): boolean {
+        const resolved = this.resolveProofKey(doc, proof);
+
+        if (!resolved) {
+            return false;
+        }
+
+        try {
+            if (proof.type === 'DataIntegrityProof' && proof.cryptosuite === 'eddsa-jcs-2022') {
+                return this.contextAgrees(unsecured, proof) && resolved.curve === 'Ed25519' && this.cipher.verifyEd25519(
+                    this.dataIntegrityPayload(unsecured, proof),
+                    multibaseToBytes(proof.proofValue),
+                    { kty: 'OKP', crv: 'Ed25519', x: base64url.baseEncode(resolved.key) },
+                );
+            }
+
+            if (proof.type === 'DataIntegrityProof' && proof.cryptosuite === ARCHON_SECP256K1_CRYPTOSUITE) {
+                return this.contextAgrees(unsecured, proof) && resolved.curve === 'secp256k1' && this.cipher.verifySig(
+                    this.cipher.hashMessage(this.dataIntegrityPayload(unsecured, proof)),
+                    base64urlToHex(proof.proofValue),
+                    resolved.jwk);
+            }
+
+            // The legacy label signs the document alone, with the proof
+            // configuration outside the signature. Every credential and
+            // operation issued before the suite was named carries it and they
+            // are immutable, so it is verified as it was written rather than
+            // corrected in place.
+            if (proof.type === 'EcdsaSecp256k1Signature2019') {
+                return resolved.curve === 'secp256k1' && this.cipher.verifySig(
+                    this.cipher.hashJSON(unsecured), base64urlToHex(proof.proofValue), resolved.jwk);
+            }
+        }
+        catch {
+            return false;
+        }
+
+        // An unrecognised cryptosuite is somebody else's, not a failure of ours.
+        return false;
     }
 
     async verifyProof<T extends PossiblyProofed>(obj: T): Promise<boolean> {
-        if (!obj?.proof) {
+        const proofs = proofsOf(obj);
+
+        if (proofs.length === 0) {
             return false;
         }
 
-        const { proof } = obj;
+        const unsecured = JSON.parse(JSON.stringify(obj));
+        delete unsecured.proof;
 
-        if (proof.type !== "EcdsaSecp256k1Signature2019") {
-            return false;
+        // One verifying proof is enough. A document may carry a suite this
+        // build does not implement alongside one it does, and refusing it for
+        // the former would make Archon unable to read a credential that is
+        // perfectly valid.
+        for (const proof of proofs) {
+            // Suite first to avoid resolving for a proof that cannot be
+            // checked anyway -- resolution is I/O, and a set may carry several
+            // foreign proofs. Resolution failure is caught below rather than
+            // prevented here: a supported suite can name an issuer this node
+            // cannot reach, and that must not take the rest of the set with it.
+            if (!proof?.verificationMethod || !this.supportedProof(proof)) {
+                continue;
+            }
+
+            const [signerDid] = proof.verificationMethod.split('#');
+            let doc: DidCidDocument;
+
+            try {
+                doc = await this.resolveDID(signerDid, { versionTime: proof.created });
+            }
+            catch {
+                continue;
+            }
+
+            if (this.verifyOneProof(unsecured, proof, doc)) {
+                return true;
+            }
         }
 
-        if (!proof.verificationMethod) {
-            return false;
-        }
-
-        // Extract DID from verificationMethod
-        const [signerDid] = proof.verificationMethod.split('#');
-
-        const jsonCopy = JSON.parse(JSON.stringify(obj));
-        delete jsonCopy.proof;
-        const msgHash = this.cipher.hashJSON(jsonCopy);
-
-        const doc = await this.resolveDID(signerDid, { versionTime: proof.created });
-        const publicJwk = this.getPublicKeyJwk(doc);
-
-        try {
-            const signatureHex = base64urlToHex(proof.proofValue);
-            return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
-        }
-        catch (error) {
-            return false;
-        }
+        return false;
     }
 
     async updateDID(id: string, doc: DidCidDocument): Promise<boolean> {
@@ -1355,7 +1672,7 @@ export default class Keymaster implements KeymasterInterface {
             controller = current.didDocument?.controller;
         }
 
-        const signed = await this.addProof(operation, controller, "authentication");
+        const signed = await this.addOperationProof(operation, controller);
         return this.gatekeeper.updateDID(signed);
     }
 
@@ -1382,7 +1699,7 @@ export default class Keymaster implements KeymasterInterface {
             controller = current.didDocument?.controller;
         }
 
-        const signed = await this.addProof(operation, controller, "authentication");
+        const signed = await this.addOperationProof(operation, controller);
 
         const ok = await this.gatekeeper.deleteDID(signed);
 
@@ -1880,15 +2197,28 @@ export default class Keymaster implements KeymasterInterface {
                 throw new KeymasterError('DID Document missing verificationMethod');
             }
 
-            const vmethod = { ...doc.didDocument.verificationMethod[0] };
-            vmethod.id = `#key-${nextIndex + 1}`;
-            vmethod.publicKeyJwk = keypair.publicJwk;
+            const rotated = doc.didDocument.verificationMethod[0];
+            const rotatedTarget = rotated.id && this.absoluteKeyId(rotated.id, id.did);
+            const rotatedId = `#key-${nextIndex + 1}`;
+            const vmethod = { ...rotated, id: rotatedId, publicKeyJwk: keypair.publicJwk };
+
+            // Replace the rotated key in place and leave every other method
+            // alone. Rebuilding these as single-element arrays dropped keys
+            // published beside the identity one -- publishDidComm's
+            // `#key-agreement-1` among them -- while `keyAgreement`, which was
+            // never rebuilt, kept pointing at the method just deleted.
+            const isRotated = (ref: string | undefined) =>
+                !!ref && !!rotatedTarget && this.absoluteKeyId(ref, id.did) === rotatedTarget;
+
+            const retitle = (refs: string[] | undefined) =>
+                (refs || []).map(ref => isRotated(ref) ? rotatedId : ref);
 
             const updatedDidDocument = {
                 ...doc.didDocument,
-                verificationMethod: [vmethod],
-                authentication: [vmethod.id],
-                assertionMethod: [vmethod.id],
+                verificationMethod: doc.didDocument.verificationMethod.map(
+                    vm => isRotated(vm.id) ? vmethod : vm),
+                authentication: retitle(doc.didDocument.authentication),
+                assertionMethod: retitle(doc.didDocument.assertionMethod),
             };
 
             ok = await this.updateDID(id.did, { didDocument: updatedDidDocument });
@@ -2393,17 +2723,128 @@ export default class Keymaster implements KeymasterInterface {
         return this.updateDID(did, { didDocument, didDocumentData });
     }
 
-    // DIDComm key agreement keys are derived on a dedicated branch (change=1)
-    // so they never collide with the authentication/signing keys at change=0.
-    // The key is deterministic from the wallet seed and the identity's account,
-    // so it survives backup/recovery without storing extra material.
+    // DIDComm key agreement keys, on SLIP-0010's Ed25519 ladder and converted
+    // to X25519 -- the relationship did:key defines between a z6Mk key and the
+    // key agreement key it resolves to. Deterministic from the wallet seed and
+    // the identity's account, so it survives backup and recovery with nothing
+    // stored, and any SLIP-0010 wallet given the mnemonic finds the same key.
     async fetchDidCommKeyPair(name?: string): Promise<OkpJwkPair> {
         const wallet = await this.loadWallet();
         const id = await this.fetchIdInfo(name, wallet);
-        const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
-        const path = `m/44'/0'/${id.account}'/1/0`;
-        const didkey = hdkey.derive(path);
-        return this.cipher.generateX25519Jwk(didkey.privateKey!);
+        const seed = await this.getSeedFromCacheOrMnemonic(wallet);
+        return this.cipher.deriveX25519Jwk(seed, `m/44'/0'/${id.account}'/1'/0'`);
+    }
+
+    // Ed25519 assertion keys, on their own SLIP-0010 branch. The account index
+    // is the identity, and the level below it separates key types: 1' key
+    // agreement, 2' assertion. Signing keys stay on the BIP32 secp256k1 tree at
+    // change=0, where their index is the rotation counter.
+    async fetchAssertionKeyPair(name?: string): Promise<Ed25519JwkPair> {
+        const wallet = await this.loadWallet();
+        const id = await this.fetchIdInfo(name, wallet);
+        const seed = await this.getSeedFromCacheOrMnemonic(wallet);
+        return this.cipher.deriveEd25519Jwk(seed, `m/44'/0'/${id.account}'/2'/0'`);
+    }
+
+    // Published as a Multikey rather than a JsonWebKey2020: eddsa-jcs-2022
+    // requires the verification method to carry publicKeyMultibase, and a
+    // strict verifier refuses the JWK form the DIDComm key uses.
+    async publishAssertionKey(name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+        const keypair = await this.fetchAssertionKeyPair(name);
+        const doc = await this.resolveDID(did);
+        const didDocument = { ...doc.didDocument! };
+
+        const vmId = `${did}#key-assertion-1`;
+        // Compared as DID URLs, not strings: a document may already carry this
+        // method relatively, and `#key-assertion-1` names the same key as the
+        // absolute form. Filtering on the raw string would keep it and append a
+        // duplicate beside it.
+        const isAssertionKey = (ref: string | undefined) =>
+            !!ref && this.absoluteKeyId(ref, did) === vmId;
+
+        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => !isAssertionKey(vm.id));
+        verificationMethod.push({
+            id: vmId,
+            controller: did,
+            type: 'Multikey',
+            publicKeyMultibase: ed25519PublicKeyToMultikey(base64url.baseDecode(keypair.publicJwk.x)),
+        });
+        didDocument.verificationMethod = verificationMethod;
+
+        // Both relationships: assertionMethod for the credentials this identity
+        // issues, authentication for the presentations it holds. A presentation
+        // signed under authentication by a key listed only for assertionMethod
+        // is one a conforming verifier rejects, so publishing for one and not
+        // the other would leave presentations Archon-only.
+        //
+        // Added to each, not substituted for it: #key-1 is already there and
+        // still signs everything Archon verifies itself. Nothing widens as a
+        // result -- both gatekeeper ports authorize an operation against
+        // verificationMethod[0] and never read these arrays.
+        for (const relationship of ['assertionMethod', 'authentication'] as const) {
+            const refs = (didDocument[relationship] || []).filter(ref => !isAssertionKey(ref));
+            refs.push(vmId);
+            didDocument[relationship] = refs;
+        }
+
+        const context = didDocument['@context'] || [];
+        if (!context.includes(MULTIKEY_CONTEXT)) {
+            didDocument['@context'] = [...context, MULTIKEY_CONTEXT];
+        }
+
+        return this.updateDID(did, { didDocument });
+    }
+
+    async unpublishAssertionKey(name?: string): Promise<boolean> {
+        const id = await this.fetchIdInfo(name);
+        const did = id.did;
+        const doc = await this.resolveDID(did);
+        const didDocument = { ...doc.didDocument! };
+
+        const vmId = `${did}#key-assertion-1`;
+        const isAssertionKey = (ref: string | undefined) =>
+            !!ref && this.absoluteKeyId(ref, did) === vmId;
+
+        const verificationMethod = (didDocument.verificationMethod || []).filter(vm => !isAssertionKey(vm.id));
+
+        if (verificationMethod.length > 0) {
+            didDocument.verificationMethod = verificationMethod;
+        }
+        else {
+            delete didDocument.verificationMethod;
+        }
+
+        // Only this fragment leaves: unlike keyAgreement, both of these hold the
+        // identity key too and deleting either wholesale would unpublish that.
+        for (const relationship of ['assertionMethod', 'authentication'] as const) {
+            const refs = (didDocument[relationship] || []).filter(ref => !isAssertionKey(ref));
+
+            if (refs.length > 0) {
+                didDocument[relationship] = refs;
+            }
+            else {
+                delete didDocument[relationship];
+            }
+        }
+
+        // Only once nothing needs it: another Multikey may remain, and dropping
+        // the context would leave its terms undefined.
+        if (!verificationMethod.some(vm => vm.type === 'Multikey')) {
+            const context = (didDocument['@context'] || []).filter(entry => entry !== MULTIKEY_CONTEXT);
+
+            if (context.length > 0) {
+                didDocument['@context'] = context;
+            }
+            else {
+                // Assigning only when something survives leaves the original
+                // array in place, multikey entry and all.
+                delete didDocument['@context'];
+            }
+        }
+
+        return this.updateDID(did, { didDocument });
     }
 
     async publishDidComm(endpoint?: string, name?: string, routingKeys?: string[]): Promise<boolean> {
@@ -2495,13 +2936,29 @@ export default class Keymaster implements KeymasterInterface {
         return this.updateDID(did, { didDocument });
     }
 
-    private didCommFragment(id: string): string {
+    // A verification method is referenced sometimes relatively (`#key-1`, which
+    // the gatekeeper writes) and sometimes absolutely (`did:cid:...#key-1`,
+    // which publishDidComm writes). Both forms resolve against the document's
+    // own DID, so comparing whole DID URLs keeps a method controlled by another
+    // DID -- `did:other:123#key-1` -- from matching the local `#key-1`.
+    private keyFragment(id: string): string {
         return id.includes('#') ? id.split('#').pop()! : id;
     }
 
+    private absoluteKeyId(ref: string, did: string): string {
+        return ref.includes(':') ? ref : `${did}#${this.keyFragment(ref)}`;
+    }
+
     private findVerificationMethod(doc: DidCidDocument, kid: string) {
-        const frag = this.didCommFragment(kid);
-        return (doc.didDocument?.verificationMethod || []).find(vm => vm.id && this.didCommFragment(vm.id) === frag);
+        const did = doc.didDocument?.id;
+
+        if (!did) {
+            return undefined;
+        }
+
+        const target = this.absoluteKeyId(kid, did);
+        return (doc.didDocument?.verificationMethod || []).find(
+            vm => vm.id && this.absoluteKeyId(vm.id, did) === target);
     }
 
     private resolveKeyAgreement(doc: DidCidDocument): { kid: string; publicJwk: OkpJwkPublic } {
@@ -5835,16 +6292,35 @@ export default class Keymaster implements KeymasterInterface {
         return enc ? `${enc.salt}.${enc.iv}.${enc.data}` : undefined;
     }
 
-    private async getHDKeyFromCacheOrMnemonic(wallet: WalletFile) {
+    // Returns the entry it resolved rather than the field it stored it in. A
+    // caller reading `this._hdkeyCache` after its own await can be handed
+    // another wallet's material, because anything that changes wallets between
+    // the two continuations replaces it (#1052).
+    private async getKeysFromCacheOrMnemonic(wallet: WalletFile): Promise<{ hdkey: any, seed: Uint8Array }> {
         const id = this.hdkeyCacheId(wallet.seed);
         if (this._hdkeyCache && id !== undefined && this._hdkeyCache.id === id) {
-            return this._hdkeyCache.hdkey;
+            return this._hdkeyCache;
         }
 
         const mnemonic = await this.getMnemonicForDerivation(wallet);
-        const hdkey = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCache = { hdkey, id };
-        return hdkey;
+        const entry = {
+            hdkey: this.cipher.generateHDKey(mnemonic),
+            seed: this.cipher.mnemonicToSeed(mnemonic),
+            id,
+        };
+        this._hdkeyCache = entry;
+        return entry;
+    }
+
+    private async getHDKeyFromCacheOrMnemonic(wallet: WalletFile) {
+        return (await this.getKeysFromCacheOrMnemonic(wallet)).hdkey;
+    }
+
+    // For the curves deriving off the BIP39 seed rather than the BIP32 node.
+    // Decrypting the mnemonic is the expensive part and these keys are fetched
+    // on every packed message, so they share the one cache entry.
+    private async getSeedFromCacheOrMnemonic(wallet: WalletFile): Promise<Uint8Array> {
+        return (await this.getKeysFromCacheOrMnemonic(wallet)).seed;
     }
 
     private async encryptWalletForStorage(decrypted: WalletFile): Promise<WalletEncFile> {
@@ -5875,7 +6351,7 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const hdkey = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCache = { hdkey, id: this.hdkeyCacheId(stored.seed) };
+        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(stored.seed) };
         const { publicJwk, privateJwk } = this.cipher.generateJwk(hdkey.privateKey!);
 
         const plaintext = this.cipher.decryptMessage(privateJwk, stored.enc, publicJwk);

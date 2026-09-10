@@ -111,9 +111,17 @@ async function checkManifestCredential(
             return { status: 'unverified', reason: 'issued to a different subject' };
         }
 
-        const verificationMethod = vc?.proof?.verificationMethod;
+        // A credential may carry a set of proofs rather than one, so that the
+        // same document satisfies verifiers that read different cryptosuites.
+        // Normalized here rather than through @didcid/common's proofsOf: this
+        // server takes the keymaster as a type only and has no @didcid runtime
+        // dependency, which is not worth adding to its image for one line.
+        const proofs: any[] = vc?.proof === undefined || vc?.proof === null
+            ? []
+            : Array.isArray(vc.proof) ? vc.proof : [vc.proof];
+        const methods = proofs.map((proof: any) => proof?.verificationMethod);
 
-        if (typeof verificationMethod !== 'string') {
+        if (methods.length === 0 || methods.some(method => typeof method !== 'string')) {
             return { status: 'unverified', reason: 'no proof' };
         }
 
@@ -121,9 +129,14 @@ async function checkManifestCredential(
         // which is not necessarily whoever the credential claims issued it.
         // Without this comparison a credential saying `issuer: did:cid:bank`
         // and signed with the subject's own key verifies happily.
-        const [signer] = verificationMethod.split('#');
+        //
+        // Every proof has to name the issuer, not merely one of them:
+        // verifyProof returns true when any single proof verifies, so checking
+        // one signer would let an attacker attach their own valid proof beside
+        // the issuer's and have the pair accepted under whichever it picked.
+        const signers = new Set(methods.map(method => String(method).split('#')[0]));
 
-        if (!vc.issuer || vc.issuer !== signer) {
+        if (!vc.issuer || signers.size !== 1 || !signers.has(vc.issuer)) {
             return { status: 'unverified', reason: 'issuer does not match the signing key' };
         }
 

@@ -2,15 +2,16 @@ import * as bip39 from 'bip39';
 import { HDKey } from '@scure/bip32';
 import * as secp from '@noble/secp256k1';
 import { schnorr } from '@noble/curves/secp256k1';
-import { x25519 } from '@noble/curves/ed25519';
+import { ed25519, edwardsToMontgomeryPriv, x25519 } from '@noble/curves/ed25519';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha256';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
 import { managedNonce } from '@noble/ciphers/webcrypto/utils'
 import { bytesToUtf8, utf8ToBytes } from '@noble/ciphers/utils';
 import { base64url } from 'multiformats/bases/base64';
-import { Cipher, HDKeyJSON, EcdsaJwkPublic, EcdsaJwkPrivate, EcdsaJwkPair, OkpJwkPublic, OkpJwkPrivate, OkpJwkPair, NostrKeys } from './types.js';
+import { Cipher, HDKeyJSON, EcdsaJwkPublic, EcdsaJwkPrivate, EcdsaJwkPair, OkpJwkPublic, OkpJwkPrivate, OkpJwkPair, Ed25519JwkPublic, Ed25519JwkPrivate, Ed25519JwkPair, NostrKeys } from './types.js';
 import { buildJweCompact, parseJweCompact, isJweCompact } from './jwe.js';
+import { slip10DerivePath } from './slip10.js';
 import { bech32 } from 'bech32';
 import canonicalizeModule from 'canonicalize';
 const canonicalize = canonicalizeModule as unknown as (input: unknown) => string;
@@ -26,6 +27,26 @@ export default abstract class CipherBase implements Cipher {
     generateHDKey(mnemonic: string): HDKey {
         const seed = bip39.mnemonicToSeedSync(mnemonic);
         return HDKey.fromMasterSeed(seed);
+    }
+
+    // The BIP39 seed both curves derive from. BIP32 and SLIP-0010 build
+    // different master nodes out of it, so one mnemonic backs every key without
+    // any curve sharing material with another.
+    mnemonicToSeed(mnemonic: string): Uint8Array {
+        return new Uint8Array(bip39.mnemonicToSeedSync(mnemonic));
+    }
+
+    // Ed25519 signing keys, on SLIP-0010's hardened-only ladder.
+    deriveEd25519Jwk(seed: Uint8Array, path: string): Ed25519JwkPair {
+        return this.generateEd25519Jwk(slip10DerivePath(seed, path));
+    }
+
+    // X25519 key agreement keys. Derived as Ed25519 and converted, which is the
+    // relationship did:key already defines between a z6Mk verification key and
+    // the key agreement key it resolves to -- so the pair stays inspectable
+    // against that method rather than being a scheme of our own.
+    deriveX25519Jwk(seed: Uint8Array, path: string): OkpJwkPair {
+        return this.generateX25519Jwk(edwardsToMontgomeryPriv(slip10DerivePath(seed, path)));
     }
 
     generateHDKeyJSON(json: HDKeyJSON): HDKey {
@@ -83,6 +104,47 @@ export default abstract class CipherBase implements Cipher {
         const privateJwk: OkpJwkPrivate = { ...publicJwk, d };
 
         return { publicJwk, privateJwk };
+    }
+
+    // Derives an Ed25519 signing keypair from 32 bytes of seed material, the
+    // same way generateX25519Jwk derives a key-agreement one: the seed is the
+    // Ed25519 private key, so an HD-derived branch always yields the same pair.
+    generateEd25519Jwk(seedBytes: Uint8Array): Ed25519JwkPair {
+        if (seedBytes.length !== 32) {
+            throw new Error('Ed25519 seed must be 32 bytes');
+        }
+
+        const publicJwk: Ed25519JwkPublic = {
+            kty: 'OKP',
+            crv: 'Ed25519',
+            x: base64url.baseEncode(ed25519.getPublicKey(seedBytes)),
+        };
+
+        const privateJwk: Ed25519JwkPrivate = { ...publicJwk, d: base64url.baseEncode(seedBytes) };
+
+        return { publicJwk, privateJwk };
+    }
+
+    // Over the message bytes, not a hash of them: EdDSA hashes internally, and
+    // eddsa-jcs-2022 signs the canonical document's digest as the message. This
+    // is why the shape differs from signHash, which takes a hex digest.
+    signEd25519(message: Uint8Array, privateJwk: Ed25519JwkPrivate): Uint8Array {
+        return ed25519.sign(message, base64url.baseDecode(privateJwk.d));
+    }
+
+    verifyEd25519(message: Uint8Array, signature: Uint8Array, publicJwk: Ed25519JwkPublic): boolean {
+        try {
+            // Left on noble's default zip215:true deliberately. Its RFC 8032
+            // mode (zip215:false) additionally rejects small-order public keys
+            // and non-canonical encodings, but Python's `cryptography` accepts
+            // both, so tightening this port alone would make the same proof
+            // verify in one language and fail in the other. See #1091.
+            return ed25519.verify(signature, message, base64url.baseDecode(publicJwk.x));
+        }
+        catch {
+            // A malformed signature or key is a failed verification, not a crash.
+            return false;
+        }
     }
 
     convertJwkToCompressedBytes(jwk: EcdsaJwkPublic): Uint8Array {

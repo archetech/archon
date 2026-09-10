@@ -169,7 +169,7 @@ vectors in the cipher/keymaster and Python test suites (JS-produced envelopes th
 decrypt in Python, and vice-versa).
 
 **Phase 1 — Standard-curve keys. ✅ done.** Deterministic X25519 derivation on a dedicated
-HD branch (`m/44'/0'/{account}'/1/0`); `publishDidComm`/`unpublishDidComm` write/remove a
+SLIP-0010 branch (`m/44'/0'/{account}'/1'/0'`, derived as Ed25519 and converted); `publishDidComm`/`unpublishDidComm` write/remove a
 `keyAgreement` verification method (+ optional `DIDCommMessaging` service) via `updateDID`.
 `cipher.generateX25519Jwk` + OKP JWK types; `DidCidDocument` gains `keyAgreement`. Wired
 through interface/client/API. *Exit met:* resolved DID docs carry a valid X25519

@@ -18,6 +18,7 @@ from cryptography.exceptions import InvalidTag
 
 from .crypto import (
     b64url,
+    bip39_seed_from_mnemonic,
     decrypt_bytes,
     decrypt_message,
     decrypt_with_passphrase,
@@ -27,6 +28,7 @@ from .crypto import (
     encrypt_with_passphrase,
     generate_jwk_pair,
     generate_mnemonic,
+    canonicalize_json,
     hash_json,
     hash_message,
     hd_root_from_mnemonic,
@@ -36,6 +38,7 @@ from .crypto import (
     private_key_to_jwk_pair,
     sign_hash,
     sign_schnorr,
+    slip10_ed25519_bytes,
     ub64url,
     verify_sig,
 )
@@ -75,6 +78,48 @@ class PollItems:
 
 # Sentinel distinguishing "capabilities not yet fetched" from "node has no manifest" (None).
 _UNFETCHED = object()
+
+
+# Data Integrity verification methods are Multikeys, whose term this context
+# defines.
+MULTIKEY_CONTEXT = "https://w3id.org/security/multikey/v1"
+
+# No registered Data Integrity cryptosuite covers secp256k1 -- vc-di-ecdsa
+# defines P-256 and P-384 only -- so the secp256k1 credential proof names a
+# suite Archon defines rather than claiming one it does not implement. The bytes
+# are unchanged: JCS canonicalization, sha256, base64url signature.
+ARCHON_SECP256K1_CRYPTOSUITE = "archon-ecdsa-jcs-2019"
+
+
+def _proofs_of(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """The proofs on a document, however it carries them."""
+    proof = payload.get("proof") if isinstance(payload, dict) else None
+    if not proof:
+        return []
+    return [p for p in (proof if isinstance(proof, list) else [proof]) if isinstance(p, dict)]
+
+
+def _key_fragment(ref: Any) -> str | None:
+    """The fragment of a verification method reference."""
+    if not isinstance(ref, str):
+        return None
+
+    return ref.split("#")[-1] if "#" in ref else ref
+
+
+def _absolute_key_id(ref: Any, did: str) -> str | None:
+    """A verification method reference as a whole DID URL.
+
+    References are written relatively (`#key-1`, which the gatekeeper emits) and
+    absolutely (`did:cid:...#key-1`, which publish_didcomm emits); both resolve
+    against the document's own DID. Comparing whole URLs keeps a method
+    controlled by another DID -- `did:other:123#key-1` -- from matching the
+    local `#key-1`. Mirrors absoluteKeyId in the TypeScript keymaster.
+    """
+    if not isinstance(ref, str):
+        return None
+
+    return ref if ":" in ref else f"{did}#{_key_fragment(ref)}"
 
 
 class KeymasterError(Exception):
@@ -120,11 +165,14 @@ class WalletStoreProtocol(Protocol):
 
 
 class _RootCache(NamedTuple):
-    # An HD root together with the identity of the wallet whose seed it came
-    # from. One value, so a root can never be observed under another wallet's
-    # identity: encrypting a *different* wallet finds the identity does not
-    # match and re-derives, rather than reusing a stale root.
+    # An HD root, the BIP39 seed the SLIP-0010 curves derive from, and the
+    # identity of the wallet both came from. One value, so a root can never be
+    # observed under another wallet's identity: encrypting a *different* wallet
+    # finds the identity does not match and re-derives, rather than reusing a
+    # stale root. Callers take the entry rather than reading self._root_cache
+    # after their own await, which anything changing wallets could replace.
     root: Any
+    seed: bytes
     id: str | None
 
 
@@ -236,7 +284,7 @@ class Keymaster:
             "aliases": {},
         }
         # Warm for the save below, which would otherwise re-derive this root.
-        self._root_cache = _RootCache(root, self._root_cache_identity(wallet["seed"]))
+        self._root_cache = _RootCache(root, bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
         ok = await self.save_wallet(wallet, overwrite=overwrite)
         if not ok:
             raise KeymasterError("save wallet failed")
@@ -253,7 +301,7 @@ class Keymaster:
             mnemonic = decrypt_with_passphrase(seed["mnemonicEnc"], self.passphrase)
         except InvalidTag as exc:
             raise KeymasterError("Incorrect passphrase.") from exc
-        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), self._root_cache_identity(seed))
+        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(seed))
         root_pair = await self.hd_key_pair()
         try:
             plaintext = decrypt_message(root_pair["privateJwk"], stored["enc"])
@@ -281,7 +329,7 @@ class Keymaster:
         wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, new_passphrase)
 
         self.passphrase = new_passphrase
-        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
+        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
         self._wallet_cache = wallet
 
         encrypted = await self.encrypt_wallet_for_storage(wallet)
@@ -305,7 +353,7 @@ class Keymaster:
             return None
         return f"{enc['salt']}.{enc['iv']}.{enc['data']}"
 
-    async def _root_node(self, wallet: dict[str, Any] | None = None):
+    async def _root_entry(self, wallet: dict[str, Any] | None = None) -> _RootCache:
         # When a wallet is supplied, re-derive if the cache belongs to a
         # different wallet (the #733 fix). When it is not, keep the original
         # early-return on a warm cache: callers inside decrypt_wallet reach here
@@ -313,19 +361,34 @@ class Keymaster:
         if wallet is not None:
             cache_id = self._root_cache_identity(wallet.get("seed", {}))
             if self._root_cache is not None and cache_id is not None and self._root_cache.id == cache_id:
-                return self._root_cache.root
-            mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
-            root = hd_root_from_mnemonic(mnemonic)
-            self._root_cache = _RootCache(root, cache_id)
-            return root
+                return self._root_cache
+            entry = self._derive_root_entry(wallet, cache_id)
+            self._root_cache = entry
+            return entry
 
         if self._root_cache is not None:
-            return self._root_cache.root
+            return self._root_cache
         wallet = await self.load_wallet()
+        entry = self._derive_root_entry(wallet, self._root_cache_identity(wallet.get("seed", {})))
+        self._root_cache = entry
+        return entry
+
+    def _derive_root_entry(self, wallet: dict[str, Any], cache_id: str | None) -> _RootCache:
+        # Decrypting the mnemonic is the expensive part, so the BIP32 root and
+        # the BIP39 seed are derived together and cached together.
         mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
-        root = hd_root_from_mnemonic(mnemonic)
-        self._root_cache = _RootCache(root, self._root_cache_identity(wallet.get("seed", {})))
-        return root
+        return _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), cache_id)
+
+    async def _root_node(self, wallet: dict[str, Any] | None = None):
+        return (await self._root_entry(wallet)).root
+
+    async def _bip39_seed(self, wallet: dict[str, Any] | None = None) -> bytes:
+        """The BIP39 seed the SLIP-0010 curves derive from.
+
+        BIP32 and SLIP-0010 build different master nodes out of it, so one
+        mnemonic backs every key without any curve sharing material.
+        """
+        return (await self._root_entry(wallet)).seed
 
     async def hd_key_pair(self, wallet: dict[str, Any] | None = None) -> dict[str, dict[str, str]]:
         root = await self._root_node(wallet)
@@ -1737,7 +1800,72 @@ class Keymaster:
 
         return decrypt_bytes(decrypted["privateJwk"], encrypted_data)
 
-    async def add_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
+    async def _add_operation_proof(self, payload: dict[str, Any], controller: str | None = None) -> dict[str, Any]:
+        """DID operations, which both gatekeeper ports validate.
+
+        verify_proof_format requires a single proof whose type is the literal
+        EcdsaSecp256k1Signature2019, so an operation never carries a proof set
+        however many keys its signer has published.
+        """
+        signer = await self._proof_signer(payload, controller)
+
+        return {
+            **payload,
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+                "verificationMethod": signer["verificationMethod"],
+                "proofPurpose": "authentication",
+                # The document alone, never the proof configuration. Weaker
+                # than the Data Integrity construction below, and kept only
+                # because it is what every operation ever anchored was signed
+                # over.
+                "proofValue": self._sign_proof_value(lambda: hash_json(payload), signer["keypair"]),
+            },
+        }
+
+    async def _archon_ecdsa_jcs_2019_proof(
+        self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod"
+    ) -> dict[str, Any]:
+        """The corrected name for the secp256k1 suite.
+
+        EcdsaSecp256k1Signature2019 is a registered type whose specification
+        requires RDF canonicalization and a `jws` member; this signs JCS-
+        canonical bytes and carries `proofValue`, so a verifier applying that
+        specification fails on a proof that is in fact sound. Credentials
+        therefore carry the Data Integrity form under a suite name Archon
+        defines -- see docs/scheme.md. Unregistered because no registered
+        cryptosuite covers secp256k1, so an outside verifier skips it and checks
+        the eddsa-jcs-2022 proof beside it.
+        """
+        signer = await self._proof_signer(payload, controller)
+
+        config = {
+            "type": "DataIntegrityProof",
+            "cryptosuite": ARCHON_SECP256K1_CRYPTOSUITE,
+            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            "verificationMethod": signer["verificationMethod"],
+            "proofPurpose": proof_purpose,
+        }
+
+        if "@context" in payload:
+            config["@context"] = payload["@context"]
+
+        # secp256k1 signs a 32-byte digest where Ed25519 takes the message, so
+        # the two concatenated digests are hashed once more to give one.
+        return {
+            **payload,
+            "proof": {
+                **config,
+                "proofValue": self._sign_proof_value(
+                    lambda: hash_message(self._data_integrity_payload(payload, config)),
+                    signer["keypair"],
+                ),
+            },
+        }
+
+    async def _proof_signer(self, payload: dict[str, Any], controller: str | None) -> dict[str, Any]:
+        """The signing identity's key and the DID URL naming it."""
         id_info = await self.fetch_id_info(controller)
         keypair = await self.fetch_key_pair(controller)
         if not keypair:
@@ -1745,34 +1873,248 @@ class Keymaster:
         doc = await self.resolve_did(id_info["did"], {"confirm": "true"})
         verification_methods = doc.get("didDocument", {}).get("verificationMethod") or []
         key_fragment = verification_methods[0].get("id", "#key-1") if verification_methods else "#key-1"
-        signature_hex = sign_hash(hash_json(payload), keypair["privateJwk"])
-        return {
-            **payload,
-            "proof": {
-                "type": "EcdsaSecp256k1Signature2019",
-                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-                "verificationMethod": f"{id_info['did']}{key_fragment}",
-                "proofPurpose": proof_purpose,
-                "proofValue": b64url(bytes.fromhex(signature_hex)),
-            },
+        return {"verificationMethod": f"{id_info['did']}{key_fragment}", "keypair": keypair}
+
+    def _sign_proof_value(self, digest: Any, keypair: dict[str, Any]) -> str:
+        """A non-serializable object reaches canonicalization as a raise, which
+        is a bad parameter rather than an internal failure."""
+        try:
+            return b64url(bytes.fromhex(sign_hash(digest(), keypair["privateJwk"])))
+        except Exception as error:
+            raise InvalidParameterError("obj") from error
+
+    async def add_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
+        secp = await self._archon_ecdsa_jcs_2019_proof(payload, controller, proof_purpose)
+        eddsa = await self._eddsa_jcs_2022_proof(payload, controller, proof_purpose)
+
+        # A single object while the signer has published no assertion key, so an
+        # identity that never opts in keeps the shape it had: one proof, not a
+        # set of one.
+        if eddsa is None:
+            return secp
+
+        return {**secp, "proof": [secp["proof"], eddsa]}
+
+    async def _eddsa_jcs_2022_proof(
+        self, payload: dict[str, Any], controller: str | None, proof_purpose: str
+    ) -> dict[str, Any] | None:
+        """The proof a did:webvh or did:key verifier can check.
+
+        Returns None when the signer has not published an assertion key, which
+        is every identity until it calls publish_assertion_key.
+        """
+        id_info = await self.fetch_id_info(controller)
+        doc = await self.resolve_did(id_info["did"], {"confirm": "true"})
+        vm_id = f"{id_info['did']}#key-assertion-1"
+        vm = self._find_verification_method(doc, vm_id)
+
+        if not vm or not vm.get("publicKeyMultibase"):
+            return None
+
+        # publish_assertion_key lists the key under assertionMethod alone, so for
+        # any other purpose this key is unauthorized and the proof it produced
+        # would be one no verifier accepts -- including this class's own.
+        if not self._authorized_for_purpose(
+            doc, {"verificationMethod": vm_id, "proofPurpose": proof_purpose}
+        ):
+            return None
+
+        keypair = await self.fetch_assertion_key_pair(controller)
+
+        # The published key is what a verifier will resolve, so a derivation
+        # that no longer matches it would produce a proof nobody can check.
+        # Silent rather than fatal: the secp256k1 proof still stands.
+        derived = dc.ed25519_public_key_to_multikey(dc.ub64url(keypair["publicJwk"]["x"]))
+        if vm["publicKeyMultibase"] != derived:
+            return None
+
+        config: dict[str, Any] = {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "eddsa-jcs-2022",
+            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            "verificationMethod": vm_id,
+            "proofPurpose": proof_purpose,
         }
 
-    async def verify_proof(self, payload: dict[str, Any]) -> bool:
-        proof = payload.get("proof")
-        if not proof:
+        # Create Proof step 2: the proof carries the context of the document it
+        # secures. Omitted when the document declares none, as a signed file may.
+        if "@context" in payload:
+            config["@context"] = payload["@context"]
+
+        signature = dc.sign_ed25519(
+            self._data_integrity_payload(payload, config), keypair["privateJwk"]
+        )
+
+        return {**config, "proofValue": dc.bytes_to_multibase(signature)}
+
+    def _authorized_for_purpose(self, doc: dict[str, Any], proof: dict[str, Any]) -> bool:
+        """Whether the document lists this key under the purpose the proof claims.
+
+        Without it a key published for authentication alone can produce a proof
+        claiming assertionMethod, and the signature checks out because the key
+        genuinely belongs to the subject.
+        """
+        did = doc.get("didDocument", {}).get("id")
+        if not did:
             return False
+
+        # Proofs are untrusted JSON, so the declared purpose is checked rather
+        # than defaulted: anything else falling through to assertionMethod lets
+        # an unsupported purpose pass on an assertion key.
+        relationship = proof.get("proofPurpose")
+        if relationship not in ("assertionMethod", "authentication"):
+            return False
+        target = _absolute_key_id(proof.get("verificationMethod", ""), did)
+
+        return any(
+            _absolute_key_id(ref, did) == target
+            for ref in doc.get("didDocument", {}).get(relationship) or []
+        )
+
+    @staticmethod
+    def _supported_proof(proof: dict[str, Any]) -> bool:
+        if proof.get("type") == "EcdsaSecp256k1Signature2019":
+            return True
+        return proof.get("type") == "DataIntegrityProof" and proof.get("cryptosuite") in (
+            "eddsa-jcs-2022",
+            ARCHON_SECP256K1_CRYPTOSUITE,
+        )
+
+    def _resolve_proof_key(self, doc: dict[str, Any], proof: dict[str, Any]) -> tuple[str, Any] | None:
+        """The key a proof names, for verification only.
+
+        Deliberately not get_public_key_jwk, whose callers reach the identity
+        key for encryption -- making that one proof-aware would hand them the
+        wrong key.
+        """
+        if not self._authorized_for_purpose(doc, proof):
+            return None
+
+        vm = self._find_verification_method(doc, proof.get("verificationMethod", ""))
+
+        if vm is None:
+            # Credentials issued before any of this named `#key-1` while the
+            # document listed one method, and resolution is at the proof's own
+            # versionTime, so this should not fire -- but a legacy proof keeps
+            # the behaviour it was written under rather than failing.
+            if proof.get("type") == "EcdsaSecp256k1Signature2019":
+                methods = doc.get("didDocument", {}).get("verificationMethod") or []
+                jwk = methods[0].get("publicKeyJwk") if methods else None
+                return ("secp256k1", jwk) if jwk else None
+            return None
+
+        if vm.get("publicKeyMultibase"):
+            try:
+                return ("Ed25519", dc.multikey_to_ed25519_public_key(vm["publicKeyMultibase"]))
+            except ValueError:
+                return None
+
+        jwk = vm.get("publicKeyJwk")
+        return ("secp256k1", jwk) if jwk else None
+
+    def _data_integrity_payload(self, unsecured: dict[str, Any], proof: dict[str, Any]) -> bytes:
+        """sha256 of the canonical proof config, then of the canonical document.
+
+        The config is the proof without its proofValue and it carries the
+        document's @context, so the context is signed too.
+
+        Shared by both cryptosuites. Binding the configuration is what makes
+        `created` and `proofPurpose` unforgeable: the legacy
+        EcdsaSecp256k1Signature2019 payload omits it, so on those proofs both
+        members can be altered without breaking the signature.
+        """
+        config = {key: value for key, value in proof.items() if key != "proofValue"}
+        return bytes.fromhex(hash_json(config) + hash_json(unsecured))
+
+    def _context_agrees(self, unsecured: dict[str, Any], proof: dict[str, Any]) -> bool:
+        """Whether the proof's @context is the one the document declares.
+
+        Create Proof sets the proof's @context from the document it secures, so
+        the two agreeing is part of the suite rather than a coincidence. The
+        proof config is canonicalized as given, which means a proof deliberately
+        signed over a different context would verify here while a verifier that
+        rebuilds the config from the document rejects it. Refused outright, and
+        for a reason a caller can act on rather than an opaque bad signature.
+
+        Absence agrees only with absence: Create Proof copies the document's
+        context into the config whenever the document declares one, so a proof
+        that omits it over a document that has one was built outside the suite.
+        """
+        return canonicalize_json(proof.get("@context")) == canonicalize_json(unsecured.get("@context"))
+
+    def _verify_one_proof(self, unsecured: dict[str, Any], proof: dict[str, Any], doc: dict[str, Any]) -> bool:
+        resolved = self._resolve_proof_key(doc, proof)
+        if resolved is None:
+            return False
+        curve, key = resolved
+
+        try:
+            if proof.get("type") == "DataIntegrityProof" and proof.get("cryptosuite") == "eddsa-jcs-2022":
+                if curve != "Ed25519" or not self._context_agrees(unsecured, proof):
+                    return False
+                return dc.verify_ed25519(
+                    self._data_integrity_payload(unsecured, proof),
+                    dc.multibase_to_bytes(proof["proofValue"]),
+                    {"kty": "OKP", "crv": "Ed25519", "x": dc.b64url(key)},
+                )
+
+            if (
+                proof.get("type") == "DataIntegrityProof"
+                and proof.get("cryptosuite") == ARCHON_SECP256K1_CRYPTOSUITE
+            ):
+                if curve != "secp256k1" or not self._context_agrees(unsecured, proof):
+                    return False
+                return verify_sig(
+                    hash_message(self._data_integrity_payload(unsecured, proof)),
+                    ub64url(proof["proofValue"]).hex(),
+                    key,
+                )
+
+            # The legacy label signs the document alone, with the proof
+            # configuration outside the signature. Every credential and
+            # operation issued before the suite was named carries it and they
+            # are immutable, so it is verified as it was written rather than
+            # corrected in place.
+            if proof.get("type") == "EcdsaSecp256k1Signature2019":
+                if curve != "secp256k1":
+                    return False
+                return verify_sig(hash_json(unsecured), ub64url(proof["proofValue"]).hex(), key)
+        except Exception:
+            return False
+
+        # An unrecognised cryptosuite is somebody else's, not a failure of ours.
+        return False
+
+    async def verify_proof(self, payload: dict[str, Any]) -> bool:
+        proofs = _proofs_of(payload)
+        if not proofs:
+            return False
+
         unsigned = deepcopy(payload)
         unsigned.pop("proof", None)
-        verification_method = proof.get("verificationMethod", "")
-        signer_did = verification_method.split("#")[0]
-        if not signer_did:
-            return False
-        doc = await self.resolve_did(signer_did, {"confirm": "true", "versionTime": proof.get("created")})
-        verification_methods = doc.get("didDocument", {}).get("verificationMethod") or []
-        public_jwk = verification_methods[0].get("publicKeyJwk") if verification_methods else None
-        if not public_jwk:
-            return False
-        return verify_sig(hash_json(unsigned), ub64url(proof["proofValue"]).hex(), public_jwk)
+
+        # One verifying proof is enough. A document may carry a suite this build
+        # does not implement alongside one it does, and refusing it for the
+        # former would make Archon unable to read a perfectly valid credential.
+        for proof in proofs:
+            # Suite first, because resolving is I/O against a DID method this
+            # node may not implement. A foreign proof whose issuer cannot be
+            # resolved would otherwise raise and take the rest of the set with
+            # it, including a proof this build can check.
+            verification_method = proof.get("verificationMethod", "")
+            signer_did = verification_method.split("#")[0]
+            if not signer_did or not self._supported_proof(proof):
+                continue
+            try:
+                doc = await self.resolve_did(
+                    signer_did, {"confirm": "true", "versionTime": proof.get("created")}
+                )
+            except Exception:
+                continue
+            if self._verify_one_proof(unsigned, proof, doc):
+                return True
+
+        return False
 
     async def update_did(self, identifier: str, doc: dict[str, Any]) -> bool:
         did = await self.lookup_did(identifier)
@@ -1790,7 +2132,7 @@ class Keymaster:
         controller = current.get("didDocument", {}).get("id")
         if current.get("didDocumentRegistration", {}).get("type") == "asset":
             controller = current.get("didDocument", {}).get("controller")
-        signed = await self.add_proof(payload, controller, "authentication")
+        signed = await self._add_operation_proof(payload, controller)
         return await self.gatekeeper.update_did(signed)
 
     async def revoke_did(self, identifier: str) -> bool:
@@ -1808,7 +2150,7 @@ class Keymaster:
         controller = current.get("didDocument", {}).get("id")
         if current.get("didDocumentRegistration", {}).get("type") == "asset":
             controller = current.get("didDocument", {}).get("controller")
-        signed = await self.add_proof(payload, controller, "authentication")
+        signed = await self._add_operation_proof(payload, controller)
         ok = await self.gatekeeper.delete_did(signed)
         if ok and current.get("didDocument", {}).get("controller"):
             await self.remove_from_owned(did, current["didDocument"]["controller"])
@@ -1922,7 +2264,7 @@ class Keymaster:
             payload["registration"]["validUntil"] = valid_until
         if block and block.get("hash"):
             payload["blockid"] = block["hash"]
-        signed = await self.add_proof(payload, controller, "authentication")
+        signed = await self._add_operation_proof(payload, controller)
         did = await self.gatekeeper.create_did(signed)
         if not valid_until:
             await self.add_to_owned(did, controller)
@@ -2237,14 +2579,29 @@ class Keymaster:
             verification_methods = did_document.get("verificationMethod") or []
             if not verification_methods:
                 raise KeymasterError("DID Document missing verificationMethod")
-            updated_method = dict(verification_methods[0])
-            updated_method["id"] = f"#key-{next_index + 1}"
-            updated_method["publicKeyJwk"] = keypair["publicJwk"]
+            rotated = verification_methods[0]
+            rotated_target = _absolute_key_id(rotated.get("id"), id_info["did"])
+            rotated_id = f"#key-{next_index + 1}"
+            updated_method = {**rotated, "id": rotated_id, "publicKeyJwk": keypair["publicJwk"]}
+
+            # Replace the rotated key in place and leave every other method
+            # alone. Rebuilding these as single-element lists dropped keys
+            # published beside the identity one -- publish_didcomm's
+            # `#key-agreement-1` among them -- while `keyAgreement`, which was
+            # never rebuilt, kept naming the method just deleted.
+            def is_rotated(ref: Any) -> bool:
+                return bool(rotated_target) and _absolute_key_id(ref, id_info["did"]) == rotated_target
+
+            def retitle(refs: Any) -> list[Any]:
+                return [rotated_id if is_rotated(ref) else ref for ref in (refs or [])]
+
             updated_doc = {
                 **did_document,
-                "verificationMethod": [updated_method],
-                "authentication": [updated_method["id"]],
-                "assertionMethod": [updated_method["id"]],
+                "verificationMethod": [
+                    updated_method if is_rotated(vm.get("id")) else vm for vm in verification_methods
+                ],
+                "authentication": retitle(did_document.get("authentication")),
+                "assertionMethod": retitle(did_document.get("assertionMethod")),
             }
             ok = await self.update_did(id_info["did"], {"didDocument": updated_doc})
             if ok:
@@ -3596,14 +3953,13 @@ class Keymaster:
     # envelope crypto lives in didcomm_crypto (dc); these methods resolve DIDs to
     # keys and call it, and speak the mailbox-relay HTTP protocol.
 
-    @staticmethod
-    def _didcomm_fragment(kid: str) -> str:
-        return kid.split("#")[-1] if "#" in kid else kid
-
     def _find_verification_method(self, doc: dict[str, Any], kid: str) -> dict[str, Any] | None:
-        frag = self._didcomm_fragment(kid)
+        did = doc.get("didDocument", {}).get("id")
+        if not did:
+            return None
+        target = _absolute_key_id(kid, did)
         for vm in doc.get("didDocument", {}).get("verificationMethod") or []:
-            if vm.get("id") and self._didcomm_fragment(vm["id"]) == frag:
+            if vm.get("id") and _absolute_key_id(vm["id"], did) == target:
                 return vm
         return None
 
@@ -3695,11 +4051,131 @@ class Keymaster:
         return self._resolve_key_agreement(doc)
 
     async def fetch_didcomm_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]]:
+        """DIDComm key agreement key, on SLIP-0010's Ed25519 ladder and converted.
+
+        The conversion is the relationship did:key defines between a z6Mk key
+        and the key agreement key it resolves to, so the pair stays inspectable
+        against that method. Deterministic from the wallet seed and the
+        identity's account, so it needs no backup of its own and any SLIP-0010
+        wallet given the mnemonic finds the same key.
+        """
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
-        root = await self._root_node(wallet)
-        seed = derive_private_key_bytes(root, f"m/44'/0'/{id_info['account']}'/1/0")
-        return dc.generate_x25519_jwk(seed)
+        seed = await self._bip39_seed(wallet)
+        derived = slip10_ed25519_bytes(seed, f"m/44'/0'/{id_info['account']}'/1'/0'")
+        return dc.generate_x25519_jwk(dc.ed25519_seed_to_x25519(derived))
+
+    async def fetch_assertion_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]]:
+        """Ed25519 assertion key, on its own SLIP-0010 branch.
+
+        Derived from the BIP39 seed rather than the BIP32 secp256k1 node, on a
+        hardened path as SLIP-0010 requires for Ed25519. The account is the
+        identity and the level below it separates key types: 1' key agreement,
+        2' assertion. Signing keys stay on the BIP32 tree at change=0, where
+        their index is the rotation counter.
+        """
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(name, wallet)
+        seed = await self._bip39_seed(wallet)
+        return dc.generate_ed25519_jwk(slip10_ed25519_bytes(seed, f"m/44'/0'/{id_info['account']}'/2'/0'"))
+
+    async def publish_assertion_key(self, name: str | None = None) -> bool:
+        """Publish the Ed25519 key as a Multikey.
+
+        eddsa-jcs-2022 requires the verification method to carry
+        publicKeyMultibase; a strict verifier refuses the JsonWebKey2020 form
+        the DIDComm key uses.
+        """
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        keypair = await self.fetch_assertion_key_pair(name)
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+
+        vm_id = f"{did}#key-assertion-1"
+
+        # Compared as DID URLs, not strings: a document may already carry this
+        # method relatively, and `#key-assertion-1` names the same key as the
+        # absolute form. Filtering on the raw string would keep it and append a
+        # duplicate beside it.
+        def is_assertion_key(ref: Any) -> bool:
+            return _absolute_key_id(ref, did) == vm_id
+
+        verification_method = [
+            vm for vm in did_document.get("verificationMethod") or [] if not is_assertion_key(vm.get("id"))
+        ]
+        verification_method.append({
+            "id": vm_id,
+            "controller": did,
+            "type": "Multikey",
+            "publicKeyMultibase": dc.ed25519_public_key_to_multikey(dc.ub64url(keypair["publicJwk"]["x"])),
+        })
+        did_document["verificationMethod"] = verification_method
+
+        # Both relationships: assertionMethod for the credentials this identity
+        # issues, authentication for the presentations it holds. A presentation
+        # signed under authentication by a key listed only for assertionMethod
+        # is one a conforming verifier rejects, so publishing for one and not
+        # the other would leave presentations Archon-only.
+        #
+        # Added to each, not substituted for it: #key-1 is already there and
+        # still signs everything Archon verifies itself. Nothing widens as a
+        # result -- both gatekeeper ports authorize an operation against
+        # verificationMethod[0] and never read these arrays.
+        for relationship in ("assertionMethod", "authentication"):
+            refs = [ref for ref in did_document.get(relationship) or [] if not is_assertion_key(ref)]
+            refs.append(vm_id)
+            did_document[relationship] = refs
+
+        context = list(did_document.get("@context") or [])
+        if MULTIKEY_CONTEXT not in context:
+            did_document["@context"] = [*context, MULTIKEY_CONTEXT]
+
+        return await self.update_did(did, {"didDocument": did_document})
+
+    async def unpublish_assertion_key(self, name: str | None = None) -> bool:
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
+        doc = await self.resolve_did(did)
+        did_document = dict(doc.get("didDocument") or {})
+
+        vm_id = f"{did}#key-assertion-1"
+
+        def is_assertion_key(ref: Any) -> bool:
+            return _absolute_key_id(ref, did) == vm_id
+
+        verification_method = [
+            vm for vm in did_document.get("verificationMethod") or [] if not is_assertion_key(vm.get("id"))
+        ]
+
+        if verification_method:
+            did_document["verificationMethod"] = verification_method
+        else:
+            did_document.pop("verificationMethod", None)
+
+        # Only this fragment leaves: unlike keyAgreement, both of these hold the
+        # identity key too and deleting either wholesale would unpublish that.
+        for relationship in ("assertionMethod", "authentication"):
+            refs = [ref for ref in did_document.get(relationship) or [] if not is_assertion_key(ref)]
+
+            if refs:
+                did_document[relationship] = refs
+            else:
+                did_document.pop(relationship, None)
+
+        # Only once nothing needs it: another Multikey may remain, and dropping
+        # the context would leave its terms undefined.
+        if not any(vm.get("type") == "Multikey" for vm in verification_method):
+            context = [entry for entry in did_document.get("@context") or [] if entry != MULTIKEY_CONTEXT]
+
+            if context:
+                did_document["@context"] = context
+            else:
+                # Assigning only when something survives leaves the original
+                # list in place, multikey entry and all.
+                did_document.pop("@context", None)
+
+        return await self.update_did(did, {"didDocument": did_document})
 
     async def publish_didcomm(self, endpoint: str | None = None, name: str | None = None, routing_keys: list[str] | None = None) -> bool:
         # When no endpoint is given, auto-discover the node's public DIDComm
