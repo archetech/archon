@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -16,11 +15,6 @@ from keymaster_service.metrics import (  # noqa: E402
     normalize_path,
     set_service_version_info,
 )
-
-# When pytest runs alongside test_app_partial_parity.py, prometheus_client may
-# already be replaced by a lightweight stub. Skip the gauge-value assertion in
-# that case — the behaviour is exercised end-to-end by test_app_partial_parity.
-_REAL_PROMETHEUS = hasattr(prometheus_client, "REGISTRY")
 
 
 def test_normalize_path_replaces_dynamic_segments() -> None:
@@ -43,8 +37,6 @@ def test_normalize_path_passthrough_for_static_routes() -> None:
 
 
 def test_set_service_version_info_publishes_gauge() -> None:
-    if not _REAL_PROMETHEUS:
-        pytest.skip("prometheus_client is stubbed by another test module")
     set_service_version_info("9.9.9", "deadbee")
     value = prometheus_client.REGISTRY.get_sample_value(
         "service_version_info", {"version": "9.9.9", "commit": "deadbee"}

@@ -4,22 +4,12 @@ test_app_partial_parity.py swaps fastapi/starlette/prometheus for stubs to call
 handlers directly; this file needs the *real* framework to assert that a raised
 exception is dispatched to the right handler (the behaviour a direct call cannot
 see -- see #1107, where an alias overwrote a handler and the direct-call tests
-stayed green). The two coexist by each forcing its own import regime and binding
-its own module references, independent of collection order (#1109).
+stayed green). The parity file restores sys.modules after importing under its
+stubs, so this file just imports the real framework normally (#1109).
 """
 
 import sys
-
-# Force the real modules for this file, undoing any stubs a sibling installed,
-# and drop the cached service modules so they re-import against the real ones.
-for _name in (
-    "fastapi", "fastapi.responses", "fastapi.testclient", "prometheus_client",
-    "starlette", "starlette.middleware", "starlette.middleware.base",
-    "keymaster_service.app", "keymaster_service.service",
-):
-    sys.modules.pop(_name, None)
-
-from pathlib import Path  # noqa: E402
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))

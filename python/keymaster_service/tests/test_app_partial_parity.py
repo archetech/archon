@@ -168,10 +168,34 @@ def _install_fastapi_stubs() -> None:
     sys.modules["starlette.middleware.base"] = starlette_base
 
 
+# Install the stubs only long enough to import the service under them, capture
+# the stubbed modules into this file's globals, then restore sys.modules to
+# exactly what it was. The imported objects stay alive through these globals, so
+# the direct-call tests below keep their stubbed app -- but nothing leaks to
+# other test files, which see the real fastapi/starlette/prometheus (#1109).
+_modules_before = set(sys.modules)
+_saved_modules = {name: sys.modules.get(name) for name in _STUBBED}
+
 _install_fastapi_stubs()
 
 app_module = importlib.import_module("keymaster_service.app")
 service_module = importlib.import_module("keymaster_service.service")
+
+# Revert only what the stubbing touched: the stubbed modules go back to their
+# originals, and any keymaster_service.* module imported under the stubs is
+# dropped so it re-imports against the real ones elsewhere. Real shared modules
+# imported during the window (keymaster.core and its exception classes) are left
+# alone -- deleting them would re-import duplicate class objects and break
+# identity checks (the handler registered under one KeymasterError, a test
+# looking up another).
+for _name, _mod in _saved_modules.items():
+    if _mod is None:
+        sys.modules.pop(_name, None)
+    else:
+        sys.modules[_name] = _mod
+for _name in list(sys.modules):
+    if _name.startswith("keymaster_service") and _name not in _modules_before:
+        del sys.modules[_name]
 
 
 def run(coro):
