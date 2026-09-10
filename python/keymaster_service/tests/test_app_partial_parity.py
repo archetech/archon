@@ -15,9 +15,23 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT.parent / "keymaster" / "src"))
 
 
+# Stubbed modules for the direct-call tests below. Installed forcefully rather
+# than only-if-absent: another test file may have imported the real fastapi
+# first, and this file's tests need the stubs regardless. It also pops the
+# service modules so they re-import against these stubs. Every reference this
+# file needs is bound into module globals right after (app_module/service_module),
+# so a later test file that reinstalls the real modules does not disturb it --
+# see test_app_error_dispatch.py, which does the mirror image for real fastapi.
+_STUBBED = (
+    "fastapi", "fastapi.responses", "prometheus_client",
+    "starlette", "starlette.middleware", "starlette.middleware.base",
+    "keymaster_service.app", "keymaster_service.service",
+)
+
+
 def _install_fastapi_stubs() -> None:
-    if "fastapi" in sys.modules:
-        return
+    for _name in _STUBBED:
+        sys.modules.pop(_name, None)
 
     fastapi: Any = types.ModuleType("fastapi")
     responses: Any = types.ModuleType("fastapi.responses")
