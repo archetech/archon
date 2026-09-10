@@ -54,24 +54,27 @@ describe('signEd25519', () => {
         expect(cipher.verifyEd25519(bytes('a credential'), mangled, publicJwk)).toBe(false);
     });
 
-    // Ed25519 verification strictness is a deliberate, pinned choice (#1091):
-    // Archon uses the permissive ZIP-215 rule in both ports, because Python's
-    // cryptography verifies that way and offers no strict switch, and a
-    // cross-port disagreement about validity is worse than either rule applied
-    // consistently. This is the classic small-order vector -- the identity
-    // point as the public key, with R = identity and S = 0, which verifies for
-    // any message under ZIP-215 and is rejected under strict RFC 8032. If a
-    // noble upgrade flips the default, or the explicit `zip215: true` is
-    // dropped, this turns false and the choice has silently changed. The Python
-    // counterpart is test_ed25519_verification_is_permissive in test_didcomm.py.
-    it('accepts a small-order key (ZIP-215 permissive rule, pinned)', () => {
+    // Ed25519 verification strictness is delegated to noble here and to OpenSSL
+    // in the Python port, and RFC 8032 underspecifies how torsion points are
+    // handled (#1091, "Taming the Many EdDSAs"). This port pins noble's
+    // cofactored ZIP-215 rule (`zip215: true`), which accepts the classic
+    // small-order vectors: the identity point, and an order-2 point, each with
+    // R = identity and S = 0, verifying for any message. The Python counterpart
+    // (test_ed25519_torsion_divergence in test_didcomm.py) records that OpenSSL
+    // accepts the first but REJECTS the second -- a divergence on adversarial
+    // keys only, since no honest key is small-order. If a noble change drops the
+    // pin these turn false.
+    it('accepts small-order keys under the pinned ZIP-215 rule', () => {
         const identity = new Uint8Array(32);
         identity[0] = 1;
+        const order2 = Uint8Array.from(Buffer.from('ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f', 'hex'));
         const signature = new Uint8Array(64);
         signature.set(identity, 0); // R = identity, S = 0
-        const publicJwk = { kty: 'OKP' as const, crv: 'Ed25519' as const, x: Buffer.from(identity).toString('base64url') };
+        const jwk = (key: Uint8Array) => ({ kty: 'OKP' as const, crv: 'Ed25519' as const, x: Buffer.from(key).toString('base64url') });
 
-        expect(cipher.verifyEd25519(bytes('any message'), signature, publicJwk)).toBe(true);
+        expect(cipher.verifyEd25519(bytes('any message'), signature, jwk(identity))).toBe(true);
+        // Order-2 is where the ports diverge: accepted here, rejected by OpenSSL.
+        expect(cipher.verifyEd25519(bytes('any message'), signature, jwk(order2))).toBe(true);
     });
 
     // A caller that hands over garbage should get `false`, not an exception it

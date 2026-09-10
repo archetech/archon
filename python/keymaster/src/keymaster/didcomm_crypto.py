@@ -180,11 +180,15 @@ def sign_ed25519(message: bytes, private_jwk: dict[str, str]) -> bytes:
 
 
 def verify_ed25519(message: bytes, signature: bytes, public_jwk: dict[str, str]) -> bool:
-    # `cryptography`/OpenSSL verifies permissively (accepts small-order keys and
-    # non-canonical encodings) with no strict switch, which is the ZIP-215 rule
-    # the JS port is pinned to. Keeping both permissive is what keeps a proof's
-    # validity the same in both languages; a shared small-order vector
-    # (test_didcomm.py, tests/cipher/ed25519.test.ts) guards it. #1091.
+    # `cryptography`/OpenSSL verifies with a strict uncofactored equation and
+    # exposes no switch. It agrees with the JS port (noble, cofactored ZIP-215)
+    # on every honest prime-order key -- so all real credentials verify
+    # identically -- but differs on adversarially-crafted small-order keys: it
+    # accepts the identity point yet rejects an order-2 key the JS port accepts.
+    # That divergence is confined to a key a signer could only plant in their own
+    # DID document (self-repudiation, not impersonation); reconciling it would
+    # mean reimplementing verification, which is not worth it. The tests record
+    # each port's behaviour so a library change surfaces. See #1091.
     try:
         Ed25519PublicKey.from_public_bytes(ub64url(public_jwk["x"])).verify(signature, message)
         return True
