@@ -1642,3 +1642,29 @@ def test_didcomm_handlers_tolerate_an_absent_body(stub_service: StubService):
         ("receive_didcomm", None),
         ("mediate_didcomm", None),
     ]
+
+
+# --- Error-status parity with the JS keymaster service (#1103) ---
+# The JS routes catch an operation error and answer 400, a not-found and answer
+# 404. The Python service relied on a single handler that returned 500 for every
+# KeymasterError, so a client saw a different status depending on which service
+# it reached. app.py now registers per-type handlers; these assert the status
+# each returns. FastAPI dispatches a raised exception to the most specific
+# registered handler, so the WalletNotFoundError/UnknownIDError subclasses reach
+# the 404 handler rather than the base 400 one.
+from keymaster.core import KeymasterError, UnknownIDError, WalletNotFoundError  # noqa: E402
+
+
+def test_operation_error_maps_to_400():
+    response = run(app_module.keymaster_bad_request_handler(app_module.Request(), KeymasterError("bad operation")))
+    assert response.status_code == 400
+
+
+def test_unknown_id_maps_to_404():
+    response = run(app_module.keymaster_not_found_handler(app_module.Request(), UnknownIDError("Unknown ID")))
+    assert response.status_code == 404
+
+
+def test_wallet_not_found_maps_to_404():
+    response = run(app_module.keymaster_not_found_handler(app_module.Request(), WalletNotFoundError("empty")))
+    assert response.status_code == 404

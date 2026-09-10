@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from keymaster.core import KeymasterError, UnknownIDError, WalletNotFoundError
+
 from .metrics import (
     http_request_duration_seconds,
     http_requests_total,
@@ -101,6 +103,25 @@ class _PrometheusMiddleware(BaseHTTPMiddleware):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(_PrometheusMiddleware)
 public_api = APIRouter(prefix="/api/v1")
+
+
+# Status by error class: a bad request is 400, a not-found is 404, an
+# unexpected failure is 500. Without these a KeymasterError -- which a caller's
+# bad input raises -- falls through to the generic handler below and returns
+# 500, so a client sees a server error for its own mistake. The JS service
+# assigns these per route and does so inconsistently (some client errors return
+# 500 there); this classifies by exception type instead, which is the behaviour
+# both services should converge on -- see #1103. The subclass handlers win over
+# the base one because FastAPI matches the most specific registered type.
+@app.exception_handler(WalletNotFoundError)
+@app.exception_handler(UnknownIDError)
+async def keymaster_not_found_handler(_: Request, exc: KeymasterError):
+    return JSONResponse(status_code=404, content={"error": str(exc)})
+
+
+@app.exception_handler(KeymasterError)
+async def keymaster_bad_request_handler(_: Request, exc: KeymasterError):
+    return JSONResponse(status_code=400, content={"error": str(exc)})
 
 
 @app.exception_handler(KeymasterServiceError)
