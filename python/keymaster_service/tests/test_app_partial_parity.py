@@ -58,9 +58,16 @@ def _install_fastapi_stubs() -> None:
         def __init__(self, *args, **kwargs):
             self.args = args
             self.kwargs = kwargs
+            # Record registrations so a test can assert which handler wins for a
+            # given exception type -- FastAPI keeps the last registration, and an
+            # alias (KeymasterServiceError is KeymasterError) registering the same
+            # class again would overwrite an earlier handler. A direct call to a
+            # handler function cannot see that; this can.
+            self.exception_handlers = {}
 
-        def exception_handler(self, *args, **kwargs):
+        def exception_handler(self, exc_type, *args, **kwargs):
             def decorate(func):
+                self.exception_handlers[exc_type] = func
                 return func
 
             return decorate
@@ -1663,6 +1670,16 @@ def test_operation_error_maps_to_400():
 def test_unknown_id_maps_to_404():
     response = run(app_module.keymaster_not_found_handler(app_module.Request(), UnknownIDError("Unknown ID")))
     assert response.status_code == 404
+
+
+def test_keymaster_error_dispatches_to_the_400_handler_not_500():
+    # KeymasterServiceError is an alias of KeymasterError; a handler registered
+    # for it would overwrite this one and send KeymasterError back to 500. Assert
+    # the class resolves to the 400 handler -- the registration, not just the
+    # handler body a direct call would exercise.
+    assert app_module.app.exception_handlers[KeymasterError] is app_module.keymaster_bad_request_handler
+    assert app_module.app.exception_handlers[UnknownIDError] is app_module.keymaster_not_found_handler
+    assert app_module.app.exception_handlers[WalletNotFoundError] is app_module.keymaster_not_found_handler
 
 
 def test_wallet_not_found_maps_to_404():

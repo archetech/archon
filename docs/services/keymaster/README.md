@@ -1160,7 +1160,7 @@ Error status is assigned by the *kind* of failure, not per route:
 | Failure | Status |
 | --- | --- |
 | Bad or invalid input (a `KeymasterError`) | 400 |
-| Not found — unknown ID, empty wallet, resolution miss (`UnknownIDError`, `WalletNotFoundError`) | 404 |
+| Not found — an unresolved non-DID name (`UnknownIDError`) or an empty wallet store (`WalletNotFoundError`) | 404 |
 | Missing/incorrect passphrase or admin key | 401 / 403 |
 | Unexpected fault — gatekeeper or IPFS unreachable, any unhandled exception | 500 |
 
@@ -1170,6 +1170,12 @@ TypeScript service still assigns status in each route's `catch` block and does
 so inconsistently — 57 routes answer 400, 79 answer 500, 22 answer 404 for what
 is often the same class of error — so it returns 500 for many client errors.
 Aligning it to this table is #1108.
+
+One nuance in the not-found row: resolving an explicit `did:` that the gatekeeper
+cannot find raises the base `KeymasterError` and so returns 400, not 404 — only
+an unresolved *name* raises `UnknownIDError`. Making a missing DID a 404 would
+change the shared keymaster library's `resolve_did`, so it is left to #1108
+alongside the TypeScript alignment.
 
 Until that lands the two implementations are **not** byte-for-byte identical on
 error status. A consumer SHOULD treat any 4xx as a client error and any 5xx as
