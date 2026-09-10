@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createNostrRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -48,7 +49,7 @@ export function createNostrRouter(options: CreateKeymasterRouterOptions): expres
             const nostr = await getKeymaster().addNostr(id);
             res.json(nostr);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -93,7 +94,7 @@ export function createNostrRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().removeNostr(id);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -145,7 +146,7 @@ export function createNostrRouter(options: CreateKeymasterRouterOptions): expres
             const nostr = await getKeymaster().importNostr(nsec, id);
             res.json(nostr);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -190,7 +191,7 @@ export function createNostrRouter(options: CreateKeymasterRouterOptions): expres
             const nsec = await getKeymaster().exportNsec(id);
             res.json({ nsec });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -263,7 +264,7 @@ export function createNostrRouter(options: CreateKeymasterRouterOptions): expres
             const signed = await getKeymaster().signNostrEvent(event);
             res.json(signed);
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

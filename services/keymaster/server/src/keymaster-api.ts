@@ -43,6 +43,7 @@ import { createVaultRouter } from './keymaster-vault-router.js';
 import promClient from 'prom-client';
 import pino from 'pino';
 import { pinoHttp } from 'pino-http';
+import { sendError } from './keymaster-error-status.js';
 
 // Initialize Prometheus metrics
 const register = promClient.register;
@@ -160,7 +161,7 @@ app.get('/metrics', async (req, res) => {
         res.set('Content-Type', register.contentType);
         res.end(await register.metrics());
     } catch (error: any) {
-        res.status(500).end(error.toString());
+        sendError(res, error);
     }
 });
 

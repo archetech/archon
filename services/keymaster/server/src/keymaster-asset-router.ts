@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createAssetRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -64,7 +65,7 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
             const did = await getKeymaster().createAsset(data, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -100,7 +101,7 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
             const assets = await getKeymaster().listAssets();
             res.json({ assets });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -194,7 +195,7 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().mergeData(req.params.id, data);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -251,7 +252,7 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
             const ok = await getKeymaster().transferAsset(req.params.id, controller);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -315,7 +316,7 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
             const did = await getKeymaster().cloneAsset(req.params.id, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

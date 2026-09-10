@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createImageRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster, config } = options;
@@ -60,7 +61,7 @@ export function createImageRouter(options: CreateKeymasterRouterOptions): expres
 
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -123,7 +124,7 @@ export function createImageRouter(options: CreateKeymasterRouterOptions): expres
 
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -203,7 +204,7 @@ export function createImageRouter(options: CreateKeymasterRouterOptions): expres
                 res.json(imageAsset);
             }
         } catch (error: any) {
-            res.status(404).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -248,7 +249,7 @@ export function createImageRouter(options: CreateKeymasterRouterOptions): expres
             const test = await getKeymaster().testImage(req.params.id);
             res.json({ test });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

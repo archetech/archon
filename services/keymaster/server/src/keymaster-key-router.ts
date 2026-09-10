@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createKeyRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -42,7 +43,7 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
             const ok = await getKeymaster().rotateKeys();
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -120,7 +121,7 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
             const did = await getKeymaster().encryptMessage(msg, receiver, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -167,7 +168,7 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
             const message = await getKeymaster().decryptMessage(req.body.did);
             res.json({ message });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -238,7 +239,7 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
             const did = await getKeymaster().encryptJSON(json, receiver, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -285,7 +286,7 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
             const json = await getKeymaster().decryptJSON(req.body.did);
             res.json({ json });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -369,7 +370,7 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
             const ok = await getKeymaster().publishAssertionKey(name);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -415,7 +416,7 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
             const ok = await getKeymaster().unpublishAssertionKey(name);
             res.json({ ok });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -424,7 +425,7 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
             const signed = await getKeymaster().addProof(JSON.parse(req.body.contents));
             res.json({ signed });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -471,7 +472,7 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
             const ok = await getKeymaster().verifyProof(req.body.json);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

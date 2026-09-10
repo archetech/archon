@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createSchemaTemplateRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -56,7 +57,7 @@ export function createSchemaTemplateRouter(options: CreateKeymasterRouterOptions
             const template = await getKeymaster().createTemplate(req.params.id);
             res.json({ template });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

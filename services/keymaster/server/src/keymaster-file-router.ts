@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createFileRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster, getGatekeeper } = options;
@@ -63,7 +64,7 @@ export function createFileRouter(options: CreateKeymasterRouterOptions): express
 
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -131,7 +132,7 @@ export function createFileRouter(options: CreateKeymasterRouterOptions): express
 
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send(error.toString());
+            sendError(res, error);
         }
     });
 
@@ -198,7 +199,7 @@ export function createFileRouter(options: CreateKeymasterRouterOptions): express
                 res.json({ file });
             }
         } catch (error: any) {
-            res.status(404).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -243,7 +244,7 @@ export function createFileRouter(options: CreateKeymasterRouterOptions): express
             const test = await getKeymaster().testFile(req.params.id);
             res.json({ test });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -288,7 +289,7 @@ export function createFileRouter(options: CreateKeymasterRouterOptions): express
             res.set('Content-Type', 'application/octet-stream');
             res.send(response);
         } catch (error: any) {
-            res.status(404).send(error.toString());
+            sendError(res, error);
         }
     });
 

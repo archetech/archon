@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createPollRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -49,7 +50,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const template = await getKeymaster().pollTemplate();
             res.json({ template });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -93,7 +94,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const polls = await getKeymaster().listPolls(param);
             res.json({ polls });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -180,7 +181,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const did = await getKeymaster().createPoll(poll, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -231,7 +232,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const did = await getKeymaster().sendBallot(ballot, poll);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -282,7 +283,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const ballot = await getKeymaster().viewBallot(req.params.did);
             res.json({ ballot });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -324,7 +325,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const poll = await getKeymaster().getPoll(req.params.poll);
             res.json({ poll });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -366,7 +367,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const test = await getKeymaster().testPoll(req.params.poll);
             res.json({ test });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -408,7 +409,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const poll = await getKeymaster().viewPoll(req.params.poll);
             res.json({ poll });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -446,7 +447,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const did = await getKeymaster().sendPoll(req.params.poll);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -513,7 +514,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const did = await getKeymaster().votePoll(req.params.poll, vote, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -560,7 +561,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const ok = await getKeymaster().updatePoll(ballot);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -618,7 +619,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const ok = await getKeymaster().publishPoll(req.params.poll, options);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -666,7 +667,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const ok = await getKeymaster().unpublishPoll(req.params.poll);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -720,7 +721,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const ok = await getKeymaster().addPollVoter(req.params.poll, memberId);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -767,7 +768,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const ok = await getKeymaster().removePollVoter(req.params.poll, req.params.voter);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -808,7 +809,7 @@ export function createPollRouter(options: CreateKeymasterRouterOptions): express
             const voters = await getKeymaster().listPollVoters(req.params.poll);
             res.json({ voters });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

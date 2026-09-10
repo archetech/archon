@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
+import { InvalidParameterError, UnknownIDError } from '@didcid/common/errors';
 
 import { createAddressRouter } from '../../services/keymaster/server/src/keymaster-address-router.ts';
 import { createAgentRouter } from '../../services/keymaster/server/src/keymaster-agent-router.ts';
@@ -46,7 +47,7 @@ function createMockKeymaster(mode: { reject: boolean }) {
         get(_target, prop: string) {
             if (!methods.has(prop)) {
                 methods.set(prop, jest.fn(() => mode.reject
-                    ? Promise.reject(new Error(`boom:${prop}`))
+                    ? Promise.reject(new InvalidParameterError(`boom:${prop}`))
                     : Promise.resolve({ ok: true, name: prop })));
             }
             return methods.get(prop);
@@ -102,7 +103,7 @@ function send(app: express.Express, method: Method, path: string) {
 // [method, path, status the handler's catch block returns]
 const ROUTES: Array<[Method, string, number]> = [
     // address
-    ['GET', '/addresses', 500],
+    ['GET', '/addresses', 400],
     ['GET', '/addresses/example.com', 400],
     ['POST', '/addresses/import', 400],
     ['GET', '/addresses/check/addr1', 400],
@@ -113,40 +114,40 @@ const ROUTES: Array<[Method, string, number]> = [
     // agent
     ['POST', '/agents/test-id/test', 400],
     // asset
-    ['POST', '/assets', 500],
-    ['GET', '/assets', 500],
+    ['POST', '/assets', 400],
+    ['GET', '/assets', 400],
     ['GET', '/assets/test-id', 404],
-    ['PUT', '/assets/test-id', 500],
-    ['POST', '/assets/test-id/transfer', 500],
-    ['POST', '/assets/test-id/clone', 500],
+    ['PUT', '/assets/test-id', 400],
+    ['POST', '/assets/test-id/transfer', 400],
+    ['POST', '/assets/test-id/clone', 400],
     // challenge
-    ['GET', '/challenge', 500],
+    ['GET', '/challenge', 400],
     ['POST', '/challenge', 400],
     // core
-    ['GET', '/registries', 500],
-    ['GET', '/capabilities', 500],
-    ['GET', '/wallet', 500],
-    ['PUT', '/wallet', 500],
-    ['POST', '/wallet/new', 500],
-    ['POST', '/wallet/backup', 500],
-    ['POST', '/wallet/recover', 500],
-    ['POST', '/wallet/check', 500],
-    ['POST', '/wallet/fix', 500],
-    ['GET', '/wallet/mnemonic', 500],
-    ['POST', '/wallet/passphrase', 500],
-    ['GET', '/export/wallet/encrypted', 500],
+    ['GET', '/registries', 400],
+    ['GET', '/capabilities', 400],
+    ['GET', '/wallet', 400],
+    ['PUT', '/wallet', 400],
+    ['POST', '/wallet/new', 400],
+    ['POST', '/wallet/backup', 400],
+    ['POST', '/wallet/recover', 400],
+    ['POST', '/wallet/check', 400],
+    ['POST', '/wallet/fix', 400],
+    ['GET', '/wallet/mnemonic', 400],
+    ['POST', '/wallet/passphrase', 400],
+    ['GET', '/export/wallet/encrypted', 400],
     // credential
     ['POST', '/credentials/bind', 400],
-    ['GET', '/credentials/held', 500],
+    ['GET', '/credentials/held', 400],
     ['POST', '/credentials/held', 400],
-    ['GET', '/credentials/held/didcid1:abc', 500],
+    ['GET', '/credentials/held/didcid1:abc', 400],
     ['DELETE', '/credentials/held/didcid1:abc', 400],
     ['POST', '/credentials/held/didcid1:abc/publish', 400],
     ['POST', '/credentials/held/didcid1:abc/unpublish', 400],
-    ['GET', '/credentials/issued', 500],
+    ['GET', '/credentials/issued', 400],
     ['POST', '/credentials/issued', 400],
-    ['GET', '/credentials/issued/didcid1:abc', 500],
-    ['POST', '/credentials/issued/didcid1:abc/send', 500],
+    ['GET', '/credentials/issued/didcid1:abc', 400],
+    ['POST', '/credentials/issued/didcid1:abc/send', 400],
     ['POST', '/credentials/issued/didcid1:abc', 400],
     ['DELETE', '/credentials/issued/didcid1:abc', 400],
     // didcomm
@@ -161,64 +162,64 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/didcomm/credential/send', 400],
     ['POST', '/didcomm/credential/accept', 400],
     // dmail
-    ['GET', '/dmail', 500],
-    ['POST', '/dmail', 500],
-    ['POST', '/dmail/import', 500],
+    ['GET', '/dmail', 400],
+    ['POST', '/dmail', 400],
+    ['POST', '/dmail/import', 400],
     ['GET', '/dmail/test-id', 404],
-    ['PUT', '/dmail/test-id', 500],
-    ['DELETE', '/dmail/test-id', 500],
-    ['POST', '/dmail/test-id/send', 500],
-    ['POST', '/dmail/test-id/file', 500],
-    ['GET', '/dmail/test-id/attachments', 404],
-    ['POST', '/dmail/test-id/attachments', 500],
-    ['DELETE', '/dmail/test-id/attachments/item', 404],
-    ['GET', '/dmail/test-id/attachments/item', 404],
+    ['PUT', '/dmail/test-id', 400],
+    ['DELETE', '/dmail/test-id', 400],
+    ['POST', '/dmail/test-id/send', 400],
+    ['POST', '/dmail/test-id/file', 400],
+    ['GET', '/dmail/test-id/attachments', 400],
+    ['POST', '/dmail/test-id/attachments', 400],
+    ['DELETE', '/dmail/test-id/attachments/item', 400],
+    ['GET', '/dmail/test-id/attachments/item', 400],
     // file
-    ['POST', '/files', 500],
-    ['PUT', '/files/test-id', 500],
-    ['GET', '/files/test-id', 404],
+    ['POST', '/files', 400],
+    ['PUT', '/files/test-id', 400],
+    ['GET', '/files/test-id', 400],
     ['POST', '/files/test-id/test', 400],
-    ['GET', '/ipfs/data/cid1', 404],
+    ['GET', '/ipfs/data/cid1', 400],
     // group
-    ['GET', '/groups', 500],
-    ['POST', '/groups', 500],
+    ['GET', '/groups', 400],
+    ['POST', '/groups', 400],
     ['GET', '/groups/item', 404],
-    ['POST', '/groups/item/add', 500],
-    ['POST', '/groups/item/remove', 500],
+    ['POST', '/groups/item/add', 400],
+    ['POST', '/groups/item/remove', 400],
     ['POST', '/groups/item/test', 400],
     // identity
     ['GET', '/did/test-id', 404],
-    ['DELETE', '/did/test-id', 500],
-    ['PUT', '/did/test-id', 500],
-    ['GET', '/ids/current', 500],
+    ['DELETE', '/did/test-id', 400],
+    ['PUT', '/did/test-id', 400],
+    ['GET', '/ids/current', 400],
     ['PUT', '/ids/current', 400],
-    ['GET', '/ids', 500],
-    ['POST', '/ids', 500],
+    ['GET', '/ids', 400],
+    ['POST', '/ids', 400],
     ['GET', '/ids/test-id', 404],
     ['DELETE', '/ids/test-id', 400],
     ['POST', '/ids/test-id/rename', 400],
     ['POST', '/ids/test-id/change-registry', 400],
     ['POST', '/ids/test-id/backup', 400],
-    ['POST', '/ids/test-id/recover', 500],
-    ['GET', '/aliases', 500],
-    ['POST', '/aliases', 500],
+    ['POST', '/ids/test-id/recover', 400],
+    ['GET', '/aliases', 400],
+    ['POST', '/aliases', 400],
     ['GET', '/aliases/ally', 404],
     ['DELETE', '/aliases/ally', 400],
     // image
-    ['POST', '/images', 500],
-    ['PUT', '/images/test-id', 500],
-    ['GET', '/images/test-id', 404],
+    ['POST', '/images', 400],
+    ['PUT', '/images/test-id', 400],
+    ['GET', '/images/test-id', 400],
     ['POST', '/images/test-id/test', 400],
     // key
-    ['POST', '/keys/rotate', 500],
+    ['POST', '/keys/rotate', 400],
     ['POST', '/keys/assertion', 400],
     ['DELETE', '/keys/assertion', 400],
-    ['POST', '/keys/encrypt/message', 500],
-    ['POST', '/keys/decrypt/message', 500],
-    ['POST', '/keys/encrypt/json', 500],
-    ['POST', '/keys/decrypt/json', 500],
+    ['POST', '/keys/encrypt/message', 400],
+    ['POST', '/keys/decrypt/message', 400],
+    ['POST', '/keys/encrypt/json', 400],
+    ['POST', '/keys/decrypt/json', 400],
     ['POST', '/keys/sign', 500],
-    ['POST', '/keys/verify', 500],
+    ['POST', '/keys/verify', 400],
     // lightning
     ['POST', '/lightning', 400],
     ['DELETE', '/lightning', 400],
@@ -238,49 +239,49 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/nostr/nsec', 400],
     ['POST', '/nostr/sign', 400],
     // notice
-    ['POST', '/notices', 500],
-    ['PUT', '/notices/test-id', 500],
-    ['POST', '/notices/refresh', 500],
+    ['POST', '/notices', 400],
+    ['PUT', '/notices/test-id', 400],
+    ['POST', '/notices/refresh', 400],
     // poll
-    ['GET', '/templates/poll', 500],
-    ['GET', '/polls', 500],
-    ['POST', '/polls', 500],
-    ['POST', '/polls/ballot/send', 500],
-    ['GET', '/polls/ballot/didcid1:abc', 500],
-    ['GET', '/polls/poll-1', 500],
-    ['GET', '/polls/poll-1/test', 500],
-    ['GET', '/polls/poll-1/view', 500],
-    ['POST', '/polls/poll-1/send', 500],
-    ['POST', '/polls/poll-1/vote', 500],
-    ['PUT', '/polls/update', 500],
-    ['POST', '/polls/poll-1/publish', 500],
-    ['POST', '/polls/poll-1/unpublish', 500],
-    ['POST', '/polls/poll-1/voters', 500],
-    ['DELETE', '/polls/poll-1/voters/did:cid:voter', 500],
-    ['GET', '/polls/poll-1/voters', 500],
+    ['GET', '/templates/poll', 400],
+    ['GET', '/polls', 400],
+    ['POST', '/polls', 400],
+    ['POST', '/polls/ballot/send', 400],
+    ['GET', '/polls/ballot/didcid1:abc', 400],
+    ['GET', '/polls/poll-1', 400],
+    ['GET', '/polls/poll-1/test', 400],
+    ['GET', '/polls/poll-1/view', 400],
+    ['POST', '/polls/poll-1/send', 400],
+    ['POST', '/polls/poll-1/vote', 400],
+    ['PUT', '/polls/update', 400],
+    ['POST', '/polls/poll-1/publish', 400],
+    ['POST', '/polls/poll-1/unpublish', 400],
+    ['POST', '/polls/poll-1/voters', 400],
+    ['DELETE', '/polls/poll-1/voters/did:cid:voter', 400],
+    ['GET', '/polls/poll-1/voters', 400],
     // public — /ready and /version are covered separately; they never call Keymaster
     // response
     ['POST', '/response', 400],
     ['POST', '/response/verify', 400],
     // schema
-    ['GET', '/schemas', 500],
-    ['POST', '/schemas', 500],
+    ['GET', '/schemas', 400],
+    ['POST', '/schemas', 400],
     ['GET', '/schemas/test-id', 404],
-    ['PUT', '/schemas/test-id', 500],
+    ['PUT', '/schemas/test-id', 400],
     ['POST', '/schemas/test-id/test', 400],
     // schema-template
-    ['POST', '/schemas/test-id/template', 500],
+    ['POST', '/schemas/test-id/template', 400],
     // vault
-    ['POST', '/vaults', 500],
-    ['GET', '/vaults/test-id', 404],
-    ['POST', '/vaults/test-id/test', 404],
-    ['POST', '/vaults/test-id/members', 404],
-    ['DELETE', '/vaults/test-id/members/did:cid:member', 404],
-    ['GET', '/vaults/test-id/members', 404],
-    ['POST', '/vaults/test-id/items', 500],
-    ['DELETE', '/vaults/test-id/items/item', 404],
-    ['GET', '/vaults/test-id/items', 404],
-    ['GET', '/vaults/test-id/items/item', 404],
+    ['POST', '/vaults', 400],
+    ['GET', '/vaults/test-id', 400],
+    ['POST', '/vaults/test-id/test', 400],
+    ['POST', '/vaults/test-id/members', 400],
+    ['DELETE', '/vaults/test-id/members/did:cid:member', 400],
+    ['GET', '/vaults/test-id/members', 400],
+    ['POST', '/vaults/test-id/items', 400],
+    ['DELETE', '/vaults/test-id/items/item', 400],
+    ['GET', '/vaults/test-id/items', 400],
+    ['GET', '/vaults/test-id/items/item', 400],
 ];
 
 describe('keymaster server routers', () => {
@@ -350,6 +351,22 @@ describe('keymaster server routers', () => {
         }
 
         expect(mismatches).toEqual([]);
+    });
+
+    // The documented-status test rejects everything with one type; this proves a
+    // route passes the *actual* thrown error to the classifier rather than
+    // hardcoding a status. POST /ids (createId) is an ordinary error-catch route.
+    it('maps the thrown error type through the classifier, not a fixed status', async () => {
+        const { app, keymaster } = mount();
+
+        keymaster.createId.mockRejectedValueOnce(new UnknownIDError('nope'));
+        expect((await send(app, 'POST', '/ids')).status).toBe(404);
+
+        keymaster.createId.mockRejectedValueOnce(new InvalidParameterError('bad'));
+        expect((await send(app, 'POST', '/ids')).status).toBe(400);
+
+        keymaster.createId.mockRejectedValueOnce(new Error('boom'));
+        expect((await send(app, 'POST', '/ids')).status).toBe(500);
     });
 });
 

@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createSchemaRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -45,7 +46,7 @@ export function createSchemaRouter(options: CreateKeymasterRouterOptions): expre
             const schemas = await getKeymaster().listSchemas(param);
             res.json({ schemas });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -101,7 +102,7 @@ export function createSchemaRouter(options: CreateKeymasterRouterOptions): expre
             const did = await getKeymaster().createSchema(schema, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -207,7 +208,7 @@ export function createSchemaRouter(options: CreateKeymasterRouterOptions): expre
             const ok = await getKeymaster().setSchema(req.params.id, schema);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -259,7 +260,7 @@ export function createSchemaRouter(options: CreateKeymasterRouterOptions): expre
             const test = await getKeymaster().testSchema(req.params.id);
             res.json({ test });
         } catch (error: any) {
-            res.status(400).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 

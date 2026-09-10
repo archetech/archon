@@ -1,5 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
+import { sendError } from './keymaster-error-status.js';
 
 export function createNoticeRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -54,7 +55,7 @@ export function createNoticeRouter(options: CreateKeymasterRouterOptions): expre
             const did = await getKeymaster().createNotice(message, options);
             res.json({ did });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -110,7 +111,7 @@ export function createNoticeRouter(options: CreateKeymasterRouterOptions): expre
             const ok = await getKeymaster().updateNotice(req.params.id, message);
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
@@ -146,7 +147,7 @@ export function createNoticeRouter(options: CreateKeymasterRouterOptions): expre
             const ok = await getKeymaster().refreshNotices();
             res.json({ ok });
         } catch (error: any) {
-            res.status(500).send({ error: error.toString() });
+            sendError(res, error);
         }
     });
 
