@@ -462,6 +462,80 @@ The `proof.verificationMethod` field identifies which key was used to create the
 - **Asset create operations**: Must use the full DID reference of the controller (e.g., `did:cid:abc123#key-1`)
 - **Update/delete operations**: Must use the full DID reference of the controller (e.g., `did:cid:abc123#key-N`)
 
+### Cryptosuites
+
+A DID operation and a credential are signed with the same key and the same bytes,
+but they are labelled differently, because they are read by different verifiers.
+
+**Operations** carry a single proof of type `EcdsaSecp256k1Signature2019`. Both
+gatekeeper implementations require exactly that literal and reject anything else,
+so an operation never carries a proof set however many keys its signer has
+published.
+
+**Credentials** carry a `DataIntegrityProof`, and may carry more than one — see
+*Proof sets* below.
+
+#### `archon-ecdsa-jcs-2019`
+
+The secp256k1 suite, defined here. It is deliberately **not** registered in the
+W3C cryptosuite registry: no registered Data Integrity cryptosuite covers
+secp256k1 (`ecdsa-jcs-2019` is defined for P-256 and P-384 only), so claiming a
+registered name for this algorithm would misstate what the proof is. An outside
+verifier that does not recognise the name skips the proof — which is the correct
+outcome, since it could not have checked it under any other name either.
+
+Given an unsecured document (the object with any `proof` member removed):
+
+1. Canonicalize the document with JCS (RFC 8785).
+2. Digest the canonical form with SHA-256.
+3. Sign the digest with secp256k1 ECDSA, producing a 64-byte compact `r || s`
+   signature.
+4. `proofValue` is that signature, base64url-encoded (unpadded).
+
+The proof carries `type`, `cryptosuite`, `created`, `verificationMethod`,
+`proofPurpose` and `proofValue`. It carries no `@context`: the signature covers
+the document alone and never the proof configuration, so a context on the proof
+would be an unsigned decoration.
+
+#### `eddsa-jcs-2022`
+
+The registered Ed25519 suite ([W3C vc-di-eddsa][vc-di-eddsa]), implemented as
+specified, so a conforming verifier can check an Archon credential without
+knowing anything about Archon. It requires a `Multikey` verification method with
+`publicKeyMultibase`; Archon publishes one at the `#key-assertion-1` fragment,
+listed under both `assertionMethod` and `authentication`.
+
+The signed payload is `SHA-256(JCS(proof configuration)) || SHA-256(JCS(unsecured
+document))`, where the proof configuration is the proof without `proofValue` and
+carrying the secured document's `@context`. `proofValue` is the 64-byte Ed25519
+signature in base58-btc multibase, so it begins with `z`.
+
+[vc-di-eddsa]: https://www.w3.org/TR/vc-di-eddsa/
+
+#### The legacy label
+
+Credentials issued before this suite was named carry `EcdsaSecp256k1Signature2019`
+over identical bytes. Those credentials are immutable, so verifiers accept that
+type indefinitely rather than deprecating it. Nothing issues it for a credential
+any more.
+
+#### Proof sets
+
+A credential's `proof` member may be a single proof or an array of them. A
+verifier accepts the credential if **any one** proof verifies: a document may
+carry a suite the verifier does not implement alongside one it does, and refusing
+it for the former would reject a credential that is perfectly valid.
+
+Each proof is computed independently over the document with `proof` removed —
+a set, not a chain — so each verifies alone.
+
+A proof is only valid if the signer's DID document authorizes its
+`verificationMethod` for the proof's `proofPurpose`, under the relationship of
+that name. A key listed only for `keyAgreement` cannot produce a valid
+`assertionMethod` proof even though the signature itself checks out. Issuers
+apply the same test before attaching a proof, so a proof that would fail this
+check is not written in the first place.
+
 ## DID Recovery
 
 For security reasons, this method provides no support for storing private keys. We recommend that clients use BIP-39 to generate a master seed phrase consisting of at least 12 words, and that users safely store the recovery phrase.

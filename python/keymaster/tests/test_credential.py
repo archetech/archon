@@ -405,7 +405,8 @@ def test_add_proof_emits_one_proof_until_an_assertion_key_is_published(testbed):
     signed = run(km.add_proof({"hello": "world"}))
 
     assert isinstance(signed["proof"], dict)
-    assert signed["proof"]["type"] == "EcdsaSecp256k1Signature2019"
+    assert signed["proof"]["type"] == "DataIntegrityProof"
+    assert signed["proof"]["cryptosuite"] == "archon-ecdsa-jcs-2019"
     assert run(km.verify_proof(signed)) is True
 
 
@@ -417,7 +418,11 @@ def test_add_proof_emits_both_proofs_once_published_and_each_verifies_alone(test
     secp, eddsa = signed["proof"]
 
     assert len(signed["proof"]) == 2
-    assert secp["type"] == "EcdsaSecp256k1Signature2019"
+    assert secp["type"] == "DataIntegrityProof"
+    assert secp["cryptosuite"] == "archon-ecdsa-jcs-2019"
+    # The signature covers the document alone, so a context here would be an
+    # unsigned decoration -- unlike the eddsa proof beside it.
+    assert "@context" not in secp
     assert eddsa["cryptosuite"] == "eddsa-jcs-2022"
     assert eddsa["proofValue"].startswith("z")
     assert eddsa["@context"] == document["@context"]
@@ -469,7 +474,7 @@ def test_add_proof_attaches_nothing_for_a_purpose_the_document_does_not_authoriz
     signed = run(km.add_proof(document, "Alice", "authentication"))
 
     assert isinstance(signed["proof"], dict)
-    assert signed["proof"]["type"] == "EcdsaSecp256k1Signature2019"
+    assert signed["proof"]["cryptosuite"] == "archon-ecdsa-jcs-2019"
     assert signed["proof"]["proofPurpose"] == "authentication"
     assert run(km.verify_proof(signed)) is True
 
@@ -484,7 +489,13 @@ def test_operations_carry_one_legacy_proof_after_an_assertion_key_is_published(t
     run(km.publish_assertion_key())
 
     signed = run(km._add_operation_proof({"type": "update"}))
+    credential_proofs = run(km.add_proof({"hello": "world"}))
 
     assert isinstance(signed["proof"], dict)
     assert signed["proof"]["type"] == "EcdsaSecp256k1Signature2019"
+    assert "cryptosuite" not in signed["proof"]
     assert signed["proof"]["proofPurpose"] == "authentication"
+
+    # The label is the whole distinction between the two writers.
+    assert credential_proofs["proof"][0]["type"] == "DataIntegrityProof"
+    assert credential_proofs["proof"][0]["cryptosuite"] == "archon-ecdsa-jcs-2019"

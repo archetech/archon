@@ -265,14 +265,28 @@ describe('untrusted proof fields', () => {
 });
 
 describe('the legacy label', () => {
-    // Every credential issued so far carries it, and they are immutable, so it
-    // is accepted for good rather than deprecated.
+    // Every credential issued before the suite was renamed carries it, and they
+    // are immutable, so it is accepted for good rather than deprecated. Built
+    // by hand because no credential path emits it any more -- which is the
+    // point: this is what is already out there, not what Archon now writes.
     it('still verifies a single EcdsaSecp256k1Signature2019 proof', async () => {
-        await keymaster.createId('Alice', { registry: 'local' });
-        const signed = await keymaster.addProof({ hello: 'world' });
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        const document = { hello: 'world' };
+        const keypair = await keymaster.fetchKeyPair();
+        const signatureHex = cipher.signHash(cipher.hashJSON(document), keypair!.privateJwk);
 
-        expect((signed.proof as any).type).toBe('EcdsaSecp256k1Signature2019');
-        expect(await keymaster.verifyProof(signed)).toBe(true);
+        const signed = {
+            ...document,
+            proof: {
+                type: 'EcdsaSecp256k1Signature2019',
+                created: new Date().toISOString(),
+                verificationMethod: `${did}#key-1`,
+                proofPurpose: 'assertionMethod',
+                proofValue: Buffer.from(signatureHex, 'hex').toString('base64url'),
+            },
+        };
+
+        expect(await keymaster.verifyProof(signed as any)).toBe(true);
     });
 });
 
@@ -285,7 +299,8 @@ describe('issuing', () => {
         const signed = await keymaster.addProof({ hello: 'world' });
 
         expect(Array.isArray(signed.proof)).toBe(false);
-        expect((signed.proof as any).type).toBe('EcdsaSecp256k1Signature2019');
+        expect((signed.proof as any).type).toBe('DataIntegrityProof');
+        expect((signed.proof as any).cryptosuite).toBe('archon-ecdsa-jcs-2019');
         expect(await keymaster.verifyProof(signed)).toBe(true);
     });
 
@@ -295,7 +310,11 @@ describe('issuing', () => {
         const [secp, eddsa] = signed.proof;
 
         expect(signed.proof).toHaveLength(2);
-        expect(secp.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(secp.type).toBe('DataIntegrityProof');
+        expect(secp.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        // The signature covers the document alone, so a context here would be
+        // an unsigned decoration -- unlike the eddsa proof beside it.
+        expect(secp['@context']).toBeUndefined();
         expect(eddsa.type).toBe('DataIntegrityProof');
         expect(eddsa.cryptosuite).toBe('eddsa-jcs-2022');
         expect(eddsa.proofValue.startsWith('z')).toBe(true);
@@ -341,7 +360,7 @@ describe('issuing', () => {
         const signed: any = await keymaster.addProof({ hello: 'world' });
 
         expect(Array.isArray(signed.proof)).toBe(false);
-        expect(signed.proof.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(signed.proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
     });
 
     // A presentation is signed under authentication, so this is the path a
@@ -372,7 +391,7 @@ describe('issuing', () => {
         const signed: any = await keymaster.addProof(document, 'Alice', 'authentication');
 
         expect(Array.isArray(signed.proof)).toBe(false);
-        expect(signed.proof.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(signed.proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
         expect(signed.proof.proofPurpose).toBe('authentication');
         expect(await keymaster.verifyProof(signed)).toBe(true);
     });
@@ -393,5 +412,20 @@ describe('issuing', () => {
         const asset = await keymaster.createAsset({ note: 'after publishing' });
 
         expect(asset).toBeDefined();
+    });
+
+    // The label is the whole distinction between the two writers, so it is
+    // asserted directly rather than inferred from an operation being accepted.
+    it('gives an operation the registered label and a credential the corrected one', async () => {
+        await keymaster.createId('Alice', { registry: 'local' });
+        await keymaster.publishAssertionKey();
+
+        const operation: any = await (keymaster as any).addOperationProof({ type: 'update' });
+        const credentialProofs: any = await keymaster.addProof({ hello: 'world' });
+
+        expect(operation.proof.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(operation.proof.cryptosuite).toBeUndefined();
+        expect(credentialProofs.proof[0].type).toBe('DataIntegrityProof');
+        expect(credentialProofs.proof[0].cryptosuite).toBe('archon-ecdsa-jcs-2019');
     });
 });

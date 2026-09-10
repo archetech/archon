@@ -1273,14 +1273,49 @@ export default class Keymaster implements KeymasterInterface {
         obj: T,
         controller?: string,
     ): Promise<T & { proof: Proof }> {
-        return this.addLegacyProof(obj, controller, 'authentication');
+        return {
+            ...obj,
+            proof: {
+                type: "EcdsaSecp256k1Signature2019",
+                ...await this.secp256k1ProofConfig(obj, controller, 'authentication'),
+            },
+        };
     }
 
-    private async addLegacyProof<T extends object>(
+    // The corrected name for the same suite. EcdsaSecp256k1Signature2019 is a
+    // registered type whose specification requires RDF canonicalization and a
+    // `jws` member; this signs JCS-canonical bytes and carries `proofValue`,
+    // so a verifier applying that specification fails on a proof that is in
+    // fact sound. Credentials therefore carry the Data Integrity form under a
+    // suite name Archon defines, claiming no specification it does not
+    // implement -- see docs/scheme.md. Unregistered, so an outside verifier
+    // skips it and checks the eddsa-jcs-2022 proof beside it instead.
+    //
+    // No `@context` on this proof: unlike eddsa-jcs-2022 the signature covers
+    // the document alone, never the proof configuration, so a context here
+    // would be an unsigned decoration.
+    private async archonEcdsaJcs2019Proof<T extends object>(
         obj: T,
         controller?: string,
         proofPurpose: ProofPurpose = "assertionMethod"
-    ): Promise<T & { proof: Proof }> {
+    ): Promise<T & { proof: DataIntegrityProof }> {
+        return {
+            ...obj,
+            proof: {
+                type: "DataIntegrityProof",
+                cryptosuite: ARCHON_SECP256K1_CRYPTOSUITE,
+                ...await this.secp256k1ProofConfig(obj, controller, proofPurpose),
+            },
+        };
+    }
+
+    // The bytes both secp256k1 proofs sign, and every member but the label.
+    // Operations and credentials differ only in what they call this suite.
+    private async secp256k1ProofConfig(
+        obj: object,
+        controller: string | undefined,
+        proofPurpose: ProofPurpose,
+    ): Promise<Omit<Proof, 'type'>> {
         if (obj == null) {
             throw new InvalidParameterError('obj');
         }
@@ -1300,17 +1335,12 @@ export default class Keymaster implements KeymasterInterface {
         try {
             const msgHash = this.cipher.hashJSON(obj);
             const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
-            const proofValue = hexToBase64url(signatureHex);
 
             return {
-                ...obj,
-                proof: {
-                    type: "EcdsaSecp256k1Signature2019",
-                    created: new Date().toISOString(),
-                    verificationMethod: `${id.did}${keyFragment}`,
-                    proofPurpose,
-                    proofValue,
-                }
+                created: new Date().toISOString(),
+                verificationMethod: `${id.did}${keyFragment}`,
+                proofPurpose,
+                proofValue: hexToBase64url(signatureHex),
             };
         }
         catch (error) {
@@ -1323,11 +1353,12 @@ export default class Keymaster implements KeymasterInterface {
         controller?: string,
         proofPurpose: ProofPurpose = "assertionMethod"
     ): Promise<T & { proof: CredentialProof | CredentialProof[] }> {
-        const secp = await this.addLegacyProof(obj, controller, proofPurpose);
+        const secp = await this.archonEcdsaJcs2019Proof(obj, controller, proofPurpose);
         const eddsa = await this.eddsaJcs2022Proof(obj, controller, proofPurpose);
 
         // A single object while the signer has published no assertion key, so
-        // an identity that never opts in emits exactly what it emitted before.
+        // an identity that never opts in keeps the shape it had: one proof,
+        // not a set of one.
         if (!eddsa) {
             return secp;
         }

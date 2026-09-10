@@ -189,7 +189,8 @@ describe('addProof', () => {
 
         const [proof] = proofsOf(signed);
 
-        expect(proof.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(proof.type).toBe('DataIntegrityProof');
+        expect((proof as any).cryptosuite).toBe('archon-ecdsa-jcs-2019');
         expect(proof.verificationMethod).toContain(did);
         expect(proof.verificationMethod).toContain('#key-');
         expect(proof.proofPurpose).toBe('assertionMethod');

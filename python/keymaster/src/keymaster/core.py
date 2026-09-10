@@ -1807,9 +1807,48 @@ class Keymaster:
         EcdsaSecp256k1Signature2019, so an operation never carries a proof set
         however many keys its signer has published.
         """
-        return await self._add_legacy_proof(payload, controller, "authentication")
+        return {
+            **payload,
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                **await self._secp256k1_proof_config(payload, controller, "authentication"),
+            },
+        }
 
-    async def _add_legacy_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
+    async def _archon_ecdsa_jcs_2019_proof(
+        self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod"
+    ) -> dict[str, Any]:
+        """The corrected name for the same suite.
+
+        EcdsaSecp256k1Signature2019 is a registered type whose specification
+        requires RDF canonicalization and a `jws` member; this signs JCS-
+        canonical bytes and carries `proofValue`, so a verifier applying that
+        specification fails on a proof that is in fact sound. Credentials
+        therefore carry the Data Integrity form under a suite name Archon
+        defines, claiming no specification it does not implement -- see
+        docs/scheme.md. Unregistered, so an outside verifier skips it and checks
+        the eddsa-jcs-2022 proof beside it instead.
+
+        No `@context` on this proof: unlike eddsa-jcs-2022 the signature covers
+        the document alone, never the proof configuration, so a context here
+        would be an unsigned decoration.
+        """
+        return {
+            **payload,
+            "proof": {
+                "type": "DataIntegrityProof",
+                "cryptosuite": ARCHON_SECP256K1_CRYPTOSUITE,
+                **await self._secp256k1_proof_config(payload, controller, proof_purpose),
+            },
+        }
+
+    async def _secp256k1_proof_config(
+        self, payload: dict[str, Any], controller: str | None, proof_purpose: str
+    ) -> dict[str, Any]:
+        """The bytes both secp256k1 proofs sign, and every member but the label.
+
+        Operations and credentials differ only in what they call this suite.
+        """
         id_info = await self.fetch_id_info(controller)
         keypair = await self.fetch_key_pair(controller)
         if not keypair:
@@ -1819,22 +1858,19 @@ class Keymaster:
         key_fragment = verification_methods[0].get("id", "#key-1") if verification_methods else "#key-1"
         signature_hex = sign_hash(hash_json(payload), keypair["privateJwk"])
         return {
-            **payload,
-            "proof": {
-                "type": "EcdsaSecp256k1Signature2019",
-                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-                "verificationMethod": f"{id_info['did']}{key_fragment}",
-                "proofPurpose": proof_purpose,
-                "proofValue": b64url(bytes.fromhex(signature_hex)),
-            },
+            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            "verificationMethod": f"{id_info['did']}{key_fragment}",
+            "proofPurpose": proof_purpose,
+            "proofValue": b64url(bytes.fromhex(signature_hex)),
         }
 
     async def add_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
-        secp = await self._add_legacy_proof(payload, controller, proof_purpose)
+        secp = await self._archon_ecdsa_jcs_2019_proof(payload, controller, proof_purpose)
         eddsa = await self._eddsa_jcs_2022_proof(payload, controller, proof_purpose)
 
         # A single object while the signer has published no assertion key, so an
-        # identity that never opts in emits exactly what it emitted before.
+        # identity that never opts in keeps the shape it had: one proof, not a
+        # set of one.
         if eddsa is None:
             return secp
 
