@@ -180,6 +180,11 @@ def sign_ed25519(message: bytes, private_jwk: dict[str, str]) -> bytes:
 
 
 def verify_ed25519(message: bytes, signature: bytes, public_jwk: dict[str, str]) -> bool:
+    # `cryptography`/OpenSSL verifies permissively (accepts small-order keys and
+    # non-canonical encodings) with no strict switch, which is the ZIP-215 rule
+    # the JS port is pinned to. Keeping both permissive is what keeps a proof's
+    # validity the same in both languages; a shared small-order vector
+    # (test_didcomm.py, tests/cipher/ed25519.test.ts) guards it. #1091.
     try:
         Ed25519PublicKey.from_public_bytes(ub64url(public_jwk["x"])).verify(signature, message)
         return True

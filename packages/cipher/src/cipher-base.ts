@@ -134,12 +134,15 @@ export default abstract class CipherBase implements Cipher {
 
     verifyEd25519(message: Uint8Array, signature: Uint8Array, publicJwk: Ed25519JwkPublic): boolean {
         try {
-            // Left on noble's default zip215:true deliberately. Its RFC 8032
-            // mode (zip215:false) additionally rejects small-order public keys
-            // and non-canonical encodings, but Python's `cryptography` accepts
-            // both, so tightening this port alone would make the same proof
-            // verify in one language and fail in the other. See #1091.
-            return ed25519.verify(signature, message, base64url.baseDecode(publicJwk.x));
+            // zip215:true is passed explicitly, not left to noble's default,
+            // so a library upgrade cannot silently change the verification
+            // rule. Permissive (ZIP-215) is the chosen rule because Python's
+            // `cryptography` verifies the same way and exposes no strict switch;
+            // keeping both ports on it is what stops the same proof verifying in
+            // one language and failing in the other. A shared small-order vector
+            // (tests/cipher/ed25519.test.ts, test_didcomm.py) pins the choice so
+            // a future default flip fails a test rather than a credential. #1091.
+            return ed25519.verify(signature, message, base64url.baseDecode(publicJwk.x), { zip215: true });
         }
         catch {
             // A malformed signature or key is a failed verification, not a crash.

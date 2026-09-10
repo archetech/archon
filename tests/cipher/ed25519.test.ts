@@ -54,6 +54,26 @@ describe('signEd25519', () => {
         expect(cipher.verifyEd25519(bytes('a credential'), mangled, publicJwk)).toBe(false);
     });
 
+    // Ed25519 verification strictness is a deliberate, pinned choice (#1091):
+    // Archon uses the permissive ZIP-215 rule in both ports, because Python's
+    // cryptography verifies that way and offers no strict switch, and a
+    // cross-port disagreement about validity is worse than either rule applied
+    // consistently. This is the classic small-order vector -- the identity
+    // point as the public key, with R = identity and S = 0, which verifies for
+    // any message under ZIP-215 and is rejected under strict RFC 8032. If a
+    // noble upgrade flips the default, or the explicit `zip215: true` is
+    // dropped, this turns false and the choice has silently changed. The Python
+    // counterpart is test_ed25519_verification_is_permissive in test_didcomm.py.
+    it('accepts a small-order key (ZIP-215 permissive rule, pinned)', () => {
+        const identity = new Uint8Array(32);
+        identity[0] = 1;
+        const signature = new Uint8Array(64);
+        signature.set(identity, 0); // R = identity, S = 0
+        const publicJwk = { kty: 'OKP' as const, crv: 'Ed25519' as const, x: Buffer.from(identity).toString('base64url') };
+
+        expect(cipher.verifyEd25519(bytes('any message'), signature, publicJwk)).toBe(true);
+    });
+
     // A caller that hands over garbage should get `false`, not an exception it
     // has to catch to decide a signature is bad.
     it('reports malformed input as unverified rather than throwing', () => {

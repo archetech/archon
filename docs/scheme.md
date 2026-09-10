@@ -518,6 +518,17 @@ document))`, where the proof configuration is the proof without `proofValue` and
 carrying the secured document's `@context`. `proofValue` is the 64-byte Ed25519
 signature in base58-btc multibase, so it begins with `z`.
 
+**Verification strictness.** Ed25519 has two accepted verification rules, and
+RFC 8032 does not settle between them (see *Taming the Many EdDSAs*). Archon uses
+the permissive **ZIP-215** rule in both the JS and Python ports — the JS port
+pins it explicitly (`zip215: true`), the Python port inherits it from OpenSSL,
+which offers no strict switch. The choice is consistency over strictness: a
+cross-port disagreement about whether a proof is valid would be worse than
+either rule applied uniformly. A shared small-order test vector holds both ports
+to it. The practical cost is that a deliberately malformed small-order key in a
+signer's *own* DID document is not rejected — a self-inflicted repudiation edge
+case, not a path to impersonating anyone else.
+
 [vc-di-eddsa]: https://www.w3.org/TR/vc-di-eddsa/
 
 #### The legacy label

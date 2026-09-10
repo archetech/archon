@@ -712,3 +712,21 @@ def test_slip10_ed25519_matches_the_published_vector():
     assert slip10_ed25519_bytes(seed, "m/0'/1'/2'/2'/1000000000'").hex() == (
         "8f94d394a8e8fd6b1bc2f3f49f5c47e385281d5c17e65324b0f62483e37e8793"
     )
+
+
+def test_ed25519_verification_is_permissive():
+    """Ed25519 strictness is a pinned choice (#1091): both ports use the
+    permissive ZIP-215 rule, because cryptography verifies that way and offers
+    no strict switch, and a cross-port disagreement about validity is worse than
+    either rule applied consistently. This is the small-order vector -- the
+    identity point as the public key, with R = identity and S = 0, which
+    verifies for any message under ZIP-215 and is rejected under strict RFC 8032.
+    If a library change makes this reject, the choice has silently changed. The
+    JS counterpart is in tests/cipher/ed25519.test.ts."""
+    from keymaster import didcomm_crypto as dc
+
+    identity = bytes([1] + [0] * 31)
+    signature = identity + bytes(32)  # R = identity, S = 0
+    public_jwk = {"kty": "OKP", "crv": "Ed25519", "x": dc.b64url(identity)}
+
+    assert dc.verify_ed25519(b"any message", signature, public_jwk) is True
