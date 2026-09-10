@@ -15,9 +15,23 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT.parent / "keymaster" / "src"))
 
 
+# Stubbed modules for the direct-call tests below. Installed forcefully rather
+# than only-if-absent: another test file may have imported the real fastapi
+# first, and this file's tests need the stubs regardless. It also pops the
+# service modules so they re-import against these stubs. Every reference this
+# file needs is bound into module globals right after (app_module/service_module),
+# so a later test file that reinstalls the real modules does not disturb it --
+# see test_app_error_dispatch.py, which does the mirror image for real fastapi.
+_STUBBED = (
+    "fastapi", "fastapi.responses", "prometheus_client",
+    "starlette", "starlette.middleware", "starlette.middleware.base",
+    "keymaster_service.app", "keymaster_service.service",
+)
+
+
 def _install_fastapi_stubs() -> None:
-    if "fastapi" in sys.modules:
-        return
+    for _name in _STUBBED:
+        sys.modules.pop(_name, None)
 
     fastapi: Any = types.ModuleType("fastapi")
     responses: Any = types.ModuleType("fastapi.responses")
@@ -154,10 +168,34 @@ def _install_fastapi_stubs() -> None:
     sys.modules["starlette.middleware.base"] = starlette_base
 
 
+# Install the stubs only long enough to import the service under them, capture
+# the stubbed modules into this file's globals, then restore sys.modules to
+# exactly what it was. The imported objects stay alive through these globals, so
+# the direct-call tests below keep their stubbed app -- but nothing leaks to
+# other test files, which see the real fastapi/starlette/prometheus (#1109).
+_modules_before = set(sys.modules)
+_saved_modules = {name: sys.modules.get(name) for name in _STUBBED}
+
 _install_fastapi_stubs()
 
 app_module = importlib.import_module("keymaster_service.app")
 service_module = importlib.import_module("keymaster_service.service")
+
+# Revert only what the stubbing touched: the stubbed modules go back to their
+# originals, and any keymaster_service.* module imported under the stubs is
+# dropped so it re-imports against the real ones elsewhere. Real shared modules
+# imported during the window (keymaster.core and its exception classes) are left
+# alone -- deleting them would re-import duplicate class objects and break
+# identity checks (the handler registered under one KeymasterError, a test
+# looking up another).
+for _name, _mod in _saved_modules.items():
+    if _mod is None:
+        sys.modules.pop(_name, None)
+    else:
+        sys.modules[_name] = _mod
+for _name in list(sys.modules):
+    if _name.startswith("keymaster_service") and _name not in _modules_before:
+        del sys.modules[_name]
 
 
 def run(coro):
