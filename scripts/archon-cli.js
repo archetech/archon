@@ -352,6 +352,34 @@ program
     });
 
 program
+    .command('publish-assertion-key')
+    .description('Publish an Ed25519 assertion key (Multikey) so credentials this identity issues carry a proof other DID methods can verify')
+    .option('-n, --name <name>', 'identity name (defaults to current)')
+    .action(async (options) => {
+        try {
+            const ok = await keymaster.publishAssertionKey(options.name);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            fail(error.error || error);
+        }
+    });
+
+program
+    .command('unpublish-assertion-key')
+    .description('Remove the Ed25519 assertion key from the current identity')
+    .option('-n, --name <name>', 'identity name (defaults to current)')
+    .action(async (options) => {
+        try {
+            const ok = await keymaster.unpublishAssertionKey(options.name);
+            console.log(ok ? UPDATE_OK : UPDATE_FAILED);
+        }
+        catch (error) {
+            fail(error.error || error);
+        }
+    });
+
+program
     .command('resolve-did <did> [confirm]')
     .description('Return document associated with DID')
     .action(async (did, confirm) => {

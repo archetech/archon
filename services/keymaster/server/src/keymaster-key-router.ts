@@ -327,6 +327,98 @@ export function createKeyRouter(options: CreateKeymasterRouterOptions): express.
      *                 error:
      *                   type: string
      */
+    /**
+     * @swagger
+     * /keys/assertion:
+     *   post:
+     *     summary: Publish an Ed25519 assertion key as a Multikey on the current identity DID document.
+     *     description: Derives the identity's deterministic Ed25519 key and writes it into the DID document as a `Multikey` verification method at the `#key-assertion-1` fragment, listed under both `assertionMethod` and `authentication`. Credentials the identity issues then carry an `eddsa-jcs-2022` proof alongside the secp256k1 one, which verifiers outside Archon can check.
+     *     requestBody:
+     *       required: false
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               name:
+     *                 type: string
+     *                 description: Optional identity name. Defaults to the current identity.
+     *     responses:
+     *       200:
+     *         description: Indicates whether the assertion key was successfully published.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 ok:
+     *                   type: boolean
+     *       400:
+     *         description: Bad request.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 error:
+     *                   type: string
+     */
+    router.post('/keys/assertion', async (req, res) => {
+        try {
+            const { name } = req.body || {};
+            const ok = await getKeymaster().publishAssertionKey(name);
+            res.json({ ok });
+        } catch (error: any) {
+            res.status(400).send({ error: error.toString() });
+        }
+    });
+
+    /**
+     * @swagger
+     * /keys/assertion:
+     *   delete:
+     *     summary: Remove the Ed25519 assertion key from the current identity DID document.
+     *     description: Removes the `#key-assertion-1` Multikey verification method and its references under `assertionMethod` and `authentication`. Credentials issued afterwards carry the secp256k1 proof alone. Credentials already issued stay verifiable only while the key remains published, so this is not a routine operation.
+     *     requestBody:
+     *       required: false
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               name:
+     *                 type: string
+     *                 description: Optional identity name. Defaults to the current identity.
+     *     responses:
+     *       200:
+     *         description: Indicates whether the assertion key was successfully removed.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 ok:
+     *                   type: boolean
+     *       400:
+     *         description: Bad request.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 error:
+     *                   type: string
+     */
+    router.delete('/keys/assertion', async (req, res) => {
+        try {
+            const { name } = req.body || {};
+            const ok = await getKeymaster().unpublishAssertionKey(name);
+            res.json({ ok });
+        } catch (error: any) {
+            res.status(400).send({ error: error.toString() });
+        }
+    });
+
     router.post('/keys/sign', async (req, res) => {
         try {
             const signed = await getKeymaster().addProof(JSON.parse(req.body.contents));

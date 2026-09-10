@@ -211,6 +211,8 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/images/test-id/test', 400],
     // key
     ['POST', '/keys/rotate', 500],
+    ['POST', '/keys/assertion', 400],
+    ['DELETE', '/keys/assertion', 400],
     ['POST', '/keys/encrypt/message', 500],
     ['POST', '/keys/decrypt/message', 500],
     ['POST', '/keys/encrypt/json', 500],

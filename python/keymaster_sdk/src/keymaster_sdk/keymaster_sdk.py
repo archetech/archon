@@ -1388,6 +1388,16 @@ def get_node_capabilities():
 # DIDComm v2
 
 
+def publish_assertion_key(name=None):
+    response = proxy_request("POST", f"{_keymaster_api}/keys/assertion", json={"name": name})
+    return response["ok"]
+
+
+def unpublish_assertion_key(name=None):
+    response = proxy_request("DELETE", f"{_keymaster_api}/keys/assertion", json={"name": name})
+    return response["ok"]
+
+
 def publish_didcomm(endpoint=None, name=None, routing_keys=None):
     response = proxy_request(
         "POST",

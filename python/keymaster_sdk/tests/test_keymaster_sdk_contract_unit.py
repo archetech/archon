@@ -313,6 +313,29 @@ def test_get_node_capabilities_returns_none_without_a_manifest(monkeypatch):
     assert sdk.get_node_capabilities() is None
 
 
+def test_assertion_key_wrappers_forward_expected_requests(monkeypatch):
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_proxy_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if url.endswith("/keys/assertion"):
+            return {"ok": True}
+        raise AssertionError(url)
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    assert sdk.publish_assertion_key("Alice") is True
+    assert sdk.unpublish_assertion_key("Alice") is True
+    assert sdk.publish_assertion_key() is True
+
+    assert calls == [
+        ("POST", "http://unit.test/api/v1/keys/assertion", {"json": {"name": "Alice"}}),
+        ("DELETE", "http://unit.test/api/v1/keys/assertion", {"json": {"name": "Alice"}}),
+        ("POST", "http://unit.test/api/v1/keys/assertion", {"json": {"name": None}}),
+    ]
+
+
 def test_didcomm_wrappers_forward_expected_requests(monkeypatch):
     calls: list[tuple[str, str, dict]] = []
 

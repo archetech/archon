@@ -22,6 +22,7 @@ const Endpoints = {
     ids: '/api/v1/ids',
     ids_current: '/api/v1/ids/current',
     keys_rotate: '/api/v1/keys/rotate',
+    keys_assertion: '/api/v1/keys/assertion',
     keys_verify: '/api/v1/keys/verify',
     keys_encrypt_message: '/api/v1/keys/encrypt/message',
     keys_decrypt_message: '/api/v1/keys/decrypt/message',
@@ -1405,6 +1406,64 @@ describe('getNodeCapabilities', () => {
 
         try {
             await keymaster.getNodeCapabilities();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('publishAssertionKey', () => {
+    it('should publish the assertion key', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.keys_assertion, (body: any) => body.name === 'Alice')
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.publishAssertionKey('Alice');
+
+        expect(ok).toStrictEqual(true);
+    });
+
+    it('should throw exception on publishAssertionKey server error', async () => {
+        nock(KeymasterURL)
+            .post(Endpoints.keys_assertion)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.publishAssertionKey();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
+describe('unpublishAssertionKey', () => {
+    it('should unpublish the assertion key', async () => {
+        nock(KeymasterURL)
+            .delete(Endpoints.keys_assertion)
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const ok = await keymaster.unpublishAssertionKey();
+
+        expect(ok).toStrictEqual(true);
+    });
+
+    it('should throw exception on unpublishAssertionKey server error', async () => {
+        nock(KeymasterURL)
+            .delete(Endpoints.keys_assertion)
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        try {
+            await keymaster.unpublishAssertionKey();
             throw new ExpectedExceptionError();
         }
         catch (error: any) {
