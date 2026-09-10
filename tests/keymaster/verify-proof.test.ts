@@ -264,6 +264,56 @@ describe('untrusted proof fields', () => {
     });
 });
 
+// The proof configuration is inside the signed payload, so every member of
+// the proof is covered -- not just the document. This is what separates the
+// named suite from the legacy label it replaces.
+describe('archon-ecdsa-jcs-2019 binds its proof configuration', () => {
+    async function archonProof() {
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        const document = { '@context': ['https://www.w3.org/ns/credentials/v2'], hello: 'world' };
+        const signed: any = await keymaster.addProof(document);
+
+        return { did, document, proof: Array.isArray(signed.proof) ? signed.proof[0] : signed.proof };
+    }
+
+    it('verifies untouched', async () => {
+        const { document, proof } = await archonProof();
+
+        expect(proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(await keymaster.verifyProof({ ...document, proof: [proof] } as any)).toBe(true);
+    });
+
+    // Both were malleable under the legacy payload: an altered purpose turned
+    // an assertion into an authentication, and an altered timestamp moved
+    // which version of the signer's document the verifier resolves.
+    it('rejects an altered proofPurpose', async () => {
+        const { document, proof } = await archonProof();
+
+        expect(await keymaster.verifyProof(
+            { ...document, proof: [{ ...proof, proofPurpose: 'authentication' }] } as any)).toBe(false);
+    });
+
+    it('rejects an altered created', async () => {
+        const { document, proof } = await archonProof();
+
+        expect(await keymaster.verifyProof(
+            { ...document, proof: [{ ...proof, created: '2020-01-01T00:00:00.000Z' }] } as any)).toBe(false);
+    });
+
+    it('rejects a substituted context', async () => {
+        const { document, proof } = await archonProof();
+
+        expect(await keymaster.verifyProof(
+            { ...document, proof: [{ ...proof, '@context': ['https://example.test/other/v1'] }] } as any)).toBe(false);
+    });
+
+    it('rejects an altered document', async () => {
+        const { document, proof } = await archonProof();
+
+        expect(await keymaster.verifyProof({ ...document, hello: 'tampered', proof: [proof] } as any)).toBe(false);
+    });
+});
+
 describe('the legacy label', () => {
     // Every credential issued before the suite was renamed carries it, and they
     // are immutable, so it is accepted for good rather than deprecated. Built
@@ -312,9 +362,7 @@ describe('issuing', () => {
         expect(signed.proof).toHaveLength(2);
         expect(secp.type).toBe('DataIntegrityProof');
         expect(secp.cryptosuite).toBe('archon-ecdsa-jcs-2019');
-        // The signature covers the document alone, so a context here would be
-        // an unsigned decoration -- unlike the eddsa proof beside it.
-        expect(secp['@context']).toBeUndefined();
+        expect(secp['@context']).toStrictEqual(document['@context']);
         expect(eddsa.type).toBe('DataIntegrityProof');
         expect(eddsa.cryptosuite).toBe('eddsa-jcs-2022');
         expect(eddsa.proofValue.startsWith('z')).toBe(true);

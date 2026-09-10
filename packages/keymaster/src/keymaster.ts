@@ -1273,49 +1273,87 @@ export default class Keymaster implements KeymasterInterface {
         obj: T,
         controller?: string,
     ): Promise<T & { proof: Proof }> {
+        const signer = await this.proofSigner(obj, controller);
+
         return {
             ...obj,
             proof: {
                 type: "EcdsaSecp256k1Signature2019",
-                ...await this.secp256k1ProofConfig(obj, controller, 'authentication'),
+                created: new Date().toISOString(),
+                verificationMethod: signer.verificationMethod,
+                proofPurpose: 'authentication',
+                // The document alone, never the proof configuration. Weaker
+                // than the Data Integrity construction below, and kept only
+                // because it is what every operation ever anchored was signed
+                // over.
+                proofValue: this.signProofValue(() => this.cipher.hashJSON(obj), signer.keypair),
             },
         };
     }
 
-    // The corrected name for the same suite. EcdsaSecp256k1Signature2019 is a
-    // registered type whose specification requires RDF canonicalization and a
-    // `jws` member; this signs JCS-canonical bytes and carries `proofValue`,
-    // so a verifier applying that specification fails on a proof that is in
-    // fact sound. Credentials therefore carry the Data Integrity form under a
-    // suite name Archon defines, claiming no specification it does not
-    // implement -- see docs/scheme.md. Unregistered, so an outside verifier
-    // skips it and checks the eddsa-jcs-2022 proof beside it instead.
-    //
-    // No `@context` on this proof: unlike eddsa-jcs-2022 the signature covers
-    // the document alone, never the proof configuration, so a context here
-    // would be an unsigned decoration.
+    // The corrected name for the secp256k1 suite. EcdsaSecp256k1Signature2019
+    // is a registered type whose specification requires RDF canonicalization
+    // and a `jws` member; this signs JCS-canonical bytes and carries
+    // `proofValue`, so a verifier applying that specification fails on a proof
+    // that is in fact sound. Credentials therefore carry the Data Integrity
+    // form under a suite name Archon defines -- see docs/scheme.md.
+    // Unregistered because no registered cryptosuite covers secp256k1, so an
+    // outside verifier skips it and checks the eddsa-jcs-2022 proof beside it.
     private async archonEcdsaJcs2019Proof<T extends object>(
         obj: T,
         controller?: string,
         proofPurpose: ProofPurpose = "assertionMethod"
     ): Promise<T & { proof: DataIntegrityProof }> {
+        const signer = await this.proofSigner(obj, controller);
+
+        const config: DataIntegrityProof = {
+            type: 'DataIntegrityProof',
+            cryptosuite: ARCHON_SECP256K1_CRYPTOSUITE,
+            created: new Date().toISOString(),
+            verificationMethod: signer.verificationMethod,
+            proofPurpose,
+            proofValue: '',
+        };
+
+        const context = (obj as { '@context'?: string[] })['@context'];
+
+        if (context !== undefined) {
+            config['@context'] = context;
+        }
+
+        const { proofValue, ...unsigned } = config;
+        void proofValue;
+
         return {
             ...obj,
             proof: {
-                type: "DataIntegrityProof",
-                cryptosuite: ARCHON_SECP256K1_CRYPTOSUITE,
-                ...await this.secp256k1ProofConfig(obj, controller, proofPurpose),
+                ...unsigned as DataIntegrityProof,
+                // secp256k1 signs a 32-byte digest where Ed25519 takes the
+                // message, so the two concatenated digests are hashed once
+                // more to give one.
+                proofValue: this.signProofValue(
+                    () => this.cipher.hashMessage(this.dataIntegrityPayload(obj, unsigned as DataIntegrityProof)),
+                    signer.keypair),
             },
         };
     }
 
-    // The bytes both secp256k1 proofs sign, and every member but the label.
-    // Operations and credentials differ only in what they call this suite.
-    private async secp256k1ProofConfig(
+    // A non-serializable object reaches canonicalization as a throw, which is
+    // a bad parameter rather than an internal failure.
+    private signProofValue(digest: () => string, keypair: EcdsaJwkPair): string {
+        try {
+            return hexToBase64url(this.cipher.signHash(digest(), keypair.privateJwk));
+        }
+        catch {
+            throw new InvalidParameterError('obj');
+        }
+    }
+
+    // The signing identity's key and the DID URL naming it.
+    private async proofSigner(
         obj: object,
         controller: string | undefined,
-        proofPurpose: ProofPurpose,
-    ): Promise<Omit<Proof, 'type'>> {
+    ): Promise<{ verificationMethod: string, keypair: EcdsaJwkPair }> {
         if (obj == null) {
             throw new InvalidParameterError('obj');
         }
@@ -1332,20 +1370,7 @@ export default class Keymaster implements KeymasterInterface {
         const doc = await this.resolveDID(id.did, { confirm: true });
         const keyFragment = doc.didDocument?.verificationMethod?.[0]?.id || '#key-1';
 
-        try {
-            const msgHash = this.cipher.hashJSON(obj);
-            const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
-
-            return {
-                created: new Date().toISOString(),
-                verificationMethod: `${id.did}${keyFragment}`,
-                proofPurpose,
-                proofValue: hexToBase64url(signatureHex),
-            };
-        }
-        catch (error) {
-            throw new InvalidParameterError('obj');
-        }
+        return { verificationMethod: `${id.did}${keyFragment}`, keypair };
     }
 
     async addProof<T extends object>(
@@ -1419,7 +1444,7 @@ export default class Keymaster implements KeymasterInterface {
 
         const { proofValue, ...unsigned } = config;
         void proofValue;
-        const payload = this.eddsaJcs2022Payload(obj, unsigned as DataIntegrityProof);
+        const payload = this.dataIntegrityPayload(obj, unsigned as DataIntegrityProof);
 
         return {
             ...unsigned as DataIntegrityProof,
@@ -1498,7 +1523,12 @@ export default class Keymaster implements KeymasterInterface {
     // canonical document, concatenated. The config is the proof without its
     // proofValue, and it carries the document's @context, so the context is
     // signed too.
-    private eddsaJcs2022Payload(unsecured: unknown, proof: DataIntegrityProof): Uint8Array {
+    //
+    // Shared by both cryptosuites. Binding the configuration is what makes
+    // `created` and `proofPurpose` unforgeable: the legacy
+    // EcdsaSecp256k1Signature2019 payload omits it, so on those proofs both
+    // members can be altered without breaking the signature.
+    private dataIntegrityPayload(unsecured: unknown, proof: DataIntegrityProof): Uint8Array {
         const { proofValue, ...config } = proof;
         void proofValue;
         const digests = this.cipher.hashJSON(config) + this.cipher.hashJSON(unsecured);
@@ -1539,16 +1569,25 @@ export default class Keymaster implements KeymasterInterface {
         try {
             if (proof.type === 'DataIntegrityProof' && proof.cryptosuite === 'eddsa-jcs-2022') {
                 return this.contextAgrees(unsecured, proof) && resolved.curve === 'Ed25519' && this.cipher.verifyEd25519(
-                    this.eddsaJcs2022Payload(unsecured, proof),
+                    this.dataIntegrityPayload(unsecured, proof),
                     multibaseToBytes(proof.proofValue),
                     { kty: 'OKP', crv: 'Ed25519', x: base64url.baseEncode(resolved.key) },
                 );
             }
 
-            // The legacy label and its corrected name sign identical bytes:
-            // sha256 over the JCS-canonical document, secp256k1, base64url.
-            if (proof.type === 'EcdsaSecp256k1Signature2019'
-                || (proof.type === 'DataIntegrityProof' && proof.cryptosuite === ARCHON_SECP256K1_CRYPTOSUITE)) {
+            if (proof.type === 'DataIntegrityProof' && proof.cryptosuite === ARCHON_SECP256K1_CRYPTOSUITE) {
+                return this.contextAgrees(unsecured, proof) && resolved.curve === 'secp256k1' && this.cipher.verifySig(
+                    this.cipher.hashMessage(this.dataIntegrityPayload(unsecured, proof)),
+                    base64urlToHex(proof.proofValue),
+                    resolved.jwk);
+            }
+
+            // The legacy label signs the document alone, with the proof
+            // configuration outside the signature. Every credential and
+            // operation issued before the suite was named carries it and they
+            // are immutable, so it is verified as it was written rather than
+            // corrected in place.
+            if (proof.type === 'EcdsaSecp256k1Signature2019') {
                 return resolved.curve === 'secp256k1' && this.cipher.verifySig(
                     this.cipher.hashJSON(unsecured), base64urlToHex(proof.proofValue), resolved.jwk);
             }

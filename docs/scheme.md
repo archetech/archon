@@ -484,18 +484,25 @@ registered name for this algorithm would misstate what the proof is. An outside
 verifier that does not recognise the name skips the proof — which is the correct
 outcome, since it could not have checked it under any other name either.
 
-Given an unsecured document (the object with any `proof` member removed):
+The proof configuration is the proof without `proofValue`: `type`,
+`cryptosuite`, `created`, `verificationMethod`, `proofPurpose`, and the secured
+document's `@context` when it declares one. The unsecured document is the object
+with any `proof` member removed.
 
-1. Canonicalize the document with JCS (RFC 8785).
-2. Digest the canonical form with SHA-256.
-3. Sign the digest with secp256k1 ECDSA, producing a 64-byte compact `r || s`
-   signature.
-4. `proofValue` is that signature, base64url-encoded (unpadded).
+1. Canonicalize the proof configuration and the unsecured document separately
+   with JCS (RFC 8785).
+2. Digest each with SHA-256 and concatenate them, configuration first — 64 bytes.
+3. Digest that with SHA-256 again. ECDSA signs a 32-byte digest, where Ed25519
+   takes the message itself, so this step has no counterpart in
+   `eddsa-jcs-2022`.
+4. Sign with secp256k1 ECDSA, producing a 64-byte compact `r || s` signature.
+5. `proofValue` is that signature, base64url-encoded (unpadded).
 
-The proof carries `type`, `cryptosuite`, `created`, `verificationMethod`,
-`proofPurpose` and `proofValue`. It carries no `@context`: the signature covers
-the document alone and never the proof configuration, so a context on the proof
-would be an unsigned decoration.
+Including the configuration in the signed payload is what makes `created` and
+`proofPurpose` unforgeable. A verifier must also reject a proof whose `@context`
+disagrees with the document's: the configuration is canonicalized as given, so
+a proof signed over some other context would otherwise verify against a
+verifier that does not rebuild it.
 
 #### `eddsa-jcs-2022`
 
@@ -514,10 +521,22 @@ signature in base58-btc multibase, so it begins with `z`.
 
 #### The legacy label
 
-Credentials issued before this suite was named carry `EcdsaSecp256k1Signature2019`
-over identical bytes. Those credentials are immutable, so verifiers accept that
+Credentials issued before this suite was named carry
+`EcdsaSecp256k1Signature2019`, and DID operations carry it still. Its payload is
+weaker: `SHA-256(JCS(document))` alone, with the proof configuration outside the
+signature. On such a proof `created` and `proofPurpose` can be altered without
+breaking it — which is the defect `archon-ecdsa-jcs-2019` was defined to fix,
+and the reason the two names are verified under different rules rather than
+treated as aliases.
+
+Those credentials and operations are immutable, so verifiers accept the legacy
 type indefinitely rather than deprecating it. Nothing issues it for a credential
 any more.
+
+Because a verifier accepts a credential when any one proof verifies, a proof set
+is only as strong as its strongest *surviving* proof: an attacker may drop the
+others. A credential carrying a legacy proof therefore inherits that proof's
+malleability no matter what accompanies it.
 
 #### Proof sets
 

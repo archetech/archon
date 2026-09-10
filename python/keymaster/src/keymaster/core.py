@@ -1807,48 +1807,65 @@ class Keymaster:
         EcdsaSecp256k1Signature2019, so an operation never carries a proof set
         however many keys its signer has published.
         """
+        signer = await self._proof_signer(payload, controller)
+
         return {
             **payload,
             "proof": {
                 "type": "EcdsaSecp256k1Signature2019",
-                **await self._secp256k1_proof_config(payload, controller, "authentication"),
+                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+                "verificationMethod": signer["verificationMethod"],
+                "proofPurpose": "authentication",
+                # The document alone, never the proof configuration. Weaker
+                # than the Data Integrity construction below, and kept only
+                # because it is what every operation ever anchored was signed
+                # over.
+                "proofValue": self._sign_proof_value(lambda: hash_json(payload), signer["keypair"]),
             },
         }
 
     async def _archon_ecdsa_jcs_2019_proof(
         self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod"
     ) -> dict[str, Any]:
-        """The corrected name for the same suite.
+        """The corrected name for the secp256k1 suite.
 
         EcdsaSecp256k1Signature2019 is a registered type whose specification
         requires RDF canonicalization and a `jws` member; this signs JCS-
         canonical bytes and carries `proofValue`, so a verifier applying that
         specification fails on a proof that is in fact sound. Credentials
         therefore carry the Data Integrity form under a suite name Archon
-        defines, claiming no specification it does not implement -- see
-        docs/scheme.md. Unregistered, so an outside verifier skips it and checks
-        the eddsa-jcs-2022 proof beside it instead.
-
-        No `@context` on this proof: unlike eddsa-jcs-2022 the signature covers
-        the document alone, never the proof configuration, so a context here
-        would be an unsigned decoration.
+        defines -- see docs/scheme.md. Unregistered because no registered
+        cryptosuite covers secp256k1, so an outside verifier skips it and checks
+        the eddsa-jcs-2022 proof beside it.
         """
+        signer = await self._proof_signer(payload, controller)
+
+        config = {
+            "type": "DataIntegrityProof",
+            "cryptosuite": ARCHON_SECP256K1_CRYPTOSUITE,
+            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            "verificationMethod": signer["verificationMethod"],
+            "proofPurpose": proof_purpose,
+        }
+
+        if "@context" in payload:
+            config["@context"] = payload["@context"]
+
+        # secp256k1 signs a 32-byte digest where Ed25519 takes the message, so
+        # the two concatenated digests are hashed once more to give one.
         return {
             **payload,
             "proof": {
-                "type": "DataIntegrityProof",
-                "cryptosuite": ARCHON_SECP256K1_CRYPTOSUITE,
-                **await self._secp256k1_proof_config(payload, controller, proof_purpose),
+                **config,
+                "proofValue": self._sign_proof_value(
+                    lambda: hash_message(self._data_integrity_payload(payload, config)),
+                    signer["keypair"],
+                ),
             },
         }
 
-    async def _secp256k1_proof_config(
-        self, payload: dict[str, Any], controller: str | None, proof_purpose: str
-    ) -> dict[str, Any]:
-        """The bytes both secp256k1 proofs sign, and every member but the label.
-
-        Operations and credentials differ only in what they call this suite.
-        """
+    async def _proof_signer(self, payload: dict[str, Any], controller: str | None) -> dict[str, Any]:
+        """The signing identity's key and the DID URL naming it."""
         id_info = await self.fetch_id_info(controller)
         keypair = await self.fetch_key_pair(controller)
         if not keypair:
@@ -1856,13 +1873,15 @@ class Keymaster:
         doc = await self.resolve_did(id_info["did"], {"confirm": "true"})
         verification_methods = doc.get("didDocument", {}).get("verificationMethod") or []
         key_fragment = verification_methods[0].get("id", "#key-1") if verification_methods else "#key-1"
-        signature_hex = sign_hash(hash_json(payload), keypair["privateJwk"])
-        return {
-            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-            "verificationMethod": f"{id_info['did']}{key_fragment}",
-            "proofPurpose": proof_purpose,
-            "proofValue": b64url(bytes.fromhex(signature_hex)),
-        }
+        return {"verificationMethod": f"{id_info['did']}{key_fragment}", "keypair": keypair}
+
+    def _sign_proof_value(self, digest: Any, keypair: dict[str, Any]) -> str:
+        """A non-serializable object reaches canonicalization as a raise, which
+        is a bad parameter rather than an internal failure."""
+        try:
+            return b64url(bytes.fromhex(sign_hash(digest(), keypair["privateJwk"])))
+        except Exception as error:
+            raise InvalidParameterError("obj") from error
 
     async def add_proof(self, payload: dict[str, Any], controller: str | None = None, proof_purpose: str = "assertionMethod") -> dict[str, Any]:
         secp = await self._archon_ecdsa_jcs_2019_proof(payload, controller, proof_purpose)
@@ -1923,7 +1942,7 @@ class Keymaster:
             config["@context"] = payload["@context"]
 
         signature = dc.sign_ed25519(
-            self._eddsa_jcs_2022_payload(payload, config), keypair["privateJwk"]
+            self._data_integrity_payload(payload, config), keypair["privateJwk"]
         )
 
         return {**config, "proofValue": dc.bytes_to_multibase(signature)}
@@ -1993,11 +2012,16 @@ class Keymaster:
         jwk = vm.get("publicKeyJwk")
         return ("secp256k1", jwk) if jwk else None
 
-    def _eddsa_jcs_2022_payload(self, unsecured: dict[str, Any], proof: dict[str, Any]) -> bytes:
+    def _data_integrity_payload(self, unsecured: dict[str, Any], proof: dict[str, Any]) -> bytes:
         """sha256 of the canonical proof config, then of the canonical document.
 
         The config is the proof without its proofValue and it carries the
         document's @context, so the context is signed too.
+
+        Shared by both cryptosuites. Binding the configuration is what makes
+        `created` and `proofPurpose` unforgeable: the legacy
+        EcdsaSecp256k1Signature2019 payload omits it, so on those proofs both
+        members can be altered without breaking the signature.
         """
         config = {key: value for key, value in proof.items() if key != "proofValue"}
         return bytes.fromhex(hash_json(config) + hash_json(unsecured))
@@ -2028,17 +2052,29 @@ class Keymaster:
                 if curve != "Ed25519" or not self._context_agrees(unsecured, proof):
                     return False
                 return dc.verify_ed25519(
-                    self._eddsa_jcs_2022_payload(unsecured, proof),
+                    self._data_integrity_payload(unsecured, proof),
                     dc.multibase_to_bytes(proof["proofValue"]),
                     {"kty": "OKP", "crv": "Ed25519", "x": dc.b64url(key)},
                 )
 
-            # The legacy label and its corrected name sign identical bytes:
-            # sha256 over the JCS-canonical document, secp256k1, base64url.
-            if proof.get("type") == "EcdsaSecp256k1Signature2019" or (
+            if (
                 proof.get("type") == "DataIntegrityProof"
                 and proof.get("cryptosuite") == ARCHON_SECP256K1_CRYPTOSUITE
             ):
+                if curve != "secp256k1" or not self._context_agrees(unsecured, proof):
+                    return False
+                return verify_sig(
+                    hash_message(self._data_integrity_payload(unsecured, proof)),
+                    ub64url(proof["proofValue"]).hex(),
+                    key,
+                )
+
+            # The legacy label signs the document alone, with the proof
+            # configuration outside the signature. Every credential and
+            # operation issued before the suite was named carries it and they
+            # are immutable, so it is verified as it was written rather than
+            # corrected in place.
+            if proof.get("type") == "EcdsaSecp256k1Signature2019":
                 if curve != "secp256k1":
                     return False
                 return verify_sig(hash_json(unsecured), ub64url(proof["proofValue"]).hex(), key)

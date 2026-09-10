@@ -420,9 +420,7 @@ def test_add_proof_emits_both_proofs_once_published_and_each_verifies_alone(test
     assert len(signed["proof"]) == 2
     assert secp["type"] == "DataIntegrityProof"
     assert secp["cryptosuite"] == "archon-ecdsa-jcs-2019"
-    # The signature covers the document alone, so a context here would be an
-    # unsigned decoration -- unlike the eddsa proof beside it.
-    assert "@context" not in secp
+    assert secp["@context"] == document["@context"]
     assert eddsa["cryptosuite"] == "eddsa-jcs-2022"
     assert eddsa["proofValue"].startswith("z")
     assert eddsa["@context"] == document["@context"]
@@ -499,3 +497,42 @@ def test_operations_carry_one_legacy_proof_after_an_assertion_key_is_published(t
     # The label is the whole distinction between the two writers.
     assert credential_proofs["proof"][0]["type"] == "DataIntegrityProof"
     assert credential_proofs["proof"][0]["cryptosuite"] == "archon-ecdsa-jcs-2019"
+
+
+def _archon_proof(km):
+    """The proof configuration is inside the signed payload, so every member of
+    the proof is covered -- not just the document. This is what separates the
+    named suite from the legacy label it replaces. Mirrors
+    tests/keymaster/verify-proof.test.ts."""
+    run(km.create_id("Alice", {"registry": "local"}))
+    document = {"@context": ["https://www.w3.org/ns/credentials/v2"], "hello": "world"}
+    signed = run(km.add_proof(document))
+    proof = signed["proof"]
+    return document, proof[0] if isinstance(proof, list) else proof
+
+
+def test_archon_suite_verifies_untouched(testbed):
+    km = testbed.keymaster
+    document, proof = _archon_proof(km)
+
+    assert proof["cryptosuite"] == "archon-ecdsa-jcs-2019"
+    assert run(km.verify_proof({**document, "proof": [proof]})) is True
+
+
+def test_archon_suite_rejects_an_altered_proof_configuration(testbed):
+    """Both were malleable under the legacy payload: an altered purpose turned an
+    assertion into an authentication, and an altered timestamp moved which
+    version of the signer's document the verifier resolves."""
+    km = testbed.keymaster
+    document, proof = _archon_proof(km)
+
+    tampered = [
+        {**proof, "proofPurpose": "authentication"},
+        {**proof, "created": "2020-01-01T00:00:00.000Z"},
+        {**proof, "@context": ["https://example.test/other/v1"]},
+    ]
+
+    for one in tampered:
+        assert run(km.verify_proof({**document, "proof": [one]})) is False
+
+    assert run(km.verify_proof({**document, "hello": "tampered", "proof": [proof]})) is False
