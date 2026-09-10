@@ -452,6 +452,10 @@ export interface KeymasterInterface {
     // Node
     getNodeCapabilities(): Promise<NodeCapabilities | null>;
 
+    // Credential proofs
+    publishAssertionKey(name?: string): Promise<boolean>;
+    unpublishAssertionKey(name?: string): Promise<boolean>;
+
     // DIDComm
     publishDidComm(endpoint?: string, name?: string, routingKeys?: string[]): Promise<boolean>;
     unpublishDidComm(name?: string): Promise<boolean>;

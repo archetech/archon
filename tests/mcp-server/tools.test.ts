@@ -275,6 +275,8 @@ function mockRuntime(overrides: Record<string, unknown> = {}) {
         removeDmailAttachment: jest.fn<any>().mockResolvedValue(true),
         getDmailAttachment: jest.fn<any>().mockResolvedValue(Buffer.from('attachment')),
         listDmailAttachments: jest.fn<any>().mockResolvedValue({}),
+        publishAssertionKey: jest.fn<any>().mockResolvedValue(true),
+        unpublishAssertionKey: jest.fn<any>().mockResolvedValue(true),
         publishDidComm: jest.fn<any>().mockResolvedValue(true),
         unpublishDidComm: jest.fn<any>().mockResolvedValue(true),
         packDidComm: jest.fn<any>().mockResolvedValue('packed'),

@@ -809,6 +809,14 @@ class StubService:
         self.calls.append(("unpublish_address", name))
         return True
 
+    async def publish_assertion_key(self, name=None) -> bool:
+        self.calls.append(("publish_assertion_key", name))
+        return True
+
+    async def unpublish_assertion_key(self, name=None) -> bool:
+        self.calls.append(("unpublish_assertion_key", name))
+        return True
+
     async def publish_didcomm(self, endpoint=None, name=None, routing_keys=None) -> bool:
         self.calls.append(("publish_didcomm", endpoint, name, routing_keys))
         return True
@@ -1595,6 +1603,30 @@ def test_didcomm_handlers(stub_service: StubService):
         ("mediate_didcomm", {"name": "Alice"}),
         ("send_credential_didcomm", "did:test:credential", "did:web:example.com", {"name": "Alice"}),
         ("accept_credential_didcomm", message),
+    ]
+
+
+def test_assertion_key_handlers(stub_service: StubService):
+    published = run(app_module.publish_assertion_key({"name": "Alice"}))
+    unpublished = run(app_module.unpublish_assertion_key({"name": "Alice"}))
+
+    assert published == {"ok": True}
+    assert unpublished == {"ok": True}
+    assert stub_service.calls == [
+        ("publish_assertion_key", "Alice"),
+        ("unpublish_assertion_key", "Alice"),
+    ]
+
+
+def test_assertion_key_handlers_tolerate_an_absent_body(stub_service: StubService):
+    # Both take no required argument, and the JS clients send no body when the
+    # identity is the current one. FastAPI would 422 a required body parameter.
+    run(app_module.publish_assertion_key())
+    run(app_module.unpublish_assertion_key())
+
+    assert stub_service.calls == [
+        ("publish_assertion_key", None),
+        ("unpublish_assertion_key", None),
     ]
 
 

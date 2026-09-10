@@ -761,6 +761,16 @@ async def keys_decrypt_json(body: dict[str, Any]) -> dict[str, Any]:
     return {"json": await service.decrypt_json(body["did"])}
 
 
+@protected_api.post("/keys/assertion")
+async def publish_assertion_key(body: dict[str, Any] | None = None) -> dict[str, bool]:
+    return {"ok": await service.publish_assertion_key((body or {}).get("name"))}
+
+
+@protected_api.delete("/keys/assertion")
+async def unpublish_assertion_key(body: dict[str, Any] | None = None) -> dict[str, bool]:
+    return {"ok": await service.unpublish_assertion_key((body or {}).get("name"))}
+
+
 @protected_api.post("/keys/sign")
 async def keys_sign(body: dict[str, Any]) -> dict[str, Any]:
     return {"signed": await service.add_proof(__import__("json").loads(body["contents"]))}

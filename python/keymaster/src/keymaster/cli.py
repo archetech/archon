@@ -1320,6 +1320,16 @@ async def cmd_publish_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
     print("published" if ok else "failed")
 
 
+async def cmd_publish_assertion_key(km: Keymaster, args: argparse.Namespace) -> None:
+    ok = await km.publish_assertion_key(args.name)
+    print(UPDATE_OK if ok else UPDATE_FAILED)
+
+
+async def cmd_unpublish_assertion_key(km: Keymaster, args: argparse.Namespace) -> None:
+    ok = await km.unpublish_assertion_key(args.name)
+    print(UPDATE_OK if ok else UPDATE_FAILED)
+
+
 async def cmd_unpublish_didcomm(km: Keymaster, args: argparse.Namespace) -> None:
     ok = await km.unpublish_didcomm(args.name)
     print("unpublished" if ok else "failed")
@@ -1731,6 +1741,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("file")
     sp = add("list-dmail-attachments", "List attachments of a dmail", cmd_list_dmail_attachments)
     sp.add_argument("did")
+
+    sp = add("publish-assertion-key", "Publish an Ed25519 assertion key (Multikey) so credentials this identity issues carry a proof other DID methods can verify", cmd_publish_assertion_key)
+    sp.add_argument("-n", "--name", help="identity name (defaults to current)")
+    sp = add("unpublish-assertion-key", "Remove the Ed25519 assertion key from the current identity", cmd_unpublish_assertion_key)
+    sp.add_argument("-n", "--name", help="identity name (defaults to current)")
 
     # DIDComm
     sp = add("publish-didcomm", "Publish an X25519 key-agreement key (+ DIDComm service; endpoint auto-discovered from the gateway when omitted) to the current ID", cmd_publish_didcomm)
