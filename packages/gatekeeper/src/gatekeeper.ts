@@ -1264,7 +1264,9 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async verifyEvent(event: GatekeeperEvent): Promise<boolean> {
-        if (!event.registry || !event.time || !event.operation) {
+        // Both ports validate the registry name here, so testing presence
+        // alone would admit an event the other refuses.
+        if (!isValidRegistryName(event.registry) || !event.time || !event.operation) {
             return false;
         }
 

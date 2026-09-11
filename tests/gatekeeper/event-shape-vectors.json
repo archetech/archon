@@ -1,0 +1,262 @@
+{
+  "description": "Event shapes both gatekeeper ports must agree on. The operation is taken from proof-vectors.json under the named base, wrapped in an event, and the mutation at `path` applied before the shape check runs. `valid` is the verdict both ports must reach. Truthiness in one port and `as_str()` in the other disagree on the empty string, which is what most of these pin.",
+  "event": {
+    "registry": "hyperswarm",
+    "time": "2026-04-11T12:00:00Z",
+    "ordinal": [
+      1
+    ]
+  },
+  "bases": {
+    "create": "agentCreateValid",
+    "update": "agentUpdateValid"
+  },
+  "vectors": [
+    {
+      "base": "create",
+      "name": "baseline",
+      "path": [],
+      "valid": true
+    },
+    {
+      "base": "create",
+      "name": "registry empty",
+      "path": [
+        "registry"
+      ],
+      "value": "",
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "registry malformed",
+      "path": [
+        "registry"
+      ],
+      "value": "!! not a registry !!",
+      "valid": false,
+      "note": "a name, not merely a value"
+    },
+    {
+      "base": "create",
+      "name": "registry not a string",
+      "path": [
+        "registry"
+      ],
+      "value": 7,
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "registry absent",
+      "path": [
+        "registry"
+      ],
+      "delete": true,
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "time empty",
+      "path": [
+        "time"
+      ],
+      "value": "",
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "time absent",
+      "path": [
+        "time"
+      ],
+      "delete": true,
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "proofValue empty",
+      "path": [
+        "operation",
+        "proof",
+        "proofValue"
+      ],
+      "value": "",
+      "valid": false,
+      "note": "an empty string is not a signature"
+    },
+    {
+      "base": "create",
+      "name": "proofValue not a string",
+      "path": [
+        "operation",
+        "proof",
+        "proofValue"
+      ],
+      "value": 7,
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "created empty",
+      "path": [
+        "operation",
+        "created"
+      ],
+      "value": "",
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "created absent",
+      "path": [
+        "operation",
+        "created"
+      ],
+      "delete": true,
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "publicJwk absent",
+      "path": [
+        "operation",
+        "publicJwk"
+      ],
+      "delete": true,
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "publicJwk empty object",
+      "path": [
+        "operation",
+        "publicJwk"
+      ],
+      "value": {},
+      "valid": true,
+      "note": "the shape check does not inspect the key; verification does"
+    },
+    {
+      "base": "create",
+      "name": "registration.registry empty",
+      "path": [
+        "operation",
+        "registration",
+        "registry"
+      ],
+      "value": "",
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "registration.registry malformed",
+      "path": [
+        "operation",
+        "registration",
+        "registry"
+      ],
+      "value": "!! nope !!",
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "operation type empty",
+      "path": [
+        "operation",
+        "type"
+      ],
+      "value": "",
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "proofPurpose empty",
+      "path": [
+        "operation",
+        "proof",
+        "proofPurpose"
+      ],
+      "value": "",
+      "valid": false
+    },
+    {
+      "base": "create",
+      "name": "verificationMethod empty",
+      "path": [
+        "operation",
+        "proof",
+        "verificationMethod"
+      ],
+      "value": "",
+      "valid": false
+    },
+    {
+      "base": "update",
+      "name": "baseline",
+      "path": [],
+      "valid": true
+    },
+    {
+      "base": "update",
+      "name": "did empty",
+      "path": [
+        "operation",
+        "did"
+      ],
+      "value": "",
+      "valid": false
+    },
+    {
+      "base": "update",
+      "name": "did absent",
+      "path": [
+        "operation",
+        "did"
+      ],
+      "delete": true,
+      "valid": false
+    },
+    {
+      "base": "update",
+      "name": "doc absent",
+      "path": [
+        "operation",
+        "doc"
+      ],
+      "delete": true,
+      "valid": false
+    },
+    {
+      "base": "update",
+      "name": "doc empty object",
+      "path": [
+        "operation",
+        "doc"
+      ],
+      "value": {},
+      "valid": false
+    },
+    {
+      "base": "update",
+      "name": "previd empty",
+      "path": [
+        "operation",
+        "previd"
+      ],
+      "value": "",
+      "valid": true,
+      "note": "previd is not part of the shape check"
+    },
+    {
+      "base": "update",
+      "name": "ordinal absent",
+      "path": [
+        "ordinal"
+      ],
+      "delete": true,
+      "valid": true,
+      "note": "ordinal is not part of the shape check"
+    }
+  ]
+}
