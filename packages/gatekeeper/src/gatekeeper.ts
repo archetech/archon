@@ -37,6 +37,19 @@ function base64urlToHex(b64: string): string {
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
 const PIN_QUEUE = 'pin';
+const MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+// Proleptic Gregorian, computed rather than taken from `Date`, whose two-digit
+// year mapping turns year 0 into 1900.
+function daysInMonth(year: number, month: number): number {
+    if (month !== 2) {
+        return MONTH_LENGTHS[month - 1];
+    }
+
+    const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    return leap ? 29 : 28;
+}
+
 function isValidRegistryName(registry: unknown): registry is string {
     return typeof registry === 'string' &&
         registry.length > 0 &&
@@ -345,12 +358,36 @@ export default class Gatekeeper implements GatekeeperInterface {
         return did.startsWith('did:');
     }
 
+    // RFC 3339, which is what the operation schema specifies and what the Rust
+    // port's chrono parser accepts. `Date` alone accepts far more -- a bare
+    // `2026-09-11`, `Sep 11 2026`, even `2026` -- so the two ports admitted
+    // different operations and held different histories for the same DID.
+    // tests/gatekeeper/timestamp-vectors.json pins the grammar both implement,
+    // including the corners chrono allows: a space separator, lowercase `t`
+    // and `z`, and a leap second.
     verifyDateFormat(time?: string): boolean {
         if (!time) {
             return false;
         }
-        const date = new Date(time);
-        return !isNaN(date.getTime());
+
+        const match = /^(\d{4})-(\d{2})-(\d{2})[Tt ](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:[Zz]|[+-](\d{2}):(\d{2}))$/.exec(time);
+
+        if (!match) {
+            return false;
+        }
+
+        const [, year, month, day, hour, minute, second, offsetHour, offsetMinute] = match.map(Number);
+
+        if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
+            return false;
+        }
+
+        // 60 seconds is a leap second, which chrono accepts.
+        if (hour > 23 || minute > 59 || second > 60) {
+            return false;
+        }
+
+        return !(offsetHour > 23 || offsetMinute > 59);
     }
 
     verifyHashFormat(hash: string): boolean {
@@ -404,7 +441,6 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         if (!this.verifyDateFormat(operation.created)) {
-            // TBD ensure valid timestamp format
             throw new InvalidOperationError(`created=${operation.created}`);
         }
 
@@ -433,7 +469,10 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError('proof.verificationMethod must be #key-1 for agent create');
         }
 
-        if (operation.registration.validUntil && !this.verifyDateFormat(operation.registration.validUntil)) {
+        // Every string reaches the parser, the empty one included. A truthiness
+        // guard would wave `""` through, where the Rust port reads the member
+        // with `as_str()` and rejects it.
+        if (typeof operation.registration.validUntil === 'string' && !this.verifyDateFormat(operation.registration.validUntil)) {
             throw new InvalidOperationError(`registration.validUntil=${operation.registration.validUntil}`);
         }
 
@@ -1220,9 +1259,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             return false;
         }
 
-        const eventTime = new Date(event.time).getTime();
-
-        if (isNaN(eventTime)) {
+        if (!this.verifyDateFormat(event.time)) {
             return false;
         }
 

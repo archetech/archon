@@ -90,7 +90,7 @@ describe('createChallenge', () => {
 
     it('should create an empty challenge with specified expiry', async () => {
         const alice = await keymaster.createId('Alice');
-        const validUntil = '2025-01-01';
+        const validUntil = '2025-01-01T00:00:00Z';
         const did = await keymaster.createChallenge({}, { validUntil });
         const doc = await keymaster.resolveDID(did);
 

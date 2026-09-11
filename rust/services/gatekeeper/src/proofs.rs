@@ -567,3 +567,38 @@ pub(crate) fn canonical_json(value: &Value) -> String {
         }
     }
 }
+
+
+#[cfg(test)]
+mod timestamp_vectors {
+    use super::verify_date_format;
+    use serde_json::Value;
+
+    // The TypeScript port checks the same file, so a change here has to be made
+    // in both ports or one of the two suites fails.
+    #[test]
+    fn matches_the_shared_vectors() {
+        let raw = include_str!("../../../../tests/gatekeeper/timestamp-vectors.json");
+        let doc: Value = serde_json::from_str(raw).expect("timestamp-vectors.json");
+        let vectors = doc["vectors"].as_array().expect("vectors");
+
+        assert!(!vectors.is_empty());
+
+        for vector in vectors {
+            let value = vector["value"].as_str().expect("value");
+            let expected = vector["valid"].as_bool().expect("valid");
+            let note = vector["note"].as_str().unwrap_or("");
+
+            assert_eq!(
+                verify_date_format(Some(value)),
+                expected,
+                "{value:?} should be {expected} ({note})"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_a_missing_timestamp() {
+        assert!(!verify_date_format(None));
+    }
+}
