@@ -73,15 +73,11 @@ def check_passphrase(
     # displace a correct file without either being edited (#1121).
     if shadowed:
         return StartupCheck(
-            warning="\n".join(
-                [
-                    "Warning: ARCHON_PASSPHRASE and ARCHON_ENCRYPTED_PASSPHRASE hold "
-                    "different values, and the wallet is encrypted with only one of them.",
-                    "ARCHON_PASSPHRASE is the one in use. If the wallet does not open, an "
-                    "exported shell variable may be displacing the value in .env:",
-                    "  env | grep -c '^ARCHON_PASSPHRASE='              # 1 means this shell exports it, and compose prefers that",
-                    "  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run",
-                ]
+            warning=(
+                "Warning: ARCHON_PASSPHRASE and ARCHON_ENCRYPTED_PASSPHRASE hold "
+                "different values, and the wallet is encrypted with only one of them. "
+                "ARCHON_PASSPHRASE is the one in use, and a value exported in the shell "
+                "displaces the one in .env."
             )
         )
 
@@ -96,31 +92,3 @@ def check_passphrase(
         )
 
     return StartupCheck()
-
-
-def wrong_passphrase_advice(shadowed: bool, from_old_name: bool) -> list[str]:
-    """What to print when the stored wallet will not decrypt.
-
-    The failure names neither the value it tried nor where that value came
-    from, and the usual cause leaves no trace in any file: ``docker compose``
-    resolves ``${ARCHON_PASSPHRASE}`` from an exported shell variable in
-    preference to the same name in .env, so a stale export displaces a correct
-    file silently. An operator who does not remember exporting it has nothing
-    to go on (#1121).
-    """
-    source = "ARCHON_ENCRYPTED_PASSPHRASE" if from_old_name else "ARCHON_PASSPHRASE"
-    lines = [f"The wallet did not decrypt with {source}."]
-
-    if shadowed:
-        lines.append(
-            "ARCHON_ENCRYPTED_PASSPHRASE holds a different value; the wallet may be "
-            "encrypted with that one instead."
-        )
-
-    return [
-        *lines,
-        "A value exported in the shell takes precedence over the same name in .env, so a "
-        f"stale export of {source} can displace it without either file changing:",
-        f"  env | grep -c '^{source}='   # 1 means this shell exports it, and compose prefers that",
-        f"  env -u {source} docker compose up -d   # ignores the export for one run",
-    ]

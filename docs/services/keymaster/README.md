@@ -1103,10 +1103,11 @@ labels.
 > as unset and falls back to `ARCHON_ENCRYPTED_PASSPHRASE`, or startup refuses
 > a missing passphrase outright. The same applies to an export of
 > `ARCHON_ENCRYPTED_PASSPHRASE` on a deployment that uses the older name. The service warns at startup when both names hold different values,
-> and prints the same guidance if the wallet fails to open. To find out whether
-> this shell is the source: `env | grep -c '^ARCHON_PASSPHRASE='` — `1` means it
-> exports the variable, and Compose prefers that over the file. To ignore the
-> export for one run: `env -u ARCHON_PASSPHRASE docker compose up -d`. Neither
+> when both names hold different values. To find out whether this shell is the
+> source: `env | grep -c '^ARCHON_PASSPHRASE='` — `1` means it exports the
+> variable, and Compose prefers that over the file. To ignore the export for one
+> run: `env -u ARCHON_PASSPHRASE docker compose up -d`. Substitute
+> `ARCHON_ENCRYPTED_PASSPHRASE` on a deployment using the older name. Neither
 > command prints the secret; `docker compose config` would.
 
 1. Validate `ARCHON_ADMIN_API_KEY` and `ARCHON_PASSPHRASE`; exit

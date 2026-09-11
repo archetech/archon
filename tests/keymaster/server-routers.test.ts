@@ -25,7 +25,7 @@ import { createResponseRouter } from '../../services/keymaster/server/src/keymas
 import { createSchemaRouter } from '../../services/keymaster/server/src/keymaster-schema-router.ts';
 import { createSchemaTemplateRouter } from '../../services/keymaster/server/src/keymaster-schema-template-router.ts';
 import { createVaultRouter } from '../../services/keymaster/server/src/keymaster-vault-router.ts';
-import { checkAdminApiKey, checkPassphrase, createRequireAdminKey, wrongPassphraseAdvice, MIN_ADMIN_API_KEY_LENGTH } from '../../services/keymaster/server/src/keymaster-admin.ts';
+import { checkAdminApiKey, checkPassphrase, createRequireAdminKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/keymaster/server/src/keymaster-admin.ts';
 import defaultConfig from '../../services/keymaster/server/src/config.js';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -608,50 +608,15 @@ describe('keymaster admin key startup check', () => {
 
         expect(fatal).toBeUndefined();
         expect(warning).toContain('different values');
-        expect(warning).toContain("env | grep -c '^ARCHON_PASSPHRASE='");
-        // The obvious diagnostic prints the secret into scrollback, so it is
-        // not what the service tells an operator to run.
-        expect(warning).not.toContain('docker compose config');
-        expect(warning).toContain('env -u ARCHON_PASSPHRASE');
+        expect(warning).toContain('exported in the shell');
+        // Commands belong in the README, where they are read in context. A
+        // service's stderr is the wrong place to maintain them, and the obvious
+        // one -- docker compose config -- prints the secret into scrollback.
+        expect(warning).not.toContain('docker compose');
     });
 
     it('says nothing when the two names agree', () => {
         expect(checkPassphrase('correct horse battery staple', false, false).warning).toBeUndefined();
-    });
-
-    describe('wrongPassphraseAdvice', () => {
-
-        it('names the variable that failed', () => {
-            expect(wrongPassphraseAdvice(false, false).join('\n')).toContain('ARCHON_PASSPHRASE');
-        });
-
-        it('names the older variable when that is the one in use', () => {
-            expect(wrongPassphraseAdvice(false, true)[0]).toContain('ARCHON_ENCRYPTED_PASSPHRASE');
-        });
-
-        // An exported legacy name displaces .env exactly as the current one
-        // does, so advice that inspects and unsets ARCHON_PASSPHRASE sends the
-        // operator after a variable that is not the one that failed.
-        it('inspects the variable it says failed', () => {
-            const advice = wrongPassphraseAdvice(false, true).join('\n');
-
-            expect(advice).toContain("env | grep -c '^ARCHON_ENCRYPTED_PASSPHRASE='");
-            expect(advice).toContain('env -u ARCHON_ENCRYPTED_PASSPHRASE');
-            expect(advice).not.toContain("env -u ARCHON_PASSPHRASE ");
-        });
-
-        it('points at the other value when both are set', () => {
-            const advice = wrongPassphraseAdvice(true, false).join('\n');
-
-            expect(advice).toContain('ARCHON_ENCRYPTED_PASSPHRASE holds a different value');
-        });
-
-        it('always gives the operator a command to run', () => {
-            for (const advice of [wrongPassphraseAdvice(true, false), wrongPassphraseAdvice(false, false)]) {
-                expect(advice.join('\n')).toContain("env | grep -c '^ARCHON_PASSPHRASE='");
-                expect(advice.join('\n')).not.toContain('docker compose config');
-            }
-        });
     });
 
     // The old name still works, so the only thing to say is which name to

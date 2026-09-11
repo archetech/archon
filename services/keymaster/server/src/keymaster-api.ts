@@ -20,7 +20,7 @@ import { createAddressRouter } from './keymaster-address-router.js';
 import { createAgentRouter } from './keymaster-agent-router.js';
 import { createAssetRouter } from './keymaster-asset-router.js';
 import { createChallengeRouter } from './keymaster-challenge-router.js';
-import { checkAdminApiKey, checkPassphrase, wrongPassphraseAdvice, createRequireAdminKey } from './keymaster-admin.js';
+import { checkAdminApiKey, checkPassphrase, createRequireAdminKey } from './keymaster-admin.js';
 import { createCoreRouter } from './keymaster-core-router.js';
 import { createCredentialRouter } from './keymaster-credential-router.js';
 import { createDidCommRouter } from './keymaster-didcomm-router.js';
@@ -321,14 +321,6 @@ const server = app.listen(port, config.bindAddress, async () => {
     }
     catch (error) {
         if (!(error instanceof WalletNotFoundError)) {
-            // Printed before the throw ends the process: the error names
-            // neither the value that failed nor where it came from.
-            if (error instanceof Error && error.message.includes('Incorrect passphrase')) {
-                for (const line of wrongPassphraseAdvice(config.passphraseShadowed, config.passphraseFromOldName)) {
-                    console.error(line);
-                }
-            }
-
             throw error;
         }
 

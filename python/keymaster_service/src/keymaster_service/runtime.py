@@ -5,7 +5,6 @@ import logging
 from typing import Any
 
 from keymaster import Keymaster, KeymasterError, WalletNotFoundError
-from .admin import wrong_passphrase_advice
 
 from .config import Settings
 from .metrics import wallets_created_total
@@ -52,8 +51,6 @@ class KeymasterService:
         # other failure to load propagates and ends startup.
         try:
             await self.keymaster.load_wallet()
-        # WalletNotFoundError subclasses KeymasterError, so it has to be caught
-        # first or provisioning a fresh node is treated as a failure.
         except WalletNotFoundError:
             LOGGER.warning(
                 "No wallet found in %s — creating one. If this node has run before, its "
@@ -62,17 +59,6 @@ class KeymasterService:
             )
             await self.keymaster.new_wallet()
             wallets_created_total.inc()
-        except KeymasterError as error:
-            # Printed before the failure ends startup: the error names
-            # neither the value that failed nor where it came from.
-            if "Incorrect passphrase" in str(error):
-                for line in wrong_passphrase_advice(
-                    self.settings.passphrase_shadowed,
-                    self.settings.passphrase_from_old_name,
-                ):
-                    LOGGER.error(line)
-
-            raise
         # Resolve the node ID in the background so the ASGI app can start
         # serving /version, /metrics, and /ready immediately. /ready will
         # report ready=False until this task completes.

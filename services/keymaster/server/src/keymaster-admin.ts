@@ -69,12 +69,7 @@ export function checkPassphrase(passphrase: string, fromOldName = false, shadowe
     // displace a correct file without either being edited (#1121).
     if (shadowed) {
         return {
-            warning: [
-                'Warning: ARCHON_PASSPHRASE and ARCHON_ENCRYPTED_PASSPHRASE hold different values, and the wallet is encrypted with only one of them.',
-                'ARCHON_PASSPHRASE is the one in use. If the wallet does not open, an exported shell variable may be displacing the value in .env:',
-                '  env | grep -c \'^ARCHON_PASSPHRASE=\'              # 1 means this shell exports it, and compose prefers that',
-                '  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run',
-            ].join('\n'),
+            warning: 'Warning: ARCHON_PASSPHRASE and ARCHON_ENCRYPTED_PASSPHRASE hold different values, and the wallet is encrypted with only one of them. ARCHON_PASSPHRASE is the one in use, and a value exported in the shell displaces the one in .env.',
         };
     }
 
@@ -85,34 +80,6 @@ export function checkPassphrase(passphrase: string, fromOldName = false, shadowe
     }
 
     return {};
-}
-
-/**
- * What to print when the stored wallet will not decrypt.
- *
- * The failure names neither the value it tried nor where that value came from,
- * and the usual cause leaves no trace in any file: `docker compose` resolves
- * `${ARCHON_PASSPHRASE}` from an exported shell variable in preference to the
- * same name in .env, so a stale export displaces a correct file silently. An
- * operator who does not remember exporting it has nothing to go on (#1121).
- */
-export function wrongPassphraseAdvice(shadowed: boolean, fromOldName: boolean): string[] {
-    const source = fromOldName ? 'ARCHON_ENCRYPTED_PASSPHRASE' : 'ARCHON_PASSPHRASE';
-
-    const lines = [
-        `The wallet did not decrypt with ${source}.`,
-    ];
-
-    if (shadowed) {
-        lines.push('ARCHON_ENCRYPTED_PASSPHRASE holds a different value; the wallet may be encrypted with that one instead.');
-    }
-
-    return [
-        ...lines,
-        `A value exported in the shell takes precedence over the same name in .env, so a stale export of ${source} can displace it without either file changing:`,
-        `  env | grep -c '^${source}='   # 1 means this shell exports it, and compose prefers that`,
-        `  env -u ${source} docker compose up -d   # ignores the export for one run`,
-    ];
 }
 
 // Admin API key middleware — every route mounted after it requires a matching
