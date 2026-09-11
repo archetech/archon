@@ -551,8 +551,8 @@ signed or expanded year, surrounding whitespace, and any calendar-invalid date.
 A field is present when it is a string, not when it is truthy. The two differ on
 the empty string, and a port that treats `""` as absent skips a check its peer
 applies — admitting an operation the other refuses, which leaves the two holding
-different histories for the same DID. `registration.validUntil`, `proof.created`
-on a create operation and `proof.proofValue` have each diverged this way.
+different histories for the same DID. `registration.validUntil`, a create
+operation's `created` and `proof.proofValue` have each diverged this way.
 
 An event's `registry` is validated as a name, not merely tested for presence.
 
