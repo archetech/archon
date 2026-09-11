@@ -25,7 +25,7 @@ import { createResponseRouter } from '../../services/keymaster/server/src/keymas
 import { createSchemaRouter } from '../../services/keymaster/server/src/keymaster-schema-router.ts';
 import { createSchemaTemplateRouter } from '../../services/keymaster/server/src/keymaster-schema-template-router.ts';
 import { createVaultRouter } from '../../services/keymaster/server/src/keymaster-vault-router.ts';
-import { checkAdminApiKey, checkPassphrase, createRequireAdminKey, MIN_ADMIN_API_KEY_LENGTH } from '../../services/keymaster/server/src/keymaster-admin.ts';
+import { checkAdminApiKey, checkPassphrase, createRequireAdminKey, wrongPassphraseAdvice, MIN_ADMIN_API_KEY_LENGTH } from '../../services/keymaster/server/src/keymaster-admin.ts';
 import defaultConfig from '../../services/keymaster/server/src/config.js';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -597,6 +597,46 @@ describe('keymaster admin key startup check', () => {
 
     it('accepts any non-empty passphrase', () => {
         expect(checkPassphrase('correct horse battery staple').fatal).toBeUndefined();
+    });
+
+    // Compose resolves ${ARCHON_PASSPHRASE} from an exported shell variable in
+    // preference to the same name in .env, so a leftover export displaces a
+    // correct file with nothing in either file changed. The wallet then refuses
+    // to decrypt and the operator has no trace to follow (#1121).
+    it('flags two names holding different values', () => {
+        const { fatal, warning } = checkPassphrase('from the shell', false, true);
+
+        expect(fatal).toBeUndefined();
+        expect(warning).toContain('different values');
+        expect(warning).toContain('docker compose config');
+        expect(warning).toContain('env -u ARCHON_PASSPHRASE');
+    });
+
+    it('says nothing when the two names agree', () => {
+        expect(checkPassphrase('correct horse battery staple', false, false).warning).toBeUndefined();
+    });
+
+    describe('wrongPassphraseAdvice', () => {
+
+        it('names the variable that failed', () => {
+            expect(wrongPassphraseAdvice(false, false).join('\n')).toContain('ARCHON_PASSPHRASE');
+        });
+
+        it('names the older variable when that is the one in use', () => {
+            expect(wrongPassphraseAdvice(false, true)[0]).toContain('ARCHON_ENCRYPTED_PASSPHRASE');
+        });
+
+        it('points at the other value when both are set', () => {
+            const advice = wrongPassphraseAdvice(true, false).join('\n');
+
+            expect(advice).toContain('ARCHON_ENCRYPTED_PASSPHRASE holds a different value');
+        });
+
+        it('always gives the operator a command to run', () => {
+            for (const advice of [wrongPassphraseAdvice(true, false), wrongPassphraseAdvice(false, false)]) {
+                expect(advice.join('\n')).toContain('docker compose config | grep ARCHON_PASSPHRASE');
+            }
+        });
     });
 
     // The old name still works, so the only thing to say is which name to

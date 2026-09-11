@@ -20,7 +20,7 @@ import { createAddressRouter } from './keymaster-address-router.js';
 import { createAgentRouter } from './keymaster-agent-router.js';
 import { createAssetRouter } from './keymaster-asset-router.js';
 import { createChallengeRouter } from './keymaster-challenge-router.js';
-import { checkAdminApiKey, checkPassphrase, createRequireAdminKey } from './keymaster-admin.js';
+import { checkAdminApiKey, checkPassphrase, wrongPassphraseAdvice, createRequireAdminKey } from './keymaster-admin.js';
 import { createCoreRouter } from './keymaster-core-router.js';
 import { createCredentialRouter } from './keymaster-credential-router.js';
 import { createDidCommRouter } from './keymaster-didcomm-router.js';
@@ -273,7 +273,7 @@ async function initWallet() {
 
 // Before the port is bound, so a misconfigured node never accepts a request at
 // all and the operator gets the reason rather than a stack trace.
-for (const check of [checkAdminApiKey(config.adminApiKey), checkPassphrase(config.keymasterPassphrase, config.passphraseFromOldName)]) {
+for (const check of [checkAdminApiKey(config.adminApiKey), checkPassphrase(config.keymasterPassphrase, config.passphraseFromOldName, config.passphraseShadowed)]) {
     if (check.fatal) {
         console.error(check.fatal);
         process.exit(1);
@@ -321,6 +321,14 @@ const server = app.listen(port, config.bindAddress, async () => {
     }
     catch (error) {
         if (!(error instanceof WalletNotFoundError)) {
+            // Said before the throw ends the process, because the throw names
+            // neither the value that failed nor where it came from.
+            if (error instanceof Error && error.message.includes('Incorrect passphrase')) {
+                for (const line of wrongPassphraseAdvice(config.passphraseShadowed, config.passphraseFromOldName)) {
+                    console.error(line);
+                }
+            }
+
             throw error;
         }
 

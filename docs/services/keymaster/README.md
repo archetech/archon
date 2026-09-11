@@ -1085,7 +1085,7 @@ labels.
 | `ARCHON_NODE_ID` | empty | Required. Name of the canonical agent ID this server provisions on startup. |
 | `ARCHON_KEYMASTER_DB` | `json` | Storage backend (`json`, `sqlite`, `redis`, `mongodb`). |
 | `ARCHON_PASSPHRASE` | empty | Wallet passphrase, and the credential `/login` checks. The same value the CLIs, the lightning scripts and the MCP server read. **Required** — the service refuses to start without it. |
-| `ARCHON_ENCRYPTED_PASSPHRASE` | empty | Older name for `ARCHON_PASSPHRASE`, still read. Set only one; the newer name wins. |
+| `ARCHON_ENCRYPTED_PASSPHRASE` | empty | Older name for `ARCHON_PASSPHRASE`, still read. Set only one; the newer name wins. Both set to different values is warned about at startup — see below. |
 | `ARCHON_WALLET_CACHE` | `false` | Enables the in-memory write-through cache. |
 | `ARCHON_DEFAULT_REGISTRY` | unset (uses `hyperswarm` in code) | Default registry for created DIDs. |
 | `ARCHON_KEYMASTER_UPLOAD_LIMIT` | `10mb` | Body cap for `/files`, `/images`, dmail attachments. |
@@ -1094,6 +1094,15 @@ labels.
 | `PBKDF2_ITERATIONS` | `100000` | Override PBKDF2 cost for `encryptWithPassphrase`. **Implementations MUST keep `100000` as the default to interop with existing wallets.** |
 
 ### 15.3 Startup sequence
+
+> **Where the value comes from.** Under Docker Compose, a variable exported in
+> the shell is substituted in preference to the same name in `.env`, so an
+> `export ARCHON_PASSPHRASE=` left in a shell profile displaces the value in the
+> file with nothing in either file changed — and the wallet then refuses to
+> decrypt. The service warns at startup when both names hold different values,
+> and prints the same guidance if the wallet fails to open. To see which value
+> won: `docker compose config | grep ARCHON_PASSPHRASE`. To ignore an export for
+> one run: `env -u ARCHON_PASSPHRASE docker compose up -d`.
 
 1. Validate `ARCHON_ADMIN_API_KEY` and `ARCHON_PASSPHRASE`; exit
    non-zero if either is unset (§2.2).

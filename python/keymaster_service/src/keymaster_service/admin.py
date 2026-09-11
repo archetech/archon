@@ -44,7 +44,9 @@ def check_admin_api_key(admin_api_key: str) -> StartupCheck:
     return StartupCheck()
 
 
-def check_passphrase(passphrase: str, from_old_name: bool = False) -> StartupCheck:
+def check_passphrase(
+    passphrase: str, from_old_name: bool = False, shadowed: bool = False
+) -> StartupCheck:
     """Validate ARCHON_PASSPHRASE at startup.
 
     Fail closed: the passphrase is both the wallet's encryption secret and the
@@ -64,6 +66,25 @@ def check_passphrase(passphrase: str, from_old_name: bool = False) -> StartupChe
             )
         )
 
+    # Both names set to different values means one of them is wrong, and
+    # nothing here can tell which. Worth saying out loud because the usual
+    # cause is invisible: ``docker compose`` substitutes an exported shell
+    # variable in preference to the same name in .env, so a stale export can
+    # displace a correct file without either being edited (#1121).
+    if shadowed:
+        return StartupCheck(
+            warning="\n".join(
+                [
+                    "Warning: ARCHON_PASSPHRASE and ARCHON_ENCRYPTED_PASSPHRASE hold "
+                    "different values, and the wallet is encrypted with only one of them.",
+                    "ARCHON_PASSPHRASE is the one in use. If the wallet does not open, an "
+                    "exported shell variable may be displacing the value in .env:",
+                    "  docker compose config | grep ARCHON_PASSPHRASE   # shows which value compose resolved",
+                    "  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run",
+                ]
+            )
+        )
+
     if from_old_name:
         return StartupCheck(
             warning=(
@@ -76,3 +97,30 @@ def check_passphrase(passphrase: str, from_old_name: bool = False) -> StartupChe
 
     return StartupCheck()
 
+
+def wrong_passphrase_advice(shadowed: bool, from_old_name: bool) -> list[str]:
+    """What to print when the stored wallet will not decrypt.
+
+    The failure names neither the value it tried nor where that value came
+    from, and the usual cause leaves no trace in any file: ``docker compose``
+    resolves ``${ARCHON_PASSPHRASE}`` from an exported shell variable in
+    preference to the same name in .env, so a stale export displaces a correct
+    file silently. An operator who does not remember exporting it has nothing
+    to go on (#1121).
+    """
+    source = "ARCHON_ENCRYPTED_PASSPHRASE" if from_old_name else "ARCHON_PASSPHRASE"
+    lines = [f"The wallet did not decrypt with {source}."]
+
+    if shadowed:
+        lines.append(
+            "ARCHON_ENCRYPTED_PASSPHRASE holds a different value; the wallet may be "
+            "encrypted with that one instead."
+        )
+
+    return [
+        *lines,
+        "A value exported in the shell takes precedence over the same name in .env, so a "
+        "leftover export can displace it without either file changing:",
+        "  docker compose config | grep ARCHON_PASSPHRASE   # shows which value compose resolved",
+        "  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run",
+    ]

@@ -8,6 +8,7 @@ from keymaster_service.admin import (
     MIN_ADMIN_API_KEY_LENGTH,
     check_admin_api_key,
     check_passphrase,
+    wrong_passphrase_advice,
 )
 
 
@@ -71,3 +72,38 @@ def test_secret_matches_handles_non_ascii_and_non_str():
     assert not _secret_matches(None, "secret")
     assert not _secret_matches(1234, "secret")
 
+
+def test_two_names_holding_different_values_are_flagged():
+    # Compose resolves ${ARCHON_PASSPHRASE} from an exported shell variable in
+    # preference to the same name in .env, so a leftover export displaces a
+    # correct file with nothing in either file changed. The wallet then refuses
+    # to decrypt and the operator has no trace to follow (#1121).
+    result = check_passphrase("from the shell", shadowed=True)
+
+    assert result.fatal is None
+    assert "different values" in (result.warning or "")
+    assert "docker compose config" in (result.warning or "")
+    assert "env -u ARCHON_PASSPHRASE" in (result.warning or "")
+
+
+def test_two_names_in_agreement_say_nothing():
+    assert check_passphrase("correct horse battery staple", shadowed=False).warning is None
+
+
+def test_advice_names_the_variable_that_failed():
+    assert "ARCHON_PASSPHRASE" in "\n".join(wrong_passphrase_advice(False, False))
+
+
+def test_advice_names_the_older_variable_when_it_is_the_one_in_use():
+    assert "ARCHON_ENCRYPTED_PASSPHRASE" in wrong_passphrase_advice(False, True)[0]
+
+
+def test_advice_points_at_the_other_value_when_both_are_set():
+    assert "ARCHON_ENCRYPTED_PASSPHRASE holds a different value" in "\n".join(
+        wrong_passphrase_advice(True, False)
+    )
+
+
+def test_advice_always_gives_a_command_to_run():
+    for advice in (wrong_passphrase_advice(True, False), wrong_passphrase_advice(False, False)):
+        assert "docker compose config | grep ARCHON_PASSPHRASE" in "\n".join(advice)

@@ -55,10 +55,26 @@ export function checkAdminApiKey(adminApiKey: string): StartupCheck {
  * The Keymaster constructor already rejects an empty passphrase, but it runs
  * inside the listen callback where the throw does not stop the server.
  */
-export function checkPassphrase(passphrase: string, fromOldName = false): StartupCheck {
+export function checkPassphrase(passphrase: string, fromOldName = false, shadowed = false): StartupCheck {
     if (!passphrase) {
         return {
             fatal: 'ARCHON_PASSPHRASE must be set — POST /login would otherwise return the admin API key without checking it. The older name ARCHON_ENCRYPTED_PASSPHRASE is read too.',
+        };
+    }
+
+    // Both names set to different values means one of them is wrong, and
+    // nothing here can tell which. Worth saying out loud because the usual
+    // cause is invisible: `docker compose` substitutes an exported shell
+    // variable in preference to the same name in .env, so a stale export can
+    // displace a correct file without either being edited (#1121).
+    if (shadowed) {
+        return {
+            warning: [
+                'Warning: ARCHON_PASSPHRASE and ARCHON_ENCRYPTED_PASSPHRASE hold different values, and the wallet is encrypted with only one of them.',
+                'ARCHON_PASSPHRASE is the one in use. If the wallet does not open, an exported shell variable may be displacing the value in .env:',
+                '  docker compose config | grep ARCHON_PASSPHRASE   # shows which value compose resolved',
+                '  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run',
+            ].join('\n'),
         };
     }
 
@@ -69,6 +85,34 @@ export function checkPassphrase(passphrase: string, fromOldName = false): Startu
     }
 
     return {};
+}
+
+/**
+ * What to print when the stored wallet will not decrypt.
+ *
+ * The failure names neither the value it tried nor where that value came from,
+ * and the usual cause leaves no trace in any file: `docker compose` resolves
+ * `${ARCHON_PASSPHRASE}` from an exported shell variable in preference to the
+ * same name in .env, so a stale export displaces a correct file silently. An
+ * operator who does not remember exporting it has nothing to go on (#1121).
+ */
+export function wrongPassphraseAdvice(shadowed: boolean, fromOldName: boolean): string[] {
+    const source = fromOldName ? 'ARCHON_ENCRYPTED_PASSPHRASE' : 'ARCHON_PASSPHRASE';
+
+    const lines = [
+        `The wallet did not decrypt with ${source}.`,
+    ];
+
+    if (shadowed) {
+        lines.push('ARCHON_ENCRYPTED_PASSPHRASE holds a different value; the wallet may be encrypted with that one instead.');
+    }
+
+    return [
+        ...lines,
+        'A value exported in the shell takes precedence over the same name in .env, so a leftover export can displace it without either file changing:',
+        '  docker compose config | grep ARCHON_PASSPHRASE   # shows which value compose resolved',
+        '  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run',
+    ];
 }
 
 // Admin API key middleware — every route mounted after it requires a matching
