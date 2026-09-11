@@ -469,7 +469,10 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError('proof.verificationMethod must be #key-1 for agent create');
         }
 
-        if (operation.registration.validUntil && !this.verifyDateFormat(operation.registration.validUntil)) {
+        // Every string reaches the parser, the empty one included. A truthiness
+        // guard would wave `""` through, where the Rust port reads the member
+        // with `as_str()` and rejects it.
+        if (typeof operation.registration.validUntil === 'string' && !this.verifyDateFormat(operation.registration.validUntil)) {
             throw new InvalidOperationError(`registration.validUntil=${operation.registration.validUntil}`);
         }
 

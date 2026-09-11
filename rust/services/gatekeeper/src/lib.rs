@@ -417,6 +417,43 @@ mod tests {
         );
     }
 
+    // registration.validUntil is checked before the signature is, so the signed
+    // vector can carry a bad value without being re-signed. Adding the member
+    // does invalidate the signature, so a value that passes the check returns
+    // Ok(false) rather than Ok(true) -- what is under test is which error is
+    // raised, not the verdict.
+    #[tokio::test]
+    async fn verify_create_operation_checks_every_string_valid_until() {
+        async fn error_for(valid_until: Value) -> Option<String> {
+            let (db, _temp_dir) = temp_json_db();
+            let (state, _dir) = make_state(db);
+            let mut operation = proof_vectors()["agentCreateValid"]["operation"].clone();
+            operation["registration"]["validUntil"] = valid_until;
+
+            verify_create_operation_impl(&state, &operation)
+                .await
+                .err()
+                .map(|error| error.to_string())
+        }
+
+        assert_eq!(error_for(json!("2026-12-31T00:00:00Z")).await, None);
+
+        // The TypeScript port must not wave the empty string through on a
+        // truthiness check; `as_str()` yields Some("") here and rejects it.
+        for rejected in [json!("2026-12-31"), json!("")] {
+            let message = error_for(rejected.clone())
+                .await
+                .unwrap_or_else(|| panic!("{rejected} should be rejected"));
+            assert!(
+                message.contains("registration.validUntil"),
+                "{rejected} raised {message}"
+            );
+        }
+
+        // `as_str()` yields None for a non-string, which is skipped.
+        assert_eq!(error_for(Value::Null).await, None);
+    }
+
     #[test]
     fn verify_proof_format_accepts_valid_and_rejects_invalid_vectors() {
         let vectors: Value = serde_json::from_str(include_str!(
