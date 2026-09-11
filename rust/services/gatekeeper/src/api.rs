@@ -681,12 +681,15 @@ pub(crate) async fn import_batch_by_cids(
     for (index, cid) in cids.iter().filter_map(Value::as_str).enumerate() {
         let mut operation = {
             let store = state.store.lock().await;
-            store.get_operation(cid)
+            store.get_operation(cid).filter(is_operation)
         };
 
         if operation.is_none() {
             operation = fetch_ipfs_json(&state, cid).await;
-            if let Some(op) = operation.as_ref() {
+            // Still imported when it is not an operation, so the caller still
+            // sees it counted as rejected -- it just never enters the store,
+            // where it would answer for this CID forever.
+            if let Some(op) = operation.as_ref().filter(|value| is_operation(value)) {
                 let mut store = state.store.lock().await;
                 if let Err(error) = store.add_operation(cid, op.clone()) {
                     error!("failed to persist imported operation {cid}: {error}");
@@ -2216,6 +2219,18 @@ async fn fetch_ipfs_json(state: &AppState, cid: &str) -> Option<Value> {
     let response = proxy_ipfs_cat_raw(state, cid).await.ok()?;
     let (_status, body) = response;
     serde_json::from_slice::<Value>(&body).ok()
+}
+
+// An IPFS read returns whatever is stored at a CID, and a gateway error document
+// deserializes like any other JSON. Checked on the way out of the operation
+// store as well as into it, so a value cached before this existed is treated as
+// a miss and fetched again rather than pinning that CID to something that can
+// never import.
+pub(crate) fn is_operation(value: &Value) -> bool {
+    matches!(
+        value.get("type").and_then(Value::as_str),
+        Some("create" | "update" | "delete")
+    )
 }
 
 pub(crate) fn is_valid_registry(registry: &str) -> bool {

@@ -4,6 +4,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import MemoryClient from '@didcid/ipfs/memory';
 import TestHelper from './helper.ts';
+import { Operation } from '@didcid/clients/gatekeeper-types';
 
 const mockConsole = {
     log: (): void => { },
@@ -137,6 +138,48 @@ describe('importBatchByCids', () => {
 
         expect(result.queued).toBe(1);
         expect(result.rejected).toBe(0);
+    });
+
+    // {"Message": "unknown node type", "Code": 0, "Type": "error"} was found in
+    // the operation store of a live node, cached from an IPFS read.
+    const notAnOperation = { Message: 'unknown node type', Code: 0, Type: 'error' };
+
+    it('should not cache a CID whose content is not an operation', async () => {
+        const cid = await ipfs.addJSON(notAnOperation);
+
+        const metadata = {
+            registry: 'hyperswarm',
+            time: new Date().toISOString(),
+            ordinal: [100, 1],
+        };
+
+        const result = await gatekeeper.importBatchByCids([cid], metadata);
+
+        // Still reported, as it was before: what changes is that it does not
+        // become this CID's answer for good.
+        expect(result.rejected).toBe(1);
+        expect(await db.getOperation(cid)).toBe(null);
+    });
+
+    it('should refetch a CID whose cached value is not an operation', async () => {
+        const keypair = cipher.generateRandomJwk();
+        const agentOp = await helper.createAgentOp(keypair, { registry: 'hyperswarm' });
+        const cid = await ipfs.addJSON(agentOp);
+
+        // What a node poisoned before the check looks like: the real operation
+        // is retrievable, but the store answers first.
+        await db.addOperation(cid, notAnOperation as unknown as Operation);
+
+        const metadata = {
+            registry: 'hyperswarm',
+            time: new Date().toISOString(),
+            ordinal: [100, 1],
+        };
+
+        const result = await gatekeeper.importBatchByCids([cid], metadata);
+
+        expect(result.queued).toBe(1);
+        expect(await db.getOperation(cid)).toStrictEqual(agentOp);
     });
 
     it('should import multiple operations by CIDs', async () => {

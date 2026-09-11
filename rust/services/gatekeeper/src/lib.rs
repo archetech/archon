@@ -40,6 +40,7 @@ pub(crate) use store::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::is_operation;
     use crate::proofs::{canonical_json, verify_proof_format};
     use crate::store::{
         compare_ordinals, hydrate_redis_event, redis_event_to_stored_value, DbBackend, JsonDbFile,
@@ -452,6 +453,26 @@ mod tests {
 
         // `as_str()` yields None for a non-string, which is skipped.
         assert_eq!(error_for(Value::Null).await, None);
+    }
+
+    #[test]
+    fn is_operation_rejects_what_ipfs_can_return_instead_of_an_operation() {
+        let vectors = proof_vectors();
+
+        assert!(is_operation(&vectors["agentCreateValid"]["operation"]));
+        assert!(is_operation(&json!({"type": "update"})));
+        assert!(is_operation(&json!({"type": "delete"})));
+
+        // Found in the operation store of a live node, cached from an IPFS
+        // read: a gateway error document, which deserializes like any other
+        // JSON.
+        assert!(!is_operation(
+            &json!({"Message": "unknown node type", "Code": 0, "Type": "error"})
+        ));
+        assert!(!is_operation(&json!({"type": "something-else"})));
+        assert!(!is_operation(&json!({})));
+        assert!(!is_operation(&Value::Null));
+        assert!(!is_operation(&json!("a string")));
     }
 
     #[test]
