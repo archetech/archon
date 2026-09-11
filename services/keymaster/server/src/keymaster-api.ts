@@ -321,7 +321,7 @@ const server = app.listen(port, config.bindAddress, async () => {
     }
     catch (error) {
         if (!(error instanceof WalletNotFoundError)) {
-            // Said before the throw ends the process, because the throw names
+            // Printed before the throw ends the process: the error names
             // neither the value that failed nor where it came from.
             if (error instanceof Error && error.message.includes('Incorrect passphrase')) {
                 for (const line of wrongPassphraseAdvice(config.passphraseShadowed, config.passphraseFromOldName)) {

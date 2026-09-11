@@ -63,8 +63,8 @@ class KeymasterService:
             await self.keymaster.new_wallet()
             wallets_created_total.inc()
         except KeymasterError as error:
-            # Said before the failure ends startup, because it names neither
-            # the value that failed nor where it came from.
+            # Printed before the failure ends startup: the error names
+            # neither the value that failed nor where it came from.
             if "Incorrect passphrase" in str(error):
                 for line in wrong_passphrase_advice(
                     self.settings.passphrase_shadowed,
