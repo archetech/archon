@@ -1264,7 +1264,9 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async verifyEvent(event: GatekeeperEvent): Promise<boolean> {
-        if (!event.registry || !event.time || !event.operation) {
+        // The registry name is validated, not merely present: the Rust port
+        // checks it here, so a truthiness test would admit an event it refuses.
+        if (!isValidRegistryName(event.registry) || !event.time || !event.operation) {
             return false;
         }
 

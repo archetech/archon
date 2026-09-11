@@ -78,7 +78,10 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
     };
     match op_type {
         "create" => {
-            operation.get("created").and_then(Value::as_str).is_some()
+            operation
+                .get("created")
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.is_empty())
                 && operation.get("registration").is_some()
                 && operation
                     .get("registration")
@@ -203,7 +206,10 @@ pub(crate) fn verify_proof_format(proof: Option<&Value>) -> bool {
     if !did.is_empty() && !verify_did_format(did) {
         return false;
     }
-    proof.get("proofValue").and_then(Value::as_str).is_some()
+    proof
+        .get("proofValue")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.is_empty())
 }
 
 fn value_without_proof(value: &Value) -> Value {
@@ -600,5 +606,67 @@ mod timestamp_vectors {
     #[test]
     fn rejects_a_missing_timestamp() {
         assert!(!verify_date_format(None));
+    }
+}
+
+#[cfg(test)]
+mod event_shape_vectors {
+    use super::verify_event_shape;
+    use serde_json::Value;
+
+    // The TypeScript port checks the same file, so a change here has to be made
+    // in both ports or one of the two suites fails.
+    #[test]
+    fn matches_the_shared_vectors() {
+        let proofs: Value =
+            serde_json::from_str(include_str!("../../../../tests/gatekeeper/proof-vectors.json"))
+                .expect("proof-vectors.json");
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/event-shape-vectors.json"
+        ))
+        .expect("event-shape-vectors.json");
+
+        let vectors = fixture["vectors"].as_array().expect("vectors");
+        assert!(!vectors.is_empty());
+
+        for vector in vectors {
+            let base = fixture["bases"][vector["base"].as_str().expect("base")]
+                .as_str()
+                .expect("base name");
+
+            let mut event = fixture["event"].clone();
+            event["operation"] = proofs[base]["operation"].clone();
+
+            let path: Vec<&str> = vector["path"]
+                .as_array()
+                .expect("path")
+                .iter()
+                .map(|segment| segment.as_str().expect("segment"))
+                .collect();
+
+            if let Some((last, parents)) = path.split_last() {
+                let mut node = &mut event;
+
+                for key in parents {
+                    node = node.get_mut(key).expect("path segment");
+                }
+
+                if vector.get("delete").and_then(Value::as_bool).unwrap_or(false) {
+                    node.as_object_mut().expect("object").remove(*last);
+                } else {
+                    node[*last] = vector["value"].clone();
+                }
+            }
+
+            let expected = vector["valid"].as_bool().expect("valid");
+            let name = vector["name"].as_str().unwrap_or("");
+            let note = vector["note"].as_str().unwrap_or("");
+
+            assert_eq!(
+                verify_event_shape(&event),
+                expected,
+                "{name} should be {expected} ({note})"
+            );
+        }
     }
 }

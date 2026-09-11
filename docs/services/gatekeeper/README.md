@@ -546,6 +546,19 @@ space separator in place of `T`, a lowercase `t` or `z`, a leap second at
 `:60`, and an unbounded fraction. Rejected are a missing offset, a bare date, a
 signed or expanded year, surrounding whitespace, and any calendar-invalid date.
 
+### 5.7 Field presence
+
+A field is present when it is a string, not when it is truthy. The two differ on
+the empty string, and a port that treats `""` as absent skips a check its peer
+applies — admitting an operation the other refuses, which leaves the two holding
+different histories for the same DID. `registration.validUntil`, `proof.created`
+on a create operation and `proof.proofValue` have each diverged this way.
+
+An event's `registry` is validated as a name, not merely tested for presence.
+
+`tests/gatekeeper/event-shape-vectors.json` pins the verdict both ports MUST
+reach for each mutation of a valid event, and both run it as a test.
+
 ## 6. DID resolution algorithm
 
 ```
@@ -1243,7 +1256,7 @@ timestamps and container labels.
 
 ## 16. Test fixtures
 
-Six shared JSON fixtures drive cross-language conformance:
+Seven shared JSON fixtures drive cross-language conformance:
 
 | File | Purpose |
 | --- | --- |
@@ -1253,6 +1266,7 @@ Six shared JSON fixtures drive cross-language conformance:
 | [tests/gatekeeper/api-parity-flows.json](../../../tests/gatekeeper/api-parity-flows.json) | Stateful flows (create + resolve + export + import + queue + block + IPFS round-trips). |
 | [tests/gatekeeper/metrics-parity.json](../../../tests/gatekeeper/metrics-parity.json) | Required metric names + route normalization expectations. |
 | [tests/gatekeeper/timestamp-vectors.json](../../../tests/gatekeeper/timestamp-vectors.json) | The RFC 3339 grammar every validated timestamp MUST satisfy — see [§5.6](#56-timestamp-grammar). |
+| [tests/gatekeeper/event-shape-vectors.json](../../../tests/gatekeeper/event-shape-vectors.json) | Event shapes both ports MUST agree to accept or reject, mutation by mutation. |
 
 The script [scripts/gatekeeper-parity.mjs](../../../scripts/gatekeeper-parity.mjs)
 replays every fixture and flow against two running implementations and diffs
