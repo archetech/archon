@@ -326,8 +326,11 @@ No `/ready`, no CORS, no admin auth. No public client-facing routes.
    (one-time upgrade path).
 4. If `ARCHON_SAT_REIMPORT=true`, clear per-item import state.
 5. Wait for bitcoind to answer `getblockchaininfo`.
-6. In export mode, wait for the satoshi-wallet `/api/v1/wallet/balance`
-   to respond, then log the balance + funding address.
+6. In export mode, wait for the satoshi-wallet to answer **both**
+   `/api/v1/wallet/balance` and `/api/v1/wallet/address`, then log the
+   balance + funding address. The address route is the readiness signal:
+   the balance route reads from bitcoind and answers whether or not the
+   wallet's own setup has succeeded.
 7. Connect to Gatekeeper + Keymaster (`waitUntilReady=true`).
 8. Start the metrics HTTP server.
 9. `syncBlocks()` — push every scanned block from `startBlock` up to

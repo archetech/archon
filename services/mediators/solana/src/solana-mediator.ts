@@ -9,6 +9,7 @@ import config from './config.js';
 import { planAnchor } from './batch.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem } from './types.js';
+import { waitForWallet } from './wallet-wait.js';
 import { DidRegistration } from '@didcid/gatekeeper/types';
 import express from 'express';
 import { readFile } from 'fs/promises';
@@ -1138,17 +1139,13 @@ async function waitForChain() {
     }
 
     console.log(`Connecting to wallet service at ${config.walletURL}`);
-    while (true) {
-        try {
-            await walletGetBalance();
-            break;
-        } catch {
-            console.log('Waiting for wallet service...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-    }
-    const { balance } = await walletGetBalance();
-    const address = await walletGetAddress();
+    const { balance, address } = await waitForWallet(
+        walletGetBalance,
+        walletGetAddress,
+        () => console.log('Waiting for wallet service...'),
+        ms => new Promise(resolve => setTimeout(resolve, ms)),
+    );
+
     console.log(`Wallet balance: ${balance}, funding address: ${address}`);
 
     return true;

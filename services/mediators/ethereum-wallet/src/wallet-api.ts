@@ -184,6 +184,45 @@ async function main() {
     }
     walletSetupStatus.set(walletReady ? 1 : 0);
 
+    // Keymaster being slow to start is the ordinary reason setup runs out of
+    // attempts, and a chain mediator waits on this wallet to serve an address.
+    // Without a retry after startup the wallet stays unusable until somebody
+    // restarts it, long after the condition that caused it has cleared.
+    if (!walletReady) {
+        let retrying = false;
+
+        const retry = setInterval(async () => {
+            if (retrying) {
+                return;
+            }
+
+            retrying = true;
+
+            try {
+                const wallet = await getConnectedWallet(provider);
+                const network = await provider.getNetwork();
+
+                if (Number(network.chainId) !== config.chainId) {
+                    throw new Error(`RPC chain ID ${network.chainId} does not match configured chain ID ${config.chainId}`);
+                }
+
+                logger.info({ address: wallet.address, network: config.network, chainId: config.chainId }, 'Ethereum wallet ready');
+                walletReady = true;
+                walletSetupStatus.set(1);
+                clearInterval(retry);
+            }
+            catch (error: any) {
+                logger.debug({ err: error }, 'Wallet setup still failing');
+            }
+            finally {
+                retrying = false;
+            }
+        }, 30000);
+
+        retry.unref();
+    }
+
+
     async function updateMetrics() {
         try {
             const wallet = await getConnectedWallet(provider);

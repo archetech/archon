@@ -176,8 +176,10 @@ async function main() {
 
     // Auto-setup: create watch-only wallet on startup
     const maxRetries = 12;
+    const retryIntervalMs = 30000;
     let walletReady = false;
     let descriptorMismatch: string | undefined;
+    let unrecoverable = false;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const mnemonic = await fetchMnemonic();
@@ -192,6 +194,7 @@ async function main() {
             if (error.name === 'DescriptorMismatchError') {
                 logger.error(`Watch-only wallet does not match the current mnemonic: ${error.message}`);
                 descriptorMismatch = error.message;
+                unrecoverable = true;
                 break;
             }
 
@@ -199,6 +202,7 @@ async function main() {
             if (error.message?.includes('sqlite')) {
                 logger.error(`Bitcoin node does not support descriptor wallets: ${error.message}`);
                 logger.error('Upgrade Bitcoin Core to a build with sqlite support');
+                unrecoverable = true;
                 break;
             }
             if (attempt === maxRetries) {
@@ -214,6 +218,48 @@ async function main() {
     }
 
     walletSetupStatus.set(walletReady ? 1 : 0);
+
+    // Keymaster being slow to start is the ordinary reason setup runs out of
+    // attempts, and a chain mediator waits on this wallet to serve an address.
+    // Without a retry after startup the wallet stays unusable until somebody
+    // restarts it, long after the condition that caused it has cleared. A
+    // refusal is different: it is a decision, and repeating it would not
+    // change the answer.
+    if (!walletReady && !unrecoverable) {
+        let retrying = false;
+
+        const retry = setInterval(async () => {
+            if (retrying) {
+                return;
+            }
+
+            retrying = true;
+
+            try {
+                const mnemonic = await fetchMnemonic();
+                const result = await setupWatchOnlyWallet(btcClient, mnemonic, config.network);
+                logger.info({ ...result }, 'Watch-only wallet ready');
+                walletReady = true;
+                walletSetupStatus.set(1);
+                clearInterval(retry);
+            }
+            catch (error: any) {
+                if (error.name === 'DescriptorMismatchError') {
+                    logger.error(`Watch-only wallet does not match the current mnemonic: ${error.message}`);
+                    descriptorMismatch = error.message;
+                    clearInterval(retry);
+                    return;
+                }
+
+                logger.debug({ err: error }, 'Watch-only wallet setup still failing');
+            }
+            finally {
+                retrying = false;
+            }
+        }, retryIntervalMs);
+
+        retry.unref();
+    }
 
     // Periodic metrics collection (every 60s)
     async function updateMetrics() {

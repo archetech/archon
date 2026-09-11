@@ -16,6 +16,7 @@ import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
 import axios from 'axios';
 import { planScanStart, type ChainReader } from './reorg.js';
+import { waitForWallet } from './wallet-wait.js';
 
 const REGISTRY = config.chain;
 
@@ -905,17 +906,13 @@ async function waitForChain() {
     }
 
     console.log(`Connecting to wallet service at ${config.walletURL}`);
-    while (true) {
-        try {
-            await walletGetBalance();
-            break;
-        } catch (error) {
-            console.log(`Waiting for wallet service...`);
-            await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-    }
-    const { balance } = await walletGetBalance();
-    const address = await walletGetAddress();
+    const { balance, address } = await waitForWallet(
+        walletGetBalance,
+        walletGetAddress,
+        () => console.log(`Waiting for wallet service...`),
+        ms => new Promise(resolve => setTimeout(resolve, ms)),
+    );
+
     console.log(`Wallet balance: ${balance}, funding address: ${address}`);
 
     return true;
