@@ -679,16 +679,20 @@ pub(crate) async fn import_batch_by_cids(
 
     let mut batch = Vec::new();
     for (index, cid) in cids.iter().filter_map(Value::as_str).enumerate() {
-        let mut operation = {
+        let cached = {
             let store = state.store.lock().await;
-            store.get_operation(cid).filter(is_operation)
+            store.get_operation(cid)
         };
 
-        if operation.is_none() {
-            operation = fetch_ipfs_json(&state, cid).await;
-            // A non-operation is imported anyway and counted as rejected for
-            // the caller. What it must not do is enter the store.
-            if let Some(op) = operation.as_ref().filter(|value| is_operation(value)) {
+        let fetched = match cached_operation(&cached) {
+            Some(_) => None,
+            None => fetch_ipfs_json(&state, cid).await,
+        };
+
+        let (operation, persist) = resolve_cid_operation(cached, fetched);
+
+        if persist {
+            if let Some(op) = operation.as_ref() {
                 let mut store = state.store.lock().await;
                 if let Err(error) = store.add_operation(cid, op.clone()) {
                     error!("failed to persist imported operation {cid}: {error}");
@@ -2218,6 +2222,28 @@ async fn fetch_ipfs_json(state: &AppState, cid: &str) -> Option<Value> {
     let response = proxy_ipfs_cat_raw(state, cid).await.ok()?;
     let (_status, body) = response;
     serde_json::from_slice::<Value>(&body).ok()
+}
+
+// The value a CID resolves to, and whether it belongs in the operation store.
+//
+// A cached value is used only when it is an operation, so an entry that is not
+// one is a miss and the fetched value stands in its place. A fetched value is
+// returned whatever it is, so a non-operation is imported and counted as
+// rejected for the caller; only an operation is written back.
+pub(crate) fn resolve_cid_operation(
+    cached: Option<Value>,
+    fetched: Option<Value>,
+) -> (Option<Value>, bool) {
+    if cached_operation(&cached).is_some() {
+        return (cached, false);
+    }
+
+    let persist = cached_operation(&fetched).is_some();
+    (fetched, persist)
+}
+
+pub(crate) fn cached_operation(value: &Option<Value>) -> Option<&Value> {
+    value.as_ref().filter(|value| is_operation(value))
 }
 
 // An IPFS read returns whatever is stored at a CID, and a gateway error document
