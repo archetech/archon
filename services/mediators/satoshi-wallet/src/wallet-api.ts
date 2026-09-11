@@ -180,6 +180,7 @@ async function main() {
     let walletReady = false;
     let descriptorMismatch: string | undefined;
     let unrecoverable = false;
+    let metricsStarted = false;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const mnemonic = await fetchMnemonic();
@@ -241,12 +242,20 @@ async function main() {
                 logger.info({ ...result }, 'Watch-only wallet ready');
                 walletReady = true;
                 walletSetupStatus.set(1);
+                startMetrics();
                 clearInterval(retry);
             }
             catch (error: any) {
                 if (error.name === 'DescriptorMismatchError') {
                     logger.error(`Watch-only wallet does not match the current mnemonic: ${error.message}`);
                     descriptorMismatch = error.message;
+                    clearInterval(retry);
+                    return;
+                }
+
+                if (error.message?.includes('sqlite')) {
+                    logger.error(`Bitcoin node does not support descriptor wallets: ${error.message}`);
+                    logger.error('Upgrade Bitcoin Core to a build with sqlite support');
                     clearInterval(retry);
                     return;
                 }
@@ -288,7 +297,6 @@ async function main() {
     // Recovery through /wallet/setup can make the wallet ready long after
     // startup gave up, so the collector starts once and skips its work until
     // there is a wallet to measure, rather than being wired to that moment.
-    let metricsStarted = false;
 
     function startMetrics() {
         if (metricsStarted) {

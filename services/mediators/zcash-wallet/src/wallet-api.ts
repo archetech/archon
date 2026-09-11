@@ -163,6 +163,7 @@ async function main() {
 
     const maxRetries = 12;
     let walletReady = false;
+    let metricsStarted = false;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const mnemonic = await fetchMnemonic();
@@ -204,6 +205,7 @@ async function main() {
                 logger.info({ ...result }, 'Transparent Zcash wallet ready');
                 walletReady = true;
                 walletSetupStatus.set(1);
+                startMetrics();
                 clearInterval(retry);
             }
             catch (error: any) {
@@ -240,9 +242,18 @@ async function main() {
         }
     }
 
-    if (walletReady) {
+    function startMetrics() {
+        if (metricsStarted) {
+            return;
+        }
+
+        metricsStarted = true;
         updateMetrics();
         setInterval(updateMetrics, 60_000);
+    }
+
+    if (walletReady) {
+        startMetrics();
     }
 
     v1router.get('/wallet/version', (_req, res) => {
@@ -254,6 +265,12 @@ async function main() {
             const mnemonic = await fetchMnemonic();
             const result = await setupTransparentWallet(zecClient, mnemonic, config.network);
             walletSetupStatus.set(1);
+            // An operator repairing the wallet by hand reaches readiness through
+            // this route, so it carries the same transition as the other two:
+            // the address route stays refused and the gauges stay stale
+            // otherwise.
+            walletReady = true;
+            startMetrics();
             res.json({ ok: true, network: config.network, ...result });
         } catch (error: any) {
             logger.error({ err: error }, 'Wallet setup failed');

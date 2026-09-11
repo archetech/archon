@@ -177,6 +177,7 @@ async function main() {
     });
 
     let walletReady = false;
+    let metricsStarted = false;
     for (let attempt = 1; attempt <= 12; attempt++) {
         try {
             const keypair = await getKeypair();
@@ -215,6 +216,7 @@ async function main() {
                 logger.info({ address: keypair.publicKey.toBase58(), network: config.network }, 'Solana wallet ready');
                 walletReady = true;
                 walletSetupStatus.set(1);
+                startMetrics();
                 clearInterval(retry);
             }
             catch (error: any) {
@@ -243,9 +245,18 @@ async function main() {
         }
     }
 
-    if (walletReady) {
+    function startMetrics() {
+        if (metricsStarted) {
+            return;
+        }
+
+        metricsStarted = true;
         updateMetrics();
         setInterval(updateMetrics, 60_000);
+    }
+
+    if (walletReady) {
+        startMetrics();
     }
 
     v1router.get('/wallet/version', (_req, res) => {
@@ -256,6 +267,12 @@ async function main() {
         try {
             const keypair = await getKeypair();
             walletSetupStatus.set(1);
+            // An operator repairing the wallet by hand reaches readiness through
+            // this route, so it carries the same transition as the other two:
+            // the address route stays refused and the gauges stay stale
+            // otherwise.
+            walletReady = true;
+            startMetrics();
             res.json({ ok: true, address: keypair.publicKey.toBase58(), network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Wallet setup failed');

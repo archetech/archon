@@ -116,6 +116,38 @@ async function main(): Promise<void> {
     }
     walletSetupStatus.set(walletReady ? 1 : 0);
 
+    // Keymaster being slow to start is the ordinary reason setup runs out of
+    // attempts. Without a retry after startup the wallet stays unusable until
+    // somebody restarts it, long after the condition that caused it has cleared.
+    if (!walletReady) {
+        let retrying = false;
+
+        const retry = setInterval(async () => {
+            if (retrying) {
+                return;
+            }
+
+            retrying = true;
+
+            try {
+                const mnemonic = await fetchMnemonic();
+                const address = configureWallet(mnemonic);
+                logger.info({ address, network: config.network, derivationPath: config.derivationPath }, 'Filecoin wallet ready');
+                walletReady = true;
+                walletSetupStatus.set(1);
+                clearInterval(retry);
+            }
+            catch (error: any) {
+                logger.debug({ err: error }, 'Wallet setup still failing');
+            }
+            finally {
+                retrying = false;
+            }
+        }, 30000);
+
+        retry.unref();
+    }
+
     v1router.get('/wallet/version', (_req, res) => {
         res.json({
             version: serviceVersion,
